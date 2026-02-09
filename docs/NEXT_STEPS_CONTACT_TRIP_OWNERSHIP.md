@@ -1,6 +1,6 @@
 # Next Steps: Contact & Trip Ownership Management
 
-## Implementation Status: Phases 1-4 Complete ✅
+## Implementation Status: Phases 1-4 Complete ✅, Phase 6 Partial ✅
 
 ### Phase 1 - Completed Features:
 - ✅ Database migration with `inbound` status, nullable `owner_id`, `contact_shares` and `trip_shares` tables
@@ -69,19 +69,25 @@
 
 ## Phase 6: Testing (Required Before Production)
 
-### Unit Tests
-- [ ] `ContactAccessService` - all access level scenarios
-- [ ] `contact-shares.service.ts` - CRUD operations
-- [ ] `trip-shares.service.ts` - CRUD operations
-- [ ] Snapshot filtering in `trip-travelers.service.ts`
+### Unit Tests (Complete ✅)
+- [x] `ContactAccessService` - all access level scenarios (21 tests)
+- [x] `TripAccessService` - all access level scenarios (23 tests)
+- [x] `UserValidationService` - user validation scenarios (16 tests)
+- [x] `CreateContactShareDto` / `UpdateContactShareDto` - validation (17 tests)
+- [x] `CreateTripShareDto` / `UpdateTripShareDto` - validation (18 tests)
 
-### Integration Tests
+**Total: 95 unit tests passing**
+
+### Integration Tests (TODO)
 - [ ] Contact visibility with shares
-- [ ] Trip access with shares (after Phase 2)
-- [ ] Owner reassignment validation (after Phase 3)
+- [ ] Trip access with shares
+- [ ] Owner reassignment validation
 - [ ] Cross-agency share prevention
+- [ ] contact-shares.service.ts CRUD operations
+- [ ] trip-shares.service.ts CRUD operations
+- [ ] Snapshot filtering in trip-travelers.service.ts
 
-### E2E Tests
+### E2E Tests (TODO)
 - [ ] Agent A creates contact, Agent B sees basic fields only
 - [ ] Agent A shares with full access, Agent B sees all fields
 - [ ] Admin creates inbound trip with no owner
