@@ -112,6 +112,19 @@ export class ActivitiesService {
   }
 
   /**
+   * Verify the user has access to a trip directly by tripId
+   * @throws ForbiddenException if access denied
+   */
+  async verifyTripAccessFromTripId(tripId: string, auth: AuthContext, writeRequired = false): Promise<string> {
+    if (writeRequired) {
+      await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    } else {
+      await this.tripAccessService.verifyReadAccess(tripId, auth)
+    }
+    return tripId
+  }
+
+  /**
    * Get all activities with optional filtering
    */
   async findAll(filters: ActivityFilterDto = {}): Promise<ActivityResponseDto[]> {

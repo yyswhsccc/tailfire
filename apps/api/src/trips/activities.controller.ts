@@ -235,6 +235,8 @@ export class ActivitiesController {
  * Global Activities Controller
  * For querying activities across all days with filters
  * Also handles package-related operations (children, travelers)
+ *
+ * Access control: All endpoints verify trip access via ActivitiesService.
  */
 @ApiTags('Activities')
 @Controller('activities')
@@ -247,9 +249,22 @@ export class ActivitiesGlobalController {
   /**
    * Get all activities with optional filtering
    * GET /activities?itineraryDayId=xxx&activityType=lodging&status=confirmed
+   *
+   * Access check: Requires dayId or tripId filter for access verification.
+   * Without a filter, returns empty array (no cross-trip queries allowed).
    */
   @Get()
-  async findAll(@Query() filters: ActivityFilterDto): Promise<ActivityResponseDto[]> {
+  async findAll(
+    @GetAuthContext() auth: AuthContext,
+    @Query() filters: ActivityFilterDto,
+  ): Promise<ActivityResponseDto[]> {
+    // Require itineraryDayId filter for access control - no cross-trip queries allowed
+    if (filters.itineraryDayId) {
+      await this.activitiesService.verifyTripAccessFromDayId(filters.itineraryDayId, auth)
+    } else {
+      // No scope filter provided - return empty to prevent cross-trip data leakage
+      return []
+    }
     return this.activitiesService.findAll(filters)
   }
 
@@ -259,14 +274,25 @@ export class ActivitiesGlobalController {
    *
    * Used for creating packages that are not associated with a specific day.
    * Packages can be "floating" and link activities from multiple days.
+   *
+   * Access check: User must have write access to the trip (via dayId or tripId).
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(zodValidation(createActivityDtoSchema))
   async create(
+    @GetAuthContext() auth: AuthContext,
     @Body() dto: CreateActivityDto,
     @Req() req: Request
   ): Promise<ActivityResponseDto | PackageResponseDto> {
+    // Verify write access via dayId or tripId
+    if (dto.itineraryDayId) {
+      await this.activitiesService.verifyTripAccessFromDayId(dto.itineraryDayId, auth, true)
+    } else if (dto.tripId) {
+      await this.activitiesService.verifyTripAccessFromTripId(dto.tripId, auth, true)
+    } else {
+      throw new BadRequestException('Either itineraryDayId or tripId is required')
+    }
     // Pass tripId for floating packages that need it for agency resolution
     const result = await this.activitiesService.create(dto, getActorId(req), dto.tripId ?? undefined)
     // For packages, return full response with all related data
@@ -440,11 +466,16 @@ export class ActivitiesGlobalController {
  * Handles type-safe create/update with activity-specific details.
  *
  * Routes under /activities/* for type-specific operations.
+ *
+ * Access control: All endpoints verify trip access via ActivitiesService.
  */
 @ApiTags('Activities')
 @Controller('activities')
 export class TypedActivitiesController {
-  constructor(private readonly orchestrationService: ComponentOrchestrationService) {}
+  constructor(
+    private readonly orchestrationService: ComponentOrchestrationService,
+    private readonly activitiesService: ActivitiesService,
+  ) {}
 
   // ============================================================================
   // Flight Activity Endpoints
@@ -457,7 +488,14 @@ export class TypedActivitiesController {
   @Post('flights')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(zodValidation(createFlightComponentDtoSchema))
-  async createFlight(@Body() dto: CreateFlightComponentDto): Promise<FlightComponentDto> {
+  async createFlight(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: CreateFlightComponentDto,
+  ): Promise<FlightComponentDto> {
+    if (!dto.itineraryDayId) {
+      throw new BadRequestException('itineraryDayId is required')
+    }
+    await this.activitiesService.verifyTripAccessFromDayId(dto.itineraryDayId, auth, true)
     return this.orchestrationService.createFlight(dto)
   }
 
@@ -466,7 +504,11 @@ export class TypedActivitiesController {
    * GET /activities/flights/:id
    */
   @Get('flights/:id')
-  async getFlight(@Param('id') id: string): Promise<FlightComponentDto> {
+  async getFlight(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<FlightComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.orchestrationService.getFlight(id)
   }
 
@@ -477,9 +519,11 @@ export class TypedActivitiesController {
   @Patch('flights/:id')
   @UsePipes(zodValidation(updateFlightComponentDtoSchema))
   async updateFlight(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdateFlightComponentDto
   ): Promise<FlightComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.orchestrationService.updateFlight(id, dto)
   }
 
@@ -489,7 +533,11 @@ export class TypedActivitiesController {
    */
   @Delete('flights/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteFlight(@Param('id') id: string): Promise<void> {
+  async deleteFlight(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     await this.orchestrationService.deleteFlight(id)
   }
 
@@ -504,7 +552,14 @@ export class TypedActivitiesController {
   @Post('lodging')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(zodValidation(createLodgingComponentDtoSchema))
-  async createLodging(@Body() dto: CreateLodgingComponentDto): Promise<LodgingComponentDto> {
+  async createLodging(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: CreateLodgingComponentDto,
+  ): Promise<LodgingComponentDto> {
+    if (!dto.itineraryDayId) {
+      throw new BadRequestException('itineraryDayId is required')
+    }
+    await this.activitiesService.verifyTripAccessFromDayId(dto.itineraryDayId, auth, true)
     return this.orchestrationService.createLodging(dto)
   }
 
@@ -513,7 +568,11 @@ export class TypedActivitiesController {
    * GET /activities/lodging/:id
    */
   @Get('lodging/:id')
-  async getLodging(@Param('id') id: string): Promise<LodgingComponentDto> {
+  async getLodging(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<LodgingComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.orchestrationService.getLodging(id)
   }
 
@@ -524,9 +583,11 @@ export class TypedActivitiesController {
   @Patch('lodging/:id')
   @UsePipes(zodValidation(updateLodgingComponentDtoSchema))
   async updateLodging(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdateLodgingComponentDto
   ): Promise<LodgingComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.orchestrationService.updateLodging(id, dto)
   }
 
@@ -536,7 +597,11 @@ export class TypedActivitiesController {
    */
   @Delete('lodging/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteLodging(@Param('id') id: string): Promise<void> {
+  async deleteLodging(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     await this.orchestrationService.deleteLodging(id)
   }
 
@@ -551,7 +616,14 @@ export class TypedActivitiesController {
   @Post('transportation')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(zodValidation(createTransportationComponentDtoSchema))
-  async createTransportation(@Body() dto: CreateTransportationComponentDto): Promise<TransportationComponentDto> {
+  async createTransportation(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: CreateTransportationComponentDto,
+  ): Promise<TransportationComponentDto> {
+    if (!dto.itineraryDayId) {
+      throw new BadRequestException('itineraryDayId is required')
+    }
+    await this.activitiesService.verifyTripAccessFromDayId(dto.itineraryDayId, auth, true)
     return this.orchestrationService.createTransportation(dto)
   }
 
@@ -560,7 +632,11 @@ export class TypedActivitiesController {
    * GET /activities/transportation/:id
    */
   @Get('transportation/:id')
-  async getTransportation(@Param('id') id: string): Promise<TransportationComponentDto> {
+  async getTransportation(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<TransportationComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.orchestrationService.getTransportation(id)
   }
 
@@ -571,9 +647,11 @@ export class TypedActivitiesController {
   @Patch('transportation/:id')
   @UsePipes(zodValidation(updateTransportationComponentDtoSchema))
   async updateTransportation(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdateTransportationComponentDto
   ): Promise<TransportationComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.orchestrationService.updateTransportation(id, dto)
   }
 
@@ -583,7 +661,11 @@ export class TypedActivitiesController {
    */
   @Delete('transportation/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteTransportation(@Param('id') id: string): Promise<void> {
+  async deleteTransportation(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     await this.orchestrationService.deleteTransportation(id)
   }
 
@@ -598,7 +680,14 @@ export class TypedActivitiesController {
   @Post('dining')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(zodValidation(createDiningComponentDtoSchema))
-  async createDining(@Body() dto: CreateDiningComponentDto): Promise<DiningComponentDto> {
+  async createDining(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: CreateDiningComponentDto,
+  ): Promise<DiningComponentDto> {
+    if (!dto.itineraryDayId) {
+      throw new BadRequestException('itineraryDayId is required')
+    }
+    await this.activitiesService.verifyTripAccessFromDayId(dto.itineraryDayId, auth, true)
     return this.orchestrationService.createDining(dto)
   }
 
@@ -607,7 +696,11 @@ export class TypedActivitiesController {
    * GET /activities/dining/:id
    */
   @Get('dining/:id')
-  async getDining(@Param('id') id: string): Promise<DiningComponentDto> {
+  async getDining(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<DiningComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.orchestrationService.getDining(id)
   }
 
@@ -618,9 +711,11 @@ export class TypedActivitiesController {
   @Patch('dining/:id')
   @UsePipes(zodValidation(updateDiningComponentDtoSchema))
   async updateDining(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdateDiningComponentDto
   ): Promise<DiningComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.orchestrationService.updateDining(id, dto)
   }
 
@@ -630,7 +725,11 @@ export class TypedActivitiesController {
    */
   @Delete('dining/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteDining(@Param('id') id: string): Promise<void> {
+  async deleteDining(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     await this.orchestrationService.deleteDining(id)
   }
 
@@ -645,7 +744,14 @@ export class TypedActivitiesController {
   @Post('port-info')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(zodValidation(createPortInfoComponentDtoSchema))
-  async createPortInfo(@Body() dto: CreatePortInfoComponentDto): Promise<PortInfoComponentDto> {
+  async createPortInfo(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: CreatePortInfoComponentDto,
+  ): Promise<PortInfoComponentDto> {
+    if (!dto.itineraryDayId) {
+      throw new BadRequestException('itineraryDayId is required')
+    }
+    await this.activitiesService.verifyTripAccessFromDayId(dto.itineraryDayId, auth, true)
     return this.orchestrationService.createPortInfo(dto)
   }
 
@@ -654,7 +760,11 @@ export class TypedActivitiesController {
    * GET /activities/port-info/:id
    */
   @Get('port-info/:id')
-  async getPortInfo(@Param('id') id: string): Promise<PortInfoComponentDto> {
+  async getPortInfo(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<PortInfoComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.orchestrationService.getPortInfo(id)
   }
 
@@ -665,9 +775,11 @@ export class TypedActivitiesController {
   @Patch('port-info/:id')
   @UsePipes(zodValidation(updatePortInfoComponentDtoSchema))
   async updatePortInfo(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdatePortInfoComponentDto
   ): Promise<PortInfoComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.orchestrationService.updatePortInfo(id, dto)
   }
 
@@ -677,7 +789,11 @@ export class TypedActivitiesController {
    */
   @Delete('port-info/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deletePortInfo(@Param('id') id: string): Promise<void> {
+  async deletePortInfo(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     await this.orchestrationService.deletePortInfo(id)
   }
 
@@ -692,7 +808,14 @@ export class TypedActivitiesController {
   @Post('options')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(zodValidation(createOptionsComponentDtoSchema))
-  async createOptions(@Body() dto: CreateOptionsComponentDto): Promise<OptionsComponentDto> {
+  async createOptions(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: CreateOptionsComponentDto,
+  ): Promise<OptionsComponentDto> {
+    if (!dto.itineraryDayId) {
+      throw new BadRequestException('itineraryDayId is required')
+    }
+    await this.activitiesService.verifyTripAccessFromDayId(dto.itineraryDayId, auth, true)
     return this.orchestrationService.createOptions(dto)
   }
 
@@ -701,7 +824,11 @@ export class TypedActivitiesController {
    * GET /activities/options/:id
    */
   @Get('options/:id')
-  async getOptions(@Param('id') id: string): Promise<OptionsComponentDto> {
+  async getOptions(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<OptionsComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.orchestrationService.getOptions(id)
   }
 
@@ -712,9 +839,11 @@ export class TypedActivitiesController {
   @Patch('options/:id')
   @UsePipes(zodValidation(updateOptionsComponentDtoSchema))
   async updateOptions(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdateOptionsComponentDto
   ): Promise<OptionsComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.orchestrationService.updateOptions(id, dto)
   }
 
@@ -724,7 +853,11 @@ export class TypedActivitiesController {
    */
   @Delete('options/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteOptions(@Param('id') id: string): Promise<void> {
+  async deleteOptions(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     await this.orchestrationService.deleteOptions(id)
   }
 
@@ -739,7 +872,14 @@ export class TypedActivitiesController {
   @Post('custom-cruise')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(zodValidation(createCustomCruiseComponentDtoSchema))
-  async createCustomCruise(@Body() dto: CreateCustomCruiseComponentDto): Promise<CustomCruiseComponentDto> {
+  async createCustomCruise(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: CreateCustomCruiseComponentDto,
+  ): Promise<CustomCruiseComponentDto> {
+    if (!dto.itineraryDayId) {
+      throw new BadRequestException('itineraryDayId is required')
+    }
+    await this.activitiesService.verifyTripAccessFromDayId(dto.itineraryDayId, auth, true)
     return this.orchestrationService.createCustomCruise(dto)
   }
 
@@ -748,7 +888,11 @@ export class TypedActivitiesController {
    * GET /activities/custom-cruise/:id
    */
   @Get('custom-cruise/:id')
-  async getCustomCruise(@Param('id') id: string): Promise<CustomCruiseComponentDto> {
+  async getCustomCruise(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<CustomCruiseComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.orchestrationService.getCustomCruise(id)
   }
 
@@ -759,9 +903,11 @@ export class TypedActivitiesController {
   @Patch('custom-cruise/:id')
   @UsePipes(zodValidation(updateCustomCruiseComponentDtoSchema))
   async updateCustomCruise(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdateCustomCruiseComponentDto
   ): Promise<CustomCruiseComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.orchestrationService.updateCustomCruise(id, dto)
   }
 
@@ -771,7 +917,11 @@ export class TypedActivitiesController {
    */
   @Delete('custom-cruise/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteCustomCruise(@Param('id') id: string): Promise<void> {
+  async deleteCustomCruise(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     await this.orchestrationService.deleteCustomCruise(id)
   }
 
@@ -781,8 +931,10 @@ export class TypedActivitiesController {
    */
   @Post('custom-cruise/:id/create-port-entries')
   async createPortEntriesFromCruise(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string
   ): Promise<{ created: string[]; skipped: number }> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.orchestrationService.createPortEntriesFromCruise(id)
   }
 
@@ -802,6 +954,7 @@ export class TypedActivitiesController {
    */
   @Post('custom-cruise/:id/generate-port-schedule')
   async generateCruisePortSchedule(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() body?: {
       itineraryId?: string
@@ -818,6 +971,9 @@ export class TypedActivitiesController {
       autoExtendItinerary?: boolean
     }
   ): Promise<{ created: PortInfoComponentDto[]; deleted: number }> {
+    // Verify write access to this cruise activity
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
+
     // Validate input when cruiseData is provided
     if (body?.itineraryId && body?.customCruiseDetails) {
       // Validate UUID format for itineraryId
@@ -870,7 +1026,11 @@ export class TypedActivitiesController {
    * GET /activities/custom-cruise/:id/port-schedule
    */
   @Get('custom-cruise/:id/port-schedule')
-  async getCruisePortSchedule(@Param('id') id: string): Promise<PortInfoComponentDto[]> {
+  async getCruisePortSchedule(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<PortInfoComponentDto[]> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.orchestrationService.getCruisePortSchedule(id)
   }
 
@@ -885,7 +1045,14 @@ export class TypedActivitiesController {
   @Post('custom-tour')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(zodValidation(createCustomTourComponentDtoSchema))
-  async createCustomTour(@Body() dto: CreateCustomTourComponentDto): Promise<CustomTourComponentDto> {
+  async createCustomTour(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: CreateCustomTourComponentDto,
+  ): Promise<CustomTourComponentDto> {
+    if (!dto.itineraryDayId) {
+      throw new BadRequestException('itineraryDayId is required')
+    }
+    await this.activitiesService.verifyTripAccessFromDayId(dto.itineraryDayId, auth, true)
     return this.orchestrationService.createCustomTour(dto)
   }
 
@@ -894,7 +1061,11 @@ export class TypedActivitiesController {
    * GET /activities/custom-tour/:id
    */
   @Get('custom-tour/:id')
-  async getCustomTour(@Param('id') id: string): Promise<CustomTourComponentDto> {
+  async getCustomTour(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<CustomTourComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.orchestrationService.getCustomTour(id)
   }
 
@@ -905,9 +1076,11 @@ export class TypedActivitiesController {
   @Patch('custom-tour/:id')
   @UsePipes(zodValidation(updateCustomTourComponentDtoSchema))
   async updateCustomTour(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Body() dto: UpdateCustomTourComponentDto
+    @Body() dto: UpdateCustomTourComponentDto,
   ): Promise<CustomTourComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.orchestrationService.updateCustomTour(id, dto)
   }
 
@@ -917,7 +1090,11 @@ export class TypedActivitiesController {
    */
   @Delete('custom-tour/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteCustomTour(@Param('id') id: string): Promise<void> {
+  async deleteCustomTour(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     await this.orchestrationService.deleteCustomTour(id)
   }
 
@@ -934,6 +1111,7 @@ export class TypedActivitiesController {
    */
   @Post('custom-tour/:id/generate-tour-day-schedule')
   async generateTourDaySchedule(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() body?: {
       itineraryId?: string
@@ -955,6 +1133,9 @@ export class TypedActivitiesController {
       autoExtendItinerary?: boolean
     }
   ): Promise<{ created: TourDayComponentDto[]; deleted: number }> {
+    // Verify write access via the custom tour activity
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
+
     // Validate input when tourData is provided
     if (body?.itineraryId) {
       // Validate UUID format for itineraryId
@@ -996,7 +1177,18 @@ export class TypedActivitiesController {
   @Post('tour-day')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(zodValidation(createTourDayComponentDtoSchema))
-  async createTourDay(@Body() dto: CreateTourDayComponentDto): Promise<TourDayComponentDto> {
+  async createTourDay(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: CreateTourDayComponentDto,
+  ): Promise<TourDayComponentDto> {
+    // Verify write access via parent activity or day
+    if (dto.parentActivityId) {
+      await this.activitiesService.verifyTripAccessFromActivityId(dto.parentActivityId, auth, true)
+    } else if (dto.itineraryDayId) {
+      await this.activitiesService.verifyTripAccessFromDayId(dto.itineraryDayId, auth, true)
+    } else {
+      throw new BadRequestException('Either parentActivityId or itineraryDayId is required')
+    }
     return this.orchestrationService.createTourDay(dto)
   }
 
@@ -1005,7 +1197,11 @@ export class TypedActivitiesController {
    * GET /activities/tour-day/:id
    */
   @Get('tour-day/:id')
-  async getTourDay(@Param('id') id: string): Promise<TourDayComponentDto> {
+  async getTourDay(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<TourDayComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.orchestrationService.getTourDay(id)
   }
 
@@ -1016,9 +1212,11 @@ export class TypedActivitiesController {
   @Patch('tour-day/:id')
   @UsePipes(zodValidation(updateTourDayComponentDtoSchema))
   async updateTourDay(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Body() dto: UpdateTourDayComponentDto
+    @Body() dto: UpdateTourDayComponentDto,
   ): Promise<TourDayComponentDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.orchestrationService.updateTourDay(id, dto)
   }
 
@@ -1028,7 +1226,11 @@ export class TypedActivitiesController {
    */
   @Delete('tour-day/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteTourDay(@Param('id') id: string): Promise<void> {
+  async deleteTourDay(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     await this.orchestrationService.deleteTourDay(id)
   }
 }
