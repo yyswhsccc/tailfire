@@ -20,11 +20,8 @@ import { ApiTags } from '@nestjs/swagger'
 import { TripSharesService } from './trip-shares.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
-import type {
-  TripShareResponseDto,
-  CreateTripShareDto,
-  UpdateTripShareDto,
-} from '../../../../packages/shared-types/src/api'
+import type { TripShareResponseDto } from '../../../../packages/shared-types/src/api'
+import { CreateTripShareDto, UpdateTripShareDto } from './dto'
 
 @ApiTags('Trip Shares')
 @Controller('trips/:tripId/shares')

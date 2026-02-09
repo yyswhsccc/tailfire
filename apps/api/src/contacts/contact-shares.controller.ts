@@ -19,11 +19,8 @@ import { ApiTags } from '@nestjs/swagger'
 import { ContactSharesService } from './contact-shares.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
-import type {
-  ContactShareResponseDto,
-  CreateContactShareDto,
-  UpdateContactShareDto,
-} from '../../../../packages/shared-types/src/api'
+import type { ContactShareResponseDto } from '../../../../packages/shared-types/src/api'
+import { CreateContactShareDto, UpdateContactShareDto } from './dto'
 
 @ApiTags('Contact Shares')
 @Controller('contacts/:contactId/shares')

@@ -18,3 +18,6 @@ export { UpdateContactGroupDto } from './update-contact-group.dto'
 export { ContactGroupFilterDto } from './contact-group-filter.dto'
 export { AddContactToGroupDto } from './add-contact-to-group.dto'
 export { UpdateContactGroupMemberDto } from './update-contact-group-member.dto'
+
+// Contact Share DTOs
+export { CreateContactShareDto, UpdateContactShareDto } from './create-contact-share.dto'
