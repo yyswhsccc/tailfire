@@ -1,6 +1,6 @@
 # Next Steps: Contact & Trip Ownership Management
 
-## Implementation Status: Phase 1 & 2 Complete ✅
+## Implementation Status: Phases 1-4 Complete ✅
 
 ### Phase 1 - Completed Features:
 - ✅ Database migration with `inbound` status, nullable `owner_id`, `contact_shares` and `trip_shares` tables
@@ -29,51 +29,13 @@
 - ✅ Updated `contact-shares.service.ts` `create()` to validate target user exists in same agency
 - ✅ Updated `trip-shares.service.ts` `create()` to validate target user exists in same agency
 
----
-
-## Phase 4: Share Endpoint Validation (Medium Priority)
-
-### Issue
-Share endpoints use shared-types DTOs without class-validator, causing 500 errors instead of 400s for invalid input.
-
-### Tasks
-1. **Create `CreateContactShareDto`** with class-validator
-   ```typescript
-   export class CreateContactShareDto {
-     @IsUUID()
-     sharedWithUserId: string
-
-     @IsIn(['basic', 'full'])
-     accessLevel: 'basic' | 'full'
-
-     @IsOptional()
-     @IsString()
-     notes?: string
-   }
-   ```
-
-2. **Create `CreateTripShareDto`** with class-validator
-   ```typescript
-   export class CreateTripShareDto {
-     @IsUUID()
-     sharedWithUserId: string
-
-     @IsIn(['read', 'write'])
-     accessLevel: 'read' | 'write'
-
-     @IsOptional()
-     @IsString()
-     notes?: string
-   }
-   ```
-
-3. **Update controllers to use new DTOs**
-
-### Files to Create/Modify
-- `apps/api/src/contacts/dto/create-contact-share.dto.ts` (CREATE)
-- `apps/api/src/trips/dto/create-trip-share.dto.ts` (CREATE)
-- `apps/api/src/contacts/contact-shares.controller.ts`
-- `apps/api/src/trips/trip-shares.controller.ts`
+### Phase 4 - Share Endpoint Validation (Complete ✅):
+- ✅ Created `CreateContactShareDto` and `UpdateContactShareDto` with class-validator decorators
+- ✅ Created `CreateTripShareDto` and `UpdateTripShareDto` with class-validator decorators
+- ✅ Updated `contact-shares.controller.ts` to use new DTOs for runtime validation
+- ✅ Updated `trip-shares.controller.ts` to use new DTOs for runtime validation
+- ✅ Added barrel exports in dto/index.ts files
+- ✅ Validation includes: `@IsUUID`, `@IsIn`, `@IsOptional`, `@IsString`, `@MaxLength(500)`
 
 ---
 
@@ -129,10 +91,10 @@ Share endpoints use shared-types DTOs without class-validator, causing 500 error
 
 ## Priority Order
 
-1. **Commit Current Implementation** - Phase 1 complete
-2. **Phase 2: Trip Share Enforcement** - Security critical
-3. **Phase 3: Owner/Share Validation** - Security critical
-4. **Phase 4: Share Endpoint Validation** - Reliability
+1. ~~**Commit Current Implementation** - Phase 1 complete~~ ✅
+2. ~~**Phase 2: Trip Share Enforcement** - Security critical~~ ✅
+3. ~~**Phase 3: Owner/Share Validation** - Security critical~~ ✅
+4. ~~**Phase 4: Share Endpoint Validation** - Reliability~~ ✅
 5. **Phase 6: Testing** - Before production
 6. **Phase 5: Frontend Updates** - User-facing features
 
