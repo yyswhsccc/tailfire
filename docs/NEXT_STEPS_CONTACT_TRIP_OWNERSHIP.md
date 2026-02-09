@@ -1,6 +1,6 @@
 # Next Steps: Contact & Trip Ownership Management
 
-## Implementation Status: Phases 1-4 Complete ✅, Phase 6 Partial ✅
+## Implementation Status: Phases 1-4 Complete ✅, Security Fixes Complete ✅, Phase 6 Partial ✅
 
 ### Phase 1 - Completed Features:
 - ✅ Database migration with `inbound` status, nullable `owner_id`, `contact_shares` and `trip_shares` tables
@@ -36,6 +36,11 @@
 - ✅ Updated `trip-shares.controller.ts` to use new DTOs for runtime validation
 - ✅ Added barrel exports in dto/index.ts files
 - ✅ Validation includes: `@IsUUID`, `@IsIn`, `@IsOptional`, `@IsString`, `@MaxLength(500)`
+
+### Critical Security Fixes (Complete ✅):
+- ✅ **Trip Listing Access Control**: `GET /trips` now filters by accessible trips using `getAccessibleTripIds()`
+- ✅ **Activities Controller Access Control**: All activity endpoints (`/days/:dayId/activities/*` and `/activities/*`) now enforce trip access via `TripAccessService`
+- ✅ **Traveler Snapshot Bypass Fixed**: Sensitive data access is now checked even when contactId is unchanged
 
 ---
 
