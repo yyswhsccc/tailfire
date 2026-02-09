@@ -2,6 +2,8 @@
  * Activity Documents Controller
  *
  * API endpoints for managing activity documents.
+ *
+ * Access control: All endpoints verify trip access via ActivitiesService.
  */
 
 import {
@@ -22,8 +24,11 @@ import {
   ActivityDocumentsService,
   VALID_DOCUMENT_TYPES,
 } from './activity-documents.service'
+import { ActivitiesService } from './activities.service'
 import { DeprecationInterceptor } from '../common/interceptors/deprecation.interceptor'
 import { StorageService } from './storage.service'
+import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
+import type { AuthContext } from '../auth/auth.types'
 import { ApiTags } from '@nestjs/swagger'
 
 // Max file size: 10MB
@@ -48,7 +53,8 @@ const ALLOWED_MIME_TYPES = [
 export class ActivityDocumentsController {
   constructor(
     private readonly documentsService: ActivityDocumentsService,
-    private readonly storageService: StorageService
+    private readonly storageService: StorageService,
+    private readonly activitiesService: ActivitiesService,
   ) {}
 
   /**
@@ -68,9 +74,15 @@ export class ActivityDocumentsController {
 
   /**
    * List all documents for an activity
+   *
+   * Access check: User must have read access to the trip.
    */
   @Get()
-  async list(@Param('activityId') activityId: string) {
+  async list(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityId') activityId: string
+  ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth)
     const documents = await this.documentsService.findByActivityId(activityId)
 
     // Add signed download URLs to each document
@@ -83,26 +95,41 @@ export class ActivityDocumentsController {
 
   /**
    * Get a single document
+   *
+   * Access check: User must have read access to the trip.
    */
   @Get(':documentId')
-  async get(@Param('documentId') documentId: string) {
+  async get(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityId') activityId: string,
+    @Param('documentId') documentId: string
+  ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth)
     const document = await this.documentsService.findById(documentId)
     if (!document) {
       throw new NotFoundException('Document not found')
+    }
+    // Verify document belongs to this activity
+    if (document.activityId !== activityId) {
+      throw new BadRequestException('Document does not belong to this activity')
     }
     return this.addDownloadUrl(document)
   }
 
   /**
    * Upload a new document
+   *
+   * Access check: User must have write access to the trip.
    */
   @Post()
   @UseInterceptors(FileInterceptor('file'))
   async upload(
+    @GetAuthContext() auth: AuthContext,
     @Param('activityId') activityId: string,
     @UploadedFile() file: Express.Multer.File,
     @Body('documentType') documentType?: string
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
     // Validate file presence
     if (!file) {
       throw new BadRequestException('No file provided')
@@ -161,12 +188,27 @@ export class ActivityDocumentsController {
 
   /**
    * Update document metadata
+   *
+   * Access check: User must have write access to the trip.
    */
   @Patch(':documentId')
   async update(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityId') activityId: string,
     @Param('documentId') documentId: string,
     @Body() body: { documentType?: string; fileName?: string }
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
+
+    // Verify document exists and belongs to this activity
+    const existing = await this.documentsService.findById(documentId)
+    if (!existing) {
+      throw new NotFoundException('Document not found')
+    }
+    if (existing.activityId !== activityId) {
+      throw new BadRequestException('Document does not belong to this activity')
+    }
+
     // Validate document type if provided
     if (
       body.documentType &&
@@ -182,21 +224,21 @@ export class ActivityDocumentsController {
       fileName: body.fileName,
     })
 
-    if (!document) {
-      throw new NotFoundException('Document not found')
-    }
-
-    return document
+    return document!
   }
 
   /**
    * Delete a document
+   *
+   * Access check: User must have write access to the trip.
    */
   @Delete(':documentId')
   async delete(
+    @GetAuthContext() auth: AuthContext,
     @Param('activityId') activityId: string,
     @Param('documentId') documentId: string
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
     // Get document to get file URL
     const document = await this.documentsService.findById(documentId)
     if (!document) {
@@ -237,7 +279,8 @@ export class ActivityDocumentsController {
 export class ComponentDocumentsController {
   constructor(
     private readonly documentsService: ActivityDocumentsService,
-    private readonly storageService: StorageService
+    private readonly storageService: StorageService,
+    private readonly activitiesService: ActivitiesService,
   ) {}
 
   private async addDownloadUrl(doc: any) {
@@ -253,7 +296,11 @@ export class ComponentDocumentsController {
   }
 
   @Get()
-  async list(@Param('componentId') componentId: string) {
+  async list(
+    @GetAuthContext() auth: AuthContext,
+    @Param('componentId') componentId: string
+  ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth)
     const documents = await this.documentsService.findByActivityId(componentId)
     const documentsWithUrls = await Promise.all(
       documents.map((doc) => this.addDownloadUrl(doc))
@@ -262,10 +309,19 @@ export class ComponentDocumentsController {
   }
 
   @Get(':documentId')
-  async get(@Param('documentId') documentId: string) {
+  async get(
+    @GetAuthContext() auth: AuthContext,
+    @Param('componentId') componentId: string,
+    @Param('documentId') documentId: string
+  ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth)
     const document = await this.documentsService.findById(documentId)
     if (!document) {
       throw new NotFoundException('Document not found')
+    }
+    // Verify document belongs to this component
+    if (document.activityId !== componentId) {
+      throw new BadRequestException('Document does not belong to this component')
     }
     return this.addDownloadUrl(document)
   }
@@ -273,10 +329,12 @@ export class ComponentDocumentsController {
   @Post()
   @UseInterceptors(FileInterceptor('file'))
   async upload(
+    @GetAuthContext() auth: AuthContext,
     @Param('componentId') componentId: string,
     @UploadedFile() file: Express.Multer.File,
     @Body('documentType') documentType?: string
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth, true)
     if (!file) {
       throw new BadRequestException('No file provided')
     }
@@ -312,9 +370,22 @@ export class ComponentDocumentsController {
 
   @Patch(':documentId')
   async update(
+    @GetAuthContext() auth: AuthContext,
+    @Param('componentId') componentId: string,
     @Param('documentId') documentId: string,
     @Body() body: { documentType?: string; fileName?: string }
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth, true)
+
+    // Verify document exists and belongs to this component
+    const existing = await this.documentsService.findById(documentId)
+    if (!existing) {
+      throw new NotFoundException('Document not found')
+    }
+    if (existing.activityId !== componentId) {
+      throw new BadRequestException('Document does not belong to this component')
+    }
+
     if (body.documentType && !VALID_DOCUMENT_TYPES.includes(body.documentType as (typeof VALID_DOCUMENT_TYPES)[number])) {
       throw new BadRequestException(`Invalid document type.`)
     }
@@ -324,18 +395,16 @@ export class ComponentDocumentsController {
       fileName: body.fileName,
     })
 
-    if (!document) {
-      throw new NotFoundException('Document not found')
-    }
-
-    return document
+    return document!
   }
 
   @Delete(':documentId')
   async delete(
+    @GetAuthContext() auth: AuthContext,
     @Param('componentId') componentId: string,
     @Param('documentId') documentId: string
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth, true)
     const document = await this.documentsService.findById(documentId)
     if (!document) {
       throw new NotFoundException('Document not found')

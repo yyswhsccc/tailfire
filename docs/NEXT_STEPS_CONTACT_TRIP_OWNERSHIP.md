@@ -47,14 +47,10 @@
 - ✅ **`traveler-groups.controller.ts`**: All 9 endpoints now enforce trip access
 - ✅ **`insurance.controller.ts`**: All 8 endpoints now enforce trip access
 
-### Remaining Security Gaps (Medium/Low Priority - TODO):
+### Remaining Security Gaps (Low Priority - TODO):
 
 | Controller | Route Pattern | Endpoints | Priority |
 |------------|---------------|-----------|----------|
-| `activity-bookings.controller.ts` | `/bookings/activities/:activityId/*` | 3 | Medium |
-| `activity-documents.controller.ts` | `/activities/:activityId/documents/*` | 5 | Medium |
-| `activity-media.controller.ts` | `/activities/:activityId/media/*` | 10+ | Medium |
-| `payment-schedules.controller.ts` | `/payment-schedules/*` | 9 | Medium |
 | `payment-templates.controller.ts` | `/agencies/:agencyId/payment-templates/*` | 7 | Low (agency-scoped) |
 
 **Controllers Already Secured:**
@@ -67,6 +63,10 @@
 - ✅ `itinerary-days.controller.ts`
 - ✅ `traveler-groups.controller.ts`
 - ✅ `insurance.controller.ts`
+- ✅ `activity-bookings.controller.ts`
+- ✅ `activity-documents.controller.ts` (including legacy ComponentDocumentsController)
+- ✅ `activity-media.controller.ts` (including legacy ComponentMediaController)
+- ✅ `payment-schedules.controller.ts`
 
 **Implementation Pattern:**
 1. Controllers with `tripId` in URL → Direct `tripAccessService.verifyReadAccess/verifyWriteAccess`

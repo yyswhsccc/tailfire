@@ -4,6 +4,8 @@
  * API endpoints for managing activity media (images, videos).
  * Uses the public media bucket for storage.
  * Supports polymorphic attachment via entityType query parameter.
+ *
+ * Access control: All endpoints verify trip access via ActivitiesService.
  */
 
 import {
@@ -23,8 +25,11 @@ import {
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ActivityMediaService, UnsplashAttribution, ExternalUrlAttribution, VALID_ENTITY_TYPES } from './activity-media.service'
+import { ActivitiesService } from './activities.service'
 import { StorageService } from './storage.service'
 import { UnsplashService } from '../unsplash/unsplash.service'
+import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
+import type { AuthContext } from '../auth/auth.types'
 import { MediaType, ComponentEntityType } from '@tailfire/database'
 import { DeprecationInterceptor } from '../common/interceptors/deprecation.interceptor'
 import { ApiTags } from '@nestjs/swagger'
@@ -90,6 +95,7 @@ export class ActivityMediaController {
 
   constructor(
     private readonly mediaService: ActivityMediaService,
+    private readonly activitiesService: ActivitiesService,
     private readonly storageService: StorageService,
     private readonly unsplashService: UnsplashService
   ) {}
@@ -98,12 +104,16 @@ export class ActivityMediaController {
    * List all media for an activity
    * @param activityId - The activity ID
    * @param entityType - The entity type (defaults to 'activity')
+   *
+   * Access check: User must have read access to the trip.
    */
   @Get()
   async list(
+    @GetAuthContext() auth: AuthContext,
     @Param('activityId') activityId: string,
     @Query('entityType') entityType?: ComponentEntityType
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth)
     // Validate entityType if provided
     const validatedEntityType = entityType || 'activity'
     if (!VALID_ENTITY_TYPES.includes(validatedEntityType)) {
@@ -116,12 +126,23 @@ export class ActivityMediaController {
 
   /**
    * Get a single media item
+   *
+   * Access check: User must have read access to the trip.
    */
   @Get(':mediaId')
-  async get(@Param('mediaId') mediaId: string) {
+  async get(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityId') activityId: string,
+    @Param('mediaId') mediaId: string
+  ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth)
     const media = await this.mediaService.findById(mediaId)
     if (!media) {
       throw new NotFoundException('Media not found')
+    }
+    // Verify media belongs to this activity
+    if (media.activityId !== activityId) {
+      throw new BadRequestException('Media does not belong to this activity')
     }
     return media
   }
@@ -135,15 +156,19 @@ export class ActivityMediaController {
    * Query: entityType (optional, defaults to 'activity')
    *
    * Returns: { id, activityId, entityType, mediaType, fileUrl, fileName, fileSize, caption, orderIndex, uploadedAt }
+   *
+   * Access check: User must have write access to the trip.
    */
   @Post()
   @UseInterceptors(FileInterceptor('file'))
   async upload(
+    @GetAuthContext() auth: AuthContext,
     @Param('activityId') activityId: string,
     @UploadedFile() file: Express.Multer.File,
     @Query('entityType') entityType?: ComponentEntityType,
     @Body('caption') caption?: string
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
     // Validate entityType if provided
     const validatedEntityType = entityType || 'activity'
     if (!VALID_ENTITY_TYPES.includes(validatedEntityType)) {
@@ -223,13 +248,17 @@ export class ActivityMediaController {
    * 4. Uploads to our R2 storage
    * 5. Triggers Unsplash download tracking (required by API guidelines)
    * 6. Saves with attribution data
+   *
+   * Access check: User must have write access to the trip.
    */
   @Post('external')
   async addExternalMedia(
+    @GetAuthContext() auth: AuthContext,
     @Param('activityId') activityId: string,
     @Query('entityType') entityType?: ComponentEntityType,
     @Body() body?: AddExternalMediaDto
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
     // Validate entityType if provided
     const validatedEntityType = entityType || 'activity'
     if (!VALID_ENTITY_TYPES.includes(validatedEntityType)) {
@@ -341,13 +370,17 @@ export class ActivityMediaController {
    *
    * Note: Unlike Unsplash integration, this does NOT download the image to R2.
    * The external URL is stored directly and served from the original source.
+   *
+   * Access check: User must have write access to the trip.
    */
   @Post('external/url')
   async addExternalUrlMedia(
+    @GetAuthContext() auth: AuthContext,
     @Param('activityId') activityId: string,
     @Query('entityType') entityType?: ComponentEntityType,
     @Body() body?: AddExternalUrlMediaDto
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
     // Validate entityType if provided
     const validatedEntityType = entityType || 'activity'
     if (!VALID_ENTITY_TYPES.includes(validatedEntityType)) {
@@ -429,13 +462,17 @@ export class ActivityMediaController {
    * Constraints:
    * - Maximum 10 images per batch
    * - Each URL max 2048 characters
+   *
+   * Access check: User must have write access to the trip.
    */
   @Post('external/batch')
   async batchImportExternalUrl(
+    @GetAuthContext() auth: AuthContext,
     @Param('activityId') activityId: string,
     @Query('entityType') entityType?: ComponentEntityType,
     @Body() body?: BatchImportExternalUrlDto
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
     // Validate entityType if provided (defaults to 'cruise' for ship images)
     const validatedEntityType = entityType || 'cruise'
     if (!VALID_ENTITY_TYPES.includes(validatedEntityType)) {
@@ -506,13 +543,17 @@ export class ActivityMediaController {
 
   /**
    * Update media metadata (caption)
+   *
+   * Access check: User must have write access to the trip.
    */
   @Patch(':mediaId')
   async update(
+    @GetAuthContext() auth: AuthContext,
     @Param('activityId') activityId: string,
     @Param('mediaId') mediaId: string,
     @Body() body: { caption?: string }
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
     // Verify media exists and belongs to activity
     const existing = await this.mediaService.findById(mediaId)
     if (!existing) {
@@ -531,12 +572,16 @@ export class ActivityMediaController {
 
   /**
    * Delete a media item
+   *
+   * Access check: User must have write access to the trip.
    */
   @Delete(':mediaId')
   async delete(
+    @GetAuthContext() auth: AuthContext,
     @Param('activityId') activityId: string,
     @Param('mediaId') mediaId: string
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
     // Get media to get file URL
     const media = await this.mediaService.findById(mediaId)
     if (!media) {
@@ -585,6 +630,7 @@ export class ComponentMediaController {
 
   constructor(
     private readonly mediaService: ActivityMediaService,
+    private readonly activitiesService: ActivitiesService,
     private readonly storageService: StorageService,
     private readonly unsplashService: UnsplashService
   ) {}
@@ -594,9 +640,11 @@ export class ComponentMediaController {
 
   @Get()
   async list(
+    @GetAuthContext() auth: AuthContext,
     @Param('componentId') componentId: string,
     @Query('entityType') entityType?: ComponentEntityType
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth)
     const validatedEntityType = entityType || 'activity'
     if (!VALID_ENTITY_TYPES.includes(validatedEntityType)) {
       throw new BadRequestException(`Invalid entityType: ${entityType}. Valid types: ${VALID_ENTITY_TYPES.join(', ')}`)
@@ -606,10 +654,19 @@ export class ComponentMediaController {
   }
 
   @Get(':mediaId')
-  async get(@Param('mediaId') mediaId: string) {
+  async get(
+    @GetAuthContext() auth: AuthContext,
+    @Param('componentId') componentId: string,
+    @Param('mediaId') mediaId: string
+  ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth)
     const media = await this.mediaService.findById(mediaId)
     if (!media) {
       throw new NotFoundException('Media not found')
+    }
+    // Verify media belongs to this component
+    if (media.activityId !== componentId) {
+      throw new BadRequestException('Media does not belong to this component')
     }
     return media
   }
@@ -617,11 +674,13 @@ export class ComponentMediaController {
   @Post()
   @UseInterceptors(FileInterceptor('file'))
   async upload(
+    @GetAuthContext() auth: AuthContext,
     @Param('componentId') componentId: string,
     @UploadedFile() file: Express.Multer.File,
     @Query('entityType') entityType?: ComponentEntityType,
     @Body('caption') caption?: string
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth, true)
     const validatedEntityType = entityType || 'activity'
     if (!VALID_ENTITY_TYPES.includes(validatedEntityType)) {
       throw new BadRequestException(`Invalid entityType: ${entityType}. Valid types: ${VALID_ENTITY_TYPES.join(', ')}`)
@@ -670,10 +729,12 @@ export class ComponentMediaController {
    */
   @Post('external')
   async addExternalMedia(
+    @GetAuthContext() auth: AuthContext,
     @Param('componentId') componentId: string,
     @Query('entityType') entityType?: ComponentEntityType,
     @Body() body?: AddExternalMediaDto
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth, true)
     const validatedEntityType = entityType || 'activity'
     if (!VALID_ENTITY_TYPES.includes(validatedEntityType)) {
       throw new BadRequestException(`Invalid entityType: ${entityType}. Valid types: ${VALID_ENTITY_TYPES.join(', ')}`)
@@ -753,10 +814,12 @@ export class ComponentMediaController {
    */
   @Post('external/url')
   async addExternalUrlMedia(
+    @GetAuthContext() auth: AuthContext,
     @Param('componentId') componentId: string,
     @Query('entityType') entityType?: ComponentEntityType,
     @Body() body?: AddExternalUrlMediaDto
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth, true)
     const validatedEntityType = entityType || 'activity'
     if (!VALID_ENTITY_TYPES.includes(validatedEntityType)) {
       throw new BadRequestException(`Invalid entityType: ${entityType}. Valid types: ${VALID_ENTITY_TYPES.join(', ')}`)
@@ -815,10 +878,12 @@ export class ComponentMediaController {
 
   @Patch(':mediaId')
   async update(
+    @GetAuthContext() auth: AuthContext,
     @Param('componentId') componentId: string,
     @Param('mediaId') mediaId: string,
     @Body() body: { caption?: string }
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth, true)
     const existing = await this.mediaService.findById(mediaId)
     if (!existing) {
       throw new NotFoundException('Media not found')
@@ -831,9 +896,11 @@ export class ComponentMediaController {
 
   @Delete(':mediaId')
   async delete(
+    @GetAuthContext() auth: AuthContext,
     @Param('componentId') componentId: string,
     @Param('mediaId') mediaId: string
   ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth, true)
     const media = await this.mediaService.findById(mediaId)
     if (!media) {
       throw new NotFoundException('Media not found')

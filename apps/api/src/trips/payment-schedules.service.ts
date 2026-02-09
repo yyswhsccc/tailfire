@@ -1615,4 +1615,78 @@ export class PaymentSchedulesService {
       throw new NotFoundException(`Trip with ID ${tripId} not found`)
     }
   }
+
+  // ============================================================================
+  // Trip Access Helpers (for TripAccessService integration)
+  // ============================================================================
+
+  /**
+   * Get tripId from activityPricingId
+   * Path: activityPricing → activity → trip
+   */
+  async getTripIdFromActivityPricingId(activityPricingId: string): Promise<string | null> {
+    const [pricing] = await this.db.client
+      .select({ activityId: this.db.schema.activityPricing.activityId })
+      .from(this.db.schema.activityPricing)
+      .where(eq(this.db.schema.activityPricing.id, activityPricingId))
+      .limit(1)
+
+    if (!pricing?.activityId) {
+      return null
+    }
+
+    const [activity] = await this.db.client
+      .select({ tripId: this.db.schema.itineraryActivities.tripId })
+      .from(this.db.schema.itineraryActivities)
+      .where(eq(this.db.schema.itineraryActivities.id, pricing.activityId))
+      .limit(1)
+
+    return activity?.tripId || null
+  }
+
+  /**
+   * Get tripId from expectedPaymentItemId
+   * Path: expectedPaymentItem → paymentScheduleConfig → activityPricing → activity → trip
+   */
+  async getTripIdFromExpectedPaymentItemId(itemId: string): Promise<string | null> {
+    const [item] = await this.db.client
+      .select({ paymentScheduleConfigId: this.db.schema.expectedPaymentItems.paymentScheduleConfigId })
+      .from(this.db.schema.expectedPaymentItems)
+      .where(eq(this.db.schema.expectedPaymentItems.id, itemId))
+      .limit(1)
+
+    if (!item) {
+      return null
+    }
+
+    const [config] = await this.db.client
+      .select({ activityPricingId: this.db.schema.paymentScheduleConfig.activityPricingId })
+      .from(this.db.schema.paymentScheduleConfig)
+      .where(eq(this.db.schema.paymentScheduleConfig.id, item.paymentScheduleConfigId))
+      .limit(1)
+
+    if (!config?.activityPricingId) {
+      return null
+    }
+
+    return this.getTripIdFromActivityPricingId(config.activityPricingId)
+  }
+
+  /**
+   * Get tripId from transactionId
+   * Path: transaction → expectedPaymentItem → paymentScheduleConfig → activityPricing → activity → trip
+   */
+  async getTripIdFromTransactionId(transactionId: string): Promise<string | null> {
+    const [transaction] = await this.db.client
+      .select({ expectedPaymentItemId: this.db.schema.paymentTransactions.expectedPaymentItemId })
+      .from(this.db.schema.paymentTransactions)
+      .where(eq(this.db.schema.paymentTransactions.id, transactionId))
+      .limit(1)
+
+    if (!transaction?.expectedPaymentItemId) {
+      return null
+    }
+
+    return this.getTripIdFromExpectedPaymentItemId(transaction.expectedPaymentItemId)
+  }
 }
