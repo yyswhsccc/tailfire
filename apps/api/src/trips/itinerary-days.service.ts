@@ -8,7 +8,9 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common'
 import { eq, ne, and, desc, asc, inArray, sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
+import { TripAccessService } from './trip-access.service'
 import type { PgTransaction } from 'drizzle-orm/pg-core'
+import type { AuthContext } from '../auth/auth.types'
 import type {
   ItineraryDayResponseDto,
   ItineraryDayWithActivitiesDto,
@@ -23,7 +25,51 @@ import type {
 export class ItineraryDaysService {
   private readonly logger = new Logger(ItineraryDaysService.name)
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly tripAccessService: TripAccessService,
+  ) {}
+
+  // ============================================================================
+  // TRIP ACCESS VERIFICATION
+  // ============================================================================
+
+  /**
+   * Get tripId from an itinerary ID
+   */
+  async getTripIdFromItineraryId(itineraryId: string): Promise<string | null> {
+    const [itinerary] = await this.db.client
+      .select({ tripId: this.db.schema.itineraries.tripId })
+      .from(this.db.schema.itineraries)
+      .where(eq(this.db.schema.itineraries.id, itineraryId))
+      .limit(1)
+
+    return itinerary?.tripId || null
+  }
+
+  /**
+   * Verify the user has access to the trip containing this itinerary
+   * @throws ForbiddenException if access denied
+   * @throws NotFoundException if itinerary not found
+   */
+  async verifyTripAccessFromItineraryId(
+    itineraryId: string,
+    auth: AuthContext,
+    writeRequired = false
+  ): Promise<string> {
+    const tripId = await this.getTripIdFromItineraryId(itineraryId)
+    if (!tripId) {
+      throw new NotFoundException(`Itinerary ${itineraryId} not found or not associated with a trip`)
+    }
+
+    if (writeRequired) {
+      await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    } else {
+      await this.tripAccessService.verifyReadAccess(tripId, auth)
+    }
+
+    return tripId
+  }
 
   /**
    * Get all days for an itinerary, ordered by sequence

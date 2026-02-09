@@ -42,6 +42,37 @@
 - ✅ **Activities Controller Access Control**: All activity endpoints (`/days/:dayId/activities/*` and `/activities/*`) now enforce trip access via `TripAccessService`
 - ✅ **Traveler Snapshot Bypass Fixed**: Sensitive data access is now checked even when contactId is unchanged
 
+### High-Priority Security Fixes (Complete ✅):
+- ✅ **`itinerary-days.controller.ts`**: Added `verifyTripAccessFromItineraryId()` to service, all 12 endpoints secured
+- ✅ **`traveler-groups.controller.ts`**: All 9 endpoints now enforce trip access
+- ✅ **`insurance.controller.ts`**: All 8 endpoints now enforce trip access
+
+### Remaining Security Gaps (Medium/Low Priority - TODO):
+
+| Controller | Route Pattern | Endpoints | Priority |
+|------------|---------------|-----------|----------|
+| `activity-bookings.controller.ts` | `/bookings/activities/:activityId/*` | 3 | Medium |
+| `activity-documents.controller.ts` | `/activities/:activityId/documents/*` | 5 | Medium |
+| `activity-media.controller.ts` | `/activities/:activityId/media/*` | 10+ | Medium |
+| `payment-schedules.controller.ts` | `/payment-schedules/*` | 9 | Medium |
+| `payment-templates.controller.ts` | `/agencies/:agencyId/payment-templates/*` | 7 | Low (agency-scoped) |
+
+**Controllers Already Secured:**
+- ✅ `trips.controller.ts`
+- ✅ `trip-travelers.controller.ts`
+- ✅ `itineraries.controller.ts`
+- ✅ `trip-media.controller.ts`
+- ✅ `activities.controller.ts`
+- ✅ `trip-shares.controller.ts`
+- ✅ `itinerary-days.controller.ts`
+- ✅ `traveler-groups.controller.ts`
+- ✅ `insurance.controller.ts`
+
+**Implementation Pattern:**
+1. Controllers with `tripId` in URL → Direct `tripAccessService.verifyReadAccess/verifyWriteAccess`
+2. Controllers with `activityId` → Use `activitiesService.verifyTripAccessFromActivityId()`
+3. Controllers with `itineraryId` → Use `itineraryDaysService.verifyTripAccessFromItineraryId()`
+
 ---
 
 ## Phase 5: Frontend Updates (Lower Priority)
