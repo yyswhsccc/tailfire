@@ -74,10 +74,17 @@ export class TripsController {
   /**
    * Get all trips with filters
    * GET /trips?page=1&limit=20&status=draft&search=honeymoon
+   *
+   * Only returns trips the user has access to:
+   * - Admin: all trips in agency
+   * - User: owned trips, shared trips, and inbound trips
    */
   @Get()
-  async findAll(@Query() filters: TripFilterDto): Promise<PaginatedTripsResponseDto> {
-    return this.tripsService.findAll(filters)
+  async findAll(
+    @GetAuthContext() auth: AuthContext,
+    @Query() filters: TripFilterDto,
+  ): Promise<PaginatedTripsResponseDto> {
+    return this.tripsService.findAll(filters, auth, this.tripAccessService)
   }
 
   // ============================================================================

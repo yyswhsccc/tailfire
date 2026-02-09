@@ -149,15 +149,41 @@ export class TripsService {
 
   /**
    * Find all trips with filters and pagination
+   * When auth is provided, only returns trips the user has access to
    */
   async findAll(
     filters: TripFilterDto,
+    auth?: AuthContext,
+    tripAccessService?: TripAccessService,
   ): Promise<PaginatedTripsResponseDto> {
     const page = filters.page || 1
     const limit = filters.limit || 20
     const offset = (page - 1) * limit
 
     const conditions = []
+
+    // Access control: filter by accessible trips when auth is provided
+    if (auth && tripAccessService) {
+      const accessibleTripIds = await tripAccessService.getAccessibleTripIds(auth)
+      if (accessibleTripIds !== 'all') {
+        // Non-admin users: only show accessible trips
+        if (accessibleTripIds.length === 0) {
+          // No accessible trips - return empty result
+          return {
+            data: [],
+            pagination: {
+              page,
+              limit,
+              total: 0,
+              totalPages: 0,
+            },
+          }
+        }
+        conditions.push(inArray(this.db.schema.trips.id, accessibleTripIds))
+      }
+      // Admin users with 'all' access: also filter by agency
+      conditions.push(eq(this.db.schema.trips.agencyId, auth.agencyId))
+    }
 
     // Search filter
     if (filters.search) {

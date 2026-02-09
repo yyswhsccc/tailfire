@@ -25,6 +25,8 @@ import { Request } from 'express'
 import { ActivitiesService } from './activities.service'
 import { ActivityTravelersService, LinkTravelersDto, ActivityTravelerDto } from './activity-travelers.service'
 import { getActorId } from '../common/decorators/actor.decorator'
+import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
+import type { AuthContext } from '../auth/auth.types'
 import { zodValidation } from '../common/pipes'
 import { ComponentOrchestrationService } from './component-orchestration.service'
 import {
@@ -99,7 +101,11 @@ export class ActivitiesController {
    * GET /days/:dayId/activities
    */
   @Get()
-  async findByDay(@Param('dayId') dayId: string): Promise<ActivityResponseDto[]> {
+  async findByDay(
+    @GetAuthContext() auth: AuthContext,
+    @Param('dayId') dayId: string,
+  ): Promise<ActivityResponseDto[]> {
+    await this.activitiesService.verifyTripAccessFromDayId(dayId, auth)
     return this.activitiesService.findByDay(dayId)
   }
 
@@ -110,9 +116,11 @@ export class ActivitiesController {
   @HttpCode(HttpStatus.OK)
   @Post('reorder')
   async reorder(
+    @GetAuthContext() auth: AuthContext,
     @Param('dayId') dayId: string,
-    @Body() dto: ReorderActivitiesDto
+    @Body() dto: ReorderActivitiesDto,
   ): Promise<ActivityResponseDto[]> {
+    await this.activitiesService.verifyTripAccessFromDayId(dayId, auth, true)
     return this.activitiesService.reorder(dayId, dto)
   }
 
@@ -123,10 +131,12 @@ export class ActivitiesController {
   @Post()
   @UsePipes(zodValidation(createActivityDtoSchema.omit({ itineraryDayId: true })))
   async create(
+    @GetAuthContext() auth: AuthContext,
     @Param('dayId') dayId: string,
     @Body() dto: Omit<CreateActivityDto, 'itineraryDayId'>,
-    @Req() req: Request
+    @Req() req: Request,
   ): Promise<ActivityResponseDto> {
+    await this.activitiesService.verifyTripAccessFromDayId(dayId, auth, true)
     return this.activitiesService.create(
       {
         ...dto,
@@ -141,7 +151,11 @@ export class ActivitiesController {
    * GET /days/:dayId/activities/:id
    */
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<ActivityResponseDto> {
+  async findOne(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<ActivityResponseDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.activitiesService.findOne(id)
   }
 
@@ -152,10 +166,12 @@ export class ActivitiesController {
   @Patch(':id')
   @UsePipes(zodValidation(updateActivityDtoSchema))
   async update(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdateActivityDto,
-    @Req() req: Request
+    @Req() req: Request,
   ): Promise<ActivityResponseDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.activitiesService.update(id, dto, getActorId(req))
   }
 
@@ -166,9 +182,13 @@ export class ActivitiesController {
   @HttpCode(HttpStatus.OK)
   @Post(':id/move')
   async move(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Body() dto: MoveActivityDto
+    @Body() dto: MoveActivityDto,
   ): Promise<ActivityResponseDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
+    // Also verify access to target day
+    await this.activitiesService.verifyTripAccessFromDayId(dto.targetDayId, auth, true)
     return this.activitiesService.move(id, dto)
   }
 
@@ -178,7 +198,12 @@ export class ActivitiesController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string, @Req() req: Request): Promise<void> {
+  async remove(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ): Promise<void> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.activitiesService.remove(id, getActorId(req))
   }
 
@@ -196,10 +221,12 @@ export class ActivitiesController {
   @HttpCode(HttpStatus.CREATED)
   @Post(':id/duplicate')
   async duplicate(
+    @GetAuthContext() auth: AuthContext,
     @Param('dayId') dayId: string,
     @Param('id') id: string,
-    @Req() req: Request
+    @Req() req: Request,
   ): Promise<ActivityResponseDto> {
+    await this.activitiesService.verifyTripAccessFromDayId(dayId, auth, true)
     return this.activitiesService.duplicate(dayId, id, getActorId(req))
   }
 }
@@ -214,7 +241,7 @@ export class ActivitiesController {
 export class ActivitiesGlobalController {
   constructor(
     private readonly activitiesService: ActivitiesService,
-    private readonly activityTravelersService: ActivityTravelersService
+    private readonly activityTravelersService: ActivityTravelersService,
   ) {}
 
   /**
@@ -261,7 +288,11 @@ export class ActivitiesGlobalController {
    * (no itineraryDayId) or on a different day than the child.
    */
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<ActivityResponseDto | PackageResponseDto> {
+  async findOne(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<ActivityResponseDto | PackageResponseDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.activitiesService.findOne(id)
   }
 
@@ -275,10 +306,12 @@ export class ActivitiesGlobalController {
   @Patch(':id')
   @UsePipes(zodValidation(updateActivityDtoSchema))
   async update(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdateActivityDto,
-    @Req() req: Request
+    @Req() req: Request,
   ): Promise<ActivityResponseDto | PackageResponseDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     const result = await this.activitiesService.update(id, dto, getActorId(req))
     // For packages, return full response with all related data
     if (result.activityType === 'package') {
@@ -295,7 +328,12 @@ export class ActivitiesGlobalController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string, @Req() req: Request): Promise<void> {
+  async remove(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ): Promise<void> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.activitiesService.remove(id, getActorId(req))
   }
 
@@ -308,7 +346,11 @@ export class ActivitiesGlobalController {
    * GET /activities/:id/children
    */
   @Get(':id/children')
-  async getChildren(@Param('id') id: string): Promise<PackageLinkedActivityDto[]> {
+  async getChildren(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<PackageLinkedActivityDto[]> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.activitiesService.getLinkedActivitiesWithDayInfo(id)
   }
 
@@ -319,9 +361,11 @@ export class ActivitiesGlobalController {
   @Post(':id/children')
   @HttpCode(HttpStatus.OK)
   async linkChildren(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Body() dto: LinkActivitiesToPackageDto
+    @Body() dto: LinkActivitiesToPackageDto,
   ): Promise<PackageLinkedActivityDto[]> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     await this.activitiesService.linkChildrenToPackage(id, dto.activityIds)
     return this.activitiesService.getLinkedActivitiesWithDayInfo(id)
   }
@@ -333,9 +377,11 @@ export class ActivitiesGlobalController {
   @Delete(':id/children')
   @HttpCode(HttpStatus.OK)
   async unlinkChildren(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Body() dto: LinkActivitiesToPackageDto
+    @Body() dto: LinkActivitiesToPackageDto,
   ): Promise<PackageLinkedActivityDto[]> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     await this.activitiesService.unlinkChildrenFromPackage(id, dto.activityIds)
     return this.activitiesService.getLinkedActivitiesWithDayInfo(id)
   }
@@ -349,7 +395,11 @@ export class ActivitiesGlobalController {
    * GET /activities/:id/travelers
    */
   @Get(':id/travelers')
-  async getTravelers(@Param('id') id: string): Promise<ActivityTravelerDto[]> {
+  async getTravelers(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<ActivityTravelerDto[]> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth)
     return this.activityTravelersService.findByActivityId(id)
   }
 
@@ -360,9 +410,11 @@ export class ActivitiesGlobalController {
   @Post(':id/travelers')
   @HttpCode(HttpStatus.OK)
   async linkTravelers(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Body() dto: LinkTravelersDto
+    @Body() dto: LinkTravelersDto,
   ): Promise<ActivityTravelerDto[]> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.activityTravelersService.linkTravelers(id, dto)
   }
 
@@ -373,9 +425,11 @@ export class ActivitiesGlobalController {
   @Delete(':id/travelers')
   @HttpCode(HttpStatus.OK)
   async unlinkTravelers(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Body() dto: LinkTravelersDto
+    @Body() dto: LinkTravelersDto,
   ): Promise<ActivityTravelerDto[]> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.activityTravelersService.unlinkTravelers(id, dto.tripTravelerIds)
   }
 }

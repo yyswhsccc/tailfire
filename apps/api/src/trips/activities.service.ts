@@ -28,6 +28,8 @@ import type {
   ActivityPricingDto,
   TripPackageTotalsDto,
 } from '@tailfire/shared-types'
+import type { AuthContext } from '../auth/auth.types'
+import { TripAccessService } from './trip-access.service'
 
 // Type for activity thumbnails map
 type ThumbnailMap = Map<string, string>
@@ -42,8 +44,72 @@ export class ActivitiesService {
     private readonly travellerSplitsService: TravellerSplitsService,
     private readonly eventEmitter: EventEmitter2,
     private readonly activityTotalsService: ActivityTotalsService,
-    private readonly activityTravelersService: ActivityTravelersService
+    private readonly activityTravelersService: ActivityTravelersService,
+    private readonly tripAccessService: TripAccessService,
   ) {}
+
+  // ============================================================================
+  // TRIP ACCESS VERIFICATION
+  // ============================================================================
+
+  /**
+   * Verify the user has read access to the trip containing this day
+   * @throws ForbiddenException if access denied
+   */
+  async verifyTripAccessFromDayId(dayId: string, auth: AuthContext, writeRequired = false): Promise<string> {
+    const tripId = await this.getTripIdFromDayId(dayId)
+    if (!tripId) {
+      throw new NotFoundException(`Day ${dayId} not found or not associated with a trip`)
+    }
+
+    if (writeRequired) {
+      await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    } else {
+      await this.tripAccessService.verifyReadAccess(tripId, auth)
+    }
+
+    return tripId
+  }
+
+  /**
+   * Verify the user has read access to the trip containing this activity
+   * @throws ForbiddenException if access denied
+   */
+  async verifyTripAccessFromActivityId(activityId: string, auth: AuthContext, writeRequired = false): Promise<string> {
+    // Get activity to find dayId
+    const [activity] = await this.db.client
+      .select({ itineraryDayId: this.db.schema.itineraryActivities.itineraryDayId })
+      .from(this.db.schema.itineraryActivities)
+      .where(eq(this.db.schema.itineraryActivities.id, activityId))
+      .limit(1)
+
+    if (!activity) {
+      throw new NotFoundException(`Activity ${activityId} not found`)
+    }
+
+    // Floating activities (no day) - get tripId from activity.tripId if available
+    if (!activity.itineraryDayId) {
+      const [activityWithTrip] = await this.db.client
+        .select({ tripId: this.db.schema.itineraryActivities.tripId })
+        .from(this.db.schema.itineraryActivities)
+        .where(eq(this.db.schema.itineraryActivities.id, activityId))
+        .limit(1)
+
+      if (!activityWithTrip?.tripId) {
+        throw new BadRequestException(`Activity ${activityId} is not associated with a trip`)
+      }
+
+      if (writeRequired) {
+        await this.tripAccessService.verifyWriteAccess(activityWithTrip.tripId, auth)
+      } else {
+        await this.tripAccessService.verifyReadAccess(activityWithTrip.tripId, auth)
+      }
+
+      return activityWithTrip.tripId
+    }
+
+    return this.verifyTripAccessFromDayId(activity.itineraryDayId, auth, writeRequired)
+  }
 
   /**
    * Get all activities with optional filtering

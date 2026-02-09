@@ -332,18 +332,21 @@ export class TripTravelersService {
     // First get the traveler to validate it exists and belongs to the trip
     const existingTraveler = await this.findOne(id, tripId, auth)
 
-    // Validate contactId if provided (including access check when changing contactId)
+    // Validate contactId if provided (including access check)
     let contactSnapshotFromReference: Record<string, any> | undefined
-    let canAccessSensitive = true // Default for backwards compatibility
+    let canAccessSensitive = true // Default for backwards compatibility when auth is not provided
     if (dto.contactId) {
-      // Validate contact access if changing contactId and auth is provided
-      if (auth && dto.contactId !== existingTraveler.contactId) {
-        const canUse = await this.contactAccessService.canUseContact(dto.contactId, auth)
-        if (!canUse) {
-          throw new ForbiddenException('You do not have access to use this contact')
+      // Always check contact access when auth is provided
+      if (auth) {
+        // If changing to a different contact, verify permission to use it
+        if (dto.contactId !== existingTraveler.contactId) {
+          const canUse = await this.contactAccessService.canUseContact(dto.contactId, auth)
+          if (!canUse) {
+            throw new ForbiddenException('You do not have access to use this contact')
+          }
         }
 
-        // Check sensitive access for snapshot filtering
+        // Always check sensitive access for snapshot filtering (even if same contact)
         const accessResult = await this.contactAccessService.canAccessSensitiveData(dto.contactId, auth)
         canAccessSensitive = accessResult.canAccessSensitive
       }
