@@ -36,6 +36,7 @@ import {
 } from '@tailfire/shared-types'
 import type { AuthContext } from '../auth/auth.types'
 import type { TripAccessService } from './trip-access.service'
+import { UserValidationService } from '../common/user-validation.service'
 
 @Injectable()
 export class TripsService {
@@ -43,6 +44,7 @@ export class TripsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly userValidationService: UserValidationService,
   ) {}
 
   /**
@@ -517,6 +519,15 @@ export class TripsService {
     // Can only set ownerId to null if status is 'inbound'
     if (ownerId === null && existingTrip.status !== 'inbound') {
       throw new BadRequestException('Trips can only have no owner when status is "inbound"')
+    }
+
+    // Validate new owner exists and belongs to same agency
+    if (ownerId !== null) {
+      await this.userValidationService.validateUserInAgency(
+        ownerId,
+        existingTrip.agencyId,
+        'New owner',
+      )
     }
 
     const [trip] = await this.db.client

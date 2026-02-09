@@ -22,37 +22,12 @@
 - ✅ Bulk operations now use proper auth context and access checks
 - ✅ Inbound trips (no owner) are read-only for agency users
 
----
-
-## Phase 3: Owner/Share Validation (High Priority)
-
-### Issue
-Owner reassignment and share creation don't validate that the target user exists or belongs to the same agency.
-
-### Tasks
-1. **Add user validation helper**
-   ```typescript
-   async validateUserInAgency(userId: string, agencyId: string): Promise<boolean>
-   ```
-
-2. **Update `trips.service.ts` `updateOwner()`**
-   - Validate new owner exists in `user_profiles`
-   - Validate new owner belongs to same agency
-
-3. **Update `contacts.service.ts` `updateOwner()`**
-   - Same validation as trips
-
-4. **Update `contact-shares.service.ts` `create()`**
-   - Validate `sharedWithUserId` exists and belongs to same agency
-
-5. **Update `trip-shares.service.ts` `create()`**
-   - Same validation as contact shares
-
-### Files to Modify
-- `apps/api/src/trips/trips.service.ts:504`
-- `apps/api/src/contacts/contacts.service.ts:356`
-- `apps/api/src/contacts/contact-shares.service.ts:31`
-- `apps/api/src/trips/trip-shares.service.ts:35`
+### Phase 3 - Owner/Share Validation (Complete ✅):
+- ✅ Created `UserValidationService` in `apps/api/src/common/` with `validateUserInAgency()` method
+- ✅ Updated `trips.service.ts` `updateOwner()` to validate new owner exists in same agency
+- ✅ Updated `contacts.service.ts` `updateOwner()` to validate new owner exists in same agency
+- ✅ Updated `contact-shares.service.ts` `create()` to validate target user exists in same agency
+- ✅ Updated `trip-shares.service.ts` `create()` to validate target user exists in same agency
 
 ---
 

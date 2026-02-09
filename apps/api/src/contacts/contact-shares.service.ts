@@ -8,6 +8,7 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common'
 import { eq, and } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
+import { UserValidationService } from '../common/user-validation.service'
 import type { AuthContext } from '../auth/auth.types'
 import type {
   ContactShareResponseDto,
@@ -17,7 +18,10 @@ import type {
 
 @Injectable()
 export class ContactSharesService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly userValidationService: UserValidationService,
+  ) {}
 
   /**
    * Share a contact with another user
@@ -57,6 +61,13 @@ export class ContactSharesService {
     if (dto.sharedWithUserId === auth.userId) {
       throw new ForbiddenException('Cannot share a contact with yourself')
     }
+
+    // Validate target user exists and belongs to same agency
+    await this.userValidationService.validateUserInAgency(
+      dto.sharedWithUserId,
+      auth.agencyId,
+      'Target user',
+    )
 
     // Check if share already exists
     const [existingShare] = await this.db.client

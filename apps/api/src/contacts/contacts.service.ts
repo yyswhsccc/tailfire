@@ -8,6 +8,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { eq, and, ilike, or, sql, desc, asc, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
+import { UserValidationService } from '../common/user-validation.service'
 import { TripBookedEvent } from '../trips/events/trip-booked.event'
 import type {
   CreateContactDto,
@@ -19,7 +20,10 @@ import type {
 
 @Injectable()
 export class ContactsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly userValidationService: UserValidationService,
+  ) {}
 
   /**
    * Create a new contact
@@ -354,6 +358,15 @@ export class ContactsService {
    * Can set to any user in the agency or null (agency-wide)
    */
   async updateOwner(id: string, ownerId: string | null, agencyId: string): Promise<ContactResponseDto> {
+    // Validate new owner exists and belongs to same agency (if not null)
+    if (ownerId !== null) {
+      await this.userValidationService.validateUserInAgency(
+        ownerId,
+        agencyId,
+        'New owner',
+      )
+    }
+
     const [contact] = await this.db.client
       .update(this.db.schema.contacts)
       .set({
