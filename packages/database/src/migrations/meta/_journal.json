@@ -649,6 +649,13 @@
     {
       "idx": 92,
       "version": "7",
+      "when": 1770634800000,
+      "tag": "20260207110000_add_inbound_status_to_trip_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
       "when": 1770638400000,
       "tag": "20260207120000_add_contact_and_trip_shares",
       "breakpoints": true

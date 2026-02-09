@@ -1,24 +1,12 @@
 -- ============================================================================
 -- Migration: Contact & Trip Ownership Management
--- Description: Adds inbound status, nullable owner_id, and sharing tables
+-- Description: Adds nullable owner_id and sharing tables
+-- NOTE: The 'inbound' enum value is added in 20260207110000_add_inbound_status_to_trip_status.sql
+--       which MUST run first (PostgreSQL requires enum values to be committed before use)
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 1. Add 'inbound' to trip_status enum
--- ----------------------------------------------------------------------------
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_enum
-    WHERE enumlabel = 'inbound'
-    AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'trip_status')
-  ) THEN
-    ALTER TYPE trip_status ADD VALUE IF NOT EXISTS 'inbound';
-  END IF;
-END $$;
-
--- ----------------------------------------------------------------------------
--- 2. Allow nullable owner_id for inbound trips
+-- 1. Allow nullable owner_id for inbound trips
 -- ----------------------------------------------------------------------------
 -- First drop the NOT NULL constraint if it exists
 ALTER TABLE trips ALTER COLUMN owner_id DROP NOT NULL;
