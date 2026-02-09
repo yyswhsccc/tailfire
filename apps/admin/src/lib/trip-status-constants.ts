@@ -28,9 +28,15 @@ interface TripStatusConfig {
  * Maps each status to its display properties and Kanban column
  */
 export const TRIP_STATUS_CONFIG: Record<TripStatus, TripStatusConfig> = {
+  inbound: {
+    status: 'inbound',
+    label: 'Inbound Lead',
+    variant: 'inbound',
+    columnId: 'inbound',
+  },
   draft: {
     status: 'draft',
-    label: 'Inbound',
+    label: 'Draft',
     variant: 'inbound',
     columnId: 'inbound',
   },
@@ -73,7 +79,7 @@ export const KANBAN_COLUMNS = [
   {
     id: 'inbound' as const,
     title: 'Inbound',
-    statuses: ['draft' as const],
+    statuses: ['inbound' as const, 'draft' as const],
   },
   {
     id: 'planning' as const,
@@ -112,6 +118,7 @@ export const COLUMN_TO_STATUS: Record<KanbanColumnId, TripStatus> = {
  * Map statuses to their Kanban column ID
  */
 export const STATUS_TO_COLUMN: Partial<Record<TripStatus, KanbanColumnId>> = {
+  inbound: 'inbound',
   draft: 'inbound',
   quoted: 'planning',
   booked: 'booked',
