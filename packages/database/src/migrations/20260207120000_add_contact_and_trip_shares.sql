@@ -12,6 +12,8 @@
 ALTER TABLE trips ALTER COLUMN owner_id DROP NOT NULL;
 
 -- Add constraint: owner_id required unless status = 'inbound'
+-- NOTE: Using status::text to avoid PostgreSQL enum value transaction limitation
+-- (new enum values can't be referenced in the same transaction they're added)
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -19,7 +21,7 @@ BEGIN
     WHERE conname = 'trips_owner_required_unless_inbound'
   ) THEN
     ALTER TABLE trips ADD CONSTRAINT trips_owner_required_unless_inbound
-      CHECK (owner_id IS NOT NULL OR status = 'inbound');
+      CHECK (owner_id IS NOT NULL OR status::text = 'inbound');
   END IF;
 END $$;
 
@@ -112,6 +114,7 @@ END $$;
 
 -- ----------------------------------------------------------------------------
 -- 5. Update trip status workflow validation trigger for inbound status
+-- NOTE: Using status::text comparisons to avoid PostgreSQL enum value transaction limitation
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION validate_trip_status_transition()
 RETURNS TRIGGER AS $$
@@ -126,11 +129,11 @@ BEGIN
   IF TG_OP = 'INSERT' THEN
     -- For new trips, ensure inbound trips don't have an owner (optional)
     -- and non-inbound trips have an owner
-    IF NEW.status = 'inbound' AND NEW.owner_id IS NOT NULL THEN
+    IF NEW.status::text = 'inbound' AND NEW.owner_id IS NOT NULL THEN
       -- Allow inbound trips to have an owner (optional)
       RETURN NEW;
     END IF;
-    IF NEW.status != 'inbound' AND NEW.owner_id IS NULL THEN
+    IF NEW.status::text != 'inbound' AND NEW.owner_id IS NULL THEN
       RAISE EXCEPTION 'Non-inbound trips must have an owner';
     END IF;
     RETURN NEW;
@@ -173,8 +176,8 @@ BEGIN
     -- Completed and Cancelled have no outgoing transitions
   ];
 
-  from_status := OLD.status;
-  to_status := NEW.status;
+  from_status := OLD.status::text;
+  to_status := NEW.status::text;
 
   -- Check if transition is valid
   FOR i IN 1..array_length(valid_transitions, 1) LOOP
@@ -189,12 +192,12 @@ BEGIN
   END IF;
 
   -- Validate owner_id when transitioning from inbound to non-inbound
-  IF OLD.status = 'inbound' AND NEW.status != 'inbound' AND NEW.owner_id IS NULL THEN
+  IF OLD.status::text = 'inbound' AND NEW.status::text != 'inbound' AND NEW.owner_id IS NULL THEN
     RAISE EXCEPTION 'An owner must be assigned when transitioning from inbound status';
   END IF;
 
   -- Validate that owner_id is cleared only when status is inbound
-  IF NEW.owner_id IS NULL AND NEW.status != 'inbound' THEN
+  IF NEW.owner_id IS NULL AND NEW.status::text != 'inbound' THEN
     RAISE EXCEPTION 'Owner can only be cleared for inbound trips';
   END IF;
 
