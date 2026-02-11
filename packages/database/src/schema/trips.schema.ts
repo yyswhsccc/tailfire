@@ -160,6 +160,15 @@ export const trips = pgTable('trips', {
   // Cover Photo (denormalized for quick access - synced from trip_media)
   coverPhotoUrl: text('cover_photo_url'),
 
+  // Cancellation Tracking
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  cancellationReason: text('cancellation_reason'),
+  cancelledBy: uuid('cancelled_by'),
+
+  // Status Transition Tracking
+  statusAutoTransitionedAt: timestamp('status_auto_transitioned_at', { withTimezone: true }),
+  lastStatusChangeAt: timestamp('last_status_change_at', { withTimezone: true }),
+
   // Audit Fields
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

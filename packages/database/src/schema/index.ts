@@ -130,6 +130,9 @@ export * from './tour-inclusions.schema'
 export * from './tour-sync-history.schema'
 export * from './geocoding-cache.schema'
 
+// Automation system (job queue history)
+export * from './automation-job-history.schema'
+
 // Later phases:
 // export * from './financials.schema'
 // export * from './tasks.schema'

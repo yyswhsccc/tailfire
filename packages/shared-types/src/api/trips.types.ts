@@ -637,3 +637,14 @@ export interface TripShareResponseDto {
 export interface UpdateTripOwnerDto {
   ownerId: string | null // null = only valid for inbound trips
 }
+
+// ============================================================================
+// CANCELLATION
+// ============================================================================
+
+/**
+ * Cancel a trip with optional reason
+ */
+export interface CancelTripDto {
+  reason?: string // Optional cancellation reason
+}

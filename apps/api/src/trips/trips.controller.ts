@@ -46,6 +46,7 @@ import type {
   TripExpectedPaymentDto,
   TripPaymentTransactionDto,
   UpdateTripOwnerDto,
+  CancelTripDto,
 } from '../../../../packages/shared-types/src/api'
 
 @ApiTags('Trips')
@@ -258,6 +259,23 @@ export class TripsController {
   ) {
     await this.tripAccessService.verifyWriteAccess(id, auth)
     return this.tripsService.unpublishTrip(id, auth.userId)
+  }
+
+  /**
+   * Cancel a trip with reason tracking
+   * POST /trips/:id/cancel
+   *
+   * Transitions trip to 'cancelled' status with optional reason.
+   * Access check: User must have write access.
+   */
+  @Post(':id/cancel')
+  async cancelTrip(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: CancelTripDto,
+  ): Promise<TripResponseDto> {
+    await this.tripAccessService.verifyWriteAccess(id, auth)
+    return this.tripsService.cancelTrip(id, dto, auth.userId)
   }
 
   /**

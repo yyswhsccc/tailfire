@@ -1,0 +1,110 @@
+/**
+ * Automation Module
+ *
+ * Centralized job queue system using BullMQ for scheduled and delayed tasks.
+ *
+ * Provides:
+ * - Trip status auto-transitions (booked -> in_progress -> completed)
+ * - Client care automations (welcome emails, follow-ups)
+ * - Notification delivery
+ *
+ * Does NOT include:
+ * - Cruise sync (stays as cron + advisory locks)
+ * - Tour sync (stays as cron)
+ */
+
+import { Module } from '@nestjs/common'
+import { BullModule } from '@nestjs/bullmq'
+import { ConfigModule, ConfigService } from '@nestjs/config'
+import { DatabaseModule } from '../db/database.module'
+import { AutomationService } from './automation.service'
+import { TripAutomationProcessor } from './processors/trip-automation.processor'
+import { ClientCareProcessor } from './processors/client-care.processor'
+import { NotificationsProcessor } from './processors/notifications.processor'
+import { AutomationController } from './admin/automation.controller'
+import { QUEUES } from './automation.types'
+
+@Module({
+  imports: [
+    // BullMQ configuration
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        const redisUrl = configService.get<string>('REDIS_URL')
+
+        if (!redisUrl) {
+          // In development, provide defaults
+          return {
+            connection: {
+              host: 'localhost',
+              port: 6379,
+            },
+            defaultJobOptions: {
+              attempts: 3,
+              backoff: {
+                type: 'exponential',
+                delay: 1000,
+              },
+            },
+          }
+        }
+
+        // Parse Redis URL for production
+        const url = new URL(redisUrl)
+        return {
+          connection: {
+            host: url.hostname,
+            port: parseInt(url.port || '6379', 10),
+            password: url.password || undefined,
+            username: url.username || undefined,
+            tls: url.protocol === 'rediss:' ? {} : undefined,
+          },
+          defaultJobOptions: {
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 1000,
+            },
+          },
+        }
+      },
+      inject: [ConfigService],
+    }),
+
+    // Register queues
+    BullModule.registerQueue(
+      {
+        name: QUEUES.TRIP_AUTOMATION,
+        defaultJobOptions: {
+          removeOnComplete: { age: 24 * 3600, count: 1000 },
+          removeOnFail: { age: 7 * 24 * 3600 },
+        },
+      },
+      {
+        name: QUEUES.CLIENT_CARE,
+        defaultJobOptions: {
+          removeOnComplete: { age: 24 * 3600, count: 1000 },
+          removeOnFail: { age: 7 * 24 * 3600 },
+        },
+      },
+      {
+        name: QUEUES.NOTIFICATIONS,
+        defaultJobOptions: {
+          removeOnComplete: { age: 3600, count: 500 }, // Shorter retention for notifications
+          removeOnFail: { age: 24 * 3600 },
+        },
+      },
+    ),
+
+    DatabaseModule,
+  ],
+  controllers: [AutomationController],
+  providers: [
+    AutomationService,
+    TripAutomationProcessor,
+    ClientCareProcessor,
+    NotificationsProcessor,
+  ],
+  exports: [AutomationService],
+})
+export class AutomationModule {}

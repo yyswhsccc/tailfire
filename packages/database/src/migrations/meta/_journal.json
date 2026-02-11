@@ -659,6 +659,20 @@
       "when": 1770638400000,
       "tag": "20260207120000_add_contact_and_trip_shares",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1770854333000,
+      "tag": "20260210233853_add_automation_job_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1770857142000,
+      "tag": "20260211000542_add_job_history_unique_constraint",
+      "breakpoints": true
     }
   ]
 }

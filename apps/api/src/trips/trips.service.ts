@@ -4,12 +4,13 @@
  * Business logic for managing trips.
  */
 
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger, Inject, forwardRef } from '@nestjs/common'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import * as crypto from 'crypto'
 import { eq, and, or, gte, lte, ilike, sql, desc, asc, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TripBookedEvent } from './events/trip-booked.event'
+import { TripCancelledEvent } from './events/trip-cancelled.event'
 import {
   TripCreatedEvent,
   TripUpdatedEvent,
@@ -27,6 +28,7 @@ import type {
   ActivityBookingStatusDto,
   ExpectedPaymentStatus,
   CommissionStatus,
+  CancelTripDto,
 } from '@tailfire/shared-types'
 import {
   canTransitionTripStatus,
@@ -37,14 +39,23 @@ import {
 import type { AuthContext } from '../auth/auth.types'
 import type { TripAccessService } from './trip-access.service'
 import { UserValidationService } from '../common/user-validation.service'
+import { AutomationService } from '../automation/automation.service'
+import {
+  QUEUES,
+  JOB_TYPES,
+  getTripTransitionJobId,
+} from '../automation/automation.types'
 
 @Injectable()
 export class TripsService {
+  private readonly logger = new Logger(TripsService.name)
 
   constructor(
     private readonly db: DatabaseService,
     private readonly eventEmitter: EventEmitter2,
     private readonly userValidationService: UserValidationService,
+    @Inject(forwardRef(() => AutomationService))
+    private readonly automationService: AutomationService,
   ) {}
 
   /**
@@ -141,6 +152,17 @@ export class TripsService {
       this.eventEmitter.emit(
         'trip.booked',
         new TripBookedEvent(trip.id, dto.primaryContactId, bookingDate),
+      )
+    }
+
+    // Schedule auto-transitions if trip is booked with dates
+    if (status === 'booked' && (dto.startDate || dto.endDate)) {
+      await this.scheduleStatusTransitions(
+        trip.id,
+        dto.startDate || null,
+        dto.endDate || null,
+        dto.timezone,
+        'booked', // currentStatus
       )
     }
 
@@ -449,13 +471,19 @@ export class TripsService {
       ? new Date().toISOString().split('T')[0]
       : dto.bookingDate
 
+    // Track status changes for audit
+    const isStatusChange = dto.status && dto.status !== existingTrip.status
+    const now = new Date()
+
     const [trip] = await this.db.client
       .update(this.db.schema.trips)
       .set({
         ...dto,
         bookingDate,
         estimatedTotalCost: dto.estimatedTotalCost?.toString(),
-        updatedAt: new Date(),
+        updatedAt: now,
+        // Set lastStatusChangeAt when status changes manually
+        ...(isStatusChange ? { lastStatusChangeAt: now } : {}),
       })
       .where(eq(this.db.schema.trips.id, id))
       .returning()
@@ -522,6 +550,33 @@ export class TripsService {
         'trip.booked',
         new TripBookedEvent(trip.id, primaryContactId, bookingDate),
       )
+    }
+
+    // Handle automation scheduling based on status and date changes
+    const finalStatus = trip.status
+    const startDate = dto.startDate ?? existingTrip.startDate
+    const endDate = dto.endDate ?? existingTrip.endDate
+    const timezone = dto.timezone ?? existingTrip.timezone ?? undefined
+    const datesChanged = dto.startDate !== undefined || dto.endDate !== undefined
+
+    // If transitioning to booked, schedule transitions
+    if (isTransitioningToBooked && (startDate || endDate)) {
+      await this.scheduleStatusTransitions(trip.id, startDate, endDate, timezone, 'booked')
+    }
+    // If already booked/in_progress and dates changed, reschedule
+    else if (
+      (finalStatus === 'booked' || finalStatus === 'in_progress') &&
+      datesChanged
+    ) {
+      await this.rescheduleStatusTransitions(trip.id, startDate, endDate, timezone, finalStatus)
+    }
+    // If transitioning away from booked/in_progress to cancelled/completed, cancel scheduled jobs
+    else if (
+      dto.status &&
+      (existingTrip.status === 'booked' || existingTrip.status === 'in_progress') &&
+      (dto.status === 'cancelled' || dto.status === 'completed')
+    ) {
+      await this.cancelScheduledTransitions(trip.id)
     }
 
     return this.mapToResponseDto(trip)
@@ -878,10 +933,13 @@ export class TripsService {
         ? new Date().toISOString().split('T')[0]
         : undefined
 
+      const now = new Date()
+
       // Update the trip
       const updateData: Record<string, any> = {
         status: newStatus,
-        updatedAt: new Date(),
+        updatedAt: now,
+        lastStatusChangeAt: now, // Track manual status change
       }
       if (bookingDate) {
         updateData.bookingDate = bookingDate
@@ -1745,5 +1803,207 @@ export class TripsService {
           eq(this.db.schema.trips.agencyId, agencyId),
         ),
       )
+  }
+
+  // ============================================================================
+  // TRIP CANCELLATION
+  // ============================================================================
+
+  /**
+   * Cancel a trip with reason tracking
+   *
+   * @param id - Trip ID
+   * @param dto - Cancellation details
+   * @param actorId - User performing the cancellation
+   */
+  async cancelTrip(
+    id: string,
+    dto: CancelTripDto,
+    actorId: string,
+  ): Promise<TripResponseDto> {
+    const [existingTrip] = await this.db.client
+      .select()
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.id, id))
+      .limit(1)
+
+    if (!existingTrip) {
+      throw new NotFoundException(`Trip with ID ${id} not found`)
+    }
+
+    // Validate transition to cancelled is allowed
+    if (!canTransitionTripStatus(existingTrip.status as TripStatus, 'cancelled')) {
+      const errorMessage = getTransitionErrorMessage(
+        existingTrip.status as TripStatus,
+        'cancelled',
+      )
+      throw new BadRequestException(errorMessage)
+    }
+
+    const now = new Date()
+
+    const [trip] = await this.db.client
+      .update(this.db.schema.trips)
+      .set({
+        status: 'cancelled',
+        cancelledAt: now,
+        cancellationReason: dto.reason,
+        cancelledBy: actorId,
+        lastStatusChangeAt: now,
+        updatedAt: now,
+      })
+      .where(eq(this.db.schema.trips.id, id))
+      .returning()
+
+    if (!trip) {
+      throw new NotFoundException(`Trip with ID ${id} not found`)
+    }
+
+    // Cancel any scheduled transitions
+    await this.cancelScheduledTransitions(id)
+
+    // Emit cancelled event
+    this.eventEmitter.emit(
+      'trip.cancelled',
+      new TripCancelledEvent(
+        trip.id,
+        trip.name,
+        trip.primaryContactId,
+        actorId,
+        dto.reason || null,
+        existingTrip.status,
+      ),
+    )
+
+    return this.mapToResponseDto(trip)
+  }
+
+  // ============================================================================
+  // AUTOMATION SCHEDULING
+  // ============================================================================
+
+  /**
+   * Schedule status transitions for a trip based on its dates
+   * Called when a trip is booked or its dates are updated
+   *
+   * @param tripId - Trip ID
+   * @param startDate - Trip start date (YYYY-MM-DD)
+   * @param endDate - Trip end date (YYYY-MM-DD)
+   * @param timezone - Trip timezone
+   * @param currentStatus - Current trip status (optional, to skip redundant scheduling)
+   */
+  async scheduleStatusTransitions(
+    tripId: string,
+    startDate: string | null,
+    endDate: string | null,
+    timezone?: string,
+    currentStatus?: string,
+  ): Promise<void> {
+    // Schedule in_progress transition for start date
+    // Skip if trip is already in_progress or beyond
+    if (startDate && currentStatus !== 'in_progress' && currentStatus !== 'completed' && currentStatus !== 'cancelled') {
+      const inProgressAt = this.automationService.computeLocalMidnight(startDate, timezone)
+      const jobId = getTripTransitionJobId(tripId, 'in_progress')
+
+      if (this.automationService.isInFuture(inProgressAt)) {
+        // Future date - schedule at that time
+        await this.automationService.scheduleAt(
+          QUEUES.TRIP_AUTOMATION,
+          JOB_TYPES.TRIP_STATUS_TRANSITION,
+          {
+            type: JOB_TYPES.TRIP_STATUS_TRANSITION,
+            tripId,
+            toStatus: 'in_progress',
+            reason: 'scheduled',
+          },
+          inProgressAt,
+          { jobId },
+        )
+        this.logger.log(`Scheduled in_progress transition for trip ${tripId} at ${inProgressAt.toISOString()}`)
+      } else {
+        // Past or same-day - schedule immediately (no delay for in_progress)
+        await this.automationService.schedule(
+          QUEUES.TRIP_AUTOMATION,
+          JOB_TYPES.TRIP_STATUS_TRANSITION,
+          {
+            type: JOB_TYPES.TRIP_STATUS_TRANSITION,
+            tripId,
+            toStatus: 'in_progress',
+            reason: 'scheduled',
+          },
+          { jobId, delay: 0 },
+        )
+        this.logger.log(`Scheduled immediate in_progress transition for trip ${tripId} (past/same-day start)`)
+      }
+    }
+
+    // Schedule completed transition for day after end date
+    // Skip if trip is already completed or cancelled
+    if (endDate && currentStatus !== 'completed' && currentStatus !== 'cancelled') {
+      const completedAt = this.automationService.computeDayAfterMidnight(endDate, timezone)
+      const jobId = getTripTransitionJobId(tripId, 'completed')
+
+      if (this.automationService.isInFuture(completedAt)) {
+        // Future date - schedule at that time
+        await this.automationService.scheduleAt(
+          QUEUES.TRIP_AUTOMATION,
+          JOB_TYPES.TRIP_STATUS_TRANSITION,
+          {
+            type: JOB_TYPES.TRIP_STATUS_TRANSITION,
+            tripId,
+            toStatus: 'completed',
+            reason: 'scheduled',
+          },
+          completedAt,
+          { jobId },
+        )
+        this.logger.log(`Scheduled completed transition for trip ${tripId} at ${completedAt.toISOString()}`)
+      } else {
+        // Past or same-day - schedule with 2s delay to ensure in_progress runs first
+        await this.automationService.schedule(
+          QUEUES.TRIP_AUTOMATION,
+          JOB_TYPES.TRIP_STATUS_TRANSITION,
+          {
+            type: JOB_TYPES.TRIP_STATUS_TRANSITION,
+            tripId,
+            toStatus: 'completed',
+            reason: 'scheduled',
+          },
+          { jobId, delay: 2000 },
+        )
+        this.logger.log(`Scheduled immediate completed transition for trip ${tripId} (past/same-day end)`)
+      }
+    }
+  }
+
+  /**
+   * Cancel all scheduled transitions for a trip
+   * Called when trip is cancelled or dates change
+   */
+  async cancelScheduledTransitions(tripId: string): Promise<void> {
+    const inProgressJobId = getTripTransitionJobId(tripId, 'in_progress')
+    const completedJobId = getTripTransitionJobId(tripId, 'completed')
+
+    const cancelledInProgress = await this.automationService.cancel(inProgressJobId, QUEUES.TRIP_AUTOMATION)
+    const cancelledCompleted = await this.automationService.cancel(completedJobId, QUEUES.TRIP_AUTOMATION)
+
+    if (cancelledInProgress || cancelledCompleted) {
+      this.logger.log(`Cancelled scheduled transitions for trip ${tripId}`)
+    }
+  }
+
+  /**
+   * Reschedule transitions when trip dates change
+   * Cancels existing jobs and schedules new ones
+   */
+  async rescheduleStatusTransitions(
+    tripId: string,
+    startDate: string | null,
+    endDate: string | null,
+    timezone?: string,
+    currentStatus?: string,
+  ): Promise<void> {
+    await this.cancelScheduledTransitions(tripId)
+    await this.scheduleStatusTransitions(tripId, startDate, endDate, timezone, currentStatus)
   }
 }

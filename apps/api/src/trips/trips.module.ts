@@ -19,6 +19,7 @@ import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
 import { UnsplashModule } from '../unsplash/unsplash.module'
 import { FinancialsModule } from '../financials/financials.module'
 import { ContactsModule } from '../contacts/contacts.module'
+import { AutomationModule } from '../automation/automation.module'
 
 // Services
 import { TripsService } from './trips.service'
@@ -86,6 +87,7 @@ import { TripSharesService } from './trip-shares.service'
     UnsplashModule,
     FinancialsModule,
     forwardRef(() => ContactsModule), // For ContactAccessService (access control)
+    forwardRef(() => AutomationModule), // For trip status auto-transitions
   ],
   controllers: [
     TripsController,

@@ -6,6 +6,7 @@ import { AppModule } from './app.module'
 import { runMigrations } from '@tailfire/database'
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'
 import { RolesGuard } from './auth/guards/roles.guard'
+import { setupBullBoard, getQueuesFromApp } from './automation/admin/bull-board.setup'
 
 async function bootstrap() {
   const databaseUrl = process.env.DATABASE_URL
@@ -103,6 +104,16 @@ async function bootstrap() {
 
     const document = SwaggerModule.createDocument(app, config)
     SwaggerModule.setup(`${apiPrefix}/docs`, app, document)
+  }
+
+  // Bull Board setup (queue monitoring dashboard)
+  console.info('🔧 Setting up Bull Board...')
+  const queues = await getQueuesFromApp(app)
+  if (queues) {
+    console.info('🔧 Queues found, initializing Bull Board...')
+    setupBullBoard(app, queues)
+  } else {
+    console.warn('⚠️ Could not get queues - Bull Board will not be available')
   }
 
   const port = process.env.PORT || 3101

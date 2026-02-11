@@ -34,6 +34,7 @@ import { UsersModule } from './users/users.module'
 import { HealthModule } from './health/health.module'
 import { DashboardModule } from './dashboard/dashboard.module'
 import { SuppliersModule } from './suppliers/suppliers.module'
+import { AutomationModule } from './automation/automation.module'
 
 @Module({
   imports: [
@@ -120,6 +121,9 @@ import { SuppliersModule } from './suppliers/suppliers.module'
 
     // Supplier management
     SuppliersModule,
+
+    // Automation system (BullMQ job queues)
+    AutomationModule,
   ],
   controllers: [AppController],
   providers: [

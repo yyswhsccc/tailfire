@@ -21,6 +21,9 @@ import {
   AuditEvent,
   AuditEntityType,
 } from './events'
+import { TripInProgressEvent } from '../trips/events/trip-in-progress.event'
+import { TripCompletedEvent } from '../trips/events/trip-completed.event'
+import { TripCancelledEvent } from '../trips/events/trip-cancelled.event'
 import { buildAuditDescription } from './audit-sanitizer'
 
 @Injectable()
@@ -145,6 +148,80 @@ export class ActivityLogsService {
       actorType: event.actorId ? 'user' : 'system',
       description: `Deleted trip "${event.tripName}"`,
       metadata: {},
+      tripId: event.tripId,
+    })
+  }
+
+  /**
+   * Listen for trip in_progress events (trip started)
+   */
+  @OnEvent('trip.in_progress')
+  async handleTripInProgress(event: TripInProgressEvent) {
+    const description = event.isAutoTransition
+      ? `Trip "${event.tripName}" automatically started (scheduled)`
+      : `Trip "${event.tripName}" started`
+
+    await this.db.client.insert(this.db.schema.activityLogs).values({
+      entityType: 'trip',
+      entityId: event.tripId,
+      action: 'status_changed',
+      actorId: null, // System action for auto-transitions
+      actorType: event.isAutoTransition ? 'system' : 'user',
+      description,
+      metadata: {
+        newStatus: 'in_progress',
+        isAutoTransition: event.isAutoTransition,
+        startDate: event.startDate,
+      },
+      tripId: event.tripId,
+    })
+  }
+
+  /**
+   * Listen for trip completed events (trip ended)
+   */
+  @OnEvent('trip.completed')
+  async handleTripCompleted(event: TripCompletedEvent) {
+    const description = event.isAutoTransition
+      ? `Trip "${event.tripName}" automatically completed (scheduled)`
+      : `Trip "${event.tripName}" completed`
+
+    await this.db.client.insert(this.db.schema.activityLogs).values({
+      entityType: 'trip',
+      entityId: event.tripId,
+      action: 'status_changed',
+      actorId: null, // System action for auto-transitions
+      actorType: event.isAutoTransition ? 'system' : 'user',
+      description,
+      metadata: {
+        newStatus: 'completed',
+        isAutoTransition: event.isAutoTransition,
+        endDate: event.endDate,
+      },
+      tripId: event.tripId,
+    })
+  }
+
+  /**
+   * Listen for trip cancelled events
+   */
+  @OnEvent('trip.cancelled')
+  async handleTripCancelled(event: TripCancelledEvent) {
+    const reasonPart = event.cancellationReason ? ` — "${event.cancellationReason}"` : ''
+    const description = `Trip "${event.tripName}" cancelled${reasonPart}`
+
+    await this.db.client.insert(this.db.schema.activityLogs).values({
+      entityType: 'trip',
+      entityId: event.tripId,
+      action: 'status_changed',
+      actorId: event.cancelledBy,
+      actorType: event.cancelledBy ? 'user' : 'system',
+      description,
+      metadata: {
+        newStatus: 'cancelled',
+        previousStatus: event.previousStatus,
+        cancellationReason: event.cancellationReason,
+      },
       tripId: event.tripId,
     })
   }
