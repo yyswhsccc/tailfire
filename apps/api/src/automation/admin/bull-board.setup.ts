@@ -13,6 +13,7 @@ import { ExpressAdapter } from '@bull-board/express'
 import { Queue } from 'bullmq'
 import type { Request, Response, NextFunction } from 'express'
 import * as jwt from 'jsonwebtoken'
+import JwksRsa from 'jwks-rsa'
 import { QUEUE_NAMES } from '../automation.types'
 
 const logger = new Logger('BullBoard')
@@ -21,11 +22,17 @@ const logger = new Logger('BullBoard')
  * Auth middleware for Bull Board
  * Validates JWT token and checks for admin role in app_metadata
  *
- * Supabase tokens have:
- * - role: 'authenticated' (always for logged-in users)
- * - app_metadata.role: 'admin' | 'agent' | etc. (the actual app role)
+ * Supports both HS256 (older Supabase projects) and ES256 (newer projects)
  */
-function bullBoardAuthMiddleware(jwtSecret: string) {
+function bullBoardAuthMiddleware(jwtSecret: string, supabaseUrl: string) {
+  // Create JWKS client for ES256 tokens
+  const jwksClient = new JwksRsa.JwksClient({
+    cache: true,
+    rateLimit: true,
+    jwksRequestsPerMinute: 5,
+    jwksUri: `${supabaseUrl}/auth/v1/.well-known/jwks.json`,
+  })
+
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const authHeader = req.headers.authorization
@@ -35,10 +42,29 @@ function bullBoardAuthMiddleware(jwtSecret: string) {
 
       const token = authHeader.substring(7)
 
-      // Verify JWT token
-      const decoded = jwt.verify(token, jwtSecret) as {
-        role?: string
-        app_metadata?: { role?: string }
+      // Decode header to check algorithm
+      const tokenParts = token.split('.')
+      if (tokenParts.length !== 3 || !tokenParts[0]) {
+        return res.status(401).json({ message: 'Invalid token format' })
+      }
+
+      const header = JSON.parse(Buffer.from(tokenParts[0], 'base64').toString('utf8')) as {
+        alg?: string
+        kid?: string
+      }
+
+      let decoded: { role?: string; app_metadata?: { role?: string } }
+
+      if (header.alg === 'HS256') {
+        // Use JWT secret for HS256
+        decoded = jwt.verify(token, jwtSecret) as typeof decoded
+      } else if (header.alg === 'ES256' && header.kid) {
+        // Use JWKS for ES256
+        const signingKey = await jwksClient.getSigningKey(header.kid)
+        const publicKey = signingKey.getPublicKey()
+        decoded = jwt.verify(token, publicKey) as typeof decoded
+      } else {
+        return res.status(401).json({ message: `Unsupported algorithm: ${header.alg}` })
       }
 
       // Check app_metadata.role for admin (Supabase stores app roles here)
@@ -112,13 +138,14 @@ export function setupBullBoard(
 
     // Mount Bull Board at /admin/queues with authentication
     const jwtSecret = process.env.SUPABASE_JWT_SECRET
-    if (jwtSecret) {
+    const supabaseUrl = process.env.SUPABASE_URL
+    if (jwtSecret && supabaseUrl) {
       // Apply auth middleware before Bull Board routes
-      expressApp.use('/admin/queues', bullBoardAuthMiddleware(jwtSecret), serverAdapter.getRouter())
-      logger.log('Bull Board protected with JWT authentication')
+      expressApp.use('/admin/queues', bullBoardAuthMiddleware(jwtSecret, supabaseUrl), serverAdapter.getRouter())
+      logger.log('Bull Board protected with JWT authentication (HS256 + ES256)')
     } else {
       // Fallback: no auth (development only, warn loudly)
-      logger.warn('Bull Board mounted WITHOUT authentication - SUPABASE_JWT_SECRET not set')
+      logger.warn('Bull Board mounted WITHOUT authentication - SUPABASE_JWT_SECRET or SUPABASE_URL not set')
       expressApp.use('/admin/queues', serverAdapter.getRouter())
     }
 
