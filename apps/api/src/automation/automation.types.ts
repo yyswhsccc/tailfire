@@ -37,7 +37,24 @@ export const JOB_TYPES = {
   CLIENT_BIRTHDAY: 'client.birthday',
   CLIENT_FOLLOW_UP: 'client.follow_up',
 
+  // Payment reminder jobs (TICO-compliant)
+  PAYMENT_REMINDER: 'payment.reminder',
+  PAYMENT_OVERDUE_CHECK: 'payment.overdue_check',
+
+  // Departure reminder jobs
+  DEPARTURE_REMINDER: 'departure.reminder',
+
+  // Post-trip automation jobs
+  POST_TRIP_THANK_YOU: 'post_trip.thank_you',
+  POST_TRIP_FEEDBACK: 'post_trip.feedback',
+
+  // Recurring jobs
+  RECURRING_BIRTHDAY_CHECK: 'recurring.birthday_check',
+  RECURRING_OVERDUE_PAYMENT_SCAN: 'recurring.overdue_payment_scan',
+
   // Notification jobs
+  NOTIFICATION_SEND: 'notification.send',
+  NOTIFICATION_EMAIL_ONLY: 'notification.email_only',
   NOTIFICATION_PUSH: 'notification.push',
   NOTIFICATION_EMAIL: 'notification.email',
   NOTIFICATION_SMS: 'notification.sms',
@@ -99,7 +116,49 @@ export interface ClientCareJobData {
   type: 'client.welcome' | 'client.post_trip' | 'client.birthday' | 'client.follow_up'
   contactId: string
   tripId?: string
+  agencyId?: string
   metadata?: Record<string, unknown>
+}
+
+/**
+ * Payment reminder job for TICO-compliant payment notifications
+ */
+export interface PaymentReminderJobData {
+  type: 'payment.reminder'
+  expectedPaymentItemId: string
+  tripId: string
+  contactId: string
+  agencyId: string
+  reminderType: '7_days_before' | '3_days_before' | 'due_date' | '1_day_overdue'
+}
+
+/**
+ * Departure reminder job for pre-trip notifications
+ */
+export interface DepartureReminderJobData {
+  type: 'departure.reminder'
+  tripId: string
+  contactId: string
+  agencyId: string
+  daysBeforeDeparture: 30 | 14 | 7 | 1
+}
+
+/**
+ * Post-trip automation job for thank-you and feedback emails
+ */
+export interface PostTripJobData {
+  type: 'post_trip.thank_you' | 'post_trip.feedback'
+  tripId: string
+  contactId: string
+  agencyId: string
+}
+
+/**
+ * Recurring job data for daily checks
+ */
+export interface RecurringJobData {
+  type: 'recurring.birthday_check' | 'recurring.overdue_payment_scan'
+  agencyId?: string // Optional - if not provided, runs for all agencies
 }
 
 // ============================================================================
@@ -110,12 +169,18 @@ export interface ClientCareJobData {
  * Notification job for push notifications and alerts
  */
 export interface NotificationJobData {
-  type: 'notification.push' | 'notification.email' | 'notification.sms'
+  type: 'notification.send' | 'notification.email_only' | 'notification.push' | 'notification.email' | 'notification.sms'
   userId?: string
   agencyId?: string
   title: string
   body: string
+  category?: string
+  actionUrl?: string
   metadata?: Record<string, unknown>
+  // For notification.email_only (contact emails)
+  contactId?: string
+  templateSlug?: string
+  context?: Record<string, unknown>
 }
 
 // ============================================================================
@@ -178,4 +243,25 @@ export function getTripTransitionJobId(tripId: string, toStatus: TripStatus): st
  */
 export function getTripReminderJobId(tripId: string, reminderType: string): string {
   return `trip:${tripId}:reminder:${reminderType}`
+}
+
+/**
+ * Generate deterministic job ID for payment reminders
+ */
+export function getPaymentReminderJobId(paymentItemId: string, reminderType: string): string {
+  return `payment:${paymentItemId}:reminder:${reminderType}`
+}
+
+/**
+ * Generate deterministic job ID for departure reminders
+ */
+export function getDepartureReminderJobId(tripId: string, daysBeforeDeparture: number): string {
+  return `trip:${tripId}:departure:${daysBeforeDeparture}d`
+}
+
+/**
+ * Generate deterministic job ID for post-trip automation
+ */
+export function getPostTripJobId(tripId: string, type: 'thank_you' | 'feedback'): string {
+  return `trip:${tripId}:${type}`
 }

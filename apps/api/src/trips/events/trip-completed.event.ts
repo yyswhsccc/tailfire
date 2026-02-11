@@ -12,6 +12,7 @@ export class TripCompletedEvent {
     public readonly tripId: string,
     public readonly tripName: string,
     public readonly primaryContactId: string | null,
+    public readonly agencyId: string,
     /** True if this was an automatic transition by the scheduler */
     public readonly isAutoTransition: boolean,
     /** The trip's end date */

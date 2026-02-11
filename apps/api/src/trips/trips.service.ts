@@ -11,6 +11,8 @@ import { eq, and, or, gte, lte, ilike, sql, desc, asc, inArray } from 'drizzle-o
 import { DatabaseService } from '../db/database.service'
 import { TripBookedEvent } from './events/trip-booked.event'
 import { TripCancelledEvent } from './events/trip-cancelled.event'
+import { TripInProgressEvent } from './events/trip-in-progress.event'
+import { TripCompletedEvent } from './events/trip-completed.event'
 import {
   TripCreatedEvent,
   TripUpdatedEvent,
@@ -44,6 +46,7 @@ import {
   QUEUES,
   JOB_TYPES,
   getTripTransitionJobId,
+  getDepartureReminderJobId,
 } from '../automation/automation.types'
 
 @Injectable()
@@ -552,6 +555,33 @@ export class TripsService {
       )
     }
 
+    // Emit events for manual status changes to in_progress or completed
+    if (isStatusChange && dto.status === 'in_progress') {
+      this.eventEmitter.emit(
+        'trip.in_progress',
+        new TripInProgressEvent(
+          trip.id,
+          trip.name,
+          primaryContactId,
+          existingTrip.agencyId,
+          false, // isAutoTransition = false for manual changes
+          trip.startDate,
+        ),
+      )
+    } else if (isStatusChange && dto.status === 'completed') {
+      this.eventEmitter.emit(
+        'trip.completed',
+        new TripCompletedEvent(
+          trip.id,
+          trip.name,
+          primaryContactId,
+          existingTrip.agencyId,
+          false, // isAutoTransition = false for manual changes
+          trip.endDate,
+        ),
+      )
+    }
+
     // Handle automation scheduling based on status and date changes
     const finalStatus = trip.status
     const startDate = dto.startDate ?? existingTrip.startDate
@@ -879,8 +909,11 @@ export class TripsService {
         id: this.db.schema.trips.id,
         status: this.db.schema.trips.status,
         ownerId: this.db.schema.trips.ownerId,
+        agencyId: this.db.schema.trips.agencyId,
         name: this.db.schema.trips.name,
         primaryContactId: this.db.schema.trips.primaryContactId,
+        startDate: this.db.schema.trips.startDate,
+        endDate: this.db.schema.trips.endDate,
       })
       .from(this.db.schema.trips)
       .where(inArray(this.db.schema.trips.id, tripIds))
@@ -961,6 +994,33 @@ export class TripsService {
         this.eventEmitter.emit(
           'trip.booked',
           new TripBookedEvent(trip.id, trip.primaryContactId, bookingDate),
+        )
+      }
+
+      // Emit events for manual status changes to in_progress or completed
+      if (newStatus === 'in_progress') {
+        this.eventEmitter.emit(
+          'trip.in_progress',
+          new TripInProgressEvent(
+            trip.id,
+            trip.name,
+            trip.primaryContactId,
+            trip.agencyId,
+            false, // isAutoTransition = false for manual changes
+            trip.startDate,
+          ),
+        )
+      } else if (newStatus === 'completed') {
+        this.eventEmitter.emit(
+          'trip.completed',
+          new TripCompletedEvent(
+            trip.id,
+            trip.name,
+            trip.primaryContactId,
+            trip.agencyId,
+            false, // isAutoTransition = false for manual changes
+            trip.endDate,
+          ),
         )
       }
 
@@ -1974,10 +2034,83 @@ export class TripsService {
         this.logger.log(`Scheduled immediate completed transition for trip ${tripId} (past/same-day end)`)
       }
     }
+
+    // Schedule departure reminders for booked trips
+    if (startDate && (currentStatus === 'booked' || !currentStatus)) {
+      await this.scheduleDepartureReminders(tripId, startDate, timezone)
+    }
   }
 
   /**
-   * Cancel all scheduled transitions for a trip
+   * Schedule departure reminders for a trip
+   * Sends reminders at: 30, 14, 7, and 1 day before departure
+   */
+  private async scheduleDepartureReminders(
+    tripId: string,
+    startDate: string,
+    timezone?: string,
+  ): Promise<void> {
+    // Get trip details for contact
+    const trip = await this.findOne(tripId)
+    if (!trip?.primaryContactId) {
+      this.logger.warn(`Trip ${tripId} has no primary contact - skipping departure reminders`)
+      return
+    }
+
+    const reminderDays: Array<30 | 14 | 7 | 1> = [30, 14, 7, 1]
+    const now = new Date()
+
+    for (const daysBeforeDeparture of reminderDays) {
+      // Calculate reminder date (days before departure at midnight local time)
+      const reminderDate = this.automationService.computeLocalMidnight(startDate, timezone)
+      reminderDate.setDate(reminderDate.getDate() - daysBeforeDeparture)
+
+      // Only schedule if reminder date is in the future
+      if (reminderDate > now) {
+        const jobId = getDepartureReminderJobId(tripId, daysBeforeDeparture)
+
+        try {
+          await this.automationService.scheduleAt(
+            QUEUES.CLIENT_CARE,
+            JOB_TYPES.DEPARTURE_REMINDER,
+            {
+              type: JOB_TYPES.DEPARTURE_REMINDER,
+              tripId,
+              contactId: trip.primaryContactId,
+              agencyId: trip.agencyId,
+              daysBeforeDeparture,
+            },
+            reminderDate,
+            { jobId },
+          )
+
+          this.logger.debug(`Scheduled ${daysBeforeDeparture}-day departure reminder for trip ${tripId}`)
+        } catch (error) {
+          // Log but don't fail - booking should succeed even if scheduling fails
+          this.logger.warn(`Failed to schedule ${daysBeforeDeparture}-day departure reminder for trip ${tripId}: ${error}`)
+        }
+      }
+    }
+  }
+
+  /**
+   * Cancel all departure reminders for a trip
+   */
+  private async cancelDepartureReminders(tripId: string): Promise<void> {
+    const reminderDays: Array<30 | 14 | 7 | 1> = [30, 14, 7, 1]
+
+    for (const days of reminderDays) {
+      const jobId = getDepartureReminderJobId(tripId, days)
+      try {
+        await this.automationService.cancel(jobId, QUEUES.CLIENT_CARE)
+      } catch {
+        // Ignore cancellation errors - job may not exist
+      }
+    }
+  }
+
+  /**
+   * Cancel all scheduled transitions and reminders for a trip
    * Called when trip is cancelled or dates change
    */
   async cancelScheduledTransitions(tripId: string): Promise<void> {
@@ -1986,6 +2119,9 @@ export class TripsService {
 
     const cancelledInProgress = await this.automationService.cancel(inProgressJobId, QUEUES.TRIP_AUTOMATION)
     const cancelledCompleted = await this.automationService.cancel(completedJobId, QUEUES.TRIP_AUTOMATION)
+
+    // Also cancel departure reminders
+    await this.cancelDepartureReminders(tripId)
 
     if (cancelledInProgress || cancelledCompleted) {
       this.logger.log(`Cancelled scheduled transitions for trip ${tripId}`)

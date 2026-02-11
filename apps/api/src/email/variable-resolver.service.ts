@@ -15,6 +15,7 @@ export interface ResolverContext {
   contactId?: string
   activityId?: string
   agentId?: string
+  paymentItemId?: string
 }
 
 interface CacheEntry {
@@ -132,6 +133,8 @@ export class VariableResolverService {
         return this.resolveAgentVariable(field, context)
       case 'business':
         return this.resolveBusinessVariable(field, context)
+      case 'payment':
+        return this.resolvePaymentVariable(field, context)
       default:
         this.logger.debug(`Unknown variable category: ${category}`)
         return null
@@ -284,6 +287,55 @@ export class VariableResolverService {
   }
 
   /**
+   * Resolve payment-related variables
+   */
+  private async resolvePaymentVariable(field: string, context: ResolverContext): Promise<string | null> {
+    if (!context.paymentItemId) return null
+
+    const { expectedPaymentItems } = this.db.schema
+
+    const [paymentItem] = await this.db.client
+      .select()
+      .from(expectedPaymentItems)
+      .where(eq(expectedPaymentItems.id, context.paymentItemId))
+      .limit(1)
+
+    if (!paymentItem) return null
+
+    // Handle special fields
+    switch (field) {
+      case 'amount':
+        return paymentItem.expectedAmountCents
+          ? this.formatCurrency(paymentItem.expectedAmountCents)
+          : null
+      case 'paid_amount':
+        return paymentItem.paidAmountCents
+          ? this.formatCurrency(paymentItem.paidAmountCents)
+          : null
+      case 'remaining':
+        if (paymentItem.expectedAmountCents && paymentItem.paidAmountCents !== null) {
+          const remaining = paymentItem.expectedAmountCents - (paymentItem.paidAmountCents || 0)
+          return this.formatCurrency(remaining)
+        }
+        return paymentItem.expectedAmountCents ? this.formatCurrency(paymentItem.expectedAmountCents) : null
+      case 'due_date':
+        return paymentItem.dueDate ? this.formatDate(paymentItem.dueDate) : null
+      default:
+        return this.extractField(paymentItem, field)
+    }
+  }
+
+  /**
+   * Format currency amount from cents
+   */
+  private formatCurrency(cents: number): string {
+    return (cents / 100).toLocaleString('en-US', {
+      style: 'currency',
+      currency: 'CAD',
+    })
+  }
+
+  /**
    * Extract field value from object (handles snake_case to camelCase)
    */
   private extractField(obj: Record<string, any>, field: string): string | null {
@@ -418,6 +470,13 @@ export class VariableResolverService {
       { key: 'business.name', description: 'Agency name', category: 'Business' },
       { key: 'business.phone', description: 'Agency phone number', category: 'Business' },
       { key: 'business.email', description: 'Agency email address', category: 'Business' },
+      // Payment variables
+      { key: 'payment.name', description: 'Payment item name', category: 'Payment' },
+      { key: 'payment.amount', description: 'Total payment amount', category: 'Payment' },
+      { key: 'payment.paid_amount', description: 'Amount already paid', category: 'Payment' },
+      { key: 'payment.remaining', description: 'Remaining balance due', category: 'Payment' },
+      { key: 'payment.due_date', description: 'Payment due date', category: 'Payment' },
+      { key: 'payment.status', description: 'Payment status', category: 'Payment' },
     ]
   }
 }

@@ -39,6 +39,40 @@ export class AutomationService implements OnModuleInit {
   async onModuleInit() {
     this.logger.log('AutomationService initialized')
     this.logger.log(`Registered queues: ${Array.from(this.queues.keys()).join(', ')}`)
+
+    // Initialize recurring jobs
+    await this.initializeRecurringJobs()
+  }
+
+  /**
+   * Initialize recurring jobs on module startup
+   * Runs daily checks for birthdays and overdue payments
+   */
+  private async initializeRecurringJobs(): Promise<void> {
+    try {
+      // Daily birthday check at 8 AM Toronto time
+      await this.scheduleRecurring(
+        QUEUES.CLIENT_CARE,
+        'recurring.birthday_check',
+        { type: 'recurring.birthday_check' },
+        '0 8 * * *', // 8 AM daily
+        { jobId: 'recurring:birthday_check' },
+      )
+      this.logger.log('Scheduled recurring birthday check job')
+
+      // Daily overdue payment scan at 9 AM Toronto time
+      await this.scheduleRecurring(
+        QUEUES.CLIENT_CARE,
+        'recurring.overdue_payment_scan',
+        { type: 'recurring.overdue_payment_scan' },
+        '0 9 * * *', // 9 AM daily
+        { jobId: 'recurring:overdue_payment_scan' },
+      )
+      this.logger.log('Scheduled recurring overdue payment scan job')
+    } catch (error) {
+      this.logger.error(`Failed to initialize recurring jobs: ${error}`)
+      // Don't throw - allow service to start even if recurring jobs fail to initialize
+    }
   }
 
   // ============================================================================
@@ -136,6 +170,7 @@ export class AutomationService implements OnModuleInit {
    * @param data - Job data payload
    * @param cronPattern - Cron expression
    * @param options - Additional scheduling options
+   * @param timezone - IANA timezone for cron schedule (default: America/Toronto)
    * @returns Job ID
    */
   async scheduleRecurring(
@@ -144,16 +179,18 @@ export class AutomationService implements OnModuleInit {
     data: Record<string, unknown>,
     cronPattern: string,
     options?: ScheduleOptions,
+    timezone: string = 'America/Toronto',
   ): Promise<string> {
     const targetQueue = this.queues.get(queue)
     if (!targetQueue) {
       throw new Error(`Queue "${queue}" not found`)
     }
 
-    // For recurring jobs, we use a repeatable job
+    // For recurring jobs, we use a repeatable job with timezone support
     const jobOptions: Record<string, unknown> = {
       repeat: {
         pattern: cronPattern,
+        tz: timezone, // BullMQ timezone support
       },
       attempts: options?.attempts ?? 3,
       backoff: options?.backoff ?? {
@@ -168,7 +205,7 @@ export class AutomationService implements OnModuleInit {
 
     const job = await targetQueue.add(jobType, { ...data, type: jobType }, jobOptions)
 
-    this.logger.log(`Scheduled recurring job ${job.id} on queue ${queue} (cron: ${cronPattern})`)
+    this.logger.log(`Scheduled recurring job ${job.id} on queue ${queue} (cron: ${cronPattern}, tz: ${timezone})`)
 
     return job.id ?? 'unknown'
   }

@@ -35,6 +35,7 @@ import { HealthModule } from './health/health.module'
 import { DashboardModule } from './dashboard/dashboard.module'
 import { SuppliersModule } from './suppliers/suppliers.module'
 import { AutomationModule } from './automation/automation.module'
+import { NotificationModule } from './notifications/notification.module'
 
 @Module({
   imports: [
@@ -124,6 +125,9 @@ import { AutomationModule } from './automation/automation.module'
 
     // Automation system (BullMQ job queues)
     AutomationModule,
+
+    // Notification system (multi-channel)
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [

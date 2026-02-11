@@ -26,7 +26,9 @@ export const emailCategoryEnum = pgEnum('email_category', [
   'trip_order',
   'notification',
   'marketing',
-  'system'
+  'system',
+  'payment',      // Payment reminders
+  'client_care',  // Birthday, follow-ups
 ])
 
 // ============================================================================

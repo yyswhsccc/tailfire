@@ -16,9 +16,12 @@
 
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common'
 import { and, eq, sql } from 'drizzle-orm'
+import { addDays, subDays, isAfter } from 'date-fns'
 import { DatabaseService } from '../db/database.service'
 import { PaymentAuditService } from './payment-audit.service'
 import { PaymentTemplatesService } from './payment-templates.service'
+import { AutomationService } from '../automation/automation.service'
+import { QUEUES, getPaymentReminderJobId } from '../automation/automation.types'
 import type {
   PaymentScheduleConfigDto,
   CreatePaymentScheduleConfigDto,
@@ -62,6 +65,7 @@ export class PaymentSchedulesService {
     private readonly db: DatabaseService,
     private readonly auditService: PaymentAuditService,
     private readonly templatesService: PaymentTemplatesService,
+    private readonly automationService: AutomationService,
   ) {}
 
   // ============================================================================
@@ -204,6 +208,7 @@ export class PaymentSchedulesService {
         config!.id,
         activityPricing.agencyId,
         data.expectedPaymentItems,
+        pricingId, // Pass activityPricingId for payment reminder scheduling
       )
     }
 
@@ -327,16 +332,23 @@ export class PaymentSchedulesService {
     // Handle expected payment items updates
     let expectedPaymentItems: ExpectedPaymentItemDto[] = []
     if (data.expectedPaymentItems && data.expectedPaymentItems.length > 0) {
-      // Delete existing items and recreate (simplest approach for now)
+      // Get existing items to cancel their reminders before deleting
+      const existingItems = await this.findExpectedPaymentItems(existingConfig.id)
+      for (const item of existingItems) {
+        await this.cancelPaymentReminders(item.id)
+      }
+
+      // Delete existing items and recreate
       await this.db.client
         .delete(this.db.schema.expectedPaymentItems)
         .where(eq(this.db.schema.expectedPaymentItems.paymentScheduleConfigId, existingConfig.id))
 
-      // Create new items
+      // Create new items (will schedule new reminders)
       expectedPaymentItems = await this.createExpectedPaymentItems(
         existingConfig.id,
         activityPricing.agencyId,
         data.expectedPaymentItems,
+        activityPricingId, // Pass for payment reminder scheduling
       )
     } else {
       // Keep existing items
@@ -407,12 +419,13 @@ export class PaymentSchedulesService {
   }
 
   /**
-   * Create multiple expected payment items
+   * Create multiple expected payment items and schedule payment reminders
    */
   private async createExpectedPaymentItems(
     paymentScheduleConfigId: string,
     agencyId: string,
     items: CreateExpectedPaymentItemDto[],
+    activityPricingId?: string,
   ): Promise<ExpectedPaymentItemDto[]> {
     if (items.length === 0) {
       return []
@@ -432,16 +445,94 @@ export class PaymentSchedulesService {
       )
       .returning()
 
+    // Schedule payment reminders for items with due dates
+    if (activityPricingId) {
+      const tripContext = await this.getTripContextFromActivityPricingId(activityPricingId)
+      if (tripContext) {
+        for (const item of created) {
+          if (item.dueDate) {
+            await this.schedulePaymentReminders(
+              item.id,
+              tripContext.tripId,
+              tripContext.contactId,
+              agencyId,
+              item.dueDate,
+            )
+          }
+        }
+      }
+    }
+
     return created.map(this.formatExpectedPaymentItem)
   }
 
   /**
+   * Get trip and contact context from activity pricing ID
+   */
+  private async getTripContextFromActivityPricingId(
+    activityPricingId: string,
+  ): Promise<{ tripId: string; contactId: string } | null> {
+    // Get activity from pricing
+    const [pricing] = await this.db.client
+      .select({ activityId: this.db.schema.activityPricing.activityId })
+      .from(this.db.schema.activityPricing)
+      .where(eq(this.db.schema.activityPricing.id, activityPricingId))
+      .limit(1)
+
+    if (!pricing?.activityId) {
+      this.logger.warn(`Activity pricing ${activityPricingId} has no activity`)
+      return null
+    }
+
+    // Get trip from activity
+    const [activity] = await this.db.client
+      .select({ tripId: this.db.schema.itineraryActivities.tripId })
+      .from(this.db.schema.itineraryActivities)
+      .where(eq(this.db.schema.itineraryActivities.id, pricing.activityId))
+      .limit(1)
+
+    if (!activity?.tripId) {
+      this.logger.warn(`Activity ${pricing.activityId} has no trip`)
+      return null
+    }
+
+    // Get primary contact from trip
+    const [trip] = await this.db.client
+      .select({ primaryContactId: this.db.schema.trips.primaryContactId })
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.id, activity.tripId))
+      .limit(1)
+
+    if (!trip?.primaryContactId) {
+      this.logger.warn(`Trip ${activity.tripId} has no primary contact`)
+      return null
+    }
+
+    return {
+      tripId: activity.tripId,
+      contactId: trip.primaryContactId,
+    }
+  }
+
+  /**
    * Update an expected payment item
+   * Reschedules payment reminders if due date changes
    */
   async updateExpectedPaymentItem(
     itemId: string,
     data: UpdateExpectedPaymentItemDto,
   ): Promise<ExpectedPaymentItemDto> {
+    // Get existing item to check for due date changes
+    const [existing] = await this.db.client
+      .select()
+      .from(this.db.schema.expectedPaymentItems)
+      .where(eq(this.db.schema.expectedPaymentItems.id, itemId))
+      .limit(1)
+
+    if (!existing) {
+      throw new NotFoundException(`Expected payment item with ID ${itemId} not found`)
+    }
+
     const [updated] = await this.db.client
       .update(this.db.schema.expectedPaymentItems)
       .set({
@@ -462,7 +553,62 @@ export class PaymentSchedulesService {
       throw new NotFoundException(`Expected payment item with ID ${itemId} not found`)
     }
 
+    // Reschedule payment reminders if due date changed
+    const dueDateChanged = data.dueDate !== undefined && data.dueDate !== existing.dueDate
+    const statusChangedToPaid = data.status === 'paid' && existing.status !== 'paid'
+
+    if (statusChangedToPaid) {
+      // Cancel reminders when payment is marked as paid
+      await this.cancelPaymentReminders(itemId)
+    } else if (dueDateChanged && data.dueDate) {
+      // Reschedule reminders with new due date
+      const tripContext = await this.getTripContextFromPaymentItemId(itemId)
+      if (tripContext) {
+        await this.reschedulePaymentReminders(
+          itemId,
+          tripContext.tripId,
+          tripContext.contactId,
+          existing.agencyId,
+          data.dueDate,
+        )
+      }
+    } else if (dueDateChanged && !data.dueDate) {
+      // Due date removed - cancel all reminders
+      await this.cancelPaymentReminders(itemId)
+    }
+
     return this.formatExpectedPaymentItem(updated)
+  }
+
+  /**
+   * Get trip context from payment item ID
+   */
+  private async getTripContextFromPaymentItemId(
+    itemId: string,
+  ): Promise<{ tripId: string; contactId: string } | null> {
+    // Get payment schedule config from item
+    const [item] = await this.db.client
+      .select({ paymentScheduleConfigId: this.db.schema.expectedPaymentItems.paymentScheduleConfigId })
+      .from(this.db.schema.expectedPaymentItems)
+      .where(eq(this.db.schema.expectedPaymentItems.id, itemId))
+      .limit(1)
+
+    if (!item) {
+      return null
+    }
+
+    // Get activity pricing from config
+    const [config] = await this.db.client
+      .select({ activityPricingId: this.db.schema.paymentScheduleConfig.activityPricingId })
+      .from(this.db.schema.paymentScheduleConfig)
+      .where(eq(this.db.schema.paymentScheduleConfig.id, item.paymentScheduleConfigId))
+      .limit(1)
+
+    if (!config?.activityPricingId) {
+      return null
+    }
+
+    return this.getTripContextFromActivityPricingId(config.activityPricingId)
   }
 
   // ============================================================================
@@ -1523,6 +1669,103 @@ export class PaymentSchedulesService {
   async ensureItemNotLocked(_itemId: string): Promise<void> {
     // TODO: Enable locking when columns are added via migration
     // For now, all items are considered unlocked
+  }
+
+  // ============================================================================
+  // Payment Reminder Scheduling
+  // ============================================================================
+
+  /**
+   * Schedule payment reminders for an expected payment item
+   * Sends reminders at: 7 days before, 3 days before, due date, 1 day overdue
+   */
+  private async schedulePaymentReminders(
+    paymentItemId: string,
+    tripId: string,
+    contactId: string,
+    agencyId: string,
+    dueDate: string | Date,
+  ): Promise<void> {
+    const reminderOffsets: Array<{ days: number; type: '7_days_before' | '3_days_before' | 'due_date' | '1_day_overdue' }> = [
+      { days: 7, type: '7_days_before' },
+      { days: 3, type: '3_days_before' },
+      { days: 0, type: 'due_date' },
+      { days: -1, type: '1_day_overdue' },
+    ]
+
+    const dueDateObj = typeof dueDate === 'string' ? new Date(dueDate) : dueDate
+    const now = new Date()
+
+    for (const { days, type } of reminderOffsets) {
+      const reminderDate = days >= 0 ? subDays(dueDateObj, days) : addDays(dueDateObj, Math.abs(days))
+
+      // Only schedule if reminder date is in the future
+      if (isAfter(reminderDate, now)) {
+        const jobId = getPaymentReminderJobId(paymentItemId, type)
+
+        try {
+          await this.automationService.scheduleAt(
+            QUEUES.CLIENT_CARE,
+            'payment.reminder',
+            {
+              type: 'payment.reminder' as const,
+              expectedPaymentItemId: paymentItemId,
+              tripId,
+              contactId,
+              agencyId,
+              reminderType: type,
+            },
+            reminderDate,
+            { jobId },
+          )
+
+          this.logger.debug(`Scheduled ${type} reminder for payment ${paymentItemId} at ${reminderDate.toISOString()}`)
+        } catch (error) {
+          // Log but don't fail - payment item creation should succeed even if scheduling fails
+          this.logger.warn(`Failed to schedule ${type} reminder for payment ${paymentItemId}: ${error}`)
+        }
+      }
+    }
+  }
+
+  /**
+   * Cancel all scheduled payment reminders for a payment item
+   */
+  private async cancelPaymentReminders(paymentItemId: string): Promise<void> {
+    const reminderTypes: Array<'7_days_before' | '3_days_before' | 'due_date' | '1_day_overdue'> = [
+      '7_days_before',
+      '3_days_before',
+      'due_date',
+      '1_day_overdue',
+    ]
+
+    for (const type of reminderTypes) {
+      const jobId = getPaymentReminderJobId(paymentItemId, type)
+      try {
+        await this.automationService.cancel(jobId, QUEUES.CLIENT_CARE)
+      } catch {
+        // Ignore cancellation errors - job may not exist
+      }
+    }
+
+    this.logger.debug(`Cancelled payment reminders for payment item ${paymentItemId}`)
+  }
+
+  /**
+   * Reschedule payment reminders when due date changes
+   */
+  private async reschedulePaymentReminders(
+    paymentItemId: string,
+    tripId: string,
+    contactId: string,
+    agencyId: string,
+    newDueDate: string | Date,
+  ): Promise<void> {
+    // Cancel existing reminders
+    await this.cancelPaymentReminders(paymentItemId)
+
+    // Schedule new reminders with the updated due date
+    await this.schedulePaymentReminders(paymentItemId, tripId, contactId, agencyId, newDueDate)
   }
 
   // ============================================================================

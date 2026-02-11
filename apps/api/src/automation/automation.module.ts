@@ -13,14 +13,17 @@
  * - Tour sync (stays as cron)
  */
 
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { BullModule } from '@nestjs/bullmq'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { DatabaseModule } from '../db/database.module'
+import { NotificationModule } from '../notifications/notification.module'
+import { EmailModule } from '../email/email.module'
 import { AutomationService } from './automation.service'
 import { TripAutomationProcessor } from './processors/trip-automation.processor'
 import { ClientCareProcessor } from './processors/client-care.processor'
 import { NotificationsProcessor } from './processors/notifications.processor'
+import { TripLifecycleListener } from './listeners/trip-lifecycle.listener'
 import { AutomationController } from './admin/automation.controller'
 import { QUEUES } from './automation.types'
 
@@ -97,6 +100,8 @@ import { QUEUES } from './automation.types'
     ),
 
     DatabaseModule,
+    forwardRef(() => NotificationModule),
+    EmailModule,
   ],
   controllers: [AutomationController],
   providers: [
@@ -104,6 +109,7 @@ import { QUEUES } from './automation.types'
     TripAutomationProcessor,
     ClientCareProcessor,
     NotificationsProcessor,
+    TripLifecycleListener,
   ],
   exports: [AutomationService],
 })

@@ -76,6 +76,7 @@ export class TripAutomationProcessor extends WorkerHost {
         status: this.db.schema.trips.status,
         name: this.db.schema.trips.name,
         primaryContactId: this.db.schema.trips.primaryContactId,
+        agencyId: this.db.schema.trips.agencyId,
         startDate: this.db.schema.trips.startDate,
         endDate: this.db.schema.trips.endDate,
       })
@@ -133,6 +134,7 @@ export class TripAutomationProcessor extends WorkerHost {
           tripId,
           trip.name,
           trip.primaryContactId,
+          trip.agencyId,
           true, // isAutoTransition
           trip.startDate,
         )
@@ -144,6 +146,7 @@ export class TripAutomationProcessor extends WorkerHost {
           tripId,
           trip.name,
           trip.primaryContactId,
+          trip.agencyId,
           true, // isAutoTransition
           trip.endDate,
         )

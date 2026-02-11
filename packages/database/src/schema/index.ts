@@ -133,6 +133,10 @@ export * from './geocoding-cache.schema'
 // Automation system (job queue history)
 export * from './automation-job-history.schema'
 
+// Notification system
+export * from './notification-preferences.schema'
+export * from './platform-notifications.schema'
+
 // Later phases:
 // export * from './financials.schema'
 // export * from './tasks.schema'
