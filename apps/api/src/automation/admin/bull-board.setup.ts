@@ -12,6 +12,7 @@ import { BullMQAdapter } from '@bull-board/api/bullMQAdapter'
 import { ExpressAdapter } from '@bull-board/express'
 import { Queue } from 'bullmq'
 import type { Request, Response, NextFunction } from 'express'
+import * as jwt from 'jsonwebtoken'
 import { QUEUE_NAMES } from '../automation.types'
 
 const logger = new Logger('BullBoard')
@@ -34,9 +35,8 @@ function bullBoardAuthMiddleware(jwtSecret: string) {
 
       const token = authHeader.substring(7)
 
-      // Dynamically import jsonwebtoken to verify token
-      const jwt = await import('jsonwebtoken')
-      const decoded = jwt.default.verify(token, jwtSecret) as {
+      // Verify JWT token
+      const decoded = jwt.verify(token, jwtSecret) as {
         role?: string
         app_metadata?: { role?: string }
       }
