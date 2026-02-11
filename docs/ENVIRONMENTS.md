@@ -158,6 +158,8 @@ origin: (origin, callback) => {
 | `DATABASE_URL` | tailfire-Dev Supabase | Tailfire-Preview Supabase | Tailfire-Prod Supabase |
 | `SUPABASE_URL` | tailfire-Dev URL | Tailfire-Preview URL | Tailfire-Prod URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | tailfire-Dev key | Tailfire-Preview key | Tailfire-Prod key |
+| `REDIS_URL` | `redis://localhost:6379` | Railway Redis | Railway Redis |
+| `ENABLE_BULL_BOARD` | `true` (implicit) | `true` | `false` (set to enable) |
 | `CORS_ORIGINS` | (default localhost) | Preview allowlist | Prod allowlist |
 | `ADMIN_URL` | `http://localhost:3100` | `https://tailfire-dev.phoenixvoyages.ca` | `https://tailfire.phoenixvoyages.ca` |
 | `RUN_MIGRATIONS_ON_STARTUP` | `true` (implicit) | `false` | `false` |
@@ -370,8 +372,48 @@ The storage provider is initialized at API startup and logged:
 
 ---
 
+## Redis Configuration (Automation System)
+
+Tailfire uses Redis for the BullMQ job queue system (trip auto-transitions, notifications, etc.).
+
+### Redis by Environment
+
+| Environment | Redis Source | URL |
+|-------------|--------------|-----|
+| **Local Dev** | Docker container | `redis://localhost:6379` |
+| **Cloud Preview** | Railway Redis service | Auto-injected by Railway |
+| **Production** | Railway Redis service | Auto-injected by Railway |
+
+### Local Development Setup
+
+```bash
+# Start Redis with Docker
+docker run -d --name tailfire-redis -p 6379:6379 redis:7-alpine
+
+# Verify connection
+redis-cli ping  # Should return PONG
+```
+
+### Railway Redis
+
+Redis is automatically provisioned and connected in Railway environments:
+- Navigate to Railway Dashboard → Project → New → Database → Redis
+- Railway auto-injects `REDIS_URL` into the API service
+
+### Redis Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
+| `ENABLE_BULL_BOARD` | Enable Bull Board dashboard | `true` in dev, `false` in prod |
+
+See [Automation System](./AUTOMATION.md) for detailed job queue documentation.
+
+---
+
 ## Related Documentation
 
 - [Local Development](./LOCAL_DEV.md) - Port assignments and startup commands
 - [CI/CD Pipeline](./CI_CD.md) - Deployment workflows
 - [API Deployment](./DEPLOYMENT_API.md) - Railway configuration
+- [Automation System](./AUTOMATION.md) - Job queues and trip auto-transitions

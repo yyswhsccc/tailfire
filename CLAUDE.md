@@ -346,6 +346,59 @@ The `StorageProviderFactory` must NOT call `credentialResolver.isAvailable()` be
 ### Unsplash Integration
 Stock photos are provided via Unsplash API. Credentials are managed through Doppler as a shared credential across environments.
 
+## Automation System (BullMQ + Redis)
+
+The API includes a centralized job queue system for scheduled and delayed tasks using BullMQ + Redis.
+
+### Key Features
+- **Trip Auto-Transitions**: Automatic status changes (booked → in_progress → completed) based on dates
+- **Bull Board Dashboard**: Admin UI at `/admin/queues` for monitoring jobs
+- **Job History**: Permanent audit trail in `automation_job_history` table
+- **Timezone-Aware**: Jobs scheduled in trip's local timezone
+
+### Queues
+| Queue | Purpose |
+|-------|---------|
+| `trip-automation` | Status transitions, reminders |
+| `client-care` | Emails, follow-ups |
+| `notifications` | Push, email, SMS delivery |
+
+### Key Files
+- `apps/api/src/automation/automation.module.ts` - BullMQ configuration
+- `apps/api/src/automation/automation.service.ts` - Central scheduling API
+- `apps/api/src/automation/processors/trip-automation.processor.ts` - Trip status transitions
+- `apps/api/src/automation/admin/bull-board.setup.ts` - Dashboard setup
+
+### Environment Variables
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
+| `ENABLE_BULL_BOARD` | Enable Bull Board in production | `false` |
+
+### Local Development
+```bash
+# Start Redis with Docker
+docker run -d --name tailfire-redis -p 6379:6379 redis:7-alpine
+
+# Verify connection
+redis-cli ping  # Should return PONG
+```
+
+### Admin API Endpoints
+```bash
+# Get queue counts
+curl http://localhost:3101/api/v1/admin/automation/queues \
+  -H "Authorization: Bearer $TOKEN"
+
+# Trigger trip backfill
+curl -X POST http://localhost:3101/api/v1/admin/automation/trips/backfill \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"batchSize": 100}'
+```
+
+See `docs/AUTOMATION.md` for detailed documentation.
+
 ## Cruise Catalog (FDW Architecture)
 
 The cruise catalog data is synchronized from Traveltek FTP and uses Foreign Data Wrapper (FDW) to share data across environments.

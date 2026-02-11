@@ -205,6 +205,50 @@ Supabase CLI migrations are deprecated (archived in `_archive/`).
 
 ---
 
+## Automation System (BullMQ + Redis)
+
+The API includes a centralized job queue system for scheduled and delayed tasks:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         NestJS API                               │
+│  ┌──────────────────┐    ┌─────────────────────────────────┐   │
+│  │  Business Logic  │───▶│      AutomationModule           │   │
+│  │  (TripsService)  │    │  - AutomationService            │   │
+│  └──────────────────┘    │  - TripAutomationProcessor      │   │
+│                          │  - ClientCareProcessor          │   │
+│                          │  - NotificationsProcessor       │   │
+│                          └─────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                          ┌─────────────────┐
+                          │  Redis (Railway) │
+                          └─────────────────┘
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Trip Auto-Transitions** | Automatic status changes based on start/end dates |
+| **Timezone-Aware** | Jobs scheduled in trip's local timezone |
+| **Deterministic IDs** | Prevents duplicate jobs |
+| **Bull Board** | Admin dashboard at `/admin/queues` |
+| **Job History** | Permanent audit trail in PostgreSQL |
+
+### Queues
+
+| Queue | Purpose |
+|-------|---------|
+| `trip-automation` | Status transitions, reminders |
+| `client-care` | Emails, follow-ups |
+| `notifications` | Push, email, SMS |
+
+**See [Automation System](./AUTOMATION.md) for detailed documentation.**
+
+---
+
 ## Application Responsibilities
 
 | App | Purpose | Users |
@@ -230,5 +274,6 @@ Supabase CLI migrations are deprecated (archived in `_archive/`).
 
 - [Security Model](./SECURITY.md) - Authentication, authorization, RLS
 - [Database Architecture](./DATABASE_ARCHITECTURE.md) - Schema details, FDW setup
+- [Automation System](./AUTOMATION.md) - Job queues, trip auto-transitions
 - [Environment Configuration](./ENVIRONMENTS.md) - Domains, CORS, env vars
 - [CI/CD Pipeline](./CI_CD.md) - Deployment workflows
