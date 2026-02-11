@@ -36,7 +36,7 @@ function bullBoardAuthMiddleware(jwtSecret: string) {
 
       // Dynamically import jsonwebtoken to verify token
       const jwt = await import('jsonwebtoken')
-      const decoded = jwt.verify(token, jwtSecret) as {
+      const decoded = jwt.default.verify(token, jwtSecret) as {
         role?: string
         app_metadata?: { role?: string }
       }
