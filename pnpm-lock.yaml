@@ -355,6 +355,9 @@ importers:
       ioredis:
         specifier: ^5.9.2
         version: 5.9.2
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
       jwks-rsa:
         specifier: ^3.2.0
         version: 3.2.0
