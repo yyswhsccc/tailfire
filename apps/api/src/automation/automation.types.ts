@@ -218,12 +218,15 @@ export type JobStatus =
 
 export interface JobStatusInfo {
   id: string
+  name: string
   status: JobStatus
   progress?: number
   data?: Record<string, unknown>
   failedReason?: string
   processedOn?: number
   finishedOn?: number
+  timestamp?: number
+  delay?: number
 }
 
 // ============================================================================

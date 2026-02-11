@@ -366,12 +366,15 @@ export class AutomationService implements OnModuleInit {
     const state = await job.getState()
     return {
       id: job.id ?? 'unknown',
+      name: job.name,
       status: state as JobStatus,
       progress: job.progress as number | undefined,
       data: job.data as Record<string, unknown>,
       failedReason: job.failedReason,
       processedOn: job.processedOn,
       finishedOn: job.finishedOn,
+      timestamp: job.timestamp,
+      delay: job.delay,
     }
   }
 
