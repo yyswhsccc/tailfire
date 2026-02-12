@@ -12,7 +12,6 @@ import type {
   UnreadCountResponse,
   NotificationActionResponse,
   GetNotificationsParams,
-  NotificationCategory,
 } from '@tailfire/shared-types/api'
 
 // Query Keys
