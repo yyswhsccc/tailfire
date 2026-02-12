@@ -22,6 +22,7 @@ import { PlatformNotificationService } from './platform-notification.service'
 import { PushNotificationService } from './push-notification.service'
 import { NotificationPreferencesController } from './notification-preferences.controller'
 import { NotificationsController } from './notifications.controller'
+import { NotificationEventsListener } from './listeners/notification-events.listener'
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { NotificationsController } from './notifications.controller'
     NotificationService,
     PlatformNotificationService,
     PushNotificationService,
+    NotificationEventsListener,
   ],
   exports: [
     NotificationService,

@@ -1,0 +1,386 @@
+/**
+ * Notification Events Listener
+ *
+ * Listens to domain events and creates platform notifications for users.
+ * Routes notifications based on user preferences via NotificationService.
+ */
+
+import { Injectable, Logger } from '@nestjs/common'
+import { OnEvent } from '@nestjs/event-emitter'
+import { eq } from 'drizzle-orm'
+import { DatabaseService } from '../../db/database.service'
+import { NotificationService } from '../notification.service'
+import type { NotificationCategory } from '../notification.types'
+
+// Import event types
+import { TripCreatedEvent } from '../../activity-logs/events/trip-created.event'
+import { TripUpdatedEvent } from '../../activity-logs/events/trip-updated.event'
+import { TripBookedEvent } from '../../trips/events/trip-booked.event'
+import { TripInProgressEvent } from '../../trips/events/trip-in-progress.event'
+import { TripCompletedEvent } from '../../trips/events/trip-completed.event'
+import { TripCancelledEvent } from '../../trips/events/trip-cancelled.event'
+
+/**
+ * Payment overdue event (emitted by client-care processor)
+ */
+interface PaymentOverdueEvent {
+  tripId: string
+  tripName: string
+  contactId: string
+  agencyId: string
+  paymentItemId: string
+  paymentName: string
+  amountDue: number
+  daysOverdue: number
+}
+
+/**
+ * Payment received event
+ */
+interface PaymentReceivedEvent {
+  tripId: string
+  paymentItemId: string
+  amount: number
+  tripOwnerId?: string
+}
+
+@Injectable()
+export class NotificationEventsListener {
+  private readonly logger = new Logger(NotificationEventsListener.name)
+
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly notificationService: NotificationService,
+  ) {}
+
+  // =========================================================================
+  // Trip Events
+  // =========================================================================
+
+  /**
+   * Handle trip.created event
+   * Notify owner when a new trip (lead) is created and assigned to them
+   */
+  @OnEvent('trip.created')
+  async handleTripCreated(event: TripCreatedEvent): Promise<void> {
+    const { tripId, tripName, actorId, metadata } = event
+
+    // Get the trip to find the owner and agency
+    const trip = await this.getTrip(tripId)
+    if (!trip) return
+
+    // Only notify if trip has an owner (assigned lead)
+    if (!trip.ownerId) {
+      this.logger.debug(`Trip ${tripId} has no owner - skipping notification`)
+      return
+    }
+
+    // Don't notify if the owner created the trip themselves
+    if (actorId === trip.ownerId) {
+      this.logger.debug(`Trip ${tripId} owner is the creator - skipping notification`)
+      return
+    }
+
+    const status = metadata?.status || 'inbound'
+    const isInbound = status === 'inbound'
+
+    await this.notificationService.send({
+      userId: trip.ownerId,
+      category: isInbound ? 'assignment' : 'trip_updates',
+      title: isInbound ? 'New Lead Assigned' : 'New Trip Created',
+      body: isInbound
+        ? `A new lead "${tripName}" has been assigned to you`
+        : `Trip "${tripName}" has been created`,
+      actionUrl: `/trips/${tripId}`,
+      data: {
+        tripId,
+        tripName,
+        status,
+        notificationType: isInbound ? 'trip.lead_assigned' : 'trip.created',
+      },
+    })
+
+    this.logger.debug(`Sent trip.created notification to user ${trip.ownerId} for trip ${tripId}`)
+  }
+
+  /**
+   * Handle trip.updated event
+   * Notify new owner when a trip is reassigned
+   */
+  @OnEvent('trip.updated')
+  async handleTripUpdated(event: TripUpdatedEvent): Promise<void> {
+    const { tripId, tripName, actorId, changes } = event
+
+    // Check if owner changed
+    if (!changes?.ownerId) return
+
+    const newOwnerId = changes.ownerId as string
+
+    // Don't notify if the new owner made the change themselves
+    if (actorId === newOwnerId) {
+      this.logger.debug(`Trip ${tripId} new owner is the actor - skipping notification`)
+      return
+    }
+
+    // Get the trip to find agency
+    const trip = await this.getTrip(tripId)
+    if (!trip) return
+
+    await this.notificationService.send({
+      userId: newOwnerId,
+      category: 'assignment',
+      title: 'Trip Assigned to You',
+      body: `Trip "${tripName}" has been assigned to you`,
+      actionUrl: `/trips/${tripId}`,
+      data: {
+        tripId,
+        tripName,
+        notificationType: 'trip.assigned',
+        previousOwnerId: actorId,
+      },
+    })
+
+    this.logger.debug(`Sent trip.assigned notification to user ${newOwnerId} for trip ${tripId}`)
+  }
+
+  /**
+   * Handle trip.booked event
+   * Notify trip owner when a trip is booked
+   */
+  @OnEvent('trip.booked')
+  async handleTripBooked(event: TripBookedEvent): Promise<void> {
+    const { tripId, bookingDate } = event
+
+    const trip = await this.getTrip(tripId)
+    if (!trip || !trip.ownerId) return
+
+    await this.notificationService.send({
+      userId: trip.ownerId,
+      category: 'booking_alerts',
+      title: 'Trip Booked',
+      body: `Trip "${trip.name}" has been booked`,
+      actionUrl: `/trips/${tripId}`,
+      data: {
+        tripId,
+        tripName: trip.name,
+        bookingDate,
+        notificationType: 'trip.booked',
+      },
+    })
+
+    this.logger.debug(`Sent trip.booked notification to user ${trip.ownerId} for trip ${tripId}`)
+  }
+
+  /**
+   * Handle trip.in_progress event
+   * Notify trip owner when a trip starts (traveling)
+   */
+  @OnEvent('trip.in_progress')
+  async handleTripInProgress(event: TripInProgressEvent): Promise<void> {
+    const { tripId, tripName, agencyId, isAutoTransition, startDate } = event
+
+    const trip = await this.getTrip(tripId)
+    if (!trip || !trip.ownerId) return
+
+    await this.notificationService.send({
+      userId: trip.ownerId,
+      category: 'trip_updates',
+      title: 'Trip Started',
+      body: isAutoTransition
+        ? `Trip "${tripName}" has automatically started (departure date reached)`
+        : `Trip "${tripName}" is now in progress`,
+      actionUrl: `/trips/${tripId}`,
+      data: {
+        tripId,
+        tripName,
+        startDate,
+        isAutoTransition,
+        notificationType: 'trip.in_progress',
+      },
+    })
+
+    this.logger.debug(`Sent trip.in_progress notification to user ${trip.ownerId} for trip ${tripId}`)
+  }
+
+  /**
+   * Handle trip.completed event
+   * Notify trip owner when a trip completes
+   */
+  @OnEvent('trip.completed')
+  async handleTripCompleted(event: TripCompletedEvent): Promise<void> {
+    const { tripId, tripName, agencyId, isAutoTransition, endDate } = event
+
+    const trip = await this.getTrip(tripId)
+    if (!trip || !trip.ownerId) return
+
+    await this.notificationService.send({
+      userId: trip.ownerId,
+      category: 'trip_updates',
+      title: 'Trip Completed',
+      body: isAutoTransition
+        ? `Trip "${tripName}" has automatically completed (return date passed)`
+        : `Trip "${tripName}" has been marked as completed`,
+      actionUrl: `/trips/${tripId}`,
+      data: {
+        tripId,
+        tripName,
+        endDate,
+        isAutoTransition,
+        notificationType: 'trip.completed',
+      },
+    })
+
+    this.logger.debug(`Sent trip.completed notification to user ${trip.ownerId} for trip ${tripId}`)
+  }
+
+  /**
+   * Handle trip.cancelled event
+   * Notify trip owner when a trip is cancelled
+   */
+  @OnEvent('trip.cancelled')
+  async handleTripCancelled(event: TripCancelledEvent): Promise<void> {
+    const { tripId, tripName, cancelledBy, cancellationReason } = event
+
+    const trip = await this.getTrip(tripId)
+    if (!trip || !trip.ownerId) return
+
+    // Don't notify if the owner cancelled it themselves
+    if (cancelledBy === trip.ownerId) {
+      this.logger.debug(`Trip ${tripId} owner cancelled it - skipping notification`)
+      return
+    }
+
+    await this.notificationService.send({
+      userId: trip.ownerId,
+      category: 'trip_updates',
+      title: 'Trip Cancelled',
+      body: cancellationReason
+        ? `Trip "${tripName}" has been cancelled: ${cancellationReason}`
+        : `Trip "${tripName}" has been cancelled`,
+      actionUrl: `/trips/${tripId}`,
+      data: {
+        tripId,
+        tripName,
+        reason: cancellationReason,
+        cancelledBy,
+        notificationType: 'trip.cancelled',
+      },
+    })
+
+    this.logger.debug(`Sent trip.cancelled notification to user ${trip.ownerId} for trip ${tripId}`)
+  }
+
+  // =========================================================================
+  // Payment Events
+  // =========================================================================
+
+  /**
+   * Handle payment.overdue event
+   * Notify trip owner when a payment becomes overdue
+   */
+  @OnEvent('payment.overdue')
+  async handlePaymentOverdue(event: PaymentOverdueEvent): Promise<void> {
+    const { tripId, tripName, paymentItemId, paymentName, amountDue, daysOverdue } = event
+
+    const trip = await this.getTrip(tripId)
+    if (!trip || !trip.ownerId) return
+
+    const formattedAmount = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amountDue / 100)
+
+    await this.notificationService.send({
+      userId: trip.ownerId,
+      category: 'payment_alert',
+      title: 'Payment Overdue',
+      body: `Payment "${paymentName}" (${formattedAmount}) for trip "${tripName}" is ${daysOverdue} day${daysOverdue > 1 ? 's' : ''} overdue`,
+      actionUrl: `/trips/${tripId}/payments`,
+      data: {
+        tripId,
+        tripName,
+        paymentItemId,
+        paymentName,
+        amountDue,
+        daysOverdue,
+        notificationType: 'payment.overdue',
+      },
+    })
+
+    this.logger.debug(`Sent payment.overdue notification to user ${trip.ownerId} for trip ${tripId}`)
+  }
+
+  /**
+   * Handle payment.received event
+   * Notify trip owner when a payment is received
+   */
+  @OnEvent('payment.received')
+  async handlePaymentReceived(event: PaymentReceivedEvent): Promise<void> {
+    const { tripId, paymentItemId, amount, tripOwnerId } = event
+
+    // If we have the owner ID directly, use it
+    let ownerId = tripOwnerId
+    let tripName = ''
+
+    if (!ownerId) {
+      const trip = await this.getTrip(tripId)
+      if (!trip || !trip.ownerId) return
+      ownerId = trip.ownerId
+      tripName = trip.name
+    } else {
+      const trip = await this.getTrip(tripId)
+      tripName = trip?.name || 'Unknown trip'
+    }
+
+    const formattedAmount = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount / 100)
+
+    await this.notificationService.send({
+      userId: ownerId,
+      category: 'payment_alert',
+      title: 'Payment Received',
+      body: `A payment of ${formattedAmount} has been received for trip "${tripName}"`,
+      actionUrl: `/trips/${tripId}/payments`,
+      data: {
+        tripId,
+        tripName,
+        paymentItemId,
+        amount,
+        notificationType: 'payment.received',
+      },
+    })
+
+    this.logger.debug(`Sent payment.received notification to user ${ownerId} for trip ${tripId}`)
+  }
+
+  // =========================================================================
+  // Helper Methods
+  // =========================================================================
+
+  /**
+   * Get trip by ID with owner and agency info
+   */
+  private async getTrip(tripId: string): Promise<{
+    id: string
+    name: string
+    ownerId: string | null
+    agencyId: string
+    status: string
+  } | null> {
+    const [trip] = await this.db.client
+      .select({
+        id: this.db.schema.trips.id,
+        name: this.db.schema.trips.name,
+        ownerId: this.db.schema.trips.ownerId,
+        agencyId: this.db.schema.trips.agencyId,
+        status: this.db.schema.trips.status,
+      })
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.id, tripId))
+      .limit(1)
+
+    return trip || null
+  }
+}
