@@ -178,7 +178,7 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
           size="sm"
           className="w-full text-xs"
           onClick={() => {
-            router.push('/settings/notifications')
+            router.push('/profile?tab=notifications')
             onClose?.()
           }}
         >
