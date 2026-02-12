@@ -84,7 +84,7 @@ export function useMarkAsRead() {
 
   return useMutation({
     mutationFn: (id: string) => api.patch<NotificationActionResponse>(`/notifications/${id}/read`),
-    onMutate: async (id) => {
+    onMutate: async (_id) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: notificationKeys.all })
 
@@ -122,7 +122,7 @@ export function useDismissNotification() {
 
   return useMutation({
     mutationFn: (id: string) => api.patch<NotificationActionResponse>(`/notifications/${id}/dismiss`),
-    onMutate: async (id) => {
+    onMutate: async (_id) => {
       await queryClient.cancelQueries({ queryKey: notificationKeys.all })
 
       const previousUnreadCount = queryClient.getQueryData<UnreadCountResponse>(notificationKeys.unreadCount())
