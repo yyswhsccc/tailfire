@@ -21,6 +21,7 @@ import { NotificationService } from './notification.service'
 import { PlatformNotificationService } from './platform-notification.service'
 import { PushNotificationService } from './push-notification.service'
 import { NotificationPreferencesController } from './notification-preferences.controller'
+import { NotificationsController } from './notifications.controller'
 
 @Module({
   imports: [
@@ -28,7 +29,7 @@ import { NotificationPreferencesController } from './notification-preferences.co
     DatabaseModule,
     forwardRef(() => EmailModule),
   ],
-  controllers: [NotificationPreferencesController],
+  controllers: [NotificationPreferencesController, NotificationsController],
   providers: [
     NotificationService,
     PlatformNotificationService,
