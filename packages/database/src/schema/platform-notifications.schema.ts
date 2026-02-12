@@ -26,6 +26,7 @@ export const platformNotificationStatusEnum = pgEnum('platform_notification_stat
  * - Title and body content
  * - Deep link URL for navigation
  * - Read/dismissed status tracking
+ * - Entity references for deeplinking
  */
 export const platformNotifications = pgTable(
   'platform_notifications',
@@ -51,6 +52,12 @@ export const platformNotifications = pgTable(
 
     // Status tracking
     status: platformNotificationStatusEnum('status').default('unread').notNull(),
+
+    // Notification type and entity references (added for better filtering)
+    notificationType: varchar('notification_type', { length: 100 }),
+    entityType: varchar('entity_type', { length: 50 }),
+    entityId: uuid('entity_id'),
+    dedupeKey: varchar('dedupe_key', { length: 255 }),
 
     // Timestamps
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

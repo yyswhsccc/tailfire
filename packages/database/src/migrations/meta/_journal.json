@@ -701,6 +701,13 @@
       "when": 1770900001000,
       "tag": "20260211000001_add_trip_status_tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1770987639000,
+      "tag": "20260212150039_enable_notification_rls_and_realtime",
+      "breakpoints": true
     }
   ]
 }
