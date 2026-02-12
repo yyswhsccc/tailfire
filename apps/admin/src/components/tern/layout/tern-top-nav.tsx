@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useMyProfile } from '@/hooks/use-user-profile'
+import { NotificationBell } from '@/components/notifications'
 
 const navigation = [
   { name: 'Trips', href: '/trips' },
@@ -105,6 +106,9 @@ export function TernTopNav() {
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <Calendar className="h-4 w-4 text-tern-gray-600" />
           </Button>
+
+          {/* Notifications */}
+          <NotificationBell />
 
           {/* Help Icon */}
           <DropdownMenu>
