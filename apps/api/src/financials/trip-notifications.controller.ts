@@ -1,12 +1,13 @@
 /**
  * Trip Notifications Controller
  *
- * REST API endpoints for financial trip notifications.
+ * REST API endpoints for financial trip notifications (alerts about trips).
+ * NOTE: Uses 'trip-notifications' prefix to avoid conflict with platform notifications.
  *
  * Endpoints:
  * - GET /trips/:tripId/notifications - Get notifications for a trip
- * - GET /notifications/:id - Get a single notification
- * - POST /notifications/:id/dismiss - Dismiss a notification
+ * - GET /trip-notifications/:id - Get a single trip notification
+ * - POST /trip-notifications/:id/dismiss - Dismiss a trip notification
  */
 
 import { Controller, Get, Post, Param, Query, Body } from '@nestjs/common'
@@ -37,19 +38,19 @@ export class TripNotificationsController {
   }
 
   /**
-   * Get a single notification by ID
-   * GET /notifications/:id
+   * Get a single trip notification by ID
+   * GET /trip-notifications/:id
    */
-  @Get('notifications/:id')
+  @Get('trip-notifications/:id')
   async getNotification(@Param('id') id: string): Promise<TripNotificationResponseDto> {
     return this.notificationsService.getNotification(id)
   }
 
   /**
-   * Dismiss a notification
-   * POST /notifications/:id/dismiss
+   * Dismiss a trip notification
+   * POST /trip-notifications/:id/dismiss
    */
-  @Post('notifications/:id/dismiss')
+  @Post('trip-notifications/:id/dismiss')
   async dismissNotification(
     @Param('id') id: string,
     @Body() dto: DismissNotificationDto

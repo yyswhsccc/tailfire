@@ -10,7 +10,7 @@ import { OnEvent } from '@nestjs/event-emitter'
 import { eq } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
 import { NotificationService } from '../notification.service'
-import type { NotificationCategory } from '../notification.types'
+// NotificationCategory type available from '../notification.types' if needed
 
 // Import event types
 import { TripCreatedEvent } from '../../activity-logs/events/trip-created.event'
@@ -177,7 +177,7 @@ export class NotificationEventsListener {
    */
   @OnEvent('trip.in_progress')
   async handleTripInProgress(event: TripInProgressEvent): Promise<void> {
-    const { tripId, tripName, agencyId, isAutoTransition, startDate } = event
+    const { tripId, tripName, isAutoTransition, startDate } = event
 
     const trip = await this.getTrip(tripId)
     if (!trip || !trip.ownerId) return
@@ -208,7 +208,7 @@ export class NotificationEventsListener {
    */
   @OnEvent('trip.completed')
   async handleTripCompleted(event: TripCompletedEvent): Promise<void> {
-    const { tripId, tripName, agencyId, isAutoTransition, endDate } = event
+    const { tripId, tripName, isAutoTransition, endDate } = event
 
     const trip = await this.getTrip(tripId)
     if (!trip || !trip.ownerId) return
