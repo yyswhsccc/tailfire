@@ -134,7 +134,7 @@ export function NotificationsTab() {
         emailEnabled: preferences.emailEnabled,
         pushEnabled: preferences.pushEnabled,
         platformEnabled: preferences.platformEnabled,
-        categoryPreferences: preferences.categoryPreferences || defaultCategoryPreferences,
+        categoryPreferences: { ...defaultCategoryPreferences, ...preferences.categoryPreferences },
         quietHoursStart: preferences.quietHoursStart || '',
         quietHoursEnd: preferences.quietHoursEnd || '',
         timezone: preferences.timezone || 'America/Toronto',
