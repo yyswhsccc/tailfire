@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
+import { NotificationBell } from '@/components/notifications'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -27,8 +28,9 @@ export function Sidebar() {
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-background">
-      <div className="flex h-16 items-center border-b px-6">
+      <div className="flex h-16 items-center justify-between border-b px-6">
         <h1 className="text-xl font-bold">Tailfire Beta</h1>
+        <NotificationBell />
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">

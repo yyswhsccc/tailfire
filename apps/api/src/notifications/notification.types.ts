@@ -13,6 +13,23 @@ export type NotificationCategory =
   | 'client_care'
   | 'booking_alerts'
   | 'system_alerts'
+  | 'assignment'
+  | 'collaboration'
+  | 'payment_alert'
+
+/**
+ * Valid notification category values for validation
+ */
+export const NOTIFICATION_CATEGORY_VALUES = [
+  'payment_reminders',
+  'trip_updates',
+  'client_care',
+  'booking_alerts',
+  'system_alerts',
+  'assignment',
+  'collaboration',
+  'payment_alert',
+] as const
 
 /**
  * Notification channels
@@ -28,6 +45,9 @@ export interface CategoryPreferences {
   client_care?: NotificationChannel[]
   booking_alerts?: NotificationChannel[]
   system_alerts?: NotificationChannel[]
+  assignment?: NotificationChannel[]
+  collaboration?: NotificationChannel[]
+  payment_alert?: NotificationChannel[]
 }
 
 /**

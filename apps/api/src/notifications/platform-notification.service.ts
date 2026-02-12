@@ -30,6 +30,9 @@ interface PlatformNotificationDto {
   actionUrl: string | null
   metadata: Record<string, unknown> | null
   status: 'unread' | 'read' | 'dismissed'
+  notificationType: string | null
+  entityType: string | null
+  entityId: string | null
   createdAt: Date
   readAt: Date | null
   dismissedAt: Date | null
@@ -110,6 +113,105 @@ export class PlatformNotificationService {
       .limit(limit)
 
     return notifications.map(this.mapToDto)
+  }
+
+  /**
+   * Get paginated notifications for a user with cursor-based pagination
+   */
+  async getPaginated(
+    userId: string,
+    options: {
+      limit?: number
+      cursor?: string
+      includeRead?: boolean
+      includeDismissed?: boolean
+      category?: string
+    }
+  ): Promise<PlatformNotificationDto[]> {
+    const limit = options.limit ?? 50
+    const conditions = [eq(this.db.schema.platformNotifications.userId, userId)]
+
+    // Build status filter
+    const statusFilter: ('unread' | 'read' | 'dismissed')[] = ['unread']
+    if (options.includeRead) statusFilter.push('read')
+    if (options.includeDismissed) statusFilter.push('dismissed')
+
+    if (statusFilter.length < 3) {
+      conditions.push(inArray(this.db.schema.platformNotifications.status, statusFilter))
+    }
+
+    // Category filter
+    if (options.category) {
+      conditions.push(eq(this.db.schema.platformNotifications.category, options.category))
+    }
+
+    // Cursor-based pagination
+    if (options.cursor) {
+      // Get the cursor notification to compare
+      const cursorNotification = await this.db.client
+        .select({ createdAt: this.db.schema.platformNotifications.createdAt })
+        .from(this.db.schema.platformNotifications)
+        .where(eq(this.db.schema.platformNotifications.id, options.cursor))
+        .limit(1)
+
+      if (cursorNotification[0]) {
+        conditions.push(
+          sql`(${this.db.schema.platformNotifications.createdAt}, ${this.db.schema.platformNotifications.id}) < (${cursorNotification[0].createdAt}, ${options.cursor})`
+        )
+      }
+    }
+
+    const notifications = await this.db.client
+      .select()
+      .from(this.db.schema.platformNotifications)
+      .where(and(...conditions))
+      .orderBy(desc(this.db.schema.platformNotifications.createdAt), desc(this.db.schema.platformNotifications.id))
+      .limit(limit)
+
+    return notifications.map(this.mapToDto)
+  }
+
+  /**
+   * Get a single notification by ID
+   */
+  async getById(notificationId: string, userId?: string): Promise<PlatformNotificationDto | null> {
+    const conditions = [eq(this.db.schema.platformNotifications.id, notificationId)]
+    if (userId) {
+      conditions.push(eq(this.db.schema.platformNotifications.userId, userId))
+    }
+
+    const [notification] = await this.db.client
+      .select()
+      .from(this.db.schema.platformNotifications)
+      .where(and(...conditions))
+      .limit(1)
+
+    return notification ? this.mapToDto(notification) : null
+  }
+
+  /**
+   * Mark multiple notifications as read
+   */
+  async markMultipleAsRead(notificationIds: string[], userId?: string): Promise<number> {
+    if (notificationIds.length === 0) return 0
+
+    const conditions = [
+      inArray(this.db.schema.platformNotifications.id, notificationIds),
+      eq(this.db.schema.platformNotifications.status, 'unread'),
+    ]
+    if (userId) {
+      conditions.push(eq(this.db.schema.platformNotifications.userId, userId))
+    }
+
+    const result = await this.db.client
+      .update(this.db.schema.platformNotifications)
+      .set({
+        status: 'read',
+        readAt: new Date(),
+      })
+      .where(and(...conditions))
+
+    return result.count ?? 0
   }
 
   /**
@@ -220,6 +322,9 @@ export class PlatformNotificationService {
       actionUrl: notification.actionUrl,
       metadata: notification.metadata,
       status: notification.status,
+      notificationType: notification.notificationType,
+      entityType: notification.entityType,
+      entityId: notification.entityId,
       createdAt: notification.createdAt,
       readAt: notification.readAt,
       dismissedAt: notification.dismissedAt,

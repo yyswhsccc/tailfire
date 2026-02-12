@@ -73,5 +73,11 @@ export * from './geolocation.types.js'
 // Suppliers
 export * from './suppliers.types.js'
 
+// Notifications
+export * from './notifications.types.js'
+
+// Activity Logs
+export * from './activity-logs.types.js'
+
 // Future exports:
 // export * from './auth.types'

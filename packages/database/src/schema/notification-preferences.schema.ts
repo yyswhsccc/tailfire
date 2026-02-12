@@ -18,6 +18,9 @@ export type NotificationCategory =
   | 'client_care'
   | 'booking_alerts'
   | 'system_alerts'
+  | 'assignment'
+  | 'collaboration'
+  | 'payment_alert'
 
 /**
  * Notification channel types
@@ -33,6 +36,9 @@ export interface CategoryPreferences {
   client_care?: NotificationChannel[]
   booking_alerts?: NotificationChannel[]
   system_alerts?: NotificationChannel[]
+  assignment?: NotificationChannel[]
+  collaboration?: NotificationChannel[]
+  payment_alert?: NotificationChannel[]
 }
 
 /**
@@ -55,6 +61,9 @@ export const DEFAULT_CATEGORY_PREFERENCES: CategoryPreferences = {
   client_care: ['email'],
   booking_alerts: ['email', 'push', 'platform'],
   system_alerts: ['platform'],
+  assignment: ['email', 'push', 'platform'],
+  collaboration: ['email', 'platform'],
+  payment_alert: ['email', 'push', 'platform'],
 }
 
 /**

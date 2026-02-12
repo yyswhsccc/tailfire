@@ -427,6 +427,9 @@ export class NotificationService {
       client_care: ['email'],
       booking_alerts: ['email', 'push', 'platform'],
       system_alerts: ['platform'],
+      assignment: ['email', 'push', 'platform'],
+      collaboration: ['email', 'platform'],
+      payment_alert: ['email', 'push', 'platform'],
     }
 
     if (!prefs?.categoryPreferences) {
