@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useRef, useState, useEffect, type ReactNode } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 /**
  * Form handler registered by each tab
@@ -39,12 +40,37 @@ interface ProfileFormProviderProps {
   defaultTab?: string
 }
 
+const VALID_TABS = ['public', 'agent', 'preferences', 'notifications', 'templates', 'tags', 'marketing', 'security']
+
 export function ProfileFormProvider({ children, defaultTab = 'public' }: ProfileFormProviderProps) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  // Get tab from URL or use default
+  const tabFromUrl = searchParams.get('tab')
+  const initialTab = tabFromUrl && VALID_TABS.includes(tabFromUrl) ? tabFromUrl : defaultTab
+
   // Use ref for handlers to avoid re-render cycles on registration
   const handlersRef = useRef<Map<string, FormHandler>>(new Map())
-  const [activeTab, setActiveTab] = useState(defaultTab)
+  const [activeTab, setActiveTabState] = useState(initialTab)
   // Counter to force re-render when isPending changes
   const [, setUpdateCounter] = useState(0)
+
+  // Sync tab state when URL changes (e.g., from notification panel click)
+  useEffect(() => {
+    if (tabFromUrl && VALID_TABS.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTabState(tabFromUrl)
+    }
+  }, [tabFromUrl, activeTab])
+
+  // Update URL when tab changes
+  const setActiveTab = useCallback((tab: string) => {
+    setActiveTabState(tab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', tab)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, router, pathname])
 
   const registerForm = useCallback((tabId: string, handler: FormHandler) => {
     handlersRef.current.set(tabId, handler)

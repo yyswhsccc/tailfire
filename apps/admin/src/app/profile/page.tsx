@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { Loader2 } from 'lucide-react'
 import { TernDashboardLayout } from '@/components/tern/layout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -12,6 +13,7 @@ import { ProfileFormProvider, useProfileForm } from './_components/profile-form-
 import { PublicProfileTab } from './_components/public-profile-tab'
 import { AgentInfoTab } from './_components/agent-info-tab'
 import { PreferencesTab } from './_components/preferences-tab'
+import { NotificationsTab } from './_components/notifications-tab'
 import { SecurityTab } from './_components/security-tab'
 
 function ProfilePageHeader() {
@@ -64,7 +66,7 @@ function ComingSoonTab({ title }: { title: string }) {
 }
 
 // Tabs that have form registration (show Save button)
-const SAVEABLE_TABS = ['public', 'agent', 'preferences']
+const SAVEABLE_TABS = ['public', 'agent', 'preferences', 'notifications']
 
 function ProfileContent() {
   const { activeTab, setActiveTab, submitActiveForm, isSubmitting } = useProfileForm()
@@ -119,7 +121,7 @@ function ProfileContent() {
         </TabsContent>
 
         <TabsContent value="notifications">
-          <ComingSoonTab title="Notifications" />
+          <NotificationsTab />
         </TabsContent>
 
         <TabsContent value="templates">
@@ -142,12 +144,22 @@ function ProfileContent() {
   )
 }
 
+function ProfilePageLoading() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  )
+}
+
 export default function ProfilePage() {
   return (
     <TernDashboardLayout>
-      <ProfileFormProvider defaultTab="public">
-        <ProfileContent />
-      </ProfileFormProvider>
+      <Suspense fallback={<ProfilePageLoading />}>
+        <ProfileFormProvider defaultTab="public">
+          <ProfileContent />
+        </ProfileFormProvider>
+      </Suspense>
     </TernDashboardLayout>
   )
 }
