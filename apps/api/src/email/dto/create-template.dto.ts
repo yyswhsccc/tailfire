@@ -16,7 +16,7 @@ import {
   Matches,
 } from 'class-validator'
 import { Type } from 'class-transformer'
-import type { EmailCategory } from '@tailfire/shared-types'
+import { EMAIL_CATEGORY_VALUES, type EmailCategory } from '@tailfire/shared-types'
 
 class VariableDefinitionDto {
   @IsString()
@@ -74,7 +74,7 @@ export class CreateEmailTemplateDto {
   variables?: VariableDefinitionDto[]
 
   @IsOptional()
-  @IsIn(['trip_order', 'notification', 'marketing', 'system'])
+  @IsIn(EMAIL_CATEGORY_VALUES)
   category?: EmailCategory
 
   @IsOptional()
@@ -111,7 +111,7 @@ export class UpdateEmailTemplateDto {
   variables?: VariableDefinitionDto[]
 
   @IsOptional()
-  @IsIn(['trip_order', 'notification', 'marketing', 'system'])
+  @IsIn(EMAIL_CATEGORY_VALUES)
   category?: EmailCategory
 
   @IsOptional()

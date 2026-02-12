@@ -1,6 +1,6 @@
 'use client'
 
-import { Ship, CalendarClock, Map, Package, MapPin, Building2 } from 'lucide-react'
+import { Ship, CalendarClock, Map, Package, MapPin, Building2, Mail } from 'lucide-react'
 import { TernDetailLayout } from '@/components/tern/layout/tern-detail-layout'
 import type { SidebarSection } from '@/components/tern/layout/tern-detail-sidebar'
 
@@ -42,6 +42,16 @@ const librarySections: SidebarSection[] = [
         name: 'Payment Schedules',
         href: '/library/payment-schedules',
         icon: CalendarClock,
+      },
+    ],
+  },
+  {
+    title: 'Communications',
+    items: [
+      {
+        name: 'Email Templates',
+        href: '/library/notifications',
+        icon: Mail,
       },
     ],
   },

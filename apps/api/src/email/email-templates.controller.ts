@@ -19,6 +19,8 @@ import {
   HttpStatus,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
+import { IsOptional, IsString, IsBoolean, IsIn } from 'class-validator'
+import { Transform } from 'class-transformer'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import { EmailService } from './email.service'
 import { EmailTemplatesService } from './email-templates.service'
@@ -27,17 +29,35 @@ import {
   SendTemplatedEmailDto,
   CreateEmailTemplateDto,
   UpdateEmailTemplateDto,
+  SendTestEmailDto,
 } from './dto'
+import {
+  renderWithSampleData,
+  getVariablesWithSampleValues,
+} from './sample-data'
 import type { AuthContext } from '../auth/auth.types'
-import type {
-  EmailResult,
-  EmailTemplateResponse,
-  EmailCategory,
+import {
+  EMAIL_CATEGORY_VALUES,
+  type EmailResult,
+  type EmailTemplateResponse,
+  type EmailCategory,
 } from '@tailfire/shared-types'
 
 class ListTemplatesQueryDto {
+  @IsOptional()
+  @IsIn(EMAIL_CATEGORY_VALUES)
   category?: EmailCategory
+
+  @IsOptional()
+  @IsString()
   search?: string
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined
+    return value === 'true' || value === true
+  })
   isActive?: boolean
 }
 
@@ -133,6 +153,89 @@ export class EmailTemplatesController {
     @Param('id', ParseUUIDPipe) id: string
   ): Promise<void> {
     await this.templatesService.deleteTemplate(id, auth.agencyId)
+  }
+
+  /**
+   * Preview a template with sample data
+   * Renders the template using realistic sample values for all variables
+   */
+  @Get(':slug/preview')
+  @ApiOperation({ summary: 'Preview template with sample data' })
+  @ApiResponse({ status: 200, description: 'Template preview rendered successfully' })
+  @ApiResponse({ status: 404, description: 'Template not found' })
+  async previewTemplate(
+    @GetAuthContext() auth: AuthContext,
+    @Param('slug') slug: string
+  ): Promise<{
+    subject: string
+    bodyHtml: string
+    bodyText: string | null
+    variables: Array<{ key: string; value: string; description: string }>
+  }> {
+    const template = await this.templatesService.getTemplateBySlug(slug, auth.agencyId)
+    if (!template) {
+      throw new NotFoundException(`Template "${slug}" not found`)
+    }
+
+    // Render with sample data
+    const subject = renderWithSampleData(template.subject)
+    const bodyHtml = renderWithSampleData(template.bodyHtml)
+    const bodyText = template.bodyText ? renderWithSampleData(template.bodyText) : null
+
+    // Extract variables used in template with their sample values
+    const variables = getVariablesWithSampleValues(
+      template.subject,
+      template.bodyHtml,
+      template.bodyText ?? undefined
+    )
+
+    return {
+      subject,
+      bodyHtml,
+      bodyText,
+      variables,
+    }
+  }
+
+  /**
+   * Send a test email using a template with sample data
+   * Sends to the current user or specified recipient
+   */
+  @Post(':slug/test')
+  @ApiOperation({ summary: 'Send test email with sample data' })
+  @ApiResponse({ status: 201, description: 'Test email sent successfully' })
+  @ApiResponse({ status: 404, description: 'Template not found' })
+  async sendTestEmail(
+    @GetAuthContext() auth: AuthContext,
+    @Param('slug') slug: string,
+    @Body() dto: SendTestEmailDto
+  ): Promise<EmailResult> {
+    const template = await this.templatesService.getTemplateBySlug(slug, auth.agencyId)
+    if (!template) {
+      throw new NotFoundException(`Template "${slug}" not found`)
+    }
+
+    // Determine recipient - use provided email or fall back to current user's email
+    const recipientEmail = dto.recipientEmail || auth.email
+    if (!recipientEmail) {
+      throw new NotFoundException('No recipient email available')
+    }
+
+    // Render with sample data
+    const subject = `[TEST] ${renderWithSampleData(template.subject)}`
+    const bodyHtml = renderWithSampleData(template.bodyHtml)
+    const bodyText = template.bodyText ? renderWithSampleData(template.bodyText) : undefined
+
+    // Send the test email
+    return this.emailService.sendTemplatedEmailWithRenderedContent({
+      to: [recipientEmail],
+      subject,
+      html: bodyHtml,
+      text: bodyText,
+      agencyId: auth.agencyId,
+      templateSlug: slug,
+      createdBy: auth.userId,
+    })
   }
 
   /**

@@ -11,7 +11,19 @@
 
 export type EmailStatus = 'pending' | 'sent' | 'failed' | 'filtered'
 
-export type EmailCategory = 'trip_order' | 'notification' | 'marketing' | 'system'
+/**
+ * Valid email category values - must match the database enum
+ */
+export const EMAIL_CATEGORY_VALUES = [
+  'trip_order',
+  'notification',
+  'marketing',
+  'system',
+  'payment',
+  'client_care',
+] as const
+
+export type EmailCategory = (typeof EMAIL_CATEGORY_VALUES)[number]
 
 // =============================================================================
 // Request DTOs
@@ -204,6 +216,21 @@ export type RenderedTemplateResponse = {
   html: string
   text: string | null
   variables: Record<string, string>
+}
+
+/**
+ * Email Template Preview Response
+ * Result of previewing a template with sample data
+ */
+export type EmailTemplatePreviewResponse = {
+  subject: string
+  bodyHtml: string
+  bodyText: string | null
+  variables: Array<{
+    key: string
+    value: string
+    description: string
+  }>
 }
 
 /**

@@ -450,7 +450,7 @@ export class VariableResolverService {
       { key: 'contact.email', description: "Contact's email address", category: 'Contact' },
       { key: 'contact.phone', description: "Contact's phone number", category: 'Contact' },
       // Trip variables
-      { key: 'trip.title', description: 'Trip title', category: 'Trip' },
+      { key: 'trip.name', description: 'Trip name', category: 'Trip' },
       { key: 'trip.reference', description: 'Trip reference number', category: 'Trip' },
       { key: 'trip.start_date', description: 'Trip start date', category: 'Trip' },
       { key: 'trip.end_date', description: 'Trip end date', category: 'Trip' },
