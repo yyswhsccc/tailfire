@@ -239,7 +239,7 @@ export function useTriggerBackfill() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (batchSize = 100) => {
+    mutationFn: async (batchSize: number = 100) => {
       return api.post<BackfillResponse>('/admin/automation/trips/backfill', { batchSize })
     },
     onSuccess: () => {
