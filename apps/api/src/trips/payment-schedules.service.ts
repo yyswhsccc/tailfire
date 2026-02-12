@@ -1092,21 +1092,24 @@ export class PaymentSchedulesService {
     }
 
     // Determine status based on paid amount vs expected amount
+    // Check overdue status first - any unpaid balance past due date is overdue
+    const isPastDue = expectedPaymentItem.dueDate
+      ? (() => {
+          const dueDate = new Date(expectedPaymentItem.dueDate)
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          return dueDate < today
+        })()
+      : false
+
     let newStatus: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending'
     if (netPaidCents >= expectedPaymentItem.expectedAmountCents) {
       newStatus = 'paid'
+    } else if (isPastDue) {
+      // Any unpaid balance past due date is overdue (regardless of partial payment)
+      newStatus = 'overdue'
     } else if (netPaidCents > 0) {
       newStatus = 'partial'
-    } else {
-      // Check if overdue
-      if (expectedPaymentItem.dueDate) {
-        const dueDate = new Date(expectedPaymentItem.dueDate)
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        if (dueDate < today) {
-          newStatus = 'overdue'
-        }
-      }
     }
 
     // Update the expected payment item with the new paidAmountCents and status
@@ -1161,21 +1164,24 @@ export class PaymentSchedulesService {
     }
 
     // Determine status based on paid amount vs expected amount
+    // Check overdue status first - any unpaid balance past due date is overdue
+    const isPastDue = expectedPaymentItem.dueDate
+      ? (() => {
+          const dueDate = new Date(expectedPaymentItem.dueDate)
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          return dueDate < today
+        })()
+      : false
+
     let newStatus: 'pending' | 'partial' | 'paid' | 'overdue' = 'pending'
     if (netPaidCents >= expectedPaymentItem.expectedAmountCents) {
       newStatus = 'paid'
+    } else if (isPastDue) {
+      // Any unpaid balance past due date is overdue (regardless of partial payment)
+      newStatus = 'overdue'
     } else if (netPaidCents > 0) {
       newStatus = 'partial'
-    } else {
-      // Check if overdue
-      if (expectedPaymentItem.dueDate) {
-        const dueDate = new Date(expectedPaymentItem.dueDate)
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        if (dueDate < today) {
-          newStatus = 'overdue'
-        }
-      }
     }
 
     // Update within the transaction

@@ -68,7 +68,11 @@ export class ClientCareProcessor extends WorkerHost {
 
       case 'client.birthday': {
         const data = job.data as ClientCareJobData
-        await this.handleBirthday(data.contactId)
+        if (!data.agencyId) {
+          this.logger.warn(`Birthday job for contact ${data.contactId} missing agencyId - skipping`)
+          break
+        }
+        await this.handleBirthday(data.contactId, data.agencyId)
         break
       }
 
@@ -127,7 +131,7 @@ export class ClientCareProcessor extends WorkerHost {
   // Welcome Email Handler
   // ============================================================================
 
-  private async handleClientWelcome(contactId: string, tripId?: string): Promise<void> {
+  private async handleClientWelcome(contactId: string, _tripId?: string): Promise<void> {
     // Fetch contact details
     const [contact] = await this.db.client
       .select({
@@ -150,16 +154,17 @@ export class ClientCareProcessor extends WorkerHost {
       return
     }
 
-    this.logger.log(`Sending welcome email to ${contact.email}`)
-
-    // Emit event for email service to handle
     // TODO: Implement actual email sending when email templates are ready
-    this.eventEmitter.emit('client.welcome', {
-      contactId,
-      email: contact.email,
-      firstName: contact.firstName,
-      tripId,
-    })
+    // The 'client-welcome' template needs to be created first
+    this.logger.warn(`Welcome email for contact ${contactId} skipped - template not yet implemented`)
+
+    // When ready, use:
+    // await this.notificationService.sendToContact({
+    //   contactId,
+    //   agencyId,
+    //   templateSlug: 'client-welcome',
+    //   context: { agencyId, contactId, tripId, customVariables: {} },
+    // })
   }
 
   // ============================================================================
@@ -220,17 +225,18 @@ export class ClientCareProcessor extends WorkerHost {
   // Birthday Handler
   // ============================================================================
 
-  private async handleBirthday(contactId: string): Promise<void> {
+  private async handleBirthday(contactId: string, agencyId: string): Promise<void> {
     // Fetch contact
+    const { contacts } = this.db.schema
     const [contact] = await this.db.client
       .select({
-        id: this.db.schema.contacts.id,
-        firstName: this.db.schema.contacts.firstName,
-        email: this.db.schema.contacts.email,
-        dateOfBirth: this.db.schema.contacts.dateOfBirth,
+        id: contacts.id,
+        firstName: contacts.firstName,
+        email: contacts.email,
+        dateOfBirth: contacts.dateOfBirth,
       })
-      .from(this.db.schema.contacts)
-      .where(eq(this.db.schema.contacts.id, contactId))
+      .from(contacts)
+      .where(eq(contacts.id, contactId))
       .limit(1)
 
     if (!contact?.email) {
@@ -240,11 +246,16 @@ export class ClientCareProcessor extends WorkerHost {
 
     this.logger.log(`Sending birthday greeting to ${contact.email}`)
 
-    // Emit event for email service
-    this.eventEmitter.emit('client.birthday', {
+    // Send birthday email via NotificationService
+    await this.notificationService.sendToContact({
       contactId,
-      email: contact.email,
-      firstName: contact.firstName,
+      agencyId,
+      templateSlug: 'client-birthday',
+      context: {
+        agencyId,
+        contactId,
+        customVariables: {},
+      },
     })
   }
 
@@ -282,16 +293,17 @@ export class ClientCareProcessor extends WorkerHost {
       tripName = trip?.name
     }
 
-    this.logger.log(`Sending follow-up to ${contact.email}${tripName ? ` for trip "${tripName}"` : ''}`)
+    // TODO: Implement actual email sending when email templates are ready
+    // The 'client-follow-up' template needs to be created first
+    this.logger.warn(`Follow-up email for contact ${contactId}${tripName ? ` (trip: ${tripName})` : ''} skipped - template not yet implemented`)
 
-    // Emit event for email service
-    this.eventEmitter.emit('client.follow_up', {
-      contactId,
-      email: contact.email,
-      firstName: contact.firstName,
-      tripId,
-      tripName,
-    })
+    // When ready, use:
+    // await this.notificationService.sendToContact({
+    //   contactId,
+    //   agencyId,
+    //   templateSlug: 'client-follow-up',
+    //   context: { agencyId, contactId, tripId, customVariables: { tripName } },
+    // })
   }
 
   // ============================================================================
