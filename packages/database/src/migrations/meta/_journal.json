@@ -708,6 +708,13 @@
       "when": 1770987639000,
       "tag": "20260212150039_enable_notification_rls_and_realtime",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1770998400000,
+      "tag": "20260212160000_add_booking_confirmation_template",
+      "breakpoints": true
     }
   ]
 }

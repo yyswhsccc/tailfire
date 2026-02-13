@@ -42,12 +42,15 @@ import type { AuthContext } from '../auth/auth.types'
 import type { TripAccessService } from './trip-access.service'
 import { UserValidationService } from '../common/user-validation.service'
 import { AutomationService } from '../automation/automation.service'
+import { EmailService } from '../email/email.service'
+import { EmailTemplatesService } from '../email/email-templates.service'
 import {
   QUEUES,
   JOB_TYPES,
   getTripTransitionJobId,
   getDepartureReminderJobId,
 } from '../automation/automation.types'
+import type { SendBookingConfirmationDto } from './dto'
 
 @Injectable()
 export class TripsService {
@@ -59,6 +62,10 @@ export class TripsService {
     private readonly userValidationService: UserValidationService,
     @Inject(forwardRef(() => AutomationService))
     private readonly automationService: AutomationService,
+    @Inject(forwardRef(() => EmailService))
+    private readonly emailService: EmailService,
+    @Inject(forwardRef(() => EmailTemplatesService))
+    private readonly emailTemplatesService: EmailTemplatesService,
   ) {}
 
   /**
@@ -2141,5 +2148,184 @@ export class TripsService {
   ): Promise<void> {
     await this.cancelScheduledTransitions(tripId)
     await this.scheduleStatusTransitions(tripId, startDate, endDate, timezone, currentStatus)
+  }
+
+  // ============================================================================
+  // BOOKING CONFIRMATION EMAIL
+  // ============================================================================
+
+  /**
+   * Send booking confirmation email
+   * Agent-triggered email sent to clients when a trip is booked
+   */
+  async sendBookingConfirmation(
+    tripId: string,
+    agencyId: string,
+    dto: SendBookingConfirmationDto = {},
+  ): Promise<{
+    success: boolean
+    emailLogId?: string
+    providerMessageId?: string
+    recipients: string[]
+    error?: string
+  }> {
+    this.logger.log(`Sending booking confirmation for trip ${tripId}`)
+
+    // Get trip details
+    const trip = await this.findOne(tripId)
+    if (!trip) {
+      throw new NotFoundException(`Trip ${tripId} not found`)
+    }
+
+    // Get primary contact
+    const primaryContact = trip.primaryContactId
+      ? await this.db.client
+          .select()
+          .from(this.db.schema.contacts)
+          .where(eq(this.db.schema.contacts.id, trip.primaryContactId))
+          .limit(1)
+          .then(rows => rows[0])
+      : null
+
+    // Get trip passengers
+    const passengers = await this.db.client
+      .select({
+        email: this.db.schema.contacts.email,
+        firstName: this.db.schema.contacts.firstName,
+        lastName: this.db.schema.contacts.lastName,
+      })
+      .from(this.db.schema.tripTravelers)
+      .innerJoin(
+        this.db.schema.contacts,
+        eq(this.db.schema.tripTravelers.contactId, this.db.schema.contacts.id)
+      )
+      .where(eq(this.db.schema.tripTravelers.tripId, tripId))
+
+    // Get trip agent/owner
+    const agent = trip.ownerId
+      ? await this.db.client
+          .select({
+            email: this.db.schema.userProfiles.email,
+            firstName: this.db.schema.userProfiles.firstName,
+            lastName: this.db.schema.userProfiles.lastName,
+          })
+          .from(this.db.schema.userProfiles)
+          .where(eq(this.db.schema.userProfiles.id, trip.ownerId))
+          .limit(1)
+          .then(rows => rows[0])
+      : null
+
+    // Build recipient list
+    const toEmails: string[] = []
+    const ccEmails: string[] = []
+
+    // Add explicit recipients
+    if (dto.to?.length) {
+      toEmails.push(...dto.to)
+    }
+
+    // Include primary contact (default: true)
+    const includePrimaryContact = dto.includePrimaryContact ?? true
+    if (includePrimaryContact && primaryContact?.email) {
+      if (!toEmails.includes(primaryContact.email)) {
+        toEmails.push(primaryContact.email)
+      }
+    }
+
+    // Include passengers if requested
+    if (dto.includePassengers) {
+      for (const passenger of passengers) {
+        if (passenger.email && !toEmails.includes(passenger.email)) {
+          toEmails.push(passenger.email)
+        }
+      }
+    }
+
+    // CC the agent if requested
+    if (dto.includeAgent && agent?.email) {
+      ccEmails.push(agent.email)
+    }
+
+    // Add explicit CC recipients
+    if (dto.cc?.length) {
+      ccEmails.push(...dto.cc.filter(e => !ccEmails.includes(e)))
+    }
+
+    // Must have at least one recipient
+    if (toEmails.length === 0) {
+      throw new BadRequestException('No valid recipients for booking confirmation email')
+    }
+
+    // Render email template
+    let rendered: { subject: string; html: string; text?: string }
+    try {
+      rendered = await this.emailTemplatesService.renderTemplate('booking-confirmation', {
+        agencyId,
+        tripId,
+        contactId: primaryContact?.id,
+      })
+    } catch {
+      // Fallback template when database template doesn't exist
+      this.logger.warn('Email template "booking-confirmation" not found, using fallback template')
+      const contactName = primaryContact ? `${primaryContact.firstName} ${primaryContact.lastName}`.trim() : 'Valued Customer'
+      const agentName = agent ? `${agent.firstName} ${agent.lastName}`.trim() : 'Your Travel Advisor'
+      rendered = {
+        subject: `Booking Confirmed: ${trip.name}`,
+        html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #c59746 0%, #e89e4a 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 28px;">Booking Confirmed!</h1>
+    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Your trip has been successfully booked</p>
+  </div>
+
+  <div style="padding: 30px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
+    <p>Dear ${contactName},</p>
+
+    <p>Great news! Your trip has been confirmed and all bookings are in place.</p>
+
+    <div style="background-color: white; padding: 20px; border-radius: 6px; margin: 20px 0; border: 1px solid #e2e8f0;">
+      <h2 style="color: #c59746; margin-top: 0; font-size: 18px;">Trip Details</h2>
+      <p><strong>Trip Name:</strong> ${trip.name}</p>
+      ${trip.referenceNumber ? `<p><strong>Reference:</strong> ${trip.referenceNumber}</p>` : ''}
+      ${trip.startDate ? `<p><strong>Travel Dates:</strong> ${trip.startDate}${trip.endDate ? ` - ${trip.endDate}` : ''}</p>` : ''}
+    </div>
+
+    <p>Your dedicated travel advisor is here to assist you every step of the way.</p>
+
+    <p>Warm regards,<br>
+    <strong style="color: #c59746;">${agentName}</strong></p>
+  </div>
+</body>
+</html>`,
+        text: `Booking Confirmed: ${trip.name}\n\nDear ${contactName},\n\nGreat news! Your trip has been confirmed.\n\nTrip: ${trip.name}\n${trip.referenceNumber ? `Reference: ${trip.referenceNumber}\n` : ''}\n\nWarm regards,\n${agentName}`,
+      }
+    }
+
+    // Send email
+    const result = await this.emailService.sendEmail({
+      to: toEmails,
+      cc: ccEmails.length > 0 ? ccEmails : undefined,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+      agencyId,
+      tripId,
+      contactId: primaryContact?.id,
+      templateSlug: 'booking-confirmation',
+    })
+
+    return {
+      success: result.success,
+      emailLogId: result.emailLogId,
+      providerMessageId: result.providerMessageId,
+      recipients: [...toEmails, ...ccEmails],
+      error: result.error,
+    }
   }
 }

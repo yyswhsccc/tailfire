@@ -42,3 +42,6 @@ export { MarkActivityBookedDto, ActivityBookingsFilterDto } from './activity-boo
 
 // Trip Share DTOs
 export { CreateTripShareDto, UpdateTripShareDto } from './create-trip-share.dto'
+
+// Email DTOs
+export { SendBookingConfirmationDto } from './send-booking-confirmation.dto'

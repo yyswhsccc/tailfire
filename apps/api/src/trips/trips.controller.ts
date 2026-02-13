@@ -33,6 +33,7 @@ import {
   BulkDeleteTripsDto,
   BulkArchiveTripsDto,
   BulkChangeStatusDto,
+  SendBookingConfirmationDto,
   type BulkTripOperationResult,
   type TripFilterOptionsResponseDto,
 } from './dto'
@@ -492,5 +493,29 @@ export class TripsController {
       })),
       total: activities.length,
     }
+  }
+
+  /**
+   * Send booking confirmation email
+   * POST /trips/:id/send-booking-confirmation
+   *
+   * Agent-triggered email sent to clients when a trip is booked.
+   * Access check: User must have write access to the trip.
+   */
+  @Post(':id/send-booking-confirmation')
+  @HttpCode(HttpStatus.OK)
+  async sendBookingConfirmation(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') tripId: string,
+    @Body() dto: SendBookingConfirmationDto,
+  ): Promise<{
+    success: boolean
+    emailLogId?: string
+    providerMessageId?: string
+    recipients: string[]
+    error?: string
+  }> {
+    await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    return this.tripsService.sendBookingConfirmation(tripId, auth.agencyId, dto)
   }
 }
