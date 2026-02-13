@@ -143,6 +143,20 @@ export class EmailDomainFilter {
     const ccResult = this.filterEmailList(cc)
     const bccResult = this.filterEmailList(bcc)
 
+    // If TO is empty after filtering but CC/BCC has recipients, promote one to TO
+    // Resend requires at least one TO recipient
+    if (toResult.allowed.length === 0) {
+      if (ccResult.allowed.length > 0) {
+        // Move first CC to TO
+        toResult.allowed.push(ccResult.allowed.shift()!)
+        this.logger.log(`Promoted CC recipient to TO after domain filtering (original TO was filtered out)`)
+      } else if (bccResult.allowed.length > 0) {
+        // Move first BCC to TO
+        toResult.allowed.push(bccResult.allowed.shift()!)
+        this.logger.log(`Promoted BCC recipient to TO after domain filtering (original TO was filtered out)`)
+      }
+    }
+
     // Check if we have any valid recipients
     const hasValidRecipients = toResult.allowed.length > 0 ||
                                ccResult.allowed.length > 0 ||
