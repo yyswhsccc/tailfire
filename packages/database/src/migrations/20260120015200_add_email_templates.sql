@@ -11,7 +11,9 @@ DO $$ BEGIN
     'trip_order',
     'notification',
     'marketing',
-    'system'
+    'system',
+    'payment',
+    'client_care'
   );
 EXCEPTION
   WHEN duplicate_object THEN null;
