@@ -16,6 +16,12 @@ DO $$
 DECLARE
   is_local_catalog boolean;
 BEGIN
+  -- Guard: This migration uses __FDW_PASSWORD__ placeholder that must be replaced at deploy time.
+  -- When running via Drizzle migrator (local dev or CI), the placeholder is NOT substituted,
+  -- so we skip FDW setup. FDW is configured manually or via deploy scripts.
+  RAISE NOTICE 'FDW setup skipped by Drizzle migrator (requires manual password injection)';
+  RETURN;
+
   -- Guard: Skip FDW setup if catalog.cruise_lines is a LOCAL table (= Prod)
   -- 'r' = ordinary table (not foreign table 'f')
   SELECT EXISTS (

@@ -19,11 +19,15 @@ BEGIN
 
   -- Check if this is Production (has local tables that should NOT be dropped)
   -- Production has cruise_sync_history with actual sync records
-  SELECT EXISTS (
-    SELECT 1 FROM catalog.cruise_sync_history
-    WHERE status = 'completed'
-    LIMIT 1
-  ) INTO is_production;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'catalog' AND tablename = 'cruise_sync_history') THEN
+    SELECT EXISTS (
+      SELECT 1 FROM catalog.cruise_sync_history
+      WHERE status = 'completed'
+      LIMIT 1
+    ) INTO is_production;
+  ELSE
+    is_production := false;
+  END IF;
 
   IF is_production THEN
     RAISE NOTICE 'Production environment detected (has sync history). Skipping FDW restore.';

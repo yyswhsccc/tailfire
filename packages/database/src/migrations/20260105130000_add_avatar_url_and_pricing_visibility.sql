@@ -1,3 +1,6 @@
+-- Add avatar_url and pricing_visibility columns
+-- Safe for fresh databases where tables may not exist yet (prod_baseline creates them)
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -7,8 +10,13 @@ BEGIN
   END IF;
 END $$;
 
-ALTER TABLE public.trips
-  ADD COLUMN IF NOT EXISTS pricing_visibility pricing_visibility DEFAULT 'show_all';
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'trips') THEN
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS pricing_visibility pricing_visibility DEFAULT 'show_all';
+  END IF;
 
-ALTER TABLE public.user_profiles
-  ADD COLUMN IF NOT EXISTS avatar_url text;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_profiles') THEN
+    ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS avatar_url text;
+  END IF;
+END $$;

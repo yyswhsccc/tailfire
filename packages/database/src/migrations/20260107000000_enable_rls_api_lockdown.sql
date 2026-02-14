@@ -1,46 +1,37 @@
 -- Phase 11: RLS API-First Lockdown
--- Strategy: Enable RLS, minimal policies, API bypasses via postgres role
--- Scope: agencies, user_profiles, contacts, trips
+-- Safe for fresh databases where tables may not exist yet (prod_baseline creates them)
 
--- ============================================================================
--- STEP 1: Enable RLS (no access by default)
--- ============================================================================
+DO $$
+BEGIN
+  -- Enable RLS on agencies
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'agencies') THEN
+    ALTER TABLE public.agencies ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.agencies FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE public.agencies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS agencies_authenticated_select ON public.agencies;
+    CREATE POLICY agencies_authenticated_select
+      ON public.agencies FOR SELECT TO authenticated USING (true);
+  END IF;
 
--- Force RLS for table owners (hardening)
-ALTER TABLE public.agencies FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.user_profiles FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.contacts FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.trips FORCE ROW LEVEL SECURITY;
+  -- Enable RLS on user_profiles
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_profiles') THEN
+    ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.user_profiles FORCE ROW LEVEL SECURITY;
 
--- ============================================================================
--- STEP 2: Allow policies (minimal)
--- ============================================================================
+    DROP POLICY IF EXISTS user_profiles_self_select ON public.user_profiles;
+    CREATE POLICY user_profiles_self_select
+      ON public.user_profiles FOR SELECT TO authenticated USING (id = auth.uid());
+  END IF;
 
--- Agencies: authenticated can read (safe - no sensitive data)
-DROP POLICY IF EXISTS agencies_authenticated_select ON public.agencies;
-CREATE POLICY agencies_authenticated_select
-  ON public.agencies
-  FOR SELECT
-  TO authenticated
-  USING (true);
+  -- Enable RLS on contacts
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'contacts') THEN
+    ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.contacts FORCE ROW LEVEL SECURITY;
+  END IF;
 
--- User Profiles: authenticated can read own record only
-DROP POLICY IF EXISTS user_profiles_self_select ON public.user_profiles;
-CREATE POLICY user_profiles_self_select
-  ON public.user_profiles
-  FOR SELECT
-  TO authenticated
-  USING (id = auth.uid());
-
--- ============================================================================
--- STEP 3: Contacts & Trips - No policies = complete lockout
--- ============================================================================
-
--- No policies created for contacts or trips
--- RLS enabled + FORCE + no policies = denied for authenticated/anon
--- API (postgres) bypasses RLS entirely
+  -- Enable RLS on trips
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'trips') THEN
+    ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.trips FORCE ROW LEVEL SECURITY;
+  END IF;
+END $$;

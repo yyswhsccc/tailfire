@@ -12,10 +12,18 @@ BEGIN;
 -- ============================================================================
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables 
-             WHERE table_schema = 'public' AND table_name = 'trips') THEN
+  -- Check for agencies table (only created by baseline, not by early numbered migrations)
+  IF EXISTS (SELECT 1 FROM information_schema.tables
+             WHERE table_schema = 'public' AND table_name = 'agencies') THEN
     RAISE EXCEPTION 'Prod baseline already applied - aborting to prevent duplicate schema';
   END IF;
+
+  -- Clean slate: drop objects from early numbered migrations so baseline can create everything fresh
+  -- This only runs on fresh installs where agencies doesn't exist yet
+  EXECUTE 'DROP SCHEMA public CASCADE';
+  EXECUTE 'CREATE SCHEMA public';
+  EXECUTE 'GRANT ALL ON SCHEMA public TO postgres';
+  EXECUTE 'GRANT ALL ON SCHEMA public TO public';
 END $$;
 
 -- ============================================================================
@@ -61,7 +69,9 @@ SET row_security = off;
 -- Name: activity_action; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.activity_action AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.activity_action AS ENUM (
     'created',
     'updated',
     'deleted',
@@ -69,38 +79,53 @@ CREATE TYPE public.activity_action AS ENUM (
     'published',
     'unpublished'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_entity_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.activity_entity_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.activity_entity_type AS ENUM (
     'trip',
     'trip_traveler',
     'itinerary',
     'contact',
     'user'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.activity_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.activity_status AS ENUM (
     'proposed',
     'confirmed',
     'cancelled',
     'optional'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.activity_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.activity_type AS ENUM (
     'lodging',
     'flight',
     'activity',
@@ -111,13 +136,18 @@ CREATE TYPE public.activity_type AS ENUM (
     'custom_cruise',
     'port_info'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: amenity_category; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.amenity_category AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.amenity_category AS ENUM (
     'connectivity',
     'facilities',
     'dining',
@@ -129,72 +159,102 @@ CREATE TYPE public.amenity_category AS ENUM (
     'pets',
     'other'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: amenity_source; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.amenity_source AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.amenity_source AS ENUM (
     'google_places',
     'booking_com',
     'amadeus',
     'manual',
     'system'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: api_provider; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.api_provider AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.api_provider AS ENUM (
     'supabase_storage',
     'cloudflare_r2',
     'backblaze_b2',
     'unsplash'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: booking_payment_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.booking_payment_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.booking_payment_status AS ENUM (
     'unpaid',
     'deposit_paid',
     'paid',
     'refunded',
     'partially_refunded'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: booking_pricing_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.booking_pricing_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.booking_pricing_type AS ENUM (
     'flat_rate',
     'per_person'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: commission_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.commission_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.commission_status AS ENUM (
     'pending',
     'received',
     'cancelled'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: component_entity_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.component_entity_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.component_entity_type AS ENUM (
     'activity',
     'accommodation',
     'flight',
@@ -204,26 +264,36 @@ CREATE TYPE public.component_entity_type AS ENUM (
     'port_info',
     'option'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_group_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.contact_group_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.contact_group_type AS ENUM (
     'family',
     'corporate',
     'wedding',
     'friends',
     'custom'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_relationship_category; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.contact_relationship_category AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.contact_relationship_category AS ENUM (
     'family',
     'business',
     'travel_companions',
@@ -231,13 +301,18 @@ CREATE TYPE public.contact_relationship_category AS ENUM (
     'other',
     'custom'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_status_enum; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.contact_status_enum AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.contact_status_enum AS ENUM (
     'prospecting',
     'quoted',
     'booked',
@@ -246,56 +321,81 @@ CREATE TYPE public.contact_status_enum AS ENUM (
     'awaiting_next',
     'inactive'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_type_enum; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.contact_type_enum AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.contact_type_enum AS ENUM (
     'lead',
     'client'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: credential_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.credential_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.credential_status AS ENUM (
     'active',
     'expired',
     'revoked'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: deposit_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.deposit_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.deposit_type AS ENUM (
     'percentage',
     'fixed_amount'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: expected_payment_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.expected_payment_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.expected_payment_status AS ENUM (
     'pending',
     'partial',
     'paid',
     'overdue'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: insurance_policy_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.insurance_policy_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.insurance_policy_type AS ENUM (
     'trip_cancellation',
     'medical',
     'comprehensive',
@@ -303,80 +403,115 @@ CREATE TYPE public.insurance_policy_type AS ENUM (
     'baggage',
     'other'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: invoice_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.invoice_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.invoice_type AS ENUM (
     'individual_item',
     'part_of_package'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: itinerary_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.itinerary_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.itinerary_status AS ENUM (
     'draft',
     'presented',
     'selected',
     'rejected'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: itinerary_style; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.itinerary_style AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.itinerary_style AS ENUM (
     'side_by_side',
     'stacked',
     'compact'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: media_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.media_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.media_type AS ENUM (
     'image',
     'video',
     'document'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: notification_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.notification_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.notification_status AS ENUM (
     'pending',
     'dismissed',
     'acted'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: notification_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.notification_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.notification_type AS ENUM (
     'split_recalculation_needed',
     'payment_received',
     'payment_overdue',
     'refund_processed'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: payment_method; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.payment_method AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.payment_method AS ENUM (
     'cash',
     'check',
     'credit_card',
@@ -384,93 +519,133 @@ CREATE TYPE public.payment_method AS ENUM (
     'stripe',
     'other'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: payment_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.payment_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.payment_status AS ENUM (
     'pending',
     'paid',
     'cancelled'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: payment_transaction_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.payment_transaction_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.payment_transaction_type AS ENUM (
     'payment',
     'refund',
     'adjustment'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: port_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.port_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.port_type AS ENUM (
     'departure',
     'arrival',
     'sea_day',
     'port_call'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: pricing_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.pricing_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.pricing_type AS ENUM (
     'per_person',
     'per_room',
     'flat_rate',
     'per_night',
     'total'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: pricing_visibility; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.pricing_visibility AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.pricing_visibility AS ENUM (
     'show_all',
     'hide_all',
     'travelers_only'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: schedule_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.schedule_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.schedule_type AS ENUM (
     'full',
     'deposit',
     'installments',
     'guarantee'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: service_fee_recipient; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.service_fee_recipient AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.service_fee_recipient AS ENUM (
     'primary_traveller',
     'all_travellers'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: service_fee_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.service_fee_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.service_fee_status AS ENUM (
     'draft',
     'sent',
     'paid',
@@ -478,83 +653,118 @@ CREATE TYPE public.service_fee_status AS ENUM (
     'refunded',
     'cancelled'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: split_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.split_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.split_type AS ENUM (
     'equal',
     'custom'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: stripe_account_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.stripe_account_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.stripe_account_status AS ENUM (
     'not_connected',
     'pending',
     'active',
     'restricted',
     'disabled'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: traveler_group_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.traveler_group_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.traveler_group_type AS ENUM (
     'room',
     'dining',
     'activity',
     'transfer',
     'custom'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: traveler_insurance_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.traveler_insurance_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.traveler_insurance_status AS ENUM (
     'pending',
     'has_own_insurance',
     'declined',
     'selected_package'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: traveler_role; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.traveler_role AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.traveler_role AS ENUM (
     'primary_contact',
     'full_access',
     'limited_access'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: traveler_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.traveler_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.traveler_type AS ENUM (
     'adult',
     'child',
     'infant'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.trip_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.trip_status AS ENUM (
     'draft',
     'quoted',
     'booked',
@@ -562,13 +772,18 @@ CREATE TYPE public.trip_status AS ENUM (
     'completed',
     'cancelled'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_type; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.trip_type AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.trip_type AS ENUM (
     'leisure',
     'business',
     'group',
@@ -576,34 +791,47 @@ CREATE TYPE public.trip_type AS ENUM (
     'corporate',
     'custom'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: user_role; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.user_role AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.user_role AS ENUM (
     'admin',
     'user'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: user_status; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE TYPE public.user_status AS ENUM (
+DO $$
+BEGIN
+  CREATE TYPE public.user_status AS ENUM (
     'active',
     'pending',
     'locked'
 );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: auto_promote_to_client(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.auto_promote_to_client() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.auto_promote_to_client() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -624,7 +852,7 @@ $$;
 -- Name: generate_trip_reference(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.generate_trip_reference() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.generate_trip_reference() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 DECLARE
@@ -673,7 +901,7 @@ $$;
 -- Name: prevent_client_demotion(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.prevent_client_demotion() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.prevent_client_demotion() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -689,7 +917,7 @@ $$;
 -- Name: update_consent_timestamps(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_consent_timestamps() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_consent_timestamps() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -723,7 +951,7 @@ $$;
 -- Name: update_cruise_lines_updated_at(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_cruise_lines_updated_at() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_cruise_lines_updated_at() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -737,7 +965,7 @@ $$;
 -- Name: update_cruise_ports_updated_at(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_cruise_ports_updated_at() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_cruise_ports_updated_at() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -751,7 +979,7 @@ $$;
 -- Name: update_cruise_regions_updated_at(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_cruise_regions_updated_at() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_cruise_regions_updated_at() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -765,7 +993,7 @@ $$;
 -- Name: update_cruise_ships_updated_at(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_cruise_ships_updated_at() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_cruise_ships_updated_at() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -779,7 +1007,7 @@ $$;
 -- Name: update_custom_cruise_details_updated_at(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.update_custom_cruise_details_updated_at() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.update_custom_cruise_details_updated_at() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -793,7 +1021,7 @@ $$;
 -- Name: validate_split_trip_consistency(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.validate_split_trip_consistency() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.validate_split_trip_consistency() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 DECLARE
@@ -845,7 +1073,7 @@ $$;
 -- Name: validate_trip_status_transition(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.validate_trip_status_transition() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.validate_trip_status_transition() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
@@ -917,7 +1145,7 @@ SET default_table_access_method = heap;
 -- Name: activity_amenities; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.activity_amenities (
+CREATE TABLE IF NOT EXISTS public.activity_amenities (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     activity_id uuid NOT NULL,
     amenity_id uuid NOT NULL,
@@ -930,7 +1158,7 @@ CREATE TABLE public.activity_amenities (
 -- Name: activity_documents; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.activity_documents (
+CREATE TABLE IF NOT EXISTS public.activity_documents (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     activity_id uuid NOT NULL,
     document_type character varying(100),
@@ -948,7 +1176,7 @@ CREATE TABLE public.activity_documents (
 -- Name: activity_logs; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.activity_logs (
+CREATE TABLE IF NOT EXISTS public.activity_logs (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     entity_type public.activity_entity_type NOT NULL,
     entity_id uuid NOT NULL,
@@ -966,7 +1194,7 @@ CREATE TABLE public.activity_logs (
 -- Name: activity_media; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.activity_media (
+CREATE TABLE IF NOT EXISTS public.activity_media (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     activity_id uuid NOT NULL,
     entity_type public.component_entity_type DEFAULT 'activity'::public.component_entity_type NOT NULL,
@@ -987,7 +1215,7 @@ CREATE TABLE public.activity_media (
 -- Name: activity_pricing; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.activity_pricing (
+CREATE TABLE IF NOT EXISTS public.activity_pricing (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     activity_id uuid NOT NULL,
     agency_id uuid NOT NULL,
@@ -1016,7 +1244,7 @@ CREATE TABLE public.activity_pricing (
 -- Name: activity_suppliers; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.activity_suppliers (
+CREATE TABLE IF NOT EXISTS public.activity_suppliers (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     activity_id uuid NOT NULL,
     supplier_id uuid NOT NULL,
@@ -1030,7 +1258,7 @@ CREATE TABLE public.activity_suppliers (
 -- Name: activity_travelers; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.activity_travelers (
+CREATE TABLE IF NOT EXISTS public.activity_travelers (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     activity_id uuid NOT NULL,
     trip_traveler_id uuid NOT NULL,
@@ -1044,7 +1272,7 @@ CREATE TABLE public.activity_travelers (
 -- Name: activity_traveller_splits; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.activity_traveller_splits (
+CREATE TABLE IF NOT EXISTS public.activity_traveller_splits (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     trip_id uuid NOT NULL,
     activity_id uuid NOT NULL,
@@ -1067,7 +1295,7 @@ CREATE TABLE public.activity_traveller_splits (
 -- Name: agencies; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.agencies (
+CREATE TABLE IF NOT EXISTS public.agencies (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     name character varying(255) NOT NULL,
     slug character varying(100),
@@ -1082,7 +1310,7 @@ CREATE TABLE public.agencies (
 -- Name: agency_settings; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.agency_settings (
+CREATE TABLE IF NOT EXISTS public.agency_settings (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     agency_id uuid NOT NULL,
     stripe_account_id character varying(255),
@@ -1104,7 +1332,7 @@ CREATE TABLE public.agency_settings (
 -- Name: amenities; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.amenities (
+CREATE TABLE IF NOT EXISTS public.amenities (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     name character varying(100) NOT NULL,
     slug character varying(100) NOT NULL,
@@ -1121,7 +1349,7 @@ CREATE TABLE public.amenities (
 -- Name: api_credentials; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.api_credentials (
+CREATE TABLE IF NOT EXISTS public.api_credentials (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     parent_id uuid,
     provider public.api_provider NOT NULL,
@@ -1143,7 +1371,7 @@ CREATE TABLE public.api_credentials (
 -- Name: commission_tracking; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.commission_tracking (
+CREATE TABLE IF NOT EXISTS public.commission_tracking (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     component_pricing_id uuid NOT NULL,
     commission_rate numeric(5,2),
@@ -1159,7 +1387,7 @@ CREATE TABLE public.commission_tracking (
 -- Name: contact_group_members; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.contact_group_members (
+CREATE TABLE IF NOT EXISTS public.contact_group_members (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     group_id uuid NOT NULL,
     contact_id uuid NOT NULL,
@@ -1174,7 +1402,7 @@ CREATE TABLE public.contact_group_members (
 -- Name: contact_groups; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.contact_groups (
+CREATE TABLE IF NOT EXISTS public.contact_groups (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     agency_id uuid,
     name character varying(255) NOT NULL,
@@ -1194,7 +1422,7 @@ CREATE TABLE public.contact_groups (
 -- Name: contact_relationships; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.contact_relationships (
+CREATE TABLE IF NOT EXISTS public.contact_relationships (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     agency_id uuid,
     contact_id1 uuid NOT NULL,
@@ -1215,7 +1443,7 @@ CREATE TABLE public.contact_relationships (
 -- Name: contact_stripe_customers; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.contact_stripe_customers (
+CREATE TABLE IF NOT EXISTS public.contact_stripe_customers (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     contact_id uuid NOT NULL,
     stripe_account_id character varying(255) NOT NULL,
@@ -1228,7 +1456,7 @@ CREATE TABLE public.contact_stripe_customers (
 -- Name: contact_tags; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.contact_tags (
+CREATE TABLE IF NOT EXISTS public.contact_tags (
     contact_id uuid NOT NULL,
     tag_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
@@ -1239,7 +1467,7 @@ CREATE TABLE public.contact_tags (
 -- Name: contacts; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.contacts (
+CREATE TABLE IF NOT EXISTS public.contacts (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     agency_id uuid,
     first_name character varying(100),
@@ -1315,7 +1543,7 @@ COMMENT ON COLUMN public.contacts.timezone IS 'IANA timezone identifier for this
 -- Name: credit_card_guarantee; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.credit_card_guarantee (
+CREATE TABLE IF NOT EXISTS public.credit_card_guarantee (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     payment_schedule_config_id uuid NOT NULL,
     card_holder_name character varying(255) NOT NULL,
@@ -1332,7 +1560,7 @@ CREATE TABLE public.credit_card_guarantee (
 -- Name: currency_exchange_rates; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.currency_exchange_rates (
+CREATE TABLE IF NOT EXISTS public.currency_exchange_rates (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     from_currency character varying(3) NOT NULL,
     to_currency character varying(3) NOT NULL,
@@ -1347,7 +1575,7 @@ CREATE TABLE public.currency_exchange_rates (
 -- Name: custom_cruise_details; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.custom_cruise_details (
+CREATE TABLE IF NOT EXISTS public.custom_cruise_details (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     component_id uuid NOT NULL,
     traveltek_cruise_id text,
@@ -1471,7 +1699,7 @@ COMMENT ON COLUMN public.custom_cruise_details.cruise_region_id IS 'FK to cruise
 -- Name: dining_details; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dining_details (
+CREATE TABLE IF NOT EXISTS public.dining_details (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     component_id uuid NOT NULL,
     restaurant_name character varying(255),
@@ -1500,7 +1728,7 @@ CREATE TABLE public.dining_details (
 -- Name: expected_payment_items; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.expected_payment_items (
+CREATE TABLE IF NOT EXISTS public.expected_payment_items (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     payment_schedule_config_id uuid NOT NULL,
     payment_name character varying(100) NOT NULL,
@@ -1520,7 +1748,7 @@ CREATE TABLE public.expected_payment_items (
 -- Name: flight_details; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.flight_details (
+CREATE TABLE IF NOT EXISTS public.flight_details (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     component_id uuid NOT NULL,
     airline character varying(255),
@@ -1546,7 +1774,7 @@ CREATE TABLE public.flight_details (
 -- Name: flight_segments; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.flight_segments (
+CREATE TABLE IF NOT EXISTS public.flight_segments (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     activity_id uuid NOT NULL,
     segment_order integer DEFAULT 0 NOT NULL,
@@ -1587,7 +1815,7 @@ CREATE TABLE public.flight_segments (
 -- Name: itineraries; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.itineraries (
+CREATE TABLE IF NOT EXISTS public.itineraries (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     trip_id uuid NOT NULL,
     name character varying(255) NOT NULL,
@@ -1609,7 +1837,7 @@ CREATE TABLE public.itineraries (
 -- Name: itinerary_activities; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.itinerary_activities (
+CREATE TABLE IF NOT EXISTS public.itinerary_activities (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     itinerary_day_id uuid NOT NULL,
     activity_type public.activity_type NOT NULL,
@@ -1640,7 +1868,7 @@ CREATE TABLE public.itinerary_activities (
 -- Name: itinerary_days; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.itinerary_days (
+CREATE TABLE IF NOT EXISTS public.itinerary_days (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     itinerary_id uuid NOT NULL,
     day_number integer NOT NULL,
@@ -1657,7 +1885,7 @@ CREATE TABLE public.itinerary_days (
 -- Name: itinerary_templates; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.itinerary_templates (
+CREATE TABLE IF NOT EXISTS public.itinerary_templates (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     agency_id uuid NOT NULL,
     name character varying(255) NOT NULL,
@@ -1675,7 +1903,7 @@ CREATE TABLE public.itinerary_templates (
 -- Name: lodging_details; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.lodging_details (
+CREATE TABLE IF NOT EXISTS public.lodging_details (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     component_id uuid NOT NULL,
     property_name character varying(255),
@@ -1702,7 +1930,7 @@ CREATE TABLE public.lodging_details (
 -- Name: options_details; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.options_details (
+CREATE TABLE IF NOT EXISTS public.options_details (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     component_id uuid NOT NULL,
     option_category character varying(50),
@@ -1742,7 +1970,7 @@ CREATE TABLE public.options_details (
 -- Name: package_details; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.package_details (
+CREATE TABLE IF NOT EXISTS public.package_details (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     activity_id uuid NOT NULL,
     trip_id uuid NOT NULL,
@@ -1764,7 +1992,7 @@ CREATE TABLE public.package_details (
 -- Name: package_templates; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.package_templates (
+CREATE TABLE IF NOT EXISTS public.package_templates (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     agency_id uuid NOT NULL,
     name character varying(255) NOT NULL,
@@ -1782,7 +2010,7 @@ CREATE TABLE public.package_templates (
 -- Name: payment_schedule; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.payment_schedule (
+CREATE TABLE IF NOT EXISTS public.payment_schedule (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     component_pricing_id uuid NOT NULL,
     payment_date date NOT NULL,
@@ -1798,7 +2026,7 @@ CREATE TABLE public.payment_schedule (
 -- Name: payment_schedule_config; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.payment_schedule_config (
+CREATE TABLE IF NOT EXISTS public.payment_schedule_config (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     component_pricing_id uuid NOT NULL,
     schedule_type public.schedule_type DEFAULT 'full'::public.schedule_type NOT NULL,
@@ -1817,7 +2045,7 @@ CREATE TABLE public.payment_schedule_config (
 -- Name: payment_transactions; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.payment_transactions (
+CREATE TABLE IF NOT EXISTS public.payment_transactions (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     expected_payment_item_id uuid NOT NULL,
     agency_id uuid NOT NULL,
@@ -1839,7 +2067,7 @@ CREATE TABLE public.payment_transactions (
 -- Name: port_info_details; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.port_info_details (
+CREATE TABLE IF NOT EXISTS public.port_info_details (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     component_id uuid NOT NULL,
     port_name character varying(255),
@@ -1867,7 +2095,7 @@ CREATE TABLE public.port_info_details (
 -- Name: service_fees; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.service_fees (
+CREATE TABLE IF NOT EXISTS public.service_fees (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     trip_id uuid NOT NULL,
     recipient_type public.service_fee_recipient DEFAULT 'primary_traveller'::public.service_fee_recipient NOT NULL,
@@ -1900,7 +2128,7 @@ CREATE TABLE public.service_fees (
 -- Name: stripe_webhook_events; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.stripe_webhook_events (
+CREATE TABLE IF NOT EXISTS public.stripe_webhook_events (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     event_id character varying(255) NOT NULL,
     event_type character varying(100) NOT NULL,
@@ -1914,7 +2142,7 @@ CREATE TABLE public.stripe_webhook_events (
 -- Name: suppliers; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.suppliers (
+CREATE TABLE IF NOT EXISTS public.suppliers (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     name character varying(255) NOT NULL,
     supplier_type character varying(100),
@@ -1928,7 +2156,7 @@ CREATE TABLE public.suppliers (
 -- Name: tags; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.tags (
+CREATE TABLE IF NOT EXISTS public.tags (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     name character varying(100) NOT NULL,
     category character varying(50),
@@ -1942,7 +2170,7 @@ CREATE TABLE public.tags (
 -- Name: transportation_details; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.transportation_details (
+CREATE TABLE IF NOT EXISTS public.transportation_details (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     component_id uuid NOT NULL,
     subtype character varying(50),
@@ -1983,7 +2211,7 @@ CREATE TABLE public.transportation_details (
 -- Name: traveler_group_members; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.traveler_group_members (
+CREATE TABLE IF NOT EXISTS public.traveler_group_members (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     traveler_group_id uuid NOT NULL,
     trip_traveler_id uuid NOT NULL,
@@ -1998,7 +2226,7 @@ CREATE TABLE public.traveler_group_members (
 -- Name: traveler_groups; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.traveler_groups (
+CREATE TABLE IF NOT EXISTS public.traveler_groups (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     trip_id uuid NOT NULL,
     name character varying(255) NOT NULL,
@@ -2016,7 +2244,7 @@ CREATE TABLE public.traveler_groups (
 -- Name: trip_collaborators; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.trip_collaborators (
+CREATE TABLE IF NOT EXISTS public.trip_collaborators (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     trip_id uuid NOT NULL,
     user_id uuid NOT NULL,
@@ -2032,7 +2260,7 @@ CREATE TABLE public.trip_collaborators (
 -- Name: trip_insurance_packages; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.trip_insurance_packages (
+CREATE TABLE IF NOT EXISTS public.trip_insurance_packages (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     trip_id uuid NOT NULL,
     provider_name character varying(255) NOT NULL,
@@ -2059,7 +2287,7 @@ CREATE TABLE public.trip_insurance_packages (
 -- Name: trip_media; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.trip_media (
+CREATE TABLE IF NOT EXISTS public.trip_media (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     trip_id uuid NOT NULL,
     media_type public.media_type NOT NULL,
@@ -2079,7 +2307,7 @@ CREATE TABLE public.trip_media (
 -- Name: trip_notifications; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.trip_notifications (
+CREATE TABLE IF NOT EXISTS public.trip_notifications (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     trip_id uuid NOT NULL,
     notification_type public.notification_type NOT NULL,
@@ -2096,7 +2324,7 @@ CREATE TABLE public.trip_notifications (
 -- Name: trip_reference_sequences; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.trip_reference_sequences (
+CREATE TABLE IF NOT EXISTS public.trip_reference_sequences (
     trip_type character varying(50) NOT NULL,
     year integer NOT NULL,
     last_sequence integer DEFAULT 0 NOT NULL,
@@ -2109,7 +2337,7 @@ CREATE TABLE public.trip_reference_sequences (
 -- Name: trip_tags; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.trip_tags (
+CREATE TABLE IF NOT EXISTS public.trip_tags (
     trip_id uuid NOT NULL,
     tag_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
@@ -2120,7 +2348,7 @@ CREATE TABLE public.trip_tags (
 -- Name: trip_traveler_insurance; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.trip_traveler_insurance (
+CREATE TABLE IF NOT EXISTS public.trip_traveler_insurance (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     trip_id uuid NOT NULL,
     trip_traveler_id uuid NOT NULL,
@@ -2145,7 +2373,7 @@ CREATE TABLE public.trip_traveler_insurance (
 -- Name: trip_travelers; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.trip_travelers (
+CREATE TABLE IF NOT EXISTS public.trip_travelers (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     trip_id uuid NOT NULL,
     contact_id uuid,
@@ -2175,7 +2403,7 @@ COMMENT ON COLUMN public.trip_travelers.role IS 'Traveler access role: primary_c
 -- Name: trips; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.trips (
+CREATE TABLE IF NOT EXISTS public.trips (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     agency_id uuid,
     branch_id uuid,
@@ -2234,7 +2462,7 @@ COMMENT ON COLUMN public.trips.timezone IS 'IANA timezone identifier for this tr
 -- Name: user_profiles; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.user_profiles (
+CREATE TABLE IF NOT EXISTS public.user_profiles (
     id uuid NOT NULL,
     agency_id uuid NOT NULL,
     email character varying(255),
@@ -2271,656 +2499,1066 @@ CREATE TABLE public.user_profiles (
 -- Name: activity_amenities activity_amenities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_amenities
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_amenities
     ADD CONSTRAINT activity_amenities_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_amenities activity_amenities_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_amenities
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_amenities
     ADD CONSTRAINT activity_amenities_unique UNIQUE (activity_id, amenity_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_documents activity_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_documents
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_documents
     ADD CONSTRAINT activity_documents_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_logs activity_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_logs
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_logs
     ADD CONSTRAINT activity_logs_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_media activity_media_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_media
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_media
     ADD CONSTRAINT activity_media_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_pricing activity_pricing_activity_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_pricing
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_pricing
     ADD CONSTRAINT activity_pricing_activity_id_key UNIQUE (activity_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_pricing activity_pricing_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_pricing
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_pricing
     ADD CONSTRAINT activity_pricing_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_suppliers activity_suppliers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_suppliers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_suppliers
     ADD CONSTRAINT activity_suppliers_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_travelers activity_travelers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_travelers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_travelers
     ADD CONSTRAINT activity_travelers_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_travelers activity_travelers_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_travelers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_travelers
     ADD CONSTRAINT activity_travelers_unique UNIQUE (activity_id, trip_traveler_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_traveller_splits activity_traveller_splits_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_traveller_splits
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_traveller_splits
     ADD CONSTRAINT activity_traveller_splits_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: agencies agencies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.agencies
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.agencies
     ADD CONSTRAINT agencies_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: agencies agencies_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.agencies
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.agencies
     ADD CONSTRAINT agencies_slug_key UNIQUE (slug);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: agency_settings agency_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.agency_settings
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.agency_settings
     ADD CONSTRAINT agency_settings_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: amenities amenities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.amenities
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.amenities
     ADD CONSTRAINT amenities_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: api_credentials api_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.api_credentials
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.api_credentials
     ADD CONSTRAINT api_credentials_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: commission_tracking commission_tracking_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.commission_tracking
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.commission_tracking
     ADD CONSTRAINT commission_tracking_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_group_members contact_group_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_group_members
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_group_members
     ADD CONSTRAINT contact_group_members_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_groups contact_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_groups
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_groups
     ADD CONSTRAINT contact_groups_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_relationships contact_relationships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_relationships
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_relationships
     ADD CONSTRAINT contact_relationships_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_stripe_customers contact_stripe_customers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_stripe_customers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_stripe_customers
     ADD CONSTRAINT contact_stripe_customers_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_tags contact_tags_contact_id_tag_id_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_tags
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_tags
     ADD CONSTRAINT contact_tags_contact_id_tag_id_pk PRIMARY KEY (contact_id, tag_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contacts contacts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contacts
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contacts
     ADD CONSTRAINT contacts_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: credit_card_guarantee credit_card_guarantee_payment_schedule_config_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.credit_card_guarantee
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.credit_card_guarantee
     ADD CONSTRAINT credit_card_guarantee_payment_schedule_config_id_unique UNIQUE (payment_schedule_config_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: credit_card_guarantee credit_card_guarantee_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.credit_card_guarantee
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.credit_card_guarantee
     ADD CONSTRAINT credit_card_guarantee_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: currency_exchange_rates currency_exchange_rates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.currency_exchange_rates
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.currency_exchange_rates
     ADD CONSTRAINT currency_exchange_rates_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: custom_cruise_details custom_cruise_details_component_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.custom_cruise_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.custom_cruise_details
     ADD CONSTRAINT custom_cruise_details_component_id_unique UNIQUE (component_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: custom_cruise_details custom_cruise_details_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.custom_cruise_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.custom_cruise_details
     ADD CONSTRAINT custom_cruise_details_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: dining_details dining_details_component_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dining_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.dining_details
     ADD CONSTRAINT dining_details_component_id_unique UNIQUE (component_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: dining_details dining_details_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dining_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.dining_details
     ADD CONSTRAINT dining_details_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: expected_payment_items expected_payment_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.expected_payment_items
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.expected_payment_items
     ADD CONSTRAINT expected_payment_items_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: flight_details flight_details_component_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.flight_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.flight_details
     ADD CONSTRAINT flight_details_component_id_unique UNIQUE (component_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: flight_details flight_details_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.flight_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.flight_details
     ADD CONSTRAINT flight_details_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: flight_segments flight_segments_activity_order_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.flight_segments
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.flight_segments
     ADD CONSTRAINT flight_segments_activity_order_unique UNIQUE (activity_id, segment_order);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: flight_segments flight_segments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.flight_segments
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.flight_segments
     ADD CONSTRAINT flight_segments_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: itineraries itineraries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.itineraries
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.itineraries
     ADD CONSTRAINT itineraries_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: itinerary_activities itinerary_activities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.itinerary_activities
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.itinerary_activities
     ADD CONSTRAINT itinerary_activities_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: itinerary_days itinerary_days_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.itinerary_days
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.itinerary_days
     ADD CONSTRAINT itinerary_days_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: itinerary_templates itinerary_templates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.itinerary_templates
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.itinerary_templates
     ADD CONSTRAINT itinerary_templates_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: lodging_details lodging_details_component_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.lodging_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.lodging_details
     ADD CONSTRAINT lodging_details_component_id_unique UNIQUE (component_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: lodging_details lodging_details_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.lodging_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.lodging_details
     ADD CONSTRAINT lodging_details_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: options_details options_details_component_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.options_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.options_details
     ADD CONSTRAINT options_details_component_id_key UNIQUE (component_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: options_details options_details_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.options_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.options_details
     ADD CONSTRAINT options_details_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: package_details package_details_activity_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.package_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.package_details
     ADD CONSTRAINT package_details_activity_id_key UNIQUE (activity_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: package_details package_details_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.package_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.package_details
     ADD CONSTRAINT package_details_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: package_templates package_templates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.package_templates
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.package_templates
     ADD CONSTRAINT package_templates_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: payment_schedule_config payment_schedule_config_component_pricing_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.payment_schedule_config
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.payment_schedule_config
     ADD CONSTRAINT payment_schedule_config_component_pricing_id_unique UNIQUE (component_pricing_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: payment_schedule_config payment_schedule_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.payment_schedule_config
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.payment_schedule_config
     ADD CONSTRAINT payment_schedule_config_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: payment_schedule payment_schedule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.payment_schedule
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.payment_schedule
     ADD CONSTRAINT payment_schedule_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: payment_transactions payment_transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.payment_transactions
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.payment_transactions
     ADD CONSTRAINT payment_transactions_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: port_info_details port_info_details_component_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.port_info_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.port_info_details
     ADD CONSTRAINT port_info_details_component_id_unique UNIQUE (component_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: port_info_details port_info_details_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.port_info_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.port_info_details
     ADD CONSTRAINT port_info_details_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: service_fees service_fees_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.service_fees
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.service_fees
     ADD CONSTRAINT service_fees_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: stripe_webhook_events stripe_webhook_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.stripe_webhook_events
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.stripe_webhook_events
     ADD CONSTRAINT stripe_webhook_events_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: suppliers suppliers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.suppliers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.suppliers
     ADD CONSTRAINT suppliers_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: tags tags_name_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.tags
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.tags
     ADD CONSTRAINT tags_name_unique UNIQUE (name);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: tags tags_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.tags
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.tags
     ADD CONSTRAINT tags_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: transportation_details transportation_details_component_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.transportation_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.transportation_details
     ADD CONSTRAINT transportation_details_component_id_key UNIQUE (component_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: transportation_details transportation_details_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.transportation_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.transportation_details
     ADD CONSTRAINT transportation_details_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: traveler_group_members traveler_group_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.traveler_group_members
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.traveler_group_members
     ADD CONSTRAINT traveler_group_members_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: traveler_groups traveler_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.traveler_groups
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.traveler_groups
     ADD CONSTRAINT traveler_groups_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_collaborators trip_collaborators_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_collaborators
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_collaborators
     ADD CONSTRAINT trip_collaborators_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_insurance_packages trip_insurance_packages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_insurance_packages
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_insurance_packages
     ADD CONSTRAINT trip_insurance_packages_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_media trip_media_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_media
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_media
     ADD CONSTRAINT trip_media_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_notifications trip_notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_notifications
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_notifications
     ADD CONSTRAINT trip_notifications_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_reference_sequences trip_reference_sequences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_reference_sequences
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_reference_sequences
     ADD CONSTRAINT trip_reference_sequences_pkey PRIMARY KEY (trip_type, year);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_tags trip_tags_trip_id_tag_id_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_tags
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_tags
     ADD CONSTRAINT trip_tags_trip_id_tag_id_pk PRIMARY KEY (trip_id, tag_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_traveler_insurance trip_traveler_insurance_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_traveler_insurance
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_traveler_insurance
     ADD CONSTRAINT trip_traveler_insurance_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_traveler_insurance trip_traveler_insurance_unique_traveler; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_traveler_insurance
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_traveler_insurance
     ADD CONSTRAINT trip_traveler_insurance_unique_traveler UNIQUE (trip_id, trip_traveler_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_travelers trip_travelers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_travelers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_travelers
     ADD CONSTRAINT trip_travelers_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trips trips_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trips
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trips
     ADD CONSTRAINT trips_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trips trips_reference_number_unique; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trips
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trips
     ADD CONSTRAINT trips_reference_number_unique UNIQUE (reference_number);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_traveller_splits unique_activity_traveller; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_traveller_splits
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_traveller_splits
     ADD CONSTRAINT unique_activity_traveller UNIQUE (activity_id, traveller_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: agency_settings unique_agency_settings; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.agency_settings
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.agency_settings
     ADD CONSTRAINT unique_agency_settings UNIQUE (agency_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_group_members unique_contact_group_member; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_group_members
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_group_members
     ADD CONSTRAINT unique_contact_group_member UNIQUE (group_id, contact_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_relationships unique_contact_relationship; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_relationships
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_relationships
     ADD CONSTRAINT unique_contact_relationship UNIQUE (contact_id1, contact_id2);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_stripe_customers unique_contact_stripe_account; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_stripe_customers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_stripe_customers
     ADD CONSTRAINT unique_contact_stripe_account UNIQUE (contact_id, stripe_account_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: currency_exchange_rates unique_currency_pair_date; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.currency_exchange_rates
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.currency_exchange_rates
     ADD CONSTRAINT unique_currency_pair_date UNIQUE (from_currency, to_currency, rate_date);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: stripe_webhook_events unique_stripe_event; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.stripe_webhook_events
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.stripe_webhook_events
     ADD CONSTRAINT unique_stripe_event UNIQUE (event_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: traveler_group_members unique_traveler_group_member; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.traveler_group_members
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.traveler_group_members
     ADD CONSTRAINT unique_traveler_group_member UNIQUE (traveler_group_id, trip_traveler_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_collaborators unique_trip_collaborator; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_collaborators
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_collaborators
     ADD CONSTRAINT unique_trip_collaborator UNIQUE (trip_id, user_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: user_profiles user_profiles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_profiles
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.user_profiles
     ADD CONSTRAINT user_profiles_pkey PRIMARY KEY (id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
@@ -3340,480 +3978,780 @@ CREATE TRIGGER validate_split_trip_consistency_trigger BEFORE INSERT OR UPDATE O
 -- Name: activity_amenities activity_amenities_activity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_amenities
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_amenities
     ADD CONSTRAINT activity_amenities_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_amenities activity_amenities_amenity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_amenities
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_amenities
     ADD CONSTRAINT activity_amenities_amenity_id_fkey FOREIGN KEY (amenity_id) REFERENCES public.amenities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_documents activity_documents_activity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_documents
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_documents
     ADD CONSTRAINT activity_documents_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_logs activity_logs_trip_id_trips_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_logs
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_logs
     ADD CONSTRAINT activity_logs_trip_id_trips_id_fk FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_pricing activity_pricing_activity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_pricing
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_pricing
     ADD CONSTRAINT activity_pricing_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_suppliers activity_suppliers_activity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_suppliers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_suppliers
     ADD CONSTRAINT activity_suppliers_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_suppliers activity_suppliers_supplier_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_suppliers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_suppliers
     ADD CONSTRAINT activity_suppliers_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_travelers activity_travelers_activity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_travelers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_travelers
     ADD CONSTRAINT activity_travelers_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_travelers activity_travelers_trip_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_travelers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_travelers
     ADD CONSTRAINT activity_travelers_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES public.trips(id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_travelers activity_travelers_trip_traveler_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_travelers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_travelers
     ADD CONSTRAINT activity_travelers_trip_traveler_id_fkey FOREIGN KEY (trip_traveler_id) REFERENCES public.trip_travelers(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_traveller_splits activity_traveller_splits_activity_id_itinerary_activities_id_f; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_traveller_splits
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_traveller_splits
     ADD CONSTRAINT activity_traveller_splits_activity_id_itinerary_activities_id_f FOREIGN KEY (activity_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_traveller_splits activity_traveller_splits_traveller_id_trip_travelers_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_traveller_splits
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_traveller_splits
     ADD CONSTRAINT activity_traveller_splits_traveller_id_trip_travelers_id_fk FOREIGN KEY (traveller_id) REFERENCES public.trip_travelers(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: activity_traveller_splits activity_traveller_splits_trip_id_trips_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.activity_traveller_splits
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.activity_traveller_splits
     ADD CONSTRAINT activity_traveller_splits_trip_id_trips_id_fk FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: api_credentials api_credentials_parent_id_api_credentials_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.api_credentials
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.api_credentials
     ADD CONSTRAINT api_credentials_parent_id_api_credentials_id_fk FOREIGN KEY (parent_id) REFERENCES public.api_credentials(id) ON DELETE SET NULL;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_group_members contact_group_members_contact_id_contacts_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_group_members
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_group_members
     ADD CONSTRAINT contact_group_members_contact_id_contacts_id_fk FOREIGN KEY (contact_id) REFERENCES public.contacts(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_group_members contact_group_members_group_id_contact_groups_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_group_members
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_group_members
     ADD CONSTRAINT contact_group_members_group_id_contact_groups_id_fk FOREIGN KEY (group_id) REFERENCES public.contact_groups(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_groups contact_groups_primary_contact_id_contacts_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_groups
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_groups
     ADD CONSTRAINT contact_groups_primary_contact_id_contacts_id_fk FOREIGN KEY (primary_contact_id) REFERENCES public.contacts(id) ON DELETE SET NULL;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_relationships contact_relationships_contact_id1_contacts_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_relationships
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_relationships
     ADD CONSTRAINT contact_relationships_contact_id1_contacts_id_fk FOREIGN KEY (contact_id1) REFERENCES public.contacts(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_relationships contact_relationships_contact_id2_contacts_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_relationships
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_relationships
     ADD CONSTRAINT contact_relationships_contact_id2_contacts_id_fk FOREIGN KEY (contact_id2) REFERENCES public.contacts(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_stripe_customers contact_stripe_customers_contact_id_contacts_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_stripe_customers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_stripe_customers
     ADD CONSTRAINT contact_stripe_customers_contact_id_contacts_id_fk FOREIGN KEY (contact_id) REFERENCES public.contacts(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_tags contact_tags_contact_id_contacts_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_tags
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_tags
     ADD CONSTRAINT contact_tags_contact_id_contacts_id_fk FOREIGN KEY (contact_id) REFERENCES public.contacts(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: contact_tags contact_tags_tag_id_tags_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.contact_tags
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.contact_tags
     ADD CONSTRAINT contact_tags_tag_id_tags_id_fk FOREIGN KEY (tag_id) REFERENCES public.tags(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: credit_card_guarantee credit_card_guarantee_payment_schedule_config_id_payment_schedu; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.credit_card_guarantee
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.credit_card_guarantee
     ADD CONSTRAINT credit_card_guarantee_payment_schedule_config_id_payment_schedu FOREIGN KEY (payment_schedule_config_id) REFERENCES public.payment_schedule_config(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: custom_cruise_details custom_cruise_details_component_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.custom_cruise_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.custom_cruise_details
     ADD CONSTRAINT custom_cruise_details_component_id_fkey FOREIGN KEY (component_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: custom_cruise_details custom_cruise_details_component_id_itinerary_activities_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.custom_cruise_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.custom_cruise_details
     ADD CONSTRAINT custom_cruise_details_component_id_itinerary_activities_id_fk FOREIGN KEY (component_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: dining_details dining_details_component_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dining_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.dining_details
     ADD CONSTRAINT dining_details_component_id_fkey FOREIGN KEY (component_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: expected_payment_items expected_payment_items_payment_schedule_config_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.expected_payment_items
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.expected_payment_items
     ADD CONSTRAINT expected_payment_items_payment_schedule_config_id_fk FOREIGN KEY (payment_schedule_config_id) REFERENCES public.payment_schedule_config(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: flight_details flight_details_component_id_itinerary_activities_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.flight_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.flight_details
     ADD CONSTRAINT flight_details_component_id_itinerary_activities_id_fk FOREIGN KEY (component_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: flight_segments flight_segments_activity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.flight_segments
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.flight_segments
     ADD CONSTRAINT flight_segments_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: itineraries itineraries_trip_id_trips_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.itineraries
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.itineraries
     ADD CONSTRAINT itineraries_trip_id_trips_id_fk FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: itinerary_activities itinerary_activities_itinerary_day_id_itinerary_days_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.itinerary_activities
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.itinerary_activities
     ADD CONSTRAINT itinerary_activities_itinerary_day_id_itinerary_days_id_fk FOREIGN KEY (itinerary_day_id) REFERENCES public.itinerary_days(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: itinerary_activities itinerary_activities_parent_activity_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.itinerary_activities
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.itinerary_activities
     ADD CONSTRAINT itinerary_activities_parent_activity_id_fk FOREIGN KEY (parent_activity_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: itinerary_days itinerary_days_itinerary_id_itineraries_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.itinerary_days
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.itinerary_days
     ADD CONSTRAINT itinerary_days_itinerary_id_itineraries_id_fk FOREIGN KEY (itinerary_id) REFERENCES public.itineraries(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: lodging_details lodging_details_component_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.lodging_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.lodging_details
     ADD CONSTRAINT lodging_details_component_id_fkey FOREIGN KEY (component_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: options_details options_details_component_id_itinerary_activities_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.options_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.options_details
     ADD CONSTRAINT options_details_component_id_itinerary_activities_id_fk FOREIGN KEY (component_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: package_details package_details_activity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.package_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.package_details
     ADD CONSTRAINT package_details_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: package_details package_details_supplier_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.package_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.package_details
     ADD CONSTRAINT package_details_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id) ON DELETE SET NULL;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: package_details package_details_trip_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.package_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.package_details
     ADD CONSTRAINT package_details_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES public.trips(id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: payment_transactions payment_transactions_expected_payment_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.payment_transactions
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.payment_transactions
     ADD CONSTRAINT payment_transactions_expected_payment_item_id_fkey FOREIGN KEY (expected_payment_item_id) REFERENCES public.expected_payment_items(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: port_info_details port_info_details_component_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.port_info_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.port_info_details
     ADD CONSTRAINT port_info_details_component_id_fkey FOREIGN KEY (component_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: service_fees service_fees_trip_id_trips_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.service_fees
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.service_fees
     ADD CONSTRAINT service_fees_trip_id_trips_id_fk FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: transportation_details transportation_details_component_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.transportation_details
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.transportation_details
     ADD CONSTRAINT transportation_details_component_id_fkey FOREIGN KEY (component_id) REFERENCES public.itinerary_activities(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: traveler_group_members traveler_group_members_traveler_group_id_traveler_groups_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.traveler_group_members
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.traveler_group_members
     ADD CONSTRAINT traveler_group_members_traveler_group_id_traveler_groups_id_fk FOREIGN KEY (traveler_group_id) REFERENCES public.traveler_groups(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: traveler_group_members traveler_group_members_trip_traveler_id_trip_travelers_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.traveler_group_members
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.traveler_group_members
     ADD CONSTRAINT traveler_group_members_trip_traveler_id_trip_travelers_id_fk FOREIGN KEY (trip_traveler_id) REFERENCES public.trip_travelers(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: traveler_groups traveler_groups_trip_id_trips_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.traveler_groups
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.traveler_groups
     ADD CONSTRAINT traveler_groups_trip_id_trips_id_fk FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_collaborators trip_collaborators_trip_id_trips_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_collaborators
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_collaborators
     ADD CONSTRAINT trip_collaborators_trip_id_trips_id_fk FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_insurance_packages trip_insurance_packages_trip_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_insurance_packages
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_insurance_packages
     ADD CONSTRAINT trip_insurance_packages_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_media trip_media_trip_id_trips_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_media
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_media
     ADD CONSTRAINT trip_media_trip_id_trips_id_fk FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_notifications trip_notifications_trip_id_trips_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_notifications
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_notifications
     ADD CONSTRAINT trip_notifications_trip_id_trips_id_fk FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_tags trip_tags_tag_id_tags_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_tags
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_tags
     ADD CONSTRAINT trip_tags_tag_id_tags_id_fk FOREIGN KEY (tag_id) REFERENCES public.tags(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_tags trip_tags_trip_id_trips_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_tags
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_tags
     ADD CONSTRAINT trip_tags_trip_id_trips_id_fk FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_traveler_insurance trip_traveler_insurance_selected_package_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_traveler_insurance
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_traveler_insurance
     ADD CONSTRAINT trip_traveler_insurance_selected_package_id_fkey FOREIGN KEY (selected_package_id) REFERENCES public.trip_insurance_packages(id) ON DELETE SET NULL;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_traveler_insurance trip_traveler_insurance_trip_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_traveler_insurance
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_traveler_insurance
     ADD CONSTRAINT trip_traveler_insurance_trip_id_fkey FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_traveler_insurance trip_traveler_insurance_trip_traveler_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_traveler_insurance
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_traveler_insurance
     ADD CONSTRAINT trip_traveler_insurance_trip_traveler_id_fkey FOREIGN KEY (trip_traveler_id) REFERENCES public.trip_travelers(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_travelers trip_travelers_contact_id_contacts_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_travelers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_travelers
     ADD CONSTRAINT trip_travelers_contact_id_contacts_id_fk FOREIGN KEY (contact_id) REFERENCES public.contacts(id) ON DELETE SET NULL;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_travelers trip_travelers_emergency_contact_id_contacts_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_travelers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_travelers
     ADD CONSTRAINT trip_travelers_emergency_contact_id_contacts_id_fk FOREIGN KEY (emergency_contact_id) REFERENCES public.contacts(id) ON DELETE SET NULL;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trip_travelers trip_travelers_trip_id_trips_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trip_travelers
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trip_travelers
     ADD CONSTRAINT trip_travelers_trip_id_trips_id_fk FOREIGN KEY (trip_id) REFERENCES public.trips(id) ON DELETE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: trips trips_primary_contact_id_contacts_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.trips
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.trips
     ADD CONSTRAINT trips_primary_contact_id_contacts_id_fk FOREIGN KEY (primary_contact_id) REFERENCES public.contacts(id) ON DELETE SET NULL;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: user_profiles user_profiles_agency_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_profiles
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.user_profiles
     ADD CONSTRAINT user_profiles_agency_id_fkey FOREIGN KEY (agency_id) REFERENCES public.agencies(id) ON DELETE RESTRICT;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
 -- Name: user_profiles user_profiles_invited_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.user_profiles
+DO $$
+BEGIN
+  ALTER TABLE ONLY public.user_profiles
     ADD CONSTRAINT user_profiles_invited_by_fkey FOREIGN KEY (invited_by) REFERENCES public.user_profiles(id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 
 --
