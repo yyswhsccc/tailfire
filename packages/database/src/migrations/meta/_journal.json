@@ -715,6 +715,13 @@
       "when": 1770998400000,
       "tag": "20260212160000_add_booking_confirmation_template",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1771065600000,
+      "tag": "20260213000000_create_task_system",
+      "breakpoints": true
     }
   ]
 }

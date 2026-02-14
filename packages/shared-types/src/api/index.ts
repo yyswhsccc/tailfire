@@ -79,5 +79,11 @@ export * from './notifications.types.js'
 // Activity Logs
 export * from './activity-logs.types.js'
 
+// Task System
+export * from './tasks.types.js'
+
+// Calendar System
+export * from './calendar.types.js'
+
 // Future exports:
 // export * from './auth.types'

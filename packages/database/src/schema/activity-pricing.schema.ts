@@ -104,9 +104,10 @@ export const commissionTracking = pgTable('commission_tracking', {
 })
 
 // Payment Schedule Config (1:1 with activity_pricing)
+// NOTE: Uses component_pricing_id in DB (legacy name), mapped to activityPricingId in code
 export const paymentScheduleConfig = pgTable('payment_schedule_config', {
   id: uuid('id').primaryKey().defaultRandom(),
-  activityPricingId: uuid('activity_pricing_id')
+  activityPricingId: uuid('component_pricing_id')
     .notNull()
     .unique()
     .references(() => activityPricing.id, { onDelete: 'cascade' }),

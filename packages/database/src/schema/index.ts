@@ -137,6 +137,9 @@ export * from './automation-job-history.schema'
 export * from './notification-preferences.schema'
 export * from './platform-notifications.schema'
 
+// Task system (Calendar integration)
+export * from './tasks.schema'
+
 // Later phases:
 // export * from './financials.schema'
 // export * from './tasks.schema'

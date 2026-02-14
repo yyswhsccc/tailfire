@@ -36,6 +36,8 @@ import { DashboardModule } from './dashboard/dashboard.module'
 import { SuppliersModule } from './suppliers/suppliers.module'
 import { AutomationModule } from './automation/automation.module'
 import { NotificationModule } from './notifications/notification.module'
+import { TasksModule } from './tasks/tasks.module'
+import { CalendarModule } from './calendar/calendar.module'
 
 @Module({
   imports: [
@@ -128,6 +130,12 @@ import { NotificationModule } from './notifications/notification.module'
 
     // Notification system (multi-channel)
     NotificationModule,
+
+    // Task management (Calendar integration)
+    TasksModule,
+
+    // Calendar event aggregation
+    CalendarModule,
   ],
   controllers: [AppController],
   providers: [

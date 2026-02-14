@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Search, Calendar, HelpCircle, Settings } from 'lucide-react'
+import { Search, HelpCircle, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
 import { useAuth } from '@/providers/auth-provider'
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { NotificationBell } from '@/components/notifications'
+import { CalendarNavbarPopover } from '@/components/calendar'
 
 const navigation = [
   { name: 'Trips', href: '/trips' },
@@ -102,10 +103,8 @@ export function TernTopNav() {
             </kbd>
           </Button>
 
-          {/* Calendar Icon */}
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Calendar className="h-4 w-4 text-tern-gray-600" />
-          </Button>
+          {/* Calendar Icon with Today's Events Popover */}
+          <CalendarNavbarPopover />
 
           {/* Notifications */}
           <NotificationBell />
