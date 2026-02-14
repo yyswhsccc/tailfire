@@ -1,6 +1,6 @@
 'use client'
 
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, isSameDay } from 'date-fns'
 import {
   CheckSquare,
   DollarSign,
@@ -89,7 +89,9 @@ export function EventBadge({
               )}
               <div className="text-xs text-muted-foreground">
                 {event.allDay
-                  ? format(parseISO(event.start), 'MMM d, yyyy')
+                  ? event.end && !isSameDay(parseISO(event.start), parseISO(event.end))
+                    ? `${format(parseISO(event.start), 'MMM d')} - ${format(parseISO(event.end), 'MMM d, yyyy')}`
+                    : format(parseISO(event.start), 'MMM d, yyyy')
                   : format(parseISO(event.start), 'MMM d, yyyy h:mm a')}
                 {event.end && !event.allDay && (
                   <> - {format(parseISO(event.end), 'h:mm a')}</>
