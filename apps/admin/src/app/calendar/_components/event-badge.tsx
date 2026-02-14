@@ -95,12 +95,12 @@ export function EventBadge({
                   <> - {format(parseISO(event.end), 'h:mm a')}</>
                 )}
               </div>
-              {event.metadata?.contactName && (
-                <div className="text-xs">Contact: {event.metadata.contactName}</div>
-              )}
-              {event.metadata?.tripName && (
-                <div className="text-xs">Trip: {event.metadata.tripName}</div>
-              )}
+              {event.metadata?.contactName ? (
+                <div className="text-xs">Contact: {String(event.metadata.contactName)}</div>
+              ) : null}
+              {event.metadata?.tripName ? (
+                <div className="text-xs">Trip: {String(event.metadata.tripName)}</div>
+              ) : null}
             </div>
           </TooltipContent>
         </Tooltip>

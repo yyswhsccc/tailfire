@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useCallback } from 'react'
 import { TaskCard } from './task-card'
 import { EmptyState } from '@/components/tern/shared'
 import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'

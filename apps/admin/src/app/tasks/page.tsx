@@ -155,18 +155,18 @@ export default function TasksPage() {
       </div>
 
       {/* Pagination */}
-      {data?.pagination && data.pagination.totalPages > 1 && (
+      {data && data.totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 pt-4 border-t">
           <p className="text-sm text-muted-foreground">
-            Showing {((data.pagination.page - 1) * data.pagination.limit) + 1} to{' '}
-            {Math.min(data.pagination.page * data.pagination.limit, data.pagination.total)} of{' '}
-            {data.pagination.total} tasks
+            Showing {((data.page - 1) * data.limit) + 1} to{' '}
+            {Math.min(data.page * data.limit, data.count)} of{' '}
+            {data.count} tasks
           </p>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              disabled={data.pagination.page <= 1}
+              disabled={data.page <= 1}
               onClick={() => setFilters((prev) => ({ ...prev, page: prev.page! - 1 }))}
             >
               Previous
@@ -174,7 +174,7 @@ export default function TasksPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled={data.pagination.page >= data.pagination.totalPages}
+              disabled={data.page >= data.totalPages}
               onClick={() => setFilters((prev) => ({ ...prev, page: prev.page! + 1 }))}
             >
               Next

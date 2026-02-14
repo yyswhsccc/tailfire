@@ -127,41 +127,41 @@ export function EventDetailModal({ event, open, onOpenChange }: EventDetailModal
           )}
 
           {/* Metadata */}
-          {(event.metadata?.contactName || event.metadata?.tripName) && (
+          {(event.metadata?.contactName || event.metadata?.tripName) ? (
             <>
               <Separator />
               <div className="space-y-2">
-                {event.metadata.contactName && (
+                {event.metadata.contactName ? (
                   <div className="flex items-center gap-3 text-sm">
                     <User className="h-4 w-4 text-muted-foreground" />
-                    <span>{event.metadata.contactName}</span>
-                    {event.metadata.contactId && (
+                    <span>{String(event.metadata.contactName)}</span>
+                    {event.metadata.contactId ? (
                       <Link
-                        href={`/contacts/${event.metadata.contactId}`}
+                        href={`/contacts/${String(event.metadata.contactId)}`}
                         className="text-primary hover:underline ml-auto"
                       >
                         View Contact
                       </Link>
-                    )}
+                    ) : null}
                   </div>
-                )}
-                {event.metadata.tripName && (
+                ) : null}
+                {event.metadata.tripName ? (
                   <div className="flex items-center gap-3 text-sm">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>{event.metadata.tripName}</span>
-                    {event.metadata.tripId && (
+                    <span>{String(event.metadata.tripName)}</span>
+                    {event.metadata.tripId ? (
                       <Link
-                        href={`/trips/${event.metadata.tripId}`}
+                        href={`/trips/${String(event.metadata.tripId)}`}
                         className="text-primary hover:underline ml-auto"
                       >
                         View Trip
                       </Link>
-                    )}
+                    ) : null}
                   </div>
-                )}
+                ) : null}
               </div>
             </>
-          )}
+          ) : null}
 
           {/* Amount for payment events */}
           {event.metadata?.amount !== undefined && (
@@ -170,13 +170,13 @@ export function EventDetailModal({ event, open, onOpenChange }: EventDetailModal
               <div className="flex items-center gap-3">
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
                 <span className="font-semibold text-lg">
-                  ${event.metadata.amount.toLocaleString('en-CA', { minimumFractionDigits: 2 })}
+                  ${Number(event.metadata.amount).toLocaleString('en-CA', { minimumFractionDigits: 2 })}
                 </span>
-                {event.metadata.currency && event.metadata.currency !== 'CAD' && (
+                {event.metadata.currency && String(event.metadata.currency) !== 'CAD' ? (
                   <span className="text-sm text-muted-foreground">
-                    {event.metadata.currency}
+                    {String(event.metadata.currency)}
                   </span>
-                )}
+                ) : null}
               </div>
             </>
           )}

@@ -56,7 +56,7 @@ export function TaskFilters({ filters, onFiltersChange }: TaskFiltersProps) {
     if (value === 'all') {
       onFiltersChange({ ...filters, status: undefined, page: 1 })
     } else {
-      onFiltersChange({ ...filters, status: [value as TaskFilterDto['status'][0]], page: 1 })
+      onFiltersChange({ ...filters, status: [value] as TaskFilterDto['status'], page: 1 })
     }
   }
 
@@ -64,7 +64,7 @@ export function TaskFilters({ filters, onFiltersChange }: TaskFiltersProps) {
     if (value === 'all') {
       onFiltersChange({ ...filters, priority: undefined, page: 1 })
     } else {
-      onFiltersChange({ ...filters, priority: [value as TaskFilterDto['priority'][0]], page: 1 })
+      onFiltersChange({ ...filters, priority: [value] as TaskFilterDto['priority'], page: 1 })
     }
   }
 
@@ -72,7 +72,7 @@ export function TaskFilters({ filters, onFiltersChange }: TaskFiltersProps) {
     if (value === 'all') {
       onFiltersChange({ ...filters, taskType: undefined, page: 1 })
     } else {
-      onFiltersChange({ ...filters, taskType: [value as TaskFilterDto['taskType'][0]], page: 1 })
+      onFiltersChange({ ...filters, taskType: [value] as TaskFilterDto['taskType'], page: 1 })
     }
   }
 
