@@ -17,7 +17,7 @@ export class CalendarQueryDto {
   @IsOptional()
   @IsArray()
   @IsEnum(
-    ['task', 'payment_deposit', 'payment_final', 'birthday', 'trip', 'scheduled_email'],
+    ['task', 'payment_deposit', 'payment_final', 'birthday', 'trip', 'scheduled_email', 'event'],
     { each: true }
   )
   @Transform(({ value }) => (Array.isArray(value) ? value : value ? [value] : undefined))
@@ -28,6 +28,7 @@ export class CalendarQueryDto {
     | 'birthday'
     | 'trip'
     | 'scheduled_email'
+    | 'event'
   )[]
 
   @IsOptional()

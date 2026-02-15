@@ -19,6 +19,7 @@ import {
   Cake,
   Plane,
   Mail,
+  CalendarCheck,
 } from 'lucide-react'
 
 const EVENT_ICONS: Record<CalendarEventType, typeof CheckSquare> = {
@@ -28,6 +29,7 @@ const EVENT_ICONS: Record<CalendarEventType, typeof CheckSquare> = {
   birthday: Cake,
   trip: Plane,
   scheduled_email: Mail,
+  event: CalendarCheck,
 }
 
 function EventListItem({ event }: { event: CalendarEvent }) {

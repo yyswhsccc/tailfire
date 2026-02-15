@@ -19,6 +19,7 @@ export type CalendarEventType =
   | 'birthday'
   | 'trip'
   | 'scheduled_email'
+  | 'event'
 
 /**
  * Event color scheme for UI consistency
@@ -30,6 +31,7 @@ export const CALENDAR_EVENT_COLORS: Record<CalendarEventType, { background: stri
   birthday: { background: '#ec4899', border: '#db2777', text: '#ffffff' }, // pink-500
   trip: { background: '#10b981', border: '#059669', text: '#ffffff' }, // emerald-500
   scheduled_email: { background: '#64748b', border: '#475569', text: '#ffffff' }, // slate-500
+  event: { background: '#8b5cf6', border: '#7c3aed', text: '#ffffff' }, // violet-500
 }
 
 // ============================================================================
@@ -58,7 +60,7 @@ export interface CalendarEvent {
 
   // Source reference (for navigation)
   sourceId: string // ID of the source entity
-  sourceType: 'task' | 'trip' | 'contact' | 'payment' | 'email'
+  sourceType: 'task' | 'trip' | 'contact' | 'payment' | 'email' | 'event'
 
   // Related entities (for context)
   tripId?: string

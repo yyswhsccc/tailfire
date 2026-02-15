@@ -8,6 +8,7 @@ import {
   Cake,
   Plane,
   Mail,
+  CalendarCheck,
   ExternalLink,
   User,
   MapPin,
@@ -31,6 +32,7 @@ const EVENT_ICONS: Record<CalendarEventType, typeof CheckSquare> = {
   birthday: Cake,
   trip: Plane,
   scheduled_email: Mail,
+  event: CalendarCheck,
 }
 
 const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
@@ -40,6 +42,7 @@ const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   birthday: 'Birthday',
   trip: 'Trip',
   scheduled_email: 'Scheduled Email',
+  event: 'Event',
 }
 
 interface EventDetailModalProps {

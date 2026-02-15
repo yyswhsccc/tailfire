@@ -39,6 +39,7 @@ import { NotificationModule } from './notifications/notification.module'
 import { TasksModule } from './tasks/tasks.module'
 import { CalendarModule } from './calendar/calendar.module'
 import { NotesModule } from './notes/notes.module'
+import { CalendarEventsModule } from './calendar-events/calendar-events.module'
 
 @Module({
   imports: [
@@ -140,6 +141,9 @@ import { NotesModule } from './notes/notes.module'
 
     // Notes system (internal agent notes on contacts/trips)
     NotesModule,
+
+    // Calendar events (standalone meetings, calls, follow-ups)
+    CalendarEventsModule,
   ],
   controllers: [AppController],
   providers: [

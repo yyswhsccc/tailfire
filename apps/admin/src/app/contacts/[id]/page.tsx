@@ -34,11 +34,11 @@ import { RelationshipDialog } from './_components/relationship-dialog'
 import { RelationshipsCard } from './_components/relationships-card'
 import { RelationshipsSection } from './_components/relationships-section'
 import { NotesSection } from '@/components/notes/NotesSection'
+import { ContactCalendarSection } from '@/components/calendar/ContactCalendarSection'
 import {
   CheckSquare,
   Mail,
   MessageCircle,
-  Calendar,
   FileText,
   Plane,
   MapPin,
@@ -1185,11 +1185,7 @@ export default function ContactDetailPage() {
                 />
               )}
               {activeSection === 'calendar' && (
-                <ComingSoonSection
-                  title="Calendar"
-                  description="Scheduled meetings and events with this contact."
-                  icon={Calendar}
-                />
+                <ContactCalendarSection contactId={contactId} />
               )}
               {activeSection === 'files' && (
                 <ComingSoonSection

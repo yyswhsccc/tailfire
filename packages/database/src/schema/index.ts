@@ -143,6 +143,9 @@ export * from './tasks.schema'
 // Notes system (internal agent notes on contacts/trips)
 export * from './notes.schema'
 
+// Calendar events (standalone meetings, calls, follow-ups)
+export * from './calendar-events.schema'
+
 // Later phases:
 // export * from './financials.schema'
 // export * from './tasks.schema'

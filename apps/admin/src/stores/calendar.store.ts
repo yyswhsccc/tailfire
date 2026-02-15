@@ -26,6 +26,8 @@ const DEFAULT_EVENT_TYPES: CalendarEventType[] = [
   'payment_final',
   'birthday',
   'trip',
+  'event',
+  'scheduled_email',
 ]
 
 export const useCalendarStore = create<CalendarState>()(
