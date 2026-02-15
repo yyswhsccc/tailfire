@@ -764,6 +764,13 @@
       "when": 1771257600000,
       "tag": "20260215180000_create_calendar_events_table",
       "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1771272000000,
+      "tag": "20260215200000_create_contact_documents_table",
+      "breakpoints": true
     }
   ]
 }

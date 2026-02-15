@@ -56,6 +56,7 @@ export type AuditEntityType =
   | 'booking'
   | 'installment'
   | 'activity_document'
+  | 'contact_document'
   | 'booking_document'
   | 'activity_media'
   | 'trip_media'

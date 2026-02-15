@@ -46,6 +46,7 @@ const ALLOWED_FIELDS: Record<string, string[]> = {
     'sequenceOrder',
   ],
   activity_document: ['fileName', 'documentType', 'category', 'description'],
+  contact_document: ['fileName', 'documentType'],
   booking_document: ['fileName', 'documentType', 'category', 'description'],
   activity_media: ['fileName', 'mediaType', 'isPrimary', 'caption', 'sequenceOrder'],
   trip_media: ['fileName', 'mediaType', 'isPrimary', 'caption', 'sequenceOrder'],

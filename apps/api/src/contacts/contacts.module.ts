@@ -15,6 +15,8 @@ import { ContactGroupsService } from './contact-groups.service'
 import { ContactSharesController } from './contact-shares.controller'
 import { ContactSharesService } from './contact-shares.service'
 import { ContactAccessService } from './contact-access.service'
+import { ContactDocumentsController } from './contact-documents.controller'
+import { ContactDocumentsService } from './contact-documents.service'
 import { ActivityLogsModule } from '../activity-logs/activity-logs.module'
 import { TripsModule } from '../trips/trips.module'
 
@@ -28,6 +30,7 @@ import { TripsModule } from '../trips/trips.module'
     ContactRelationshipsController,
     ContactGroupsController,
     ContactSharesController,
+    ContactDocumentsController,
   ],
   providers: [
     ContactsService,
@@ -35,6 +38,7 @@ import { TripsModule } from '../trips/trips.module'
     ContactGroupsService,
     ContactSharesService,
     ContactAccessService,
+    ContactDocumentsService,
   ],
   exports: [
     ContactsService,

@@ -33,13 +33,13 @@ import { ComingSoonSection } from './_components/coming-soon-section'
 import { RelationshipDialog } from './_components/relationship-dialog'
 import { RelationshipsCard } from './_components/relationships-card'
 import { RelationshipsSection } from './_components/relationships-section'
+import { ContactDocumentsSection } from './_components/contact-documents-section'
 import { NotesSection } from '@/components/notes/NotesSection'
 import { ContactCalendarSection } from '@/components/calendar/ContactCalendarSection'
 import {
   CheckSquare,
   Mail,
   MessageCircle,
-  FileText,
   Plane,
   MapPin,
   CreditCard,
@@ -1188,11 +1188,7 @@ export default function ContactDetailPage() {
                 <ContactCalendarSection contactId={contactId} />
               )}
               {activeSection === 'files' && (
-                <ComingSoonSection
-                  title="Files"
-                  description="Documents and attachments for this contact."
-                  icon={FileText}
-                />
+                <ContactDocumentsSection contactId={contactId} />
               )}
               {activeSection === 'trips' && (
                 <Card>

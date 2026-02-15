@@ -20,6 +20,7 @@ export type { Database } from './client'
 
 // Direct exports for commonly used constants
 export { VALID_DOCUMENT_TYPES, type DocumentType } from './schema/activity-documents.schema'
+export { VALID_CONTACT_DOCUMENT_TYPES, type ContactDocumentType } from './schema/contact-documents.schema'
 export { mediaTypeEnum, componentEntityTypeEnum, type MediaType, type ComponentEntityType } from './schema/activity-media.schema'
 
 // Cruise schema exports
