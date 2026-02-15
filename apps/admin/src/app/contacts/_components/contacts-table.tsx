@@ -38,12 +38,8 @@ export function ContactsTable({
     null
   )
 
-  const isDetailPageEnabled = process.env.NEXT_PUBLIC_ENABLE_CONTACTS_DETAIL === 'true'
-
   const handleRowClick = (contactId: string) => {
-    if (isDetailPageEnabled) {
-      router.push(`/contacts/${contactId}`)
-    }
+    router.push(`/contacts/${contactId}`)
   }
 
   return (
@@ -65,7 +61,7 @@ export function ContactsTable({
               <TableRow
                 key={contact.id}
                 onClick={() => handleRowClick(contact.id)}
-                className={isDetailPageEnabled ? "cursor-pointer hover:bg-tern-gray-50/50 transition-colors border-b border-tern-gray-100" : "border-b border-tern-gray-100"}
+                className="cursor-pointer hover:bg-tern-gray-50/50 transition-colors border-b border-tern-gray-100"
               >
                 <TableCell className="h-12 px-4 py-2">
                   <div className="flex items-center gap-2">
