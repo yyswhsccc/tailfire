@@ -140,6 +140,9 @@ export * from './platform-notifications.schema'
 // Task system (Calendar integration)
 export * from './tasks.schema'
 
+// Notes system (internal agent notes on contacts/trips)
+export * from './notes.schema'
+
 // Later phases:
 // export * from './financials.schema'
 // export * from './tasks.schema'

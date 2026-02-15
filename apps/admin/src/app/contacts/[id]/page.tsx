@@ -33,9 +33,9 @@ import { ComingSoonSection } from './_components/coming-soon-section'
 import { RelationshipDialog } from './_components/relationship-dialog'
 import { RelationshipsCard } from './_components/relationships-card'
 import { RelationshipsSection } from './_components/relationships-section'
+import { NotesSection } from '@/components/notes/NotesSection'
 import {
   CheckSquare,
-  StickyNote,
   Mail,
   MessageCircle,
   Calendar,
@@ -1168,11 +1168,7 @@ export default function ContactDetailPage() {
                 </div>
               )}
               {activeSection === 'notes' && (
-                <ComingSoonSection
-                  title="Notes"
-                  description="Internal notes and comments for this contact."
-                  icon={StickyNote}
-                />
+                <NotesSection contactId={contactId} />
               )}
               {activeSection === 'emails' && (
                 <ComingSoonSection

@@ -49,6 +49,7 @@ import { ServiceFeesPanel } from '@/components/financials/service-fees-panel'
 import { TernCard } from '@/components/tern/core'
 import { TripDetailSkeleton } from '@/components/tern/shared/loading-skeleton'
 import { EmptyState } from '@/components/tern/shared/empty-state'
+import { NotesSection } from '@/components/notes/NotesSection'
 import {
   getTripStatusLabel,
   getTripStatusVariant,
@@ -567,11 +568,12 @@ export default function TripDetailPage() {
         return <TripPackages trip={trip} />
       case 'insurance':
         return <TripInsurance trip={trip} />
+      case 'notes':
+        return <NotesSection tripId={trip.id} />
       case 'tasks':
       case 'documents':
       case 'emails':
       case 'forms':
-      case 'notes':
       case 'automations':
         return (
           <EmptyState

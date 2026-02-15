@@ -750,6 +750,13 @@
       "when": 1771149780000,
       "tag": "20260214100300_seed_task_due_reminder_email_template",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1771236000000,
+      "tag": "20260215120000_create_notes_table",
+      "breakpoints": true
     }
   ]
 }

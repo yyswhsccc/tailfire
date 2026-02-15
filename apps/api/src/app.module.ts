@@ -38,6 +38,7 @@ import { AutomationModule } from './automation/automation.module'
 import { NotificationModule } from './notifications/notification.module'
 import { TasksModule } from './tasks/tasks.module'
 import { CalendarModule } from './calendar/calendar.module'
+import { NotesModule } from './notes/notes.module'
 
 @Module({
   imports: [
@@ -136,6 +137,9 @@ import { CalendarModule } from './calendar/calendar.module'
 
     // Calendar event aggregation
     CalendarModule,
+
+    // Notes system (internal agent notes on contacts/trips)
+    NotesModule,
   ],
   controllers: [AppController],
   providers: [
