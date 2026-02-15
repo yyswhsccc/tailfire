@@ -49,6 +49,12 @@ export class TaskFilterDto {
   taskType?: ('manual' | 'automatic' | 'reminder' | 'milestone')[]
 
   @IsOptional()
+  @IsArray()
+  @IsEnum(['user', 'contact', 'admin_pool'], { each: true })
+  @Transform(({ value }) => (Array.isArray(value) ? value : value ? [value] : undefined))
+  assigneeType?: ('user' | 'contact' | 'admin_pool')[]
+
+  @IsOptional()
   @IsUUID()
   assigneeUserId?: string
 

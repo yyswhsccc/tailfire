@@ -8,7 +8,7 @@
  */
 
 import { Injectable } from '@nestjs/common'
-import { eq, and, or, isNull } from 'drizzle-orm'
+import { eq, and, or, isNull, ne } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import type { AuthContext } from '../auth/auth.types'
 import type { TaskResponseDto } from '../../../../packages/shared-types/src/api'
@@ -34,6 +34,7 @@ export class TaskAccessService {
         id: this.db.schema.tasks.id,
         ownerId: this.db.schema.tasks.ownerId,
         assigneeUserId: this.db.schema.tasks.assigneeUserId,
+        assigneeType: this.db.schema.tasks.assigneeType,
         createdBy: this.db.schema.tasks.createdBy,
       })
       .from(this.db.schema.tasks)
@@ -69,13 +70,14 @@ export class TaskAccessService {
     const isOwner = task.ownerId === auth.userId
     const isAssignee = task.assigneeUserId === auth.userId
     const isCreator = task.createdBy === auth.userId
-    const isAgencyWide = task.ownerId === null
+    // Agency-wide tasks (no owner) are visible to non-admins UNLESS they are admin_pool
+    const isAgencyWide = task.ownerId === null && task.assigneeType !== 'admin_pool'
 
     // Users can view:
     // - Tasks they own
     // - Tasks assigned to them
     // - Tasks they created
-    // - Agency-wide tasks (no owner)
+    // - Agency-wide tasks (no owner, not admin_pool)
     const canView = isOwner || isAssignee || isCreator || isAgencyWide
 
     // Users can edit:
@@ -114,7 +116,7 @@ export class TaskAccessService {
       const isOwner = task.ownerId === auth.userId
       const isAssignee = task.assigneeUserId === auth.userId
       const isCreator = task.createdBy === auth.userId
-      const isAgencyWide = !task.ownerId
+      const isAgencyWide = !task.ownerId && task.assigneeType !== 'admin_pool'
 
       return isOwner || isAssignee || isCreator || isAgencyWide
     })
@@ -134,14 +136,14 @@ export class TaskAccessService {
     // - Tasks they own
     // - Tasks assigned to them
     // - Tasks they created
-    // - Agency-wide tasks (no owner)
+    // - Agency-wide tasks (no owner, not admin_pool)
     return and(
       eq(this.db.schema.tasks.agencyId, auth.agencyId),
       or(
         eq(this.db.schema.tasks.ownerId, auth.userId),
         eq(this.db.schema.tasks.assigneeUserId, auth.userId),
         eq(this.db.schema.tasks.createdBy, auth.userId),
-        isNull(this.db.schema.tasks.ownerId)
+        and(isNull(this.db.schema.tasks.ownerId), ne(this.db.schema.tasks.assigneeType, 'admin_pool'))
       )
     )
   }

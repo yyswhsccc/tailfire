@@ -11,6 +11,8 @@ import {
   ValidateNested,
   IsObject,
   Matches,
+  ValidateIf,
+  IsNotEmpty,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 
@@ -118,10 +120,15 @@ export class CreateTaskDto {
 
   // Assignment
   @IsOptional()
+  @IsEnum(['user', 'contact', 'admin_pool'])
+  assigneeType?: 'user' | 'contact' | 'admin_pool'
+
+  @IsOptional()
   @IsUUID()
   assigneeUserId?: string
 
-  @IsOptional()
+  @ValidateIf((o) => o.assigneeType === 'contact')
+  @IsNotEmpty({ message: 'assigneeContactId is required when assigneeType is contact' })
   @IsUUID()
   assigneeContactId?: string
 

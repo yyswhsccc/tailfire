@@ -37,6 +37,30 @@ export class TasksService {
     agencyId: string,
     userId: string
   ): Promise<TaskResponseDto> {
+    // Determine assignee type and resolve defaults
+    const assigneeType = dto.assigneeType || 'user'
+    let assigneeUserId = dto.assigneeUserId
+    let assigneeContactId = dto.assigneeContactId
+    let assigneeName = dto.assigneeName
+
+    if (assigneeType === 'user') {
+      if (!assigneeUserId) assigneeUserId = userId // Default to creating user
+      assigneeContactId = undefined // Clear irrelevant contact ID
+    } else if (assigneeType === 'contact') {
+      assigneeUserId = undefined // Clear irrelevant user ID
+    } else if (assigneeType === 'admin_pool') {
+      assigneeUserId = undefined
+      assigneeContactId = undefined
+      assigneeName = undefined
+    }
+    // Resolve contact name for contact-type assignments
+    if (assigneeType === 'contact' && assigneeContactId) {
+      const contact = await this.getContact(assigneeContactId)
+      if (contact) {
+        assigneeName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || assigneeName
+      }
+    }
+
     const [task] = await this.db.client
       .insert(this.db.schema.tasks)
       .values({
@@ -52,9 +76,10 @@ export class TasksService {
         tripId: dto.tripId,
         contactId: dto.contactId,
         activityId: dto.activityId,
-        assigneeUserId: dto.assigneeUserId,
-        assigneeContactId: dto.assigneeContactId,
-        assigneeName: dto.assigneeName,
+        assigneeType,
+        assigneeUserId,
+        assigneeContactId,
+        assigneeName,
         parentTaskId: dto.parentTaskId,
         isVisibleInCalendar: dto.isVisibleInCalendar ?? true,
         colorOverride: dto.colorOverride,
@@ -77,6 +102,19 @@ export class TasksService {
           tagId,
         }))
       )
+    }
+
+    // Insert notification pending row for contact assignments
+    if (assigneeType === 'contact' && assigneeContactId) {
+      await this.db.client
+        .insert(this.db.schema.taskNotificationPending)
+        .values({
+          agencyId,
+          taskId: task.id,
+          contactId: assigneeContactId,
+          eventType: 'assigned',
+        })
+        .onConflictDoNothing()
     }
 
     return this.findOne(task.id, agencyId)
@@ -121,6 +159,11 @@ export class TasksService {
     // Task type filter
     if (filters.taskType?.length) {
       conditions.push(inArray(this.db.schema.tasks.taskType, filters.taskType))
+    }
+
+    // Assignee type filter
+    if (filters.assigneeType?.length) {
+      conditions.push(inArray(this.db.schema.tasks.assigneeType, filters.assigneeType))
     }
 
     // Assignee filter
@@ -265,6 +308,27 @@ export class TasksService {
     agencyId: string,
     userId: string
   ): Promise<TaskResponseDto> {
+    // Fetch existing task to detect reassignment
+    const [existingTask] = await this.db.client
+      .select({
+        assigneeType: this.db.schema.tasks.assigneeType,
+        assigneeContactId: this.db.schema.tasks.assigneeContactId,
+        dueDate: this.db.schema.tasks.dueDate,
+        dueAt: this.db.schema.tasks.dueAt,
+      })
+      .from(this.db.schema.tasks)
+      .where(
+        and(
+          eq(this.db.schema.tasks.id, id),
+          eq(this.db.schema.tasks.agencyId, agencyId)
+        )
+      )
+      .limit(1)
+
+    if (!existingTask) {
+      throw new NotFoundException('Task not found')
+    }
+
     // Build update object with only provided fields
     const updateData: Record<string, unknown> = {}
 
@@ -279,6 +343,7 @@ export class TasksService {
     if (dto.tripId !== undefined) updateData.tripId = dto.tripId
     if (dto.contactId !== undefined) updateData.contactId = dto.contactId
     if (dto.activityId !== undefined) updateData.activityId = dto.activityId
+    if (dto.assigneeType !== undefined) updateData.assigneeType = dto.assigneeType
     if (dto.assigneeUserId !== undefined) updateData.assigneeUserId = dto.assigneeUserId
     if (dto.assigneeContactId !== undefined) updateData.assigneeContactId = dto.assigneeContactId
     if (dto.assigneeName !== undefined) updateData.assigneeName = dto.assigneeName
@@ -290,6 +355,27 @@ export class TasksService {
     if (dto.ownerId !== undefined) updateData.ownerId = dto.ownerId
     if (dto.completedAt !== undefined) updateData.completedAt = dto.completedAt ? new Date(dto.completedAt) : null
     if (dto.completedBy !== undefined) updateData.completedBy = dto.completedBy
+
+    // Normalize assignee IDs based on assigneeType — clear irrelevant fields
+    if (dto.assigneeType === 'user') {
+      updateData.assigneeContactId = null
+    } else if (dto.assigneeType === 'contact') {
+      updateData.assigneeUserId = null
+    } else if (dto.assigneeType === 'admin_pool') {
+      updateData.assigneeUserId = null
+      updateData.assigneeContactId = null
+      updateData.assigneeName = null
+    }
+
+    // Resolve contact name for contact-type assignments
+    const newAssigneeType = dto.assigneeType ?? existingTask.assigneeType
+    const newContactId = dto.assigneeContactId ?? existingTask.assigneeContactId
+    if (newAssigneeType === 'contact' && newContactId && dto.assigneeContactId !== undefined) {
+      const contact = await this.getContact(newContactId)
+      if (contact) {
+        updateData.assigneeName = [contact.firstName, contact.lastName].filter(Boolean).join(' ')
+      }
+    }
 
     // Handle status change to completed
     if (dto.status === 'completed' && !dto.completedAt) {
@@ -310,6 +396,60 @@ export class TasksService {
 
     if (!updated) {
       throw new NotFoundException('Task not found')
+    }
+
+    // Detect reassignment and insert notification pending rows
+    const assigneeTypeChanged = dto.assigneeType !== undefined && dto.assigneeType !== existingTask.assigneeType
+    const contactIdChanged = dto.assigneeContactId !== undefined && dto.assigneeContactId !== existingTask.assigneeContactId
+
+    if (assigneeTypeChanged || contactIdChanged) {
+      // Old contact was assigned — insert 'removed' notification
+      if (existingTask.assigneeType === 'contact' && existingTask.assigneeContactId) {
+        await this.db.client
+          .insert(this.db.schema.taskNotificationPending)
+          .values({
+            agencyId,
+            taskId: id,
+            contactId: existingTask.assigneeContactId,
+            eventType: 'removed',
+          })
+          .onConflictDoNothing()
+      }
+      // New contact assigned — insert 'assigned' notification
+      if (newAssigneeType === 'contact' && newContactId) {
+        await this.db.client
+          .insert(this.db.schema.taskNotificationPending)
+          .values({
+            agencyId,
+            taskId: id,
+            contactId: newContactId,
+            eventType: 'assigned',
+          })
+          .onConflictDoNothing()
+      }
+      // Clear due_reminder markers so the new assignee can receive a reminder
+      await this.db.client
+        .delete(this.db.schema.taskNotificationPending)
+        .where(
+          and(
+            eq(this.db.schema.taskNotificationPending.taskId, id),
+            eq(this.db.schema.taskNotificationPending.eventType, 'due_reminder'),
+          )
+        )
+    }
+
+    // Clear due_reminder markers if due date changed (so new reminder can be sent for the new date)
+    const dueDateChanged = dto.dueDate !== undefined && dto.dueDate !== existingTask.dueDate
+    const dueAtChanged = dto.dueAt !== undefined && dto.dueAt !== existingTask.dueAt?.toISOString()
+    if (dueDateChanged || dueAtChanged) {
+      await this.db.client
+        .delete(this.db.schema.taskNotificationPending)
+        .where(
+          and(
+            eq(this.db.schema.taskNotificationPending.taskId, id),
+            eq(this.db.schema.taskNotificationPending.eventType, 'due_reminder'),
+          )
+        )
     }
 
     // Handle tags update if provided
@@ -521,7 +661,7 @@ export class TasksService {
 
   private async enrichTask(task: typeof this.db.schema.tasks.$inferSelect): Promise<TaskResponseDto> {
     // Fetch related entities in parallel
-    const [trip, contact, activity, tags, subtaskCount, assigneeUser, owner, createdByUser] =
+    const [trip, contact, activity, tags, subtaskCount, assigneeUser, assigneeContact, owner, createdByUser] =
       await Promise.all([
         task.tripId ? this.getTrip(task.tripId) : null,
         task.contactId ? this.getContact(task.contactId) : null,
@@ -529,6 +669,7 @@ export class TasksService {
         this.getTaskTags(task.id),
         this.getSubtaskCount(task.id),
         task.assigneeUserId ? this.getUser(task.assigneeUserId) : null,
+        task.assigneeContactId ? this.getContact(task.assigneeContactId) : null,
         task.ownerId ? this.getUser(task.ownerId) : null,
         this.getUser(task.createdBy),
       ])
@@ -563,7 +704,8 @@ export class TasksService {
       activity: activity
         ? { id: activity.id, title: activity.name, activityType: activity.activityType }
         : undefined,
-      assignee: this.buildAssignee(task, assigneeUser),
+      assigneeType: task.assigneeType,
+      assignee: this.buildAssignee(task, assigneeUser, assigneeContact),
       assigneeUserId: task.assigneeUserId ?? undefined,
       assigneeContactId: task.assigneeContactId ?? undefined,
       assigneeName: task.assigneeName ?? undefined,
@@ -591,13 +733,20 @@ export class TasksService {
 
   private buildAssignee(
     task: typeof this.db.schema.tasks.$inferSelect,
-    user?: { id: string; firstName?: string | null; lastName?: string | null; avatarUrl?: string | null } | null
+    user?: { id: string; firstName?: string | null; lastName?: string | null; avatarUrl?: string | null } | null,
+    assigneeContact?: { id: string; firstName?: string | null; lastName?: string | null; email?: string | null } | null,
   ) {
     if (task.assigneeUserId && user) {
       return {
         userId: user.id,
         name: [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Unknown',
         avatarUrl: user.avatarUrl ?? undefined,
+      }
+    }
+    if (task.assigneeContactId && assigneeContact) {
+      return {
+        contactId: assigneeContact.id,
+        name: [assigneeContact.firstName, assigneeContact.lastName].filter(Boolean).join(' ') || task.assigneeName || 'Unknown',
       }
     }
     if (task.assigneeName) {

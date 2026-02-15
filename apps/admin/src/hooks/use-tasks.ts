@@ -69,6 +69,11 @@ export function useTasks(filters: TaskFilterDto = {}) {
         )
       }
 
+      if (filters.assigneeType?.length) {
+        (Array.isArray(filters.assigneeType) ? [filters.assigneeType].flat() : [filters.assigneeType]).forEach(
+          (t) => params.append('assigneeType', t)
+        )
+      }
       if (filters.assigneeUserId)
         params.append('assigneeUserId', filters.assigneeUserId)
       if (filters.tripId) params.append('tripId', filters.tripId)
@@ -152,6 +157,10 @@ export function useCreateTask() {
         contactId: newTask.contactId,
         tripId: newTask.tripId,
         isVisibleInCalendar: newTask.isVisibleInCalendar ?? true,
+        assigneeType: newTask.assigneeType ?? 'user',
+        assigneeUserId: newTask.assigneeUserId,
+        assigneeContactId: newTask.assigneeContactId,
+        assigneeName: newTask.assigneeName,
         createdBy: '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
