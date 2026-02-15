@@ -59,9 +59,10 @@ interface TaskFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   task?: TaskResponseDto | null
+  contactId?: string
 }
 
-export function TaskFormDialog({ open, onOpenChange, task }: TaskFormDialogProps) {
+export function TaskFormDialog({ open, onOpenChange, task, contactId }: TaskFormDialogProps) {
   const { toast } = useToast()
   const createTask = useCreateTask()
   const updateTask = useUpdateTask()
@@ -117,7 +118,7 @@ export function TaskFormDialog({ open, onOpenChange, task }: TaskFormDialogProps
         await updateTask.mutateAsync({ id: task.id, data })
         toast({ title: 'Task updated', description: values.title })
       } else {
-        await createTask.mutateAsync(data)
+        await createTask.mutateAsync({ ...data, ...(contactId ? { contactId } : {}) })
         toast({ title: 'Task created', description: values.title })
       }
       onOpenChange(false)

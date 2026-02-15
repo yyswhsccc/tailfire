@@ -18,11 +18,14 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useContact, useUpdateContact, useContactTrips } from '@/hooks/use-contacts'
+import { useTasks } from '@/hooks/use-tasks'
+import { TaskList } from '@/app/tasks/_components/task-list'
+import { TaskFormDialog } from '@/app/tasks/_components/task-form-dialog'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'
 import { TernBadge } from '@/components/tern/core'
 import { useToast } from '@/hooks/use-toast'
-import type { UpdateContactDto } from '@tailfire/shared-types/api'
+import type { UpdateContactDto, TaskResponseDto } from '@tailfire/shared-types/api'
 import { ContactAvatar } from '@/components/contacts/contact-avatar'
 import { ContactNavigation, type ContactSection } from './_components/contact-navigation'
 import { ComingSoonSection } from './_components/coming-soon-section'
@@ -115,6 +118,14 @@ export default function ContactDetailPage() {
   // Relationship dialog state
   const [relationshipDialogOpen, setRelationshipDialogOpen] = useState(false)
   const [editingRelationship, setEditingRelationship] = useState<ContactRelationshipResponseDto | null>(null)
+
+  // Task state
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<TaskResponseDto | null>(null)
+  const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useTasks(
+    { contactId, sortBy: 'dueDate', sortOrder: 'asc', limit: 50 },
+  )
+  const contactTasks = tasksData?.data ?? []
 
   const handleEdit = (section: EditSection) => {
     if (!contact) return
@@ -1103,11 +1114,46 @@ export default function ContactDetailPage() {
                 />
               )}
               {activeSection === 'tasks' && (
-                <ComingSoonSection
-                  title="Tasks"
-                  description="Task management for this contact coming soon."
-                  icon={CheckSquare}
-                />
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <CheckSquare className="h-5 w-5" />
+                      Tasks
+                    </CardTitle>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setEditingTask(null)
+                        setTaskDialogOpen(true)
+                      }}
+                    >
+                      Add Task
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {tasksError ? (
+                      <div className="text-center py-8">
+                        <p className="text-sm text-red-600 mb-2">Failed to load tasks.</p>
+                        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                          Retry
+                        </Button>
+                      </div>
+                    ) : (
+                      <TaskList
+                        tasks={contactTasks}
+                        isLoading={tasksLoading}
+                        onCreateTask={() => {
+                          setEditingTask(null)
+                          setTaskDialogOpen(true)
+                        }}
+                        onTaskClick={(task) => {
+                          setEditingTask(task)
+                          setTaskDialogOpen(true)
+                        }}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
               )}
               {activeSection === 'relationships' && (
                 <div className="p-6">
@@ -1231,6 +1277,14 @@ export default function ContactDetailPage() {
         onOpenChange={setRelationshipDialogOpen}
         contactId={contactId}
         relationship={editingRelationship}
+      />
+
+      {/* Task Dialog */}
+      <TaskFormDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        task={editingTask}
+        contactId={contactId}
       />
     </TernDashboardLayout>
   )
