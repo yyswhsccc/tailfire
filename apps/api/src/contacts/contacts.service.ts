@@ -5,11 +5,13 @@
  */
 
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { OnEvent } from '@nestjs/event-emitter'
+import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter'
 import { eq, and, ilike, or, sql, desc, asc, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { UserValidationService } from '../common/user-validation.service'
 import { TripBookedEvent } from '../trips/events/trip-booked.event'
+import { AuditEvent } from '../activity-logs/events/audit.event'
+import { sanitizeForAudit, computeAuditDiff } from '../activity-logs/audit-sanitizer'
 import type {
   CreateContactDto,
   UpdateContactDto,
@@ -23,12 +25,13 @@ export class ContactsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly userValidationService: UserValidationService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
    * Create a new contact
    */
-  async create(dto: CreateContactDto, agencyId: string): Promise<ContactResponseDto> {
+  async create(dto: CreateContactDto, agencyId: string, userId?: string): Promise<ContactResponseDto> {
     const [contact] = await this.db.client
       .insert(this.db.schema.contacts)
       .values({
@@ -102,7 +105,16 @@ export class ContactsService {
       })
       .returning()
 
-    return this.mapToResponseDto(contact)
+    const result = this.mapToResponseDto(contact)
+
+    const displayName = `${contact!.firstName || ''} ${contact!.lastName || ''}`.trim() || 'Unknown'
+    this.eventEmitter.emit('audit.created', new AuditEvent(
+      'contact', contact!.id, 'created', null, userId ?? null,
+      displayName,
+      { after: sanitizeForAudit('contact', contact as Record<string, unknown>) }
+    ))
+
+    return result
   }
 
   /**
@@ -240,7 +252,15 @@ export class ContactsService {
     id: string,
     dto: UpdateContactDto,
     agencyId: string,
+    userId?: string,
   ): Promise<ContactResponseDto> {
+    // Fetch before state for audit diff
+    const [before] = await this.db.client
+      .select()
+      .from(this.db.schema.contacts)
+      .where(and(eq(this.db.schema.contacts.id, id), eq(this.db.schema.contacts.agencyId, agencyId)))
+      .limit(1)
+
     const updateData: any = { ...dto }
 
     // Parse travelPreferences if it's a string
@@ -261,13 +281,50 @@ export class ContactsService {
       throw new NotFoundException(`Contact with ID ${id} not found`)
     }
 
+    // Emit audit events for update
+    if (before) {
+      const diff = computeAuditDiff('contact', before as Record<string, unknown>, contact as Record<string, unknown>)
+      const displayName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown'
+
+      // Emit status_changed if contactStatus or contactType changed via update()
+      const statusFields = ['contactStatus', 'contactType']
+      const statusChanges = diff.changedFields.filter(f => statusFields.includes(f))
+      if (statusChanges.length > 0) {
+        const statusBefore: Record<string, unknown> = {}
+        const statusAfter: Record<string, unknown> = {}
+        for (const f of statusChanges) {
+          statusBefore[f] = diff.before[f]
+          statusAfter[f] = diff.after[f]
+        }
+        this.eventEmitter.emit('audit.status_changed', new AuditEvent(
+          'contact', id, 'status_changed', null, userId ?? null,
+          displayName,
+          { before: statusBefore, after: statusAfter, changedFields: statusChanges }
+        ))
+      }
+
+      // Emit updated for non-status field changes (strip status fields from diff)
+      diff.changedFields = diff.changedFields.filter(f => !statusFields.includes(f))
+      delete diff.before.contactStatus
+      delete diff.before.contactType
+      delete diff.after.contactStatus
+      delete diff.after.contactType
+      if (diff.changedFields.length > 0) {
+        this.eventEmitter.emit('audit.updated', new AuditEvent(
+          'contact', id, 'updated', null, userId ?? null,
+          displayName,
+          diff
+        ))
+      }
+    }
+
     return this.mapToResponseDto(contact)
   }
 
   /**
    * Delete a contact (soft delete by setting isActive = false)
    */
-  async remove(id: string, agencyId: string): Promise<void> {
+  async remove(id: string, agencyId: string, userId?: string): Promise<void> {
     const [contact] = await this.db.client
       .update(this.db.schema.contacts)
       .set({ isActive: false, updatedAt: new Date() })
@@ -277,6 +334,12 @@ export class ContactsService {
     if (!contact) {
       throw new NotFoundException(`Contact with ID ${id} not found`)
     }
+
+    const displayName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown'
+    this.eventEmitter.emit('audit.deleted', new AuditEvent(
+      'contact', id, 'deleted', null, userId ?? null,
+      displayName
+    ))
   }
 
   /**
@@ -302,7 +365,7 @@ export class ContactsService {
   /**
    * Promote a lead to client
    */
-  async promoteToClient(id: string, agencyId: string): Promise<ContactResponseDto> {
+  async promoteToClient(id: string, agencyId: string, userId?: string): Promise<ContactResponseDto> {
     const [contact] = await this.db.client
       .update(this.db.schema.contacts)
       .set({
@@ -318,13 +381,20 @@ export class ContactsService {
       throw new NotFoundException(`Contact with ID ${id} not found`)
     }
 
+    const displayName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown'
+    this.eventEmitter.emit('audit.status_changed', new AuditEvent(
+      'contact', id, 'status_changed', null, userId ?? null,
+      displayName,
+      { before: { contactType: 'lead' }, after: { contactType: 'client' }, changedFields: ['contactType'] }
+    ))
+
     return this.mapToResponseDto(contact)
   }
 
   /**
    * Update contact status
    */
-  async updateStatus(id: string, status: string, agencyId: string): Promise<ContactResponseDto> {
+  async updateStatus(id: string, status: string, agencyId: string, userId?: string): Promise<ContactResponseDto> {
     // Find contact first to validate status transition
     const [existing] = await this.db.client
       .select()
@@ -341,6 +411,8 @@ export class ContactsService {
       throw new Error('Leads can only have status "prospecting". Promote to client first.')
     }
 
+    const previousStatus = existing.contactStatus
+
     const [contact] = await this.db.client
       .update(this.db.schema.contacts)
       .set({
@@ -350,7 +422,19 @@ export class ContactsService {
       .where(and(eq(this.db.schema.contacts.id, id), eq(this.db.schema.contacts.agencyId, agencyId)))
       .returning()
 
-    return this.mapToResponseDto(contact)
+    const result = this.mapToResponseDto(contact)
+
+    // Only emit if status actually changed
+    if (previousStatus !== status) {
+      const displayName = `${contact!.firstName || ''} ${contact!.lastName || ''}`.trim() || 'Unknown'
+      this.eventEmitter.emit('audit.status_changed', new AuditEvent(
+        'contact', id, 'status_changed', null, userId ?? null,
+        displayName,
+        { before: { contactStatus: previousStatus }, after: { contactStatus: status }, changedFields: ['contactStatus'] }
+      ))
+    }
+
+    return result
   }
 
   /**

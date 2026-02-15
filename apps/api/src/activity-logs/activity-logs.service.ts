@@ -9,7 +9,7 @@
 
 import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
-import { eq, desc, and, sql } from 'drizzle-orm'
+import { eq, desc, and, or, sql, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import {
   TripCreatedEvent,
@@ -438,6 +438,93 @@ export class ActivityLogsService {
           eq(this.db.schema.activityLogs.entityId, entityId)
         )
       )
+      .orderBy(desc(this.db.schema.activityLogs.createdAt))
+      .limit(limit)
+      .offset(offset)
+
+    return logs
+  }
+
+  /**
+   * Get activity logs for a contact (combined timeline)
+   * Returns both direct contact changes AND trip activity where the contact is involved,
+   * filtered by the user's trip access permissions.
+   */
+  async getActivityForContact(
+    contactId: string,
+    agencyId: string,
+    accessibleTripIds: string[] | 'all',
+    limit = 50,
+    offset = 0,
+  ) {
+    // Find trip IDs where contact is primary contact or a traveler
+    const primaryContactTrips = await this.db.client
+      .select({ id: this.db.schema.trips.id })
+      .from(this.db.schema.trips)
+      .where(
+        and(
+          eq(this.db.schema.trips.primaryContactId, contactId),
+          eq(this.db.schema.trips.agencyId, agencyId),
+        )
+      )
+
+    const travelerTrips = await this.db.client
+      .select({ tripId: this.db.schema.tripTravelers.tripId })
+      .from(this.db.schema.tripTravelers)
+      .where(eq(this.db.schema.tripTravelers.contactId, contactId))
+
+    const allContactTripIds = [
+      ...new Set([
+        ...primaryContactTrips.map((t) => t.id),
+        ...travelerTrips.map((t) => t.tripId),
+      ]),
+    ]
+
+    // Intersect with user's accessible trip IDs
+    let filteredTripIds: string[]
+    if (accessibleTripIds === 'all') {
+      filteredTripIds = allContactTripIds
+    } else {
+      const accessibleSet = new Set(accessibleTripIds)
+      filteredTripIds = allContactTripIds.filter((id) => accessibleSet.has(id))
+    }
+
+    // Build OR conditions: direct contact changes + accessible trip activity
+    const conditions = []
+
+    // Direct contact changes
+    conditions.push(
+      and(
+        eq(this.db.schema.activityLogs.entityType, 'contact'),
+        eq(this.db.schema.activityLogs.entityId, contactId),
+      )
+    )
+
+    // Trip activity (only accessible trips)
+    if (filteredTripIds.length > 0) {
+      conditions.push(inArray(this.db.schema.activityLogs.tripId, filteredTripIds))
+    }
+
+    const logs = await this.db.client
+      .select({
+        id: this.db.schema.activityLogs.id,
+        entityType: this.db.schema.activityLogs.entityType,
+        entityId: this.db.schema.activityLogs.entityId,
+        action: this.db.schema.activityLogs.action,
+        actorId: this.db.schema.activityLogs.actorId,
+        actorType: this.db.schema.activityLogs.actorType,
+        actorName: sql<string | null>`COALESCE(${this.db.schema.userProfiles.firstName} || ' ' || ${this.db.schema.userProfiles.lastName}, NULL)`.as('actor_name'),
+        description: this.db.schema.activityLogs.description,
+        metadata: this.db.schema.activityLogs.metadata,
+        tripId: this.db.schema.activityLogs.tripId,
+        createdAt: this.db.schema.activityLogs.createdAt,
+      })
+      .from(this.db.schema.activityLogs)
+      .leftJoin(
+        this.db.schema.userProfiles,
+        eq(this.db.schema.activityLogs.actorId, this.db.schema.userProfiles.id)
+      )
+      .where(or(...conditions))
       .orderBy(desc(this.db.schema.activityLogs.createdAt))
       .limit(limit)
       .offset(offset)

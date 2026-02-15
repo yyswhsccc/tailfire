@@ -52,7 +52,13 @@ const ALLOWED_FIELDS: Record<string, string[]> = {
   trip: ['name', 'status', 'tripType', 'startDate', 'endDate'],
   trip_traveler: ['travelerType', 'role', 'isPrimaryTraveler'],
   itinerary: ['name', 'status', 'startDate', 'endDate', 'isSelected'],
-  contact: ['firstName', 'lastName', 'displayName'],
+  contact: [
+    'firstName', 'lastName', 'displayName', 'preferredName', 'prefix',
+    'email', 'phone',
+    'contactType', 'contactStatus',
+    'city', 'province', 'country',
+    'tags',
+  ],
   user: ['firstName', 'lastName', 'displayName', 'role'],
   trip_group: ['name', 'description'],
 }

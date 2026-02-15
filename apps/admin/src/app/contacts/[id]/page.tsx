@@ -27,13 +27,13 @@ import { TernBadge } from '@/components/tern/core'
 import { useToast } from '@/hooks/use-toast'
 import type { UpdateContactDto, TaskResponseDto } from '@tailfire/shared-types/api'
 import { ContactAvatar } from '@/components/contacts/contact-avatar'
+import { ContactActivityFeed } from '@/components/contacts/ContactActivityFeed'
 import { ContactNavigation, type ContactSection } from './_components/contact-navigation'
 import { ComingSoonSection } from './_components/coming-soon-section'
 import { RelationshipDialog } from './_components/relationship-dialog'
 import { RelationshipsCard } from './_components/relationships-card'
 import { RelationshipsSection } from './_components/relationships-section'
 import {
-  Activity,
   CheckSquare,
   StickyNote,
   Mail,
@@ -1107,11 +1107,14 @@ export default function ContactDetailPage() {
             {/* Dynamic Content Area */}
             <div className="bg-white border border-tern-gray-200 rounded-lg">
               {activeSection === 'timeline' && (
-                <ComingSoonSection
-                  title="Timeline"
-                  description="Activity timeline will show contact events, updates, and interactions."
-                  icon={Activity}
-                />
+                <Card>
+                  <CardHeader>
+                    <h2 className="text-lg font-semibold text-tern-gray-900">Activity Timeline</h2>
+                  </CardHeader>
+                  <CardContent>
+                    <ContactActivityFeed contactId={contactId} limit={20} showLoadMore={true} />
+                  </CardContent>
+                </Card>
               )}
               {activeSection === 'tasks' && (
                 <Card>

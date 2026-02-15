@@ -22,6 +22,8 @@ import {
 import { ApiTags } from '@nestjs/swagger'
 import { ContactsService } from './contacts.service'
 import { ContactAccessService } from './contact-access.service'
+import { ActivityLogsService } from '../activity-logs/activity-logs.service'
+import { TripAccessService } from '../trips/trip-access.service'
 import {
   CreateContactDto,
   UpdateContactDto,
@@ -41,6 +43,8 @@ export class ContactsController {
   constructor(
     private readonly contactsService: ContactsService,
     private readonly contactAccessService: ContactAccessService,
+    private readonly activityLogsService: ActivityLogsService,
+    private readonly tripAccessService: TripAccessService,
   ) {}
 
   /**
@@ -63,7 +67,7 @@ export class ContactsController {
     if (auth.role !== 'admin' && dto.ownerId !== auth.userId) {
       throw new ForbiddenException('Users can only create contacts they own')
     }
-    return this.contactsService.create(dto, auth.agencyId)
+    return this.contactsService.create(dto, auth.agencyId, auth.userId)
   }
 
   /**
@@ -95,6 +99,27 @@ export class ContactsController {
     @Param('id') id: string,
   ) {
     return this.contactsService.getTripsForContact(id, auth.agencyId)
+  }
+
+  /**
+   * Get activity timeline for a contact
+   * GET /contacts/:id/activity
+   * Returns combined timeline of contact changes and related trip activity
+   */
+  @Get(':id/activity')
+  async getActivity(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    // Verify contact exists and user has access
+    await this.contactsService.findOne(id, auth.agencyId)
+    // Get accessible trip IDs for the current user
+    const accessibleTripIds = await this.tripAccessService.getAccessibleTripIds(auth)
+    const parsedLimit = limit ? Number(limit) : 50
+    const parsedOffset = offset ? Number(offset) : 0
+    return this.activityLogsService.getActivityForContact(id, auth.agencyId, accessibleTripIds, parsedLimit, parsedOffset)
   }
 
   /**
@@ -131,7 +156,7 @@ export class ContactsController {
         throw new ForbiddenException('You can only update contacts you own or have full access to')
       }
     }
-    return this.contactsService.update(id, dto, auth.agencyId)
+    return this.contactsService.update(id, dto, auth.agencyId, auth.userId)
   }
 
   /**
@@ -153,7 +178,7 @@ export class ContactsController {
         throw new ForbiddenException('You can only delete contacts you own')
       }
     }
-    return this.contactsService.remove(id, auth.agencyId)
+    return this.contactsService.remove(id, auth.agencyId, auth.userId)
   }
 
   /**
@@ -196,7 +221,7 @@ export class ContactsController {
         throw new ForbiddenException('You can only promote contacts you own')
       }
     }
-    return this.contactsService.promoteToClient(id, auth.agencyId)
+    return this.contactsService.promoteToClient(id, auth.agencyId, auth.userId)
   }
 
   /**
@@ -218,7 +243,7 @@ export class ContactsController {
         throw new ForbiddenException('You can only update status of contacts you own')
       }
     }
-    return this.contactsService.updateStatus(id, dto.status, auth.agencyId)
+    return this.contactsService.updateStatus(id, dto.status, auth.agencyId, auth.userId)
   }
 
   /**

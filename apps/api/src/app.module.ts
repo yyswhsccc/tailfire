@@ -49,7 +49,7 @@ import { CalendarModule } from './calendar/calendar.module'
     }),
 
     // Event-driven architecture
-    EventEmitterModule.forRoot(),
+    EventEmitterModule.forRoot({ wildcard: true }),
 
     // Database
     DatabaseModule,
