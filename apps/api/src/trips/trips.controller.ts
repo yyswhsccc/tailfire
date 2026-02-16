@@ -479,7 +479,7 @@ export class TripsController {
     await this.tripAccessService.verifyReadAccess(tripId, auth)
     const activities = await this.activitiesService.findUnlinkedByTrip(tripId, itineraryId)
     return {
-      activities: activities.map((a) => ({
+      activities: activities.map((a: any) => ({
         id: a.id,
         name: a.name,
         activityType: a.activityType,
@@ -490,6 +490,12 @@ export class TripsController {
         sequenceOrder: a.sequenceOrder,
         totalPriceCents: a.pricing?.totalPriceCents ?? null,
         parentActivityId: a.parentActivityId,
+        supplierName: a.supplierName ?? null,
+        isBooked: a.isBooked ?? false,
+        confirmationNumber: a.confirmationNumber ?? null,
+        paymentStatus: a.paymentStatus ?? null,
+        paidCents: a.paidCents ?? null,
+        currency: a.currency ?? null,
       })),
       total: activities.length,
     }
