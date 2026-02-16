@@ -69,6 +69,11 @@ export function useTasks(filters: TaskFilterDto = {}) {
         )
       }
 
+      if (filters.assigneeType?.length) {
+        (Array.isArray(filters.assigneeType) ? [filters.assigneeType].flat() : [filters.assigneeType]).forEach(
+          (t) => params.append('assigneeType', t)
+        )
+      }
       if (filters.assigneeUserId)
         params.append('assigneeUserId', filters.assigneeUserId)
       if (filters.tripId) params.append('tripId', filters.tripId)
@@ -122,7 +127,7 @@ export function useSubtasks(parentTaskId: string | null) {
 // ============================================================================
 
 /**
- * Create new task
+ * Create new task (with optimistic update)
  */
 export function useCreateTask() {
   const queryClient = useQueryClient()
@@ -130,8 +135,60 @@ export function useCreateTask() {
   return useMutation({
     mutationFn: (data: CreateTaskDto) =>
       api.post<TaskResponseDto>('/tasks', data),
-    onSuccess: () => {
-      // Invalidate task lists and calendar
+    onMutate: async (newTask) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: taskKeys.lists() })
+
+      // Snapshot all current task list caches
+      const previousLists = queryClient.getQueriesData<PaginatedTasksResponseDto>({
+        queryKey: taskKeys.lists(),
+      })
+
+      // Build an optimistic placeholder
+      const optimisticTask: TaskResponseDto = {
+        id: `optimistic-${Date.now()}`,
+        agencyId: '',
+        title: newTask.title,
+        description: newTask.description,
+        status: newTask.status ?? 'pending',
+        priority: newTask.priority ?? 'medium',
+        taskType: newTask.taskType ?? 'manual',
+        dueDate: newTask.dueDate,
+        contactId: newTask.contactId,
+        tripId: newTask.tripId,
+        isVisibleInCalendar: newTask.isVisibleInCalendar ?? true,
+        assigneeType: newTask.assigneeType ?? 'user',
+        assigneeUserId: newTask.assigneeUserId,
+        assigneeContactId: newTask.assigneeContactId,
+        assigneeName: newTask.assigneeName,
+        createdBy: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isDeleted: false,
+      }
+
+      // Prepend the optimistic task into every cached task list
+      for (const [queryKey, data] of previousLists) {
+        if (!data) continue
+        queryClient.setQueryData<PaginatedTasksResponseDto>(queryKey, {
+          ...data,
+          data: [optimisticTask, ...data.data],
+          count: data.count + 1,
+        })
+      }
+
+      return { previousLists }
+    },
+    onError: (_err, _newTask, context) => {
+      // Roll back all caches to their previous state
+      if (context?.previousLists) {
+        for (const [queryKey, data] of context.previousLists) {
+          queryClient.setQueryData(queryKey, data)
+        }
+      }
+    },
+    onSettled: () => {
+      // Always refetch to get the real server state
       queryClient.invalidateQueries({ queryKey: taskKeys.lists() })
       queryClient.invalidateQueries({ queryKey: calendarKeys.events() })
       queryClient.invalidateQueries({ queryKey: calendarKeys.today() })
@@ -140,7 +197,7 @@ export function useCreateTask() {
 }
 
 /**
- * Update existing task
+ * Update existing task (with optimistic update)
  */
 export function useUpdateTask() {
   const queryClient = useQueryClient()
@@ -148,8 +205,33 @@ export function useUpdateTask() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTaskDto }) =>
       api.put<TaskResponseDto>(`/tasks/${id}`, data),
-    onSuccess: (_, variables) => {
-      // Invalidate specific task and lists
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: taskKeys.lists() })
+
+      const previousLists = queryClient.getQueriesData<PaginatedTasksResponseDto>({
+        queryKey: taskKeys.lists(),
+      })
+
+      for (const [queryKey, cached] of previousLists) {
+        if (!cached) continue
+        queryClient.setQueryData<PaginatedTasksResponseDto>(queryKey, {
+          ...cached,
+          data: cached.data.map((task) =>
+            task.id === id ? { ...task, ...data, updatedAt: new Date().toISOString() } : task
+          ),
+        })
+      }
+
+      return { previousLists }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousLists) {
+        for (const [queryKey, data] of context.previousLists) {
+          queryClient.setQueryData(queryKey, data)
+        }
+      }
+    },
+    onSettled: (_, __, variables) => {
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(variables.id) })
       queryClient.invalidateQueries({ queryKey: taskKeys.lists() })
       queryClient.invalidateQueries({ queryKey: calendarKeys.events() })
@@ -175,7 +257,7 @@ export function useDeleteTask() {
 }
 
 /**
- * Complete a task
+ * Complete a task (with optimistic update)
  */
 export function useCompleteTask() {
   const queryClient = useQueryClient()
@@ -183,7 +265,35 @@ export function useCompleteTask() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data?: CompleteTaskDto }) =>
       api.post<TaskResponseDto>(`/tasks/${id}/complete`, data || {}),
-    onSuccess: (_, variables) => {
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: taskKeys.lists() })
+
+      const previousLists = queryClient.getQueriesData<PaginatedTasksResponseDto>({
+        queryKey: taskKeys.lists(),
+      })
+
+      for (const [queryKey, data] of previousLists) {
+        if (!data) continue
+        queryClient.setQueryData<PaginatedTasksResponseDto>(queryKey, {
+          ...data,
+          data: data.data.map((task) =>
+            task.id === id
+              ? { ...task, status: 'completed' as const, completedAt: new Date().toISOString() }
+              : task
+          ),
+        })
+      }
+
+      return { previousLists }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousLists) {
+        for (const [queryKey, data] of context.previousLists) {
+          queryClient.setQueryData(queryKey, data)
+        }
+      }
+    },
+    onSettled: (_, __, variables) => {
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(variables.id) })
       queryClient.invalidateQueries({ queryKey: taskKeys.lists() })
       queryClient.invalidateQueries({ queryKey: calendarKeys.events() })

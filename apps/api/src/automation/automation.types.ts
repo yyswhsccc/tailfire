@@ -51,6 +51,8 @@ export const JOB_TYPES = {
   // Recurring jobs
   RECURRING_BIRTHDAY_CHECK: 'recurring.birthday_check',
   RECURRING_OVERDUE_PAYMENT_SCAN: 'recurring.overdue_payment_scan',
+  RECURRING_TASK_ASSIGNMENT_DIGEST: 'recurring.task_assignment_digest',
+  RECURRING_TASK_DUE_REMINDER: 'recurring.task_due_reminder',
 
   // Notification jobs
   NOTIFICATION_SEND: 'notification.send',
@@ -157,7 +159,7 @@ export interface PostTripJobData {
  * Recurring job data for daily checks
  */
 export interface RecurringJobData {
-  type: 'recurring.birthday_check' | 'recurring.overdue_payment_scan'
+  type: 'recurring.birthday_check' | 'recurring.overdue_payment_scan' | 'recurring.task_assignment_digest' | 'recurring.task_due_reminder'
   agencyId?: string // Optional - if not provided, runs for all agencies
 }
 

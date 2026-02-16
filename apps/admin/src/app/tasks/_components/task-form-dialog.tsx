@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
-import { Calendar as CalendarIcon } from 'lucide-react'
+import { Calendar as CalendarIcon, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import {
@@ -40,6 +40,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { useCreateTask, useUpdateTask } from '@/hooks/use-tasks'
+import { useUsers } from '@/hooks/use-users'
 import { useToast } from '@/hooks/use-toast'
 import type { TaskResponseDto } from '@tailfire/shared-types/api'
 
@@ -51,6 +52,9 @@ const taskFormSchema = z.object({
   taskType: z.enum(['manual', 'automatic', 'reminder', 'milestone']),
   dueDate: z.date().optional().nullable(),
   isVisibleInCalendar: z.boolean(),
+  assigneeType: z.enum(['user', 'contact', 'admin_pool']),
+  assigneeUserId: z.string().optional().nullable(),
+  assigneeContactId: z.string().optional().nullable(),
 })
 
 type TaskFormValues = z.infer<typeof taskFormSchema>
@@ -59,14 +63,25 @@ interface TaskFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   task?: TaskResponseDto | null
+  contactId?: string
+  contactName?: string
 }
 
-export function TaskFormDialog({ open, onOpenChange, task }: TaskFormDialogProps) {
+export function TaskFormDialog({ open, onOpenChange, task, contactId, contactName }: TaskFormDialogProps) {
   const { toast } = useToast()
   const createTask = useCreateTask()
   const updateTask = useUpdateTask()
+  const { data: usersData } = useUsers({ status: 'active', limit: 100 })
 
   const isEditing = !!task
+
+  const userOptions = useMemo(() => {
+    if (!usersData?.users) return []
+    return usersData.users.map((u) => ({
+      value: u.id,
+      label: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email,
+    }))
+  }, [usersData])
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -78,8 +93,13 @@ export function TaskFormDialog({ open, onOpenChange, task }: TaskFormDialogProps
       taskType: 'manual',
       dueDate: null,
       isVisibleInCalendar: true,
+      assigneeType: 'user',
+      assigneeUserId: null,
+      assigneeContactId: null,
     },
   })
+
+  const watchAssigneeType = form.watch('assigneeType')
 
   // Reset form when task changes
   useEffect(() => {
@@ -92,6 +112,9 @@ export function TaskFormDialog({ open, onOpenChange, task }: TaskFormDialogProps
         taskType: task.taskType,
         dueDate: task.dueDate ? new Date(task.dueDate) : null,
         isVisibleInCalendar: task.isVisibleInCalendar ?? true,
+        assigneeType: task.assigneeType || 'user',
+        assigneeUserId: task.assigneeUserId || null,
+        assigneeContactId: task.assigneeContactId || null,
       })
     } else {
       form.reset({
@@ -102,22 +125,42 @@ export function TaskFormDialog({ open, onOpenChange, task }: TaskFormDialogProps
         taskType: 'manual',
         dueDate: null,
         isVisibleInCalendar: true,
+        assigneeType: contactId ? 'contact' : 'user',
+        assigneeUserId: null,
+        assigneeContactId: contactId || null,
       })
     }
-  }, [task, form])
+  }, [task, form, contactId])
+
+  // Clear irrelevant assignee fields when type changes
+  useEffect(() => {
+    if (watchAssigneeType === 'user') {
+      form.setValue('assigneeContactId', null)
+    } else if (watchAssigneeType === 'contact') {
+      form.setValue('assigneeUserId', null)
+      if (contactId) {
+        form.setValue('assigneeContactId', contactId)
+      }
+    } else if (watchAssigneeType === 'admin_pool') {
+      form.setValue('assigneeUserId', null)
+      form.setValue('assigneeContactId', null)
+    }
+  }, [watchAssigneeType, form, contactId])
 
   const onSubmit = async (values: TaskFormValues) => {
     try {
       const data = {
         ...values,
         dueDate: values.dueDate ? format(values.dueDate, 'yyyy-MM-dd') : undefined,
+        assigneeUserId: values.assigneeType === 'user' ? values.assigneeUserId || undefined : undefined,
+        assigneeContactId: values.assigneeType === 'contact' ? values.assigneeContactId || undefined : undefined,
       }
 
       if (isEditing && task) {
         await updateTask.mutateAsync({ id: task.id, data })
         toast({ title: 'Task updated', description: values.title })
       } else {
-        await createTask.mutateAsync(data)
+        await createTask.mutateAsync({ ...data, ...(contactId ? { contactId } : {}) })
         toast({ title: 'Task created', description: values.title })
       }
       onOpenChange(false)
@@ -287,6 +330,88 @@ export function TaskFormDialog({ open, onOpenChange, task }: TaskFormDialogProps
                   </FormItem>
                 )}
               />
+            </div>
+
+            {/* Assignee Section */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="assigneeType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assignee Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="user">Team Member</SelectItem>
+                        <SelectItem value="contact">Contact</SelectItem>
+                        <SelectItem value="admin_pool">Admin Pool</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {watchAssigneeType === 'user' && (
+                <FormField
+                  control={form.control}
+                  name="assigneeUserId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assignee</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || undefined}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select team member" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {userOptions.map((user) => (
+                            <SelectItem key={user.value} value={user.value}>
+                              {user.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {watchAssigneeType === 'contact' && (
+                <FormItem>
+                  <FormLabel>Assignee</FormLabel>
+                  {contactId ? (
+                    <div className="flex h-9 items-center rounded-md border px-3 text-sm">
+                      {contactName || 'Linked contact'}
+                    </div>
+                  ) : (
+                    <div className="flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm text-muted-foreground">
+                      <Info className="h-3.5 w-3.5" />
+                      Open from contact page
+                    </div>
+                  )}
+                </FormItem>
+              )}
+
+              {watchAssigneeType === 'admin_pool' && (
+                <FormItem>
+                  <FormLabel>Assignee</FormLabel>
+                  <div className="flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm text-muted-foreground">
+                    <Info className="h-3.5 w-3.5" />
+                    Any admin can complete
+                  </div>
+                </FormItem>
+              )}
             </div>
 
             <FormField

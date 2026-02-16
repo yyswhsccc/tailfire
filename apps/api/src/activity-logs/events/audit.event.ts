@@ -56,6 +56,7 @@ export type AuditEntityType =
   | 'booking'
   | 'installment'
   | 'activity_document'
+  | 'contact_document'
   | 'booking_document'
   | 'activity_media'
   | 'trip_media'
@@ -72,8 +73,8 @@ export class AuditEvent {
     public readonly entityId: string,
     /** The action performed */
     public readonly action: AuditAction,
-    /** The trip this entity belongs to */
-    public readonly tripId: string,
+    /** The trip this entity belongs to (null for non-trip entities like contacts) */
+    public readonly tripId: string | null,
     /** The user who performed the action (null for system actions) */
     public readonly actorId: string | null,
     /** Human-readable display name for the log entry */

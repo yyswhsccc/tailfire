@@ -28,6 +28,7 @@
 // Schema exports - Active development (Phase 3)
 export * from './contacts.schema'
 export * from './contact-shares.schema'
+export * from './contact-documents.schema'
 export * from './trips.schema'
 export * from './trip-shares.schema'
 export * from './trip-media.schema'
@@ -139,6 +140,12 @@ export * from './platform-notifications.schema'
 
 // Task system (Calendar integration)
 export * from './tasks.schema'
+
+// Notes system (internal agent notes on contacts/trips)
+export * from './notes.schema'
+
+// Calendar events (standalone meetings, calls, follow-ups)
+export * from './calendar-events.schema'
 
 // Later phases:
 // export * from './financials.schema'

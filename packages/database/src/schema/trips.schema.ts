@@ -71,6 +71,7 @@ export const activityEntityTypeEnum = pgEnum('activity_entity_type', [
   'booking',
   'installment',
   'activity_document',
+  'contact_document',
   'booking_document',
   'activity_media',
   'trip_media',

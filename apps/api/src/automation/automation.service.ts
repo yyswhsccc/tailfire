@@ -69,6 +69,26 @@ export class AutomationService implements OnModuleInit {
         { jobId: 'recurring:overdue_payment_scan' },
       )
       this.logger.log('Scheduled recurring overdue payment scan job')
+
+      // Hourly task assignment digest for contacts
+      await this.scheduleRecurring(
+        QUEUES.CLIENT_CARE,
+        'recurring.task_assignment_digest',
+        { type: 'recurring.task_assignment_digest' },
+        '0 * * * *', // Every hour
+        { jobId: 'recurring:task_assignment_digest' },
+      )
+      this.logger.log('Scheduled recurring task assignment digest job')
+
+      // Hourly task due reminder check (sends 24h before due date)
+      await this.scheduleRecurring(
+        QUEUES.CLIENT_CARE,
+        'recurring.task_due_reminder',
+        { type: 'recurring.task_due_reminder' },
+        '0 * * * *', // Every hour
+        { jobId: 'recurring:task_due_reminder' },
+      )
+      this.logger.log('Scheduled recurring task due reminder job')
     } catch (error) {
       this.logger.error(`Failed to initialize recurring jobs: ${error}`)
       // Don't throw - allow service to start even if recurring jobs fail to initialize

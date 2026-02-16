@@ -4,7 +4,7 @@ import { useCallback } from 'react'
 import { TaskCard } from './task-card'
 import { EmptyState } from '@/components/tern/shared'
 import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'
-import { useCompleteTask, useDeleteTask } from '@/hooks/use-tasks'
+import { useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-tasks'
 import { useToast } from '@/hooks/use-toast'
 import type { TaskResponseDto } from '@tailfire/shared-types/api'
 
@@ -27,13 +27,14 @@ export function TaskList({
 }: TaskListProps) {
   const { toast } = useToast()
   const completeTask = useCompleteTask()
+  const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
 
   const handleComplete = useCallback(
     async (task: TaskResponseDto) => {
       try {
         if (task.status === 'completed') {
-          // Reopen task - this would need a different endpoint
+          await updateTask.mutateAsync({ id: task.id, data: { status: 'pending' } })
           toast({ title: 'Task reopened', description: task.title })
         } else {
           await completeTask.mutateAsync({ id: task.id })
@@ -47,7 +48,7 @@ export function TaskList({
         })
       }
     },
-    [completeTask, toast]
+    [completeTask, updateTask, toast]
   )
 
   const handleDelete = useCallback(

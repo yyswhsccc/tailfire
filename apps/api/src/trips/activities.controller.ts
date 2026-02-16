@@ -396,7 +396,7 @@ export class ActivitiesGlobalController {
     @Body() dto: LinkActivitiesToPackageDto,
   ): Promise<PackageLinkedActivityDto[]> {
     await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
-    await this.activitiesService.linkChildrenToPackage(id, dto.activityIds)
+    await this.activitiesService.linkChildrenToPackage(id, dto.activityIds, auth.userId)
     return this.activitiesService.getLinkedActivitiesWithDayInfo(id)
   }
 
@@ -412,7 +412,7 @@ export class ActivitiesGlobalController {
     @Body() dto: LinkActivitiesToPackageDto,
   ): Promise<PackageLinkedActivityDto[]> {
     await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
-    await this.activitiesService.unlinkChildrenFromPackage(id, dto.activityIds)
+    await this.activitiesService.unlinkChildrenFromPackage(id, dto.activityIds, auth.userId)
     return this.activitiesService.getLinkedActivitiesWithDayInfo(id)
   }
 

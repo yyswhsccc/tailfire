@@ -71,7 +71,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
           if (status === 'SUBSCRIBED') {
             console.debug('[Notifications] Realtime subscription active')
           } else if (status === 'CHANNEL_ERROR') {
-            console.warn('[Notifications] Realtime subscription error - falling back to polling')
+            console.warn('[Notifications] Realtime subscription failed — falling back to polling. Ensure Realtime is enabled for platform_notifications in Supabase.')
           }
         })
     }

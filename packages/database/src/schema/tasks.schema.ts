@@ -51,6 +51,12 @@ export const taskTypeEnum = pgEnum('task_type', [
   'milestone',
 ])
 
+export const taskAssigneeTypeEnum = pgEnum('task_assignee_type', [
+  'user',
+  'contact',
+  'admin_pool',
+])
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -58,6 +64,7 @@ export const taskTypeEnum = pgEnum('task_type', [
 export type TaskStatus = (typeof taskStatusEnum.enumValues)[number]
 export type TaskPriority = (typeof taskPriorityEnum.enumValues)[number]
 export type TaskType = (typeof taskTypeEnum.enumValues)[number]
+export type TaskAssigneeType = (typeof taskAssigneeTypeEnum.enumValues)[number]
 
 /**
  * Recurring configuration for tasks
@@ -124,6 +131,7 @@ export const tasks = pgTable('tasks', {
   }),
 
   // Assignment (explicit FKs)
+  assigneeType: taskAssigneeTypeEnum('assignee_type').notNull().default('user'),
   assigneeUserId: uuid('assignee_user_id').references(() => userProfiles.id, {
     onDelete: 'set null',
   }),
@@ -262,6 +270,27 @@ export const taskTemplates = pgTable('task_templates', {
 })
 
 // ============================================================================
+// TABLE: task_notification_pending
+// ============================================================================
+
+export const taskNotificationPending = pgTable('task_notification_pending', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agencyId: uuid('agency_id')
+    .notNull()
+    .references(() => agencies.id, { onDelete: 'cascade' }),
+  taskId: uuid('task_id')
+    .notNull()
+    .references(() => tasks.id, { onDelete: 'cascade' }),
+  contactId: uuid('contact_id')
+    .notNull()
+    .references(() => contacts.id, { onDelete: 'cascade' }),
+  eventType: varchar('event_type', { length: 50 }).notNull(), // 'assigned' | 'removed'
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+})
+
+// ============================================================================
 // RELATIONS
 // ============================================================================
 
@@ -345,5 +374,20 @@ export const taskTemplatesRelations = relations(taskTemplates, ({ one }) => ({
   agency: one(agencies, {
     fields: [taskTemplates.agencyId],
     references: [agencies.id],
+  }),
+}))
+
+export const taskNotificationPendingRelations = relations(taskNotificationPending, ({ one }) => ({
+  agency: one(agencies, {
+    fields: [taskNotificationPending.agencyId],
+    references: [agencies.id],
+  }),
+  task: one(tasks, {
+    fields: [taskNotificationPending.taskId],
+    references: [tasks.id],
+  }),
+  contact: one(contacts, {
+    fields: [taskNotificationPending.contactId],
+    references: [contacts.id],
   }),
 }))

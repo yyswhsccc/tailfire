@@ -28,9 +28,9 @@ export function PackagesOverview({ totals, currency }: PackagesOverviewProps) {
     }).format(cents / 100)
   }
   const totalCost = totals.grandTotalCents
+  const booked = totals.bookedTotalCents
   const paid = totals.totalCollectedCents
-  const authorized = 0 // TODO: Add authorized amount tracking when Stripe integration is ready
-  const unpaid = totals.outstandingCents
+  const unpaid = totals.outstandingCents // bookedTotal - paid
   const expectedCommission = totals.expectedCommissionCents
   const pendingCommission = totals.pendingCommissionCents
 
@@ -55,9 +55,9 @@ export function PackagesOverview({ totals, currency }: PackagesOverviewProps) {
         </div>
 
         <div>
-          <div className="text-xs text-gray-500">Authorized</div>
+          <div className="text-xs text-gray-500">Booked</div>
           <div className="text-lg font-semibold text-teal-600">
-            {formatCents(authorized, currency)}
+            {formatCents(booked, currency)}
           </div>
         </div>
 

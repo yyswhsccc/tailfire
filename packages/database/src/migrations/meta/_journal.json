@@ -722,6 +722,55 @@
       "when": 1771065600000,
       "tag": "20260213000000_create_task_system",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1771149600000,
+      "tag": "20260214100000_add_task_assignee_type",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1771149660000,
+      "tag": "20260214100100_create_task_notification_pending",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1771149720000,
+      "tag": "20260214100200_seed_task_assignment_email_template",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1771149780000,
+      "tag": "20260214100300_seed_task_due_reminder_email_template",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1771236000000,
+      "tag": "20260215120000_create_notes_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1771257600000,
+      "tag": "20260215180000_create_calendar_events_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1771272000000,
+      "tag": "20260215200000_create_contact_documents_table",
+      "breakpoints": true
     }
   ]
 }

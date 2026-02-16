@@ -13,6 +13,7 @@ import { Injectable } from '@nestjs/common'
 import { and, eq, gte, lte, or, isNotNull, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TripAccessService } from '../trips/trip-access.service'
+import { CalendarEventsService } from '../calendar-events/calendar-events.service'
 import type { CalendarQueryDto } from './dto'
 import type { AuthContext } from '../auth/auth.types'
 import type {
@@ -32,13 +33,15 @@ const EVENT_COLORS: Record<CalendarEventType, { background: string; border: stri
   birthday: { background: '#ec4899', border: '#db2777' },
   trip: { background: '#10b981', border: '#059669' },
   scheduled_email: { background: '#64748b', border: '#475569' },
+  event: { background: '#8b5cf6', border: '#7c3aed' },
 }
 
 @Injectable()
 export class CalendarService {
   constructor(
     private readonly db: DatabaseService,
-    private readonly tripAccessService: TripAccessService
+    private readonly tripAccessService: TripAccessService,
+    private readonly calendarEventsService: CalendarEventsService
   ) {}
 
   /**
@@ -55,10 +58,11 @@ export class CalendarService {
       'birthday',
       'trip',
       'scheduled_email',
+      'event',
     ]
 
     // Fetch events from all sources in parallel
-    const [tasks, trips, payments, birthdays, scheduledEmails] = await Promise.all([
+    const [tasks, trips, payments, birthdays, scheduledEmails, calendarEvents] = await Promise.all([
       enabledTypes.includes('task')
         ? this.getTaskEvents(query, auth)
         : [],
@@ -74,10 +78,13 @@ export class CalendarService {
       enabledTypes.includes('scheduled_email')
         ? this.getScheduledEmailEvents(query, auth)
         : [],
+      enabledTypes.includes('event')
+        ? this.getCalendarEventEvents(query, auth)
+        : [],
     ])
 
     // Combine and sort events
-    const events = [...tasks, ...trips, ...payments, ...birthdays, ...scheduledEmails].sort(
+    const events = [...tasks, ...trips, ...payments, ...birthdays, ...scheduledEmails, ...calendarEvents].sort(
       (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
     )
 
@@ -686,5 +693,54 @@ export class CalendarService {
           },
         }
       })
+  }
+
+  /**
+   * Get standalone calendar events as CalendarEvent[]
+   */
+  private async getCalendarEventEvents(
+    query: CalendarQueryDto,
+    auth: AuthContext
+  ): Promise<CalendarEvent[]> {
+    const rows = await this.calendarEventsService.findInRange(
+      query.start,
+      query.end,
+      auth.agencyId,
+      query.contactId,
+      query.tripId
+    )
+
+    return rows.map((row): CalendarEvent => {
+      // For all-day events, normalize to date-only strings
+      const start = row.allDay
+        ? row.startAt.toISOString().split('T')[0]!
+        : row.startAt.toISOString()
+      const end = row.endAt
+        ? row.allDay
+          ? row.endAt.toISOString().split('T')[0]!
+          : row.endAt.toISOString()
+        : undefined
+
+      return {
+        id: `event-${row.id}`,
+        type: 'event',
+        title: row.title,
+        description: row.description ?? undefined,
+        start,
+        end,
+        allDay: row.allDay,
+        backgroundColor: EVENT_COLORS.event.background,
+        borderColor: EVENT_COLORS.event.border,
+        sourceId: row.id,
+        sourceType: 'event',
+        tripId: row.tripId ?? undefined,
+        contactId: row.contactId ?? undefined,
+        editable: true,
+        clickable: true,
+        metadata: {
+          eventType: row.eventType,
+        },
+      }
+    })
   }
 }
