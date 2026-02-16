@@ -188,6 +188,8 @@ export function useBatchCreateItineraryDays(itineraryId: string) {
       queryClient.invalidateQueries({
         queryKey: itineraryDayKeys.withActivities(itineraryId),
       })
+      // Also invalidate trip queries since adding days at start updates trip dates
+      queryClient.invalidateQueries({ queryKey: ['trips'] })
     },
   })
 }
