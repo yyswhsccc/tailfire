@@ -295,6 +295,10 @@ export class ActivitiesGlobalController {
     }
     // Pass tripId for floating packages that need it for agency resolution
     const result = await this.activitiesService.create(dto, getActorId(req), dto.tripId ?? undefined)
+    // For packages, link child activities if provided
+    if (dto.activityType === 'package' && dto.activityIds?.length) {
+      await this.activitiesService.linkChildrenToPackage(result.id, dto.activityIds)
+    }
     // For packages, return full response with all related data
     if (dto.activityType === 'package') {
       return this.activitiesService.findOne(result.id)
