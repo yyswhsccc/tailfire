@@ -970,7 +970,7 @@ export function FlightForm({
       setSaveStatus('saved')
       setLastSavedAt(new Date())
 
-      // Check for cascade: extract last segment arrival airport
+      // Auto-apply arrival location to the flight's day (no dialog prompt)
       const segments = data.flightSegments || []
       const lastSegment = segments[segments.length - 1]
       const arrivalCode = lastSegment?.arrivalAirport
@@ -981,20 +981,24 @@ export function FlightForm({
           const preview = await cascadePreviewMutation.mutateAsync({
             dayId,
             request: {
-              location: { name: arrivalCode, lat: 0, lng: 0 }, // Backend geocoding resolves coords
+              location: { name: arrivalCode, lat: 0, lng: 0 },
               activityId: savedActivityId,
               activityType: 'flight',
               description: `Flight arrives at ${arrivalCode}`,
             },
           })
 
-          if (preview.affectedDays.length > 0) {
-            setCascadePreview(preview)
-            setShowCascadeDialog(true)
-            return // Don't show success overlay yet
+          // Auto-apply to just the flight's day
+          const flightDay = preview.affectedDays.find(d => d.dayId === dayId)
+          if (flightDay) {
+            await cascadeApplyMutation.mutateAsync({
+              dayId,
+              confirmation: { dayIds: [dayId] },
+              preview,
+            })
           }
         } catch {
-          // Cascade preview failure is non-blocking
+          // Cascade failure is non-blocking
         }
       }
 

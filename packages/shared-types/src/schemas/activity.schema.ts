@@ -55,6 +55,9 @@ export const createActivityDtoSchema = z.object({
 
   // Media - nullable/optional
   photos: z.array(photoSchema).nullable().optional(),
+
+  // Package-specific: activities to link immediately after creation
+  activityIds: z.array(z.string().uuid()).optional(),
 })
 
 export type CreateActivityDto = z.infer<typeof createActivityDtoSchema>

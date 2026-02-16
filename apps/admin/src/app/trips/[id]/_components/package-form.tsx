@@ -46,6 +46,7 @@ import {
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { DocumentUploader } from '@/components/document-uploader'
+import { SupplierCombobox } from '@/components/suppliers/supplier-combobox'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import type { PricingData } from '@/lib/pricing'
 import {
@@ -156,6 +157,7 @@ export function PackageForm({
   const statusValue = useWatch({ control, name: 'status' })
   const paymentStatusValue = useWatch({ control, name: 'paymentStatus' })
   const nameValue = useWatch({ control, name: 'name' })
+  const supplierNameValue = useWatch({ control, name: 'supplierName' })
 
   // Mutations
   const createBooking = useCreateBooking()
@@ -589,9 +591,18 @@ export function PackageForm({
               {/* Supplier */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Supplier</label>
-                <Input
-                  {...register('supplierName')}
-                  placeholder="e.g., Royal Caribbean"
+                <SupplierCombobox
+                  value={supplierNameValue}
+                  onValueChange={(name) => {
+                    setValue('supplierName', name, { shouldDirty: true })
+                  }}
+                  onSupplierSelect={(supplier) => {
+                    if (supplier?.defaultCommissionRate) {
+                      setSupplierCommissionRate(Number(supplier.defaultCommissionRate))
+                    }
+                  }}
+                  placeholder="Search suppliers..."
+                  allowCreate
                 />
               </div>
             </CardContent>
