@@ -140,9 +140,9 @@ export function useCreateBooking() {
       queryClient.invalidateQueries({
         queryKey: bookingKeys.tripTotals(newBooking.tripId),
       })
-      // Invalidate unlinked activities (activities may have been linked during creation)
+      // Invalidate unlinked activities (use prefix key to match all itinerary variants)
       queryClient.invalidateQueries({
-        queryKey: bookingKeys.unlinkedActivities(newBooking.tripId),
+        queryKey: [...bookingKeys.all, 'unlinkedActivities', newBooking.tripId],
       })
       // Invalidate activities queries so they reflect new package link
       queryClient.invalidateQueries({ queryKey: ['activities'] })
@@ -267,9 +267,9 @@ export function useLinkActivities() {
       // Invalidate trip totals (unlinked activities count changed)
       queryClient.invalidateQueries({ queryKey: bookingKeys.tripTotals(result.tripId) })
       // Invalidate ALL unlinked activities queries for this trip (regardless of itinerary filter)
-      // Use bookingKeys helper for consistent key structure - matches how queries are created
+      // Use prefix key without itineraryId to match all variants
       queryClient.invalidateQueries({
-        queryKey: bookingKeys.unlinkedActivities(result.tripId),
+        queryKey: [...bookingKeys.all, 'unlinkedActivities', result.tripId],
       })
       // Invalidate activities queries so they reflect new booking link
       queryClient.invalidateQueries({ queryKey: ['activities'] })
@@ -301,9 +301,9 @@ export function useUnlinkActivities() {
       // Invalidate trip totals (unlinked activities count changed)
       queryClient.invalidateQueries({ queryKey: bookingKeys.tripTotals(result.tripId) })
       // Invalidate ALL unlinked activities queries for this trip (regardless of itinerary filter)
-      // Use bookingKeys helper for consistent key structure - matches how queries are created
+      // Use prefix key to match all itinerary variants
       queryClient.invalidateQueries({
-        queryKey: bookingKeys.unlinkedActivities(result.tripId),
+        queryKey: [...bookingKeys.all, 'unlinkedActivities', result.tripId],
       })
       // Invalidate activities queries
       queryClient.invalidateQueries({ queryKey: ['activities'] })

@@ -7,7 +7,7 @@
 
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common'
 import { EventEmitter2 } from '@nestjs/event-emitter'
-import { eq, and, or, desc, asc, inArray, sql } from 'drizzle-orm'
+import { eq, ne, and, or, desc, asc, inArray, sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { StorageService } from './storage.service'
 import { TravellerSplitsService } from '../financials/traveller-splits.service'
@@ -820,6 +820,43 @@ export class ActivitiesService {
       } catch (error) {
         this.logger.warn(`Failed to update activity_pricing for activity ${id}: ${error}`)
         // Don't fail the update if pricing update fails
+      }
+    }
+
+    // Cascade booking status to children when a package booking status changes
+    if (beforeActivity.activityType === 'package' && dto.isBooked !== undefined) {
+      if (dto.isBooked === true) {
+        // Mark non-cancelled children as booked
+        await this.db.client
+          .update(this.db.schema.itineraryActivities)
+          .set({
+            isBooked: true,
+            status: 'confirmed',
+            bookingDate: dto.bookingDate ? new Date(dto.bookingDate) : new Date(),
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(this.db.schema.itineraryActivities.parentActivityId, id),
+              ne(this.db.schema.itineraryActivities.status, 'cancelled')
+            )
+          )
+      } else {
+        // Un-book non-cancelled children when package is un-booked
+        await this.db.client
+          .update(this.db.schema.itineraryActivities)
+          .set({
+            isBooked: false,
+            status: 'proposed',
+            bookingDate: null,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(this.db.schema.itineraryActivities.parentActivityId, id),
+              ne(this.db.schema.itineraryActivities.status, 'cancelled')
+            )
+          )
       }
     }
 
@@ -1718,6 +1755,20 @@ export class ActivitiesService {
     const packageActivities = activities.filter(a => a.activityType === 'package')
     if (packageActivities.length > 0) {
       throw new BadRequestException('Cannot nest packages. Packages cannot be children of other packages.')
+    }
+
+    // Verify all children belong to the same agency as the package
+    const crossAgency = activities.filter(a => a.agencyId !== pkg.agencyId)
+    if (crossAgency.length > 0) {
+      throw new BadRequestException('All activities must belong to the same agency as the package')
+    }
+
+    // Verify all children belong to the same trip as the package
+    if (pkg.tripId) {
+      const crossTrip = activities.filter(a => a.tripId !== pkg.tripId)
+      if (crossTrip.length > 0) {
+        throw new BadRequestException('All activities must belong to the same trip as the package')
+      }
     }
 
     // Check for cycles (prevent an activity from being its own ancestor)

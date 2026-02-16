@@ -34,6 +34,7 @@ import {
   useUnlinkedActivities,
   useBookingLinkedActivities,
   useCreateBooking,
+  useDeleteBooking,
   useLinkActivities,
   useUnlinkActivities,
   getPaymentStatusLabel,
@@ -66,9 +67,12 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  MoreHorizontal,
   Package,
+  Pencil,
   Plus,
   Link2,
+  Trash2,
   Unlink,
   Boxes,
   Plane,
@@ -563,17 +567,16 @@ function SelectionActionMenu({
     }
   }
 
-  if (selectedItems.length === 0) return null
-
   const isPending = createBooking.isPending || linkActivities.isPending || unlinkActivities.isPending
 
   return (
     <>
-      <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-        <span className="text-sm text-blue-800 font-medium">
-          {selectedItems.length} selected
-        </span>
-        <div className="flex items-center gap-1 ml-auto">
+      {/* Inline selection buttons - rendered in table header */}
+      {selectedItems.length > 0 && (
+        <>
+          <Badge variant="secondary" className="text-xs">
+            {selectedItems.length} selected
+          </Badge>
           {canCreatePackage && (
             <Button
               variant="outline"
@@ -582,7 +585,7 @@ function SelectionActionMenu({
               disabled={isPending}
             >
               <Plus className="h-3 w-3 mr-1" />
-              Create New Package
+              Create Package
             </Button>
           )}
           {canAddToPackage && (
@@ -610,8 +613,9 @@ function SelectionActionMenu({
           <Button variant="ghost" size="sm" onClick={onClearSelection}>
             Clear
           </Button>
-        </div>
-      </div>
+          <div className="w-px h-6 bg-gray-200" />
+        </>
+      )}
 
       {/* Create Package Dialog */}
       <Dialog open={isCreatePackageOpen} onOpenChange={setIsCreatePackageOpen}>
@@ -702,11 +706,14 @@ export function PackagesTable({
   filterItineraryId,
 }: PackagesTableProps) {
   const router = useRouter()
+  const { toast } = useToast()
+  const deleteBooking = useDeleteBooking()
 
   // State
   const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set())
   const [expandedStandaloneCruises, setExpandedStandaloneCruises] = useState<Set<string>>(new Set())
   const [selectedItems, setSelectedItems] = useState<SelectionItem[]>([])
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
 
   // Data fetching
   const { data: bookingsData, isLoading: bookingsLoading, error: bookingsError } = useBookings({ tripId })
@@ -876,6 +883,28 @@ export function PackagesTable({
     [router, tripId, itineraryId]
   )
 
+  // Delete package handler
+  const handleDeletePackage = useCallback((id: string, name: string) => {
+    setDeleteTarget({ id, name })
+  }, [])
+
+  const confirmDeletePackage = useCallback(async () => {
+    if (!deleteTarget) return
+    try {
+      await deleteBooking.mutateAsync({ id: deleteTarget.id, tripId })
+      toast({
+        title: 'Package deleted',
+        description: `"${deleteTarget.name}" has been deleted. Linked activities have been unlinked.`,
+      })
+      setDeleteTarget(null)
+    } catch (error) {
+      toast({
+        title: 'Failed to delete package',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      })
+    }
+  }, [deleteTarget, deleteBooking, tripId, toast])
 
   // Loading state
   if (bookingsLoading || totalsLoading || unlinkedLoading) {
@@ -900,20 +929,18 @@ export function PackagesTable({
       {/* Overview Card */}
       {totals && <OverviewCard totals={totals} currency={currency} />}
 
-      {/* Selection Action Menu */}
-      <SelectionActionMenu
-        selectedItems={selectedItems}
-        packages={allPackages}
-        tripId={tripId}
-        onClearSelection={clearSelection}
-      />
-
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-lg">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Bookings</h2>
           <div className="flex items-center gap-2">
+            <SelectionActionMenu
+              selectedItems={selectedItems}
+              packages={allPackages}
+              tripId={tripId}
+              onClearSelection={clearSelection}
+            />
             <TripOrderGeneratorButton tripId={tripId} currency={currency} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1018,21 +1045,27 @@ export function PackagesTable({
                           )}
                           onClick={() => navigateToPackage(row.id)}
                         >
-                          <td className="px-4 py-3">
+                          <td
+                            className="px-4 py-3"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleSelection(
+                                { type: 'package', id: row.id, name: row.name },
+                                e
+                              )
+                            }}
+                          >
                             <div className="flex items-center gap-2">
                               <Checkbox
                                 checked={isSelected(row.id)}
-                                onCheckedChange={() =>
-                                  toggleSelection(
-                                    { type: 'package', id: row.id, name: row.name },
-                                    { stopPropagation: () => {} } as React.MouseEvent
-                                  )
-                                }
-                                onClick={(e) => e.stopPropagation()}
+                                onCheckedChange={() => {}}
                               />
                               {hasActivities && (
                                 <button
-                                  onClick={(e) => togglePackageExpand(row.id, e)}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    togglePackageExpand(row.id, e)
+                                  }}
                                   className="text-gray-400 hover:text-gray-600"
                                 >
                                   {isExpanded ? (
@@ -1076,7 +1109,37 @@ export function PackagesTable({
                               {commissionStatus.label}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3"></td>
+                          <td className="px-4 py-3">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => navigateToPackage(row.id)}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit Package
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-red-600 focus:text-red-600"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeletePackage(row.id, row.name)
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Package
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
                         </tr>
                         {/* Expanded activities */}
                         {isExpanded && hasActivities && (
@@ -1103,27 +1166,33 @@ export function PackagesTable({
                           )}
                           onClick={() => navigateToActivity(row.id)}
                         >
-                          <td className="px-4 py-3">
+                          <td
+                            className="px-4 py-3"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleSelection(
+                                {
+                                  type: 'activity',
+                                  id: row.id,
+                                  name: row.name,
+                                  packageId: null,
+                                },
+                                e
+                              )
+                            }}
+                          >
                             <div className="flex items-center gap-2">
                               <Checkbox
                                 checked={isSelected(row.id)}
-                                onCheckedChange={() =>
-                                  toggleSelection(
-                                    {
-                                      type: 'activity',
-                                      id: row.id,
-                                      name: row.name,
-                                      packageId: null,
-                                    },
-                                    { stopPropagation: () => {} } as React.MouseEvent
-                                  )
-                                }
-                                onClick={(e) => e.stopPropagation()}
+                                onCheckedChange={() => {}}
                               />
                               {/* Expand button for standalone cruises with ports */}
                               {isCruise && hasChildren && (
                                 <button
-                                  onClick={(e) => toggleStandaloneCruiseExpand(row.id, e)}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleStandaloneCruiseExpand(row.id, e)
+                                  }}
                                   className="text-gray-400 hover:text-gray-600"
                                 >
                                   {isCruiseExpanded ? (
@@ -1188,22 +1257,25 @@ export function PackagesTable({
                               )}
                               onClick={() => navigateToActivity(child.id)}
                             >
-                              <td className="px-4 py-2">
+                              <td
+                                className="px-4 py-2"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleSelection(
+                                    {
+                                      type: 'activity',
+                                      id: child.id,
+                                      name: child.name,
+                                      packageId: null,
+                                    },
+                                    e
+                                  )
+                                }}
+                              >
                                 <div className="pl-6">
                                   <Checkbox
                                     checked={isSelected(child.id)}
-                                    onCheckedChange={() =>
-                                      toggleSelection(
-                                        {
-                                          type: 'activity',
-                                          id: child.id,
-                                          name: child.name,
-                                          packageId: null,
-                                        },
-                                        { stopPropagation: () => {} } as React.MouseEvent
-                                      )
-                                    }
-                                    onClick={(e) => e.stopPropagation()}
+                                    onCheckedChange={() => {}}
                                   />
                                 </div>
                               </td>
@@ -1251,6 +1323,37 @@ export function PackagesTable({
           </div>
         )}
       </div>
+
+      {/* Delete Package Confirmation Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Package</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? Linked activities will be unlinked but not deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeletePackage}
+              disabled={deleteBooking.isPending}
+            >
+              {deleteBooking.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Package'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

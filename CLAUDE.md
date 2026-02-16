@@ -532,7 +532,9 @@ EOF
 # Send to Codex - ALL STEPS REQUIRED
 tmux load-buffer /tmp/codex_query.txt
 tmux paste-buffer -t 1
-tmux send-keys -t 1 C-m  # <-- CRITICAL: C-m is Ctrl+M (Enter key)
+# CRITICAL: Send Enter SEPARATELY after paste. C-m often fails silently.
+# If Codex shows "[Pasted Content ...]" instead of processing, Enter was not received.
+tmux send-keys -t 1 Enter
 
 # Wait and capture
 sleep 10
@@ -540,4 +542,4 @@ tmux capture-pane -t 1 -p -S -200 > /tmp/codex_response.txt
 cat /tmp/codex_response.txt
 ```
 
-> **Note**: Use `C-m` (Ctrl+M) instead of `Enter` for tmux send-keys. The `Enter` keyword may not work reliably in all terminal configurations.
+> **Note**: Always send `Enter` as a separate `tmux send-keys -t 1 Enter` command after pasting. `C-m` is unreliable and often results in Codex showing `[Pasted Content ...]` without processing.
