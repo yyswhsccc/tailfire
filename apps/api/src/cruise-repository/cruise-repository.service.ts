@@ -66,6 +66,12 @@ export class CruiseRepositoryService {
     // Build WHERE conditions
     const conditions: any[] = [eq(cruiseSailings.isActive, true)]
 
+    // Only show future sailings (sail date >= today) unless a specific date range is provided
+    if (!dto.sailDateFrom) {
+      const today = new Date().toISOString().split('T')[0]!
+      conditions.push(gte(cruiseSailings.sailDate, today))
+    }
+
     // Text search - broadly matches sailing name, ship, cruise line, ports, and regions
     if (dto.q) {
       const { cruiseSailingStops, cruisePorts, cruiseRegions } = this.db.schema
@@ -340,6 +346,12 @@ export class CruiseRepositoryService {
     // This ensures dropdowns are filtered based on current selections
     const baseConditions: any[] = [eq(cruiseSailings.isActive, true)]
 
+    // Only include future sailings in filter options unless a specific date range is provided
+    if (!currentFilters?.sailDateFrom) {
+      const today = new Date().toISOString().split('T')[0]!
+      baseConditions.push(gte(cruiseSailings.sailDate, today))
+    }
+
     if (currentFilters?.cruiseLineId) {
       baseConditions.push(eq(cruiseSailings.cruiseLineId, currentFilters.cruiseLineId))
     }
@@ -365,7 +377,7 @@ export class CruiseRepositoryService {
       baseConditions.push(lte(cruiseSailings.nights, currentFilters.nightsMax))
     }
 
-    // Get distinct cruise lines with counts (don't filter by cruiseLineId for this dropdown)
+    // Get distinct cruise lines with counts
     const linesResult = await this.db.db
       .select({
         id: cruiseLines.id,
@@ -374,7 +386,7 @@ export class CruiseRepositoryService {
       })
       .from(cruiseLines)
       .leftJoin(cruiseSailings, eq(cruiseSailings.cruiseLineId, cruiseLines.id))
-      .where(and(eq(cruiseSailings.isActive, true)))
+      .where(and(...baseConditions))
       .groupBy(cruiseLines.id, cruiseLines.name)
       .orderBy(cruiseLines.name)
 
@@ -387,11 +399,7 @@ export class CruiseRepositoryService {
       })
       .from(cruiseShips)
       .leftJoin(cruiseSailings, eq(cruiseSailings.shipId, cruiseShips.id))
-      .where(
-        currentFilters?.cruiseLineId
-          ? and(eq(cruiseSailings.isActive, true), eq(cruiseSailings.cruiseLineId, currentFilters.cruiseLineId))
-          : eq(cruiseSailings.isActive, true)
-      )
+      .where(and(...baseConditions))
       .groupBy(cruiseShips.id, cruiseShips.name)
       .orderBy(cruiseShips.name)
 
@@ -405,11 +413,7 @@ export class CruiseRepositoryService {
       .from(cruiseRegions)
       .leftJoin(cruiseSailingRegions, eq(cruiseSailingRegions.regionId, cruiseRegions.id))
       .leftJoin(cruiseSailings, eq(cruiseSailings.id, cruiseSailingRegions.sailingId))
-      .where(
-        currentFilters?.cruiseLineId
-          ? and(eq(cruiseSailings.isActive, true), eq(cruiseSailings.cruiseLineId, currentFilters.cruiseLineId))
-          : eq(cruiseSailings.isActive, true)
-      )
+      .where(and(...baseConditions))
       .groupBy(cruiseRegions.id, cruiseRegions.name)
       .orderBy(cruiseRegions.name)
 
@@ -422,11 +426,7 @@ export class CruiseRepositoryService {
       })
       .from(cruisePorts)
       .leftJoin(cruiseSailings, eq(cruiseSailings.embarkPortId, cruisePorts.id))
-      .where(
-        currentFilters?.cruiseLineId
-          ? and(eq(cruiseSailings.isActive, true), eq(cruiseSailings.cruiseLineId, currentFilters.cruiseLineId))
-          : eq(cruiseSailings.isActive, true)
-      )
+      .where(and(...baseConditions))
       .groupBy(cruisePorts.id, cruisePorts.name)
       .orderBy(cruisePorts.name)
 
@@ -439,11 +439,7 @@ export class CruiseRepositoryService {
       })
       .from(cruisePorts)
       .leftJoin(cruiseSailings, eq(cruiseSailings.disembarkPortId, cruisePorts.id))
-      .where(
-        currentFilters?.cruiseLineId
-          ? and(eq(cruiseSailings.isActive, true), eq(cruiseSailings.cruiseLineId, currentFilters.cruiseLineId))
-          : eq(cruiseSailings.isActive, true)
-      )
+      .where(and(...baseConditions))
       .groupBy(cruisePorts.id, cruisePorts.name)
       .orderBy(cruisePorts.name)
 
@@ -461,26 +457,18 @@ export class CruiseRepositoryService {
       .from(cruisePorts)
       .innerJoin(cruiseSailingStops, eq(cruiseSailingStops.portId, cruisePorts.id))
       .innerJoin(cruiseSailings, eq(cruiseSailings.id, cruiseSailingStops.sailingId))
-      .where(
-        currentFilters?.cruiseLineId
-          ? and(
-              eq(cruiseSailings.isActive, true),
-              eq(cruiseSailingStops.isSeaDay, false),
-              eq(cruiseSailings.cruiseLineId, currentFilters.cruiseLineId)
-            )
-          : and(eq(cruiseSailings.isActive, true), eq(cruiseSailingStops.isSeaDay, false))
-      )
+      .where(and(...baseConditions, eq(cruiseSailingStops.isSeaDay, false)))
       .groupBy(sql`TRIM(${cruisePorts.name})`)
       .orderBy(sql`TRIM(${cruisePorts.name})`)
 
-    // Get date range
+    // Get date range (future sailings only)
     const dateRangeResult = await this.db.db
       .select({
         minDate: sql<string>`MIN(${cruiseSailings.sailDate})`,
         maxDate: sql<string>`MAX(${cruiseSailings.sailDate})`,
       })
       .from(cruiseSailings)
-      .where(eq(cruiseSailings.isActive, true))
+      .where(and(...baseConditions))
 
     // Get nights range
     const nightsRangeResult = await this.db.db
@@ -489,7 +477,7 @@ export class CruiseRepositoryService {
         maxNights: sql<number>`MAX(${cruiseSailings.nights})`,
       })
       .from(cruiseSailings)
-      .where(eq(cruiseSailings.isActive, true))
+      .where(and(...baseConditions))
 
     // Get price range (inside cabin)
     const priceRangeResult = await this.db.db
@@ -500,7 +488,7 @@ export class CruiseRepositoryService {
       .from(cruiseSailings)
       .where(
         and(
-          eq(cruiseSailings.isActive, true),
+          ...baseConditions,
           sql`${cruiseSailings.cheapestInsideCents} IS NOT NULL`
         )
       )
