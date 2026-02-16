@@ -2884,16 +2884,15 @@ export class ComponentOrchestrationService {
     // ========================================================================
 
     // Step 1: Compute all dates upfront
+    // Use UTC methods consistently to match autoGenerate (itinerary-days.service.ts)
     const allDates: string[] = []
     for (let dayIndex = 0; dayIndex < dayCount; dayIndex++) {
       const currentDate = new Date(startDate)
-      currentDate.setDate(startDate.getDate() + dayIndex)
-      // Format date in local time (not UTC) to avoid timezone shift
-      const year = currentDate.getFullYear()
-      const month = String(currentDate.getMonth() + 1).padStart(2, '0')
-      const day = String(currentDate.getDate()).padStart(2, '0')
-      allDates.push(`${year}-${month}-${day}`)
+      currentDate.setUTCDate(startDate.getUTCDate() + dayIndex)
+      allDates.push(currentDate.toISOString().split('T')[0]!)
     }
+
+
 
     // Step 2: Bulk find/create all itinerary days in one operation
     stepStart = Date.now()
@@ -2933,7 +2932,7 @@ export class ComponentOrchestrationService {
       }
 
       const currentDate = new Date(startDate)
-      currentDate.setDate(startDate.getDate() + dayIndex)
+      currentDate.setUTCDate(startDate.getUTCDate() + dayIndex)
 
       // Cruise day number is 1-indexed (dayIndex 0 = day 1)
       const cruiseDayNumber = dayIndex + 1
