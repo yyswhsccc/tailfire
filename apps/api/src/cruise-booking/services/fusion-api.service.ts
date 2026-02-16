@@ -29,6 +29,7 @@ import {
   BookingResult,
   PastPaxParams,
   PastPaxResult,
+  ImportBookingParams,
   FusionApiResponse,
   FusionApiError,
   FusionApiErrorCode,
@@ -186,6 +187,20 @@ export class FusionApiService {
     const response = await this.get<PastPaxResult>('cruisegetpaxdata.pl', params)
 
     return response.results?.[0] || { found: false }
+  }
+
+  // ============================================================================
+  // Import Existing Booking
+  // ============================================================================
+
+  async importBooking(params: ImportBookingParams): Promise<FusionApiResponse<Record<string, any>>> {
+    return this.get<Record<string, any>>('cruiseimportbooking.pl', {
+      lineid: params.lineid,
+      bookingreference: params.bookingreference,
+      viewonly: params.viewonly ?? 1,
+      currency: params.currency ?? 'CAD',
+      language: params.language ?? 'en',
+    })
   }
 
   // ============================================================================

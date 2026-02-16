@@ -5,7 +5,7 @@
  * One-to-one relationship with itinerary_activities.
  */
 
-import { pgTable, uuid, varchar, text, date, time, integer, timestamp, jsonb } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, text, date, time, integer, bigint, timestamp, jsonb } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { itineraryActivities } from './activities.schema'
 import { cruisePorts } from './cruise-ports.schema'
@@ -84,6 +84,7 @@ export const customCruiseDetails = pgTable('custom_cruise_details', {
   cabinCode: varchar('cabin_code', { length: 50 }),
   cabinNumber: varchar('cabin_number', { length: 50 }),
   cabinDeck: varchar('cabin_deck', { length: 50 }),
+  cabinLocation: varchar('cabin_location', { length: 100 }),
   cabinImageUrl: text('cabin_image_url'),
   cabinDescription: text('cabin_description'),
 
@@ -102,6 +103,15 @@ export const customCruiseDetails = pgTable('custom_cruise_details', {
   portCallsJson: jsonb('port_calls_json').default([]),
   cabinPricingJson: jsonb('cabin_pricing_json').default({}),
   shipContentJson: jsonb('ship_content_json').default({}),
+
+  // Import-specific data
+  diningPreferences: jsonb('dining_preferences').default({}),
+  selectedExtras: jsonb('selected_extras').default([]),
+  selectedPromotions: jsonb('selected_promotions').default({}),
+
+  // Traveltek internal IDs for future re-sync/refresh
+  traveltekBookingId: bigint('traveltek_booking_id', { mode: 'number' }),
+  traveltekPortfolioId: bigint('traveltek_portfolio_id', { mode: 'number' }),
 
   // Additional Details
   inclusions: text('inclusions').array(), // What's included

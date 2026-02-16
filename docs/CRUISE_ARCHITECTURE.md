@@ -33,16 +33,16 @@ The Tailfire platform uses two complementary Traveltek systems for cruise functi
 │            │                                      │                      │
 │            │ Stores                               │ Uses for             │
 │            │ catalog data                         │ live queries         │
-│            ▼                                      ▼                      │
+│            ▼                           ┌──────────┴──────────┐           │
 │   ┌─────────────────────────────────────────────────────────┐           │
-│   │                     DATABASE                             │           │
-│   │                                                          │           │
-│   │  catalog.cruise_sailings.provider_identifier             │           │
-│   │                        ║                                 │           │
-│   │                        ║ codetocruiseid                  │           │
-│   │                        ║ (THE CRITICAL LINK)             │           │
-│   │                        ▼                                 │           │
-│   │              Links FTP data to FusionAPI                 │           │
+│   │                     DATABASE                   │         │           │
+│   │                                                │         │           │
+│   │  catalog.cruise_sailings.provider_identifier   │ Import  │           │
+│   │                        ║                       │ Booking │           │
+│   │                        ║ codetocruiseid        │ (creates│           │
+│   │                        ║ (THE CRITICAL LINK)   │  trips) │           │
+│   │                        ▼                       │         │           │
+│   │              Links FTP data to FusionAPI       │         │           │
 │   └─────────────────────────────────────────────────────────┘           │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -238,8 +238,10 @@ cruise-booking/
 │   ├── traveltek-auth.service.ts       # OAuth token caching
 │   ├── fusion-api.service.ts           # Low-level HTTP client with retry
 │   ├── booking-session.service.ts      # Session CRUD, handoff, idempotency
-│   └── booking.service.ts              # High-level orchestration
+│   ├── booking.service.ts              # High-level orchestration
+│   └── import-booking.service.ts       # Import existing bookings
 ├── dto/                                # 6 DTOs with class-validator
+│   └── import-booking.dto.ts           # Import preview & confirm DTOs
 └── types/
     └── fusion-api.types.ts             # FusionAPI type definitions
 ```
@@ -262,6 +264,8 @@ cruise-booking/
 | `/cruise-booking/book` | POST | Complete booking with idempotency |
 | `/cruise-booking/proposal/:activityId` | GET | Get proposal for client handoff |
 | `/cruise-booking/session/:sessionId` | DELETE | Cancel session |
+| `/cruise-booking/import/preview` | POST | Preview existing cruise booking for import |
+| `/cruise-booking/import/confirm` | POST | Import existing cruise booking into Tailfire |
 
 ### Database Tables
 
@@ -392,6 +396,67 @@ FusionAPI is **stateful**. The `sessionkey` (UUID) maintains context:
 | `TRAVELTEK_USERNAME` | OAuth username | Doppler |
 | `TRAVELTEK_PASSWORD` | OAuth password | Doppler |
 | `TRAVELTEK_SID` | Site ID (account identifier) | Doppler |
+
+---
+
+## System 3: Booking Import (cruiseimportbooking.pl) - IMPLEMENTED
+
+### Overview
+
+The Booking Import feature allows agents to import existing cruise bookings from cruise line reservation systems into Tailfire. This uses Traveltek's `cruiseimportbooking.pl` endpoint to fetch booking data and creates a complete trip with all associated entities.
+
+| Property | Value |
+|----------|-------|
+| **Location** | `apps/api/src/cruise-booking/services/import-booking.service.ts` |
+| **FusionAPI Endpoint** | `cruiseimportbooking.pl` |
+| **Purpose** | Import pre-existing bookings into Tailfire |
+| **Status** | Implemented (February 2026) |
+
+### Import Flow (2-Step Process)
+
+**Step 1: Preview** - Fetches booking from Traveltek without creating anything in Tailfire. Returns passenger list, cruise details, pricing, itinerary ports.
+
+**Step 2: Confirm** - Creates the full entity graph:
+1. Match or create contacts for each passenger (by name + DOB)
+2. Create or use existing trip
+3. Create itinerary and itinerary day
+4. Create custom cruise activity with enriched details
+5. Create trip travelers for each passenger
+6. Link travelers to cruise activity
+7. Generate port schedule from cruise itinerary
+8. Stamp Traveltek fields as idempotency marker
+
+### Idempotency
+
+Import is scoped by `agency_id + source + fusionBookingRef` to prevent duplicate imports. If the same booking reference has already been imported, the confirm endpoint returns the existing trip.
+
+### Catalog Enrichment
+
+The import service performs best-effort catalog lookups to enrich the imported data:
+- Sail catalog lookup (by Traveltek codetocruiseid)
+- Region lookup from catalog
+- Ship details (image URL, ship class)
+- Port timezone enrichment from cruise catalog
+- Cabin category, deck, and location persistence
+
+### Database Changes (Migration: `20260216120000`)
+
+Added to `custom_cruise_details`:
+- `cabin_location` (varchar) - Ship location (Mid-ship, Aft, Forward)
+- `dining_preferences` (jsonb) - Seating, table size, smoking preferences
+- `selected_extras` (jsonb) - Beverage packages, wifi, excursions
+- `selected_promotions` (jsonb) - Applied promotion codes
+- `traveltek_booking_id` (bigint) - For re-sync capability
+- `traveltek_portfolio_id` (bigint) - For re-sync capability
+
+### FusionAPI Types
+
+New types in `fusion-api.types.ts`:
+- `ImportBookingParams` - Request parameters (lineid, bookingreference, viewonly, currency)
+- `ImportBookingResult` - Full booking response (cruise item, passengers, payment info)
+- `ImportBookingCruiseItem` - Cruise details (ship, cabin, itinerary, pricing, dining)
+- `ImportBookingPassenger` - Passenger details (name, DOB, nationality, gender)
+- `ImportBookingItineraryPort` - Port call details with coordinates
 
 ---
 

@@ -91,6 +91,7 @@ export const customCruiseDetailsDtoSchema = z.object({
   cabinCode: z.string().nullable().optional(),
   cabinNumber: z.string().nullable().optional(),
   cabinDeck: z.string().nullable().optional(),
+  cabinLocation: z.string().nullable().optional(),
   cabinImageUrl: z.string().nullable().optional(),
   cabinDescription: z.string().nullable().optional(),
 
@@ -103,6 +104,15 @@ export const customCruiseDetailsDtoSchema = z.object({
   portCallsJson: z.array(cruisePortCallSchema).optional(),
   cabinPricingJson: z.record(z.unknown()).optional(),
   shipContentJson: z.record(z.unknown()).optional(),
+
+  // Import-specific data
+  diningPreferences: z.record(z.unknown()).nullable().optional(),
+  selectedExtras: z.array(z.record(z.unknown())).nullable().optional(),
+  selectedPromotions: z.record(z.unknown()).nullable().optional(),
+
+  // Traveltek internal IDs for re-sync/refresh
+  traveltekBookingId: z.number().int().nullable().optional(),
+  traveltekPortfolioId: z.number().int().nullable().optional(),
 
   // Additional Details
   inclusions: z.array(z.string()).optional(),

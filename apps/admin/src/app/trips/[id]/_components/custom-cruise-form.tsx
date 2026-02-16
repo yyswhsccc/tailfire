@@ -359,6 +359,9 @@ export function CustomCruiseForm({
               cabinPricingJson: serverDetails.cabinPricingJson ?? {},
               shipContentJson: serverDetails.shipContentJson ?? {},
               inclusions: serverDetails.inclusions ?? [],
+              diningPreferences: serverDetails.diningPreferences ?? {},
+              selectedExtras: serverDetails.selectedExtras ?? [],
+              selectedPromotions: serverDetails.selectedPromotions ?? {},
             } : undefined,
           },
           effectiveDayDate,
@@ -431,6 +434,7 @@ export function CustomCruiseForm({
   })
   // Voyage details
   const itineraryNameValue = useWatch({ control, name: 'customCruiseDetails.itineraryName' })
+  const voyageCodeValue = useWatch({ control, name: 'customCruiseDetails.voyageCode' })
   const regionValue = useWatch({ control, name: 'customCruiseDetails.region' })
   const nightsValue = useWatch({ control, name: 'customCruiseDetails.nights' })
   const seaDaysValue = useWatch({ control, name: 'customCruiseDetails.seaDays' })
@@ -451,8 +455,10 @@ export function CustomCruiseForm({
   const cabinCodeValue = useWatch({ control, name: 'customCruiseDetails.cabinCode' })
   const cabinNumberValue = useWatch({ control, name: 'customCruiseDetails.cabinNumber' })
   const cabinDeckValue = useWatch({ control, name: 'customCruiseDetails.cabinDeck' })
+  const cabinLocationValue = useWatch({ control, name: 'customCruiseDetails.cabinLocation' })
   const cabinImageUrlValue = useWatch({ control, name: 'customCruiseDetails.cabinImageUrl' })
   const cabinDescriptionValue = useWatch({ control, name: 'customCruiseDetails.cabinDescription' })
+  const specialRequestsValue = useWatch({ control, name: 'customCruiseDetails.specialRequests' })
   // Booking details
   const bookingNumberValue = useWatch({ control, name: 'customCruiseDetails.bookingNumber' })
   const fareCodeValue = useWatch({ control, name: 'customCruiseDetails.fareCode' })
@@ -1206,14 +1212,26 @@ export function CustomCruiseForm({
               <CardTitle className="text-lg">Voyage Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Itinerary Name</label>
-                <Input
-                  value={itineraryNameValue || ''}
-                  onChange={(e) => setValue('customCruiseDetails.itineraryName', e.target.value || null, { shouldDirty: true })}
-                  data-field="customCruiseDetails.itineraryName"
-                  placeholder="e.g., Western Caribbean 7-Night"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Itinerary Name</label>
+                  <Input
+                    value={itineraryNameValue || ''}
+                    onChange={(e) => setValue('customCruiseDetails.itineraryName', e.target.value || null, { shouldDirty: true })}
+                    data-field="customCruiseDetails.itineraryName"
+                    placeholder="e.g., Western Caribbean 7-Night"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Voyage Code</label>
+                  <Input
+                    value={voyageCodeValue || ''}
+                    onChange={(e) => setValue('customCruiseDetails.voyageCode', e.target.value || null, { shouldDirty: true })}
+                    data-field="customCruiseDetails.voyageCode"
+                    placeholder="e.g., WC20260301"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
@@ -1570,7 +1588,7 @@ export function CustomCruiseForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Cabin Number</label>
                   <Input
@@ -1588,6 +1606,16 @@ export function CustomCruiseForm({
                     onChange={(e) => setValue('customCruiseDetails.cabinDeck', e.target.value || null, { shouldDirty: true })}
                     data-field="customCruiseDetails.cabinDeck"
                     placeholder="e.g., Deck 7"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Cabin Location</label>
+                  <Input
+                    value={cabinLocationValue || ''}
+                    onChange={(e) => setValue('customCruiseDetails.cabinLocation', e.target.value || null, { shouldDirty: true })}
+                    data-field="customCruiseDetails.cabinLocation"
+                    placeholder="e.g., Mid-Ship, Aft"
                   />
                 </div>
               </div>
@@ -1704,6 +1732,25 @@ export function CustomCruiseForm({
               </div>
             </CardContent>
           </Card>
+
+          {/* Special Requests */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Special Requests</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Textarea
+                  value={specialRequestsValue || ''}
+                  onChange={(e) => setValue('customCruiseDetails.specialRequests', e.target.value || null, { shouldDirty: true })}
+                  data-field="customCruiseDetails.specialRequests"
+                  placeholder="e.g., Wheelchair accessible, adjoining cabins, anniversary celebration, dietary requirements..."
+                  className="min-h-[100px]"
+                />
+                <p className="text-xs text-gray-500">Any special requests or notes for this cruise booking</p>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Media Tab */}
@@ -1798,6 +1845,77 @@ export function CustomCruiseForm({
               </div>
             </CardContent>
           </Card>
+
+          {/* Import Metadata — only shown when populated (from booking import) */}
+          {(currentValues.customCruiseDetails?.diningPreferences &&
+            Object.keys(currentValues.customCruiseDetails.diningPreferences).length > 0) ||
+           (currentValues.customCruiseDetails?.selectedExtras &&
+            currentValues.customCruiseDetails.selectedExtras.length > 0) ||
+           (currentValues.customCruiseDetails?.selectedPromotions &&
+            Object.keys(currentValues.customCruiseDetails.selectedPromotions).length > 0) ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Import Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {currentValues.customCruiseDetails?.diningPreferences &&
+                  Object.keys(currentValues.customCruiseDetails.diningPreferences).length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Dining Preferences</label>
+                    <div className="rounded-md border bg-gray-50 p-3">
+                      {(() => {
+                        const dp = currentValues.customCruiseDetails.diningPreferences as Record<string, unknown>
+                        const seatings = dp.seatings as Array<Record<string, string>> | undefined
+                        if (seatings && Array.isArray(seatings)) {
+                          return (
+                            <div className="space-y-1 text-sm text-gray-700">
+                              {seatings.map((s, i) => (
+                                <p key={i}>{s.description || s.seating}{s.tablesize ? ` (Table: ${s.tablesize})` : ''}</p>
+                              ))}
+                              {dp.smoking ? <p>Smoking: {String(dp.smoking)}</p> : null}
+                            </div>
+                          )
+                        }
+                        return <pre className="text-xs text-gray-600 whitespace-pre-wrap">{JSON.stringify(dp, null, 2)}</pre>
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {currentValues.customCruiseDetails?.selectedExtras &&
+                  currentValues.customCruiseDetails.selectedExtras.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Selected Extras</label>
+                    <div className="rounded-md border bg-gray-50 p-3">
+                      <div className="space-y-1 text-sm text-gray-700">
+                        {currentValues.customCruiseDetails.selectedExtras.map((extra, i) => (
+                          <p key={i}>
+                            {(extra as Record<string, unknown>).description
+                              ? String((extra as Record<string, unknown>).description)
+                              : JSON.stringify(extra)}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {currentValues.customCruiseDetails?.selectedPromotions &&
+                  Object.keys(currentValues.customCruiseDetails.selectedPromotions).length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Applied Promotions</label>
+                    <div className="rounded-md border bg-gray-50 p-3">
+                      <div className="space-y-1 text-sm text-gray-700">
+                        {Object.entries(currentValues.customCruiseDetails.selectedPromotions as Record<string, unknown>).map(([key, val]) => (
+                          <p key={key}>{key}: {String(val)}</p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Separator />
 
