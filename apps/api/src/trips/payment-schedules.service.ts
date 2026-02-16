@@ -728,6 +728,11 @@ export class PaymentSchedulesService {
 
     const agencyId = parentInfo.agencyId
 
+    // Validate trip has at least one traveler before accepting payment (skip for refunds/adjustments)
+    if (data.transactionType === 'payment') {
+      await this.validateTripHasTravelersForPayment(data.expectedPaymentItemId)
+    }
+
     // Wrap insert + cache sync in a transaction for consistency
     const result = await this.db.client.transaction(async (tx) => {
       // Create the transaction
@@ -806,6 +811,70 @@ export class PaymentSchedulesService {
     return {
       currency: pricing?.currency || null,
       agencyId: pricing?.agencyId || null,
+    }
+  }
+
+  /**
+   * Validate that the trip associated with a payment item has at least one traveler.
+   * Traverses: expectedPaymentItem → config → activityPricing → activity → trip → trip_travelers
+   */
+  private async validateTripHasTravelersForPayment(expectedPaymentItemId: string): Promise<void> {
+    const result = await this.db.client
+      .select({
+        activityId: this.db.schema.activityPricing.activityId,
+      })
+      .from(this.db.schema.expectedPaymentItems)
+      .innerJoin(
+        this.db.schema.paymentScheduleConfig,
+        eq(this.db.schema.expectedPaymentItems.paymentScheduleConfigId, this.db.schema.paymentScheduleConfig.id)
+      )
+      .innerJoin(
+        this.db.schema.activityPricing,
+        eq(this.db.schema.paymentScheduleConfig.activityPricingId, this.db.schema.activityPricing.id)
+      )
+      .where(eq(this.db.schema.expectedPaymentItems.id, expectedPaymentItemId))
+      .limit(1)
+
+    if (!result[0]) return // Can't resolve chain — skip validation
+
+    // Resolve tripId from the activity (direct trip_id or via itinerary chain)
+    const [activity] = await this.db.client
+      .select({
+        directTripId: this.db.schema.itineraryActivities.tripId,
+        itineraryDayId: this.db.schema.itineraryActivities.itineraryDayId,
+      })
+      .from(this.db.schema.itineraryActivities)
+      .where(eq(this.db.schema.itineraryActivities.id, result[0].activityId))
+      .limit(1)
+
+    if (!activity) return
+
+    let tripId = activity.directTripId
+    if (!tripId && activity.itineraryDayId) {
+      const [dayResult] = await this.db.client
+        .select({ tripId: this.db.schema.itineraries.tripId })
+        .from(this.db.schema.itineraryDays)
+        .innerJoin(
+          this.db.schema.itineraries,
+          eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
+        )
+        .where(eq(this.db.schema.itineraryDays.id, activity.itineraryDayId))
+        .limit(1)
+      tripId = dayResult?.tripId ?? null
+    }
+
+    if (!tripId) return // Can't resolve trip — skip validation
+
+    // Check if trip has at least one traveler
+    const [travelerCount] = await this.db.client
+      .select({ count: sql<number>`count(*)::int` })
+      .from(this.db.schema.tripTravelers)
+      .where(eq(this.db.schema.tripTravelers.tripId, tripId))
+
+    if (!travelerCount || travelerCount.count === 0) {
+      throw new BadRequestException(
+        'Cannot record payment: this trip has no travelers assigned. Please add at least one traveler before recording payments.'
+      )
     }
   }
 

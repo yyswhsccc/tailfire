@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Search, X, ChevronDown, ChevronUp, Filter, Check, ChevronsUpDown, Anchor } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -14,11 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 import {
   Popover,
   PopoverContent,
@@ -35,6 +30,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Combobox } from '@/components/ui/combobox'
+import { useDebounce } from '@/hooks/use-debounce'
 import { cn } from '@/lib/utils'
 import type { SailingSearchFilters, SailingFiltersResponse, CabinCategory } from '@/hooks/use-cruise-library'
 
@@ -64,19 +61,26 @@ export function CruiseFilters({
   const [searchInput, setSearchInput] = useState(filters.q ?? '')
   const [portsPopoverOpen, setPortsPopoverOpen] = useState(false)
 
-  // Count active filters (excluding search and sort)
-  const activeFilterCount = [
-    filters.cruiseLineId,
-    filters.shipId,
-    filters.regionId,
-    filters.embarkPortId,
+  // Live debounced search
+  const debouncedSearch = useDebounce(searchInput, 300)
+  const prevDebouncedRef = useRef(debouncedSearch)
+
+  useEffect(() => {
+    // Only fire when debounced value actually changes
+    if (debouncedSearch === prevDebouncedRef.current) return
+    prevDebouncedRef.current = debouncedSearch
+
+    const newQ = debouncedSearch || undefined
+    if (newQ !== filters.q) {
+      onChange({ q: newQ })
+    }
+  }, [debouncedSearch, filters.q, onChange])
+
+  // Count only Tier 3 filters for "More Filters (N)" badge
+  const tier3FilterCount = [
     filters.disembarkPortId,
-    filters.sailDateFrom,
-    filters.sailDateTo,
-    filters.nightsMin !== undefined || filters.nightsMax !== undefined,
-    filters.priceMinCents !== undefined || filters.priceMaxCents !== undefined,
     filters.portOfCallIds && filters.portOfCallIds.length > 0,
-    filters.cabinCategory, // Include cabin category in count
+    filters.priceMinCents !== undefined || filters.priceMaxCents !== undefined,
   ].filter(Boolean).length
 
   // Handle cabin category change
@@ -84,15 +88,14 @@ export function CruiseFilters({
     onChange({ cabinCategory: value === 'all' ? undefined : value as CabinCategory })
   }
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onChange({ q: searchInput || undefined })
-  }
-
   const handleSearchClear = () => {
     setSearchInput('')
+    prevDebouncedRef.current = ''
     onChange({ q: undefined })
   }
+
+  // Count all active filters for badge display (after handleSearchClear is defined)
+  const allActiveFilters = getActiveFilterBadges(filters, filterOptions, onChange, handleSearchClear)
 
   const handleDurationChange = (value: string) => {
     const option = DURATION_OPTIONS.find((o) => o.value === value)
@@ -106,6 +109,7 @@ export function CruiseFilters({
 
   const handleClearAll = () => {
     setSearchInput('')
+    prevDebouncedRef.current = ''
     onChange({
       q: undefined,
       cruiseLineId: undefined,
@@ -125,52 +129,40 @@ export function CruiseFilters({
   }
 
   // Handle ports of call selection toggle
-  // Uses allIds to handle duplicate port entries with same name
   const handlePortOfCallToggle = (port: { id: string; allIds?: string[] }) => {
     const currentPorts = filters.portOfCallIds ?? []
     const portIds = port.allIds ?? [port.id]
-
-    // Check if this port is already selected (any of its IDs)
     const isSelected = portIds.some(id => currentPorts.includes(id))
 
     let newPorts: string[]
     if (isSelected) {
-      // Remove all IDs for this port
       newPorts = currentPorts.filter(id => !portIds.includes(id))
     } else {
-      // Add all IDs for this port (to match all duplicate entries)
       newPorts = [...currentPorts, ...portIds]
     }
 
     onChange({ portOfCallIds: newPorts.length > 0 ? newPorts : undefined })
   }
 
-  // Check if a port is selected (by checking if any of its allIds are in the filter)
   const isPortSelected = (port: { id: string; allIds?: string[] }): boolean => {
     const currentPorts = filters.portOfCallIds ?? []
     const portIds = port.allIds ?? [port.id]
     return portIds.some(id => currentPorts.includes(id))
   }
 
-  // Get selected port names for display
   const getSelectedPortNames = (): string => {
     const selected = filters.portOfCallIds ?? []
     if (selected.length === 0) return 'Select ports...'
-
-    // Count unique port names selected (not IDs, since one port can have multiple IDs)
     const selectedPorts = (filterOptions?.portsOfCall ?? []).filter(p => isPortSelected(p))
-
     if (selectedPorts.length === 0) return 'Select ports...'
     if (selectedPorts.length === 1) return selectedPorts[0]?.name ?? '1 port'
     return `${selectedPorts.length} ports selected`
   }
 
-  // Format price in dollars
   const formatPriceDollars = (cents: number): string => {
     return `$${Math.round(cents / 100).toLocaleString()}`
   }
 
-  // Get current price range values for slider
   const getPriceRangeValues = (): [number, number] => {
     const minPrice = filterOptions?.priceRange?.min ?? 0
     const maxPrice = filterOptions?.priceRange?.max ?? 1000000
@@ -183,18 +175,11 @@ export function CruiseFilters({
   const handlePriceRangeChange = (values: number[]) => {
     const minPrice = filterOptions?.priceRange?.min ?? 0
     const maxPrice = filterOptions?.priceRange?.max ?? 1000000
-
-    // Only set values if they differ from the full range
     const newMin = values[0] === minPrice ? undefined : values[0]
     const newMax = values[1] === maxPrice ? undefined : values[1]
-
-    onChange({
-      priceMinCents: newMin,
-      priceMaxCents: newMax,
-    })
+    onChange({ priceMinCents: newMin, priceMaxCents: newMax })
   }
 
-  // Get current duration value
   const getCurrentDuration = (): string => {
     const { nightsMin, nightsMax } = filters
     if (nightsMin === undefined && nightsMax === undefined) return 'any'
@@ -204,61 +189,93 @@ export function CruiseFilters({
     return option?.value ?? 'any'
   }
 
+  // Build combobox options
+  const shipOptions = (filterOptions?.ships ?? []).map(s => ({
+    value: s.id,
+    label: s.count !== undefined ? `${s.name} (${s.count})` : s.name,
+  }))
+
+  const embarkPortOptions = (filterOptions?.embarkPorts ?? []).map(p => ({
+    value: p.id,
+    label: p.count !== undefined ? `${p.name} (${p.count})` : p.name,
+  }))
+
+  const disembarkPortOptions = (filterOptions?.disembarkPorts ?? []).map(p => ({
+    value: p.id,
+    label: p.count !== undefined ? `${p.name} (${p.count})` : p.name,
+  }))
+
   return (
-    <div className="bg-white border border-tern-gray-200 rounded-lg p-4 space-y-4">
-      {/* Search Bar */}
-      <form onSubmit={handleSearchSubmit} className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tern-gray-400" />
-          <Input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by cruise name, ship, port..."
-            className="pl-9 pr-8"
-          />
-          {searchInput && (
-            <button
-              type="button"
-              onClick={handleSearchClear}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-tern-gray-400 hover:text-tern-gray-600"
-            >
-              <X className="h-4 w-4" />
-            </button>
+    <div className="bg-white border border-tern-gray-200 rounded-lg p-4 space-y-3">
+      {/* ── TIER 1: Quick Find ─────────────────────────────────────── */}
+      <div className="flex flex-wrap items-end gap-3">
+        {/* Search */}
+        <div className="flex-1 min-w-[200px]">
+          <Label className="text-xs text-tern-gray-500 mb-1 block">Search</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tern-gray-400" />
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by cruise name, ship, port..."
+              className="pl-9 pr-8"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={handleSearchClear}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-tern-gray-400 hover:text-tern-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Ship (Combobox with type-ahead) */}
+        <div className="w-56">
+          <Label className="text-xs text-tern-gray-500 mb-1 block">Ship</Label>
+          {isLoading ? (
+            <Skeleton className="h-9 w-full" />
+          ) : (
+            <Combobox
+              options={shipOptions}
+              value={filters.shipId ?? null}
+              onValueChange={(v) => onChange({ shipId: v ?? undefined })}
+              placeholder="All Ships"
+              searchPlaceholder="Search ships..."
+              emptyText="No ships found."
+            />
           )}
         </div>
-        <Button type="submit">Search</Button>
-      </form>
 
-      {/* Cabin Category Tabs */}
-      <div className="flex items-center gap-4">
-        <span className="text-sm text-tern-gray-600 font-medium">Cabin Type:</span>
-        <Tabs
-          value={filters.cabinCategory ?? 'all'}
-          onValueChange={handleCabinCategoryChange}
-          className="w-auto"
-        >
-          <TabsList className="h-9 bg-tern-gray-100">
-            <TabsTrigger value="all" className="text-sm px-4">
-              All Cabins
-            </TabsTrigger>
-            <TabsTrigger value="inside" className="text-sm px-4">
-              Inside
-            </TabsTrigger>
-            <TabsTrigger value="oceanview" className="text-sm px-4">
-              Oceanview
-            </TabsTrigger>
-            <TabsTrigger value="balcony" className="text-sm px-4">
-              Balcony
-            </TabsTrigger>
-            <TabsTrigger value="suite" className="text-sm px-4">
-              Suite
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Date From */}
+        <div className="w-40">
+          <Label className="text-xs text-tern-gray-500 mb-1 block">Departs From</Label>
+          <DatePickerEnhanced
+            value={filters.sailDateFrom ?? null}
+            onChange={(date) => onChange({ sailDateFrom: date || undefined })}
+            placeholder="Any date"
+            minDate={filterOptions?.dateRange.min ?? undefined}
+            maxDate={filterOptions?.dateRange.max ?? undefined}
+          />
+        </div>
+
+        {/* Date To */}
+        <div className="w-40">
+          <Label className="text-xs text-tern-gray-500 mb-1 block">Departs To</Label>
+          <DatePickerEnhanced
+            value={filters.sailDateTo ?? null}
+            onChange={(date) => onChange({ sailDateTo: date || undefined })}
+            placeholder="Any date"
+            minDate={filters.sailDateFrom ?? filterOptions?.dateRange.min ?? undefined}
+            maxDate={filterOptions?.dateRange.max ?? undefined}
+          />
+        </div>
       </div>
 
-      {/* Quick Filters Row */}
-      <div className="flex flex-wrap gap-3">
+      {/* ── TIER 2: Common Filters ─────────────────────────────────── */}
+      <div className="flex flex-wrap items-end gap-3 pt-2 border-t border-tern-gray-100">
         {/* Cruise Line */}
         <div className="w-40">
           {isLoading ? (
@@ -329,238 +346,167 @@ export function CruiseFilters({
           </Select>
         </div>
 
-        {/* More Filters Toggle */}
-        <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                'gap-1.5',
-                activeFilterCount > 0 && 'border-tern-teal-500 text-tern-teal-600'
-              )}
-            >
-              <Filter className="h-4 w-4" />
-              More Filters
-              {activeFilterCount > 0 && (
-                <span className="ml-1 bg-tern-teal-100 text-tern-teal-700 text-xs px-1.5 py-0.5 rounded-full">
-                  {activeFilterCount}
-                </span>
-              )}
-              {isExpanded ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
-          </CollapsibleTrigger>
+        {/* Departure Port (Combobox) */}
+        <div className="w-48">
+          {isLoading ? (
+            <Skeleton className="h-9 w-full" />
+          ) : (
+            <Combobox
+              options={embarkPortOptions}
+              value={filters.embarkPortId ?? null}
+              onValueChange={(v) => onChange({ embarkPortId: v ?? undefined })}
+              placeholder="Departure Port"
+              searchPlaceholder="Search ports..."
+              emptyText="No ports found."
+            />
+          )}
+        </div>
 
-          <CollapsibleContent className="mt-3">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-tern-gray-100">
-              {/* Ship */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Ship</Label>
-                {isLoading ? (
-                  <Skeleton className="h-9 w-full" />
-                ) : (
-                  <Select
-                    value={filters.shipId ?? 'all'}
-                    onValueChange={(v) => onChange({ shipId: v === 'all' ? undefined : v })}
+        {/* Cabin Type (Tabs - compact) */}
+        <div>
+          <Tabs
+            value={filters.cabinCategory ?? 'all'}
+            onValueChange={handleCabinCategoryChange}
+            className="w-auto"
+          >
+            <TabsList className="h-9 bg-tern-gray-100">
+              <TabsTrigger value="all" className="text-xs px-3">All</TabsTrigger>
+              <TabsTrigger value="inside" className="text-xs px-3">Inside</TabsTrigger>
+              <TabsTrigger value="oceanview" className="text-xs px-3">Ocean</TabsTrigger>
+              <TabsTrigger value="balcony" className="text-xs px-3">Balcony</TabsTrigger>
+              <TabsTrigger value="suite" className="text-xs px-3">Suite</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        {/* More Filters Toggle Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsExpanded(!isExpanded)}
+          aria-expanded={isExpanded}
+          aria-controls="tier3-filters"
+          className={cn(
+            'gap-1.5 h-9',
+            tier3FilterCount > 0 && 'border-tern-teal-500 text-tern-teal-600'
+          )}
+        >
+          <Filter className="h-4 w-4" />
+          More Filters
+          {tier3FilterCount > 0 && (
+            <span className="ml-1 bg-tern-teal-100 text-tern-teal-700 text-xs px-1.5 py-0.5 rounded-full">
+              {tier3FilterCount}
+            </span>
+          )}
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+
+      {/* ── TIER 3: More Filters (collapsed, full-width outside flex) ─── */}
+      {isExpanded && (
+        <div id="tier3-filters" className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-tern-gray-100">
+          {/* Return Port (Combobox) */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Return Port</Label>
+            {isLoading ? (
+              <Skeleton className="h-9 w-full" />
+            ) : (
+              <Combobox
+                options={disembarkPortOptions}
+                value={filters.disembarkPortId ?? null}
+                onValueChange={(v) => onChange({ disembarkPortId: v ?? undefined })}
+                placeholder="All Ports"
+                searchPlaceholder="Search ports..."
+                emptyText="No ports found."
+              />
+            )}
+          </div>
+
+          {/* Ports of Call (Multi-select) */}
+          <div className="space-y-1.5 md:col-span-2">
+            <Label className="text-xs flex items-center gap-1">
+              <Anchor className="h-3 w-3" />
+              Ports of Call
+            </Label>
+            {isLoading ? (
+              <Skeleton className="h-9 w-full" />
+            ) : (
+              <Popover open={portsPopoverOpen} onOpenChange={setPortsPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={portsPopoverOpen}
+                    className={cn(
+                      'w-full justify-between font-normal',
+                      (filters.portOfCallIds?.length ?? 0) > 0 && 'border-tern-teal-500'
+                    )}
                   >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All Ships" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Ships</SelectItem>
-                      {filterOptions?.ships.map((ship) => (
-                        <SelectItem key={ship.id} value={ship.id}>
-                          {ship.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              {/* Departure Port */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Departure Port</Label>
-                {isLoading ? (
-                  <Skeleton className="h-9 w-full" />
-                ) : (
-                  <Select
-                    value={filters.embarkPortId ?? 'all'}
-                    onValueChange={(v) => onChange({ embarkPortId: v === 'all' ? undefined : v })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All Ports" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Ports</SelectItem>
-                      {filterOptions?.embarkPorts.map((port) => (
-                        <SelectItem key={port.id} value={port.id}>
-                          {port.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              {/* Return Port */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Return Port</Label>
-                {isLoading ? (
-                  <Skeleton className="h-9 w-full" />
-                ) : (
-                  <Select
-                    value={filters.disembarkPortId ?? 'all'}
-                    onValueChange={(v) => onChange({ disembarkPortId: v === 'all' ? undefined : v })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="All Ports" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Ports</SelectItem>
-                      {filterOptions?.disembarkPorts?.map((port) => (
-                        <SelectItem key={port.id} value={port.id}>
-                          {port.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              {/* Date From */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Departure From</Label>
-                <DatePickerEnhanced
-                  value={filters.sailDateFrom ?? null}
-                  onChange={(date) => onChange({ sailDateFrom: date || undefined })}
-                  placeholder="Select date"
-                  minDate={filterOptions?.dateRange.min ?? undefined}
-                  maxDate={filterOptions?.dateRange.max ?? undefined}
-                />
-              </div>
-
-              {/* Date To */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Departure To</Label>
-                <DatePickerEnhanced
-                  value={filters.sailDateTo ?? null}
-                  onChange={(date) => onChange({ sailDateTo: date || undefined })}
-                  placeholder="Select date"
-                  minDate={filters.sailDateFrom ?? filterOptions?.dateRange.min ?? undefined}
-                  maxDate={filterOptions?.dateRange.max ?? undefined}
-                />
-              </div>
-
-              {/* Ports of Call (Multi-select) */}
-              <div className="space-y-1.5 md:col-span-2">
-                <Label className="text-xs flex items-center gap-1">
-                  <Anchor className="h-3 w-3" />
-                  Ports of Call
-                </Label>
-                {isLoading ? (
-                  <Skeleton className="h-9 w-full" />
-                ) : (
-                  <Popover open={portsPopoverOpen} onOpenChange={setPortsPopoverOpen}>
-                    <PopoverTrigger asChild>
+                    <span className="truncate">{getSelectedPortNames()}</span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search ports..." />
+                    <CommandList>
+                      <CommandEmpty>No ports found.</CommandEmpty>
+                      <CommandGroup>
+                        {filterOptions?.portsOfCall?.map((port) => {
+                          const selected = isPortSelected(port)
+                          return (
+                            <CommandItem
+                              key={port.id}
+                              value={port.name}
+                              onSelect={() => handlePortOfCallToggle(port)}
+                            >
+                              <div
+                                className={cn(
+                                  'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
+                                  selected
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'opacity-50 [&_svg]:invisible'
+                                )}
+                              >
+                                <Check className="h-3 w-3" />
+                              </div>
+                              <span className="truncate">{port.name}</span>
+                              {port.count !== undefined && (
+                                <span className="ml-auto text-xs text-tern-gray-400">
+                                  ({port.count})
+                                </span>
+                              )}
+                            </CommandItem>
+                          )
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                  {(filters.portOfCallIds?.length ?? 0) > 0 && (
+                    <div className="border-t p-2">
                       <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={portsPopoverOpen}
-                        className={cn(
-                          'w-full justify-between font-normal',
-                          (filters.portOfCallIds?.length ?? 0) > 0 && 'border-tern-teal-500'
-                        )}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => onChange({ portOfCallIds: undefined })}
                       >
-                        <span className="truncate">{getSelectedPortNames()}</span>
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        Clear selection
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search ports..." />
-                        <CommandList>
-                          <CommandEmpty>No ports found.</CommandEmpty>
-                          <CommandGroup>
-                            {filterOptions?.portsOfCall?.map((port) => {
-                              const selected = isPortSelected(port)
-                              return (
-                                <CommandItem
-                                  key={port.id}
-                                  value={port.name}
-                                  onSelect={() => handlePortOfCallToggle(port)}
-                                >
-                                  <div
-                                    className={cn(
-                                      'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
-                                      selected
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'opacity-50 [&_svg]:invisible'
-                                    )}
-                                  >
-                                    <Check className="h-3 w-3" />
-                                  </div>
-                                  <span className="truncate">{port.name}</span>
-                                  {port.count !== undefined && (
-                                    <span className="ml-auto text-xs text-tern-gray-400">
-                                      ({port.count})
-                                    </span>
-                                  )}
-                                </CommandItem>
-                              )
-                            })}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                      {(filters.portOfCallIds?.length ?? 0) > 0 && (
-                        <div className="border-t p-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full text-xs"
-                            onClick={() => onChange({ portOfCallIds: undefined })}
-                          >
-                            Clear selection
-                          </Button>
-                        </div>
-                      )}
-                    </PopoverContent>
-                  </Popover>
-                )}
-                {/* Show selected ports as badges (unique port names) */}
-                {(() => {
-                  const selectedPorts = (filterOptions?.portsOfCall ?? []).filter(p => isPortSelected(p))
-                  if (selectedPorts.length === 0) return null
-                  return (
-                    <div className="flex flex-wrap gap-1 pt-1">
-                      {selectedPorts.slice(0, 3).map((port) => (
-                        <Badge
-                          key={port.id}
-                          variant="secondary"
-                          className="text-xs cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
-                          onClick={() => handlePortOfCallToggle(port)}
-                        >
-                          {port.name}
-                          <X className="ml-1 h-3 w-3" />
-                        </Badge>
-                      ))}
-                      {selectedPorts.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{selectedPorts.length - 3} more
-                        </Badge>
-                      )}
                     </div>
-                  )
-                })()}
-              </div>
-            </div>
+                  )}
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
 
-            {/* Price Range Slider */}
+          {/* Price Range Slider */}
+          <div className="space-y-1.5">
             {filterOptions?.priceRange?.min != null && filterOptions?.priceRange?.max != null && (
-              <div className="space-y-3 pt-3 border-t border-tern-gray-100">
+              <>
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Price Range</Label>
                   <span className="text-xs text-tern-gray-500">
@@ -572,22 +518,112 @@ export function CruiseFilters({
                   onValueCommit={handlePriceRangeChange}
                   min={filterOptions.priceRange.min}
                   max={filterOptions.priceRange.max}
-                  step={10000} // $100 increments
+                  step={10000}
                   className="w-full"
                 />
-              </div>
+              </>
             )}
-          </CollapsibleContent>
-        </Collapsible>
+          </div>
+        </div>
+      )}
 
-        {/* Clear All */}
-        {(filters.q || activeFilterCount > 0) && (
-          <Button variant="ghost" size="sm" onClick={handleClearAll} className="text-tern-gray-500">
-            <X className="h-4 w-4 mr-1" />
-            Clear All
-          </Button>
-        )}
-      </div>
+      {/* ── Active Filter Badges ──────────────────────────────────── */}
+      {allActiveFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-tern-gray-100">
+          {allActiveFilters.map((badge) => (
+            <Badge
+              key={badge.key}
+              variant="secondary"
+              className="text-xs cursor-pointer hover:bg-destructive/10 hover:text-destructive gap-1 pr-1"
+              onClick={badge.onClear}
+            >
+              {badge.label}
+              <X className="h-3 w-3" />
+            </Badge>
+          ))}
+          {allActiveFilters.length >= 2 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearAll}
+              className="text-xs text-tern-gray-500 h-6 px-2"
+            >
+              Clear All
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   )
+}
+
+// ── Helper: Build active filter badge descriptors ──────────────────
+interface FilterBadge {
+  key: string
+  label: string
+  onClear: () => void
+}
+
+function getActiveFilterBadges(
+  filters: SailingSearchFilters,
+  filterOptions: SailingFiltersResponse | undefined,
+  onChange: (filters: Partial<SailingSearchFilters>) => void,
+  onSearchClear: () => void,
+): FilterBadge[] {
+  const badges: FilterBadge[] = []
+
+  if (filters.q) {
+    badges.push({ key: 'q', label: `Search: ${filters.q}`, onClear: onSearchClear })
+  }
+  if (filters.cruiseLineId) {
+    const name = filterOptions?.cruiseLines.find(l => l.id === filters.cruiseLineId)?.name ?? 'Selected'
+    badges.push({ key: 'cruiseLine', label: `Line: ${name}`, onClear: () => onChange({ cruiseLineId: undefined }) })
+  }
+  if (filters.shipId) {
+    const name = filterOptions?.ships.find(s => s.id === filters.shipId)?.name ?? 'Selected'
+    badges.push({ key: 'ship', label: `Ship: ${name}`, onClear: () => onChange({ shipId: undefined }) })
+  }
+  if (filters.regionId) {
+    const name = filterOptions?.regions.find(r => r.id === filters.regionId)?.name ?? 'Selected'
+    badges.push({ key: 'region', label: `Region: ${name}`, onClear: () => onChange({ regionId: undefined }) })
+  }
+  if (filters.embarkPortId) {
+    const name = filterOptions?.embarkPorts.find(p => p.id === filters.embarkPortId)?.name ?? 'Selected'
+    badges.push({ key: 'embarkPort', label: `Depart: ${name}`, onClear: () => onChange({ embarkPortId: undefined }) })
+  }
+  if (filters.disembarkPortId) {
+    const name = filterOptions?.disembarkPorts?.find(p => p.id === filters.disembarkPortId)?.name ?? 'Selected'
+    badges.push({ key: 'disembarkPort', label: `Return: ${name}`, onClear: () => onChange({ disembarkPortId: undefined }) })
+  }
+  if (filters.sailDateFrom) {
+    badges.push({ key: 'dateFrom', label: `Date From: ${filters.sailDateFrom}`, onClear: () => onChange({ sailDateFrom: undefined }) })
+  }
+  if (filters.sailDateTo) {
+    badges.push({ key: 'dateTo', label: `Date To: ${filters.sailDateTo}`, onClear: () => onChange({ sailDateTo: undefined }) })
+  }
+  if (filters.nightsMin !== undefined || filters.nightsMax !== undefined) {
+    const min = filters.nightsMin ?? 'any'
+    const max = filters.nightsMax ?? 'any'
+    badges.push({ key: 'duration', label: `Nights: ${min}-${max}`, onClear: () => onChange({ nightsMin: undefined, nightsMax: undefined }) })
+  }
+  if (filters.cabinCategory) {
+    badges.push({ key: 'cabin', label: `Cabin: ${filters.cabinCategory}`, onClear: () => onChange({ cabinCategory: undefined }) })
+  }
+  if (filters.portOfCallIds && filters.portOfCallIds.length > 0) {
+    // Count unique port names (not IDs) since one port can have multiple IDs
+    const selectedPorts = (filterOptions?.portsOfCall ?? []).filter(p => {
+      const portIds = p.allIds ?? [p.id]
+      return portIds.some(id => filters.portOfCallIds!.includes(id))
+    })
+    // Fall back to deduped ID count if filterOptions not loaded yet
+    const count = selectedPorts.length || new Set(filters.portOfCallIds).size
+    badges.push({ key: 'portsOfCall', label: `Ports of Call: ${count} selected`, onClear: () => onChange({ portOfCallIds: undefined }) })
+  }
+  if (filters.priceMinCents !== undefined || filters.priceMaxCents !== undefined) {
+    const min = filters.priceMinCents !== undefined ? `$${Math.round(filters.priceMinCents / 100)}` : 'min'
+    const max = filters.priceMaxCents !== undefined ? `$${Math.round(filters.priceMaxCents / 100)}` : 'max'
+    badges.push({ key: 'price', label: `Price: ${min}-${max}`, onClear: () => onChange({ priceMinCents: undefined, priceMaxCents: undefined }) })
+  }
+
+  return badges
 }

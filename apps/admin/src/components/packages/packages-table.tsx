@@ -125,6 +125,11 @@ type UnifiedBookingRow =
       activityType: string
       dayNumber: number | null
       totalPriceCents: number | null
+      supplierName: string | null
+      isBooked: boolean
+      confirmationNumber: string | null
+      paymentStatus: string | null
+      currency: string | null
       children: UnlinkedActivity[]
     }
 
@@ -356,6 +361,12 @@ type UnlinkedActivity = {
   sequenceOrder: number
   totalPriceCents: number | null
   parentActivityId: string | null
+  supplierName: string | null
+  isBooked: boolean
+  confirmationNumber: string | null
+  paymentStatus: string | null
+  paidCents: number | null
+  currency: string | null
 }
 
 function groupUnlinkedByParent(activities: UnlinkedActivity[]) {
@@ -396,14 +407,16 @@ function OverviewCard({ totals, currency }: { totals: TripPackageTotalsDto; curr
           </div>
         </div>
         <div>
+          <span className="text-gray-500">Booked</span>
+          <div className="text-lg font-semibold text-teal-600">
+            {formatCurrency(totals.bookedTotalCents, currency)}
+          </div>
+        </div>
+        <div>
           <span className="text-gray-500">Paid</span>
           <div className="text-lg font-semibold text-green-600">
             {formatCurrency(totals.totalCollectedCents, currency)}
           </div>
-        </div>
-        <div>
-          <span className="text-gray-500">Authorized</span>
-          <div className="text-lg font-semibold text-gray-900">$0.00</div>
         </div>
         <div>
           <span className="text-gray-500">Unpaid</span>
@@ -772,6 +785,11 @@ export function PackagesTable({
         activityType: activity.activityType,
         dayNumber: activity.dayNumber,
         totalPriceCents: activity.totalPriceCents,
+        supplierName: activity.supplierName ?? null,
+        isBooked: activity.isBooked ?? false,
+        confirmationNumber: activity.confirmationNumber ?? null,
+        paymentStatus: activity.paymentStatus ?? null,
+        currency: activity.currency ?? null,
         children,
       })
     }
@@ -1140,13 +1158,21 @@ export function PackagesTable({
                           <td className="px-4 py-3 text-sm text-gray-900">
                             {formatCurrency(row.totalPriceCents ?? 0, currency)}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-500">–</td>
-                          <td className="px-4 py-3 text-sm text-gray-500">–</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{row.supplierName || '–'}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{row.confirmationNumber || '–'}</td>
                           <td className="px-4 py-3">
-                            <Badge variant="outline">Unpaid</Badge>
+                            {row.paymentStatus ? (
+                              <Badge variant={getPaymentStatusVariant(row.paymentStatus) as any}>
+                                {getPaymentStatusLabel(row.paymentStatus)}
+                              </Badge>
+                            ) : (
+                              <span className="text-sm text-gray-400">–</span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
-                            <Badge variant="outline">Not Booked</Badge>
+                            <Badge variant={row.isBooked ? 'default' : 'outline'}>
+                              {row.isBooked ? 'Booked' : 'Not Booked'}
+                            </Badge>
                           </td>
                           <td className="px-4 py-3"></td>
                         </tr>
@@ -1196,13 +1222,21 @@ export function PackagesTable({
                               <td className="px-4 py-2 text-xs text-gray-500">
                                 {formatCurrency(child.totalPriceCents ?? 0, currency)}
                               </td>
-                              <td className="px-4 py-2 text-xs text-gray-500">–</td>
-                              <td className="px-4 py-2 text-xs text-gray-500">–</td>
+                              <td className="px-4 py-2 text-xs text-gray-500">{child.supplierName || '–'}</td>
+                              <td className="px-4 py-2 text-xs text-gray-500">{child.confirmationNumber || '–'}</td>
                               <td className="px-4 py-2">
-                                <Badge variant="outline" className="text-xs">Unpaid</Badge>
+                                {child.paymentStatus ? (
+                                  <Badge variant={getPaymentStatusVariant(child.paymentStatus) as any} className="text-xs">
+                                    {getPaymentStatusLabel(child.paymentStatus)}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-gray-400">–</span>
+                                )}
                               </td>
                               <td className="px-4 py-2">
-                                <Badge variant="outline" className="text-xs">Not Booked</Badge>
+                                <Badge variant={child.isBooked ? 'default' : 'outline'} className="text-xs">
+                                  {child.isBooked ? 'Booked' : 'Not Booked'}
+                                </Badge>
                               </td>
                               <td className="px-4 py-2"></td>
                             </tr>

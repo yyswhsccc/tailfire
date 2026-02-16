@@ -319,6 +319,7 @@ export type PackageListResponseDto = {
 export type TripPackageTotalsDto = {
   totalPackages: number
   grandTotalCents: number
+  bookedTotalCents: number
   totalCollectedCents: number
   outstandingCents: number
   expectedCommissionCents: number
@@ -340,6 +341,12 @@ export type UnlinkedActivityDto = {
   sequenceOrder: number
   totalPriceCents: number | null
   parentActivityId: string | null
+  supplierName: string | null
+  isBooked: boolean
+  confirmationNumber: string | null
+  paymentStatus: string | null // 'paid' | 'deposit_paid' | 'unpaid' | null (no schedule)
+  paidCents: number | null
+  currency: string | null
 }
 
 /**

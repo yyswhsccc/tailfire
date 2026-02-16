@@ -381,7 +381,14 @@ export function useCreatePaymentTransaction(activityPricingId: string, tripId?: 
         queryClient.invalidateQueries({
           queryKey: paymentScheduleKeys.tripTransactions(tripId),
         })
+        // Refresh Bookings tab (payment status computed from transactions)
+        queryClient.invalidateQueries({ queryKey: ['bookings', 'list'] })
+        queryClient.invalidateQueries({ queryKey: ['bookings', 'tripTotals', tripId] })
+        queryClient.invalidateQueries({ queryKey: ['bookings', 'unlinkedActivities', tripId] })
       }
+      // Refresh Trip Overview (activities may show updated payment status)
+      queryClient.invalidateQueries({ queryKey: ['activities'] })
+      queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
 
       toast({
         title: 'Payment recorded',
