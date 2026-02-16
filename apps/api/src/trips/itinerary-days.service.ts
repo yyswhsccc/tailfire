@@ -351,51 +351,68 @@ export class ItineraryDaysService {
 
     const agencyId = itinerary.agencyId
 
-    // Get max day number and sequence order for new days
-    const existingDays = await db
-      .select({
-        dayNumber: this.db.schema.itineraryDays.dayNumber,
-        sequenceOrder: this.db.schema.itineraryDays.sequenceOrder,
-      })
-      .from(this.db.schema.itineraryDays)
-      .where(eq(this.db.schema.itineraryDays.itineraryId, itineraryId))
-
-    const maxDayNumber = existingDays.length > 0
-      ? Math.max(...existingDays.map(d => d.dayNumber))
-      : 0
-    const maxSequenceOrder = existingDays.length > 0
-      ? Math.max(...existingDays.map(d => d.sequenceOrder))
-      : -1
-
-    // Prepare bulk insert values
     // Sort dates to ensure sequential day numbering
     const sortedDates = [...dates].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
 
-    const valuesToInsert = sortedDates.map((dateStr, idx) => {
-      const dateObj = new Date(dateStr)
-      const formattedDate = dateObj.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
+    // Check which dates already have itinerary days
+    const existingDaysForDates = await db
+      .select()
+      .from(this.db.schema.itineraryDays)
+      .where(
+        and(
+          eq(this.db.schema.itineraryDays.itineraryId, itineraryId),
+          inArray(this.db.schema.itineraryDays.date, sortedDates)
+        )
+      )
+
+    const existingDateSet = new Set(existingDaysForDates.map(d => d.date))
+
+    // Filter to only dates that don't already have days
+    const missingDates = sortedDates.filter(d => !existingDateSet.has(d))
+
+    let createdCount = 0
+    if (missingDates.length > 0) {
+      // Get max day number and sequence order for new days
+      const allExistingDays = await db
+        .select({
+          dayNumber: this.db.schema.itineraryDays.dayNumber,
+          sequenceOrder: this.db.schema.itineraryDays.sequenceOrder,
+        })
+        .from(this.db.schema.itineraryDays)
+        .where(eq(this.db.schema.itineraryDays.itineraryId, itineraryId))
+
+      const maxDayNumber = allExistingDays.length > 0
+        ? Math.max(...allExistingDays.map(d => d.dayNumber))
+        : 0
+      const maxSequenceOrder = allExistingDays.length > 0
+        ? Math.max(...allExistingDays.map(d => d.sequenceOrder))
+        : -1
+
+      const valuesToInsert = missingDates.map((dateStr, idx) => {
+        const dateObj = new Date(dateStr)
+        const formattedDate = dateObj.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })
+        const dayNum = maxDayNumber + idx + 1
+
+        return {
+          agencyId,
+          itineraryId,
+          dayNumber: dayNum,
+          date: dateStr,
+          title: `Day ${dayNum} - ${formattedDate}`,
+          sequenceOrder: maxSequenceOrder + idx + 1,
+        }
       })
-      const dayNum = maxDayNumber + idx + 1
 
-      return {
-        agencyId,
-        itineraryId,
-        dayNumber: dayNum,
-        date: dateStr,
-        title: `Day ${dayNum} - ${formattedDate}`,
-        sequenceOrder: maxSequenceOrder + idx + 1,
-      }
-    })
+      await db
+        .insert(this.db.schema.itineraryDays)
+        .values(valuesToInsert)
 
-    // Bulk INSERT with ON CONFLICT DO NOTHING
-    // Uses the partial unique index on (itinerary_id, date) WHERE date IS NOT NULL
-    await db
-      .insert(this.db.schema.itineraryDays)
-      .values(valuesToInsert)
-      .onConflictDoNothing()
+      createdCount = valuesToInsert.length
+    }
 
     // SELECT all days for the requested dates (includes pre-existing + just-created)
     const allDays = await db
@@ -410,14 +427,14 @@ export class ItineraryDaysService {
       .orderBy(asc(this.db.schema.itineraryDays.date))
 
     const duration = Date.now() - start
-    // Use debug level for performance metrics to avoid noise in production logs
     this.logger.debug({
       message: 'Bulk day upsert completed',
       event: 'bulk_day_upsert_ms',
       duration,
       dayCount: dates.length,
       itineraryId,
-      createdCount: valuesToInsert.length,
+      createdCount,
+      existingCount: existingDaysForDates.length,
       returnedCount: allDays.length,
     })
 
