@@ -801,7 +801,8 @@ export class ItineraryDaysService {
         itinerary.agencyId,
         dto.count!,
         existingDays,
-        tripStartDate
+        itinerary,
+        trip
       )
     }
 
@@ -933,7 +934,8 @@ export class ItineraryDaysService {
     agencyId: string,
     count: number,
     existingDays: ItineraryDayResponseDto[],
-    tripStartDate: string | null | undefined
+    itinerary: { id: string; startDate: string | null; tripId: string },
+    trip: { id: string; startDate: string | null } | undefined
   ): Promise<ItineraryDayResponseDto[]> {
     // Find first dated day (sorted by date ascending)
     const datedDays = existingDays
@@ -952,27 +954,22 @@ export class ItineraryDaysService {
       sequenceOrder: number
     }> = []
 
+    let earliestNewDate: string | null = null
+
     for (let i = 0; i < count; i++) {
       const dayNum = i + 1
       let dateStr: string | null = null
 
-      // If existing days have dates, calculate dates going backwards
+      // If existing days have dates, calculate dates going backwards (use UTC to avoid timezone bugs)
       if (firstDate) {
         const newDate = new Date(firstDate)
         // For count=3: i=0 gets firstDate-3, i=1 gets firstDate-2, i=2 gets firstDate-1
-        newDate.setDate(firstDate.getDate() - (count - i))
+        newDate.setUTCDate(firstDate.getUTCDate() - (count - i))
         dateStr = newDate.toISOString().split('T')[0]!
 
-        // Validate: new date must not be before trip start date
-        if (tripStartDate) {
-          const tripStart = new Date(tripStartDate)
-          if (newDate < tripStart) {
-            const tripStartStr = tripStart.toISOString().split('T')[0]
-            throw new BadRequestException(
-              `Cannot add ${count} days before trip start date (${tripStartStr}). ` +
-              `The earliest date would be ${dateStr}.`
-            )
-          }
+        // Track earliest new date for updating trip/itinerary start dates
+        if (i === 0) {
+          earliestNewDate = dateStr
         }
       }
 
@@ -986,18 +983,25 @@ export class ItineraryDaysService {
       })
     }
 
-    // Use transaction: shift existing days FIRST, then insert new days
+    // Use transaction: shift existing days, insert new days, update trip/itinerary dates
     const created = await this.db.client.transaction(async (tx) => {
-      // Step 1: Shift all existing days' dayNumber and sequenceOrder by count
+      // Step 1: Shift existing days' dayNumber, sequenceOrder, and title by count
+      // Exclude Day 0 (Pre-Travel) — it stays as Day 0 with its original title
       if (existingDays.length > 0) {
         await tx
           .update(this.db.schema.itineraryDays)
           .set({
             dayNumber: sql`${this.db.schema.itineraryDays.dayNumber} + ${count}`,
             sequenceOrder: sql`${this.db.schema.itineraryDays.sequenceOrder} + ${count}`,
+            title: sql`'Day ' || (${this.db.schema.itineraryDays.dayNumber} + ${count})`,
             updatedAt: new Date(),
           })
-          .where(eq(this.db.schema.itineraryDays.itineraryId, itineraryId))
+          .where(
+            and(
+              eq(this.db.schema.itineraryDays.itineraryId, itineraryId),
+              ne(this.db.schema.itineraryDays.dayNumber, 0)
+            )
+          )
       }
 
       // Step 2: Insert new days at the start
@@ -1005,6 +1009,27 @@ export class ItineraryDaysService {
         .insert(this.db.schema.itineraryDays)
         .values(daysToCreate)
         .returning()
+
+      // Step 3: Update trip and itinerary start dates if new days extend before current start
+      if (earliestNewDate) {
+        const tripStartDate = itinerary.startDate || trip?.startDate
+        if (tripStartDate && earliestNewDate < tripStartDate) {
+          // Update trip start date
+          if (trip) {
+            await tx
+              .update(this.db.schema.trips)
+              .set({ startDate: earliestNewDate, updatedAt: new Date() })
+              .where(eq(this.db.schema.trips.id, trip.id))
+          }
+          // Update itinerary start date if it has one
+          if (itinerary.startDate) {
+            await tx
+              .update(this.db.schema.itineraries)
+              .set({ startDate: earliestNewDate, updatedAt: new Date() })
+              .where(eq(this.db.schema.itineraries.id, itinerary.id))
+          }
+        }
+      }
 
       return inserted
     })
