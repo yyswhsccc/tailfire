@@ -85,5 +85,11 @@ export * from './tasks.types.js'
 // Calendar System
 export * from './calendar.types.js'
 
+// Notes System
+export * from './notes.types.js'
+
+// Calendar Events (standalone meetings, calls, follow-ups)
+export * from './calendar-events.types.js'
+
 // Future exports:
 // export * from './auth.types'

@@ -23,7 +23,7 @@ export interface ActivityLog {
   actorType: 'user' | 'system' | 'api'
   description: string
   metadata: Record<string, any>
-  tripId: string
+  tripId: string | null
   createdAt: string
 }
 

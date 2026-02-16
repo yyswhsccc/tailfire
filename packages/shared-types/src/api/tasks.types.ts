@@ -17,6 +17,8 @@ export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
 
 export type TaskType = 'manual' | 'automatic' | 'reminder' | 'milestone'
 
+export type TaskAssigneeType = 'user' | 'contact' | 'admin_pool'
+
 // ============================================================================
 // RECURRING CONFIG
 // ============================================================================
@@ -66,6 +68,7 @@ export interface CreateTaskDto {
   activityId?: string
 
   // Assignment
+  assigneeType?: TaskAssigneeType
   assigneeUserId?: string
   assigneeContactId?: string
   assigneeName?: string
@@ -104,6 +107,7 @@ export interface TaskFilterDto extends BaseFilterDto {
   status?: TaskStatus | TaskStatus[]
   priority?: TaskPriority | TaskPriority[]
   taskType?: TaskType | TaskType[]
+  assigneeType?: TaskAssigneeType | TaskAssigneeType[]
   assigneeUserId?: string
   tripId?: string
   contactId?: string
@@ -190,6 +194,7 @@ export interface TaskResponseDto {
   }
 
   // Assignment
+  assigneeType: TaskAssigneeType
   assignee?: TaskAssigneeDto
   assigneeUserId?: string
   assigneeContactId?: string

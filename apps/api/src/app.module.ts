@@ -38,6 +38,8 @@ import { AutomationModule } from './automation/automation.module'
 import { NotificationModule } from './notifications/notification.module'
 import { TasksModule } from './tasks/tasks.module'
 import { CalendarModule } from './calendar/calendar.module'
+import { NotesModule } from './notes/notes.module'
+import { CalendarEventsModule } from './calendar-events/calendar-events.module'
 
 @Module({
   imports: [
@@ -49,7 +51,7 @@ import { CalendarModule } from './calendar/calendar.module'
     }),
 
     // Event-driven architecture
-    EventEmitterModule.forRoot(),
+    EventEmitterModule.forRoot({ wildcard: true }),
 
     // Database
     DatabaseModule,
@@ -136,6 +138,12 @@ import { CalendarModule } from './calendar/calendar.module'
 
     // Calendar event aggregation
     CalendarModule,
+
+    // Notes system (internal agent notes on contacts/trips)
+    NotesModule,
+
+    // Calendar events (standalone meetings, calls, follow-ups)
+    CalendarEventsModule,
   ],
   controllers: [AppController],
   providers: [
