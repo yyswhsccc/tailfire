@@ -1729,7 +1729,7 @@ export class ActivitiesService {
    * @param packageId - The package activity ID
    * @param activityIds - Array of activity IDs to link
    */
-  async linkChildrenToPackage(packageId: string, activityIds: string[]): Promise<void> {
+  async linkChildrenToPackage(packageId: string, activityIds: string[], actorId?: string | null): Promise<void> {
     if (activityIds.length === 0) return
 
     // Verify package exists and is of type 'package'
@@ -1781,6 +1781,24 @@ export class ActivitiesService {
       .update(this.db.schema.itineraryActivities)
       .set({ parentActivityId: packageId, updatedAt: new Date() })
       .where(inArray(this.db.schema.itineraryActivities.id, activityIds))
+
+    // Emit audit event
+    const tripId = pkg.tripId ?? (pkg.itineraryDayId ? await this.getTripIdFromDayId(pkg.itineraryDayId) : null)
+    if (tripId) {
+      const linkedNames = activities.map(a => a.name).join(', ')
+      this.eventEmitter.emit(
+        'audit.updated',
+        new AuditEvent(
+          'activity',
+          packageId,
+          'updated',
+          tripId,
+          actorId ?? null,
+          `Linked ${activityIds.length} activit${activityIds.length === 1 ? 'y' : 'ies'} to ${pkg.name}`,
+          { childrenLinked: activityIds, linkedNames, count: activityIds.length, subType: 'package' }
+        )
+      )
+    }
   }
 
   /**
@@ -1790,8 +1808,14 @@ export class ActivitiesService {
    * @param packageId - The package activity ID
    * @param activityIds - Array of activity IDs to unlink
    */
-  async unlinkChildrenFromPackage(packageId: string, activityIds: string[]): Promise<void> {
+  async unlinkChildrenFromPackage(packageId: string, activityIds: string[], actorId?: string | null): Promise<void> {
     if (activityIds.length === 0) return
+
+    // Fetch activity names for audit log before unlinking
+    const activities = await this.db.client
+      .select({ id: this.db.schema.itineraryActivities.id, name: this.db.schema.itineraryActivities.name })
+      .from(this.db.schema.itineraryActivities)
+      .where(inArray(this.db.schema.itineraryActivities.id, activityIds))
 
     await this.db.client
       .update(this.db.schema.itineraryActivities)
@@ -1802,6 +1826,27 @@ export class ActivitiesService {
           eq(this.db.schema.itineraryActivities.parentActivityId, packageId)
         )
       )
+
+    // Emit audit event
+    const pkg = await this.findOneInternal(packageId)
+    if (pkg) {
+      const tripId = pkg.tripId ?? (pkg.itineraryDayId ? await this.getTripIdFromDayId(pkg.itineraryDayId) : null)
+      if (tripId) {
+        const unlinkedNames = activities.map(a => a.name).join(', ')
+        this.eventEmitter.emit(
+          'audit.updated',
+          new AuditEvent(
+            'activity',
+            packageId,
+            'updated',
+            tripId,
+            actorId ?? null,
+            `Unlinked ${activityIds.length} activit${activityIds.length === 1 ? 'y' : 'ies'} from ${pkg.name}`,
+            { childrenUnlinked: activityIds, unlinkedNames, count: activityIds.length, subType: 'package' }
+          )
+        )
+      }
+    }
   }
 
   /**
@@ -1855,12 +1900,13 @@ export class ActivitiesService {
     // Get activity IDs for batch pricing query
     const activityIds = activities.map(a => a.activity.id)
 
-    // Fetch pricing for all activities in a single query
+    // Fetch pricing for all activities in a single query (include confirmationNumber)
     const pricingData = await this.db.client
       .select({
         activityId: this.db.schema.activityPricing.activityId,
         totalPriceCents: this.db.schema.activityPricing.totalPriceCents,
         currency: this.db.schema.activityPricing.currency,
+        confirmationNumber: this.db.schema.activityPricing.confirmationNumber,
       })
       .from(this.db.schema.activityPricing)
       .where(inArray(this.db.schema.activityPricing.activityId, activityIds))
@@ -1869,13 +1915,94 @@ export class ActivitiesService {
       pricingData.map(p => [p.activityId, p])
     )
 
-    // Return activities with pricing enriched
+    // Fetch payment data (computed from expected_payment_items)
+    const paymentData = await this.db.client
+      .select({
+        activityId: this.db.schema.activityPricing.activityId,
+        paidCents: sql<number>`COALESCE(SUM(${this.db.schema.expectedPaymentItems.paidAmountCents}), 0)::int`,
+        expectedCents: sql<number>`COALESCE(SUM(${this.db.schema.expectedPaymentItems.expectedAmountCents}), 0)::int`,
+      })
+      .from(this.db.schema.activityPricing)
+      .innerJoin(
+        this.db.schema.paymentScheduleConfig,
+        eq(this.db.schema.paymentScheduleConfig.activityPricingId, this.db.schema.activityPricing.id)
+      )
+      .innerJoin(
+        this.db.schema.expectedPaymentItems,
+        eq(this.db.schema.expectedPaymentItems.paymentScheduleConfigId, this.db.schema.paymentScheduleConfig.id)
+      )
+      .where(inArray(this.db.schema.activityPricing.activityId, activityIds))
+      .groupBy(this.db.schema.activityPricing.activityId)
+
+    const paymentDataMap = new Map(
+      paymentData.map(p => [p.activityId, p])
+    )
+
+    // Fetch primary supplier for all activities in a single query
+    const supplierData = await this.db.client
+      .select({
+        activityId: this.db.schema.activitySuppliers.activityId,
+        supplierName: this.db.schema.suppliers.name,
+      })
+      .from(this.db.schema.activitySuppliers)
+      .innerJoin(
+        this.db.schema.suppliers,
+        eq(this.db.schema.activitySuppliers.supplierId, this.db.schema.suppliers.id)
+      )
+      .where(
+        and(
+          inArray(this.db.schema.activitySuppliers.activityId, activityIds),
+          eq(this.db.schema.activitySuppliers.primarySupplier, true)
+        )
+      )
+
+    const supplierMap = new Map(
+      supplierData.map(s => [s.activityId, s.supplierName])
+    )
+
+    // Fetch cruise line name for cruise activities (stored in custom_cruise_details, not activity_suppliers)
+    const cruiseLineData = await this.db.client
+      .select({
+        activityId: this.db.schema.customCruiseDetails.activityId,
+        cruiseLineName: this.db.schema.customCruiseDetails.cruiseLineName,
+      })
+      .from(this.db.schema.customCruiseDetails)
+      .where(inArray(this.db.schema.customCruiseDetails.activityId, activityIds))
+
+    const cruiseLineMap = new Map(
+      cruiseLineData.map(c => [c.activityId, c.cruiseLineName])
+    )
+
+    // Return activities with pricing, supplier, and payment data enriched
     return activities.map(r => {
       const baseResponse = this.formatActivityResponse(r.activity)
       const pricing = pricingMap.get(r.activity.id)
+      const payment = paymentDataMap.get(r.activity.id)
+      // Use activity_suppliers first, fall back to cruise_line_name for cruises
+      const supplierName = supplierMap.get(r.activity.id)
+        ?? cruiseLineMap.get(r.activity.id)
+        ?? null
+
+      // Compute payment status from transaction data
+      let paymentStatus: string | null = null
+      if (payment) {
+        if (payment.paidCents >= payment.expectedCents && payment.expectedCents > 0) {
+          paymentStatus = 'paid'
+        } else if (payment.paidCents > 0) {
+          paymentStatus = 'deposit_paid'
+        } else {
+          paymentStatus = 'unpaid'
+        }
+      }
 
       return {
         ...baseResponse,
+        supplierName,
+        confirmationNumber: pricing?.confirmationNumber ?? r.activity.confirmationNumber ?? null,
+        isBooked: r.activity.isBooked,
+        paymentStatus,
+        paidCents: payment?.paidCents ?? null,
+        currency: pricing?.currency ?? 'CAD',
         pricing: pricing ? {
           totalPriceCents: pricing.totalPriceCents ?? 0,
           currency: pricing.currency ?? 'CAD',
@@ -1989,6 +2116,30 @@ export class ActivitiesService {
       pricingData.map(p => [p.activityId, p])
     )
 
+    // Fetch payment data for all packages (computed from expected_payment_items)
+    const paymentData = packageIds.length > 0 ? await this.db.client
+      .select({
+        activityId: this.db.schema.activityPricing.activityId,
+        paidCents: sql<number>`COALESCE(SUM(${this.db.schema.expectedPaymentItems.paidAmountCents}), 0)::int`,
+        expectedCents: sql<number>`COALESCE(SUM(${this.db.schema.expectedPaymentItems.expectedAmountCents}), 0)::int`,
+      })
+      .from(this.db.schema.activityPricing)
+      .innerJoin(
+        this.db.schema.paymentScheduleConfig,
+        eq(this.db.schema.paymentScheduleConfig.activityPricingId, this.db.schema.activityPricing.id)
+      )
+      .innerJoin(
+        this.db.schema.expectedPaymentItems,
+        eq(this.db.schema.expectedPaymentItems.paymentScheduleConfigId, this.db.schema.paymentScheduleConfig.id)
+      )
+      .where(inArray(this.db.schema.activityPricing.activityId, packageIds))
+      .groupBy(this.db.schema.activityPricing.activityId)
+    : []
+
+    const paymentDataMap = new Map(
+      paymentData.map(p => [p.activityId, p])
+    )
+
     // Fetch itinerary IDs for each package based on linked activities' itineraries
     // This allows filtering packages by selected itinerary in the UI
     const itineraryIdsQuery = await this.db.client
@@ -2030,16 +2181,35 @@ export class ActivitiesService {
       const itineraryIds = Array.from(itineraryIdsMap.get(activity.id) ?? [])
       this.logger.debug(`[findPackagesByTrip] Package ${activity.name}: activityCount=${activityCount}, itineraryIds=${JSON.stringify(itineraryIds)}`)
 
+      // Compute payment status from actual transaction data
+      const payment = paymentDataMap.get(activity.id)
+      let computedPaymentStatus: string
+      if (payment) {
+        if (payment.paidCents >= payment.expectedCents && payment.expectedCents > 0) {
+          computedPaymentStatus = 'paid'
+        } else if (payment.paidCents > 0) {
+          computedPaymentStatus = 'deposit_paid'
+        } else {
+          computedPaymentStatus = 'unpaid'
+        }
+      } else {
+        // No payment schedule — fall back to packageDetails.paymentStatus
+        computedPaymentStatus = details?.paymentStatus ?? 'unpaid'
+      }
+
+      const totalPaidCents = payment?.paidCents ?? 0
+      const totalPriceCentsVal = pricing?.totalPriceCents ?? 0
+
       return {
         ...baseResponse,
         tripId,
         activityCount,
         itineraryIds, // For filtering packages by selected itinerary
         supplierName: details?.supplierName ?? null,
-        paymentStatus: details?.paymentStatus ?? 'unpaid',
-        totalPriceCents: pricing?.totalPriceCents ?? 0,
-        totalPaidCents: 0, // Not fetched for list view
-        totalUnpaidCents: 0, // Not fetched for list view
+        paymentStatus: computedPaymentStatus,
+        totalPriceCents: totalPriceCentsVal,
+        totalPaidCents,
+        totalUnpaidCents: Math.max(0, totalPriceCentsVal - totalPaidCents),
         packageDetails: details ? {
           supplierId: null,
           supplierName: details.supplierName,
@@ -2108,7 +2278,8 @@ export class ActivitiesService {
     const [activity] = await this.db.client
       .select({
         id: this.db.schema.itineraryActivities.id,
-        tripId: this.db.schema.itineraries.tripId,
+        directTripId: this.db.schema.itineraryActivities.tripId,
+        itineraryTripId: this.db.schema.itineraries.tripId,
       })
       .from(this.db.schema.itineraryActivities)
       .leftJoin(
@@ -2122,14 +2293,15 @@ export class ActivitiesService {
       .where(eq(this.db.schema.itineraryActivities.id, activityId))
       .limit(1)
 
-    if (!activity?.tripId) {
+    const tripId = activity?.directTripId ?? activity?.itineraryTripId
+    if (!tripId) {
       throw new NotFoundException(`Trip not found for activity ${activityId}`)
     }
 
     await this.db.client
       .insert(this.db.schema.packageDetails)
       .values({
-        tripId: activity.tripId,
+        tripId,
         activityId,
         supplierId: details?.supplierId || null,
         supplierName: details?.supplierName || null,
@@ -2218,6 +2390,7 @@ export class ActivitiesService {
     type TotalsRow = {
       total_packages: string
       grand_total_cents: string
+      booked_total_cents: string
       total_collected_cents: string
       expected_commission_cents: string
       pending_commission_cents: string
@@ -2230,16 +2403,10 @@ export class ActivitiesService {
         FROM itinerary_activities ia
         LEFT JOIN itinerary_days id ON ia.itinerary_day_id = id.id
         LEFT JOIN itineraries i ON id.itinerary_id = i.id
-        WHERE ia.activity_type = 'package'
+        WHERE ia.parent_activity_id IS NULL
           AND (
             i.trip_id = ${tripId}
-            OR (ia.itinerary_day_id IS NULL AND EXISTS (
-              SELECT 1 FROM itinerary_activities child
-              JOIN itinerary_days cid ON child.itinerary_day_id = cid.id
-              JOIN itineraries ci ON cid.itinerary_id = ci.id
-              WHERE child.parent_activity_id = ia.id
-                AND ci.trip_id = ${tripId}
-            ))
+            OR ia.trip_id = ${tripId}
           )
       ),
       package_totals AS (
@@ -2265,6 +2432,7 @@ export class ActivitiesService {
       SELECT
         COUNT(DISTINCT pt.id)::text as total_packages,
         COALESCE(SUM(pt.price_cents), 0)::text as grand_total_cents,
+        COALESCE(SUM(pt.price_cents) FILTER (WHERE pt.is_booked = true), 0)::text as booked_total_cents,
         COALESCE(SUM(p.paid_cents), 0)::text as total_collected_cents,
         COALESCE(SUM(pt.commission_cents) FILTER (WHERE pt.is_booked = true), 0)::text as expected_commission_cents,
         COALESCE(SUM(pt.commission_cents) FILTER (WHERE pt.is_booked = false), 0)::text as pending_commission_cents
@@ -2273,13 +2441,15 @@ export class ActivitiesService {
     `) as unknown as TotalsRow[]
 
     const grandTotal = Number(result?.grand_total_cents ?? 0)
+    const bookedTotal = Number(result?.booked_total_cents ?? 0)
     const totalCollected = Number(result?.total_collected_cents ?? 0)
 
     return {
       totalPackages: Number(result?.total_packages ?? 0),
       grandTotalCents: grandTotal,
+      bookedTotalCents: bookedTotal,
       totalCollectedCents: totalCollected,
-      outstandingCents: grandTotal - totalCollected,
+      outstandingCents: bookedTotal - totalCollected,
       expectedCommissionCents: Number(result?.expected_commission_cents ?? 0),
       pendingCommissionCents: Number(result?.pending_commission_cents ?? 0),
     }

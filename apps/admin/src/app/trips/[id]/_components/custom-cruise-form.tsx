@@ -367,6 +367,11 @@ export function CustomCruiseForm({
         { keepDirty: false }
       )
 
+      // Force pricingData memo to recompute with hydrated values.
+      // The watch subscription (set up in a later effect) hasn't been created yet
+      // when this hydration runs, so reset() alone won't trigger changeCounter.
+      setChangeCounter((c) => c + 1)
+
       // Initialize ship filtering based on loaded cruise line
       if (cruiseData.customCruiseDetails?.cruiseLineId) {
         setSelectedCruiseLineId(cruiseData.customCruiseDetails.cruiseLineId)

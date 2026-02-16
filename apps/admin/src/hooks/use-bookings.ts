@@ -332,10 +332,17 @@ export function useMarkAsBooked() {
         bookingDate: data.bookingDate,
       }),
 
-    onSuccess: (_result, { bookingId }) => {
-      // Invalidate booking detail and lists
+    onSuccess: (result, { bookingId }) => {
+      // Invalidate booking detail, lists, and totals
       queryClient.invalidateQueries({ queryKey: bookingKeys.detail(bookingId) })
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists() })
+      if (result.tripId) {
+        queryClient.invalidateQueries({ queryKey: bookingKeys.tripTotals(result.tripId) })
+        queryClient.invalidateQueries({ queryKey: bookingKeys.unlinkedActivities(result.tripId) })
+      }
+      // Refresh Trip Overview (itinerary activities show isBooked/status)
+      queryClient.invalidateQueries({ queryKey: ['activities'] })
+      queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
     },
   })
 }
