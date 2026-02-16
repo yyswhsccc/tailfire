@@ -46,10 +46,14 @@ function CruiseLibraryContent() {
     shipId: searchParams.get('shipId') ?? undefined,
     regionId: searchParams.get('regionId') ?? undefined,
     embarkPortId: searchParams.get('embarkPortId') ?? undefined,
+    disembarkPortId: searchParams.get('disembarkPortId') ?? undefined,
+    portOfCallIds: searchParams.getAll('portOfCallIds').length > 0 ? searchParams.getAll('portOfCallIds') : undefined,
     sailDateFrom: searchParams.get('sailDateFrom') ?? undefined,
     sailDateTo: searchParams.get('sailDateTo') ?? undefined,
     nightsMin: searchParams.get('nightsMin') ? parseInt(searchParams.get('nightsMin')!, 10) : undefined,
     nightsMax: searchParams.get('nightsMax') ? parseInt(searchParams.get('nightsMax')!, 10) : undefined,
+    priceMinCents: searchParams.get('priceMinCents') ? parseInt(searchParams.get('priceMinCents')!, 10) : undefined,
+    priceMaxCents: searchParams.get('priceMaxCents') ? parseInt(searchParams.get('priceMaxCents')!, 10) : undefined,
     cabinCategory: (searchParams.get('cabinCategory') as CabinCategory) ?? undefined,
     sortBy: (searchParams.get('sortBy') as SortField) ?? 'sailDate',
     sortDir: (searchParams.get('sortDir') as 'asc' | 'desc') ?? 'asc',
@@ -73,9 +77,16 @@ function CruiseLibraryContent() {
   } = useInfiniteCruiseSailings(filters)
   // Pass current filters to get dynamic filter options
   // (e.g., when cruise line is selected, only show ships from that line)
+  // NOTE: Do NOT pass shipId/embarkPortId/disembarkPortId here — that would
+  // self-filter the option lists, showing only the current selection and
+  // preventing users from switching without clearing first.
   const { data: filterOptions, isLoading: filtersLoading } = useCruiseFilters({
     cruiseLineId: filters.cruiseLineId,
     regionId: filters.regionId,
+    sailDateFrom: filters.sailDateFrom,
+    sailDateTo: filters.sailDateTo,
+    nightsMin: filters.nightsMin,
+    nightsMax: filters.nightsMax,
   })
 
   // Stop the navigation loading overlay once page has mounted
@@ -83,6 +94,40 @@ function CruiseLibraryContent() {
   useEffect(() => {
     stopLoading('cruise-library')
   }, [stopLoading])
+
+  // Track previous cruiseLineId to gate orphan clearing
+  const prevCruiseLineIdRef = useRef(filters.cruiseLineId)
+
+  // Auto-clear orphaned child filters ONLY when cruiseLineId changes
+  // (not on date/nights changes which would erase the primary "ship + date" workflow)
+  useEffect(() => {
+    if (filtersLoading || !filterOptions) return
+
+    // Only run when cruise line actually changed
+    if (prevCruiseLineIdRef.current === filters.cruiseLineId) return
+    prevCruiseLineIdRef.current = filters.cruiseLineId
+
+    const updates: Partial<SailingSearchFilters> = {}
+
+    // Clear shipId if not in current options after cruise line change
+    if (filters.shipId && !filterOptions.ships.some(s => s.id === filters.shipId)) {
+      updates.shipId = undefined
+    }
+
+    // Clear embarkPortId if not in current options
+    if (filters.embarkPortId && !filterOptions.embarkPorts.some(p => p.id === filters.embarkPortId)) {
+      updates.embarkPortId = undefined
+    }
+
+    // Clear disembarkPortId if not in current options
+    if (filters.disembarkPortId && !filterOptions.disembarkPorts.some(p => p.id === filters.disembarkPortId)) {
+      updates.disembarkPortId = undefined
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setFilters(prev => ({ ...prev, ...updates }))
+    }
+  }, [filterOptions, filtersLoading, filters.cruiseLineId, filters.shipId, filters.embarkPortId, filters.disembarkPortId])
 
   // Auto-apply itinerary date filters when navigating from trip itinerary
   // Only apply once on initial load, not on subsequent renders
@@ -151,10 +196,16 @@ function CruiseLibraryContent() {
     if (filters.shipId) params.set('shipId', filters.shipId)
     if (filters.regionId) params.set('regionId', filters.regionId)
     if (filters.embarkPortId) params.set('embarkPortId', filters.embarkPortId)
+    if (filters.disembarkPortId) params.set('disembarkPortId', filters.disembarkPortId)
+    if (filters.portOfCallIds && filters.portOfCallIds.length > 0) {
+      filters.portOfCallIds.forEach(id => params.append('portOfCallIds', id))
+    }
     if (filters.sailDateFrom) params.set('sailDateFrom', filters.sailDateFrom)
     if (filters.sailDateTo) params.set('sailDateTo', filters.sailDateTo)
     if (filters.nightsMin !== undefined) params.set('nightsMin', String(filters.nightsMin))
     if (filters.nightsMax !== undefined) params.set('nightsMax', String(filters.nightsMax))
+    if (filters.priceMinCents !== undefined) params.set('priceMinCents', String(filters.priceMinCents))
+    if (filters.priceMaxCents !== undefined) params.set('priceMaxCents', String(filters.priceMaxCents))
     if (filters.cabinCategory) params.set('cabinCategory', filters.cabinCategory)
     if (filters.sortBy && filters.sortBy !== 'sailDate') params.set('sortBy', filters.sortBy)
     if (filters.sortDir && filters.sortDir !== 'asc') params.set('sortDir', filters.sortDir)
