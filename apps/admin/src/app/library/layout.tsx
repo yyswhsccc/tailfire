@@ -1,8 +1,8 @@
 'use client'
 
 import { Ship, CalendarClock, Map, Package, MapPin, Building2, Mail } from 'lucide-react'
-import { TernDetailLayout } from '@/components/tern/layout/tern-detail-layout'
-import type { SidebarSection } from '@/components/tern/layout/tern-detail-sidebar'
+import { DetailLayout } from '@/components/layout/detail-layout'
+import type { SidebarSection } from '@/components/layout/detail-sidebar'
 
 const librarySections: SidebarSection[] = [
   {
@@ -63,12 +63,12 @@ interface LibraryLayoutProps {
 
 export default function LibraryLayout({ children }: LibraryLayoutProps) {
   return (
-    <TernDetailLayout
+    <DetailLayout
       backHref="/dashboard"
       backLabel="Dashboard"
       sidebarSections={librarySections}
     >
       {children}
-    </TernDetailLayout>
+    </DetailLayout>
   )
 }

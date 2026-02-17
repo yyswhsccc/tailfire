@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { StickyNote, Send, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { EmptyState } from '@/components/tern/shared/empty-state'
+import { EmptyState } from '@/components/shared/empty-state'
 import { NoteCard } from './NoteCard'
 import {
   useNotes,
@@ -141,7 +141,7 @@ export function NotesSection({ tripId, contactId }: NotesSectionProps) {
           className="min-h-[80px] text-sm resize-none"
         />
         <div className="flex items-center justify-between">
-          <span className="text-xs text-tern-gray-400">
+          <span className="text-xs text-ash-400">
             Press {navigator?.platform?.includes('Mac') ? 'Cmd' : 'Ctrl'}+Enter to submit
           </span>
           <Button
@@ -162,11 +162,11 @@ export function NotesSection({ tripId, contactId }: NotesSectionProps) {
       {/* Notes list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-tern-gray-400" />
+          <Loader2 className="h-5 w-5 animate-spin text-ash-400" />
         </div>
       ) : notes.length === 0 ? (
         <EmptyState
-          icon={<StickyNote className="h-10 w-10 text-tern-gray-300" />}
+          icon={<StickyNote className="h-10 w-10 text-ash-300" />}
           title="No notes yet"
           description="Add a note above to get started."
         />
@@ -195,7 +195,7 @@ export function NotesSection({ tripId, contactId }: NotesSectionProps) {
               >
                 Previous
               </Button>
-              <span className="text-xs text-tern-gray-500">
+              <span className="text-xs text-ash-500">
                 Page {page} of {totalPages}
               </span>
               <Button

@@ -117,7 +117,7 @@ export function FinancialSummaryCard({ tripId, agencyId, summaryData }: Financia
             label="Outstanding"
             value={formatCents(grandTotal.outstandingCents, tripCurrency)}
             icon={hasOutstanding ? <AlertCircle className="h-4 w-4" /> : undefined}
-            className={hasOutstanding ? 'text-amber-600' : 'text-tern-gray-600'}
+            className={hasOutstanding ? 'text-amber-600' : 'text-ash-600'}
           />
           <StatCard
             label="Travellers"
@@ -127,15 +127,15 @@ export function FinancialSummaryCard({ tripId, agencyId, summaryData }: Financia
         </div>
 
         {/* Cost Breakdown */}
-        <div className="grid grid-cols-2 gap-4 p-4 bg-tern-gray-50 rounded-lg">
+        <div className="grid grid-cols-2 gap-4 p-4 bg-ash-50 rounded-lg">
           <div>
-            <p className="text-sm text-tern-gray-500">Activity Costs</p>
+            <p className="text-sm text-ash-500">Activity Costs</p>
             <p className="text-lg font-medium">
               {formatCents(activitiesSummary.totalInTripCurrencyCents, tripCurrency)}
             </p>
           </div>
           <div>
-            <p className="text-sm text-tern-gray-500">Service Fees</p>
+            <p className="text-sm text-ash-500">Service Fees</p>
             <p className="text-lg font-medium">
               {formatCents(serviceFeesSummary.totalInTripCurrencyCents, tripCurrency)}
             </p>
@@ -185,7 +185,7 @@ function StatCard({
 }) {
   return (
     <div className="space-y-1">
-      <p className="text-sm text-tern-gray-500">{label}</p>
+      <p className="text-sm text-ash-500">{label}</p>
       <p className={`text-xl font-semibold flex items-center gap-2 ${className}`}>
         {icon}
         {value}
@@ -203,13 +203,13 @@ function TravellerBreakdownRow({
   currency: string
 }) {
   return (
-    <div className="flex items-center justify-between p-3 bg-white border border-tern-gray-200 rounded-lg">
+    <div className="flex items-center justify-between p-3 bg-white border border-ash-200 rounded-lg">
       <div className="flex items-center gap-3">
-        <div className="h-8 w-8 rounded-full bg-tern-gray-100 flex items-center justify-center">
-          <Users className="h-4 w-4 text-tern-gray-600" />
+        <div className="h-8 w-8 rounded-full bg-ash-100 flex items-center justify-center">
+          <Users className="h-4 w-4 text-ash-600" />
         </div>
         <div>
-          <p className="font-medium text-tern-gray-900">
+          <p className="font-medium text-ash-900">
             {traveller.travellerName}
             {traveller.isPrimary && (
               <Badge variant="secondary" className="ml-2 text-xs">
@@ -217,7 +217,7 @@ function TravellerBreakdownRow({
               </Badge>
             )}
           </p>
-          <p className="text-sm text-tern-gray-500">
+          <p className="text-sm text-ash-500">
             Activities: {formatCents(traveller.activityCostsInTripCurrencyCents, currency)}
             {' | '}
             Fees: {formatCents(traveller.serviceFeesInTripCurrencyCents, currency)}
@@ -225,7 +225,7 @@ function TravellerBreakdownRow({
         </div>
       </div>
       <div className="text-right">
-        <p className="font-semibold text-tern-gray-900">
+        <p className="font-semibold text-ash-900">
           {formatCents(traveller.totalInTripCurrencyCents, currency)}
         </p>
       </div>
@@ -250,7 +250,7 @@ function FinancialSummaryCardSkeleton() {
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-4 p-4 bg-tern-gray-50 rounded-lg">
+        <div className="grid grid-cols-2 gap-4 p-4 bg-ash-50 rounded-lg">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-12 w-full" />
         </div>

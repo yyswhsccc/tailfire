@@ -125,8 +125,8 @@ const BRAND_STYLES: Record<string, { badge: string; text: string }> = {
 }
 
 const DEFAULT_STYLE = {
-  badge: 'bg-tern-teal-600 text-white hover:bg-tern-teal-600',
-  text: 'text-tern-teal-600',
+  badge: 'bg-phoenix-gold-600 text-white hover:bg-phoenix-gold-600',
+  text: 'text-phoenix-gold-600',
 }
 
 function getBrandStyle(operatorCode?: string) {
@@ -145,7 +145,7 @@ function InclusionsSection({ inclusions }: { inclusions: TourInclusion[] }) {
       {/* Highlights */}
       {highlights.length > 0 && (
         <div>
-          <h4 className="font-semibold text-sm text-tern-gray-900 mb-3 flex items-center gap-2">
+          <h4 className="font-semibold text-sm text-ash-900 mb-3 flex items-center gap-2">
             <Star className="h-4 w-4 text-amber-500" />
             Highlights
           </h4>
@@ -153,7 +153,7 @@ function InclusionsSection({ inclusions }: { inclusions: TourInclusion[] }) {
             {highlights.map((item, idx) => (
               <div key={idx} className="flex items-start gap-2 text-sm">
                 <Star className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                <span className="text-tern-gray-700">{item.description}</span>
+                <span className="text-ash-700">{item.description}</span>
               </div>
             ))}
           </div>
@@ -163,7 +163,7 @@ function InclusionsSection({ inclusions }: { inclusions: TourInclusion[] }) {
       {/* Included */}
       {included.length > 0 && (
         <div>
-          <h4 className="font-semibold text-sm text-tern-gray-900 mb-3 flex items-center gap-2">
+          <h4 className="font-semibold text-sm text-ash-900 mb-3 flex items-center gap-2">
             <Check className="h-4 w-4 text-green-600" />
             What's Included
           </h4>
@@ -173,9 +173,9 @@ function InclusionsSection({ inclusions }: { inclusions: TourInclusion[] }) {
                 <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                 <div>
                   {item.category && (
-                    <span className="font-medium text-tern-gray-900">{item.category}: </span>
+                    <span className="font-medium text-ash-900">{item.category}: </span>
                   )}
-                  <span className="text-tern-gray-700">{item.description}</span>
+                  <span className="text-ash-700">{item.description}</span>
                 </div>
               </div>
             ))}
@@ -186,7 +186,7 @@ function InclusionsSection({ inclusions }: { inclusions: TourInclusion[] }) {
       {/* Excluded */}
       {excluded.length > 0 && (
         <div>
-          <h4 className="font-semibold text-sm text-tern-gray-900 mb-3 flex items-center gap-2">
+          <h4 className="font-semibold text-sm text-ash-900 mb-3 flex items-center gap-2">
             <X className="h-4 w-4 text-red-500" />
             Not Included
           </h4>
@@ -194,7 +194,7 @@ function InclusionsSection({ inclusions }: { inclusions: TourInclusion[] }) {
             {excluded.map((item, idx) => (
               <div key={idx} className="flex items-start gap-2 text-sm">
                 <X className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
-                <span className="text-tern-gray-500">{item.description}</span>
+                <span className="text-ash-500">{item.description}</span>
               </div>
             ))}
           </div>
@@ -202,12 +202,12 @@ function InclusionsSection({ inclusions }: { inclusions: TourInclusion[] }) {
       )}
 
       {inclusions.length === 0 && (
-        <div className="text-center py-8 border border-dashed border-tern-gray-200 rounded-lg bg-tern-gray-50/50">
-          <Check className="mx-auto h-8 w-8 text-tern-gray-300" />
-          <p className="mt-2 text-sm font-medium text-tern-gray-500">
+        <div className="text-center py-8 border border-dashed border-ash-200 rounded-lg bg-ash-50/50">
+          <Check className="mx-auto h-8 w-8 text-ash-300" />
+          <p className="mt-2 text-sm font-medium text-ash-500">
             Inclusions not available
           </p>
-          <p className="mt-1 text-xs text-tern-gray-400 max-w-xs mx-auto">
+          <p className="mt-1 text-xs text-ash-400 max-w-xs mx-auto">
             What&apos;s included and excluded is available in the production catalog.
           </p>
         </div>
@@ -235,26 +235,26 @@ function DepartureRow({
       className={cn(
         'border rounded-lg p-4 space-y-3 cursor-pointer transition-colors',
         isSelected
-          ? 'border-tern-teal-500 bg-tern-teal-50'
-          : 'border-tern-gray-200 hover:border-tern-teal-300'
+          ? 'border-phoenix-gold-500 bg-phoenix-gold-50'
+          : 'border-ash-200 hover:border-phoenix-gold-300'
       )}
       onClick={onSelect}
     >
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           {/* Date */}
-          <div className="flex items-center gap-1.5 text-sm font-medium text-tern-gray-900">
-            <Calendar className="h-4 w-4 text-tern-teal-600" />
+          <div className="flex items-center gap-1.5 text-sm font-medium text-ash-900">
+            <Calendar className="h-4 w-4 text-phoenix-gold-600" />
             {startDate ? format(startDate, 'MMM d, yyyy') : departure.landStartDate}
             {endDate && (
-              <span className="text-tern-gray-400">
+              <span className="text-ash-400">
                 {' '}&mdash; {format(endDate, 'MMM d, yyyy')}
               </span>
             )}
           </div>
 
           {/* Code + Status */}
-          <div className="flex items-center gap-2 text-xs text-tern-gray-500">
+          <div className="flex items-center gap-2 text-xs text-ash-500">
             <Tag className="h-3 w-3" />
             <span>{departure.departureCode}</span>
             {departure.status && (
@@ -282,14 +282,14 @@ function DepartureRow({
         {/* Price + Selection */}
         <div className="text-right flex items-center gap-3">
           <div>
-            <p className="text-xs text-tern-gray-500">From</p>
-            <p className="text-lg font-bold text-tern-teal-600">
+            <p className="text-xs text-ash-500">From</p>
+            <p className="text-lg font-bold text-phoenix-gold-600">
               {lowestPrice > 0 ? formatPrice(lowestPrice) : 'TBD'}
             </p>
-            <p className="text-xs text-tern-gray-400">{departure.currency}</p>
+            <p className="text-xs text-ash-400">{departure.currency}</p>
           </div>
           {isSelected && (
-            <div className="h-6 w-6 rounded-full bg-tern-teal-500 flex items-center justify-center">
+            <div className="h-6 w-6 rounded-full bg-phoenix-gold-500 flex items-center justify-center">
               <Check className="h-4 w-4 text-white" />
             </div>
           )}
@@ -298,23 +298,23 @@ function DepartureRow({
 
       {/* Cities */}
       {(departure.startCity || departure.endCity) && (
-        <div className="flex items-center gap-2 text-xs text-tern-gray-500">
-          <Plane className="h-3 w-3 text-tern-teal-500" />
+        <div className="flex items-center gap-2 text-xs text-ash-500">
+          <Plane className="h-3 w-3 text-phoenix-gold-500" />
           {departure.startCity && (
-            <span className="font-medium text-tern-gray-700">
+            <span className="font-medium text-ash-700">
               {formatCityFromCode(departure.startCity)}
             </span>
           )}
           {departure.endCity && departure.endCity !== departure.startCity && (
             <>
-              <span className="text-tern-gray-400">&rarr;</span>
-              <span className="font-medium text-tern-gray-700">
+              <span className="text-ash-400">&rarr;</span>
+              <span className="font-medium text-ash-700">
                 {formatCityFromCode(departure.endCity)}
               </span>
             </>
           )}
           {/* Show codes in smaller text for reference */}
-          <span className="text-tern-gray-400 text-[10px]">
+          <span className="text-ash-400 text-[10px]">
             ({departure.startCity}
             {departure.endCity && departure.endCity !== departure.startCity && ` → ${departure.endCity}`})
           </span>
@@ -323,11 +323,11 @@ function DepartureRow({
 
       {/* Cabin Pricing */}
       {departure.cabinPricing.length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-2 border-t border-tern-gray-100">
+        <div className="flex flex-wrap gap-2 pt-2 border-t border-ash-100">
           {departure.cabinPricing.map((cabin, i) => (
-            <div key={i} className="bg-tern-gray-50 rounded px-2 py-1 text-xs">
-              <span className="text-tern-gray-500">{cabin.cabinCategory ?? 'Standard'}:</span>{' '}
-              <span className="font-medium text-tern-gray-900">
+            <div key={i} className="bg-ash-50 rounded px-2 py-1 text-xs">
+              <span className="text-ash-500">{cabin.cabinCategory ?? 'Standard'}:</span>{' '}
+              <span className="font-medium text-ash-900">
                 {formatPrice(cabin.priceCents)}
               </span>
               {cabin.discountCents && cabin.discountCents > 0 && (
@@ -512,8 +512,8 @@ export function TourDetailModal({
             </DialogHeader>
             <div className="flex flex-col items-center justify-center py-12 px-6">
               <AlertCircle className="h-12 w-12 text-red-400" />
-              <h3 className="mt-2 text-lg font-medium text-tern-gray-900">Error loading tour</h3>
-              <p className="mt-1 text-sm text-tern-gray-500">
+              <h3 className="mt-2 text-lg font-medium text-ash-900">Error loading tour</h3>
+              <p className="mt-1 text-sm text-ash-500">
                 Unable to load tour details. Please try again.
               </p>
               <Button variant="outline" onClick={onClose} className="mt-4">
@@ -529,10 +529,10 @@ export function TourDetailModal({
               </DialogDescription>
               <div className="flex items-start gap-4">
                 <div className="flex-1">
-                  <DialogTitle className="text-xl font-bold text-tern-gray-900">
+                  <DialogTitle className="text-xl font-bold text-ash-900">
                     {tour.name}
                   </DialogTitle>
-                  <div className="flex items-center gap-2 mt-1 text-sm text-tern-gray-500">
+                  <div className="flex items-center gap-2 mt-1 text-sm text-ash-500">
                     <span className="font-mono">{tour.providerIdentifier}</span>
                     {tour.operatorCode && (
                       <>
@@ -546,7 +546,7 @@ export function TourDetailModal({
                 </div>
                 <div className="flex items-center gap-2">
                   {tour.days && (
-                    <Badge variant="secondary" className="bg-tern-teal-100 text-tern-teal-700">
+                    <Badge variant="secondary" className="bg-phoenix-gold-100 text-phoenix-gold-700">
                       {tour.days} Days
                     </Badge>
                   )}
@@ -560,7 +560,7 @@ export function TourDetailModal({
             <div className="flex-1 h-0 overflow-y-auto">
               <div className="px-6 pb-6">
                 {/* Tour Image */}
-                <div className="relative h-36 bg-tern-gray-100 rounded-lg overflow-hidden mb-4">
+                <div className="relative h-36 bg-ash-100 rounded-lg overflow-hidden mb-4">
                   {imageUrl ? (
                     <>
                       <img
@@ -597,7 +597,7 @@ export function TourDetailModal({
                     </>
                   ) : (
                     <div className="flex items-center justify-center h-full">
-                      <MapPin className="h-16 w-16 text-tern-gray-300" />
+                      <MapPin className="h-16 w-16 text-ash-300" />
                     </div>
                   )}
                 </div>
@@ -605,8 +605,8 @@ export function TourDetailModal({
                 {/* Quick Info Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   {tour.days && (
-                    <div className="bg-tern-gray-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 text-tern-gray-500 text-xs mb-1">
+                    <div className="bg-ash-50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-ash-500 text-xs mb-1">
                         <Clock className="h-3.5 w-3.5" />
                         Duration
                       </div>
@@ -616,8 +616,8 @@ export function TourDetailModal({
                     </div>
                   )}
                   {tour.itinerary.length > 0 && (
-                    <div className="bg-tern-gray-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 text-tern-gray-500 text-xs mb-1">
+                    <div className="bg-ash-50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-ash-500 text-xs mb-1">
                         <MapPin className="h-3.5 w-3.5" />
                         From
                       </div>
@@ -627,8 +627,8 @@ export function TourDetailModal({
                     </div>
                   )}
                   {tour.hotels.length > 0 && (
-                    <div className="bg-tern-gray-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 text-tern-gray-500 text-xs mb-1">
+                    <div className="bg-ash-50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-ash-500 text-xs mb-1">
                         <Building2 className="h-3.5 w-3.5" />
                         Hotels
                       </div>
@@ -636,12 +636,12 @@ export function TourDetailModal({
                     </div>
                   )}
                   {tour.lowestPriceCents && (
-                    <div className="bg-tern-gray-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 text-tern-gray-500 text-xs mb-1">
+                    <div className="bg-ash-50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-ash-500 text-xs mb-1">
                         <Calendar className="h-3.5 w-3.5" />
                         From
                       </div>
-                      <p className="font-medium text-sm text-tern-teal-600">
+                      <p className="font-medium text-sm text-phoenix-gold-600">
                         {formatPrice(tour.lowestPriceCents)}
                       </p>
                     </div>
@@ -655,7 +655,7 @@ export function TourDetailModal({
                     <TabsTrigger value="itinerary">
                       Itinerary
                       {tour.itinerary.length > 0 && (
-                        <span className="ml-1 text-xs text-tern-gray-400">
+                        <span className="ml-1 text-xs text-ash-400">
                           ({tour.itinerary.length})
                         </span>
                       )}
@@ -664,7 +664,7 @@ export function TourDetailModal({
                     <TabsTrigger value="departures">
                       Departures
                       {allDepartures.length > 0 && (
-                        <span className="ml-1 text-xs text-tern-gray-400">
+                        <span className="ml-1 text-xs text-ash-400">
                           ({filteredDepartures.length}/{allDepartures.length})
                         </span>
                       )}
@@ -675,15 +675,15 @@ export function TourDetailModal({
                   <TabsContent value="overview" className="mt-4">
                     {tour.description ? (
                       <div className="prose prose-sm max-w-none">
-                        <p className="text-tern-gray-700 whitespace-pre-wrap">{tour.description}</p>
+                        <p className="text-ash-700 whitespace-pre-wrap">{tour.description}</p>
                       </div>
                     ) : (
-                      <div className="text-center py-8 border border-dashed border-tern-gray-200 rounded-lg bg-tern-gray-50/50">
-                        <MapPin className="mx-auto h-8 w-8 text-tern-gray-300" />
-                        <p className="mt-2 text-sm font-medium text-tern-gray-500">
+                      <div className="text-center py-8 border border-dashed border-ash-200 rounded-lg bg-ash-50/50">
+                        <MapPin className="mx-auto h-8 w-8 text-ash-300" />
+                        <p className="mt-2 text-sm font-medium text-ash-500">
                           Description not available
                         </p>
-                        <p className="mt-1 text-xs text-tern-gray-400 max-w-xs mx-auto">
+                        <p className="mt-1 text-xs text-ash-400 max-w-xs mx-auto">
                           Full tour details including description, itinerary, and inclusions are available in the production catalog.
                         </p>
                       </div>
@@ -694,7 +694,7 @@ export function TourDetailModal({
                       <>
                         <Separator className="my-4" />
                         <div>
-                          <h4 className="font-semibold text-sm text-tern-gray-900 mb-3 flex items-center gap-2">
+                          <h4 className="font-semibold text-sm text-ash-900 mb-3 flex items-center gap-2">
                             <Building2 className="h-4 w-4" />
                             Featured Hotels
                           </h4>
@@ -702,17 +702,17 @@ export function TourDetailModal({
                             {tour.hotels.slice(0, 4).map((hotel, idx) => (
                               <div
                                 key={idx}
-                                className="bg-tern-gray-50 rounded-lg p-3 text-sm"
+                                className="bg-ash-50 rounded-lg p-3 text-sm"
                               >
-                                <p className="font-medium text-tern-gray-900">{hotel.hotelName}</p>
+                                <p className="font-medium text-ash-900">{hotel.hotelName}</p>
                                 {hotel.city && (
-                                  <p className="text-xs text-tern-gray-500">{hotel.city}</p>
+                                  <p className="text-xs text-ash-500">{hotel.city}</p>
                                 )}
                               </div>
                             ))}
                           </div>
                           {tour.hotels.length > 4 && (
-                            <p className="text-xs text-tern-gray-400 mt-2">
+                            <p className="text-xs text-ash-400 mt-2">
                               +{tour.hotels.length - 4} more hotels
                             </p>
                           )}
@@ -726,36 +726,36 @@ export function TourDetailModal({
                     {tour.itinerary.length > 0 ? (
                       <div className="space-y-4">
                         {tour.itinerary.map((day) => (
-                          <div key={day.dayNumber} className="border-l-2 border-tern-teal-200 pl-4">
+                          <div key={day.dayNumber} className="border-l-2 border-phoenix-gold-200 pl-4">
                             <div className="flex items-center gap-2 mb-1">
                               <Badge variant="outline" className="text-xs">
                                 Day {day.dayNumber}
                               </Badge>
                               {day.overnightCity && (
-                                <span className="text-xs text-tern-gray-500 flex items-center gap-1">
+                                <span className="text-xs text-ash-500 flex items-center gap-1">
                                   <MapPin className="h-3 w-3" />
                                   {day.overnightCity}
                                 </span>
                               )}
                             </div>
                             {day.title && (
-                              <h5 className="font-medium text-sm text-tern-gray-900">
+                              <h5 className="font-medium text-sm text-ash-900">
                                 {day.title}
                               </h5>
                             )}
                             {day.description && (
-                              <p className="text-sm text-tern-gray-600 mt-1">{day.description}</p>
+                              <p className="text-sm text-ash-600 mt-1">{day.description}</p>
                             )}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-8 border border-dashed border-tern-gray-200 rounded-lg bg-tern-gray-50/50">
-                        <Calendar className="mx-auto h-8 w-8 text-tern-gray-300" />
-                        <p className="mt-2 text-sm font-medium text-tern-gray-500">
+                      <div className="text-center py-8 border border-dashed border-ash-200 rounded-lg bg-ash-50/50">
+                        <Calendar className="mx-auto h-8 w-8 text-ash-300" />
+                        <p className="mt-2 text-sm font-medium text-ash-500">
                           Day-by-day itinerary not available
                         </p>
-                        <p className="mt-1 text-xs text-tern-gray-400 max-w-xs mx-auto">
+                        <p className="mt-1 text-xs text-ash-400 max-w-xs mx-auto">
                           The detailed daily itinerary is available in the production catalog after data sync.
                         </p>
                       </div>
@@ -771,16 +771,16 @@ export function TourDetailModal({
                   <TabsContent value="departures" className="mt-4">
                     {departuresLoading ? (
                       <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-6 w-6 animate-spin text-tern-teal-500" />
-                        <span className="ml-2 text-sm text-tern-gray-500">
+                        <Loader2 className="h-6 w-6 animate-spin text-phoenix-gold-500" />
+                        <span className="ml-2 text-sm text-ash-500">
                           Loading departures...
                         </span>
                       </div>
                     ) : allDepartures.length > 0 ? (
                       <div className="space-y-3">
                         {/* Filters */}
-                        <div className="flex flex-col gap-3 p-3 bg-tern-gray-50 rounded-lg">
-                          <div className="flex items-center gap-2 text-sm font-medium text-tern-gray-700">
+                        <div className="flex flex-col gap-3 p-3 bg-ash-50 rounded-lg">
+                          <div className="flex items-center gap-2 text-sm font-medium text-ash-700">
                             <Filter className="h-4 w-4" />
                             <span>Filter Departures</span>
                           </div>
@@ -833,7 +833,7 @@ export function TourDetailModal({
                         </div>
 
                         {/* Results count */}
-                        <p className="text-sm text-tern-gray-500">
+                        <p className="text-sm text-ash-500">
                           Showing {filteredDepartures.length} of {allDepartures.length} departure{allDepartures.length !== 1 ? 's' : ''}.
                           {filteredDepartures.length > 0 && ' Select a departure to add to itinerary.'}
                         </p>
@@ -849,9 +849,9 @@ export function TourDetailModal({
                             />
                           ))
                         ) : (
-                          <div className="text-center py-8 border border-dashed border-tern-gray-200 rounded-lg">
-                            <Filter className="mx-auto h-8 w-8 text-tern-gray-300" />
-                            <p className="mt-2 text-sm text-tern-gray-500">
+                          <div className="text-center py-8 border border-dashed border-ash-200 rounded-lg">
+                            <Filter className="mx-auto h-8 w-8 text-ash-300" />
+                            <p className="mt-2 text-sm text-ash-500">
                               No departures match your filters.
                             </p>
                             <Button
@@ -874,8 +874,8 @@ export function TourDetailModal({
                       </div>
                     ) : (
                       <div className="text-center py-8">
-                        <Calendar className="mx-auto h-8 w-8 text-tern-gray-300" />
-                        <p className="mt-2 text-sm text-tern-gray-500">
+                        <Calendar className="mx-auto h-8 w-8 text-ash-300" />
+                        <p className="mt-2 text-sm text-ash-500">
                           No departures available for this tour.
                         </p>
                       </div>
@@ -885,12 +885,12 @@ export function TourDetailModal({
               </div>
             </div>
 
-            <DialogFooter className="flex-shrink-0 border-t border-tern-gray-200 p-6 pt-4">
+            <DialogFooter className="flex-shrink-0 border-t border-ash-200 p-6 pt-4">
               <div className="flex justify-between w-full items-center">
-                <div className="text-sm text-tern-gray-500">
+                <div className="text-sm text-ash-500">
                   {selectedDeparture ? (
                     <span className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-tern-teal-500" />
+                      <CheckCircle2 className="h-4 w-4 text-phoenix-gold-500" />
                       Selected: {selectedDeparture.departureCode}
                       {selectedDeparture.landStartDate && (
                         <span>
@@ -910,7 +910,7 @@ export function TourDetailModal({
                     <Button
                       onClick={handleAddToItinerary}
                       disabled={!selectedDeparture || addTourMutation.isPending}
-                      className="bg-tern-teal-600 hover:bg-tern-teal-700"
+                      className="bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
                     >
                       {addTourMutation.isPending ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -922,7 +922,7 @@ export function TourDetailModal({
                   ) : (
                     <Button
                       disabled={!selectedDeparture}
-                      className="bg-tern-teal-600 hover:bg-tern-teal-700"
+                      className="bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Add to Trip
@@ -950,7 +950,7 @@ export function TourDetailModal({
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirmExtend}
-            className="bg-tern-teal-600 hover:bg-tern-teal-700"
+            className="bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
           >
             Extend & Add Tour
           </AlertDialogAction>

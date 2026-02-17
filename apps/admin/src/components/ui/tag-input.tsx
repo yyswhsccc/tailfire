@@ -122,8 +122,8 @@ export function TagInput({
         <PopoverTrigger asChild>
           <div
             className={cn(
-              'flex min-h-[40px] w-full flex-wrap gap-2 rounded-md border border-tern-gray-200 bg-white px-3 py-2 text-sm',
-              'cursor-text focus-within:outline-none focus-within:ring-2 focus-within:ring-tern-blue-500 focus-within:ring-offset-2',
+              'flex min-h-[40px] w-full flex-wrap gap-2 rounded-md border border-ash-200 bg-white px-3 py-2 text-sm',
+              'cursor-text focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2',
               disabled && 'cursor-not-allowed opacity-50',
               className
             )}
@@ -147,7 +147,7 @@ export function TagInput({
                     handleRemoveTag(tag.id)
                   }}
                   disabled={disabled}
-                  className="rounded-sm opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-tern-blue-500"
+                  className="rounded-sm opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <X className="h-3 w-3" />
                   <span className="sr-only">Remove {tag.name}</span>
@@ -165,7 +165,7 @@ export function TagInput({
               onFocus={() => setOpen(true)}
               disabled={disabled}
               placeholder={selectedTagIds.length === 0 ? placeholder : ''}
-              className="flex-1 bg-transparent outline-none placeholder:text-tern-gray-400 disabled:cursor-not-allowed min-w-[120px]"
+              className="flex-1 bg-transparent outline-none placeholder:text-ash-400 disabled:cursor-not-allowed min-w-[120px]"
             />
           </div>
         </PopoverTrigger>
@@ -216,7 +216,7 @@ export function TagInput({
                         <CommandItem
                           value={`create-${inputValue}`}
                           onSelect={handleCreateTag}
-                          className="text-tern-blue-600"
+                          className="text-blue-600"
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Create &quot;{inputValue}&quot;

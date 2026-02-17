@@ -17,8 +17,8 @@ import {
   Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { TernCard } from '@/components/tern/core'
-import { EmptyState } from '@/components/tern/shared/empty-state'
+import { Card } from '@/components/ui/card'
+import { EmptyState } from '@/components/shared/empty-state'
 import {
   Dialog,
   DialogContent,
@@ -133,24 +133,24 @@ export function TripMediaTab({ trip }: TripMediaTabProps) {
   // Loading state
   if (isLoading) {
     return (
-      <TernCard>
+      <Card className="p-6">
         <div className="py-12 text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-tern-gray-400 mx-auto mb-4" />
-          <p className="text-tern-gray-500">Loading media...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-ash-400 mx-auto mb-4" />
+          <p className="text-ash-500">Loading media...</p>
         </div>
-      </TernCard>
+      </Card>
     )
   }
 
   return (
     <div className="space-y-6">
       {/* Cover Photo Section */}
-      <TernCard>
+      <Card className="p-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-tern-gray-900">Cover Photo</h2>
-              <p className="text-sm text-tern-gray-600">
+              <h2 className="text-lg font-semibold text-ash-900">Cover Photo</h2>
+              <p className="text-sm text-ash-600">
                 The main image displayed for this trip
               </p>
             </div>
@@ -169,7 +169,7 @@ export function TripMediaTab({ trip }: TripMediaTabProps) {
 
           {coverPhoto ? (
             <div className="relative group">
-              <div className="aspect-[3/1] max-h-48 overflow-hidden rounded-lg border border-tern-gray-200">
+              <div className="aspect-[3/1] max-h-48 overflow-hidden rounded-lg border border-ash-200">
                 <img
                   src={coverPhoto.fileUrl}
                   alt={coverPhoto.caption || 'Trip cover photo'}
@@ -179,13 +179,13 @@ export function TripMediaTab({ trip }: TripMediaTabProps) {
 
               {/* Attribution for Unsplash photos */}
               {coverPhoto.attribution?.source === 'unsplash' && (
-                <div className="mt-2 text-xs text-tern-gray-500">
+                <div className="mt-2 text-xs text-ash-500">
                   Photo by{' '}
                   <a
                     href={`${coverPhoto.attribution.photographerUrl}?utm_source=tailfire&utm_medium=referral`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="underline hover:text-tern-gray-700"
+                    className="underline hover:text-ash-700"
                   >
                     {coverPhoto.attribution.photographerName}
                   </a>
@@ -194,7 +194,7 @@ export function TripMediaTab({ trip }: TripMediaTabProps) {
                     href="https://unsplash.com/?utm_source=tailfire&utm_medium=referral"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="underline hover:text-tern-gray-700"
+                    className="underline hover:text-ash-700"
                   >
                     Unsplash
                   </a>
@@ -223,26 +223,26 @@ export function TripMediaTab({ trip }: TripMediaTabProps) {
               </div>
             </div>
           ) : (
-            <div className="aspect-[3/1] max-h-48 rounded-lg border-2 border-dashed border-tern-gray-300 flex items-center justify-center bg-tern-gray-50">
+            <div className="aspect-[3/1] max-h-48 rounded-lg border-2 border-dashed border-ash-300 flex items-center justify-center bg-ash-50">
               <div className="text-center">
-                <ImageIcon className="h-12 w-12 text-tern-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-tern-gray-500">No cover photo set</p>
-                <p className="text-xs text-tern-gray-400 mt-1">
+                <ImageIcon className="h-12 w-12 text-ash-300 mx-auto mb-2" />
+                <p className="text-sm text-ash-500">No cover photo set</p>
+                <p className="text-xs text-ash-400 mt-1">
                   Add a cover photo to make this trip stand out
                 </p>
               </div>
             </div>
           )}
         </div>
-      </TernCard>
+      </Card>
 
       {/* Gallery Section */}
-      <TernCard>
+      <Card className="p-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-tern-gray-900">Gallery</h2>
-              <p className="text-sm text-tern-gray-600">
+              <h2 className="text-lg font-semibold text-ash-900">Gallery</h2>
+              <p className="text-sm text-ash-600">
                 Additional photos for this trip
               </p>
             </div>
@@ -285,7 +285,7 @@ export function TripMediaTab({ trip }: TripMediaTabProps) {
             />
           )}
         </div>
-      </TernCard>
+      </Card>
 
       {/* Add Media Dialog - Uses MediaUploader with Unsplash integration */}
       <Dialog
@@ -368,7 +368,7 @@ interface MediaCardProps {
 
 function MediaCard({ media, onSetCover, onDelete, isSettingCover }: MediaCardProps) {
   return (
-    <div className="group relative aspect-square overflow-hidden rounded-lg border border-tern-gray-200">
+    <div className="group relative aspect-square overflow-hidden rounded-lg border border-ash-200">
       <img
         src={media.fileUrl}
         alt={media.caption || 'Trip photo'}

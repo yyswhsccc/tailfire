@@ -2,8 +2,8 @@
 
 import { useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { TernDashboardLayout } from '@/components/tern/layout'
-import { PageHeader } from '@/components/tern/shared'
+import { DashboardLayout } from '@/components/layout'
+import { PageHeader } from '@/components/shared'
 import { useTrip } from '@/hooks/use-trips'
 import { ImportSourceForm, type ImportFormState } from './_components/import-source-form'
 import { BookingPreview } from './_components/booking-preview'
@@ -45,7 +45,7 @@ function ImportBookingContent() {
   }
 
   return (
-    <TernDashboardLayout>
+    <DashboardLayout>
       <PageHeader
         title="Import Booking"
         description={
@@ -76,7 +76,7 @@ function ImportBookingContent() {
           />
         )}
       </div>
-    </TernDashboardLayout>
+    </DashboardLayout>
   )
 }
 

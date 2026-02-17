@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Ship, SlidersHorizontal, RefreshCw } from 'lucide-react'
-import { TernDashboardLayout } from '@/components/tern/layout'
-import { PageHeader } from '@/components/tern/shared'
+import { DashboardLayout } from '@/components/layout'
+import { PageHeader } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,7 +21,7 @@ import {
 import { SailingsTable } from './_components/sailings-table'
 import { SyncStatusBanner } from './_components/sync-status-banner'
 import { SailingFiltersSheet } from './_components/sailing-filters-sheet'
-import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'
+import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { cn } from '@/lib/utils'
 
 export default function CruisesPage() {
@@ -88,7 +88,7 @@ export default function CruisesPage() {
     selectedShip
 
   return (
-    <TernDashboardLayout>
+    <DashboardLayout>
       {/* Sync Status Banner */}
       {data?.sync?.syncInProgress && (
         <SyncStatusBanner lastSyncedAt={data.sync.lastSyncedAt} />
@@ -103,12 +103,12 @@ export default function CruisesPage() {
               variant="outline"
               size="sm"
               onClick={() => setFiltersOpen(true)}
-              className={cn(hasActiveFilters && 'border-tern-teal-500 text-tern-teal-600')}
+              className={cn(hasActiveFilters && 'border-phoenix-gold-500 text-phoenix-gold-600')}
             >
               <SlidersHorizontal className="mr-2 h-4 w-4" />
               Filters
               {hasActiveFilters && (
-                <span className="ml-1 rounded-full bg-tern-teal-500 px-1.5 py-0.5 text-xs text-white">
+                <span className="ml-1 rounded-full bg-phoenix-gold-500 px-1.5 py-0.5 text-xs text-white">
                   {[debouncedSearch, selectedCruiseLine, selectedRegion, selectedShip].filter(Boolean).length}
                 </span>
               )}
@@ -184,7 +184,7 @@ export default function CruisesPage() {
         )}
 
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-sm text-tern-gray-500">Sort by:</span>
+          <span className="text-sm text-ash-500">Sort by:</span>
           <Select
             value={sortBy}
             onValueChange={(v) => setSortBy(v as SailingSearchFilters['sortBy'])}
@@ -211,7 +211,7 @@ export default function CruisesPage() {
       </div>
 
       {/* Content */}
-      <div className="bg-white border border-tern-gray-200 rounded-lg">
+      <div className="bg-white border border-ash-200 rounded-lg">
         {error ? (
           <div className="text-center py-12">
             <p className="text-destructive mb-4">Failed to load sailings. Please try again.</p>
@@ -223,8 +223,8 @@ export default function CruisesPage() {
           <TableSkeleton rows={pageSize} />
         ) : !data?.items || data.items.length === 0 ? (
           <div className="text-center py-12">
-            <Ship className="mx-auto h-12 w-12 text-tern-gray-300 mb-4" />
-            <p className="text-tern-gray-500">
+            <Ship className="mx-auto h-12 w-12 text-ash-300 mb-4" />
+            <p className="text-ash-500">
               {hasActiveFilters
                 ? 'No sailings match your filters'
                 : 'No sailings found. Run a sync to import cruise data.'}
@@ -239,8 +239,8 @@ export default function CruisesPage() {
           <>
             <SailingsTable sailings={data.items} />
             {data.pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-3 border-t border-tern-gray-200">
-                <p className="text-sm text-tern-gray-600">
+              <div className="flex items-center justify-between px-6 py-3 border-t border-ash-200">
+                <p className="text-sm text-ash-600">
                   Showing {((page - 1) * pageSize) + 1}-
                   {Math.min(page * pageSize, data.pagination.totalItems)} of{' '}
                   {data.pagination.totalItems} sailings
@@ -254,7 +254,7 @@ export default function CruisesPage() {
                   >
                     Previous
                   </Button>
-                  <span className="text-sm text-tern-gray-700 px-2">
+                  <span className="text-sm text-ash-700 px-2">
                     Page {page} of {data.pagination.totalPages}
                   </span>
                   <Button
@@ -285,6 +285,6 @@ export default function CruisesPage() {
           // Add more filter handlers as needed
         }}
       />
-    </TernDashboardLayout>
+    </DashboardLayout>
   )
 }

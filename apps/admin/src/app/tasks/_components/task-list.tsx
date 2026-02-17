@@ -2,8 +2,8 @@
 
 import { useCallback } from 'react'
 import { TaskCard } from './task-card'
-import { EmptyState } from '@/components/tern/shared'
-import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'
+import { EmptyState } from '@/components/shared'
+import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { useCompleteTask, useUpdateTask, useDeleteTask } from '@/hooks/use-tasks'
 import { useToast } from '@/hooks/use-toast'
 import type { TaskResponseDto } from '@tailfire/shared-types/api'

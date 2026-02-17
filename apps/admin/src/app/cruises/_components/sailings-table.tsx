@@ -45,10 +45,10 @@ export function SailingsTable({ sailings }: SailingsTableProps) {
                   href={'/cruises/' + sailing.id}
                   className="block group"
                 >
-                  <div className="font-medium text-tern-gray-900 group-hover:text-tern-teal-600 transition-colors">
+                  <div className="font-medium text-ash-900 group-hover:text-phoenix-gold-600 transition-colors">
                     {sailing.name}
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-tern-gray-500 mt-1">
+                  <div className="flex items-center gap-2 text-sm text-ash-500 mt-1">
                     <Calendar className="h-3.5 w-3.5" />
                     {formatSailDate(sailing.sailDate)}
                   </div>
@@ -63,13 +63,13 @@ export function SailingsTable({ sailings }: SailingsTableProps) {
                       className="w-10 h-10 rounded object-cover"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded bg-tern-gray-100 flex items-center justify-center">
-                      <Ship className="h-5 w-5 text-tern-gray-400" />
+                    <div className="w-10 h-10 rounded bg-ash-100 flex items-center justify-center">
+                      <Ship className="h-5 w-5 text-ash-400" />
                     </div>
                   )}
                   <div>
                     <div className="font-medium text-sm">{sailing.ship.name}</div>
-                    <div className="text-xs text-tern-gray-500">
+                    <div className="text-xs text-ash-500">
                       {sailing.cruiseLine.name}
                     </div>
                   </div>
@@ -77,11 +77,11 @@ export function SailingsTable({ sailings }: SailingsTableProps) {
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-1 text-sm">
-                  <MapPin className="h-3.5 w-3.5 text-tern-gray-400" />
+                  <MapPin className="h-3.5 w-3.5 text-ash-400" />
                   <span>{sailing.embarkPort.name}</span>
                   {sailing.embarkPort.name !== sailing.disembarkPort.name && (
                     <>
-                      <span className="text-tern-gray-400 mx-1">→</span>
+                      <span className="text-ash-400 mx-1">→</span>
                       <span>{sailing.disembarkPort.name}</span>
                     </>
                   )}
@@ -96,13 +96,13 @@ export function SailingsTable({ sailings }: SailingsTableProps) {
               <TableCell className="text-right">
                 {cheapestPrice !== null ? (
                   <div>
-                    <div className="font-semibold text-tern-teal-600">
+                    <div className="font-semibold text-phoenix-gold-600">
                       {formatPrice(cheapestPrice)}
                     </div>
-                    <div className="text-xs text-tern-gray-500">per person</div>
+                    <div className="text-xs text-ash-500">per person</div>
                   </div>
                 ) : (
-                  <span className="text-tern-gray-400 text-sm">Price TBA</span>
+                  <span className="text-ash-400 text-sm">Price TBA</span>
                 )}
               </TableCell>
             </TableRow>

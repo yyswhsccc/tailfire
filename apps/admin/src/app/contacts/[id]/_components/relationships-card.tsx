@@ -42,7 +42,7 @@ export function RelationshipsCard({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="text-sm font-semibold text-tern-gray-900 flex items-center gap-2">
+        <CardTitle className="text-sm font-semibold text-ash-900 flex items-center gap-2">
           <Users className="h-4 w-4" />
           Relationships & Groups
         </CardTitle>
@@ -62,10 +62,10 @@ export function RelationshipsCard({
           </div>
         ) : !relationships || relationships.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 px-2">
-            <div className="rounded-full bg-tern-gray-100 p-3 mb-2">
-              <Users className="h-5 w-5 text-tern-gray-400" />
+            <div className="rounded-full bg-ash-100 p-3 mb-2">
+              <Users className="h-5 w-5 text-ash-400" />
             </div>
-            <p className="text-xs text-tern-gray-600 text-center mb-3">
+            <p className="text-xs text-ash-600 text-center mb-3">
               No relationships yet
             </p>
             <Button
@@ -95,7 +95,7 @@ export function RelationshipsCard({
                         router.push(`/contacts/${relatedContactId}`)
                       }
                     }}
-                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-tern-gray-50 cursor-pointer transition-colors"
+                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-ash-50 cursor-pointer transition-colors"
                     aria-label={`Go to ${displayName}`}
                   >
                     <Avatar className="h-8 w-8 flex-shrink-0">
@@ -105,7 +105,7 @@ export function RelationshipsCard({
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <p className="text-sm font-medium text-tern-gray-900 truncate">
+                        <p className="text-sm font-medium text-ash-900 truncate">
                           {displayName}
                         </p>
                         <Badge
@@ -115,7 +115,7 @@ export function RelationshipsCard({
                           {getRelationshipCategoryLabel(relationship.category)}
                         </Badge>
                       </div>
-                      <p className="text-xs text-tern-gray-600 truncate">{label}</p>
+                      <p className="text-xs text-ash-600 truncate">{label}</p>
                     </div>
                     <Button
                       variant="ghost"
@@ -124,24 +124,24 @@ export function RelationshipsCard({
                         e.stopPropagation()
                         onEditRelationship(relationship)
                       }}
-                      className="h-7 w-7 p-0 hover:bg-tern-gray-100"
+                      className="h-7 w-7 p-0 hover:bg-ash-100"
                       aria-label={`Edit relationship with ${displayName}`}
                     >
-                      <Pencil className="h-3.5 w-3.5 text-tern-gray-600" />
+                      <Pencil className="h-3.5 w-3.5 text-ash-600" />
                     </Button>
-                    <ArrowRight className="h-4 w-4 text-tern-gray-400 flex-shrink-0" />
+                    <ArrowRight className="h-4 w-4 text-ash-400 flex-shrink-0" />
                   </div>
                 )
               })}
             </div>
 
             {hasMore && (
-              <div className="pt-1 border-t border-tern-gray-200">
+              <div className="pt-1 border-t border-ash-200">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onViewAll}
-                  className="w-full justify-center text-xs h-8 text-tern-gray-600 hover:text-phoenix-gold-600"
+                  className="w-full justify-center text-xs h-8 text-ash-600 hover:text-phoenix-gold-600"
                 >
                   View all {relationships.length} relationships
                   <ArrowRight className="h-3 w-3 ml-1" />

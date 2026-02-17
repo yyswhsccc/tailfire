@@ -41,12 +41,12 @@ export function TripsBulkActions({
   const isProcessing = isDeleting || isArchiving || isChangingStatus
 
   return (
-    <div className="flex items-center gap-2 bg-tern-teal-50 border border-tern-teal-200 rounded-lg px-4 py-2">
-      <span className="text-sm font-medium text-tern-teal-700">
+    <div className="flex items-center gap-2 bg-phoenix-gold-50 border border-phoenix-gold-200 rounded-lg px-4 py-2">
+      <span className="text-sm font-medium text-phoenix-gold-700">
         {selectedCount} selected
       </span>
 
-      <div className="h-4 w-px bg-tern-teal-200 mx-1" />
+      <div className="h-4 w-px bg-phoenix-gold-200 mx-1" />
 
       {/* Change Status Dropdown */}
       <DropdownMenu>
@@ -55,7 +55,7 @@ export function TripsBulkActions({
             variant="ghost"
             size="sm"
             disabled={isProcessing}
-            className="text-tern-teal-700 hover:text-tern-teal-800 hover:bg-tern-teal-100"
+            className="text-phoenix-gold-700 hover:text-phoenix-gold-800 hover:bg-phoenix-gold-100"
           >
             <ArrowRight className="mr-2 h-4 w-4" />
             Change Status
@@ -80,7 +80,7 @@ export function TripsBulkActions({
             variant="ghost"
             size="sm"
             disabled={isProcessing}
-            className="text-tern-teal-700 hover:text-tern-teal-800 hover:bg-tern-teal-100"
+            className="text-phoenix-gold-700 hover:text-phoenix-gold-800 hover:bg-phoenix-gold-100"
           >
             <Archive className="mr-2 h-4 w-4" />
             Archive
@@ -110,14 +110,14 @@ export function TripsBulkActions({
         Delete
       </Button>
 
-      <div className="h-4 w-px bg-tern-teal-200 mx-1" />
+      <div className="h-4 w-px bg-phoenix-gold-200 mx-1" />
 
       {/* Clear Selection */}
       <Button
         variant="ghost"
         size="sm"
         onClick={onClearSelection}
-        className="text-tern-teal-600 hover:text-tern-teal-700"
+        className="text-phoenix-gold-600 hover:text-phoenix-gold-700"
       >
         Clear
       </Button>

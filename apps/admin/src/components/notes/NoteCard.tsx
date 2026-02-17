@@ -63,7 +63,7 @@ export function NoteCard({
   }
 
   return (
-    <div className="group relative rounded-lg border border-tern-gray-200 bg-white p-4">
+    <div className="group relative rounded-lg border border-ash-200 bg-white p-4">
       {/* Header row: avatar + name + time + actions */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -75,12 +75,12 @@ export function NoteCard({
           />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-medium text-tern-gray-900 truncate">
+              <span className="text-sm font-medium text-ash-900 truncate">
                 {authorName}
               </span>
-              <span className="text-xs text-tern-gray-500">{timeAgo}</span>
+              <span className="text-xs text-ash-500">{timeAgo}</span>
               {isEdited && (
-                <span className="text-xs text-tern-gray-400 italic">
+                <span className="text-xs text-ash-400 italic">
                   (edited)
                 </span>
               )}
@@ -98,7 +98,7 @@ export function NoteCard({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 text-tern-gray-400 hover:text-tern-gray-600"
+                className="h-7 w-7 p-0 text-ash-400 hover:text-ash-600"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
@@ -161,7 +161,7 @@ export function NoteCard({
           </div>
         </div>
       ) : (
-        <p className="mt-2 text-sm text-tern-gray-700 whitespace-pre-wrap">
+        <p className="mt-2 text-sm text-ash-700 whitespace-pre-wrap">
           {note.content}
         </p>
       )}

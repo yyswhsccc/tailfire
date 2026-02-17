@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { TernButton } from '../core/tern-button'
+import { Button } from '@/components/ui/button'
 
 interface EmptyStateProps {
   icon?: ReactNode
@@ -14,7 +14,7 @@ interface EmptyStateProps {
 }
 
 /**
- * Tern Empty State
+ * Empty State
  * Display when there's no data to show
  */
 export function EmptyState({
@@ -32,22 +32,22 @@ export function EmptyState({
       )}
     >
       {icon && (
-        <div className="mb-4 rounded-full bg-tern-gray-100 p-3 text-tern-gray-400">
+        <div className="mb-4 rounded-full bg-ash-100 p-3 text-ash-400">
           {icon}
         </div>
       )}
-      <h3 className="mb-1 text-base font-semibold text-tern-gray-900">
+      <h3 className="mb-1 text-base font-semibold text-ash-900">
         {title}
       </h3>
       {description && (
-        <p className="mb-4 text-sm text-tern-gray-500 max-w-sm">
+        <p className="mb-4 text-sm text-ash-500 max-w-sm">
           {description}
         </p>
       )}
       {action && (
-        <TernButton onClick={action.onClick} size="sm">
+        <Button onClick={action.onClick} size="sm">
           {action.label}
-        </TernButton>
+        </Button>
       )}
     </div>
   )

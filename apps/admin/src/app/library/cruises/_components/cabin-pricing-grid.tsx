@@ -58,11 +58,11 @@ export function CabinPricingGrid({ sailing }: CabinPricingGridProps) {
   if (!hasAnyPrice) {
     return (
       <div>
-        <h3 className="font-semibold text-sm text-tern-gray-900 mb-3 flex items-center gap-2">
+        <h3 className="font-semibold text-sm text-ash-900 mb-3 flex items-center gap-2">
           <DollarSign className="h-4 w-4" />
           Cabin Pricing
         </h3>
-        <div className="bg-tern-gray-50 rounded-lg p-4 text-center text-sm text-tern-gray-500">
+        <div className="bg-ash-50 rounded-lg p-4 text-center text-sm text-ash-500">
           Pricing information is not currently available for this sailing.
         </div>
       </div>
@@ -71,10 +71,10 @@ export function CabinPricingGrid({ sailing }: CabinPricingGridProps) {
 
   return (
     <div>
-      <h3 className="font-semibold text-sm text-tern-gray-900 mb-3 flex items-center gap-2">
+      <h3 className="font-semibold text-sm text-ash-900 mb-3 flex items-center gap-2">
         <DollarSign className="h-4 w-4" />
         Cabin Pricing
-        <span className="text-xs font-normal text-tern-gray-500 ml-2">
+        <span className="text-xs font-normal text-ash-500 ml-2">
           (per person, double occupancy)
         </span>
       </h3>
@@ -88,7 +88,7 @@ export function CabinPricingGrid({ sailing }: CabinPricingGridProps) {
               key={category.key}
               className={cn(
                 'rounded-lg border p-3 transition-colors',
-                price !== null ? category.color : 'bg-tern-gray-50 text-tern-gray-400 border-tern-gray-200'
+                price !== null ? category.color : 'bg-ash-50 text-ash-400 border-ash-200'
               )}
             >
               <div className="flex items-center gap-2 mb-1">
@@ -107,27 +107,27 @@ export function CabinPricingGrid({ sailing }: CabinPricingGridProps) {
       {/* Detailed Pricing Table (if we have detailed prices) */}
       {sailing.prices.length > 0 && (
         <details className="mt-4">
-          <summary className="text-sm text-tern-gray-500 cursor-pointer hover:text-tern-gray-700">
+          <summary className="text-sm text-ash-500 cursor-pointer hover:text-ash-700">
             View all {sailing.prices.length} cabin options
           </summary>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-tern-gray-200">
-                  <th className="text-left py-2 px-2 font-medium text-tern-gray-600">Cabin Code</th>
-                  <th className="text-left py-2 px-2 font-medium text-tern-gray-600">Category</th>
-                  <th className="text-right py-2 px-2 font-medium text-tern-gray-600">Base</th>
-                  <th className="text-right py-2 px-2 font-medium text-tern-gray-600">Taxes</th>
-                  <th className="text-right py-2 px-2 font-medium text-tern-gray-600">Total</th>
+                <tr className="border-b border-ash-200">
+                  <th className="text-left py-2 px-2 font-medium text-ash-600">Cabin Code</th>
+                  <th className="text-left py-2 px-2 font-medium text-ash-600">Category</th>
+                  <th className="text-right py-2 px-2 font-medium text-ash-600">Base</th>
+                  <th className="text-right py-2 px-2 font-medium text-ash-600">Taxes</th>
+                  <th className="text-right py-2 px-2 font-medium text-ash-600">Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-tern-gray-100">
+              <tbody className="divide-y divide-ash-100">
                 {sailing.prices.slice(0, 20).map((price) => (
-                  <tr key={price.cabinCode} className="hover:bg-tern-gray-50">
+                  <tr key={price.cabinCode} className="hover:bg-ash-50">
                     <td className="py-2 px-2 font-mono text-xs">{price.cabinCode}</td>
                     <td className="py-2 px-2 capitalize">{price.cabinCategory}</td>
                     <td className="py-2 px-2 text-right">{formatPrice(price.basePriceCents)}</td>
-                    <td className="py-2 px-2 text-right text-tern-gray-500">
+                    <td className="py-2 px-2 text-right text-ash-500">
                       {formatPrice(price.taxesCents)}
                     </td>
                     <td className="py-2 px-2 text-right font-medium">
@@ -138,7 +138,7 @@ export function CabinPricingGrid({ sailing }: CabinPricingGridProps) {
               </tbody>
             </table>
             {sailing.prices.length > 20 && (
-              <p className="text-xs text-tern-gray-500 mt-2 text-center">
+              <p className="text-xs text-ash-500 mt-2 text-center">
                 Showing 20 of {sailing.prices.length} cabin options
               </p>
             )}

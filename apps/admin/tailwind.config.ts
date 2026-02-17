@@ -99,31 +99,17 @@ const config: Config = {
   					'900': 'hsl(var(--golden-orange-900))'
   				}
   			},
-  			tern: {
-  				gray: {
-  					'50': 'hsl(var(--tern-gray-50))',
-  					'100': 'hsl(var(--tern-gray-100))',
-  					'200': 'hsl(var(--tern-gray-200))',
-  					'300': 'hsl(var(--tern-gray-300))',
-  					'400': 'hsl(var(--tern-gray-400))',
-  					'500': 'hsl(var(--tern-gray-500))',
-  					'600': 'hsl(var(--tern-gray-600))',
-  					'700': 'hsl(var(--tern-gray-700))',
-  					'800': 'hsl(var(--tern-gray-800))',
-  					'900': 'hsl(var(--tern-gray-900))'
-  				},
-  				teal: {
-  					'50': 'hsl(var(--phoenix-gold-50))',
-  					'100': 'hsl(var(--phoenix-gold-100))',
-  					'200': 'hsl(var(--phoenix-gold-200))',
-  					'300': 'hsl(var(--phoenix-gold-300))',
-  					'400': 'hsl(var(--phoenix-gold-400))',
-  					'500': 'hsl(var(--phoenix-gold-500))',
-  					'600': 'hsl(var(--phoenix-gold-600))',
-  					'700': 'hsl(var(--phoenix-gold-700))',
-  					'800': 'hsl(var(--phoenix-gold-800))',
-  					'900': 'hsl(var(--phoenix-gold-900))'
-  				}
+  			ash: {
+  				'50': 'hsl(var(--ash-50))',
+  				'100': 'hsl(var(--ash-100))',
+  				'200': 'hsl(var(--ash-200))',
+  				'300': 'hsl(var(--ash-300))',
+  				'400': 'hsl(var(--ash-400))',
+  				'500': 'hsl(var(--ash-500))',
+  				'600': 'hsl(var(--ash-600))',
+  				'700': 'hsl(var(--ash-700))',
+  				'800': 'hsl(var(--ash-800))',
+  				'900': 'hsl(var(--ash-900))'
   			}
   		},
   		borderRadius: {

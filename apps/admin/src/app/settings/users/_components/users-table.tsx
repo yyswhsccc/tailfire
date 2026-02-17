@@ -242,7 +242,7 @@ export function UsersTable({
               {headerGroup.headers.map((header) => (
                 <TableHead
                   key={header.id}
-                  className="px-6 py-3 text-left text-xs font-medium text-tern-gray-600 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium text-ash-600 uppercase tracking-wider"
                 >
                   {header.isPlaceholder
                     ? null

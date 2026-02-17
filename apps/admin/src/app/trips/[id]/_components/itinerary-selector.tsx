@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Plus, Check, MoreVertical, Trash2, Pencil, FileText, Send, CheckCircle2, Archive, Library, Download } from 'lucide-react'
 import type { ItineraryResponseDto } from '@tailfire/shared-types/api'
-import { TernBadge } from '@/components/tern/core'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -135,7 +135,7 @@ export function ItinerarySelector({
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 pb-2 border-b border-tern-gray-200" role="status" aria-label="Loading itinerary options">
+      <div className="flex items-center gap-2 pb-2 border-b border-ash-200" role="status" aria-label="Loading itinerary options">
         <div className={cn('h-8 w-24 rounded animate-pulse', SKELETON_BG)} />
         <div className={cn('h-8 w-24 rounded animate-pulse', SKELETON_BG)} />
         <div className={cn('h-8 w-8 rounded animate-pulse', SKELETON_BG)} />
@@ -146,11 +146,11 @@ export function ItinerarySelector({
   // If no itineraries exist, show create prompt
   if (!itineraries || itineraries.length === 0) {
     return (
-      <div className="pb-2 border-b border-tern-gray-200">
+      <div className="pb-2 border-b border-ash-200">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xs font-medium text-tern-gray-900">Itinerary Options</h3>
-            <p className="text-xs text-tern-gray-500">
+            <h3 className="text-xs font-medium text-ash-900">Itinerary Options</h3>
+            <p className="text-xs text-ash-500">
               Create your first itinerary or import from the library
             </p>
           </div>
@@ -158,7 +158,7 @@ export function ItinerarySelector({
             <Button
               onClick={onCreateClick}
               aria-label="Create first itinerary"
-              className={cn('bg-tern-teal-500 hover:bg-tern-teal-600 text-white h-8 px-3', FOCUS_VISIBLE_RING)}
+              className={cn('bg-phoenix-gold-500 hover:bg-phoenix-gold-600 text-white h-8 px-3', FOCUS_VISIBLE_RING)}
               size="sm"
             >
               <Plus className="h-3.5 w-3.5 mr-1" />
@@ -213,17 +213,17 @@ export function ItinerarySelector({
                 onClick={() => onSelectItinerary(itinerary)}
                 className={cn(
                   'px-2.5 py-1 rounded-md border transition-all flex items-center gap-1.5',
-                  'hover:border-tern-teal-400 hover:bg-tern-teal-50',
+                  'hover:border-phoenix-gold-400 hover:bg-phoenix-gold-50',
                   FOCUS_VISIBLE_RING,
                   isSelected
-                    ? 'border-tern-teal-500 bg-tern-teal-50 text-tern-teal-900'
-                    : 'border-tern-gray-200 bg-white text-tern-gray-900',
+                    ? 'border-phoenix-gold-500 bg-phoenix-gold-50 text-phoenix-gold-900'
+                    : 'border-ash-200 bg-white text-ash-900',
                   isArchived && 'opacity-60'
                 )}
               >
                 {/* Check icon for selected */}
                 {isSelected && (
-                  <Check className="h-3 w-3 text-tern-teal-600" />
+                  <Check className="h-3 w-3 text-phoenix-gold-600" />
                 )}
 
                 {/* Itinerary Name */}
@@ -233,24 +233,24 @@ export function ItinerarySelector({
 
                 {/* Status Badge */}
                 {isDraft && (
-                  <TernBadge variant="inbound">
+                  <Badge variant="inbound">
                     Draft
-                  </TernBadge>
+                  </Badge>
                 )}
                 {isProposing && (
-                  <TernBadge variant="planning">
+                  <Badge variant="planning">
                     Proposing
-                  </TernBadge>
+                  </Badge>
                 )}
                 {isApproved && (
-                  <TernBadge variant="completed">
+                  <Badge variant="completed">
                     Approved
-                  </TernBadge>
+                  </Badge>
                 )}
                 {isArchived && (
-                  <TernBadge variant="secondary">
+                  <Badge variant="secondary">
                     Archived
-                  </TernBadge>
+                  </Badge>
                 )}
 
               </button>
@@ -372,7 +372,7 @@ export function ItinerarySelector({
             variant="ghost"
             size="sm"
             aria-label="Create new itinerary"
-            className={cn('h-7 px-2 text-xs text-tern-gray-500 hover:text-tern-gray-900', FOCUS_VISIBLE_RING)}
+            className={cn('h-7 px-2 text-xs text-ash-500 hover:text-ash-900', FOCUS_VISIBLE_RING)}
           >
             <Plus className="h-3.5 w-3.5 mr-1" />
             Create
@@ -395,7 +395,7 @@ export function ItinerarySelector({
             variant="ghost"
             size="sm"
             aria-label="Import itinerary from library"
-            className={cn('h-7 px-2 text-xs text-tern-gray-500 hover:text-tern-gray-900', FOCUS_VISIBLE_RING)}
+            className={cn('h-7 px-2 text-xs text-ash-500 hover:text-ash-900', FOCUS_VISIBLE_RING)}
           >
             <Download className="h-3.5 w-3.5 mr-1" />
             Import

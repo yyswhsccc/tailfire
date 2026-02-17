@@ -49,11 +49,11 @@ export function TourFilters({
   const hasActiveFilters = !!(filters.operator || filters.q)
 
   return (
-    <div className="bg-white border border-tern-gray-200 rounded-lg p-4 space-y-4">
+    <div className="bg-white border border-ash-200 rounded-lg p-4 space-y-4">
       {/* Search Bar */}
       <form onSubmit={handleSearchSubmit} className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tern-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ash-400" />
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
@@ -64,7 +64,7 @@ export function TourFilters({
             <button
               type="button"
               onClick={handleSearchClear}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-tern-gray-400 hover:text-tern-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-ash-400 hover:text-ash-600"
             >
               <X className="h-4 w-4" />
             </button>
@@ -125,7 +125,7 @@ export function TourFilters({
 
         {/* Clear All */}
         {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={handleClearAll} className="text-tern-gray-500">
+          <Button variant="ghost" size="sm" onClick={handleClearAll} className="text-ash-500">
             <X className="h-4 w-4 mr-1" />
             Clear All
           </Button>

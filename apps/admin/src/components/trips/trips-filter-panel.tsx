@@ -94,7 +94,7 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
           <Button
             variant="outline"
             size="sm"
-            className={cn(filters.status && 'border-tern-teal-500 bg-tern-teal-50')}
+            className={cn(filters.status && 'border-phoenix-gold-500 bg-phoenix-gold-50')}
           >
             Status
             {filters.status && (
@@ -137,7 +137,7 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
           <Button
             variant="outline"
             size="sm"
-            className={cn(filters.tripType && 'border-tern-teal-500 bg-tern-teal-50')}
+            className={cn(filters.tripType && 'border-phoenix-gold-500 bg-phoenix-gold-50')}
           >
             Type
             {filters.tripType && (
@@ -181,7 +181,7 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
             <Button
               variant="outline"
               size="sm"
-              className={cn(filters.tripGroupId && 'border-tern-teal-500 bg-tern-teal-50')}
+              className={cn(filters.tripGroupId && 'border-phoenix-gold-500 bg-phoenix-gold-50')}
             >
               Group
               {filters.tripGroupId && (

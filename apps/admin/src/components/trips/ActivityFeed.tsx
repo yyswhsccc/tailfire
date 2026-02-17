@@ -169,8 +169,8 @@ function ActivityItem({ log }: { log: ActivityLog }) {
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-tern-gray-900">{log.description}</p>
-        <p className="text-xs text-tern-gray-500 mt-1">{timeAgo}</p>
+        <p className="text-sm text-ash-900">{log.description}</p>
+        <p className="text-xs text-ash-500 mt-1">{timeAgo}</p>
       </div>
     </div>
   )
@@ -228,8 +228,8 @@ export function ActivityFeed({
     return (
       <div className="text-center py-8">
         <XCircle className="h-12 w-12 text-red-300 mx-auto mb-3" />
-        <p className="text-sm text-tern-gray-900 mb-1">Failed to load activity</p>
-        <p className="text-sm text-tern-gray-500">Please try again later.</p>
+        <p className="text-sm text-ash-900 mb-1">Failed to load activity</p>
+        <p className="text-sm text-ash-500">Please try again later.</p>
       </div>
     )
   }
@@ -237,9 +237,9 @@ export function ActivityFeed({
   if (logs.length === 0) {
     return (
       <div className="text-center py-8">
-        <Calendar className="h-12 w-12 text-tern-gray-300 mx-auto mb-3" />
-        <p className="text-sm text-tern-gray-900 mb-1">No activity yet</p>
-        <p className="text-sm text-tern-gray-500">Activity will appear here as changes are made.</p>
+        <Calendar className="h-12 w-12 text-ash-300 mx-auto mb-3" />
+        <p className="text-sm text-ash-900 mb-1">No activity yet</p>
+        <p className="text-sm text-ash-500">Activity will appear here as changes are made.</p>
       </div>
     )
   }
@@ -247,7 +247,7 @@ export function ActivityFeed({
   return (
     <div>
       {/* Activity Timeline */}
-      <div className="space-y-1 divide-y divide-tern-gray-100">
+      <div className="space-y-1 divide-y divide-ash-100">
         {logs.map((log) => (
           <ActivityItem key={log.id} log={log} />
         ))}

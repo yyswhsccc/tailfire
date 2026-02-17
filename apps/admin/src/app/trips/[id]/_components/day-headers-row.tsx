@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { parseISODate } from '@/lib/date-utils'
 import { COLUMN_WIDTH, ITINERARY_CARD_STYLES, FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
 import { Button } from '@/components/ui/button'
-import { TernBadge } from '@/components/tern/core'
+import { Badge } from '@/components/ui/badge'
 import { DayEditModal } from './day-edit-modal'
 import { filterItineraryActivities } from '@/lib/activity-constants'
 
@@ -50,16 +50,16 @@ function DayHeader({ day, itineraryId, activityCount }: DayHeaderProps) {
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className="font-medium text-sm text-tern-gray-900">
+                <p className="font-medium text-sm text-ash-900">
                   {dayHeaderTitle}
                 </p>
-                <TernBadge variant="secondary">
+                <Badge variant="secondary">
                   {count}
-                </TernBadge>
+                </Badge>
               </div>
               {day.title && (
                 <p
-                  className="text-xs text-tern-gray-500 truncate mt-0.5"
+                  className="text-xs text-ash-500 truncate mt-0.5"
                   title={day.title}
                 >
                   {day.title}
@@ -76,7 +76,7 @@ function DayHeader({ day, itineraryId, activityCount }: DayHeaderProps) {
                 FOCUS_VISIBLE_RING
               )}
             >
-              <Pencil className="h-3.5 w-3.5 text-tern-gray-500" />
+              <Pencil className="h-3.5 w-3.5 text-ash-500" />
             </Button>
           </div>
         </div>
