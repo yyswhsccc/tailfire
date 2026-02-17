@@ -200,6 +200,7 @@ export type CustomCruiseDetailsDto = {
   cabinCode?: string | null
   cabinNumber?: string | null
   cabinDeck?: string | null
+  cabinLocation?: string | null
   cabinImageUrl?: string | null
   cabinDescription?: string | null
 
@@ -212,6 +213,15 @@ export type CustomCruiseDetailsDto = {
   portCallsJson?: CruisePortCall[] // Array of port calls
   cabinPricingJson?: Record<string, unknown> // Traveltek cachedprices structure
   shipContentJson?: Record<string, unknown> // shipcontent for images, amenities
+
+  // Import-specific data
+  diningPreferences?: Record<string, unknown> | null
+  selectedExtras?: Record<string, unknown>[] | null
+  selectedPromotions?: Record<string, unknown> | null
+
+  // Traveltek internal IDs for re-sync/refresh
+  traveltekBookingId?: number | null
+  traveltekPortfolioId?: number | null
 
   // Additional Details
   inclusions?: string[] // What's included - always returns [] not null

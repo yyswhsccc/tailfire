@@ -474,16 +474,28 @@ Real-time cruise booking via Traveltek FusionAPI. Supports three booking flows:
 | **Agent** | Agent searches, selects cabin, books on behalf of client |
 | **Client Handoff** | Agent searches & holds cabin → Client completes booking |
 | **OTA** | Client self-service search and booking |
+| **Import** | Agent fetches existing booking from cruise line system → creates full trip in Tailfire |
 
 ### Key Files
 - `apps/api/src/cruise-booking/cruise-booking.controller.ts` - 10 API endpoints
 - `apps/api/src/cruise-booking/services/booking.service.ts` - Booking orchestration
 - `apps/api/src/cruise-booking/services/fusion-api.service.ts` - FusionAPI client
 - `apps/api/src/cruise-booking/services/traveltek-auth.service.ts` - OAuth token management
+- `apps/api/src/cruise-booking/services/import-booking.service.ts` - Import orchestration (preview + confirm)
+- `apps/api/src/cruise-booking/dto/import-booking.dto.ts` - Import DTOs
+- `apps/admin/src/lib/validation/cruise-validation.ts` - Cruise form Zod validation
 
 ### Session Tables
 - `cruise_booking_sessions` - Ephemeral FusionAPI session state
 - `cruise_booking_idempotency` - Double-booking prevention (24h TTL)
+
+### Import Endpoints
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/cruise-booking/import/preview` | POST | Preview booking from cruise line system |
+| `/cruise-booking/import/confirm` | POST | Import booking into Tailfire (creates trip, contacts, travelers) |
+
+Import is idempotent — scoped by agency + source + booking reference to prevent duplicates.
 
 ### Two Expiry Times
 | Expiry | Duration | Purpose |

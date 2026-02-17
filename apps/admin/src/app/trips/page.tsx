@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Plus, Search, Download } from 'lucide-react'
 import { TernDashboardLayout } from '@/components/tern/layout'
 import { PageHeader } from '@/components/tern/shared'
 import { TernButton } from '@/components/tern/core'
@@ -34,6 +35,7 @@ import type { TripStatus } from '@tailfire/shared-types'
  * Supports both Kanban and Table views with bulk operations
  */
 export default function TernTripsPage() {
+  const router = useRouter()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [viewMode, setViewMode] = useState<TripsViewMode>('kanban')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -191,6 +193,15 @@ export default function TernTripsPage() {
                 className="w-64 pl-9"
               />
             </div>
+
+            <TernButton
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/trips/import')}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Import Booking
+            </TernButton>
 
             <TernButton onClick={() => setIsCreateOpen(true)} size="sm">
               <Plus className="mr-2 h-4 w-4" />

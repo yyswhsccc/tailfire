@@ -101,6 +101,7 @@ export class CustomCruiseDetailsService {
       cabinCode: data.cabinCode || null,
       cabinNumber: data.cabinNumber || null,
       cabinDeck: data.cabinDeck || null,
+      cabinLocation: data.cabinLocation || null,
       cabinImageUrl: data.cabinImageUrl || null,
       cabinDescription: data.cabinDescription || null,
 
@@ -113,6 +114,13 @@ export class CustomCruiseDetailsService {
       portCallsJson: data.portCallsJson || [],
       cabinPricingJson: data.cabinPricingJson || {},
       shipContentJson: data.shipContentJson || {},
+
+      // Import-specific data
+      diningPreferences: data.diningPreferences || {},
+      selectedExtras: data.selectedExtras || [],
+      selectedPromotions: data.selectedPromotions || {},
+      traveltekBookingId: data.traveltekBookingId ?? null,
+      traveltekPortfolioId: data.traveltekPortfolioId ?? null,
 
       // Additional Details
       inclusions: data.inclusions || [],
@@ -174,6 +182,7 @@ export class CustomCruiseDetailsService {
         ...(data.cabinCode !== undefined && { cabinCode: data.cabinCode }),
         ...(data.cabinNumber !== undefined && { cabinNumber: data.cabinNumber }),
         ...(data.cabinDeck !== undefined && { cabinDeck: data.cabinDeck }),
+        ...(data.cabinLocation !== undefined && { cabinLocation: data.cabinLocation }),
         ...(data.cabinImageUrl !== undefined && { cabinImageUrl: data.cabinImageUrl }),
         ...(data.cabinDescription !== undefined && { cabinDescription: data.cabinDescription }),
 
@@ -186,6 +195,13 @@ export class CustomCruiseDetailsService {
         ...(data.portCallsJson !== undefined && { portCallsJson: data.portCallsJson }),
         ...(data.cabinPricingJson !== undefined && { cabinPricingJson: data.cabinPricingJson }),
         ...(data.shipContentJson !== undefined && { shipContentJson: data.shipContentJson }),
+
+        // Import-specific data
+        ...(data.diningPreferences !== undefined && { diningPreferences: data.diningPreferences }),
+        ...(data.selectedExtras !== undefined && { selectedExtras: data.selectedExtras }),
+        ...(data.selectedPromotions !== undefined && { selectedPromotions: data.selectedPromotions }),
+        ...(data.traveltekBookingId !== undefined && { traveltekBookingId: data.traveltekBookingId }),
+        ...(data.traveltekPortfolioId !== undefined && { traveltekPortfolioId: data.traveltekPortfolioId }),
 
         // Additional Details
         ...(data.inclusions !== undefined && { inclusions: data.inclusions }),
@@ -280,6 +296,7 @@ export class CustomCruiseDetailsService {
       cabinCode: details.cabinCode || null,
       cabinNumber: details.cabinNumber || null,
       cabinDeck: details.cabinDeck || null,
+      cabinLocation: details.cabinLocation || null,
       cabinImageUrl: details.cabinImageUrl || null,
       cabinDescription: details.cabinDescription || null,
 
@@ -292,6 +309,13 @@ export class CustomCruiseDetailsService {
       portCallsJson: (details.portCallsJson || []) as CruisePortCall[],
       cabinPricingJson: details.cabinPricingJson || {},
       shipContentJson: details.shipContentJson || {},
+
+      // Import-specific data
+      diningPreferences: details.diningPreferences || {},
+      selectedExtras: details.selectedExtras || [],
+      selectedPromotions: details.selectedPromotions || {},
+      traveltekBookingId: details.traveltekBookingId ?? null,
+      traveltekPortfolioId: details.traveltekPortfolioId ?? null,
 
       // Additional Details
       inclusions: details.inclusions || [],

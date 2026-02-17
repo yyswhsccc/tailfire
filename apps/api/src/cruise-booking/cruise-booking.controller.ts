@@ -33,6 +33,8 @@ import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import type { AuthContext } from '../auth/auth.types'
 import { BookingService } from './services/booking.service'
+import { ImportBookingService } from './services/import-booking.service'
+import { ImportBookingPreviewDto, ImportBookingConfirmDto } from './dto/import-booking.dto'
 import { SearchCruisesDto, SearchResponseDto } from './dto/search.dto'
 import { GetRateCodesDto, RateCodesResponseDto, RateCodeDto } from './dto/rate-code.dto'
 import { GetCabinGradesDto, CabinGradesResponseDto, CabinGradeDto } from './dto/cabin-grade.dto'
@@ -45,7 +47,10 @@ import { CreateBookingDto, BookingResponseDto } from './dto/booking.dto'
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
 export class CruiseBookingController {
-  constructor(private readonly bookingService: BookingService) {}
+  constructor(
+    private readonly bookingService: BookingService,
+    private readonly importBookingService: ImportBookingService,
+  ) {}
 
   // ============================================================================
   // SEARCH (Step 1)
@@ -462,5 +467,41 @@ export class CruiseBookingController {
     @GetAuthContext() auth: AuthContext
   ): Promise<void> {
     await this.bookingService.cancelSession(sessionId, auth.userId)
+  }
+
+  // ============================================================================
+  // IMPORT EXISTING BOOKING
+  // ============================================================================
+
+  /**
+   * Preview an existing cruise booking from a cruise line system.
+   * Fetches booking data from Traveltek without creating anything in Tailfire.
+   * POST /cruise-booking/import/preview
+   */
+  @Post('import/preview')
+  @Roles('admin', 'user')
+  @ApiOperation({ summary: 'Preview an existing cruise booking for import' })
+  @ApiResponse({ status: 200, description: 'Booking preview data' })
+  async importPreview(
+    @Body() dto: ImportBookingPreviewDto,
+    @GetAuthContext() auth: AuthContext,
+  ) {
+    return this.importBookingService.preview(dto, auth)
+  }
+
+  /**
+   * Import an existing cruise booking into Tailfire.
+   * Creates Trip, Itinerary, Cruise Activity, Contacts, and Travelers.
+   * POST /cruise-booking/import/confirm
+   */
+  @Post('import/confirm')
+  @Roles('admin', 'user')
+  @ApiOperation({ summary: 'Import an existing cruise booking into Tailfire' })
+  @ApiResponse({ status: 201, description: 'Imported trip details' })
+  async importConfirm(
+    @Body() dto: ImportBookingConfirmDto,
+    @GetAuthContext() auth: AuthContext,
+  ) {
+    return this.importBookingService.confirm(dto, auth)
   }
 }

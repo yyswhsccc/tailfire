@@ -72,6 +72,7 @@ export const customCruiseDetailsSchema = z.object({
   cabinCode: z.string().nullable().optional(),
   cabinNumber: z.string().nullable().optional(),
   cabinDeck: z.string().nullable().optional(),
+  cabinLocation: z.string().nullable().optional(),
   cabinImageUrl: z.string().nullable().optional(),
   cabinDescription: z.string().nullable().optional(),
 
@@ -84,6 +85,13 @@ export const customCruiseDetailsSchema = z.object({
   portCallsJson: z.array(z.any()).default([]),
   cabinPricingJson: z.record(z.any()).default({}),
   shipContentJson: z.record(z.any()).default({}),
+
+  // Import-specific data
+  diningPreferences: z.record(z.any()).nullable().optional().default({}),
+  selectedExtras: z.array(z.record(z.any())).nullable().optional().default([]),
+  selectedPromotions: z.record(z.any()).nullable().optional().default({}),
+  traveltekBookingId: z.coerce.number().nullable().optional(),
+  traveltekPortfolioId: z.coerce.number().nullable().optional(),
 
   // Additional Details
   inclusions: z.array(z.string()).default([]),
@@ -223,6 +231,7 @@ export function toCustomCruiseDefaults(
       cabinCode: serverData?.customCruiseDetails?.cabinCode ?? null,
       cabinNumber: serverData?.customCruiseDetails?.cabinNumber ?? null,
       cabinDeck: serverData?.customCruiseDetails?.cabinDeck ?? null,
+      cabinLocation: serverData?.customCruiseDetails?.cabinLocation ?? null,
       cabinImageUrl: serverData?.customCruiseDetails?.cabinImageUrl ?? null,
       cabinDescription: serverData?.customCruiseDetails?.cabinDescription ?? null,
       bookingNumber: serverData?.customCruiseDetails?.bookingNumber ?? null,
@@ -231,6 +240,11 @@ export function toCustomCruiseDefaults(
       portCallsJson: serverData?.customCruiseDetails?.portCallsJson ?? [],
       cabinPricingJson: serverData?.customCruiseDetails?.cabinPricingJson ?? {},
       shipContentJson: serverData?.customCruiseDetails?.shipContentJson ?? {},
+      diningPreferences: serverData?.customCruiseDetails?.diningPreferences ?? {},
+      selectedExtras: serverData?.customCruiseDetails?.selectedExtras ?? [],
+      selectedPromotions: serverData?.customCruiseDetails?.selectedPromotions ?? {},
+      traveltekBookingId: serverData?.customCruiseDetails?.traveltekBookingId ?? null,
+      traveltekPortfolioId: serverData?.customCruiseDetails?.traveltekPortfolioId ?? null,
       inclusions: serverData?.customCruiseDetails?.inclusions ?? [],
       specialRequests: serverData?.customCruiseDetails?.specialRequests ?? null,
     },
@@ -297,6 +311,7 @@ export function toCustomCruiseApiPayload(data: CustomCruiseFormData): CreateCust
       cabinCode: data.customCruiseDetails.cabinCode || undefined,
       cabinNumber: data.customCruiseDetails.cabinNumber || undefined,
       cabinDeck: data.customCruiseDetails.cabinDeck || undefined,
+      cabinLocation: data.customCruiseDetails.cabinLocation || undefined,
       bookingNumber: data.customCruiseDetails.bookingNumber || undefined,
       fareCode: data.customCruiseDetails.fareCode || undefined,
       bookingDeadline: data.customCruiseDetails.bookingDeadline || undefined,

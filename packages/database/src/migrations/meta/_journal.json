@@ -771,6 +771,13 @@
       "when": 1771272000000,
       "tag": "20260215200000_create_contact_documents_table",
       "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1771329600000,
+      "tag": "20260216120000_add_import_fields_to_cruise_details",
+      "breakpoints": true
     }
   ]
 }
