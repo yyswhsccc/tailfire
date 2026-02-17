@@ -19,6 +19,16 @@ import { customCruiseDetailsDtoSchema } from './custom-cruise-details.schema'
 import { customTourDetailsDtoSchema, tourDayDetailsDtoSchema } from './custom-tour-details.schema'
 
 // =============================================================================
+// Per-Person Pricing Breakdown Item Schema
+// =============================================================================
+
+const pricingBreakdownItemSchema = z.object({
+  label: z.string(),
+  priceCents: z.number().int(),
+  travelerId: z.string().uuid().optional(),
+})
+
+// =============================================================================
 // Base Create Component Schema
 // =============================================================================
 
@@ -65,6 +75,9 @@ const baseCreateComponentSchema = z.object({
   cancellationPolicy: z.string().nullable().optional(),
   supplier: z.string().nullable().optional(),
   bookingReference: z.string().nullable().optional(),
+
+  // Per-person pricing breakdown
+  pricingBreakdownJson: z.array(pricingBreakdownItemSchema).nullable().optional(),
 
   // Media
   photos: z.array(photoSchema).nullable().optional(),
@@ -114,6 +127,9 @@ const baseUpdateComponentSchema = z.object({
   cancellationPolicy: z.string().nullable().optional(),
   supplier: z.string().nullable().optional(),
   bookingReference: z.string().nullable().optional(),
+
+  // Per-person pricing breakdown
+  pricingBreakdownJson: z.array(pricingBreakdownItemSchema).nullable().optional(),
 
   // Media
   photos: z.array(photoSchema).nullable().optional(),

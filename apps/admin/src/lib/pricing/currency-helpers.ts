@@ -76,5 +76,6 @@ export function buildInitialPricingState(component: any) {
     cancellationPolicy: '',
     confirmationNumber: component.confirmationNumber || '',
     supplier: '',
+    pricingBreakdown: component.pricingBreakdownJson ?? null,
   }
 }

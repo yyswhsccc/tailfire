@@ -13,6 +13,12 @@ import {
 } from './enums.schema'
 import { coordinatesSchema, photoSchema } from './common.schema'
 
+const pricingBreakdownItemSchema = z.object({
+  label: z.string(),
+  priceCents: z.number().int(),
+  travelerId: z.string().uuid().optional(),
+})
+
 // =============================================================================
 // Create Activity DTO Schema
 // =============================================================================
@@ -52,6 +58,9 @@ export const createActivityDtoSchema = z.object({
   taxesCents: z.number().int().nonnegative().optional(),
   commissionTotalCents: z.number().int().nonnegative().nullable().optional(),
   commissionSplitPercentage: z.number().min(0).max(100).nullable().optional(),
+
+  // Per-person pricing breakdown
+  pricingBreakdownJson: z.array(pricingBreakdownItemSchema).nullable().optional(),
 
   // Media - nullable/optional
   photos: z.array(photoSchema).nullable().optional(),
@@ -102,6 +111,9 @@ export const updateActivityDtoSchema = z.object({
   taxesCents: z.number().int().nonnegative().optional(),
   commissionTotalCents: z.number().int().nonnegative().nullable().optional(),
   commissionSplitPercentage: z.number().min(0).max(100).nullable().optional(),
+
+  // Per-person pricing breakdown
+  pricingBreakdownJson: z.array(pricingBreakdownItemSchema).nullable().optional(),
 
   // Media
   photos: z.array(photoSchema).nullable().optional(),

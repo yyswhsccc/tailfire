@@ -221,7 +221,7 @@ export class ComponentOrchestrationService {
     // Note: BaseComponentService.create() auto-creates an activity_pricing record, so we update it
     const hasPricingData = dto.totalPriceCents !== undefined || dto.termsAndConditions ||
       dto.cancellationPolicy || dto.supplier || dto.commissionTotalCents !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined || dto.pricingBreakdownJson !== undefined
 
     if (hasPricingData) {
       await this.db.client
@@ -243,6 +243,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy ?? null,
           supplier: dto.supplier ?? null,
           bookingReference: dto.bookingReference ?? null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
           updatedAt: new Date(),
         })
         .where(eq(this.db.schema.activityPricing.activityId, activityId))
@@ -341,6 +342,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: activityPricing?.cancellationPolicy || null,
       supplier: activityPricing?.supplier || null,
       bookingReference: activityPricing?.bookingReference || null,
+      pricingBreakdownJson: activityPricing?.pricingBreakdownJson as any[] || null,
       photos: baseComponent.photos || null,
       createdAt: baseComponent.createdAt.toISOString(),
       updatedAt: baseComponent.updatedAt.toISOString(),
@@ -395,7 +397,8 @@ export class ComponentOrchestrationService {
       dto.termsAndConditions !== undefined ||
       dto.cancellationPolicy !== undefined ||
       dto.supplier !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined ||
+      dto.pricingBreakdownJson !== undefined
 
     if (hasPricingUpdate) {
       const [existingPricing] = await this.db.client
@@ -425,6 +428,7 @@ export class ComponentOrchestrationService {
             cancellationPolicy: dto.cancellationPolicy !== undefined ? dto.cancellationPolicy : existingPricing.cancellationPolicy,
             supplier: dto.supplier !== undefined ? dto.supplier : existingPricing.supplier,
             bookingReference: dto.bookingReference !== undefined ? dto.bookingReference : existingPricing.bookingReference,
+            ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
             updatedAt: new Date(),
           })
           .where(eq(this.db.schema.activityPricing.id, existingPricing.id))
@@ -449,6 +453,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy || null,
           supplier: dto.supplier || null,
           bookingReference: dto.bookingReference || null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
         })
       }
     }
@@ -514,7 +519,7 @@ export class ComponentOrchestrationService {
     // Note: BaseComponentService.create() auto-creates an activity_pricing record, so we update it
     const hasPricingData = dto.totalPriceCents !== undefined || dto.termsAndConditions ||
       dto.cancellationPolicy || dto.supplier || dto.commissionTotalCents !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined || dto.pricingBreakdownJson !== undefined
 
     if (hasPricingData) {
       await this.db.client
@@ -535,6 +540,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy ?? null,
           supplier: dto.supplier ?? null,
           bookingReference: dto.bookingReference ?? null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
           updatedAt: new Date(),
         })
         .where(eq(this.db.schema.activityPricing.activityId, activityId))
@@ -589,6 +595,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: activityPricing?.cancellationPolicy || null,
       supplier: activityPricing?.supplier || null,
       bookingReference: activityPricing?.bookingReference || null,
+      pricingBreakdownJson: activityPricing?.pricingBreakdownJson as any[] || null,
       photos: baseComponent.photos || null,
       createdAt: baseComponent.createdAt.toISOString(),
       updatedAt: baseComponent.updatedAt.toISOString(),
@@ -637,7 +644,8 @@ export class ComponentOrchestrationService {
       dto.termsAndConditions !== undefined ||
       dto.cancellationPolicy !== undefined ||
       dto.supplier !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined ||
+      dto.pricingBreakdownJson !== undefined
 
     if (hasPricingUpdate) {
       const [existingPricing] = await this.db.client
@@ -665,6 +673,7 @@ export class ComponentOrchestrationService {
             cancellationPolicy: dto.cancellationPolicy !== undefined ? dto.cancellationPolicy : existingPricing.cancellationPolicy,
             supplier: dto.supplier !== undefined ? dto.supplier : existingPricing.supplier,
             bookingReference: dto.bookingReference !== undefined ? dto.bookingReference : existingPricing.bookingReference,
+            ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
             updatedAt: new Date(),
           })
           .where(eq(this.db.schema.activityPricing.id, existingPricing.id))
@@ -688,6 +697,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy || null,
           supplier: dto.supplier || null,
           bookingReference: dto.bookingReference || null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
         })
       }
     }
@@ -775,7 +785,7 @@ export class ComponentOrchestrationService {
     // Note: BaseComponentService.create() auto-creates an activity_pricing record, so we update it
     const hasPricingData = dto.totalPriceCents !== undefined || dto.termsAndConditions ||
       dto.cancellationPolicy || dto.supplier || dto.commissionTotalCents !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined || dto.pricingBreakdownJson !== undefined
 
     if (hasPricingData) {
       await this.db.client
@@ -796,6 +806,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy ?? null,
           supplier: dto.supplier ?? null,
           bookingReference: dto.bookingReference ?? null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
           updatedAt: new Date(),
         })
         .where(eq(this.db.schema.activityPricing.activityId, activityId))
@@ -850,6 +861,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: activityPricing?.cancellationPolicy || null,
       supplier: activityPricing?.supplier || null,
       bookingReference: activityPricing?.bookingReference || null,
+      pricingBreakdownJson: activityPricing?.pricingBreakdownJson as any[] || null,
       photos: baseComponent.photos || null,
       createdAt: baseComponent.createdAt.toISOString(),
       updatedAt: baseComponent.updatedAt.toISOString(),
@@ -921,7 +933,8 @@ export class ComponentOrchestrationService {
       dto.termsAndConditions !== undefined ||
       dto.cancellationPolicy !== undefined ||
       dto.supplier !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined ||
+      dto.pricingBreakdownJson !== undefined
 
     if (hasPricingUpdate) {
       const [existingPricing] = await this.db.client
@@ -949,6 +962,7 @@ export class ComponentOrchestrationService {
             cancellationPolicy: dto.cancellationPolicy !== undefined ? dto.cancellationPolicy : existingPricing.cancellationPolicy,
             supplier: dto.supplier !== undefined ? dto.supplier : existingPricing.supplier,
             bookingReference: dto.bookingReference !== undefined ? dto.bookingReference : existingPricing.bookingReference,
+            ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
             updatedAt: new Date(),
           })
           .where(eq(this.db.schema.activityPricing.id, existingPricing.id))
@@ -972,6 +986,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy || null,
           supplier: dto.supplier || null,
           bookingReference: dto.bookingReference || null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
         })
       }
     }
@@ -1040,7 +1055,7 @@ export class ComponentOrchestrationService {
     // Note: BaseComponentService.create() auto-creates an activity_pricing record, so we update it
     const hasPricingData = dto.totalPriceCents !== undefined || dto.termsAndConditions ||
       dto.cancellationPolicy || dto.supplier || dto.commissionTotalCents !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined || dto.pricingBreakdownJson !== undefined
 
     if (hasPricingData) {
       await this.db.client
@@ -1061,6 +1076,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy ?? null,
           supplier: dto.supplier ?? null,
           bookingReference: dto.bookingReference ?? null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
           updatedAt: new Date(),
         })
         .where(eq(this.db.schema.activityPricing.activityId, activityId))
@@ -1115,6 +1131,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: activityPricing?.cancellationPolicy || null,
       supplier: activityPricing?.supplier || null,
       bookingReference: activityPricing?.bookingReference || null,
+      pricingBreakdownJson: activityPricing?.pricingBreakdownJson as any[] || null,
       photos: baseComponent.photos || null,
       createdAt: baseComponent.createdAt.toISOString(),
       updatedAt: baseComponent.updatedAt.toISOString(),
@@ -1167,7 +1184,8 @@ export class ComponentOrchestrationService {
       dto.termsAndConditions !== undefined ||
       dto.cancellationPolicy !== undefined ||
       dto.supplier !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined ||
+      dto.pricingBreakdownJson !== undefined
 
     if (hasPricingUpdate) {
       const [existingPricing] = await this.db.client
@@ -1195,6 +1213,7 @@ export class ComponentOrchestrationService {
             cancellationPolicy: dto.cancellationPolicy !== undefined ? dto.cancellationPolicy : existingPricing.cancellationPolicy,
             supplier: dto.supplier !== undefined ? dto.supplier : existingPricing.supplier,
             bookingReference: dto.bookingReference !== undefined ? dto.bookingReference : existingPricing.bookingReference,
+            ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
             updatedAt: new Date(),
           })
           .where(eq(this.db.schema.activityPricing.id, existingPricing.id))
@@ -1218,6 +1237,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy || null,
           supplier: dto.supplier || null,
           bookingReference: dto.bookingReference || null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
         })
       }
     }
@@ -1317,6 +1337,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: null,
       supplier: null,
       bookingReference: null,
+      pricingBreakdownJson: null,
       photos: baseComponent.photos || null,
       createdAt: baseComponent.createdAt.toISOString(),
       updatedAt: baseComponent.updatedAt.toISOString(),
@@ -1413,7 +1434,7 @@ export class ComponentOrchestrationService {
     // Note: BaseComponentService.create() auto-creates an activity_pricing record, so we update it
     const hasPricingData = dto.totalPriceCents !== undefined || dto.termsAndConditions ||
       dto.cancellationPolicy || dto.supplier || dto.commissionTotalCents !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined || dto.pricingBreakdownJson !== undefined
 
     if (hasPricingData) {
       await this.db.client
@@ -1434,6 +1455,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy ?? null,
           supplier: dto.supplier ?? null,
           bookingReference: dto.bookingReference ?? null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
           updatedAt: new Date(),
         })
         .where(eq(this.db.schema.activityPricing.activityId, activityId))
@@ -1488,6 +1510,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: activityPricing?.cancellationPolicy || null,
       supplier: activityPricing?.supplier || null,
       bookingReference: activityPricing?.bookingReference || null,
+      pricingBreakdownJson: activityPricing?.pricingBreakdownJson as any[] || null,
       photos: baseComponent.photos || null,
       createdAt: baseComponent.createdAt.toISOString(),
       updatedAt: baseComponent.updatedAt.toISOString(),
@@ -1533,7 +1556,8 @@ export class ComponentOrchestrationService {
       dto.termsAndConditions !== undefined ||
       dto.cancellationPolicy !== undefined ||
       dto.supplier !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined ||
+      dto.pricingBreakdownJson !== undefined
 
     if (hasPricingUpdate) {
       const [existingPricing] = await this.db.client
@@ -1563,6 +1587,7 @@ export class ComponentOrchestrationService {
             cancellationPolicy: dto.cancellationPolicy !== undefined ? dto.cancellationPolicy : existingPricing.cancellationPolicy,
             supplier: dto.supplier !== undefined ? dto.supplier : existingPricing.supplier,
             bookingReference: dto.bookingReference !== undefined ? dto.bookingReference : existingPricing.bookingReference,
+            ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
             updatedAt: new Date(),
           })
           .where(eq(this.db.schema.activityPricing.id, existingPricing.id))
@@ -1587,6 +1612,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy || null,
           supplier: dto.supplier || null,
           bookingReference: dto.bookingReference || null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
         })
       }
     }
@@ -1650,7 +1676,7 @@ export class ComponentOrchestrationService {
     let finalPricing = initialPricing
     const hasPricingData = dto.totalPriceCents !== undefined || dto.termsAndConditions ||
       dto.cancellationPolicy || dto.supplier || dto.commissionTotalCents !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined || dto.pricingBreakdownJson !== undefined
 
     if (hasPricingData && initialPricing) {
       const [updatedPricing] = await this.db.client
@@ -1712,6 +1738,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: finalPricing?.cancellationPolicy || null,
       supplier: finalPricing?.supplier || null,
       bookingReference: finalPricing?.bookingReference || null,
+      pricingBreakdownJson: finalPricing?.pricingBreakdownJson as any[] || null,
       photos: component.photos || null,
       createdAt: component.createdAt.toISOString(),
       updatedAt: component.updatedAt.toISOString(),
@@ -1765,6 +1792,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: activityPricing?.cancellationPolicy || null,
       supplier: activityPricing?.supplier || null,
       bookingReference: activityPricing?.bookingReference || null,
+      pricingBreakdownJson: activityPricing?.pricingBreakdownJson as any[] || null,
       photos: baseComponent.photos || null,
       createdAt: baseComponent.createdAt.toISOString(),
       updatedAt: baseComponent.updatedAt.toISOString(),
@@ -1810,7 +1838,8 @@ export class ComponentOrchestrationService {
       dto.termsAndConditions !== undefined ||
       dto.cancellationPolicy !== undefined ||
       dto.supplier !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined ||
+      dto.pricingBreakdownJson !== undefined
 
     if (hasPricingUpdate) {
       const [existingPricing] = await this.db.client
@@ -1840,6 +1869,7 @@ export class ComponentOrchestrationService {
             cancellationPolicy: dto.cancellationPolicy !== undefined ? dto.cancellationPolicy : existingPricing.cancellationPolicy,
             supplier: dto.supplier !== undefined ? dto.supplier : existingPricing.supplier,
             bookingReference: dto.bookingReference !== undefined ? dto.bookingReference : existingPricing.bookingReference,
+            ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
             updatedAt: new Date(),
           })
           .where(eq(this.db.schema.activityPricing.id, existingPricing.id))
@@ -1864,6 +1894,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy || null,
           supplier: dto.supplier || null,
           bookingReference: dto.bookingReference || null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
         })
       }
     }
@@ -1925,7 +1956,7 @@ export class ComponentOrchestrationService {
     let finalPricing = initialPricing
     const hasPricingData = dto.totalPriceCents !== undefined || dto.termsAndConditions ||
       dto.cancellationPolicy || dto.supplier || dto.commissionTotalCents !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined || dto.pricingBreakdownJson !== undefined
 
     if (hasPricingData && initialPricing) {
       const [updatedPricing] = await this.db.client
@@ -1987,6 +2018,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: finalPricing?.cancellationPolicy || null,
       supplier: finalPricing?.supplier || null,
       bookingReference: finalPricing?.bookingReference || null,
+      pricingBreakdownJson: finalPricing?.pricingBreakdownJson as any[] || null,
       photos: component.photos || null,
       createdAt: component.createdAt.toISOString(),
       updatedAt: component.updatedAt.toISOString(),
@@ -2040,6 +2072,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: activityPricing?.cancellationPolicy || null,
       supplier: activityPricing?.supplier || null,
       bookingReference: activityPricing?.bookingReference || null,
+      pricingBreakdownJson: activityPricing?.pricingBreakdownJson as any[] || null,
       photos: baseComponent.photos || null,
       createdAt: baseComponent.createdAt.toISOString(),
       updatedAt: baseComponent.updatedAt.toISOString(),
@@ -2085,7 +2118,8 @@ export class ComponentOrchestrationService {
       dto.termsAndConditions !== undefined ||
       dto.cancellationPolicy !== undefined ||
       dto.supplier !== undefined ||
-      dto.bookingReference !== undefined
+      dto.bookingReference !== undefined ||
+      dto.pricingBreakdownJson !== undefined
 
     if (hasPricingUpdate) {
       const [existingPricing] = await this.db.client
@@ -2115,6 +2149,7 @@ export class ComponentOrchestrationService {
             cancellationPolicy: dto.cancellationPolicy !== undefined ? dto.cancellationPolicy : existingPricing.cancellationPolicy,
             supplier: dto.supplier !== undefined ? dto.supplier : existingPricing.supplier,
             bookingReference: dto.bookingReference !== undefined ? dto.bookingReference : existingPricing.bookingReference,
+            ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
             updatedAt: new Date(),
           })
           .where(eq(this.db.schema.activityPricing.id, existingPricing.id))
@@ -2139,6 +2174,7 @@ export class ComponentOrchestrationService {
           cancellationPolicy: dto.cancellationPolicy || null,
           supplier: dto.supplier || null,
           bookingReference: dto.bookingReference || null,
+          ...(dto.pricingBreakdownJson !== undefined && { pricingBreakdownJson: dto.pricingBreakdownJson }),
         })
       }
     }
@@ -2225,6 +2261,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: null,
       supplier: null,
       bookingReference: null,
+      pricingBreakdownJson: null,
       photos: null,
       createdAt: component.createdAt.toISOString(),
       updatedAt: component.updatedAt.toISOString(),
@@ -2270,6 +2307,7 @@ export class ComponentOrchestrationService {
       cancellationPolicy: null,
       supplier: null,
       bookingReference: null,
+      pricingBreakdownJson: null,
       photos: null,
       createdAt: baseComponent.createdAt.toISOString(),
       updatedAt: baseComponent.updatedAt.toISOString(),
@@ -3074,6 +3112,7 @@ export class ComponentOrchestrationService {
         cancellationPolicy: null,
         supplier: null,
         bookingReference: null,
+        pricingBreakdownJson: null,
         photos: null,
         createdAt: now,
         updatedAt: now,

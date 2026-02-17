@@ -36,7 +36,7 @@ import { itineraryDayKeys } from '@/hooks/use-itinerary-days'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
-import { buildInitialPricingState, type PricingData, type ValidationErrors } from '@/lib/pricing'
+import { buildInitialPricingState, type PricingData, type PricingBreakdownItem, type ValidationErrors } from '@/lib/pricing'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { dollarsToCents } from '@/lib/pricing/currency-helpers'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
@@ -208,6 +208,9 @@ export function LodgingForm({
 
   // Package linkage state for PricingSection
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
+  const [pricingBreakdown, setPricingBreakdown] = useState<PricingBreakdownItem[] | null>(
+    (activity as any)?.pricingBreakdownJson ?? null
+  )
   const { data: packagesData } = useBookings({ tripId })
   const availablePackages = useMemo(
     () => packagesData?.map(pkg => ({ id: pkg.id, name: pkg.name })) ?? [],
@@ -442,7 +445,8 @@ export function LodgingForm({
   const saveFn = useCallback(
     async (data: LodgingFormData) => {
       // Convert form data to API payload with proper type conversions
-      const payload = toApiPayload(data)
+      const apiPayload = toApiPayload(data)
+      const payload = { ...apiPayload, pricingBreakdownJson: pricingBreakdown }
 
       if (activityId) {
         return updateLodging.mutateAsync({ id: activityId, data: payload })
@@ -450,7 +454,7 @@ export function LodgingForm({
         return createLodging.mutateAsync(payload)
       }
     },
-    [activityId, createLodging, updateLodging]
+    [activityId, createLodging, updateLodging, pricingBreakdown]
   )
 
   // Auto-save effect with proper gating
@@ -638,13 +642,18 @@ export function LodgingForm({
       termsAndConditions: watch('termsAndConditions') || '',
       cancellationPolicy: watch('cancellationPolicy') || '',
       supplier: watch('supplier') || '',
+      pricingBreakdown,
     }
-  }, [watch, watchedFields, selectedPackageId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [watch, watchedFields, selectedPackageId, pricingBreakdown]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle pricing section updates
   const handlePricingUpdate = useCallback(
     (updates: Partial<PricingData>) => {
+      if ('pricingBreakdown' in updates) {
+        setPricingBreakdown(updates.pricingBreakdown ?? null)
+      }
       Object.entries(updates).forEach(([key, value]) => {
+        if (key === 'pricingBreakdown') return
         // Convert commissionExpectedDate string back to Date (form stores Date objects)
         if (key === 'commissionExpectedDate' && typeof value === 'string') {
           setValue('commissionExpectedDate', stringToDate(value), { shouldDirty: true, shouldValidate: true })
@@ -1492,6 +1501,7 @@ export function LodgingForm({
             onPackageChange={setSelectedPackageId}
             isChildOfPackage={isChildOfPackage}
             parentPackageName={parentPackageName}
+            travelers={travelers}
           />
 
           <Separator />

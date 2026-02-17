@@ -90,6 +90,7 @@ export class ContactsService {
         // Phase 2: Lifecycle (optional on create)
         contactType: dto.contactType,
         contactStatus: dto.contactStatus,
+        becameClientAt: dto.becameClientAt ? new Date(dto.becameClientAt) : undefined,
 
         // Phase 3: Marketing consent (optional on create)
         marketingEmailOptIn: dto.marketingEmailOptIn,

@@ -36,7 +36,7 @@ import { useIsChildOfPackage } from '@/hooks/use-is-child-of-package'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
-import { buildInitialPricingState, type PricingData } from '@/lib/pricing'
+import { buildInitialPricingState, type PricingData, type PricingBreakdownItem } from '@/lib/pricing'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
@@ -168,6 +168,9 @@ export function TourForm({
 
   // Package linkage state for PricingSection
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
+  const [pricingBreakdown, setPricingBreakdown] = useState<PricingBreakdownItem[] | null>(
+    (activity as any)?.pricingBreakdownJson ?? null
+  )
   const { data: packagesData } = useBookings({ tripId: trip?.id })
   const availablePackages = useMemo(
     () => packagesData?.map(pkg => ({ id: pkg.id, name: pkg.name })) ?? [],
@@ -514,12 +517,13 @@ export function TourForm({
     setAutoSaveStatus('saving')
     try {
       const formData = getValues()
+      const payload = { ...formData, pricingBreakdownJson: pricingBreakdown }
 
       let response
       if (activityId) {
-        response = await updateTour.mutateAsync({ id: activityId, data: formData })
+        response = await updateTour.mutateAsync({ id: activityId, data: payload })
       } else {
-        response = await createTour.mutateAsync(formData)
+        response = await createTour.mutateAsync(payload)
       }
 
       if (!activityId && response.id) {
@@ -545,6 +549,7 @@ export function TourForm({
     activityId,
     activityPricingId,
     getValues,
+    pricingBreakdown,
     createTour,
     updateTour,
     toast,
@@ -669,6 +674,7 @@ export function TourForm({
     termsAndConditions: getValues('termsAndConditions') || '',
     cancellationPolicy: getValues('cancellationPolicy') || '',
     supplier: getValues('supplier') || '',
+    pricingBreakdown,
   }
 
   // Get travelers from trip data
@@ -1345,7 +1351,11 @@ export function TourForm({
           <PricingSection
             pricingData={pricingData}
             onUpdate={(updates) => {
+              if ('pricingBreakdown' in updates) {
+                setPricingBreakdown(updates.pricingBreakdown ?? null)
+              }
               Object.entries(updates).forEach(([key, value]) => {
+                if (key === 'pricingBreakdown') return
                 setValue(key as keyof TourFormData, value as any, { shouldDirty: true, shouldValidate: true })
               })
             }}
@@ -1356,6 +1366,7 @@ export function TourForm({
             onPackageChange={setSelectedPackageId}
             isChildOfPackage={isChildOfPackage}
             parentPackageName={parentPackageName}
+            travelers={travelers}
           />
 
           <Separator />

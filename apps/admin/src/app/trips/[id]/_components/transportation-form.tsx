@@ -70,7 +70,7 @@ import { DocumentUploader } from '@/components/document-uploader'
 import { ComponentMediaTab } from '@/components/shared'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { PaymentScheduleSection } from './payment-schedule-section'
-import { type PricingData } from '@/lib/pricing'
+import { type PricingData, type PricingBreakdownItem } from '@/lib/pricing'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -249,6 +249,9 @@ export function TransportationForm({
 
   // Package linkage state for PricingSection
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
+  const [pricingBreakdown, setPricingBreakdown] = useState<PricingBreakdownItem[] | null>(
+    (activity as any)?.pricingBreakdownJson ?? null
+  )
   const { data: packagesData } = useBookings({ tripId: trip?.id })
   const availablePackages = useMemo(
     () => packagesData?.map(pkg => ({ id: pkg.id, name: pkg.name })) ?? [],
@@ -454,12 +457,19 @@ export function TransportationForm({
       termsAndConditions: values.termsAndConditions || '',
       cancellationPolicy: values.cancellationPolicy || '',
       supplier: values.supplier || '',
+      pricingBreakdown,
     }
-  }, [watchedFields, getValues, selectedPackageId])
+  }, [watchedFields, getValues, selectedPackageId, pricingBreakdown])
+
+  const travelers: Array<{ id: string; name: string }> = trip?.travelers || []
 
   // Handler for pricing/booking/commission section updates
   const handlePricingUpdate = useCallback((updates: Partial<PricingData>) => {
+    if ('pricingBreakdown' in updates) {
+      setPricingBreakdown(updates.pricingBreakdown ?? null)
+    }
     Object.entries(updates).forEach(([key, value]) => {
+      if (key === 'pricingBreakdown') return
       setValue(key as keyof TransportationFormData, value as any, { shouldDirty: true, shouldValidate: true })
     })
   }, [setValue])
@@ -533,7 +543,8 @@ export function TransportationForm({
   const saveFn = useCallback(
     async (data: TransportationFormData) => {
       // Convert form data to API payload with proper type conversions
-      const payload = toTransportationApiPayload(data)
+      const formData = toTransportationApiPayload(data)
+      const payload = { ...formData, pricingBreakdownJson: pricingBreakdown }
 
       if (activityId) {
         return updateMutation.mutateAsync({
@@ -544,7 +555,7 @@ export function TransportationForm({
         return createMutation.mutateAsync(payload)
       }
     },
-    [activityId, createMutation, updateMutation]
+    [activityId, createMutation, updateMutation, pricingBreakdown]
   )
 
   // Auto-save effect with proper gating
@@ -1394,6 +1405,7 @@ export function TransportationForm({
             onPackageChange={setSelectedPackageId}
             isChildOfPackage={isChildOfPackage}
             parentPackageName={parentPackageName}
+            travelers={travelers}
           />
 
           <Separator />

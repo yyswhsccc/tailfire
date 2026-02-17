@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'static3.traveltek.net',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'pub-0ab7614dd4094206aa5c733bea70d570.r2.dev',
         pathname: '/**',
       },

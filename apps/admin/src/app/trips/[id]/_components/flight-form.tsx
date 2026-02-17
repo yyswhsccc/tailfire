@@ -51,7 +51,7 @@ import { PaymentScheduleSection } from './payment-schedule-section'
 import { ComponentMediaTab } from '@/components/shared'
 import { DocumentUploader } from '@/components/document-uploader'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
-import { buildInitialPricingState, type PricingData } from '@/lib/pricing'
+import { buildInitialPricingState, type PricingData, type PricingBreakdownItem } from '@/lib/pricing'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { DateRangeInput } from '@/components/ui/date-range-input'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
@@ -227,6 +227,9 @@ export function FlightForm({
 
   // Package linkage state
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
+  const [pricingBreakdown, setPricingBreakdown] = useState<PricingBreakdownItem[] | null>(
+    (activity as any)?.pricingBreakdownJson ?? null
+  )
   const { data: packagesData } = useBookings({ tripId: trip?.id })
   const availablePackages = useMemo(() =>
     packagesData?.map(pkg => ({ id: pkg.id, name: pkg.name })) ?? [],
@@ -600,8 +603,9 @@ export function FlightForm({
       termsAndConditions: values.termsAndConditions || '',
       cancellationPolicy: values.cancellationPolicy || '',
       supplier: values.supplier || '',
+      pricingBreakdown,
     }
-  }, [watchedFields, getValues, selectedPackageId])
+  }, [watchedFields, getValues, selectedPackageId, pricingBreakdown])
 
   // Auto-save effect with proper validation gating
   // IMPORTANT: Uses refs for activityId and saving state to prevent infinite loops
@@ -631,7 +635,7 @@ export function FlightForm({
 
       isSavingRef.current = true
       const data = getValues()
-      const payload = toFlightApiPayload(data)
+      const payload = { ...toFlightApiPayload(data), pricingBreakdownJson: pricingBreakdown }
 
       setSaveStatus('saving')
 
@@ -712,6 +716,7 @@ export function FlightForm({
     createMutation,
     updateMutation,
     errors,
+    pricingBreakdown,
   ])
 
   const handleAiSubmit = () => {
@@ -946,7 +951,7 @@ export function FlightForm({
   }
 
   const onSubmit = handleSubmit(async (data) => {
-    const payload = toFlightApiPayload(data)
+    const payload = { ...toFlightApiPayload(data), pricingBreakdownJson: pricingBreakdown }
 
     setSaveStatus('saving')
 
@@ -1041,6 +1046,7 @@ export function FlightForm({
     if ('termsAndConditions' in updates) setValue('termsAndConditions', updates.termsAndConditions ?? '')
     if ('cancellationPolicy' in updates) setValue('cancellationPolicy', updates.cancellationPolicy ?? '')
     if ('supplier' in updates) setValue('supplier', updates.supplier ?? '')
+    if ('pricingBreakdown' in updates) setPricingBreakdown(updates.pricingBreakdown ?? null)
   }, [setValue])
 
   // Handle supplier defaults from BookingDetailsSection
@@ -2021,6 +2027,7 @@ export function FlightForm({
             onPackageChange={setSelectedPackageId}
             isChildOfPackage={isChildOfPackage}
             parentPackageName={parentPackageName}
+            travelers={travelers}
           />
 
           <Separator />

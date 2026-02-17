@@ -10,6 +10,17 @@ import { z } from 'zod'
 /**
  * Pricing data schema
  */
+/**
+ * Per-person/per-unit breakdown item schema
+ */
+export const pricingBreakdownItemSchema = z.object({
+  label: z.string(),
+  priceCents: z.number().int().nonnegative(),
+  travelerId: z.string().optional(),
+})
+
+export type PricingBreakdownItem = z.infer<typeof pricingBreakdownItemSchema>
+
 export const pricingDataSchema = z.object({
   // Invoice and pricing type
   invoiceType: z.enum(['individual_item', 'part_of_package']).default('individual_item'),
@@ -19,6 +30,9 @@ export const pricingDataSchema = z.object({
   totalPriceCents: z.number().int().nonnegative('Total price must be non-negative'),
   taxesAndFeesCents: z.number().int().nonnegative('Taxes & fees must be non-negative').optional(),
   currency: z.string().min(1, 'Currency is required'),
+
+  // Per-person/per-unit breakdown
+  pricingBreakdown: z.array(pricingBreakdownItemSchema).nullable().optional(),
 
   // Commission fields
   commissionTotalCents: z.number().int().nonnegative('Commission total must be non-negative').optional(),

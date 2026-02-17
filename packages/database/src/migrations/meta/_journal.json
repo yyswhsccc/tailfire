@@ -778,6 +778,13 @@
       "when": 1771329600000,
       "tag": "20260216120000_add_import_fields_to_cruise_details",
       "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1771416000000,
+      "tag": "20260217120000_add_pricing_breakdown_json",
+      "breakpoints": true
     }
   ]
 }

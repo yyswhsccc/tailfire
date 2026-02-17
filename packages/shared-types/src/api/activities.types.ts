@@ -59,6 +59,15 @@ export {
 // =============================================================================
 
 /**
+ * Per-person or per-unit pricing breakdown item
+ */
+export type PricingBreakdownItem = {
+  label: string           // e.g., "Mrs Jacqueline Belanger" or "Adult 1"
+  priceCents: number      // individual price in cents
+  travelerId?: string     // optional link to trip_traveler UUID
+}
+
+/**
  * Activity Pricing DTO
  * Represents pricing data from activity_pricing table
  */
@@ -70,6 +79,8 @@ export type ActivityPricingDto = {
   taxesAndFeesCents?: number | null
   commissionTotalCents?: number | null
   commissionSplitPercentage?: number | null
+  // Per-person/per-unit breakdown
+  pricingBreakdownJson?: PricingBreakdownItem[] | null
 }
 
 // =============================================================================
@@ -121,6 +132,7 @@ export type ActivityResponseDto = {
   pricing: ActivityPricingDto | null
   activityPricingId?: string | null // ID of activity_pricing record (for payment schedule config)
   pricingType: PricingType | null // Display hint (kept for backward compatibility)
+  pricingBreakdownJson?: PricingBreakdownItem[] | null // Per-person pricing breakdown
   currency: string // 3-letter currency code (default: 'USD')
 
   // Media (deferred - kept nullable for future photo uploads)

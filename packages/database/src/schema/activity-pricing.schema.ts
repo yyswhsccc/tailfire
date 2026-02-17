@@ -4,7 +4,7 @@
  * Pricing, payment schedules, and commission tracking for bookable activities
  */
 
-import { pgTable, pgEnum, uuid, varchar, decimal, text, date, timestamp, integer, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, pgEnum, uuid, varchar, decimal, text, date, timestamp, integer, boolean, jsonb } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { itineraryActivities } from './activities.schema'
 
@@ -50,6 +50,9 @@ export const activityPricing = pgTable('activity_pricing', {
   // Extended pricing fields (added in migration 0019)
   totalPriceCents: integer('total_price_cents'),
   taxesAndFeesCents: integer('taxes_and_fees_cents').default(0),
+
+  // Per-person/per-unit pricing breakdown (added in migration 0111)
+  pricingBreakdownJson: jsonb('pricing_breakdown_json'),
 
   // Commission configuration fields (expected values, not actuals)
   commissionTotalCents: integer('commission_total_cents'),
