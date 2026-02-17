@@ -92,7 +92,7 @@ export function ServiceFeesPanel({
 
   if (isLoading) {
     return (
-      <div className="p-4 text-center text-sm text-tern-gray-500">
+      <div className="p-4 text-center text-sm text-ash-500">
         Loading service fees...
       </div>
     )
@@ -104,7 +104,7 @@ export function ServiceFeesPanel({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-tern-gray-900">Service Fees</h3>
+        <h3 className="text-lg font-semibold text-ash-900">Service Fees</h3>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button size="sm">
@@ -122,10 +122,10 @@ export function ServiceFeesPanel({
 
       {/* Fees Table */}
       {fees.length === 0 ? (
-        <div className="p-8 border border-dashed border-tern-gray-200 rounded-lg text-center">
-          <FileText className="mx-auto h-12 w-12 text-tern-gray-400" />
-          <h4 className="mt-4 text-sm font-medium text-tern-gray-900">No service fees</h4>
-          <p className="mt-1 text-sm text-tern-gray-500">
+        <div className="p-8 border border-dashed border-ash-200 rounded-lg text-center">
+          <FileText className="mx-auto h-12 w-12 text-ash-400" />
+          <h4 className="mt-4 text-sm font-medium text-ash-900">No service fees</h4>
+          <p className="mt-1 text-sm text-ash-500">
             Get started by adding a service fee to this trip.
           </p>
           <Button
@@ -139,7 +139,7 @@ export function ServiceFeesPanel({
           </Button>
         </div>
       ) : (
-        <div className="border border-tern-gray-200 rounded-lg overflow-hidden">
+        <div className="border border-ash-200 rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
@@ -412,21 +412,21 @@ function ServiceFeesSummary({
     .reduce((sum, fee) => sum + fee.amountCents, 0)
 
   return (
-    <div className="grid grid-cols-3 gap-4 p-4 bg-tern-gray-50 rounded-lg">
+    <div className="grid grid-cols-3 gap-4 p-4 bg-ash-50 rounded-lg">
       <div>
-        <p className="text-sm text-tern-gray-500">Total Fees</p>
-        <p className="text-lg font-semibold text-tern-gray-900">
+        <p className="text-sm text-ash-500">Total Fees</p>
+        <p className="text-lg font-semibold text-ash-900">
           {formatCents(totalAmount, currency)}
         </p>
       </div>
       <div>
-        <p className="text-sm text-tern-gray-500">Collected</p>
+        <p className="text-sm text-ash-500">Collected</p>
         <p className="text-lg font-semibold text-green-600">
           {formatCents(totalCollected, currency)}
         </p>
       </div>
       <div>
-        <p className="text-sm text-tern-gray-500">Pending</p>
+        <p className="text-sm text-ash-500">Pending</p>
         <p className="text-lg font-semibold text-blue-600">
           {formatCents(totalPending, currency)}
         </p>

@@ -3,7 +3,7 @@
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useMemo } from 'react'
 import { Loader2, Package } from 'lucide-react'
-import { TernDetailLayout } from '@/components/tern/layout'
+import { DetailLayout } from '@/components/layout'
 import { ActivityForm } from '../../../_components/activity-form'
 import { FlightForm } from '../../../_components/flight-form'
 import { CustomCruiseForm } from '../../../_components/custom-cruise-form'
@@ -189,7 +189,7 @@ function renderActivityForm(
     // Fallback - generic activity form for unknown types
     default:
       return (
-        <div key={formKey} className="bg-white rounded-lg border border-tern-gray-200 p-6">
+        <div key={formKey} className="bg-white rounded-lg border border-ash-200 p-6">
           <ActivityForm
             itineraryId={itineraryId}
             dayId={dayId}
@@ -267,23 +267,23 @@ export default function EditActivityPage() {
 
   if (isLoading && type !== 'package') {
     return (
-      <TernDetailLayout
+      <DetailLayout
         backHref={`/trips/${tripId}?tab=itinerary`}
         backLabel="Back to Itinerary"
         additionalBackLinks={additionalBackLinks}
         sidebarSections={sidebarSections}
       >
         <div className="flex items-center justify-center p-12">
-          <Loader2 className="h-8 w-8 animate-spin text-tern-teal-500" />
+          <Loader2 className="h-8 w-8 animate-spin text-phoenix-gold-500" />
         </div>
-      </TernDetailLayout>
+      </DetailLayout>
     )
   }
 
   // Package edit - PackageForm handles its own data fetching via useBooking()
   if (type === 'package') {
     return (
-      <TernDetailLayout
+      <DetailLayout
         backHref={`/trips/${tripId}?tab=bookings`}
         backLabel="Back to Bookings"
         sidebarSections={sidebarSections}
@@ -296,14 +296,14 @@ export default function EditActivityPage() {
             onCancel={() => router.back()}
           />
         </div>
-      </TernDetailLayout>
+      </DetailLayout>
     )
   }
 
   // Fallback: If activity not found but package fetch succeeded, render PackageForm
   if ((!dayId || !activity) && packageFallback) {
     return (
-      <TernDetailLayout
+      <DetailLayout
         backHref={`/trips/${tripId}?tab=bookings`}
         backLabel="Back to Bookings"
         sidebarSections={sidebarSections}
@@ -316,29 +316,29 @@ export default function EditActivityPage() {
             onCancel={() => router.back()}
           />
         </div>
-      </TernDetailLayout>
+      </DetailLayout>
     )
   }
 
   if (!dayId || !activity) {
     return (
-      <TernDetailLayout
+      <DetailLayout
         backHref={`/trips/${tripId}?tab=itinerary`}
         backLabel="Back to Itinerary"
         additionalBackLinks={additionalBackLinks}
         sidebarSections={sidebarSections}
       >
         <div className="p-6">
-          <p className="text-tern-gray-600">Activity not found.</p>
+          <p className="text-ash-600">Activity not found.</p>
         </div>
-      </TernDetailLayout>
+      </DetailLayout>
     )
   }
 
   const day = days?.find((d) => d.id === dayId)
 
   return (
-    <TernDetailLayout
+    <DetailLayout
       backHref={`/trips/${tripId}?tab=itinerary`}
       backLabel="Back to Itinerary"
       additionalBackLinks={additionalBackLinks}
@@ -346,9 +346,9 @@ export default function EditActivityPage() {
     >
       <div className="p-6">
         {/* Header */}
-        <div className="border-b border-tern-gray-200 pb-6 mb-6">
+        <div className="border-b border-ash-200 pb-6 mb-6">
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-bold text-tern-gray-900">Edit Activity</h1>
+            <h1 className="text-2xl font-bold text-ash-900">Edit Activity</h1>
             {activity.packageId && (
               <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
                 <Package className="h-3.5 w-3.5" />
@@ -357,7 +357,7 @@ export default function EditActivityPage() {
             )}
           </div>
           {day && (
-            <p className="text-sm text-tern-gray-600">
+            <p className="text-sm text-ash-600">
               {day.title || `Day ${day.dayNumber}`}
               {day.date && parseISODate(day.date) && (
                 <span className="ml-2">• {parseISODate(day.date)!.toLocaleDateString()}</span>
@@ -380,6 +380,6 @@ export default function EditActivityPage() {
           days: days || [],
         })}
       </div>
-    </TernDetailLayout>
+    </DetailLayout>
   )
 }

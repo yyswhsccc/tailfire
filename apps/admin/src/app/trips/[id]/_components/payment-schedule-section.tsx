@@ -202,13 +202,13 @@ export function PaymentScheduleSection({
   }
 
   if (isLoading) {
-    return <div className="text-sm text-tern-gray-500">Loading payment schedule...</div>
+    return <div className="text-sm text-ash-500">Loading payment schedule...</div>
   }
 
   // Show message if no pricing ID (activity not saved yet)
   if (!activityPricingId) {
     return (
-      <div className="p-4 border border-tern-gray-200 rounded-lg bg-tern-gray-50 text-center text-sm text-tern-gray-500">
+      <div className="p-4 border border-ash-200 rounded-lg bg-ash-50 text-center text-sm text-ash-500">
         Please save the activity with a total price first to configure payment schedules.
       </div>
     )
@@ -218,7 +218,7 @@ export function PaymentScheduleSection({
     <div className="space-y-6">
       {/* Schedule Type Selection */}
       <div className="space-y-2">
-        <Label className="text-sm font-medium text-tern-gray-700">Schedule Type</Label>
+        <Label className="text-sm font-medium text-ash-700">Schedule Type</Label>
         <Select value={scheduleType} onValueChange={(value) => setScheduleType(value as ScheduleType)}>
           <SelectTrigger>
             <SelectValue />
@@ -233,12 +233,12 @@ export function PaymentScheduleSection({
 
       {/* Deposit Configuration */}
       {scheduleType === 'deposit' && (
-        <div className="space-y-4 p-4 border border-tern-gray-200 rounded-lg bg-tern-gray-50">
-          <h4 className="text-sm font-medium text-tern-gray-900">Deposit Calculator</h4>
+        <div className="space-y-4 p-4 border border-ash-200 rounded-lg bg-ash-50">
+          <h4 className="text-sm font-medium text-ash-900">Deposit Calculator</h4>
 
           {/* Deposit Type */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-tern-gray-700">Deposit Type</Label>
+            <Label className="text-sm font-medium text-ash-700">Deposit Type</Label>
             <Select value={depositType} onValueChange={(value) => setDepositType(value as DepositType)}>
               <SelectTrigger>
                 <SelectValue />
@@ -253,7 +253,7 @@ export function PaymentScheduleSection({
           {/* Deposit Value Input */}
           {depositType === 'percentage' ? (
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-tern-gray-700">Deposit Percentage</Label>
+              <Label className="text-sm font-medium text-ash-700">Deposit Percentage</Label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
@@ -263,14 +263,14 @@ export function PaymentScheduleSection({
                   onChange={(e) => setDepositPercentage(parseFloat(e.target.value) || 0)}
                   className={`w-24 ${NUMERIC_INPUT_CLASS}`}
                 />
-                <span className="text-sm text-tern-gray-600">%</span>
+                <span className="text-sm text-ash-600">%</span>
               </div>
             </div>
           ) : (
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-tern-gray-700">Deposit Amount</Label>
+              <Label className="text-sm font-medium text-ash-700">Deposit Amount</Label>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-tern-gray-600">{currency}</span>
+                <span className="text-sm text-ash-600">{currency}</span>
                 <Input
                   type="number"
                   min={0}
@@ -287,15 +287,15 @@ export function PaymentScheduleSection({
           {depositCalculation && (
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
-                <span className="text-tern-gray-600">Deposit:</span>
+                <span className="text-ash-600">Deposit:</span>
                 <span className="font-medium">{formatCurrency(depositCalculation.depositAmountCents, currency)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-tern-gray-600">Remaining:</span>
+                <span className="text-ash-600">Remaining:</span>
                 <span className="font-medium">{formatCurrency(depositCalculation.remainingAmountCents, currency)}</span>
               </div>
-              <div className="flex justify-between pt-1 border-t border-tern-gray-200">
-                <span className="text-tern-gray-900 font-medium">Total:</span>
+              <div className="flex justify-between pt-1 border-t border-ash-200">
+                <span className="text-ash-900 font-medium">Total:</span>
                 <span className="font-semibold">{formatCurrency(depositCalculation.totalAmountCents, currency)}</span>
               </div>
             </div>
@@ -305,11 +305,11 @@ export function PaymentScheduleSection({
 
       {/* Installments Configuration */}
       {scheduleType === 'installments' && (
-        <div className="space-y-4 p-4 border border-tern-gray-200 rounded-lg bg-tern-gray-50">
-          <h4 className="text-sm font-medium text-tern-gray-900">Installment Configuration</h4>
+        <div className="space-y-4 p-4 border border-ash-200 rounded-lg bg-ash-50">
+          <h4 className="text-sm font-medium text-ash-900">Installment Configuration</h4>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-tern-gray-700">Number of Installments</Label>
+            <Label className="text-sm font-medium text-ash-700">Number of Installments</Label>
             <Input
               type="number"
               min={2}
@@ -324,8 +324,8 @@ export function PaymentScheduleSection({
 
       {/* Expected Payments Table */}
       <div className="space-y-2">
-        <Label className="text-sm font-medium text-tern-gray-700">Expected Payments</Label>
-        <div className="border border-tern-gray-200 rounded-lg overflow-hidden">
+        <Label className="text-sm font-medium text-ash-700">Expected Payments</Label>
+        <div className="border border-ash-200 rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
@@ -341,7 +341,7 @@ export function PaymentScheduleSection({
               {/* Show saved items from database if they exist */}
               {existingSchedule?.expectedPaymentItems?.map((savedItem, index) => (
                 <TableRow key={savedItem.id}>
-                  <TableCell className="text-sm text-tern-gray-500">{index + 1}</TableCell>
+                  <TableCell className="text-sm text-ash-500">{index + 1}</TableCell>
                   <TableCell className="font-medium">{savedItem.paymentName}</TableCell>
                   <TableCell className={`font-medium ${NUMERIC_INPUT_CLASS}`}>
                     {formatCurrency(savedItem.expectedAmountCents, currency)}
@@ -366,7 +366,7 @@ export function PaymentScheduleSection({
               {/* Show editable local items when no saved schedule exists */}
               {!existingSchedule && expectedPayments.map((payment, index) => (
                 <TableRow key={index}>
-                  <TableCell className="text-sm text-tern-gray-500">{index + 1}</TableCell>
+                  <TableCell className="text-sm text-ash-500">{index + 1}</TableCell>
                   <TableCell>
                     <Input
                       value={payment.paymentName}
@@ -415,7 +415,7 @@ export function PaymentScheduleSection({
                   </TableCell>
                   <TableCell>{getStatusBadge(payment)}</TableCell>
                   <TableCell>
-                    <span className="text-xs text-tern-gray-400">Save to record</span>
+                    <span className="text-xs text-ash-400">Save to record</span>
                   </TableCell>
                 </TableRow>
               ))}

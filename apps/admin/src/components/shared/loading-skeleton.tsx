@@ -1,8 +1,8 @@
 import { Skeleton } from '@/components/ui/skeleton'
-import { TernCard } from '../core/tern-card'
+import { Card } from '@/components/ui/card'
 
 /**
- * Tern Table Skeleton
+ * Table Skeleton
  * Loading state for tables
  */
 export function TableSkeleton({ rows = 5 }: { rows?: number }) {
@@ -16,22 +16,22 @@ export function TableSkeleton({ rows = 5 }: { rows?: number }) {
 }
 
 /**
- * Tern Stat Card Skeleton
+ * Stat Card Skeleton
  * Loading state for stat cards
  */
 export function StatCardSkeleton() {
   return (
-    <TernCard className="p-5">
+    <Card className="p-5">
       <div className="space-y-2">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-8 w-32" />
       </div>
-    </TernCard>
+    </Card>
   )
 }
 
 /**
- * Tern Stats Grid Skeleton
+ * Stats Grid Skeleton
  * Loading state for stats grid
  */
 export function StatsGridSkeleton({ count = 4 }: { count?: number }) {
@@ -45,7 +45,7 @@ export function StatsGridSkeleton({ count = 4 }: { count?: number }) {
 }
 
 /**
- * Tern Page Skeleton
+ * Page Skeleton
  * Full page loading state
  */
 export function PageSkeleton() {
@@ -61,10 +61,10 @@ export function PageSkeleton() {
       <StatsGridSkeleton />
 
       {/* Content */}
-      <TernCard className="p-6">
+      <Card className="p-6">
         <Skeleton className="h-6 w-48 mb-4" />
         <TableSkeleton />
-      </TernCard>
+      </Card>
     </div>
   )
 }
@@ -77,7 +77,7 @@ export function TripDetailSkeleton() {
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="border-b border-tern-gray-200 pb-6 mb-6">
+      <div className="border-b border-ash-200 pb-6 mb-6">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -101,18 +101,18 @@ export function TripDetailSkeleton() {
         {/* Stats Grid */}
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <TernCard key={i} className="p-4">
+            <Card key={i} className="p-4">
               <div className="space-y-2">
                 <Skeleton className="h-4 w-20" />
                 <Skeleton className="h-6 w-28" />
               </div>
-            </TernCard>
+            </Card>
           ))}
         </div>
 
         {/* Two Column Layout */}
         <div className="grid gap-6 lg:grid-cols-2">
-          <TernCard className="p-5">
+          <Card className="p-5">
             <Skeleton className="h-5 w-32 mb-4" />
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -122,8 +122,8 @@ export function TripDetailSkeleton() {
                 </div>
               ))}
             </div>
-          </TernCard>
-          <TernCard className="p-5">
+          </Card>
+          <Card className="p-5">
             <Skeleton className="h-5 w-32 mb-4" />
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -136,7 +136,7 @@ export function TripDetailSkeleton() {
                 </div>
               ))}
             </div>
-          </TernCard>
+          </Card>
         </div>
       </div>
     </div>

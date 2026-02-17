@@ -9,7 +9,7 @@ import { CalendarWeekView } from './calendar-week-view'
 import { CalendarDayView } from './calendar-day-view'
 import { CalendarListView } from './calendar-list-view'
 import { EventDetailModal } from './event-detail-modal'
-import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'
+import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import type { CalendarEvent } from '@tailfire/shared-types/api'
 
 interface CalendarViewProps {

@@ -7,7 +7,7 @@ import { GripVertical, Pencil, Trash2, MoreHorizontal, Package } from 'lucide-re
 import { cn } from '@/lib/utils'
 import { FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
-import { TernBadge } from '@/components/tern/core'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -133,10 +133,10 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
         tabIndex={0}
         aria-label={`Activity: ${activity.name}`}
         className={cn(
-          "group flex items-start gap-1.5 p-2 border border-tern-gray-200 rounded-lg transition-all",
-          "hover:border-tern-gray-300 hover:bg-tern-gray-50 hover:shadow-sm hover:-translate-y-px",
+          "group flex items-start gap-1.5 p-2 border border-ash-200 rounded-lg transition-all",
+          "hover:border-ash-300 hover:bg-ash-50 hover:shadow-sm hover:-translate-y-px",
           FOCUS_VISIBLE_RING,
-          isDragging && "border-tern-teal-500 shadow-md scale-[1.02]",
+          isDragging && "border-phoenix-gold-500 shadow-md scale-[1.02]",
           cruiseColor && `border-l-4 ${cruiseColor.borderLeft}`
         )}
       >
@@ -150,7 +150,7 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
                 {...attributes}
                 {...listeners}
               >
-                <GripVertical className="h-4 w-4 text-tern-gray-400 hover:text-tern-gray-600" />
+                <GripVertical className="h-4 w-4 text-ash-400 hover:text-ash-600" />
               </div>
             </TooltipTrigger>
             <TooltipContent>
@@ -180,14 +180,14 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
             <div className="flex-1 min-w-0 overflow-hidden">
               <div className="flex items-center gap-1.5">
                 <h4
-                  className="font-medium text-sm text-tern-gray-900 truncate"
+                  className="font-medium text-sm text-ash-900 truncate"
                   title={activity.name}
                 >
                   {activity.name}
                 </h4>
-                <TernBadge variant="secondary" className="flex-shrink-0">
+                <Badge variant="secondary" className="flex-shrink-0">
                   {activity.status}
-                </TernBadge>
+                </Badge>
                 {activity.packageId && (
                   <TooltipProvider>
                     <Tooltip>
@@ -217,7 +217,7 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
                     FOCUS_VISIBLE_RING
                   )}
                 >
-                  <MoreHorizontal className="h-3.5 w-3.5 text-tern-gray-500" />
+                  <MoreHorizontal className="h-3.5 w-3.5 text-ash-500" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-32">

@@ -34,7 +34,7 @@ import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
 import { Combobox } from '@/components/ui/combobox'
 import { DocumentUploader } from '@/components/document-uploader'
-import { ComponentMediaTab } from '@/components/tern/shared'
+import { ComponentMediaTab } from '@/components/shared'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { PaymentScheduleSection } from './payment-schedule-section'
@@ -1359,7 +1359,7 @@ export function CustomCruiseForm({
                     )}
                     {/* Day assignment feedback for pendingDay mode */}
                     {pendingDay && departureDateValue && matchedDay && !departureDateMismatch && (
-                      <p className="text-sm text-tern-teal-700 flex items-center gap-1.5 mt-1">
+                      <p className="text-sm text-phoenix-gold-700 flex items-center gap-1.5 mt-1">
                         <Check className="h-4 w-4" />
                         This cruise will be added to <strong>Day {matchedDay.dayNumber}</strong>
                       </p>

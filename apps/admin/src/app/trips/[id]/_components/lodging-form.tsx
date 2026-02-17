@@ -46,7 +46,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DocumentUploader } from '@/components/document-uploader'
 import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
 import { ChildOfPackageBookingSection } from '@/components/activities/child-of-package-booking-section'
-import { ComponentMediaTab } from '@/components/tern/shared'
+import { ComponentMediaTab } from '@/components/shared'
 import { HotelSearchPanel } from '@/components/hotel-search-panel'
 import type { NormalizedHotelResult } from '@tailfire/shared-types'
 import {
@@ -1255,7 +1255,7 @@ export function LodgingForm({
                     {pendingDay && (
                       <>
                         {checkInDateValue && matchedDay ? (
-                          <p className="text-sm text-tern-teal-700 flex items-center gap-1.5">
+                          <p className="text-sm text-phoenix-gold-700 flex items-center gap-1.5">
                             <Check className="h-4 w-4" />
                             This lodging will be added to <strong>Day {matchedDay.dayNumber}</strong>
                           </p>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { TernDashboardLayout } from '@/components/tern/layout'
+import { DashboardLayout } from '@/components/layout'
 import {
   Card,
   CardContent,
@@ -25,7 +25,7 @@ export default function DashboardPage() {
   })
 
   return (
-    <TernDashboardLayout>
+    <DashboardLayout>
       <div className="space-y-6">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
@@ -106,6 +106,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-    </TernDashboardLayout>
+    </DashboardLayout>
   )
 }

@@ -22,7 +22,7 @@ import { useParams } from 'next/navigation'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { useToast } from '@/hooks/use-toast'
 import { useCreateActivity, useUpdateActivity } from '@/hooks/use-activities'
-import { ComponentMediaTab } from '@/components/tern/shared'
+import { ComponentMediaTab } from '@/components/shared'
 import { DocumentUploader } from '@/components/document-uploader'
 import {
   activityFormSchema,
@@ -413,11 +413,11 @@ export function ActivityForm({
         <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-6">
           {/* Pending Day Date Picker - shown when day is not predetermined */}
           {pendingDay && (
-            <div className="p-4 bg-tern-teal-50 border border-tern-teal-200 rounded-lg">
+            <div className="p-4 bg-phoenix-gold-50 border border-phoenix-gold-200 rounded-lg">
               <div className="flex items-start gap-3">
-                <CalendarDays className="h-5 w-5 text-tern-teal-600 mt-0.5 flex-shrink-0" />
+                <CalendarDays className="h-5 w-5 text-phoenix-gold-600 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+                  <label className="text-sm font-medium text-ash-900 block mb-2">
                     Activity Date *
                   </label>
                   <DatePickerEnhanced
@@ -430,7 +430,7 @@ export function ActivityForm({
                   />
                   {/* Day resolution feedback */}
                   {selectedActivityDate && resolvedDay && (
-                    <p className="text-sm text-tern-teal-700 mt-2 flex items-center gap-1.5">
+                    <p className="text-sm text-phoenix-gold-700 mt-2 flex items-center gap-1.5">
                       <Check className="h-4 w-4" />
                       This activity will be added to <strong>Day {resolvedDay.dayNumber}</strong>
                     </p>
@@ -442,7 +442,7 @@ export function ActivityForm({
                     </p>
                   )}
                   {!selectedActivityDate && (
-                    <p className="text-xs text-tern-gray-500 mt-1">
+                    <p className="text-xs text-ash-500 mt-1">
                       Select a date to determine which day this activity will be assigned to.
                     </p>
                   )}
@@ -454,7 +454,7 @@ export function ActivityForm({
           {/* Activity Type and Name */}
           <div className="grid grid-cols-2 gap-4">
             <div data-field="activityType">
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Type *
               </label>
               <Select
@@ -478,7 +478,7 @@ export function ActivityForm({
             </div>
 
             <div data-field="name">
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Name *
               </label>
               <Input
@@ -493,7 +493,7 @@ export function ActivityForm({
 
           {/* Description */}
           <div data-field="description">
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Description
             </label>
             <Textarea
@@ -506,7 +506,7 @@ export function ActivityForm({
           {/* Time Range */}
           <div className="grid grid-cols-2 gap-4">
             <div data-field="startDatetime">
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Start Time
               </label>
               <Input
@@ -522,7 +522,7 @@ export function ActivityForm({
               />
             </div>
             <div data-field="endDatetime">
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 End Time
               </label>
               <Input
@@ -545,7 +545,7 @@ export function ActivityForm({
           {/* Location */}
           <div className="grid grid-cols-2 gap-4">
             <div data-field="location">
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Location
               </label>
               <Input
@@ -554,7 +554,7 @@ export function ActivityForm({
               />
             </div>
             <div data-field="address">
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Address
               </label>
               <Input
@@ -567,7 +567,7 @@ export function ActivityForm({
           {/* Status and Confirmation */}
           <div className="grid grid-cols-2 gap-4">
             <div data-field="status">
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Status
               </label>
               <Select
@@ -587,7 +587,7 @@ export function ActivityForm({
               </Select>
             </div>
             <div data-field="confirmationNumber">
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Confirmation #
               </label>
               <Input
@@ -600,7 +600,7 @@ export function ActivityForm({
           {/* Pricing Metadata - pricing values managed via activity_pricing table */}
           <div className="grid grid-cols-2 gap-4">
             <div data-field="pricingType">
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Pricing Type
               </label>
               <Select
@@ -620,7 +620,7 @@ export function ActivityForm({
               </Select>
             </div>
             <div data-field="currency">
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Currency
               </label>
               <Input
@@ -636,7 +636,7 @@ export function ActivityForm({
 
           {/* Notes */}
           <div data-field="notes">
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Notes
             </label>
             <Textarea
@@ -661,7 +661,7 @@ export function ActivityForm({
             <Button
               type="submit"
               disabled={isPending || !canSubmit}
-              className="bg-tern-teal-500 hover:bg-tern-teal-600 text-white"
+              className="bg-phoenix-gold-500 hover:bg-phoenix-gold-600 text-white"
               title={pendingDay && !canSubmit ? 'Select a valid date first' : undefined}
             >
               <Check className="h-4 w-4 mr-2" />
@@ -682,7 +682,7 @@ export function ActivityForm({
             description="Images and photos for this activity"
           />
         ) : (
-          <div className="text-center py-12 text-tern-gray-500">
+          <div className="text-center py-12 text-ash-500">
             <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p className="text-sm">Save the activity first to upload media</p>
           </div>
@@ -694,7 +694,7 @@ export function ActivityForm({
         {isEditing && activity ? (
           <DocumentUploader resourceId={activity.id} />
         ) : (
-          <div className="text-center py-12 text-tern-gray-500">
+          <div className="text-center py-12 text-ash-500">
             <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p className="text-sm">Save the activity first to upload documents</p>
           </div>

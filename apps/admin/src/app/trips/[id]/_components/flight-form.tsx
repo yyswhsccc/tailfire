@@ -48,7 +48,7 @@ import { FlightOffersSearchPanel } from '@/components/flight-offers-search-panel
 import { normalizedTimeToFormFields } from '@/lib/flight-time-utils'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { PaymentScheduleSection } from './payment-schedule-section'
-import { ComponentMediaTab } from '@/components/tern/shared'
+import { ComponentMediaTab } from '@/components/shared'
 import { DocumentUploader } from '@/components/document-uploader'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { buildInitialPricingState, type PricingData } from '@/lib/pricing'
@@ -1485,7 +1485,7 @@ export function FlightForm({
                           />
                           {/* Day assignment feedback for pendingDay mode (collapsed view, first segment only) */}
                           {pendingDay && index === 0 && dateValue && matchedDay && (
-                            <p className="text-sm text-tern-teal-700 flex items-center gap-1.5 mt-1">
+                            <p className="text-sm text-phoenix-gold-700 flex items-center gap-1.5 mt-1">
                               <Check className="h-4 w-4" />
                               This flight will be added to <strong>Day {matchedDay.dayNumber}</strong>
                             </p>
@@ -1765,7 +1765,7 @@ export function FlightForm({
                       {pendingDay && index === 0 && (
                         <div className="mt-2">
                           {(dateValue || departureDateValue) && matchedDay ? (
-                            <p className="text-sm text-tern-teal-700 flex items-center gap-1.5">
+                            <p className="text-sm text-phoenix-gold-700 flex items-center gap-1.5">
                               <Check className="h-4 w-4" />
                               This flight will be added to <strong>Day {matchedDay.dayNumber}</strong>
                             </p>

@@ -43,7 +43,7 @@ export function ActivityTypeSelector({
         sideOffset={4}
       >
         <div className="space-y-1">
-          <p className="text-xs font-medium text-tern-gray-500 px-2 pb-1">
+          <p className="text-xs font-medium text-ash-500 px-2 pb-1">
             Select Activity Type
           </p>
           {Object.entries(ACTIVITY_TYPE_METADATA)
@@ -54,14 +54,14 @@ export function ActivityTypeSelector({
                 onClick={() => handleSelect(type as UIActivityType)}
                 className={cn(
                   'flex items-center gap-2 w-full p-2 rounded-md',
-                  'border border-tern-gray-200',
-                  'hover:bg-tern-gray-50 hover:border-tern-gray-300',
-                  'focus:outline-none focus:ring-2 focus:ring-tern-teal-500 focus:ring-offset-1',
+                  'border border-ash-200',
+                  'hover:bg-ash-50 hover:border-ash-300',
+                  'focus:outline-none focus:ring-2 focus:ring-phoenix-gold-500 focus:ring-offset-1',
                   'transition-all text-left'
                 )}
               >
                 <ActivityIconBadge type={type} size="sm" shape="square" />
-                <span className="text-sm font-medium text-tern-gray-700">
+                <span className="text-sm font-medium text-ash-700">
                   {metadata.label}
                 </span>
               </button>

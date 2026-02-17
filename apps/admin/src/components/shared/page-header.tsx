@@ -9,7 +9,7 @@ interface PageHeaderProps {
 }
 
 /**
- * Tern Page Header
+ * Page Header
  * Standard page title with optional description and action buttons
  */
 export function PageHeader({
@@ -22,11 +22,11 @@ export function PageHeader({
     <div className={cn('mb-6', className)}>
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight text-tern-gray-900">
+          <h1 className="text-2xl font-bold tracking-tight text-ash-900">
             {title}
           </h1>
           {description && (
-            <p className="text-sm text-tern-gray-500">{description}</p>
+            <p className="text-sm text-ash-500">{description}</p>
           )}
         </div>
         {actions && (

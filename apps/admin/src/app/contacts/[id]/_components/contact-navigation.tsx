@@ -78,7 +78,7 @@ export function ContactNavigation({ activeSection, onSectionChange }: ContactNav
     <Menubar className="border-none bg-transparent p-4">
       {navigationGroups.map((group) => (
         <MenubarMenu key={group.id}>
-          <MenubarTrigger className="text-sm font-medium text-tern-gray-700 hover:text-phoenix-gold-600 data-[state=open]:text-phoenix-gold-600">
+          <MenubarTrigger className="text-sm font-medium text-ash-700 hover:text-phoenix-gold-600 data-[state=open]:text-phoenix-gold-600">
             {group.label}
           </MenubarTrigger>
           <MenubarContent>
@@ -90,7 +90,7 @@ export function ContactNavigation({ activeSection, onSectionChange }: ContactNav
                   className={
                     activeSection === item.id
                       ? 'bg-phoenix-gold-50 text-phoenix-gold-700 font-medium'
-                      : 'text-tern-gray-700 hover:bg-tern-gray-50'
+                      : 'text-ash-700 hover:bg-ash-50'
                   }
                 >
                   <item.icon className="mr-2 h-4 w-4" />

@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { TripStatusBadge } from '@/components/tern/shared'
+import { TripStatusBadge } from '@/components/shared'
 import { formatDate, cn } from '@/lib/utils'
 import { canDeleteTrip, type TripStatus } from '@/lib/trip-status-constants'
 import type { TripResponseDto } from '@tailfire/shared-types/api'
@@ -112,7 +112,7 @@ export function TripsDataTable({
                 <TableCell>
                   <Link
                     href={`/trips/${trip.id}`}
-                    className="font-medium hover:text-tern-teal-600 transition-colors"
+                    className="font-medium hover:text-phoenix-gold-600 transition-colors"
                   >
                     {trip.name}
                   </Link>

@@ -61,11 +61,11 @@ export function FlightDetailsTab({
     <div className="space-y-6">
       {/* Basic Information */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-tern-gray-900">Basic Information</h3>
+        <h3 className="text-sm font-semibold text-ash-900">Basic Information</h3>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Flight Name *
             </label>
             <Input
@@ -76,7 +76,7 @@ export function FlightDetailsTab({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Status
             </label>
             <Select
@@ -98,7 +98,7 @@ export function FlightDetailsTab({
         </div>
 
         <div>
-          <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+          <label className="text-sm font-medium text-ash-900 block mb-2">
             Description
           </label>
           <Textarea
@@ -110,7 +110,7 @@ export function FlightDetailsTab({
         </div>
 
         <div>
-          <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+          <label className="text-sm font-medium text-ash-900 block mb-2">
             Confirmation Number
           </label>
           <Input
@@ -123,11 +123,11 @@ export function FlightDetailsTab({
 
       {/* Flight Information */}
       <div className="space-y-4 pt-4 border-t">
-        <h3 className="text-sm font-semibold text-tern-gray-900">Flight Information</h3>
+        <h3 className="text-sm font-semibold text-ash-900">Flight Information</h3>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Airline
             </label>
             <Input
@@ -138,7 +138,7 @@ export function FlightDetailsTab({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Flight Number
             </label>
             <Input
@@ -152,11 +152,11 @@ export function FlightDetailsTab({
 
       {/* Departure Details */}
       <div className="space-y-4 pt-4 border-t">
-        <h3 className="text-sm font-semibold text-tern-gray-900">Departure</h3>
+        <h3 className="text-sm font-semibold text-ash-900">Departure</h3>
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Airport Code
             </label>
             <Input
@@ -168,7 +168,7 @@ export function FlightDetailsTab({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Date
             </label>
             <DatePickerEnhanced
@@ -179,7 +179,7 @@ export function FlightDetailsTab({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Time
             </label>
             <Input
@@ -192,7 +192,7 @@ export function FlightDetailsTab({
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Timezone
             </label>
             <Input
@@ -203,7 +203,7 @@ export function FlightDetailsTab({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Terminal
             </label>
             <Input
@@ -214,7 +214,7 @@ export function FlightDetailsTab({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Gate
             </label>
             <Input
@@ -228,11 +228,11 @@ export function FlightDetailsTab({
 
       {/* Arrival Details */}
       <div className="space-y-4 pt-4 border-t">
-        <h3 className="text-sm font-semibold text-tern-gray-900">Arrival</h3>
+        <h3 className="text-sm font-semibold text-ash-900">Arrival</h3>
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Airport Code
             </label>
             <Input
@@ -244,7 +244,7 @@ export function FlightDetailsTab({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Date
             </label>
             <DatePickerEnhanced
@@ -255,7 +255,7 @@ export function FlightDetailsTab({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Time
             </label>
             <Input
@@ -268,7 +268,7 @@ export function FlightDetailsTab({
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Timezone
             </label>
             <Input
@@ -279,7 +279,7 @@ export function FlightDetailsTab({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Terminal
             </label>
             <Input
@@ -290,7 +290,7 @@ export function FlightDetailsTab({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Gate
             </label>
             <Input
@@ -304,7 +304,7 @@ export function FlightDetailsTab({
 
       {/* Notes */}
       <div className="pt-4 border-t">
-        <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+        <label className="text-sm font-medium text-ash-900 block mb-2">
           Additional Notes
         </label>
         <Textarea

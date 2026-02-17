@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { TernCard, TernCardContent, TernCardHeader, TernCardTitle } from '@/components/tern/core/tern-card'
-import { TernButton } from '@/components/tern/core/tern-button'
-import { TernBadge } from '@/components/tern/core/tern-badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Combobox } from '@/components/ui/combobox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -80,11 +80,11 @@ export function ImportSourceForm({ onPreviewSuccess, isLoading, formState, onFor
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
       {/* Source Type */}
-      <TernCard>
-        <TernCardHeader>
-          <TernCardTitle>Import Source</TernCardTitle>
-        </TernCardHeader>
-        <TernCardContent>
+      <Card>
+        <CardHeader>
+          <CardTitle>Import Source</CardTitle>
+        </CardHeader>
+        <CardContent>
           <RadioGroup value={sourceType} onValueChange={setSourceType} className="space-y-3">
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="supplier-api" id="source-api" />
@@ -94,32 +94,32 @@ export function ImportSourceForm({ onPreviewSuccess, isLoading, formState, onFor
             </div>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="pdf" id="source-pdf" disabled />
-              <Label htmlFor="source-pdf" className="cursor-not-allowed text-tern-gray-400">
+              <Label htmlFor="source-pdf" className="cursor-not-allowed text-ash-400">
                 Confirmation (PDF)
               </Label>
-              <TernBadge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs">
                 Coming Soon
-              </TernBadge>
+              </Badge>
             </div>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="ai" id="source-ai" disabled />
-              <Label htmlFor="source-ai" className="cursor-not-allowed text-tern-gray-400">
+              <Label htmlFor="source-ai" className="cursor-not-allowed text-ash-400">
                 Fuzzy (AI)
               </Label>
-              <TernBadge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs">
                 Coming Soon
-              </TernBadge>
+              </Badge>
             </div>
           </RadioGroup>
-        </TernCardContent>
-      </TernCard>
+        </CardContent>
+      </Card>
 
       {/* Booking Details */}
-      <TernCard>
-        <TernCardHeader>
-          <TernCardTitle>Booking Details</TernCardTitle>
-        </TernCardHeader>
-        <TernCardContent className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Booking Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
           {/* Cruise Line */}
           <div className="space-y-2">
             <Label htmlFor="cruise-line">Cruise Line</Label>
@@ -160,8 +160,8 @@ export function ImportSourceForm({ onPreviewSuccess, isLoading, formState, onFor
               </SelectContent>
             </Select>
           </div>
-        </TernCardContent>
-      </TernCard>
+        </CardContent>
+      </Card>
 
       {/* Error Banner */}
       {error && (
@@ -171,7 +171,7 @@ export function ImportSourceForm({ onPreviewSuccess, isLoading, formState, onFor
       )}
 
       {/* Submit */}
-      <TernButton type="submit" disabled={!canSubmit}>
+      <Button type="submit" disabled={!canSubmit}>
         {previewMutation.isPending ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -180,7 +180,7 @@ export function ImportSourceForm({ onPreviewSuccess, isLoading, formState, onFor
         ) : (
           'Preview Booking'
         )}
-      </TernButton>
+      </Button>
     </form>
   )
 }

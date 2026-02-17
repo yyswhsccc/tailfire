@@ -1,4 +1,4 @@
-import type { SidebarSection } from '@/components/tern/layout/tern-detail-sidebar'
+import type { SidebarSection } from '@/components/layout/detail-sidebar'
 import { getActivityTypeMetadata, filterItineraryActivities } from '@/lib/activity-constants'
 import { parseISODate } from '@/lib/date-utils'
 import type { ItineraryDayResponseDto, ActivityResponseDto } from '@tailfire/shared-types/api'

@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
-import { TernCard } from '@/components/tern/core'
+import { Card } from '@/components/ui/card'
 import { Plus, Pencil, Trash2, Shield, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react'
 import {
   useInsurancePackages,
@@ -227,11 +227,11 @@ export function TripInsurance({ trip }: TripInsuranceProps) {
   return (
     <div className="space-y-6">
       {/* Insurance Packages Section */}
-      <TernCard>
+      <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-tern-gray-900">Insurance Packages</h2>
-            <p className="text-sm text-tern-gray-500">Manage available insurance options for this trip</p>
+            <h2 className="text-lg font-semibold text-ash-900">Insurance Packages</h2>
+            <p className="text-sm text-ash-500">Manage available insurance options for this trip</p>
           </div>
           <Button onClick={() => handleOpenPackageDialog()} size="sm">
             <Plus className="h-4 w-4 mr-1" />
@@ -240,12 +240,12 @@ export function TripInsurance({ trip }: TripInsuranceProps) {
         </div>
 
         {isLoading ? (
-          <div className="text-sm text-tern-gray-500 py-8 text-center">Loading insurance packages...</div>
+          <div className="text-sm text-ash-500 py-8 text-center">Loading insurance packages...</div>
         ) : packages.length === 0 ? (
-          <div className="text-center py-8 border border-dashed border-tern-gray-200 rounded-lg">
-            <Shield className="h-8 w-8 text-tern-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-tern-gray-500">No insurance packages configured</p>
-            <p className="text-xs text-tern-gray-400 mt-1">Add packages to offer travelers insurance options</p>
+          <div className="text-center py-8 border border-dashed border-ash-200 rounded-lg">
+            <Shield className="h-8 w-8 text-ash-400 mx-auto mb-2" />
+            <p className="text-sm text-ash-500">No insurance packages configured</p>
+            <p className="text-xs text-ash-400 mt-1">Add packages to offer travelers insurance options</p>
           </div>
         ) : (
           <Table>
@@ -288,24 +288,24 @@ export function TripInsurance({ trip }: TripInsuranceProps) {
             </TableBody>
           </Table>
         )}
-      </TernCard>
+      </Card>
 
       {/* Traveler Insurance Status Section */}
-      <TernCard>
+      <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-tern-gray-900">Traveler Insurance Status</h2>
-            <p className="text-sm text-tern-gray-500">Track insurance compliance for each traveler</p>
+            <h2 className="text-lg font-semibold text-ash-900">Traveler Insurance Status</h2>
+            <p className="text-sm text-ash-500">Track insurance compliance for each traveler</p>
           </div>
           {summary && (
             <div className="flex gap-4 text-sm">
-              <span className="text-tern-gray-500">
+              <span className="text-ash-500">
                 <span className="font-medium text-green-600">{summary.hasOwnInsurance + summary.selectedPackage}</span> covered
               </span>
-              <span className="text-tern-gray-500">
+              <span className="text-ash-500">
                 <span className="font-medium text-yellow-600">{summary.pending}</span> pending
               </span>
-              <span className="text-tern-gray-500">
+              <span className="text-ash-500">
                 <span className="font-medium text-red-600">{summary.declined}</span> declined
               </span>
             </div>
@@ -313,10 +313,10 @@ export function TripInsurance({ trip }: TripInsuranceProps) {
         </div>
 
         {travelers.length === 0 ? (
-          <div className="text-center py-8 border border-dashed border-tern-gray-200 rounded-lg">
-            <AlertTriangle className="h-8 w-8 text-tern-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-tern-gray-500">No travelers on this trip</p>
-            <p className="text-xs text-tern-gray-400 mt-1">Add travelers to track their insurance status</p>
+          <div className="text-center py-8 border border-dashed border-ash-200 rounded-lg">
+            <AlertTriangle className="h-8 w-8 text-ash-400 mx-auto mb-2" />
+            <p className="text-sm text-ash-500">No travelers on this trip</p>
+            <p className="text-xs text-ash-400 mt-1">Add travelers to track their insurance status</p>
           </div>
         ) : (
           <Table>
@@ -344,7 +344,7 @@ export function TripInsurance({ trip }: TripInsuranceProps) {
                         {config.label}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-tern-gray-500">
+                    <TableCell className="text-sm text-ash-500">
                       {status === 'selected_package' && insurance?.selectedPackageId && (
                         <span>{packages.find(p => p.id === insurance.selectedPackageId)?.packageName || 'Selected Package'}</span>
                       )}
@@ -367,7 +367,7 @@ export function TripInsurance({ trip }: TripInsuranceProps) {
             </TableBody>
           </Table>
         )}
-      </TernCard>
+      </Card>
 
       {/* Package Dialog */}
       <Dialog open={showPackageDialog} onOpenChange={setShowPackageDialog}>

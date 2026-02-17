@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { useCredentialHistory } from '@/hooks/use-api-credentials'
-import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'
+import { TableSkeleton } from '@/components/shared/loading-skeleton'
 
 interface VersionHistoryDialogProps {
   credentialId: string | null

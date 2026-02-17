@@ -109,13 +109,13 @@ function TourLibraryContent() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-3">
-          <MapPin className="h-8 w-8 text-tern-teal-600" />
-          <h1 className="text-2xl font-bold text-tern-gray-900">Tour Library</h1>
+          <MapPin className="h-8 w-8 text-phoenix-gold-600" />
+          <h1 className="text-2xl font-bold text-ash-900">Tour Library</h1>
         </div>
-        <p className="mt-1 text-sm text-tern-gray-500">
+        <p className="mt-1 text-sm text-ash-500">
           {hasTripContext && itinerary?.startDate && itinerary?.endDate ? (
             <>
-              Select a tour for your itinerary: <span className="font-medium text-tern-teal-600">{itinerary.startDate}</span> to <span className="font-medium text-tern-teal-600">{itinerary.endDate}</span>
+              Select a tour for your itinerary: <span className="font-medium text-phoenix-gold-600">{itinerary.startDate}</span> to <span className="font-medium text-phoenix-gold-600">{itinerary.endDate}</span>
             </>
           ) : (
             'Browse tours from Globus, Cosmos, and Monograms'
@@ -134,7 +134,7 @@ function TourLibraryContent() {
 
       {/* Results Header */}
       <div className="flex items-center justify-between">
-        <div className="text-sm text-tern-gray-500">
+        <div className="text-sm text-ash-500">
           {isLoading ? (
             <span className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -149,10 +149,10 @@ function TourLibraryContent() {
             <span>
               {toursResult?.total.toLocaleString() ?? 0} tour{toursResult?.total !== 1 ? 's' : ''}
               {filters.q && (
-                <span className="text-tern-gray-400"> for &ldquo;{filters.q}&rdquo;</span>
+                <span className="text-ash-400"> for &ldquo;{filters.q}&rdquo;</span>
               )}
               {hasMore && (
-                <span className="text-tern-gray-400">
+                <span className="text-ash-400">
                   {' '}· showing {items.length.toLocaleString()}
                 </span>
               )}
@@ -165,22 +165,22 @@ function TourLibraryContent() {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-52 bg-tern-gray-100 rounded-lg animate-pulse" />
+            <div key={i} className="h-52 bg-ash-100 rounded-lg animate-pulse" />
           ))}
         </div>
       ) : error ? (
         <div className="text-center py-12">
           <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-          <h3 className="mt-2 text-sm font-medium text-tern-gray-900">Error loading tours</h3>
-          <p className="mt-1 text-sm text-tern-gray-500">
+          <h3 className="mt-2 text-sm font-medium text-ash-900">Error loading tours</h3>
+          <p className="mt-1 text-sm text-ash-500">
             Unable to load tour catalog. Please try again later.
           </p>
         </div>
       ) : tours.length === 0 ? (
         <div className="text-center py-12">
-          <MapPin className="mx-auto h-12 w-12 text-tern-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-tern-gray-900">No tours found</h3>
-          <p className="mt-1 text-sm text-tern-gray-500">
+          <MapPin className="mx-auto h-12 w-12 text-ash-400" />
+          <h3 className="mt-2 text-sm font-medium text-ash-900">No tours found</h3>
+          <p className="mt-1 text-sm text-ash-500">
             Try adjusting your search or filters.
           </p>
         </div>
@@ -199,7 +199,7 @@ function TourLibraryContent() {
           {/* Infinite scroll sentinel */}
           {hasMore && (
             <div ref={sentinelRef} className="flex justify-center py-6">
-              <Loader2 className="h-5 w-5 animate-spin text-tern-gray-400" />
+              <Loader2 className="h-5 w-5 animate-spin text-ash-400" />
             </div>
           )}
         </>
@@ -233,21 +233,21 @@ function TourLibraryLoading() {
     <div className="p-6 space-y-6">
       <div>
         <div className="flex items-center gap-3">
-          <MapPin className="h-8 w-8 text-tern-teal-600" />
-          <h1 className="text-2xl font-bold text-tern-gray-900">Tour Library</h1>
+          <MapPin className="h-8 w-8 text-phoenix-gold-600" />
+          <h1 className="text-2xl font-bold text-ash-900">Tour Library</h1>
         </div>
-        <p className="mt-1 text-sm text-tern-gray-500">
+        <p className="mt-1 text-sm text-ash-500">
           Browse tours from Globus, Cosmos, and Monograms
         </p>
       </div>
 
-      <div className="bg-white border border-tern-gray-200 rounded-lg p-4">
-        <div className="h-10 bg-tern-gray-100 rounded animate-pulse" />
+      <div className="bg-white border border-ash-200 rounded-lg p-4">
+        <div className="h-10 bg-ash-100 rounded animate-pulse" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-52 bg-tern-gray-100 rounded-lg animate-pulse" />
+          <div key={i} className="h-52 bg-ash-100 rounded-lg animate-pulse" />
         ))}
       </div>
     </div>

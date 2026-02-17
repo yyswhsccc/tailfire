@@ -206,14 +206,14 @@ export function CruiseFilters({
   }))
 
   return (
-    <div className="bg-white border border-tern-gray-200 rounded-lg p-4 space-y-3">
+    <div className="bg-white border border-ash-200 rounded-lg p-4 space-y-3">
       {/* ── TIER 1: Quick Find ─────────────────────────────────────── */}
       <div className="flex flex-wrap items-end gap-3">
         {/* Search */}
         <div className="flex-1 min-w-[200px]">
-          <Label className="text-xs text-tern-gray-500 mb-1 block">Search</Label>
+          <Label className="text-xs text-ash-500 mb-1 block">Search</Label>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tern-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ash-400" />
             <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
@@ -224,7 +224,7 @@ export function CruiseFilters({
               <button
                 type="button"
                 onClick={handleSearchClear}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-tern-gray-400 hover:text-tern-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ash-400 hover:text-ash-600"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -234,7 +234,7 @@ export function CruiseFilters({
 
         {/* Ship (Combobox with type-ahead) */}
         <div className="w-56">
-          <Label className="text-xs text-tern-gray-500 mb-1 block">Ship</Label>
+          <Label className="text-xs text-ash-500 mb-1 block">Ship</Label>
           {isLoading ? (
             <Skeleton className="h-9 w-full" />
           ) : (
@@ -251,7 +251,7 @@ export function CruiseFilters({
 
         {/* Date From */}
         <div className="w-40">
-          <Label className="text-xs text-tern-gray-500 mb-1 block">Departs From</Label>
+          <Label className="text-xs text-ash-500 mb-1 block">Departs From</Label>
           <DatePickerEnhanced
             value={filters.sailDateFrom ?? null}
             onChange={(date) => onChange({ sailDateFrom: date || undefined })}
@@ -263,7 +263,7 @@ export function CruiseFilters({
 
         {/* Date To */}
         <div className="w-40">
-          <Label className="text-xs text-tern-gray-500 mb-1 block">Departs To</Label>
+          <Label className="text-xs text-ash-500 mb-1 block">Departs To</Label>
           <DatePickerEnhanced
             value={filters.sailDateTo ?? null}
             onChange={(date) => onChange({ sailDateTo: date || undefined })}
@@ -275,7 +275,7 @@ export function CruiseFilters({
       </div>
 
       {/* ── TIER 2: Common Filters ─────────────────────────────────── */}
-      <div className="flex flex-wrap items-end gap-3 pt-2 border-t border-tern-gray-100">
+      <div className="flex flex-wrap items-end gap-3 pt-2 border-t border-ash-100">
         {/* Cruise Line */}
         <div className="w-40">
           {isLoading ? (
@@ -294,7 +294,7 @@ export function CruiseFilters({
                   <SelectItem key={line.id} value={line.id}>
                     {line.name}
                     {line.count !== undefined && (
-                      <span className="ml-1 text-tern-gray-400">({line.count})</span>
+                      <span className="ml-1 text-ash-400">({line.count})</span>
                     )}
                   </SelectItem>
                 ))}
@@ -321,7 +321,7 @@ export function CruiseFilters({
                   <SelectItem key={region.id} value={region.id}>
                     {region.name}
                     {region.count !== undefined && (
-                      <span className="ml-1 text-tern-gray-400">({region.count})</span>
+                      <span className="ml-1 text-ash-400">({region.count})</span>
                     )}
                   </SelectItem>
                 ))}
@@ -369,7 +369,7 @@ export function CruiseFilters({
             onValueChange={handleCabinCategoryChange}
             className="w-auto"
           >
-            <TabsList className="h-9 bg-tern-gray-100">
+            <TabsList className="h-9 bg-ash-100">
               <TabsTrigger value="all" className="text-xs px-3">All</TabsTrigger>
               <TabsTrigger value="inside" className="text-xs px-3">Inside</TabsTrigger>
               <TabsTrigger value="oceanview" className="text-xs px-3">Ocean</TabsTrigger>
@@ -388,13 +388,13 @@ export function CruiseFilters({
           aria-controls="tier3-filters"
           className={cn(
             'gap-1.5 h-9',
-            tier3FilterCount > 0 && 'border-tern-teal-500 text-tern-teal-600'
+            tier3FilterCount > 0 && 'border-phoenix-gold-500 text-phoenix-gold-600'
           )}
         >
           <Filter className="h-4 w-4" />
           More Filters
           {tier3FilterCount > 0 && (
-            <span className="ml-1 bg-tern-teal-100 text-tern-teal-700 text-xs px-1.5 py-0.5 rounded-full">
+            <span className="ml-1 bg-phoenix-gold-100 text-phoenix-gold-700 text-xs px-1.5 py-0.5 rounded-full">
               {tier3FilterCount}
             </span>
           )}
@@ -408,7 +408,7 @@ export function CruiseFilters({
 
       {/* ── TIER 3: More Filters (collapsed, full-width outside flex) ─── */}
       {isExpanded && (
-        <div id="tier3-filters" className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-tern-gray-100">
+        <div id="tier3-filters" className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-ash-100">
           {/* Return Port (Combobox) */}
           <div className="space-y-1.5">
             <Label className="text-xs">Return Port</Label>
@@ -443,7 +443,7 @@ export function CruiseFilters({
                     aria-expanded={portsPopoverOpen}
                     className={cn(
                       'w-full justify-between font-normal',
-                      (filters.portOfCallIds?.length ?? 0) > 0 && 'border-tern-teal-500'
+                      (filters.portOfCallIds?.length ?? 0) > 0 && 'border-phoenix-gold-500'
                     )}
                   >
                     <span className="truncate">{getSelectedPortNames()}</span>
@@ -476,7 +476,7 @@ export function CruiseFilters({
                               </div>
                               <span className="truncate">{port.name}</span>
                               {port.count !== undefined && (
-                                <span className="ml-auto text-xs text-tern-gray-400">
+                                <span className="ml-auto text-xs text-ash-400">
                                   ({port.count})
                                 </span>
                               )}
@@ -509,7 +509,7 @@ export function CruiseFilters({
               <>
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Price Range</Label>
-                  <span className="text-xs text-tern-gray-500">
+                  <span className="text-xs text-ash-500">
                     {formatPriceDollars(getPriceRangeValues()[0])} - {formatPriceDollars(getPriceRangeValues()[1])}
                   </span>
                 </div>
@@ -529,7 +529,7 @@ export function CruiseFilters({
 
       {/* ── Active Filter Badges ──────────────────────────────────── */}
       {allActiveFilters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-tern-gray-100">
+        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-ash-100">
           {allActiveFilters.map((badge) => (
             <Badge
               key={badge.key}
@@ -546,7 +546,7 @@ export function CruiseFilters({
               variant="ghost"
               size="sm"
               onClick={handleClearAll}
-              className="text-xs text-tern-gray-500 h-6 px-2"
+              className="text-xs text-ash-500 h-6 px-2"
             >
               Clear All
             </Button>

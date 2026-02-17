@@ -32,8 +32,8 @@ import {
   Link as LinkIcon,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { TernDetailLayout } from '@/components/tern/layout'
-import { TernBadge } from '@/components/tern/core'
+import { DetailLayout } from '@/components/layout'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useTrip, useDeleteTrip, usePublishTrip, useUnpublishTrip, useDuplicateTrip } from '@/hooks/use-trips'
 import { MoveToGroupDialog } from '@/components/trips/MoveToGroupDialog'
@@ -46,9 +46,9 @@ import { TripInsurance } from './_components/trip-insurance'
 import { TripFormDialog } from '@/app/trips/_components/trip-form-dialog'
 import { ActivityFeed } from '@/components/trips/ActivityFeed'
 import { ServiceFeesPanel } from '@/components/financials/service-fees-panel'
-import { TernCard } from '@/components/tern/core'
-import { TripDetailSkeleton } from '@/components/tern/shared/loading-skeleton'
-import { EmptyState } from '@/components/tern/shared/empty-state'
+import { Card } from '@/components/ui/card'
+import { TripDetailSkeleton } from '@/components/shared/loading-skeleton'
+import { EmptyState } from '@/components/shared/empty-state'
 import { NotesSection } from '@/components/notes/NotesSection'
 import {
   getTripStatusLabel,
@@ -498,19 +498,19 @@ export default function TripDetailPage() {
 
   if (isLoading) {
     return (
-      <TernDetailLayout
+      <DetailLayout
         backHref="/trips"
         backLabel="Trips"
         sidebarSections={getSidebarNav(activeTab, handleTabChange, hasTravelerChanges)}
       >
         <TripDetailSkeleton />
-      </TernDetailLayout>
+      </DetailLayout>
     )
   }
 
   if (error || !trip) {
     return (
-      <TernDetailLayout
+      <DetailLayout
         backHref="/trips"
         backLabel="Trips"
         sidebarSections={getSidebarNav(activeTab, handleTabChange, hasTravelerChanges)}
@@ -526,7 +526,7 @@ export default function TripDetailPage() {
             }}
           />
         </div>
-      </TernDetailLayout>
+      </DetailLayout>
     )
   }
 
@@ -539,12 +539,12 @@ export default function TripDetailPage() {
         return <TripItinerary trip={trip} />
       case 'activity':
         return (
-          <TernCard>
+          <Card>
             <div className="flex flex-col gap-6">
-              <h2 className="text-lg font-semibold text-tern-gray-900">Activity Log</h2>
+              <h2 className="text-lg font-semibold text-ash-900">Activity Log</h2>
               <ActivityFeed tripId={trip.id} limit={20} showLoadMore={true} />
             </div>
-          </TernCard>
+          </Card>
         )
       case 'travelers':
         return <TravelersTab tripId={trip.id} primaryContactId={trip.primaryContactId} tripStartDate={trip.startDate} />
@@ -554,7 +554,7 @@ export default function TripDetailPage() {
         return <TripPayments trip={trip} />
       case 'service-fees':
         return (
-          <TernCard>
+          <Card>
             <div className="flex flex-col gap-6">
               <ServiceFeesPanel
                 tripId={trip.id}
@@ -562,7 +562,7 @@ export default function TripDetailPage() {
                 currency={trip.currency || 'CAD'}
               />
             </div>
-          </TernCard>
+          </Card>
         )
       case 'bookings':
         return <TripPackages trip={trip} />
@@ -587,41 +587,41 @@ export default function TripDetailPage() {
   }
 
   return (
-    <TernDetailLayout
+    <DetailLayout
       backHref="/trips"
       backLabel="Trips"
       sidebarSections={getSidebarNav(activeTab, handleTabChange, hasTravelerChanges)}
     >
       <div className="p-6">
         {/* Header */}
-        <div className="border-b border-tern-gray-200 pb-4 mb-6 flex items-start justify-between gap-4">
+        <div className="border-b border-ash-200 pb-4 mb-6 flex items-start justify-between gap-4">
           <div className="space-y-1">
             <div
               className="flex items-center gap-2 group"
               onMouseEnter={() => setIsHeaderHovered(true)}
               onMouseLeave={() => setIsHeaderHovered(false)}
             >
-              <h1 className="text-lg font-semibold leading-tight text-tern-gray-900">{trip.name}</h1>
+              <h1 className="text-lg font-semibold leading-tight text-ash-900">{trip.name}</h1>
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-7 w-7 transition-opacity focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-tern-teal-500 focus-visible:ring-offset-2 ${isHeaderHovered ? 'opacity-100' : 'opacity-0'}`}
+                className={`h-7 w-7 transition-opacity focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-phoenix-gold-500 focus-visible:ring-offset-2 ${isHeaderHovered ? 'opacity-100' : 'opacity-0'}`}
                 aria-label="Edit trip name"
                 onClick={() => setShowEditTripDialog(true)}
               >
-                <Pencil className="h-3.5 w-3.5 text-tern-gray-500" aria-hidden="true" />
+                <Pencil className="h-3.5 w-3.5 text-ash-500" aria-hidden="true" />
               </Button>
             </div>
             {/* Status, Type, Dates & Primary Contact - single compact row */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <TernBadge variant={getStatusVariant(trip.status)}>
+              <Badge variant={getStatusVariant(trip.status)}>
                 {getStatusLabel(trip.status)}
-              </TernBadge>
+              </Badge>
               <span>Regular Trip</span>
               {/* Dates */}
               {trip.startDate && (
                 <>
-                  <span className="text-tern-gray-300">•</span>
+                  <span className="text-ash-300">•</span>
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>
@@ -634,7 +634,7 @@ export default function TripDetailPage() {
               {/* Primary Contact */}
               {primaryTraveler ? (
                 <>
-                  <span className="text-tern-gray-300">•</span>
+                  <span className="text-ash-300">•</span>
                   <div className="flex items-center gap-1">
                     <User className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>{getTravelerName(primaryTraveler)}</span>
@@ -642,7 +642,7 @@ export default function TripDetailPage() {
                 </>
               ) : !loadingTravelers && trip.primaryContactId ? (
                 <>
-                  <span className="text-tern-gray-300">•</span>
+                  <span className="text-ash-300">•</span>
                   <div className="flex items-center gap-1">
                     <User className="h-3.5 w-3.5" aria-hidden="true" />
                     <span className="italic">Primary contact not on trip</span>
@@ -780,6 +780,6 @@ export default function TripDetailPage() {
           currentGroupId={trip.tripGroupId}
         />
       )}
-    </TernDetailLayout>
+    </DetailLayout>
   )
 }

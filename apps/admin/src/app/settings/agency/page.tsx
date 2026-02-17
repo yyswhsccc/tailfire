@@ -17,7 +17,7 @@ export default function AgencySettingsPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
-          <div className="rounded-lg bg-tern-gray-100 p-2 text-tern-gray-400">
+          <div className="rounded-lg bg-ash-100 p-2 text-ash-400">
             <Building2 className="h-6 w-6" />
           </div>
           <div>

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { TernDashboardLayout } from '@/components/tern/layout'
+import { DashboardLayout } from '@/components/layout'
 import { cn } from '@/lib/utils'
 
 interface SettingsTabsLayoutProps {
@@ -27,7 +27,7 @@ const settingsTabs: SettingsTab[] = [
 
 export function SettingsTabsLayout({ children, activeTab }: SettingsTabsLayoutProps) {
   return (
-    <TernDashboardLayout>
+    <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -38,7 +38,7 @@ export function SettingsTabsLayout({ children, activeTab }: SettingsTabsLayoutPr
         </div>
 
         {/* Tab Navigation */}
-        <div className="border-b border-tern-gray-200">
+        <div className="border-b border-ash-200">
           <nav className="-mb-px flex space-x-8" aria-label="Settings tabs">
             {settingsTabs.map((tab) => {
               const isActive = activeTab === tab.id
@@ -52,10 +52,10 @@ export function SettingsTabsLayout({ children, activeTab }: SettingsTabsLayoutPr
                   className={cn(
                     'whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors',
                     isActive
-                      ? 'border-tern-teal-500 text-tern-teal-600'
+                      ? 'border-phoenix-gold-500 text-phoenix-gold-600'
                       : tab.disabled
                         ? 'border-transparent text-muted-foreground/50'
-                        : 'border-transparent text-muted-foreground hover:border-tern-gray-300 hover:text-foreground'
+                        : 'border-transparent text-muted-foreground hover:border-ash-300 hover:text-foreground'
                   )}
                 >
                   {tab.label}
@@ -68,6 +68,6 @@ export function SettingsTabsLayout({ children, activeTab }: SettingsTabsLayoutPr
         {/* Content */}
         <div>{children}</div>
       </div>
-    </TernDashboardLayout>
+    </DashboardLayout>
   )
 }

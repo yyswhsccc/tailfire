@@ -155,7 +155,7 @@ export function AddDaysDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <CalendarPlus className="h-5 w-5 text-tern-teal-600" />
+            <CalendarPlus className="h-5 w-5 text-phoenix-gold-600" />
             Add Days
           </DialogTitle>
           <DialogDescription>
@@ -226,7 +226,7 @@ export function AddDaysDialog({
           <Button
             onClick={handleSubmit}
             disabled={!isValid || batchCreate.isPending}
-            className="bg-tern-teal-500 hover:bg-tern-teal-600"
+            className="bg-phoenix-gold-500 hover:bg-phoenix-gold-600"
           >
             {batchCreate.isPending ? (
               <>

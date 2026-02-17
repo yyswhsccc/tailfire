@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, MapPin, User, Users, Plus, ChevronDown, ChevronUp, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { TripResponseDto, ItineraryResponseDto } from '@tailfire/shared-types/api'
-import { TernCard, TernBadge } from '@/components/tern/core'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { ITINERARY_CARD_STYLES, SKELETON_BG, FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
 import { cn } from '@/lib/utils'
 import { CreateItineraryDialog } from './create-itinerary-dialog'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -86,37 +86,37 @@ export function TripOverview({ trip }: TripOverviewProps) {
       <div className="lg:col-span-2 space-y-6">
         {/* Get Started Section - Hidden when trip has itineraries */}
         {!hasItineraries && (
-          <TernCard>
+          <Card className="p-6">
             <div className="flex flex-col gap-4">
-              <h2 className="text-lg font-semibold text-tern-gray-900">Get Started</h2>
+              <h2 className="text-lg font-semibold text-ash-900">Get Started</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <QuickActionCard
-                  icon={<Users className="h-5 w-5 text-tern-teal-600" />}
+                  icon={<Users className="h-5 w-5 text-phoenix-gold-600" />}
                   title="Add Travelers"
                   description="Manage trip participants"
                   onClick={handleAddTravelers}
                 />
                 <QuickActionCard
-                  icon={<MapPin className="h-5 w-5 text-tern-teal-600" />}
+                  icon={<MapPin className="h-5 w-5 text-phoenix-gold-600" />}
                   title="Draft an itinerary"
                   description="Share plans and options"
                   onClick={handleDraftItinerary}
                 />
                 <QuickActionCard
-                  icon={<Calendar className="h-5 w-5 text-tern-teal-600" />}
+                  icon={<Calendar className="h-5 w-5 text-phoenix-gold-600" />}
                   title="Track bookings"
                   description="Report sales and commission"
                   onClick={handleTrackBookings}
                 />
               </div>
             </div>
-          </TernCard>
+          </Card>
         )}
 
         {/* Upcoming Activity */}
-        <TernCard>
+        <Card className="p-6">
           <div className="flex flex-col gap-4">
-            <h2 className="text-lg font-semibold text-tern-gray-900">Upcoming Activity</h2>
+            <h2 className="text-lg font-semibold text-ash-900">Upcoming Activity</h2>
             <div className="space-y-3">
               {trip.startDate && (
                 <ActivityItem
@@ -135,28 +135,28 @@ export function TripOverview({ trip }: TripOverviewProps) {
                 />
               )}
               {!trip.startDate && !trip.endDate && (
-                <p className="text-sm text-tern-gray-500">No upcoming activities</p>
+                <p className="text-sm text-ash-500">No upcoming activities</p>
               )}
             </div>
           </div>
-        </TernCard>
+        </Card>
 
         {/* Past Activity */}
-        <TernCard>
+        <Card className="p-6">
           <div className="flex flex-col gap-4">
-            <h2 className="text-lg font-semibold text-tern-gray-900">Past Activity</h2>
+            <h2 className="text-lg font-semibold text-ash-900">Past Activity</h2>
             <ActivityFeed tripId={trip.id} limit={5} showLoadMore={false} />
           </div>
-        </TernCard>
+        </Card>
       </div>
 
       {/* Right Sidebar */}
       <div className="space-y-6">
         {/* Travelers Card */}
-        <TernCard>
+        <Card className="p-6">
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-tern-gray-900">Travelers</h3>
+              <h3 className="font-semibold text-ash-900">Travelers</h3>
               <Button
                 variant="outline"
                 size="sm"
@@ -167,13 +167,13 @@ export function TripOverview({ trip }: TripOverviewProps) {
             </div>
           {loadingTravelers ? (
             <div className="text-center py-8">
-              <p className="text-sm text-tern-gray-500">Loading travelers...</p>
+              <p className="text-sm text-ash-500">Loading travelers...</p>
             </div>
           ) : travelers.length === 0 ? (
             <div className="text-center py-8">
-              <User className="h-12 w-12 text-tern-gray-300 mx-auto mb-3" />
-              <p className="text-sm text-tern-gray-900 mb-1">No travelers added to this trip</p>
-              <p className="text-sm text-tern-gray-500 mb-4">Add a traveler to get started.</p>
+              <User className="h-12 w-12 text-ash-300 mx-auto mb-3" />
+              <p className="text-sm text-ash-900 mb-1">No travelers added to this trip</p>
+              <p className="text-sm text-ash-500 mb-4">Add a traveler to get started.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -182,11 +182,11 @@ export function TripOverview({ trip }: TripOverviewProps) {
                 const initials = getInitials(name)
                 const isExpanded = expandedTravelers.has(traveler.id)
                 return (
-                  <div key={traveler.id} className="border border-tern-gray-200 rounded-lg overflow-hidden">
+                  <div key={traveler.id} className="border border-ash-200 rounded-lg overflow-hidden">
                     {/* Traveler Header - Always Visible */}
                     <button
                       onClick={() => toggleTraveler(traveler.id)}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-tern-gray-50 transition-colors"
+                      className="w-full flex items-center gap-3 p-3 hover:bg-ash-50 transition-colors"
                     >
                       <Avatar className="h-10 w-10 flex-shrink-0">
                         <AvatarFallback className={`${getAvatarColor(traveler.id)} text-white text-sm font-medium`}>
@@ -194,9 +194,9 @@ export function TripOverview({ trip }: TripOverviewProps) {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0 text-left">
-                        <p className="text-sm font-semibold text-tern-gray-900 truncate">{name}</p>
+                        <p className="text-sm font-semibold text-ash-900 truncate">{name}</p>
                         {!isExpanded && (
-                          <p className="text-xs text-tern-gray-500">No details</p>
+                          <p className="text-xs text-ash-500">No details</p>
                         )}
                       </div>
                       <Badge
@@ -206,32 +206,32 @@ export function TripOverview({ trip }: TripOverviewProps) {
                         {getRoleLabel(traveler.role) === 'Primary Contact' ? 'Primary' : getRoleLabel(traveler.role)}
                       </Badge>
                       {isExpanded ? (
-                        <ChevronUp className="h-4 w-4 text-tern-gray-500 flex-shrink-0" />
+                        <ChevronUp className="h-4 w-4 text-ash-500 flex-shrink-0" />
                       ) : (
-                        <ChevronDown className="h-4 w-4 text-tern-gray-500 flex-shrink-0" />
+                        <ChevronDown className="h-4 w-4 text-ash-500 flex-shrink-0" />
                       )}
                     </button>
 
                     {/* Traveler Details - Expandable */}
                     {isExpanded && (
-                      <div className="border-t border-tern-gray-200 bg-tern-gray-50 p-4 space-y-3">
+                      <div className="border-t border-ash-200 bg-ash-50 p-4 space-y-3">
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <p className="text-xs text-tern-gray-500 mb-1">Type</p>
-                            <p className="text-tern-gray-900 capitalize">{traveler.travelerType}</p>
+                            <p className="text-xs text-ash-500 mb-1">Type</p>
+                            <p className="text-ash-900 capitalize">{traveler.travelerType}</p>
                           </div>
                           {(traveler.contact?.email || traveler.contactSnapshot?.email) && (
                             <div>
-                              <p className="text-xs text-tern-gray-500 mb-1">Email</p>
-                              <p className="text-tern-gray-900 truncate">
+                              <p className="text-xs text-ash-500 mb-1">Email</p>
+                              <p className="text-ash-900 truncate">
                                 {traveler.contact?.email || traveler.contactSnapshot?.email}
                               </p>
                             </div>
                           )}
                           {(traveler.contact?.phone || traveler.contactSnapshot?.phone) && (
                             <div>
-                              <p className="text-xs text-tern-gray-500 mb-1">Phone</p>
-                              <p className="text-tern-gray-900">
+                              <p className="text-xs text-ash-500 mb-1">Phone</p>
+                              <p className="text-ash-900">
                                 {traveler.contact?.phone || traveler.contactSnapshot?.phone}
                               </p>
                             </div>
@@ -245,13 +245,13 @@ export function TripOverview({ trip }: TripOverviewProps) {
             </div>
           )}
           </div>
-        </TernCard>
+        </Card>
 
         {/* Itinerary Card */}
         <div className={cn(ITINERARY_CARD_STYLES, 'p-4')}>
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-tern-gray-900">Itinerary</h3>
+              <h3 className="font-semibold text-ash-900">Itinerary</h3>
               <Button
                 type="button"
                 variant="ghost"
@@ -276,7 +276,7 @@ export function TripOverview({ trip }: TripOverviewProps) {
             {itinerariesError && !loadingItineraries && (
               <div className="text-center py-4">
                 <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
-                <p className="text-sm text-tern-gray-600 mb-2">Failed to load itineraries</p>
+                <p className="text-sm text-ash-600 mb-2">Failed to load itineraries</p>
                 <Button
                   type="button"
                   variant="outline"
@@ -292,13 +292,13 @@ export function TripOverview({ trip }: TripOverviewProps) {
             {/* Empty State */}
             {!loadingItineraries && !itinerariesError && (!itineraries || itineraries.length === 0) && (
               <div className="text-center py-4">
-                <Calendar className="h-8 w-8 text-tern-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-tern-gray-600 mb-3">Create your first itinerary</p>
+                <Calendar className="h-8 w-8 text-ash-300 mx-auto mb-2" />
+                <p className="text-sm text-ash-600 mb-3">Create your first itinerary</p>
                 <Button
                   type="button"
                   size="sm"
                   onClick={() => setShowCreateItineraryDialog(true)}
-                  className={cn('bg-tern-teal-500 hover:bg-tern-teal-600 text-white', FOCUS_VISIBLE_RING)}
+                  className={cn('bg-phoenix-gold-500 hover:bg-phoenix-gold-600 text-white', FOCUS_VISIBLE_RING)}
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Create Itinerary
@@ -323,13 +323,13 @@ export function TripOverview({ trip }: TripOverviewProps) {
         </div>
 
         {/* Trip Settings */}
-        <TernCard>
+        <Card className="p-6">
           <div className="flex flex-col gap-4">
-            <h3 className="font-semibold text-tern-gray-900">Trip Settings</h3>
+            <h3 className="font-semibold text-ash-900">Trip Settings</h3>
           <div className="space-y-4">
             {/* Currency */}
             <div className="space-y-2">
-              <Label htmlFor="currency" className="text-sm font-medium text-tern-gray-900">
+              <Label htmlFor="currency" className="text-sm font-medium text-ash-900">
                 Currency
               </Label>
               <Select
@@ -352,7 +352,7 @@ export function TripOverview({ trip }: TripOverviewProps) {
 
             {/* Pricing Visibility */}
             <div className="space-y-2">
-              <Label htmlFor="pricing-visibility" className="text-sm font-medium text-tern-gray-900">
+              <Label htmlFor="pricing-visibility" className="text-sm font-medium text-ash-900">
                 Pricing visibility
               </Label>
               <Select
@@ -372,7 +372,7 @@ export function TripOverview({ trip }: TripOverviewProps) {
 
             {/* Tags */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-tern-gray-900">Tags</Label>
+              <Label className="text-sm font-medium text-ash-900">Tags</Label>
               <TagInput
                 value={tripTags}
                 onChange={(tagIds) => {
@@ -393,7 +393,7 @@ export function TripOverview({ trip }: TripOverviewProps) {
 
             {/* Allow PDF Downloads */}
             <div className="flex items-center justify-between py-2">
-              <Label htmlFor="allow-pdf" className="text-sm font-medium text-tern-gray-900 cursor-pointer">
+              <Label htmlFor="allow-pdf" className="text-sm font-medium text-ash-900 cursor-pointer">
                 Allow PDF Downloads
               </Label>
               <Switch
@@ -410,7 +410,7 @@ export function TripOverview({ trip }: TripOverviewProps) {
             {/* Database field preserved, DateDisplay falls back to browser timezone */}
             </div>
           </div>
-        </TernCard>
+        </Card>
       </div>
 
       {/* Edit Travelers Dialog */}
@@ -528,13 +528,13 @@ function QuickActionCard({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex flex-col items-center text-center p-4 gap-1 rounded-lg hover:bg-tern-gray-50 transition-all duration-200 ease-in-out group hover:-translate-y-1 hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none"
+      className="flex flex-col items-center text-center p-4 gap-1 rounded-lg hover:bg-ash-50 transition-all duration-200 ease-in-out group hover:-translate-y-1 hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none disabled:hover:shadow-none"
     >
       <div className="mb-2 transition-transform duration-200 group-hover:scale-110 motion-reduce:transform-none">{icon}</div>
-      <h4 className="text-sm font-medium text-tern-gray-900 group-hover:text-tern-teal-600 transition-colors">
+      <h4 className="text-sm font-medium text-ash-900 group-hover:text-phoenix-gold-600 transition-colors">
         {title}
       </h4>
-      <p className="text-xs text-tern-gray-500">{description}</p>
+      <p className="text-xs text-ash-500">{description}</p>
     </button>
   )
 }
@@ -552,17 +552,17 @@ function ActivityItem({
   timezone?: string
 }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-tern-gray-100 last:border-0">
+    <div className="flex items-center justify-between py-2 border-b border-ash-100 last:border-0">
       <div className="flex items-center gap-3">
-        <div className="bg-slate-100 rounded-full p-2 text-tern-gray-500">
+        <div className="bg-slate-100 rounded-full p-2 text-ash-500">
           {icon}
         </div>
-        <span className="text-sm text-tern-gray-900">{label}</span>
+        <span className="text-sm text-ash-900">{label}</span>
       </div>
       <DateDisplay
         date={date}
         timezone={timezone}
-        className="text-sm text-tern-gray-500"
+        className="text-sm text-ash-500"
       />
     </div>
   )
@@ -581,10 +581,10 @@ function _SettingItem({
 }) {
   return (
     <div>
-      <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+      <label className="text-sm font-medium text-ash-900 block mb-2">
         {label}
       </label>
-      <div className={`text-sm px-3 py-2 rounded-md border border-tern-gray-200 ${placeholder ? 'text-tern-gray-400' : 'text-tern-gray-900'}`}>
+      <div className={`text-sm px-3 py-2 rounded-md border border-ash-200 ${placeholder ? 'text-ash-400' : 'text-ash-900'}`}>
         {value}
       </div>
     </div>
@@ -614,20 +614,20 @@ function ItineraryListItem({
   const getStatusBadge = () => {
     switch (itinerary.status) {
       case 'draft':
-        return <TernBadge variant="inbound">Draft</TernBadge>
+        return <Badge variant="inbound">Draft</Badge>
       case 'proposing':
-        return <TernBadge variant="planning">Proposing</TernBadge>
+        return <Badge variant="planning">Proposing</Badge>
       case 'approved':
         return (
-          <TernBadge variant="completed" className="gap-1">
+          <Badge variant="completed" className="gap-1">
             <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
             <span>Approved</span>
-          </TernBadge>
+          </Badge>
         )
       case 'archived':
-        return <TernBadge variant="secondary">Archived</TernBadge>
+        return <Badge variant="secondary">Archived</Badge>
       default:
-        return <TernBadge variant="secondary">{itinerary.status}</TernBadge>
+        return <Badge variant="secondary">{itinerary.status}</Badge>
     }
   }
 
@@ -636,20 +636,20 @@ function ItineraryListItem({
       type="button"
       onClick={onNavigate}
       className={cn(
-        'w-full text-left p-3 rounded-lg border border-tern-gray-200 transition-all',
-        'hover:border-tern-teal-400 hover:bg-tern-teal-50',
+        'w-full text-left p-3 rounded-lg border border-ash-200 transition-all',
+        'hover:border-phoenix-gold-400 hover:bg-phoenix-gold-50',
         FOCUS_VISIBLE_RING,
-        itinerary.isSelected && 'border-tern-teal-500 bg-tern-teal-50/50'
+        itinerary.isSelected && 'border-phoenix-gold-500 bg-phoenix-gold-50/50'
       )}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
-        <span className="font-medium text-sm text-tern-gray-900">{itinerary.name}</span>
+        <span className="font-medium text-sm text-ash-900">{itinerary.name}</span>
         {getStatusBadge()}
       </div>
 
       {/* Dates */}
       {startDate && endDate && (
-        <p className="text-xs text-tern-gray-600 mb-1">
+        <p className="text-xs text-ash-600 mb-1">
           <DateDisplay date={startDate} timezone={trip.timezone || undefined} /> –{' '}
           <DateDisplay date={endDate} timezone={trip.timezone || undefined} />
         </p>
@@ -657,9 +657,9 @@ function ItineraryListItem({
 
       {/* Overview text with line-clamp */}
       {overviewText ? (
-        <p className="text-xs text-tern-gray-500 line-clamp-2">{overviewText}</p>
+        <p className="text-xs text-ash-500 line-clamp-2">{overviewText}</p>
       ) : (
-        <p className="text-xs text-tern-gray-400 italic">No overview</p>
+        <p className="text-xs text-ash-400 italic">No overview</p>
       )}
 
     </button>

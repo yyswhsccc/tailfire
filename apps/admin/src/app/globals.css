@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* Tern Design System - Light Mode */
+    /* Design System - Light Mode */
     --background: 0 0% 98%;
     --foreground: 217 33% 7%;
     --card: 0 0% 100%;
@@ -16,11 +16,11 @@
     --primary: 39 48% 60%;
     --primary-foreground: 0 0% 100%;
 
-    /* Tern Secondary: Light Gray */
+    /* Secondary: Light Gray */
     --secondary: 220 14% 96%;
     --secondary-foreground: 217 33% 17%;
 
-    /* Tern Muted: Very Light Gray */
+    /* Muted: Very Light Gray */
     --muted: 220 13% 97%;
     --muted-foreground: 217 10% 43%;
 
@@ -32,25 +32,25 @@
     --destructive: 0 51% 47%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Tern Borders: Light Gray #E5E7EB */
+    /* Borders: Light Gray #E5E7EB */
     --border: 220 13% 91%;
     --input: 220 13% 91%;
     --ring: 39 48% 60%;
 
-    /* Tern Border Radius: Subtle, minimal */
+    /* Border Radius: Subtle, minimal */
     --radius: 0.375rem;
 
-    /* Additional Tern Colors */
-    --tern-gray-50: 220 14% 98%;
-    --tern-gray-100: 220 13% 97%;
-    --tern-gray-200: 220 13% 91%;
-    --tern-gray-300: 216 12% 84%;
-    --tern-gray-400: 218 11% 65%;
-    --tern-gray-500: 217 10% 43%;
-    --tern-gray-600: 217 17% 35%;
-    --tern-gray-700: 217 33% 17%;
-    --tern-gray-800: 217 33% 12%;
-    --tern-gray-900: 217 33% 7%;
+    /* Ash Gray Palette */
+    --ash-50: 220 14% 98%;
+    --ash-100: 220 13% 97%;
+    --ash-200: 220 13% 91%;
+    --ash-300: 216 12% 84%;
+    --ash-400: 218 11% 65%;
+    --ash-500: 217 10% 43%;
+    --ash-600: 217 17% 35%;
+    --ash-700: 217 33% 17%;
+    --ash-800: 217 33% 12%;
+    --ash-900: 217 33% 7%;
 
     /* Phoenix Gold Palette - Base: #C59746 */
     --phoenix-gold-50: 39 65% 95%;
@@ -99,18 +99,6 @@
     --golden-orange-700: 33 65% 45%;
     --golden-orange-800: 33 60% 35%;
     --golden-orange-900: 33 55% 25%;
-
-    /* Backward compatibility: tern-teal now aliases to phoenix-gold */
-    --tern-teal-50: var(--phoenix-gold-50);
-    --tern-teal-100: var(--phoenix-gold-100);
-    --tern-teal-200: var(--phoenix-gold-200);
-    --tern-teal-300: var(--phoenix-gold-300);
-    --tern-teal-400: var(--phoenix-gold-400);
-    --tern-teal-500: var(--phoenix-gold-500);
-    --tern-teal-600: var(--phoenix-gold-600);
-    --tern-teal-700: var(--phoenix-gold-700);
-    --tern-teal-800: var(--phoenix-gold-800);
-    --tern-teal-900: var(--phoenix-gold-900);
   }
 
   .dark {

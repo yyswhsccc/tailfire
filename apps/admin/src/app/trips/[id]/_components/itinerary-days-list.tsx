@@ -94,9 +94,9 @@ export function ItineraryDaysList({ trip, itinerary }: ItineraryDaysListProps) {
             <div className="flex-1 flex items-center justify-center">
               <div className={cn(ITINERARY_CARD_STYLES, 'max-w-md mx-auto p-8')}>
                 <div className="text-center">
-                  <Calendar className="h-12 w-12 text-tern-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-tern-gray-900 mb-2">No days yet</h3>
-                  <p className="text-sm text-tern-gray-500 mb-4">
+                  <Calendar className="h-12 w-12 text-ash-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-ash-900 mb-2">No days yet</h3>
+                  <p className="text-sm text-ash-500 mb-4">
                     {trip.startDate && trip.endDate
                       ? 'Click below to generate days from the trip dates.'
                       : 'Set trip start and end dates first, then generate days.'}

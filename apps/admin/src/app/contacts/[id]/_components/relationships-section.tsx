@@ -90,11 +90,11 @@ export function RelationshipsSection({
   if (!relationships || relationships.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
-        <div className="rounded-full bg-tern-gray-100 p-4 mb-4">
-          <Users className="h-8 w-8 text-tern-gray-400" />
+        <div className="rounded-full bg-ash-100 p-4 mb-4">
+          <Users className="h-8 w-8 text-ash-400" />
         </div>
-        <h3 className="text-lg font-semibold text-tern-gray-900 mb-2">No Relationships</h3>
-        <p className="text-sm text-tern-gray-600 text-center max-w-md mb-6">
+        <h3 className="text-lg font-semibold text-ash-900 mb-2">No Relationships</h3>
+        <p className="text-sm text-ash-600 text-center max-w-md mb-6">
           Track relationships between contacts like family members, business partners, or travel companions.
         </p>
         <Button onClick={onAddRelationship} className="flex items-center gap-2">
@@ -108,7 +108,7 @@ export function RelationshipsSection({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-tern-gray-900">
+        <h2 className="text-lg font-semibold text-ash-900">
           Relationships ({relationships.length})
         </h2>
         <Button onClick={onAddRelationship} size="sm" className="flex items-center gap-2">
@@ -135,7 +135,7 @@ export function RelationshipsSection({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-tern-gray-900 truncate">
+                      <h3 className="font-semibold text-ash-900 truncate">
                         {displayName}
                       </h3>
                       <Badge
@@ -146,14 +146,14 @@ export function RelationshipsSection({
                       </Badge>
                     </div>
 
-                    <p className="text-sm text-tern-gray-600 mb-2">{label}</p>
+                    <p className="text-sm text-ash-600 mb-2">{label}</p>
 
                     {relationship.notes && (
-                      <p className="text-sm text-tern-gray-500 line-clamp-2">{relationship.notes}</p>
+                      <p className="text-sm text-ash-500 line-clamp-2">{relationship.notes}</p>
                     )}
 
                     {relatedContact && (
-                      <div className="flex gap-4 mt-2 text-xs text-tern-gray-500">
+                      <div className="flex gap-4 mt-2 text-xs text-ash-500">
                         {relatedContact.email && (
                           <span className="truncate">{relatedContact.email}</span>
                         )}

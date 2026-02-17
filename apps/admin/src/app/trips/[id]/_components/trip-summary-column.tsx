@@ -106,32 +106,32 @@ export function TripSummaryColumn({ days, tripId, tripStartDate, tripEndDate, it
   }, [days, dayActivities, spanningActivities, continuingSpansByDay])
 
   return (
-    <div className={cn(SUMMARY_COLUMN_WIDTH, ITINERARY_CARD_STYLES, 'p-0 bg-tern-gray-50/50')}>
+    <div className={cn(SUMMARY_COLUMN_WIDTH, ITINERARY_CARD_STYLES, 'p-0 bg-ash-50/50')}>
       {/* Summary Header */}
-      <div className="p-3 border-b border-tern-gray-200">
+      <div className="p-3 border-b border-ash-200">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-tern-gray-500" />
-            <h3 className="font-semibold text-sm text-tern-gray-900">Trip Summary</h3>
+            <FileText className="h-4 w-4 text-ash-500" />
+            <h3 className="font-semibold text-sm text-ash-900">Trip Summary</h3>
           </div>
           <Button
             variant="ghost"
             size="sm"
             aria-label="Edit itinerary"
-            className={cn('h-8 w-8 p-0 hover:bg-tern-gray-100', FOCUS_VISIBLE_RING)}
+            className={cn('h-8 w-8 p-0 hover:bg-ash-100', FOCUS_VISIBLE_RING)}
             onClick={() => setEditDialogOpen(true)}
           >
-            <Pencil className="h-4 w-4 text-tern-gray-500" />
+            <Pencil className="h-4 w-4 text-ash-500" />
           </Button>
         </div>
-        <p className="text-xs text-tern-gray-500 line-clamp-1" title={itinerary.name}>
+        <p className="text-xs text-ash-500 line-clamp-1" title={itinerary.name}>
           {itinerary.name}
         </p>
       </div>
 
       {/* Instructional Text */}
-      <div className="p-2 border-b border-tern-gray-200">
-        <p className="text-xs text-tern-gray-500 leading-snug">
+      <div className="p-2 border-b border-ash-200">
+        <p className="text-xs text-ash-500 leading-snug">
           Drag and drop activities here to add them to both the summary and their scheduled day.
         </p>
       </div>
@@ -149,9 +149,9 @@ export function TripSummaryColumn({ days, tripId, tripStartDate, tripEndDate, it
       >
         {activitiesByDay.every(d => d.activities.length === 0 && d.spanningStarts.length === 0) ? (
           <div className="text-center py-8">
-            <FileText className="h-8 w-8 text-tern-gray-300 mx-auto mb-2" />
-            <p className="text-xs text-tern-gray-500">No activities yet</p>
-            <p className="text-xs text-tern-gray-400 mt-1">
+            <FileText className="h-8 w-8 text-ash-300 mx-auto mb-2" />
+            <p className="text-xs text-ash-500">No activities yet</p>
+            <p className="text-xs text-ash-400 mt-1">
               Drag components from the sidebar
             </p>
           </div>
@@ -165,7 +165,7 @@ export function TripSummaryColumn({ days, tripId, tripStartDate, tripEndDate, it
               return (
                 <div key={dayId}>
                   {/* Day label */}
-                  <p className="text-[10px] font-medium text-tern-gray-400 uppercase tracking-wide mb-1 mt-2 first:mt-0">
+                  <p className="text-[10px] font-medium text-ash-400 uppercase tracking-wide mb-1 mt-2 first:mt-0">
                     {day.title || `Day ${day.dayNumber}`}
                   </p>
 
@@ -182,7 +182,7 @@ export function TripSummaryColumn({ days, tripId, tripStartDate, tripEndDate, it
                         />
                         {/* Vertical line indicator extending down */}
                         <div
-                          className={cn("absolute left-3 top-full w-0.5", color ? color.line : 'bg-tern-teal-300')}
+                          className={cn("absolute left-3 top-full w-0.5", color ? color.line : 'bg-phoenix-gold-300')}
                           style={{ height: '8px' }}
                           aria-hidden="true"
                         />
@@ -203,13 +203,13 @@ export function TripSummaryColumn({ days, tripId, tripStartDate, tripEndDate, it
                         <div
                           className={cn(
                             'w-0.5 flex-shrink-0',
-                            color ? color.line : 'bg-tern-teal-300',
+                            color ? color.line : 'bg-phoenix-gold-300',
                             isLastDay ? 'h-2 rounded-b' : 'h-full min-h-[16px]'
                           )}
                           aria-hidden="true"
                         />
                         {/* Dotted continuation indicator */}
-                        <span className="text-[10px] text-tern-gray-400 italic truncate">
+                        <span className="text-[10px] text-ash-400 italic truncate">
                           {spanning.name} {isLastDay ? '(ends)' : '(continues)'}
                         </span>
                       </div>

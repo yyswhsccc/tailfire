@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import { Plus, AlertCircle, Cloud, CheckCircle2, XCircle, ExternalLink } from 'lucide-react'
-import { TernButton } from '@/components/tern/core'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { SettingsTabsLayout } from '../_components/settings-tabs-layout'
-import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'
+import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { useToast } from '@/hooks/use-toast'
 import {
   useApiCredentials,
@@ -222,10 +222,10 @@ export default function ApiCredentialsPage() {
             Manage encrypted API credentials for third-party service integrations
           </p>
         </div>
-        <TernButton onClick={() => setIsCreateOpen(true)} size="sm">
+        <Button onClick={() => setIsCreateOpen(true)} size="sm">
           <Plus className="mr-2 h-4 w-4" />
           Add Credential
-        </TernButton>
+        </Button>
       </div>
 
       <div className="space-y-6">
@@ -291,7 +291,7 @@ export default function ApiCredentialsPage() {
           </CardContent>
         </Card>
 
-        <div className="bg-white border border-tern-gray-200 rounded-lg">
+        <div className="bg-white border border-ash-200 rounded-lg">
           {error ? (
             <div className="text-center py-12">
               <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
@@ -303,13 +303,13 @@ export default function ApiCredentialsPage() {
             <TableSkeleton rows={3} />
           ) : !credentials || credentials.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-tern-gray-500 mb-4">
+              <p className="text-ash-500 mb-4">
                 No API credentials configured
               </p>
-              <TernButton onClick={() => setIsCreateOpen(true)}>
+              <Button onClick={() => setIsCreateOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Your First Credential
-              </TernButton>
+              </Button>
             </div>
           ) : (
             <CredentialsTable

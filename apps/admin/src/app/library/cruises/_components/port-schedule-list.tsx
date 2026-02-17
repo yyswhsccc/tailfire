@@ -14,14 +14,14 @@ export function PortScheduleList({ sailing }: PortScheduleListProps) {
 
   return (
     <div>
-      <h3 className="font-semibold text-sm text-tern-gray-900 mb-3 flex items-center gap-2">
+      <h3 className="font-semibold text-sm text-ash-900 mb-3 flex items-center gap-2">
         <MapPin className="h-4 w-4" />
         Port Schedule
       </h3>
 
       <div className="relative">
         {/* Vertical line connecting stops */}
-        <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-tern-gray-200" />
+        <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-ash-200" />
 
         <div className="space-y-0">
           {sailing.itinerary.map((stop, index) => {
@@ -34,7 +34,7 @@ export function PortScheduleList({ sailing }: PortScheduleListProps) {
                 key={`${stop.dayNumber}-${stop.portName}`}
                 className={cn(
                   'relative flex items-start gap-4 py-3',
-                  !isLast && 'border-b border-tern-gray-100'
+                  !isLast && 'border-b border-ash-100'
                 )}
               >
                 {/* Timeline Node */}
@@ -44,8 +44,8 @@ export function PortScheduleList({ sailing }: PortScheduleListProps) {
                     stop.isSeaDay
                       ? 'bg-blue-100 text-blue-600'
                       : isFirst || isLast
-                        ? 'bg-tern-teal-600 text-white'
-                        : 'bg-tern-gray-100 text-tern-gray-600'
+                        ? 'bg-phoenix-gold-600 text-white'
+                        : 'bg-ash-100 text-ash-600'
                   )}
                 >
                   {stop.isSeaDay ? (
@@ -61,17 +61,17 @@ export function PortScheduleList({ sailing }: PortScheduleListProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-sm text-tern-gray-900">
+                      <p className="font-medium text-sm text-ash-900">
                         {stop.isSeaDay ? 'At Sea' : stop.portName}
                       </p>
-                      <p className="text-xs text-tern-gray-500">
+                      <p className="text-xs text-ash-500">
                         Day {stop.dayNumber} - {format(stopDate, 'EEE, MMM d')}
                       </p>
                     </div>
 
                     {/* Times */}
                     {!stop.isSeaDay && (stop.arrivalTime || stop.departureTime) && (
-                      <div className="flex items-center gap-3 text-xs text-tern-gray-500">
+                      <div className="flex items-center gap-3 text-xs text-ash-500">
                         {stop.arrivalTime && (
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
@@ -90,12 +90,12 @@ export function PortScheduleList({ sailing }: PortScheduleListProps) {
 
                   {/* Port Type Label */}
                   {isFirst && (
-                    <span className="inline-block mt-1 text-[10px] font-medium text-tern-teal-600 bg-tern-teal-50 px-1.5 py-0.5 rounded">
+                    <span className="inline-block mt-1 text-[10px] font-medium text-phoenix-gold-600 bg-phoenix-gold-50 px-1.5 py-0.5 rounded">
                       Embarkation
                     </span>
                   )}
                   {isLast && !isFirst && (
-                    <span className="inline-block mt-1 text-[10px] font-medium text-tern-teal-600 bg-tern-teal-50 px-1.5 py-0.5 rounded">
+                    <span className="inline-block mt-1 text-[10px] font-medium text-phoenix-gold-600 bg-phoenix-gold-50 px-1.5 py-0.5 rounded">
                       Disembarkation
                     </span>
                   )}

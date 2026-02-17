@@ -1,11 +1,11 @@
 'use client'
 
-import { TernDashboardLayout } from '@/components/tern/layout'
+import { DashboardLayout } from '@/components/layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function DestinationsPage() {
   return (
-    <TernDashboardLayout>
+    <DashboardLayout>
       <div className="space-y-6">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Destinations</h2>
@@ -25,6 +25,6 @@ export default function DestinationsPage() {
           </CardContent>
         </Card>
       </div>
-    </TernDashboardLayout>
+    </DashboardLayout>
   )
 }

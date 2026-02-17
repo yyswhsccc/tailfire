@@ -6,7 +6,7 @@
  *
  * Current Usage Audit (as of Phase 1.3):
  * - Radix UI components (popovers, tooltips, dialogs): z-50
- * - Sticky header (tern-top-nav): z-50
+ * - Sticky header (top-nav): z-50
  * - Toast notifications: z-[200]
  *
  * Date Picker Strategy:
@@ -17,7 +17,7 @@
 export const Z_INDEX = {
   /**
    * Base layer for sticky headers and navigation
-   * Used by: tern-top-nav.tsx
+   * Used by: top-nav.tsx
    */
   STICKY_HEADER: 50,
 

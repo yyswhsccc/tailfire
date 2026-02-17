@@ -17,7 +17,7 @@ import { DRAG_OVERLAY_STYLES } from '@/lib/itinerary-styles'
 import { isValidActivityType, getActivityTypeMetadata } from '@/lib/activity-constants'
 import { ActivityIconBadge } from '@/components/ui/activity-icon-badge'
 import { Button } from '@/components/ui/button'
-import { EmptyState } from '@/components/tern/shared'
+import { EmptyState } from '@/components/shared'
 import { ItineraryDaysList } from './itinerary-days-list'
 import { ItinerarySelector } from './itinerary-selector'
 import { ItineraryTableView } from './itinerary-table-view'
@@ -605,7 +605,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
               )}
 
               {/* View Toggle - icon only */}
-              <div className="flex items-center gap-1 rounded-md border border-tern-gray-200 p-0.5 bg-tern-gray-50">
+              <div className="flex items-center gap-1 rounded-md border border-ash-200 p-0.5 bg-ash-50">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -613,7 +613,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
                   className={`h-7 w-7 p-0 ${viewMode === 'board' ? 'bg-white shadow-sm' : ''}`}
                   aria-label="Board view"
                 >
-                  <LayoutGrid className="h-4 w-4 text-tern-gray-600" />
+                  <LayoutGrid className="h-4 w-4 text-ash-600" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -622,7 +622,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
                   className={`h-7 w-7 p-0 ${viewMode === 'table' ? 'bg-white shadow-sm' : ''}`}
                   aria-label="Table view"
                 >
-                  <Table2 className="h-4 w-4 text-tern-gray-600" />
+                  <Table2 className="h-4 w-4 text-ash-600" />
                 </Button>
               </div>
             </div>
@@ -678,7 +678,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
               {activeDragItem.componentType && isValidActivityType(activeDragItem.componentType) && (
                 <ActivityIconBadge type={activeDragItem.componentType} size="md" shape="rounded" />
               )}
-              <p className="text-sm font-medium text-tern-gray-900">{activeDragItem.label}</p>
+              <p className="text-sm font-medium text-ash-900">{activeDragItem.label}</p>
             </div>
           </div>
         ) : null}

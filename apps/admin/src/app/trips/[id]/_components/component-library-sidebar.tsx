@@ -37,20 +37,20 @@ function DraggableComponent({ id, componentType, label, icon: Icon }: DraggableC
       {...attributes}
       aria-label={`Drag to add ${label}`}
       className={cn(
-        'flex items-center gap-2 p-2 rounded-md border border-tern-gray-200 cursor-grab active:cursor-grabbing',
-        'hover:bg-tern-gray-50 hover:border-tern-gray-300 transition-all',
+        'flex items-center gap-2 p-2 rounded-md border border-ash-200 cursor-grab active:cursor-grabbing',
+        'hover:bg-ash-50 hover:border-ash-300 transition-all',
         FOCUS_VISIBLE_RING,
-        isDragging && 'opacity-50 border-tern-teal-500 shadow-sm'
+        isDragging && 'opacity-50 border-phoenix-gold-500 shadow-sm'
       )}
     >
       {isActivityType ? (
         <ActivityIconBadge type={componentType} size="sm" shape="square" />
       ) : Icon ? (
-        <Icon className="h-4 w-4 text-tern-gray-500" />
+        <Icon className="h-4 w-4 text-ash-500" />
       ) : null}
-      <span className="text-xs text-tern-gray-900">{label}</span>
+      <span className="text-xs text-ash-900">{label}</span>
       <div className="ml-auto">
-        <div className="h-4 w-4 text-tern-gray-400">⋮⋮</div>
+        <div className="h-4 w-4 text-ash-400">⋮⋮</div>
       </div>
     </div>
   )
@@ -64,32 +64,32 @@ export function ComponentLibrarySidebar() {
     <div className={cn(SIDEBAR_WIDTH, ITINERARY_CARD_STYLES, 'overflow-y-auto')}>
       <div className="p-3 space-y-3">
         {/* Header */}
-        <h3 className="text-base font-semibold text-tern-gray-900">Build your trip</h3>
+        <h3 className="text-base font-semibold text-ash-900">Build your trip</h3>
 
         {/* AI Assist Section */}
-        <div className="border border-tern-gray-200 rounded-md overflow-hidden">
+        <div className="border border-ash-200 rounded-md overflow-hidden">
           <button
             onClick={() => setAiAssistExpanded(!aiAssistExpanded)}
             aria-expanded={aiAssistExpanded}
             aria-controls="ai-assist-content"
             className={cn(
-              'w-full flex items-center justify-between p-2.5 hover:bg-tern-gray-50 transition-colors',
+              'w-full flex items-center justify-between p-2.5 hover:bg-ash-50 transition-colors',
               FOCUS_VISIBLE_RING
             )}
           >
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-purple-600" />
-              <h4 className="font-medium text-xs text-tern-gray-900">AI Assist</h4>
+              <h4 className="font-medium text-xs text-ash-900">AI Assist</h4>
             </div>
             {aiAssistExpanded ? (
-              <ChevronUp className="h-3 w-3 text-tern-gray-500" />
+              <ChevronUp className="h-3 w-3 text-ash-500" />
             ) : (
-              <ChevronDown className="h-3 w-3 text-tern-gray-500" />
+              <ChevronDown className="h-3 w-3 text-ash-500" />
             )}
           </button>
 
           {aiAssistExpanded && (
-            <div id="ai-assist-content" className="p-2.5 space-y-2 border-t border-tern-gray-200">
+            <div id="ai-assist-content" className="p-2.5 space-y-2 border-t border-ash-200">
               <Textarea
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
@@ -102,7 +102,7 @@ export function ComponentLibrarySidebar() {
                   <FileText className="h-3.5 w-3.5 mr-1" />
                   Upload
                 </Button>
-                <Button size="sm" className="h-8 text-xs bg-tern-teal-500 hover:bg-tern-teal-600">
+                <Button size="sm" className="h-8 text-xs bg-phoenix-gold-500 hover:bg-phoenix-gold-600">
                   Submit
                 </Button>
               </div>
@@ -130,7 +130,7 @@ export function ComponentLibrarySidebar() {
 
         {/* Library Items */}
         <div role="group" aria-labelledby="library-items-heading">
-          <p id="library-items-heading" className="text-xs font-medium text-tern-gray-500 mb-2">Library Items</p>
+          <p id="library-items-heading" className="text-xs font-medium text-ash-500 mb-2">Library Items</p>
           <div className="space-y-1.5">
             <DraggableComponent
               id="library-itinerary"
@@ -161,7 +161,7 @@ export function ComponentLibrarySidebar() {
 
         {/* Trip Components */}
         <div role="group" aria-labelledby="trip-components-heading">
-          <p id="trip-components-heading" className="text-xs font-medium text-tern-gray-500 mb-2">Trip Components</p>
+          <p id="trip-components-heading" className="text-xs font-medium text-ash-500 mb-2">Trip Components</p>
           <div className="space-y-1.5">
             {Object.entries(ACTIVITY_TYPE_METADATA)
               .filter(([_, metadata]) => !metadata.hidden)

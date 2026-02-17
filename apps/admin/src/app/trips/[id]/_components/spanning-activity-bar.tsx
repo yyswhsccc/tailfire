@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
 import type { ActivityWithSpan } from '@/lib/spanning-activity-utils'
 import { getActivityNights } from '@/lib/spanning-activity-utils'
-import { TernBadge } from '@/components/tern/core'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -135,16 +135,16 @@ export function SpanningActivityBar({
           'bg-gradient-to-r border rounded-lg',
           cruiseColor
             ? `${cruiseColor.bgGradient} ${cruiseColor.border} ${cruiseColor.borderHover}`
-            : 'from-tern-teal-50 to-tern-teal-25 border-tern-teal-200 hover:border-tern-teal-300',
+            : 'from-phoenix-gold-50 to-phoenix-gold-25 border-phoenix-gold-200 hover:border-phoenix-gold-300',
           'hover:shadow-sm transition-all',
           FOCUS_VISIBLE_RING
         )}
       >
         {/* Sticky container for image, name, badges, and actions - visible when scrolling */}
-        <div className={cn("sticky left-3 flex items-center gap-2 bg-gradient-to-r pr-6 z-10 rounded-l-md", cruiseColor ? cruiseColor.stickyGradient : 'from-tern-teal-50 via-tern-teal-50/95 to-tern-teal-50/0')}>
+        <div className={cn("sticky left-3 flex items-center gap-2 bg-gradient-to-r pr-6 z-10 rounded-l-md", cruiseColor ? cruiseColor.stickyGradient : 'from-phoenix-gold-50 via-phoenix-gold-50/95 to-phoenix-gold-50/0')}>
           {/* Activity Thumbnail or Icon */}
           {activity.thumbnail ? (
-            <div className="relative w-8 h-8 rounded-md overflow-hidden flex-shrink-0 border border-tern-teal-200">
+            <div className="relative w-8 h-8 rounded-md overflow-hidden flex-shrink-0 border border-phoenix-gold-200">
               <Image
                 src={activity.thumbnail}
                 alt={activity.name}
@@ -159,7 +159,7 @@ export function SpanningActivityBar({
 
           {/* Activity Name */}
           <h4
-            className="font-medium text-sm text-tern-gray-900 truncate max-w-[180px]"
+            className="font-medium text-sm text-ash-900 truncate max-w-[180px]"
             title={activity.name}
           >
             {activity.name}
@@ -170,7 +170,7 @@ export function SpanningActivityBar({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-xs font-medium flex-shrink-0", cruiseColor ? cruiseColor.badge : 'bg-tern-teal-100 text-tern-teal-800')}>
+                  <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-xs font-medium flex-shrink-0", cruiseColor ? cruiseColor.badge : 'bg-phoenix-gold-100 text-phoenix-gold-800')}>
                     {durationLabel}
                   </span>
                 </TooltipTrigger>
@@ -182,9 +182,9 @@ export function SpanningActivityBar({
           )}
 
           {/* Status Badge */}
-          <TernBadge variant="secondary" className="flex-shrink-0">
+          <Badge variant="secondary" className="flex-shrink-0">
             {activity.status}
-          </TernBadge>
+          </Badge>
 
           {/* Action Menu */}
           <DropdownMenu>
@@ -197,7 +197,7 @@ export function SpanningActivityBar({
                   FOCUS_VISIBLE_RING
                 )}
               >
-                <MoreHorizontal className="h-3.5 w-3.5 text-tern-gray-500" />
+                <MoreHorizontal className="h-3.5 w-3.5 text-ash-500" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-32">

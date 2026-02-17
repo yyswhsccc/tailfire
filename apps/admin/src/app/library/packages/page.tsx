@@ -201,10 +201,10 @@ function PackageTemplatesContent() {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <Package className="h-8 w-8 text-tern-teal-600" />
-            <h1 className="text-2xl font-bold text-tern-gray-900">Package Templates</h1>
+            <Package className="h-8 w-8 text-phoenix-gold-600" />
+            <h1 className="text-2xl font-bold text-ash-900">Package Templates</h1>
           </div>
-          <p className="mt-1 text-sm text-tern-gray-500">
+          <p className="mt-1 text-sm text-ash-500">
             {hasTripContext
               ? `Select a package to add to your itinerary${dayDate ? ` starting from ${formatDate(dayDate)}` : ''}`
               : 'Save and reuse package structures with activities across multiple days'}
@@ -228,7 +228,7 @@ function PackageTemplatesContent() {
 
       {/* Search */}
       <div className="relative w-full max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tern-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ash-400" />
         <Input
           placeholder="Search templates..."
           value={searchQuery}
@@ -240,22 +240,22 @@ function PackageTemplatesContent() {
       {/* Content */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-tern-gray-400" />
+          <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
         </div>
       ) : error ? (
         <div className="text-center py-12">
           <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-          <h3 className="mt-2 text-sm font-medium text-tern-gray-900">Error loading templates</h3>
-          <p className="mt-1 text-sm text-tern-gray-500">{error}</p>
+          <h3 className="mt-2 text-sm font-medium text-ash-900">Error loading templates</h3>
+          <p className="mt-1 text-sm text-ash-500">{error}</p>
           <Button variant="outline" className="mt-4" onClick={fetchTemplates}>
             Try Again
           </Button>
         </div>
       ) : templates.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-tern-gray-200 rounded-lg">
-          <Package className="mx-auto h-12 w-12 text-tern-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-tern-gray-900">No templates yet</h3>
-          <p className="mt-1 text-sm text-tern-gray-500">
+        <div className="text-center py-12 border-2 border-dashed border-ash-200 rounded-lg">
+          <Package className="mx-auto h-12 w-12 text-ash-400" />
+          <h3 className="mt-2 text-sm font-medium text-ash-900">No templates yet</h3>
+          <p className="mt-1 text-sm text-ash-500">
             {searchQuery
               ? 'No templates match your search'
               : hasTripContext
@@ -270,7 +270,7 @@ function PackageTemplatesContent() {
           )}
         </div>
       ) : (
-        <div className="border border-tern-gray-200 rounded-lg overflow-hidden">
+        <div className="border border-ash-200 rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
@@ -423,16 +423,16 @@ function PackageTemplatesLoading() {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <Package className="h-8 w-8 text-tern-teal-600" />
-            <h1 className="text-2xl font-bold text-tern-gray-900">Package Templates</h1>
+            <Package className="h-8 w-8 text-phoenix-gold-600" />
+            <h1 className="text-2xl font-bold text-ash-900">Package Templates</h1>
           </div>
-          <p className="mt-1 text-sm text-tern-gray-500">
+          <p className="mt-1 text-sm text-ash-500">
             Save and reuse package structures with activities across multiple days
           </p>
         </div>
       </div>
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-tern-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 'use client'
 
-import { TernDashboardLayout } from '@/components/tern/layout'
-import { PageHeader } from '@/components/tern/shared'
+import { DashboardLayout } from '@/components/layout'
+import { PageHeader } from '@/components/shared'
 import { CalendarView } from './_components'
 import { useUsers } from '@/hooks/use-users'
 import { useUser } from '@/hooks/use-user'
@@ -29,7 +29,7 @@ export default function CalendarPage() {
   })) || []
 
   return (
-    <TernDashboardLayout>
+    <DashboardLayout>
       <div className="flex flex-col h-[calc(100vh-8rem)]">
         <PageHeader
           title="Calendar"
@@ -40,6 +40,6 @@ export default function CalendarPage() {
           <CalendarView userOptions={userOptions} isAdmin={isAdmin} />
         </div>
       </div>
-    </TernDashboardLayout>
+    </DashboardLayout>
   )
 }

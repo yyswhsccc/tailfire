@@ -198,7 +198,7 @@ export function RelationshipDialog({
                         <span>{selectedContact.displayName}</span>
                       </div>
                     ) : (
-                      <span className="text-tern-gray-500">Select a contact...</span>
+                      <span className="text-ash-500">Select a contact...</span>
                     )}
                     <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -232,7 +232,7 @@ export function RelationshipDialog({
                               <div className="flex flex-col">
                                 <span className="text-sm font-medium">{contact.displayName}</span>
                                 {contact.email && (
-                                  <span className="text-xs text-tern-gray-500">{contact.email}</span>
+                                  <span className="text-xs text-ash-500">{contact.email}</span>
                                 )}
                               </div>
                             </div>
@@ -287,7 +287,7 @@ export function RelationshipDialog({
               {...register('labelForContact1')}
               placeholder="e.g., Spouse, Parent, Business Partner"
             />
-            <p className="text-xs text-tern-gray-500">
+            <p className="text-xs text-ash-500">
               How this contact relates to the selected contact
             </p>
           </div>
@@ -302,7 +302,7 @@ export function RelationshipDialog({
               {...register('labelForContact2')}
               placeholder="e.g., Spouse, Child, Business Partner"
             />
-            <p className="text-xs text-tern-gray-500">
+            <p className="text-xs text-ash-500">
               How the selected contact relates to this contact
             </p>
           </div>

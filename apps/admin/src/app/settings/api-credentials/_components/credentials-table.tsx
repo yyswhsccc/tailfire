@@ -161,34 +161,34 @@ export function CredentialsTable({
       <div className="w-full">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-tern-gray-200 bg-gray-50">
-              <th className="px-6 py-3 text-left text-xs font-medium text-tern-gray-600 uppercase tracking-wider">
+            <tr className="border-b border-ash-200 bg-gray-50">
+              <th className="px-6 py-3 text-left text-xs font-medium text-ash-600 uppercase tracking-wider">
                 Name
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-tern-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-ash-600 uppercase tracking-wider">
                 Provider
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-tern-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-ash-600 uppercase tracking-wider">
                 Version
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-tern-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-ash-600 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-tern-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-ash-600 uppercase tracking-wider">
                 Connection
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-tern-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-ash-600 uppercase tracking-wider">
                 Last Rotated
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-tern-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-ash-600 uppercase tracking-wider">
                 Expires
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-tern-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-ash-600 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-tern-gray-200">
+          <tbody className="bg-white divide-y divide-ash-200">
             {credentials.map((credential) => (
               <tr
                 key={credential.id}

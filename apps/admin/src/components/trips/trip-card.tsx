@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Calendar, Loader2, MoreVertical, Trash2, XCircle } from 'lucide-react'
 import type { TripResponseDto } from '@tailfire/shared-types/api'
-import { TernCard } from '../core/tern-card'
+import { Card } from '@/components/ui/card'
 import { formatDate, cn } from '@/lib/utils'
 import Link from 'next/link'
 import {
@@ -33,8 +33,8 @@ interface TripCardProps {
 }
 
 /**
- * Tern Trip Card
- * Minimal card displaying trip name, cover photo, and dates, matching Tern's kanban card design
+ * Trip Card
+ * Minimal card displaying trip name, cover photo, and dates
  */
 export function TripCard({ trip, isUpdating = false }: TripCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -64,7 +64,7 @@ export function TripCard({ trip, isUpdating = false }: TripCardProps) {
     <>
       <div className="relative group">
         <Link href={`/trips/${trip.id}`}>
-          <TernCard
+          <Card
             className={cn(
               'cursor-pointer relative overflow-hidden p-0',
               isUpdating && 'opacity-70'
@@ -85,20 +85,20 @@ export function TripCard({ trip, isUpdating = false }: TripCardProps) {
             <div className="p-2">
               {isUpdating && (
                 <div className="absolute top-2 right-2">
-                  <Loader2 className="h-4 w-4 text-tern-teal-600 animate-spin" />
+                  <Loader2 className="h-4 w-4 text-phoenix-gold-600 animate-spin" />
                 </div>
               )}
 
-              <h3 className="font-semibold text-sm text-tern-gray-900 mb-0.5 pr-6 group-hover:text-tern-teal-600 transition-colors">
+              <h3 className="font-semibold text-sm text-ash-900 mb-0.5 pr-6 group-hover:text-phoenix-gold-600 transition-colors">
                 {trip.name}
               </h3>
 
               {trip.referenceNumber && (
-                <p className="text-xs text-tern-gray-400 mb-0.5">{trip.referenceNumber}</p>
+                <p className="text-xs text-ash-400 mb-0.5">{trip.referenceNumber}</p>
               )}
 
               {(trip.startDate || trip.endDate) && (
-                <div className="flex items-center gap-1.5 text-xs text-tern-gray-500">
+                <div className="flex items-center gap-1.5 text-xs text-ash-500">
                   <Calendar className="h-3.5 w-3.5" />
                   <span>
                     {trip.startDate && formatDate(trip.startDate)}
@@ -108,7 +108,7 @@ export function TripCard({ trip, isUpdating = false }: TripCardProps) {
                 </div>
               )}
             </div>
-          </TernCard>
+          </Card>
         </Link>
 
         {/* Actions dropdown */}
