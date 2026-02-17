@@ -29,11 +29,13 @@ export class AutomationService implements OnModuleInit {
     @InjectQueue(QUEUES.TRIP_AUTOMATION) private readonly tripAutomationQueue: Queue,
     @InjectQueue(QUEUES.CLIENT_CARE) private readonly clientCareQueue: Queue,
     @InjectQueue(QUEUES.NOTIFICATIONS) private readonly notificationsQueue: Queue,
+    @InjectQueue(QUEUES.ENRICHMENT) private readonly enrichmentQueue: Queue,
     private readonly db: DatabaseService,
   ) {
     this.queues.set(QUEUES.TRIP_AUTOMATION, this.tripAutomationQueue)
     this.queues.set(QUEUES.CLIENT_CARE, this.clientCareQueue)
     this.queues.set(QUEUES.NOTIFICATIONS, this.notificationsQueue)
+    this.queues.set(QUEUES.ENRICHMENT, this.enrichmentQueue)
   }
 
   async onModuleInit() {

@@ -14,6 +14,8 @@ export const QUEUES = {
   TRIP_AUTOMATION: 'trip-automation',
   CLIENT_CARE: 'client-care',
   NOTIFICATIONS: 'notifications',
+  OCR_PROCESSING: 'ocr-processing',
+  ENRICHMENT: 'enrichment',
 } as const
 
 // Alias for backward compatibility
@@ -53,6 +55,12 @@ export const JOB_TYPES = {
   RECURRING_OVERDUE_PAYMENT_SCAN: 'recurring.overdue_payment_scan',
   RECURRING_TASK_ASSIGNMENT_DIGEST: 'recurring.task_assignment_digest',
   RECURRING_TASK_DUE_REMINDER: 'recurring.task_due_reminder',
+
+  // OCR processing jobs
+  OCR_EXTRACT: 'ocr.extract',
+
+  // Enrichment jobs
+  HOTEL_PHOTO_ENRICHMENT: 'hotel.photo_enrichment',
 
   // Notification jobs
   NOTIFICATION_SEND: 'notification.send',
@@ -183,6 +191,41 @@ export interface NotificationJobData {
   contactId?: string
   templateSlug?: string
   context?: Record<string, unknown>
+}
+
+// ============================================================================
+// OCR Processing Job Types
+// ============================================================================
+
+/**
+ * OCR extraction job data for async processing
+ */
+export interface OcrExtractJobData {
+  type: 'ocr.extract'
+  jobId: string
+  fileStoragePath: string | null
+  documentType?: string
+  tripId?: string
+  contactId?: string
+  agencyId: string
+  userId: string
+}
+
+// ============================================================================
+// Enrichment Job Types
+// ============================================================================
+
+/**
+ * Hotel photo enrichment job — searches Google Places and imports cover photos
+ */
+export interface HotelPhotoEnrichmentJobData {
+  type: 'hotel.photo_enrichment'
+  activityId: string
+  hotelName: string
+  address?: string | null
+  agencyId: string
+  userId: string
+  maxPhotos?: number
 }
 
 // ============================================================================

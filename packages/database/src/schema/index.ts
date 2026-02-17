@@ -147,6 +147,12 @@ export * from './notes.schema'
 // Calendar events (standalone meetings, calls, follow-ups)
 export * from './calendar-events.schema'
 
+// OCR document import jobs
+export * from './ocr-import-jobs.schema'
+
+// OCR supplier runbooks (extraction hints per supplier/document type)
+export * from './ocr-supplier-runbooks.schema'
+
 // Later phases:
 // export * from './financials.schema'
 // export * from './tasks.schema'

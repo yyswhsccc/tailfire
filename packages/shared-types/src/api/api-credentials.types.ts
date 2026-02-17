@@ -20,6 +20,8 @@ export enum ApiProvider {
   AMADEUS = 'amadeus',
   GOOGLE_PLACES = 'google_places',
   BOOKING_COM = 'booking_com',
+  // AI providers
+  OPEN_AI = 'open_ai',
   // Future providers:
   // VISA_REQUIREMENTS = 'visa_requirements',
 }
@@ -201,6 +203,15 @@ export interface BookingComCredentials {
 }
 
 /**
+ * OpenAI API credentials
+ * For GPT-4o Vision OCR document extraction
+ * Maps to encryptedCredentials JSONB field
+ */
+export interface OpenAiCredentials {
+  apiKey: string           // OpenAI API key
+}
+
+/**
  * Union type of all API credential types
  */
 export type ApiCredentials =
@@ -210,3 +221,4 @@ export type ApiCredentials =
   | AmadeusCredentials
   | GooglePlacesCredentials
   | BookingComCredentials
+  | OpenAiCredentials

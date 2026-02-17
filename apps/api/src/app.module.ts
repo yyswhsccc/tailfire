@@ -40,6 +40,7 @@ import { TasksModule } from './tasks/tasks.module'
 import { CalendarModule } from './calendar/calendar.module'
 import { NotesModule } from './notes/notes.module'
 import { CalendarEventsModule } from './calendar-events/calendar-events.module'
+import { OcrImportModule } from './ocr-import/ocr-import.module'
 
 @Module({
   imports: [
@@ -144,6 +145,9 @@ import { CalendarEventsModule } from './calendar-events/calendar-events.module'
 
     // Calendar events (standalone meetings, calls, follow-ups)
     CalendarEventsModule,
+
+    // OCR document import (PDF booking confirmations, passports)
+    OcrImportModule,
   ],
   controllers: [AppController],
   providers: [
