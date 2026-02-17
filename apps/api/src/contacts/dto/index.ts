@@ -21,3 +21,7 @@ export { UpdateContactGroupMemberDto } from './update-contact-group-member.dto'
 
 // Contact Share DTOs
 export { CreateContactShareDto, UpdateContactShareDto } from './create-contact-share.dto'
+
+// Loyalty Program DTOs
+export { CreateLoyaltyProgramDto } from './create-loyalty-program.dto'
+export { UpdateLoyaltyProgramDto } from './update-loyalty-program.dto'

@@ -61,6 +61,7 @@ export type AuditEntityType =
   | 'activity_media'
   | 'trip_media'
   | 'trip_group'
+  | 'contact_loyalty_program'
 
 /**
  * Generic audit event for all entity changes

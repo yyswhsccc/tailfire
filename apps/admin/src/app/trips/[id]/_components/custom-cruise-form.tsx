@@ -6,7 +6,7 @@ import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { useSearchParams } from 'next/navigation'
 import { useForm, useWatch } from 'react-hook-form'
-import { Ship, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, DollarSign, FileText, ImageIcon, Calendar, Anchor, RefreshCw, CalendarCheck } from 'lucide-react'
+import { Ship, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, DollarSign, FileText, ImageIcon, Calendar, Anchor, RefreshCw, CalendarCheck, Plus, Trash2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
@@ -35,7 +35,10 @@ import { TimePicker } from '@/components/ui/time-picker'
 import { Combobox } from '@/components/ui/combobox'
 import { DocumentUploader } from '@/components/document-uploader'
 import { ComponentMediaTab } from '@/components/shared'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
+import { centsToDollars, dollarsToCents } from '@/lib/pricing/currency-helpers'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { type PricingData, type PricingBreakdownItem } from '@/lib/pricing'
@@ -466,6 +469,15 @@ export function CustomCruiseForm({
   const bookingNumberValue = useWatch({ control, name: 'customCruiseDetails.bookingNumber' })
   const fareCodeValue = useWatch({ control, name: 'customCruiseDetails.fareCode' })
   const bookingDeadlineValue = useWatch({ control, name: 'customCruiseDetails.bookingDeadline' })
+
+  // Phase B: New cruise fields
+  const stateroomCategoryCodeValue = useWatch({ control, name: 'customCruiseDetails.stateroomCategoryCode' })
+  const reservationNumberValue = useWatch({ control, name: 'customCruiseDetails.reservationNumber' })
+  const onboardCreditCentsValue = useWatch({ control, name: 'customCruiseDetails.onboardCreditCents' })
+  const onboardCreditCurrencyValue = useWatch({ control, name: 'customCruiseDetails.onboardCreditCurrency' })
+  const netPriceCentsValue = useWatch({ control, name: 'netPriceCents' })
+  const nonRefundableDepositValue = useWatch({ control, name: 'nonRefundableDeposit' })
+  const cancellationScheduleValue = useWatch({ control, name: 'cancellationScheduleJson' })
 
   // Track if dayDate has been auto-applied (prevents duplicate application)
   const dayDateAppliedRef = useRef(false)
@@ -1598,7 +1610,7 @@ export function CustomCruiseForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Cabin Number</label>
                   <Input
@@ -1626,6 +1638,16 @@ export function CustomCruiseForm({
                     onChange={(e) => setValue('customCruiseDetails.cabinLocation', e.target.value || null, { shouldDirty: true })}
                     data-field="customCruiseDetails.cabinLocation"
                     placeholder="e.g., Mid-Ship, Aft"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Stateroom Category</label>
+                  <Input
+                    value={stateroomCategoryCodeValue || ''}
+                    onChange={(e) => setValue('customCruiseDetails.stateroomCategoryCode', e.target.value || null, { shouldDirty: true })}
+                    data-field="customCruiseDetails.stateroomCategoryCode"
+                    placeholder="e.g., D4, JS"
                   />
                 </div>
               </div>
@@ -1853,6 +1875,52 @@ export function CustomCruiseForm({
                   />
                 </div>
               </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Reservation Number</label>
+                  <Input
+                    value={reservationNumberValue || ''}
+                    onChange={(e) => setValue('customCruiseDetails.reservationNumber', e.target.value || null, { shouldDirty: true })}
+                    data-field="customCruiseDetails.reservationNumber"
+                    placeholder="Cruise line confirmation #"
+                  />
+                  <p className="text-xs text-gray-500">Cruise line confirmation number (different from Tailfire booking number)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Onboard Credit</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={onboardCreditCentsValue ? centsToDollars(onboardCreditCentsValue) : ''}
+                    onChange={(e) => {
+                      const cents = e.target.value ? dollarsToCents(e.target.value) : null
+                      setValue('customCruiseDetails.onboardCreditCents', cents, { shouldDirty: true })
+                    }}
+                    data-field="customCruiseDetails.onboardCreditCents"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">OBC Currency</label>
+                  <Select
+                    value={onboardCreditCurrencyValue || ''}
+                    onValueChange={(value) => setValue('customCruiseDetails.onboardCreditCurrency', value || null, { shouldDirty: true })}
+                  >
+                    <SelectTrigger data-field="customCruiseDetails.onboardCreditCurrency">
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="CAD">CAD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -1954,6 +2022,182 @@ export function CustomCruiseForm({
               currency={pricingData.currency}
             />
           </div>
+
+          {/* Cancellation Schedule */}
+          {(cancellationScheduleValue && cancellationScheduleValue.length > 0) ? (
+            <>
+              <Separator />
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg">Cancellation Schedule</CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const current = cancellationScheduleValue || []
+                      setValue('cancellationScheduleJson', [
+                        ...current,
+                        { daysRange: '', penaltyPercent: 0, penaltyAmountCents: null, effectiveDate: null, description: null },
+                      ], { shouldDirty: true })
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Row
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 px-2 font-medium text-gray-700">Days Range</th>
+                          <th className="text-left py-2 px-2 font-medium text-gray-700">Penalty %</th>
+                          <th className="text-left py-2 px-2 font-medium text-gray-700">Amount</th>
+                          <th className="text-left py-2 px-2 font-medium text-gray-700">Effective Date</th>
+                          <th className="text-left py-2 px-2 font-medium text-gray-700">Description</th>
+                          <th className="py-2 px-2 w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cancellationScheduleValue.map((row: any, index: number) => {
+                          const updateRow = (field: string, value: unknown) => {
+                            const updated = (cancellationScheduleValue as any[]).map((r: any, i: number) =>
+                              i === index ? { ...r, [field]: value } : r
+                            )
+                            setValue('cancellationScheduleJson', updated as any, { shouldDirty: true })
+                          }
+                          return (
+                          <tr key={index} className="border-b">
+                            <td className="py-2 px-2">
+                              <Input
+                                value={row.daysRange || ''}
+                                onChange={(e) => updateRow('daysRange', e.target.value)}
+                                placeholder="e.g., 90-120"
+                                className="h-8"
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={row.penaltyPercent ?? ''}
+                                onChange={(e) => updateRow('penaltyPercent', e.target.value ? Number(e.target.value) : 0)}
+                                placeholder="0"
+                                className="h-8 w-20"
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={row.penaltyAmountCents ? centsToDollars(row.penaltyAmountCents) : ''}
+                                onChange={(e) => updateRow('penaltyAmountCents', e.target.value ? dollarsToCents(e.target.value) : null)}
+                                placeholder="0.00"
+                                className="h-8 w-24"
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <Input
+                                type="date"
+                                value={row.effectiveDate || ''}
+                                onChange={(e) => updateRow('effectiveDate', e.target.value || null)}
+                                className="h-8"
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <Input
+                                value={row.description || ''}
+                                onChange={(e) => updateRow('description', e.target.value || null)}
+                                placeholder="Description"
+                                className="h-8"
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => {
+                                  const updated = cancellationScheduleValue.filter((_: any, i: number) => i !== index)
+                                  setValue('cancellationScheduleJson', (updated.length > 0 ? updated : null) as any, { shouldDirty: true })
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        )})}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              <Separator />
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setValue('cancellationScheduleJson', [
+                      { daysRange: '', penaltyPercent: 0, penaltyAmountCents: null, effectiveDate: null, description: null },
+                    ], { shouldDirty: true })
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Cancellation Schedule
+                </Button>
+              </div>
+            </>
+          )}
+
+          <Separator />
+
+          {/* Agency Pricing */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Agency Pricing</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Net Price</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={netPriceCentsValue ? centsToDollars(netPriceCentsValue) : ''}
+                    onChange={(e) => {
+                      const cents = e.target.value ? dollarsToCents(e.target.value) : null
+                      setValue('netPriceCents', cents, { shouldDirty: true })
+                    }}
+                    data-field="netPriceCents"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-gray-500">Agency net cost (before markup)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Non-Refundable Deposit</label>
+                  <div className="flex items-center space-x-2 pt-2">
+                    <Checkbox
+                      id="nonRefundableDeposit"
+                      checked={nonRefundableDepositValue || false}
+                      onCheckedChange={(checked) => setValue('nonRefundableDeposit', checked as boolean, { shouldDirty: true })}
+                    />
+                    <Label htmlFor="nonRefundableDeposit" className="text-sm text-gray-700 font-normal">
+                      Deposit is non-refundable
+                    </Label>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Separator />
 
