@@ -69,6 +69,7 @@ export interface CreateContactDto {
   // Lifecycle (optional on create, defaults applied)
   contactType?: 'lead' | 'client' // Defaults to 'lead'
   contactStatus?: 'prospecting' | 'quoted' | 'booked' | 'traveling' | 'returned' | 'awaiting_next' | 'inactive'
+  becameClientAt?: string // ISO timestamp, required when contactType is 'client'
 
   // Marketing consent (optional on create, defaults to false)
   marketingEmailOptIn?: boolean

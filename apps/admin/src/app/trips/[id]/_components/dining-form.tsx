@@ -34,7 +34,7 @@ import { ChildOfPackageBookingSection } from '@/components/activities/child-of-p
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
-import { buildInitialPricingState, type PricingData } from '@/lib/pricing'
+import { buildInitialPricingState, type PricingData, type PricingBreakdownItem } from '@/lib/pricing'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
@@ -148,6 +148,9 @@ export function DiningForm({
 
   // Package linkage state for PricingSection
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
+  const [pricingBreakdown, setPricingBreakdown] = useState<PricingBreakdownItem[] | null>(
+    (activity as any)?.pricingBreakdownJson ?? null
+  )
   const { data: packagesData } = useBookings({ tripId: trip?.id })
   const availablePackages = useMemo(
     () => packagesData?.map(pkg => ({ id: pkg.id, name: pkg.name })) ?? [],
@@ -437,7 +440,7 @@ export function DiningForm({
     setAutoSaveStatus('saving')
     try {
       const formData = getValues()
-      const payload = toDiningApiPayload(formData)
+      const payload = { ...toDiningApiPayload(formData), pricingBreakdownJson: pricingBreakdown }
 
       let response
       if (activityId) {
@@ -471,6 +474,7 @@ export function DiningForm({
     errors,
     activityId,
     activityPricingId,
+    pricingBreakdown,
     getValues,
     createDining,
     updateDining,
@@ -515,6 +519,7 @@ export function DiningForm({
     termsAndConditions: getValues('termsAndConditions') || '',
     cancellationPolicy: getValues('cancellationPolicy') || '',
     supplier: getValues('supplier') || '',
+    pricingBreakdown,
   }
 
   // Get travelers from trip data
@@ -1014,7 +1019,11 @@ export function DiningForm({
           <PricingSection
             pricingData={pricingData}
             onUpdate={(updates) => {
+              if ('pricingBreakdown' in updates) {
+                setPricingBreakdown(updates.pricingBreakdown ?? null)
+              }
               Object.entries(updates).forEach(([key, value]) => {
+                if (key === 'pricingBreakdown') return
                 setValue(key as keyof DiningFormData, value as any, { shouldDirty: true, shouldValidate: true })
               })
             }}
@@ -1025,6 +1034,7 @@ export function DiningForm({
             onPackageChange={setSelectedPackageId}
             isChildOfPackage={isChildOfPackage}
             parentPackageName={parentPackageName}
+            travelers={travelers}
           />
 
           <Separator />

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,15 @@ import { useImportPreview } from '@/hooks/use-import-booking'
 import { ApiError } from '@/lib/api'
 import type { ImportPreviewRequest, ImportPreviewResponse } from '@/types/import-booking.types'
 
+/**
+ * Cruise line slugs that support booking import via Traveltek's cruiseimportbooking endpoint.
+ * Add new slugs here as more cruise lines become import-compatible.
+ */
+const IMPORT_SUPPORTED_SLUGS = new Set([
+  'royal-caribbean',
+  'celebrity-cruises',
+])
+
 export interface ImportFormState {
   cruiseLineId: string | null
   bookingRef: string
@@ -40,7 +49,11 @@ export function ImportSourceForm({ onPreviewSuccess, isLoading, formState, onFor
 
   const { cruiseLineId, bookingRef, currency } = formState
 
-  const cruiseLineOptions = useCruiseLineOptions()
+  const allCruiseLineOptions = useCruiseLineOptions()
+  const cruiseLineOptions = useMemo(
+    () => allCruiseLineOptions?.filter(opt => opt.data && IMPORT_SUPPORTED_SLUGS.has(opt.data.slug)),
+    [allCruiseLineOptions],
+  )
   const previewMutation = useImportPreview()
 
   const canSubmit = cruiseLineId && bookingRef.trim() && !previewMutation.isPending && !isLoading

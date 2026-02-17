@@ -284,12 +284,14 @@ export class ActivitiesService {
           commissionSplitPercentage: pricing.commissionSplitPercentage,
           currency: pricing.currency,
           pricingType: pricing.pricingType,
+          pricingBreakdownJson: pricing.pricingBreakdownJson,
         }
       : null
     return {
       ...baseResponse,
       pricing: pricingDto,
       activityPricingId,
+      pricingBreakdownJson: pricing?.pricingBreakdownJson ?? null,
     }
   }
 
@@ -309,6 +311,7 @@ export class ActivitiesService {
         commissionSplitPercentage: this.db.schema.activityPricing.commissionSplitPercentage,
         currency: this.db.schema.activityPricing.currency,
         pricingType: this.db.schema.activityPricing.pricingType,
+        pricingBreakdownJson: this.db.schema.activityPricing.pricingBreakdownJson,
       })
       .from(this.db.schema.activityPricing)
       .where(eq(this.db.schema.activityPricing.activityId, activityId))
@@ -326,6 +329,7 @@ export class ActivitiesService {
         : null,
       currency: pricing.currency || 'CAD',
       pricingType: (pricing.pricingType || null) as PricingType | null,
+      pricingBreakdownJson: (pricing.pricingBreakdownJson as any[]) ?? null,
     }
   }
 
@@ -370,6 +374,7 @@ export class ActivitiesService {
           commissionSplitPercentage: pricing.commissionSplitPercentage,
           currency: pricing.currency,
           pricingType: pricing.pricingType,
+          pricingBreakdownJson: pricing.pricingBreakdownJson,
         }
       : null
 
@@ -377,6 +382,7 @@ export class ActivitiesService {
       ...baseResponse,
       pricing: pricingDto,
       activityPricingId,
+      pricingBreakdownJson: pricing?.pricingBreakdownJson ?? null,
       packageDetails: packageDetails
         ? {
             supplierId: packageDetails.supplierId,

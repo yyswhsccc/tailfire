@@ -48,7 +48,7 @@ import { useMyProfile } from '@/hooks/use-user-profile'
 import { DocumentUploader } from '@/components/document-uploader'
 import { SupplierCombobox } from '@/components/suppliers/supplier-combobox'
 import { PaymentScheduleSection } from './payment-schedule-section'
-import type { PricingData } from '@/lib/pricing'
+import type { PricingData, PricingBreakdownItem } from '@/lib/pricing'
 import {
   packageFormSchema,
   toPackageDefaults,
@@ -109,6 +109,11 @@ export function PackageForm({
 
   // Track supplier commission rate from selected supplier
   const [supplierCommissionRate, setSupplierCommissionRate] = useState<number | null>(null)
+
+  // Pricing breakdown for per-person pricing
+  const [pricingBreakdown, setPricingBreakdown] = useState<PricingBreakdownItem[] | null>(
+    (initialPackageData as any)?.pricingBreakdownJson ?? null
+  )
 
   // Safety net ref to prevent duplicate creation race condition
   const createInProgressRef = useRef(false)
@@ -219,13 +224,13 @@ export function PackageForm({
         // Use ref for immediate check (state may be stale)
         if (currentPackageId || packageIdRef.current) {
           const id = currentPackageId || packageIdRef.current!
-          const updatePayload = toPackageUpdatePayload(formData)
+          const updatePayload = { ...toPackageUpdatePayload(formData), pricingBreakdownJson: pricingBreakdown }
           response = await updateBooking.mutateAsync({ id, data: updatePayload })
         } else {
           // Mark create as in progress before API call
           createInProgressRef.current = true
           try {
-            const createPayload = toPackageApiPayload(formData, tripId)
+            const createPayload = { ...toPackageApiPayload(formData, tripId), pricingBreakdownJson: pricingBreakdown }
             response = await createBooking.mutateAsync(createPayload)
           } finally {
             createInProgressRef.current = false
@@ -270,6 +275,7 @@ export function PackageForm({
     activityPricingId,
     tripId,
     getValues,
+    pricingBreakdown,
     createBooking,
     updateBooking,
     toast,
@@ -295,10 +301,10 @@ export function PackageForm({
 
       let response
       if (currentPackageId) {
-        const updatePayload = toPackageUpdatePayload(formData)
+        const updatePayload = { ...toPackageUpdatePayload(formData), pricingBreakdownJson: pricingBreakdown }
         response = await updateBooking.mutateAsync({ id: currentPackageId, data: updatePayload })
       } else {
-        const createPayload = toPackageApiPayload(formData, tripId)
+        const createPayload = { ...toPackageApiPayload(formData, tripId), pricingBreakdownJson: pricingBreakdown }
         response = await createBooking.mutateAsync(createPayload)
       }
 
@@ -335,6 +341,7 @@ export function PackageForm({
     activityPricingId,
     tripId,
     getValues,
+    pricingBreakdown,
     createBooking,
     updateBooking,
     toast,
@@ -410,12 +417,17 @@ export function PackageForm({
       termsAndConditions: getValues('termsAndConditions') || '',
       cancellationPolicy: getValues('cancellationPolicy') || '',
       supplier: getValues('supplierName') || '',
+      pricingBreakdown,
     }
-  }, [watchedValues, getValues])
+  }, [watchedValues, getValues, pricingBreakdown])
 
   // Handle pricing updates from child components
   const handlePricingUpdate = useCallback((updates: Partial<PricingData>) => {
+    if ('pricingBreakdown' in updates) {
+      setPricingBreakdown(updates.pricingBreakdown ?? null)
+    }
     Object.entries(updates).forEach(([key, value]) => {
+      if (key === 'pricingBreakdown') return
       // Map PricingData keys to PackageFormData keys
       const keyMap: Record<string, keyof PackageFormData> = {
         totalPriceCents: 'totalPriceCents',
@@ -441,6 +453,10 @@ export function PackageForm({
   const handleSupplierDefaultsApplied = useCallback((defaults: SupplierDefaults) => {
     setSupplierCommissionRate(defaults.commissionRate)
   }, [])
+
+  // Travelers for per-person pricing breakdown
+  // Package forms don't have direct access to trip travelers, but we pass the prop for consistency
+  const travelers: Array<{ id: string; name: string }> = []
 
   return (
     <div className="max-w-5xl">
@@ -723,6 +739,7 @@ export function PackageForm({
             packageId={null}
             packages={[]}
             tripId={tripId}
+            travelers={travelers}
           />
 
           <Separator />

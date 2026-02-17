@@ -38,7 +38,7 @@ import { ComponentMediaTab } from '@/components/shared'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { PaymentScheduleSection } from './payment-schedule-section'
-import { type PricingData } from '@/lib/pricing'
+import { type PricingData, type PricingBreakdownItem } from '@/lib/pricing'
 import { Separator } from '@/components/ui/separator'
 import { useCruiseLineOptions, useCruiseShipOptions, useCruiseRegionOptions, useCruisePortOptions } from '@/hooks/use-traveltek-reference'
 import {
@@ -175,6 +175,9 @@ export function CustomCruiseForm({
 
   // Package linkage state for PricingSection
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
+  const [pricingBreakdown, setPricingBreakdown] = useState<PricingBreakdownItem[] | null>(
+    (activity as any)?.pricingBreakdownJson ?? null
+  )
   const { data: packagesData } = useBookings({ tripId: trip?.id })
   const availablePackages = useMemo(
     () => packagesData?.map(pkg => ({ id: pkg.id, name: pkg.name })) ?? [],
@@ -729,7 +732,8 @@ export function CustomCruiseForm({
       return
     }
 
-    const payload = toCustomCruiseApiPayload(formData)
+    const basePayload = toCustomCruiseApiPayload(formData)
+    const payload = { ...basePayload, pricingBreakdownJson: pricingBreakdown }
 
     try {
       setAutoSaveStatus('saving')
@@ -741,7 +745,7 @@ export function CustomCruiseForm({
           data: payload as any,
         })
       } else {
-        const response = await createCustomCruise.mutateAsync(payload)
+        const response = await createCustomCruise.mutateAsync(payload as any)
         if (response.id) {
           setActivityId(response.id)
         }
@@ -784,6 +788,7 @@ export function CustomCruiseForm({
     setError,
     trip?.startDate,
     trip?.endDate,
+    pricingBreakdown,
   ])
 
   const handleAiSubmit = () => {
@@ -893,12 +898,17 @@ export function CustomCruiseForm({
       termsAndConditions: values.termsAndConditions || '',
       cancellationPolicy: values.cancellationPolicy || '',
       supplier: values.supplier || '',
+      pricingBreakdown,
     }
-  }, [changeCounter, getValues, selectedPackageId])
+  }, [changeCounter, getValues, selectedPackageId, pricingBreakdown])
 
   // Handler for pricing/booking/commission section updates
   const handlePricingUpdate = useCallback((updates: Partial<PricingData>) => {
+    if ('pricingBreakdown' in updates) {
+      setPricingBreakdown(updates.pricingBreakdown ?? null)
+    }
     Object.entries(updates).forEach(([key, value]) => {
+      if (key === 'pricingBreakdown') return
       setValue(key as keyof CustomCruiseFormData, value as any, { shouldDirty: true, shouldValidate: true })
     })
   }, [setValue])
@@ -1930,6 +1940,7 @@ export function CustomCruiseForm({
             onPackageChange={setSelectedPackageId}
             isChildOfPackage={isChildOfPackage}
             parentPackageName={parentPackageName}
+            travelers={travelers}
           />
 
           <Separator />

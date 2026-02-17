@@ -164,6 +164,7 @@ import { TripSharesService } from './trip-shares.service'
     BaseComponentService,
     ActivityTotalsService,
     ActivityTravelersService,
+    PaymentSchedulesService,
   ],
 })
 export class TripsModule {}

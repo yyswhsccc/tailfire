@@ -5,7 +5,7 @@
  * Shared between API (NestJS) and client (React/Next.js).
  */
 
-import { ActivityType, ActivityStatus, PricingType, PortType, Coordinates, Photo } from './activities.types'
+import { ActivityType, ActivityStatus, PricingType, PortType, Coordinates, Photo, PricingBreakdownItem } from './activities.types'
 
 // =============================================================================
 // Imports from Zod Schemas (for local use)
@@ -454,6 +454,7 @@ export type BaseComponentDto = {
   taxesAndFeesCents: number | null
   activityPricingId: string | null
   invoiceType: 'individual_item' | 'part_of_package' | null
+  pricingBreakdownJson: PricingBreakdownItem[] | null
 
   // Commission (expected values, not actuals from commission_tracking)
   commissionTotalCents: number | null
@@ -643,6 +644,7 @@ export type BaseCreateComponentDto = {
   totalPriceCents?: number | null
   taxesAndFeesCents?: number | null
   invoiceType?: 'individual_item' | 'part_of_package' | null
+  pricingBreakdownJson?: PricingBreakdownItem[] | null
 
   // Commission
   commissionTotalCents?: number | null
@@ -809,6 +811,7 @@ export type BaseUpdateComponentDto = {
   totalPriceCents?: number | null
   taxesAndFeesCents?: number | null
   invoiceType?: 'individual_item' | 'part_of_package' | null
+  pricingBreakdownJson?: PricingBreakdownItem[] | null
 
   // Commission
   commissionTotalCents?: number | null

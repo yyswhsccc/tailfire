@@ -27,6 +27,7 @@ import { ComponentOrchestrationService } from '../../trips/component-orchestrati
 import { TripTravelersService } from '../../trips/trip-travelers.service'
 import { ActivityTravelersService } from '../../trips/activity-travelers.service'
 import { TripAccessService } from '../../trips/trip-access.service'
+import { PaymentSchedulesService } from '../../trips/payment-schedules.service'
 import type { AuthContext } from '../../auth/auth.types'
 import type { ImportBookingPreviewDto, ImportBookingConfirmDto } from '../dto/import-booking.dto'
 import type {
@@ -34,10 +35,11 @@ import type {
   ImportBookingCruiseItem,
   ImportBookingPassenger,
   ImportBookingItineraryPort,
+  ImportBookingBreakdownItem,
 } from '../types/fusion-api.types'
 import type { CustomCruiseDetailsDto, CruisePortCall, CreateTripTravelerDto } from '@tailfire/shared-types'
 
-const { customCruiseDetails, cruiseLines, cruiseSailings, cruiseShips, cruisePorts, cruiseRegions, cruiseSailingRegions } = schema
+const { customCruiseDetails, cruiseLines, cruiseSailings, cruiseShips, cruisePorts, cruiseRegions, cruiseSailingRegions, activityPricing } = schema
 
 @Injectable()
 export class ImportBookingService {
@@ -54,6 +56,7 @@ export class ImportBookingService {
     private readonly tripTravelersService: TripTravelersService,
     private readonly activityTravelersService: ActivityTravelersService,
     private readonly tripAccessService: TripAccessService,
+    private readonly paymentSchedulesService: PaymentSchedulesService,
   ) {}
 
   // ============================================================================
@@ -175,6 +178,7 @@ export class ImportBookingService {
     const commissionCents = result.commission
       ? Math.round(result.commission * 100)
       : null
+    const taxesAndFeesCents = this.extractTaxesAndFeesCents(cruiseItem.breakdown || [], totalPriceCents)
 
     const cruiseActivity = await this.componentOrchestrationService.createCustomCruise({
       itineraryDayId: departureDay.id,
@@ -185,11 +189,21 @@ export class ImportBookingService {
       status: 'confirmed',
       currency: dto.currency ?? 'CAD',
       totalPriceCents: totalPriceCents,
+      taxesAndFeesCents: taxesAndFeesCents ?? null,
       commissionTotalCents: commissionCents,
       supplier: cruiseItem.suppliername || null,
       bookingReference: dto.bookingReference,
       customCruiseDetails: cruiseDetails,
     })
+
+    // 8b. Mark the imported cruise as booked — it's an existing confirmed booking
+    await this.db.client
+      .update(this.db.schema.itineraryActivities)
+      .set({
+        isBooked: true,
+        bookingDate: new Date(),
+      })
+      .where(eq(this.db.schema.itineraryActivities.id, cruiseActivity.id))
 
     // 9. Create trip travelers for each passenger
     const travelerIds: string[] = []
@@ -211,6 +225,58 @@ export class ImportBookingService {
       await this.activityTravelersService.linkTravelers(cruiseActivity.id, {
         tripTravelerIds: travelerIds,
       })
+    }
+
+    // 10c. Populate per-person pricing breakdown from FusionAPI perperson data
+    if (cruiseActivity.activityPricingId && cruiseItem.perperson?.length > 0) {
+      try {
+        const breakdown = result.passengers.map((pax, i) => {
+          // Sum all perperson category prices for this guest
+          const paxTotal = cruiseItem.perperson.reduce((sum, item) => {
+            const paxPrice = item.prices?.find(p => p.guestno === pax.paxno)
+            return sum + (this.parsePriceToCents(paxPrice?.price) ?? 0)
+          }, 0)
+          return {
+            label: `${pax.title || ''} ${pax.firstname} ${pax.lastname}`.trim(),
+            priceCents: paxTotal,
+            travelerId: travelerIds[i] || undefined,
+          }
+        })
+
+        await this.db.client
+          .update(activityPricing)
+          .set({
+            pricingBreakdownJson: breakdown,
+            pricingType: 'per_person',
+          })
+          .where(eq(activityPricing.id, cruiseActivity.activityPricingId))
+      } catch (error) {
+        this.logger.warn({
+          message: 'Failed to populate per-person pricing breakdown',
+          bookingReference: dto.bookingReference,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
+    // 10b. Create payment schedule + record received payments (non-critical)
+    // Must run AFTER travelers are linked — createTransaction validates trip has travelers
+    if (cruiseActivity.activityPricingId && cruiseItem.paymentinfo) {
+      try {
+        await this.createPaymentsFromImport(
+          cruiseActivity.activityPricingId,
+          cruiseItem.paymentinfo,
+          totalPriceCents,
+          dto.currency ?? 'CAD',
+          dto.bookingReference,
+        )
+      } catch (error) {
+        this.logger.warn({
+          message: 'Failed to create payment records for imported booking',
+          bookingReference: dto.bookingReference,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
 
     // 11. Generate port schedule from cruise port calls (non-critical)
@@ -419,6 +485,7 @@ export class ImportBookingService {
             gender: this.normalizeGender(pax.gender),
             nationality: this.sanitizeNationality(pax.nationality),
             contactType: 'client',
+            becameClientAt: new Date().toISOString(),
           },
           auth.agencyId,
           auth.userId,
@@ -707,6 +774,224 @@ export class ImportBookingService {
     const num = typeof price === 'string' ? parseFloat(price) : price
     if (isNaN(num)) return null
     return Math.round(num * 100)
+  }
+
+  /**
+   * Extract taxes and fees from FusionAPI breakdown items.
+   * Non-commissionable items (commissionable === 0) are port charges, government fees, and taxes.
+   */
+  private extractTaxesAndFeesCents(
+    breakdown: ImportBookingBreakdownItem[],
+    totalPriceCents: number | null,
+  ): number {
+    if (!breakdown?.length) return 0
+    let sum = 0
+    for (const item of breakdown) {
+      if (Number(item.commissionable) === 0) {
+        const itemCents = this.parsePriceToCents(item.itemprice) ?? 0
+        if (itemCents > 0) {
+          sum += itemCents * (item.quantity ?? 1)
+        }
+      }
+    }
+    if (totalPriceCents !== null && totalPriceCents > 0) {
+      return Math.max(0, Math.min(sum, totalPriceCents))
+    }
+    return Math.max(0, sum)
+  }
+
+  /**
+   * Create payment schedule and record received payments from FusionAPI paymentinfo.
+   *
+   * Strategy:
+   * - If a schedule already exists (re-import), skip creation and just record transactions
+   * - Parse the cruise line's paymentschedule[] into expected payment items
+   * - Ensure items sum exactly to totalPriceCents (required by validation)
+   * - Use 'full' for single item, 'installments' for multiple
+   *   (NOT 'deposit' — that requires depositType/depositPercentage fields we don't have)
+   * - Record receivedtotal as payment transaction(s) against the expected items
+   */
+  private async createPaymentsFromImport(
+    activityPricingId: string,
+    paymentInfo: ImportBookingCruiseItem['paymentinfo'],
+    totalPriceCents: number | null,
+    currency: string,
+    bookingReference: string,
+  ): Promise<void> {
+    if (!totalPriceCents || totalPriceCents <= 0) {
+      this.logger.debug('Skipping payment creation — no total price')
+      return
+    }
+
+    const receivedCents = this.parsePriceToCents(paymentInfo.receivedtotal) || 0
+
+    // Check for existing schedule (re-import or partial failure recovery)
+    const existingConfig = await this.paymentSchedulesService.findByActivityPricingId(activityPricingId)
+    if (existingConfig) {
+      this.logger.log(`Payment schedule already exists for pricing ${activityPricingId} — recording transactions only`)
+      if (receivedCents > 0 && existingConfig.expectedPaymentItems?.length) {
+        await this.recordPaymentTransactions(
+          existingConfig.expectedPaymentItems,
+          receivedCents,
+          currency,
+          bookingReference,
+        )
+      }
+      return
+    }
+
+    const schedule = paymentInfo.paymentschedule || []
+
+    // Build expected payment items from FusionAPI payment schedule
+    const expectedItems: { paymentName: string; expectedAmountCents: number; dueDate: string | null; sequenceOrder: number }[] = []
+
+    if (schedule.length > 0) {
+      // Parse schedule items, filtering out zero/negative amounts
+      const parsed: { amountCents: number; dueDate: string | null }[] = []
+      for (const entry of schedule) {
+        const amountCents = this.parsePriceToCents(entry.amount) || 0
+        if (amountCents > 0) {
+          parsed.push({ amountCents, dueDate: this.normalizeDueDate(entry.duedate) })
+        }
+      }
+
+      if (parsed.length > 0) {
+        const scheduleSum = parsed.reduce((sum, p) => sum + p.amountCents, 0)
+
+        if (scheduleSum === totalPriceCents) {
+          // Perfect match — use as-is
+          for (let i = 0; i < parsed.length; i++) {
+            expectedItems.push({
+              paymentName: parsed.length === 1 ? 'Full Payment' : i === 0 ? 'Deposit' : i === parsed.length - 1 ? 'Final Payment' : `Payment ${i + 1}`,
+              expectedAmountCents: parsed[i]!.amountCents,
+              dueDate: parsed[i]!.dueDate,
+              sequenceOrder: i + 1,
+            })
+          }
+        } else if (scheduleSum < totalPriceCents) {
+          // Schedule is less than total — add balance item
+          for (let i = 0; i < parsed.length; i++) {
+            expectedItems.push({
+              paymentName: i === 0 ? 'Deposit' : `Payment ${i + 1}`,
+              expectedAmountCents: parsed[i]!.amountCents,
+              dueDate: parsed[i]!.dueDate,
+              sequenceOrder: i + 1,
+            })
+          }
+          expectedItems.push({
+            paymentName: 'Final Payment',
+            expectedAmountCents: totalPriceCents - scheduleSum,
+            dueDate: null,
+            sequenceOrder: expectedItems.length + 1,
+          })
+        } else {
+          // Schedule exceeds total — ignore schedule, use single item
+          this.logger.warn({
+            message: 'FusionAPI payment schedule sum exceeds gross price — using single payment item',
+            bookingReference,
+            scheduleSumCents: scheduleSum,
+            totalPriceCents,
+          })
+          expectedItems.push({
+            paymentName: 'Full Payment',
+            expectedAmountCents: totalPriceCents,
+            dueDate: null,
+            sequenceOrder: 1,
+          })
+        }
+      }
+    }
+
+    // Fallback: no valid schedule items parsed — single full-payment item
+    if (expectedItems.length === 0) {
+      expectedItems.push({
+        paymentName: 'Full Payment',
+        expectedAmountCents: totalPriceCents,
+        dueDate: null,
+        sequenceOrder: 1,
+      })
+    }
+
+    // 'full' for single item, 'installments' for multiple
+    // (NOT 'deposit' — that requires depositType/depositPercentage we don't have)
+    const scheduleType = expectedItems.length > 1 ? 'installments' as const : 'full' as const
+
+    const config = await this.paymentSchedulesService.create({
+      activityPricingId,
+      scheduleType,
+      allowPartialPayments: true,
+      expectedPaymentItems: expectedItems,
+    })
+
+    // Record received payment as transaction(s)
+    if (receivedCents > 0 && config.expectedPaymentItems && config.expectedPaymentItems.length > 0) {
+      await this.recordPaymentTransactions(
+        config.expectedPaymentItems,
+        receivedCents,
+        currency,
+        bookingReference,
+      )
+    }
+  }
+
+  /**
+   * Record payment transactions against expected payment items, distributing
+   * the received amount across items in order.
+   */
+  private async recordPaymentTransactions(
+    expectedItems: { id: string; expectedAmountCents: number }[],
+    receivedCents: number,
+    currency: string,
+    bookingReference: string,
+  ): Promise<void> {
+    let remainingCents = receivedCents
+    for (const item of expectedItems) {
+      if (remainingCents <= 0) break
+      const payAmount = Math.min(remainingCents, item.expectedAmountCents)
+      await this.paymentSchedulesService.createTransaction({
+        expectedPaymentItemId: item.id,
+        transactionType: 'payment',
+        amountCents: payAmount,
+        currency,
+        paymentMethod: null,
+        referenceNumber: bookingReference,
+        transactionDate: new Date().toISOString(),
+        notes: `Imported from cruise line booking ${bookingReference}`,
+      })
+      remainingCents -= payAmount
+    }
+
+    if (remainingCents > 0) {
+      // Excess is expected — receivedtotal from the cruise line includes the commission portion
+      this.logger.debug({
+        message: 'Received total includes commission portion beyond expected schedule',
+        bookingReference,
+        commissionPortionCents: remainingCents,
+      })
+    }
+
+    this.logger.log({
+      message: 'Payment transactions recorded for imported booking',
+      bookingReference,
+      receivedCents,
+      recordedCents: receivedCents - remainingCents,
+      itemCount: expectedItems.length,
+    })
+  }
+
+  /**
+   * Normalize a due date string from Traveltek to YYYY-MM-DD format.
+   * Returns null if the date is invalid or missing.
+   */
+  private normalizeDueDate(duedate: string | undefined | null): string | null {
+    if (!duedate) return null
+    const trimmed = duedate.trim()
+    // Already ISO date format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+    // Try parsing as a date
+    const parsed = new Date(trimmed)
+    if (isNaN(parsed.getTime())) return null
+    return parsed.toISOString().split('T')[0]!
   }
 
   /**
