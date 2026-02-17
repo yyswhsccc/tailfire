@@ -412,6 +412,23 @@ export interface ContactGroupMemberResponseDto {
 }
 
 // ============================================================================
+// LOYALTY PROGRAM DTOs
+// ============================================================================
+
+export interface LoyaltyProgramDto {
+  id: string
+  contactId: string
+  programName: string
+  providerName: string
+  membershipNumber: string
+  tierLevel: string | null
+  notes: string | null
+  metadata: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+// ============================================================================
 // PAGINATED RESPONSE
 // ============================================================================
 

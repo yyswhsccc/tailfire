@@ -1755,6 +1755,9 @@ export class ActivitiesService {
         cancellationPolicy: source.cancellationPolicy,
         supplier: source.supplier,
         bookingReference: source.bookingReference,
+        netPriceCents: source.netPriceCents,
+        nonRefundableDeposit: source.nonRefundableDeposit,
+        cancellationScheduleJson: source.cancellationScheduleJson,
       })
     }
   }

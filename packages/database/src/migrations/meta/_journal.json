@@ -790,6 +790,7 @@
       "idx": 112,
       "version": "7",
       "when": 1771437600000,
+<<<<<<< HEAD
       "tag": "20260217180000_add_openai_and_ocr_import_jobs",
       "breakpoints": true
     },
@@ -910,6 +911,13 @@
       "version": "7",
       "when": 1771856788000,
       "tag": "20260223000000_cleanup_duplicate_migration_rows",
+      "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "7",
+      "when": 1771856789000,
+      "tag": "20260217180000_add_loyalty_and_booking_fields",
       "breakpoints": true
     }
   ]

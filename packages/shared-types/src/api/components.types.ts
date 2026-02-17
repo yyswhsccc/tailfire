@@ -20,6 +20,22 @@ export type { TransportationSubtype, TransportationDetailsDto }
 export { transportationSubtypeSchema, transportationDetailsDtoSchema } from '../schemas'
 
 // =============================================================================
+// Shared Booking Types
+// =============================================================================
+
+/**
+ * Cancellation schedule item for structured cancellation policies.
+ * Used in activity_pricing.cancellation_schedule_json for all activity types.
+ */
+export type CancellationScheduleItem = {
+  daysRange: string           // "89-75", "74-61", "60-31", "30-0"
+  penaltyPercent: number      // 25, 50, 75, 100
+  penaltyAmountCents?: number // Optional absolute amount
+  effectiveDate?: string      // "2026-01-12" (computed from start date)
+  description?: string        // "25% Per Guest"
+}
+
+// =============================================================================
 // Component-Specific Detail Types
 // =============================================================================
 
@@ -222,6 +238,12 @@ export type CustomCruiseDetailsDto = {
   // Traveltek internal IDs for re-sync/refresh
   traveltekBookingId?: number | null
   traveltekPortfolioId?: number | null
+
+  // Cruise-specific booking fields
+  reservationNumber?: string | null
+  stateroomCategoryCode?: string | null
+  onboardCreditCents?: number | null
+  onboardCreditCurrency?: string | null
 
   // Additional Details
   inclusions?: string[] // What's included - always returns [] not null
@@ -467,6 +489,11 @@ export type BaseComponentDto = {
   supplier: string | null
   bookingReference: string | null // Links round-trip flights/activities
 
+  // Universal booking fields
+  netPriceCents: number | null
+  nonRefundableDeposit: boolean | null
+  cancellationScheduleJson: CancellationScheduleItem[] | null
+
   // Media
   photos: Photo[] | null
 
@@ -657,6 +684,11 @@ export type BaseCreateComponentDto = {
   supplier?: string | null
   bookingReference?: string | null // Links round-trip flights/activities
 
+  // Universal booking fields
+  netPriceCents?: number | null
+  nonRefundableDeposit?: boolean | null
+  cancellationScheduleJson?: CancellationScheduleItem[] | null
+
   // Media
   photos?: Photo[] | null
 }
@@ -823,6 +855,11 @@ export type BaseUpdateComponentDto = {
   cancellationPolicy?: string | null
   supplier?: string | null
   bookingReference?: string | null // Links round-trip flights/activities
+
+  // Universal booking fields
+  netPriceCents?: number | null
+  nonRefundableDeposit?: boolean | null
+  cancellationScheduleJson?: CancellationScheduleItem[] | null
 
   // Media
   photos?: Photo[] | null

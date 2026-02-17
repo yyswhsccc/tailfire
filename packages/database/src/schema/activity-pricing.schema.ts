@@ -69,6 +69,11 @@ export const activityPricing = pgTable('activity_pricing', {
   cancellationPolicy: text('cancellation_policy'),
   supplier: varchar('supplier', { length: 255 }),
 
+  // Universal booking fields (all activity types)
+  netPriceCents: integer('net_price_cents'),
+  nonRefundableDeposit: boolean('non_refundable_deposit'),
+  cancellationScheduleJson: jsonb('cancellation_schedule_json'),
+
   // Audit fields
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
