@@ -113,6 +113,12 @@ export const customCruiseDetails = pgTable('custom_cruise_details', {
   traveltekBookingId: bigint('traveltek_booking_id', { mode: 'number' }),
   traveltekPortfolioId: bigint('traveltek_portfolio_id', { mode: 'number' }),
 
+  // Cruise-specific booking fields
+  reservationNumber: varchar('reservation_number', { length: 100 }),
+  stateroomCategoryCode: varchar('stateroom_category_code', { length: 20 }),
+  onboardCreditCents: integer('onboard_credit_cents'),
+  onboardCreditCurrency: varchar('onboard_credit_currency', { length: 3 }),
+
   // Additional Details
   inclusions: text('inclusions').array(), // What's included
   specialRequests: text('special_requests'),

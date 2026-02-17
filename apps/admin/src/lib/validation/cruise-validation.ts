@@ -96,6 +96,12 @@ export const customCruiseDetailsSchema = z.object({
   // Additional Details
   inclusions: z.array(z.string()).default([]),
   specialRequests: z.string().nullable().optional(),
+
+  // Phase B: New cruise fields
+  reservationNumber: z.string().nullable().optional(),
+  stateroomCategoryCode: z.string().nullable().optional(),
+  onboardCreditCents: z.coerce.number().nullable().optional(),
+  onboardCreditCurrency: z.string().max(3).nullable().optional(),
 })
 
 // ============================================================================
@@ -135,6 +141,19 @@ export const customCruiseFormSchema = z.object({
   termsAndConditions: z.string().optional().default(''),
   cancellationPolicy: z.string().optional().default(''),
   supplier: z.string().optional().default(''),
+
+  // Phase B: Agency pricing fields (activity_pricing level)
+  netPriceCents: z.coerce.number().nullable().optional(),
+  nonRefundableDeposit: z.boolean().nullable().optional(),
+
+  // Phase B: Cancellation schedule (activity_pricing level)
+  cancellationScheduleJson: z.array(z.object({
+    daysRange: z.string(),
+    penaltyPercent: z.coerce.number().min(0).max(100),
+    penaltyAmountCents: z.coerce.number().nullable().optional(),
+    effectiveDate: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+  })).nullable().optional().default(null),
 
   // Nested cruise details
   customCruiseDetails: customCruiseDetailsSchema.default({}),
@@ -200,6 +219,10 @@ export function toCustomCruiseDefaults(
     cancellationPolicy: serverData?.cancellationPolicy ?? '',
     supplier: serverData?.supplier ?? '',
 
+    netPriceCents: serverData?.netPriceCents ?? null,
+    nonRefundableDeposit: serverData?.nonRefundableDeposit ?? null,
+    cancellationScheduleJson: serverData?.cancellationScheduleJson ?? null,
+
     customCruiseDetails: {
       source: serverData?.customCruiseDetails?.source ?? 'manual',
       traveltekCruiseId: serverData?.customCruiseDetails?.traveltekCruiseId ?? null,
@@ -247,6 +270,10 @@ export function toCustomCruiseDefaults(
       traveltekPortfolioId: serverData?.customCruiseDetails?.traveltekPortfolioId ?? null,
       inclusions: serverData?.customCruiseDetails?.inclusions ?? [],
       specialRequests: serverData?.customCruiseDetails?.specialRequests ?? null,
+      reservationNumber: serverData?.customCruiseDetails?.reservationNumber ?? null,
+      stateroomCategoryCode: serverData?.customCruiseDetails?.stateroomCategoryCode ?? null,
+      onboardCreditCents: serverData?.customCruiseDetails?.onboardCreditCents ?? null,
+      onboardCreditCurrency: serverData?.customCruiseDetails?.onboardCreditCurrency ?? null,
     },
   }
 }
@@ -285,6 +312,18 @@ export function toCustomCruiseApiPayload(data: CustomCruiseFormData): CreateCust
     termsAndConditions: data.termsAndConditions || undefined,
     cancellationPolicy: data.cancellationPolicy || undefined,
     supplier: data.supplier || undefined,
+    // Agency pricing fields
+    netPriceCents: data.netPriceCents ?? undefined,
+    nonRefundableDeposit: data.nonRefundableDeposit ?? undefined,
+    cancellationScheduleJson: data.cancellationScheduleJson?.length
+      ? data.cancellationScheduleJson.map(item => ({
+          daysRange: item.daysRange,
+          penaltyPercent: item.penaltyPercent,
+          penaltyAmountCents: item.penaltyAmountCents ?? undefined,
+          effectiveDate: item.effectiveDate ?? undefined,
+          description: item.description ?? undefined,
+        }))
+      : undefined,
     customCruiseDetails: {
       source: data.customCruiseDetails.source,
       traveltekCruiseId: data.customCruiseDetails.traveltekCruiseId || undefined,
@@ -320,6 +359,10 @@ export function toCustomCruiseApiPayload(data: CustomCruiseFormData): CreateCust
       shipContentJson: data.customCruiseDetails.shipContentJson,
       inclusions: data.customCruiseDetails.inclusions,
       specialRequests: data.customCruiseDetails.specialRequests || undefined,
+      reservationNumber: data.customCruiseDetails.reservationNumber || undefined,
+      stateroomCategoryCode: data.customCruiseDetails.stateroomCategoryCode || undefined,
+      onboardCreditCents: data.customCruiseDetails.onboardCreditCents ?? undefined,
+      onboardCreditCurrency: data.customCruiseDetails.onboardCreditCurrency || undefined,
     } as any,
   }
 }

@@ -7,6 +7,7 @@
 
 import { pgTable, uuid, varchar, text, date, decimal, boolean, timestamp, pgEnum, check, unique, jsonb } from 'drizzle-orm/pg-core'
 import { relations, sql } from 'drizzle-orm'
+import { contactLoyaltyPrograms } from './contact-loyalty-programs.schema'
 
 // ============================================================================
 // ENUMS
@@ -260,6 +261,8 @@ export const contactsRelations = relations(contacts, ({ many }) => ({
   groupMemberships: many(contactGroupMembers),
   // Groups where this contact is primary
   primaryGroups: many(contactGroups),
+  // Loyalty programs
+  loyaltyPrograms: many(contactLoyaltyPrograms),
 }))
 
 export const contactRelationshipsRelations = relations(contactRelationships, ({ one }) => ({

@@ -10,7 +10,8 @@ import {
   MapPin,
   CreditCard,
   Banknote,
-  Users
+  Users,
+  Award,
 } from 'lucide-react'
 import {
   Menubar,
@@ -30,6 +31,7 @@ export type ContactSection =
   | 'calendar'
   | 'files'
   | 'relationships'
+  | 'loyalty'
   | 'trips'
   | 'bookings'
   | 'payments'
@@ -47,7 +49,8 @@ const navigationGroups = [
     items: [
       { id: 'timeline' as const, label: 'Timeline', icon: Activity },
       { id: 'tasks' as const, label: 'Tasks', icon: CheckSquare },
-      { id: 'relationships' as const, label: 'Relationships', icon: Users }
+      { id: 'relationships' as const, label: 'Relationships', icon: Users },
+      { id: 'loyalty' as const, label: 'Loyalty Programs', icon: Award },
     ]
   },
   {

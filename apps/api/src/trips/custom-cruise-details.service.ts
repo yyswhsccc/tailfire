@@ -122,6 +122,12 @@ export class CustomCruiseDetailsService {
       traveltekBookingId: data.traveltekBookingId ?? null,
       traveltekPortfolioId: data.traveltekPortfolioId ?? null,
 
+      // Cruise-specific booking fields
+      reservationNumber: data.reservationNumber || null,
+      stateroomCategoryCode: data.stateroomCategoryCode || null,
+      onboardCreditCents: data.onboardCreditCents ?? null,
+      onboardCreditCurrency: data.onboardCreditCurrency || null,
+
       // Additional Details
       inclusions: data.inclusions || [],
       specialRequests: data.specialRequests || null,
@@ -202,6 +208,12 @@ export class CustomCruiseDetailsService {
         ...(data.selectedPromotions !== undefined && { selectedPromotions: data.selectedPromotions }),
         ...(data.traveltekBookingId !== undefined && { traveltekBookingId: data.traveltekBookingId }),
         ...(data.traveltekPortfolioId !== undefined && { traveltekPortfolioId: data.traveltekPortfolioId }),
+
+        // Cruise-specific booking fields
+        ...(data.reservationNumber !== undefined && { reservationNumber: data.reservationNumber }),
+        ...(data.stateroomCategoryCode !== undefined && { stateroomCategoryCode: data.stateroomCategoryCode }),
+        ...(data.onboardCreditCents !== undefined && { onboardCreditCents: data.onboardCreditCents }),
+        ...(data.onboardCreditCurrency !== undefined && { onboardCreditCurrency: data.onboardCreditCurrency }),
 
         // Additional Details
         ...(data.inclusions !== undefined && { inclusions: data.inclusions }),
@@ -316,6 +328,12 @@ export class CustomCruiseDetailsService {
       selectedPromotions: details.selectedPromotions || {},
       traveltekBookingId: details.traveltekBookingId ?? null,
       traveltekPortfolioId: details.traveltekPortfolioId ?? null,
+
+      // Cruise-specific booking fields
+      reservationNumber: details.reservationNumber || null,
+      stateroomCategoryCode: details.stateroomCategoryCode || null,
+      onboardCreditCents: details.onboardCreditCents ?? null,
+      onboardCreditCurrency: details.onboardCreditCurrency || null,
 
       // Additional Details
       inclusions: details.inclusions || [],

@@ -114,6 +114,12 @@ export const customCruiseDetailsDtoSchema = z.object({
   traveltekBookingId: z.number().int().nullable().optional(),
   traveltekPortfolioId: z.number().int().nullable().optional(),
 
+  // Cruise-specific booking fields
+  reservationNumber: z.string().nullable().optional(),
+  stateroomCategoryCode: z.string().nullable().optional(),
+  onboardCreditCents: z.number().int().nullable().optional(),
+  onboardCreditCurrency: z.string().max(3).nullable().optional(),
+
   // Additional Details
   inclusions: z.array(z.string()).optional(),
   specialRequests: z.string().nullable().optional(),
