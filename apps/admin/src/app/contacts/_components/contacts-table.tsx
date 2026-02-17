@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { TernBadge } from '@/components/tern/core'
+import { Badge } from '@/components/ui/badge'
 import { ContactFormDialog } from './contact-form-dialog'
 import { ContactAvatar } from '@/components/contacts/contact-avatar'
 
@@ -47,13 +47,13 @@ export function ContactsTable({
       <div className="overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="border-b border-tern-gray-200 hover:bg-transparent">
-              <TableHead className="h-10 px-4 text-xs font-medium text-tern-gray-600">First Name</TableHead>
-              <TableHead className="h-10 px-4 text-xs font-medium text-tern-gray-600">Last Name</TableHead>
-              <TableHead className="h-10 px-4 text-xs font-medium text-tern-gray-600">Email</TableHead>
-              <TableHead className="h-10 px-4 text-xs font-medium text-tern-gray-600">Next Trip</TableHead>
-              <TableHead className="h-10 px-4 text-xs font-medium text-tern-gray-600">Birthday</TableHead>
-              <TableHead className="h-10 px-4 text-xs font-medium text-tern-gray-600">Tags</TableHead>
+            <TableRow className="border-b border-ash-200 hover:bg-transparent">
+              <TableHead className="h-10 px-4 text-xs font-medium text-ash-600">First Name</TableHead>
+              <TableHead className="h-10 px-4 text-xs font-medium text-ash-600">Last Name</TableHead>
+              <TableHead className="h-10 px-4 text-xs font-medium text-ash-600">Email</TableHead>
+              <TableHead className="h-10 px-4 text-xs font-medium text-ash-600">Next Trip</TableHead>
+              <TableHead className="h-10 px-4 text-xs font-medium text-ash-600">Birthday</TableHead>
+              <TableHead className="h-10 px-4 text-xs font-medium text-ash-600">Tags</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -61,7 +61,7 @@ export function ContactsTable({
               <TableRow
                 key={contact.id}
                 onClick={() => handleRowClick(contact.id)}
-                className="cursor-pointer hover:bg-tern-gray-50/50 transition-colors border-b border-tern-gray-100"
+                className="cursor-pointer hover:bg-ash-50/50 transition-colors border-b border-ash-100"
               >
                 <TableCell className="h-12 px-4 py-2">
                   <div className="flex items-center gap-2">
@@ -71,16 +71,16 @@ export function ContactsTable({
                       // avatarUrl={contact.avatarUrl} // TODO: Add avatarUrl to ContactResponseDto
                       size="sm"
                     />
-                    <span className="text-sm text-tern-gray-900">{contact.firstName || '-'}</span>
+                    <span className="text-sm text-ash-900">{contact.firstName || '-'}</span>
                   </div>
                 </TableCell>
-                <TableCell className="h-12 px-4 py-2 text-sm text-tern-gray-900">{contact.lastName || '-'}</TableCell>
-                <TableCell className="h-12 px-4 py-2 text-sm text-tern-gray-700">{contact.email || '-'}</TableCell>
-                <TableCell className="h-12 px-4 py-2 text-sm text-tern-gray-700">-</TableCell>
-                <TableCell className="h-12 px-4 py-2 text-sm text-tern-gray-700">-</TableCell>
+                <TableCell className="h-12 px-4 py-2 text-sm text-ash-900">{contact.lastName || '-'}</TableCell>
+                <TableCell className="h-12 px-4 py-2 text-sm text-ash-700">{contact.email || '-'}</TableCell>
+                <TableCell className="h-12 px-4 py-2 text-sm text-ash-700">-</TableCell>
+                <TableCell className="h-12 px-4 py-2 text-sm text-ash-700">-</TableCell>
                 <TableCell className="h-12 px-4 py-2">
                   {contact.contactType === 'lead' ? (
-                    <TernBadge variant="inbound">VIP</TernBadge>
+                    <Badge variant="inbound">VIP</Badge>
                   ) : null}
                 </TableCell>
               </TableRow>

@@ -31,11 +31,11 @@ export function FlightPricingTab({
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-tern-gray-900">Pricing Information</h3>
+        <h3 className="text-sm font-semibold text-ash-900">Pricing Information</h3>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Pricing Type
             </label>
             <Select
@@ -56,7 +56,7 @@ export function FlightPricingTab({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Currency
             </label>
             <Input
@@ -68,8 +68,8 @@ export function FlightPricingTab({
           </div>
         </div>
 
-        <div className="rounded-lg bg-tern-gray-50 p-4 mt-6">
-          <p className="text-sm text-tern-gray-600">
+        <div className="rounded-lg bg-ash-50 p-4 mt-6">
+          <p className="text-sm text-ash-600">
             <strong>Note:</strong> Detailed pricing information including payment schedules,
             commissions, and supplier details will be available once the shared pricing tables
             are fully implemented.

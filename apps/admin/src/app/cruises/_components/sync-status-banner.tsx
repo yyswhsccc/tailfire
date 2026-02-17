@@ -37,14 +37,14 @@ export function SyncStatusBanner({ lastSyncedAt, isStuck, onForceReset }: SyncSt
   }
 
   return (
-    <Alert className="mb-4 border-tern-teal-200 bg-tern-teal-50">
-      <RefreshCw className="h-4 w-4 animate-spin text-tern-teal-600" />
-      <AlertDescription className="flex items-center gap-2 text-tern-teal-700">
+    <Alert className="mb-4 border-phoenix-gold-200 bg-phoenix-gold-50">
+      <RefreshCw className="h-4 w-4 animate-spin text-phoenix-gold-600" />
+      <AlertDescription className="flex items-center gap-2 text-phoenix-gold-700">
         <span>
           Cruise data is syncing from Traveltek. Prices may update momentarily.
         </span>
         {lastSyncedAt && (
-          <span className="text-tern-teal-500 text-sm flex items-center gap-1">
+          <span className="text-phoenix-gold-500 text-sm flex items-center gap-1">
             <Clock className="h-3 w-3" />
             Last sync: {lastSyncedText}
           </span>

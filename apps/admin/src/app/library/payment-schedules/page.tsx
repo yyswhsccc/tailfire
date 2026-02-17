@@ -144,10 +144,10 @@ export default function PaymentSchedulesLibraryPage() {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <CalendarClock className="h-8 w-8 text-tern-teal-600" />
-            <h1 className="text-2xl font-bold text-tern-gray-900">Payment Schedule Templates</h1>
+            <CalendarClock className="h-8 w-8 text-phoenix-gold-600" />
+            <h1 className="text-2xl font-bold text-ash-900">Payment Schedule Templates</h1>
           </div>
-          <p className="mt-1 text-sm text-tern-gray-500">
+          <p className="mt-1 text-sm text-ash-500">
             Create and manage reusable payment schedules for TICO-compliant booking workflows
           </p>
         </div>
@@ -160,19 +160,19 @@ export default function PaymentSchedulesLibraryPage() {
       {/* Content */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-tern-gray-400" />
+          <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
         </div>
       ) : error ? (
         <div className="text-center py-12">
           <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-          <h3 className="mt-2 text-sm font-medium text-tern-gray-900">Error loading templates</h3>
-          <p className="mt-1 text-sm text-tern-gray-500">{error}</p>
+          <h3 className="mt-2 text-sm font-medium text-ash-900">Error loading templates</h3>
+          <p className="mt-1 text-sm text-ash-500">{error}</p>
         </div>
       ) : templates.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-tern-gray-200 rounded-lg">
-          <CalendarClock className="mx-auto h-12 w-12 text-tern-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-tern-gray-900">No templates yet</h3>
-          <p className="mt-1 text-sm text-tern-gray-500">
+        <div className="text-center py-12 border-2 border-dashed border-ash-200 rounded-lg">
+          <CalendarClock className="mx-auto h-12 w-12 text-ash-400" />
+          <h3 className="mt-2 text-sm font-medium text-ash-900">No templates yet</h3>
+          <p className="mt-1 text-sm text-ash-500">
             Create your first payment schedule template to streamline bookings
           </p>
           <Button className="mt-4" onClick={handleNewTemplate}>
@@ -181,7 +181,7 @@ export default function PaymentSchedulesLibraryPage() {
           </Button>
         </div>
       ) : (
-        <div className="border border-tern-gray-200 rounded-lg overflow-hidden">
+        <div className="border border-ash-200 rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>

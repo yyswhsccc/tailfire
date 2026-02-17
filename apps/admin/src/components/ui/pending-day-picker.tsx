@@ -96,11 +96,11 @@ export function PendingDayPicker({
   )
 
   return (
-    <div className="p-4 bg-tern-teal-50 border border-tern-teal-200 rounded-lg mb-6">
+    <div className="p-4 bg-phoenix-gold-50 border border-phoenix-gold-200 rounded-lg mb-6">
       <div className="flex items-start gap-3">
-        <CalendarDays className="h-5 w-5 text-tern-teal-600 mt-0.5 flex-shrink-0" />
+        <CalendarDays className="h-5 w-5 text-phoenix-gold-600 mt-0.5 flex-shrink-0" />
         <div className="flex-1">
-          <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+          <label className="text-sm font-medium text-ash-900 block mb-2">
             Activity Date *
           </label>
           <DatePickerEnhanced
@@ -113,7 +113,7 @@ export function PendingDayPicker({
           />
           {/* Day resolution feedback */}
           {selectedDate && matchedDay && (
-            <p className="text-sm text-tern-teal-700 mt-2 flex items-center gap-1.5">
+            <p className="text-sm text-phoenix-gold-700 mt-2 flex items-center gap-1.5">
               <Check className="h-4 w-4" />
               This activity will be added to <strong>Day {matchedDay.dayNumber}</strong>
             </p>
@@ -125,7 +125,7 @@ export function PendingDayPicker({
             </p>
           )}
           {!selectedDate && (
-            <p className="text-xs text-tern-gray-500 mt-1">
+            <p className="text-xs text-ash-500 mt-1">
               Select a date to determine which day this activity will be assigned to.
             </p>
           )}

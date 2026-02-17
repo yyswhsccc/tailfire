@@ -125,7 +125,7 @@ export function UnsplashPicker({
     <div className="space-y-4">
       {/* Search input */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tern-gray-400" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ash-400" />
         <Input
           type="text"
           placeholder="Search for photos (e.g., beach, mountains, city)..."
@@ -135,7 +135,7 @@ export function UnsplashPicker({
           disabled={isSelecting}
         />
         {(isLoading || isFetching) && (
-          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-tern-gray-400" />
+          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-ash-400" />
         )}
       </div>
 
@@ -151,17 +151,17 @@ export function UnsplashPicker({
       {/* Results */}
       {!debouncedQuery.trim() ? (
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <ImageIcon className="h-12 w-12 text-tern-gray-300" />
-          <p className="mt-2 text-sm text-tern-gray-500">
+          <ImageIcon className="h-12 w-12 text-ash-300" />
+          <p className="mt-2 text-sm text-ash-500">
             Search for free stock photos from Unsplash
           </p>
-          <p className="text-xs text-tern-gray-400">
+          <p className="text-xs text-ash-400">
             Try: beach, mountains, travel, city, nature
           </p>
         </div>
       ) : isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-tern-gray-400" />
+          <Loader2 className="h-6 w-6 animate-spin text-ash-400" />
         </div>
       ) : searchResults && searchResults.results.length > 0 ? (
         <>
@@ -174,9 +174,9 @@ export function UnsplashPicker({
                 onClick={() => handleSelect(photo)}
                 disabled={isSelecting}
                 className={`
-                  group relative aspect-[4/3] overflow-hidden rounded-lg border border-tern-gray-200
-                  transition-all hover:border-tern-blue-400 hover:shadow-md
-                  focus:outline-none focus:ring-2 focus:ring-tern-blue-500 focus:ring-offset-2
+                  group relative aspect-[4/3] overflow-hidden rounded-lg border border-ash-200
+                  transition-all hover:border-blue-400 hover:shadow-md
+                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
                   ${isSelecting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
                 `}
               >
@@ -197,7 +197,7 @@ export function UnsplashPicker({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="underline hover:text-tern-blue-300"
+                        className="underline hover:text-blue-300"
                       >
                         {photo.user.name}
                       </a>
@@ -208,7 +208,7 @@ export function UnsplashPicker({
                 {/* Selection indicator */}
                 {isSelecting && (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/50">
-                    <Loader2 className="h-6 w-6 animate-spin text-tern-blue-500" />
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                   </div>
                 )}
               </button>
@@ -218,7 +218,7 @@ export function UnsplashPicker({
           {/* Pagination */}
           {searchResults.totalPages > 1 && (
             <div className="flex items-center justify-between">
-              <p className="text-xs text-tern-gray-500">
+              <p className="text-xs text-ash-500">
                 Page {page} of {searchResults.totalPages} ({searchResults.total} results)
               </p>
               <div className="flex gap-2">
@@ -243,13 +243,13 @@ export function UnsplashPicker({
           )}
 
           {/* Unsplash attribution */}
-          <p className="text-center text-xs text-tern-gray-400">
+          <p className="text-center text-xs text-ash-400">
             Photos provided by{' '}
             <a
               href="https://unsplash.com/?utm_source=tailfire&utm_medium=referral"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline hover:text-tern-gray-600"
+              className="underline hover:text-ash-600"
             >
               Unsplash
             </a>
@@ -257,11 +257,11 @@ export function UnsplashPicker({
         </>
       ) : searchResults ? (
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <ImageIcon className="h-12 w-12 text-tern-gray-300" />
-          <p className="mt-2 text-sm text-tern-gray-500">
+          <ImageIcon className="h-12 w-12 text-ash-300" />
+          <p className="mt-2 text-sm text-ash-500">
             No photos found for &ldquo;{debouncedQuery}&rdquo;
           </p>
-          <p className="text-xs text-tern-gray-400">Try different keywords</p>
+          <p className="text-xs text-ash-400">Try different keywords</p>
         </div>
       ) : null}
     </div>

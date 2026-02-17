@@ -165,7 +165,7 @@ export function CredentialFormDialog({
 
         {loadingProviders ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-tern-gray-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-ash-400" />
           </div>
         ) : (
           <Form {...form}>

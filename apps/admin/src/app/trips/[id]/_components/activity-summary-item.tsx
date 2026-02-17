@@ -6,7 +6,7 @@ import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
-import { TernBadge } from '@/components/tern/core'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -95,8 +95,8 @@ export function ActivitySummaryItem({ itineraryId, activity, dayId, cruiseColor 
       <div
         onDoubleClick={handleEdit}
         className={cn(
-          "group flex items-center gap-2 p-2 border border-tern-gray-200 rounded-lg transition-all",
-          "hover:border-tern-gray-300 hover:bg-tern-gray-50",
+          "group flex items-center gap-2 p-2 border border-ash-200 rounded-lg transition-all",
+          "hover:border-ash-300 hover:bg-ash-50",
           FOCUS_VISIBLE_RING,
           cruiseColor && `border-l-4 ${cruiseColor.borderLeft}`
         )}
@@ -107,14 +107,14 @@ export function ActivitySummaryItem({ itineraryId, activity, dayId, cruiseColor 
         {/* Name & Status - truncated */}
         <div className="flex-1 min-w-0 overflow-hidden">
           <p
-            className="text-xs font-medium text-tern-gray-900 truncate"
+            className="text-xs font-medium text-ash-900 truncate"
             title={activity.name}
           >
             {activity.name}
           </p>
-          <TernBadge variant="secondary" className="text-[10px] px-1 py-0">
+          <Badge variant="secondary" className="text-[10px] px-1 py-0">
             {activity.status}
-          </TernBadge>
+          </Badge>
         </div>
 
         {/* Actions Dropdown */}
@@ -128,7 +128,7 @@ export function ActivitySummaryItem({ itineraryId, activity, dayId, cruiseColor 
                 FOCUS_VISIBLE_RING
               )}
             >
-              <MoreHorizontal className="h-3.5 w-3.5 text-tern-gray-500" />
+              <MoreHorizontal className="h-3.5 w-3.5 text-ash-500" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-32">

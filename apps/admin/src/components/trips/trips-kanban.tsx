@@ -92,7 +92,7 @@ function DroppableColumn({ column, trips, pendingUpdates }: DroppableColumnProps
     <div className="flex flex-col">
       {/* Column Header */}
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-tern-gray-900">
+        <h3 className="text-sm font-semibold text-ash-900">
           {column.title}
         </h3>
       </div>
@@ -106,11 +106,11 @@ function DroppableColumn({ column, trips, pendingUpdates }: DroppableColumnProps
           aria-dropeffect="move"
           className={cn(
             'flex-1 rounded-lg p-3 space-y-3 min-h-[400px] transition-colors',
-            isOver ? 'bg-tern-teal-50 ring-2 ring-tern-teal-300' : 'bg-tern-gray-100'
+            isOver ? 'bg-phoenix-gold-50 ring-2 ring-phoenix-gold-300' : 'bg-ash-100'
           )}
         >
           {trips.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-sm text-tern-gray-400">
+            <div className="flex items-center justify-center h-32 text-sm text-ash-400">
               No trips
             </div>
           ) : (
@@ -129,8 +129,8 @@ function DroppableColumn({ column, trips, pendingUpdates }: DroppableColumnProps
 }
 
 /**
- * Tern Trips Kanban
- * Kanban board view matching Tern's trips list layout with drag-and-drop
+ * Trips Kanban
+ * Kanban board view with drag-and-drop
  */
 export function TripsKanban({ trips }: TripsKanbanProps) {
   const [activeTrip, setActiveTrip] = useState<TripResponseDto | null>(null)

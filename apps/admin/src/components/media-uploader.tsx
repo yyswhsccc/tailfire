@@ -490,8 +490,8 @@ export function MediaUploader({
         transition-colors duration-200
         ${
           isDragging
-            ? 'border-tern-blue-500 bg-tern-blue-50'
-            : 'border-tern-gray-300 hover:border-tern-gray-400'
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-ash-300 hover:border-ash-400'
         }
       `}
       onDragOver={handleDragOver}
@@ -508,18 +508,18 @@ export function MediaUploader({
         onChange={(e) => handleFiles(e.target.files)}
       />
 
-      <Upload className="mx-auto h-8 w-8 text-tern-gray-400" />
-      <p className="mt-2 text-sm text-tern-gray-600">
+      <Upload className="mx-auto h-8 w-8 text-ash-400" />
+      <p className="mt-2 text-sm text-ash-600">
         {isDragging ? (
           'Drop files here...'
         ) : (
           <>
-            <span className="font-medium text-tern-blue-600">Click to upload</span> or drag and
+            <span className="font-medium text-blue-600">Click to upload</span> or drag and
             drop
           </>
         )}
       </p>
-      <p className="mt-1 text-xs text-tern-gray-500">
+      <p className="mt-1 text-xs text-ash-500">
         {allowedTypes.includes('image') && allowedTypes.includes('video')
           ? 'JPG, PNG, GIF, WebP, AVIF, MP4, WebM up to 10MB'
           : allowedTypes.includes('image')
@@ -529,7 +529,7 @@ export function MediaUploader({
 
       {uploadMutation.isPending && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg">
-          <Loader2 className="h-6 w-6 animate-spin text-tern-blue-500" />
+          <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
         </div>
       )}
     </div>
@@ -581,7 +581,7 @@ export function MediaUploader({
       {/* Media grid - only show if not hidden */}
       {!hideMediaGrid && (isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-tern-gray-400" />
+          <Loader2 className="h-5 w-5 animate-spin text-ash-400" />
         </div>
       ) : fetchError ? (
         <div className="text-sm text-red-600">Failed to load media</div>
@@ -590,7 +590,7 @@ export function MediaUploader({
           {media.map((item) => (
             <div
               key={item.id}
-              className="group relative rounded-lg border border-tern-gray-200 overflow-hidden bg-tern-gray-50"
+              className="group relative rounded-lg border border-ash-200 overflow-hidden bg-ash-50"
             >
               {/* Thumbnail */}
               <div className="aspect-square relative">
@@ -601,12 +601,12 @@ export function MediaUploader({
                     className="w-full h-full object-cover"
                   />
                 ) : item.mediaType === 'video' ? (
-                  <div className="w-full h-full flex items-center justify-center bg-tern-gray-100">
-                    <Video className="h-12 w-12 text-tern-gray-400" />
+                  <div className="w-full h-full flex items-center justify-center bg-ash-100">
+                    <Video className="h-12 w-12 text-ash-400" />
                   </div>
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-tern-gray-100">
-                    <ImageIcon className="h-12 w-12 text-tern-gray-400" />
+                  <div className="w-full h-full flex items-center justify-center bg-ash-100">
+                    <ImageIcon className="h-12 w-12 text-ash-400" />
                   </div>
                 )}
 
@@ -683,19 +683,19 @@ export function MediaUploader({
                     onClick={() => startEditCaption(item)}
                   >
                     {item.caption ? (
-                      <span className="text-xs text-tern-gray-700 truncate flex-1">
+                      <span className="text-xs text-ash-700 truncate flex-1">
                         {item.caption}
                       </span>
                     ) : (
-                      <span className="text-xs text-tern-gray-400 italic flex-1">
+                      <span className="text-xs text-ash-400 italic flex-1">
                         Add caption...
                       </span>
                     )}
-                    <Pencil className="h-3 w-3 text-tern-gray-400 opacity-0 group-hover/caption:opacity-100 transition-opacity" />
+                    <Pencil className="h-3 w-3 text-ash-400 opacity-0 group-hover/caption:opacity-100 transition-opacity" />
                   </div>
                 )}
                 {item.fileSize && (
-                  <p className="text-xs text-tern-gray-400 mt-0.5">
+                  <p className="text-xs text-ash-400 mt-0.5">
                     {formatFileSize(item.fileSize)}
                   </p>
                 )}
@@ -704,14 +704,14 @@ export function MediaUploader({
           ))}
         </div>
       ) : (
-        <p className="text-sm text-tern-gray-500 text-center py-4">
+        <p className="text-sm text-ash-500 text-center py-4">
           No media uploaded yet
         </p>
       ))}
 
       {/* File count */}
       {!hideMediaGrid && maxFiles && media && (
-        <p className="text-xs text-tern-gray-500 text-center">
+        <p className="text-xs text-ash-500 text-center">
           {media.length} / {maxFiles} files
         </p>
       )}

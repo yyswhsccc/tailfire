@@ -183,8 +183,8 @@ export function CruiseDetailModal({
             </DialogHeader>
             <div className="flex flex-col items-center justify-center py-12 px-6">
               <AlertCircle className="h-12 w-12 text-red-400" />
-              <h3 className="mt-2 text-lg font-medium text-tern-gray-900">Error loading sailing</h3>
-              <p className="mt-1 text-sm text-tern-gray-500">
+              <h3 className="mt-2 text-lg font-medium text-ash-900">Error loading sailing</h3>
+              <p className="mt-1 text-sm text-ash-500">
                 Unable to load sailing details. Please try again.
               </p>
               <Button variant="outline" onClick={onClose} className="mt-4">
@@ -213,17 +213,17 @@ export function CruiseDetailModal({
                   </div>
                 )}
                 <div className="flex-1">
-                  <DialogTitle className="text-xl font-bold text-tern-gray-900">
+                  <DialogTitle className="text-xl font-bold text-ash-900">
                     {sailing.name}
                   </DialogTitle>
-                  <div className="flex items-center gap-2 mt-1 text-sm text-tern-gray-500">
+                  <div className="flex items-center gap-2 mt-1 text-sm text-ash-500">
                     <span>{sailing.cruiseLine.name}</span>
                     <span>-</span>
                     <span>{sailing.ship.name}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-tern-teal-100 text-tern-teal-700">
+                  <Badge variant="secondary" className="bg-phoenix-gold-100 text-phoenix-gold-700">
                     {sailing.nights} Nights
                   </Badge>
                   {sailing.regions[0] && (
@@ -236,7 +236,7 @@ export function CruiseDetailModal({
             <div className="flex-1 h-0 overflow-y-auto">
                 <div className="space-y-6 px-6 pb-6">
                 {/* Ship Image Gallery */}
-                <div className="relative h-64 bg-tern-gray-100 rounded-lg overflow-hidden">
+                <div className="relative h-64 bg-ash-100 rounded-lg overflow-hidden">
                   {imageUrl ? (
                     <>
                       <Image
@@ -277,15 +277,15 @@ export function CruiseDetailModal({
                     </>
                   ) : (
                     <div className="flex items-center justify-center h-full">
-                      <Ship className="h-16 w-16 text-tern-gray-300" />
+                      <Ship className="h-16 w-16 text-ash-300" />
                     </div>
                   )}
                 </div>
 
                 {/* Quick Info Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-tern-gray-50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-tern-gray-500 text-xs mb-1">
+                  <div className="bg-ash-50 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-ash-500 text-xs mb-1">
                       <Calendar className="h-3.5 w-3.5" />
                       Departure
                     </div>
@@ -293,8 +293,8 @@ export function CruiseDetailModal({
                       {format(parseISO(sailing.sailDate), 'MMM d, yyyy')}
                     </p>
                   </div>
-                  <div className="bg-tern-gray-50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-tern-gray-500 text-xs mb-1">
+                  <div className="bg-ash-50 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-ash-500 text-xs mb-1">
                       <Calendar className="h-3.5 w-3.5" />
                       Return
                     </div>
@@ -302,8 +302,8 @@ export function CruiseDetailModal({
                       {format(parseISO(sailing.endDate), 'MMM d, yyyy')}
                     </p>
                   </div>
-                  <div className="bg-tern-gray-50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-tern-gray-500 text-xs mb-1">
+                  <div className="bg-ash-50 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-ash-500 text-xs mb-1">
                       <MapPin className="h-3.5 w-3.5" />
                       From
                     </div>
@@ -311,8 +311,8 @@ export function CruiseDetailModal({
                       {sailing.embarkPort?.name ?? sailing.embarkPortName ?? 'TBD'}
                     </p>
                   </div>
-                  <div className="bg-tern-gray-50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-tern-gray-500 text-xs mb-1">
+                  <div className="bg-ash-50 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-ash-500 text-xs mb-1">
                       <Clock className="h-3.5 w-3.5" />
                       Duration
                     </div>
@@ -327,22 +327,22 @@ export function CruiseDetailModal({
                   <>
                     <Separator />
                     <div>
-                      <h3 className="font-semibold text-sm text-tern-gray-900 mb-3 flex items-center gap-2">
+                      <h3 className="font-semibold text-sm text-ash-900 mb-3 flex items-center gap-2">
                         <Anchor className="h-4 w-4" />
                         Ship Details - {sailing.ship.name}
                       </h3>
                       <div className="grid grid-cols-3 gap-4">
                         {sailing.ship.yearBuilt && (
                           <div className="flex items-center gap-2 text-sm">
-                            <Building2 className="h-4 w-4 text-tern-gray-400" />
-                            <span className="text-tern-gray-500">Built:</span>
+                            <Building2 className="h-4 w-4 text-ash-400" />
+                            <span className="text-ash-500">Built:</span>
                             <span className="font-medium">{sailing.ship.yearBuilt}</span>
                           </div>
                         )}
                         {sailing.ship.passengerCapacity && (
                           <div className="flex items-center gap-2 text-sm">
-                            <Users className="h-4 w-4 text-tern-gray-400" />
-                            <span className="text-tern-gray-500">Capacity:</span>
+                            <Users className="h-4 w-4 text-ash-400" />
+                            <span className="text-ash-500">Capacity:</span>
                             <span className="font-medium">
                               {sailing.ship.passengerCapacity.toLocaleString()} guests
                             </span>
@@ -350,8 +350,8 @@ export function CruiseDetailModal({
                         )}
                         {sailing.ship.tonnage && (
                           <div className="flex items-center gap-2 text-sm">
-                            <Ruler className="h-4 w-4 text-tern-gray-400" />
-                            <span className="text-tern-gray-500">Tonnage:</span>
+                            <Ruler className="h-4 w-4 text-ash-400" />
+                            <span className="text-ash-500">Tonnage:</span>
                             <span className="font-medium">
                               {sailing.ship.tonnage.toLocaleString()} GT
                             </span>
@@ -372,7 +372,7 @@ export function CruiseDetailModal({
                 </div>
             </div>
 
-            <DialogFooter className="flex-shrink-0 border-t border-tern-gray-200 p-6 pt-4">
+            <DialogFooter className="flex-shrink-0 border-t border-ash-200 p-6 pt-4">
               <div className="flex justify-end w-full">
                 <div className="flex gap-3">
                   <Button variant="outline" onClick={onClose}>
@@ -382,7 +382,7 @@ export function CruiseDetailModal({
                     <Button
                       onClick={handleAddToItinerary}
                       disabled={addCruiseMutation.isPending}
-                      className="bg-tern-teal-600 hover:bg-tern-teal-700"
+                      className="bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
                     >
                       {addCruiseMutation.isPending ? (
                         <>
@@ -396,7 +396,7 @@ export function CruiseDetailModal({
                   ) : (
                     <Button
                       onClick={() => setShowAddToTripDialog(true)}
-                      className="bg-tern-teal-600 hover:bg-tern-teal-700"
+                      className="bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Add to Trip
@@ -439,7 +439,7 @@ export function CruiseDetailModal({
                   </p>
                   <div className="bg-amber-50 rounded-lg p-3 space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-tern-gray-600">Cruise dates:</span>
+                      <span className="text-ash-600">Cruise dates:</span>
                       <span className="font-medium">
                         {format(parseISO(sailing.sailDate), 'MMM d')} -{' '}
                         {format(parseISO(sailing.endDate), 'MMM d, yyyy')}
@@ -458,7 +458,7 @@ export function CruiseDetailModal({
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleConfirmExtend}
-                className="bg-tern-teal-600 hover:bg-tern-teal-700"
+                className="bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
                 disabled={addCruiseMutation.isPending}
               >
                 {addCruiseMutation.isPending ? (

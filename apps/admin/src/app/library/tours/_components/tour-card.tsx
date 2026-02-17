@@ -39,8 +39,8 @@ const BRAND_STYLES: Record<string, { badge: string; bg: string; icon: string }> 
 }
 
 const DEFAULT_STYLE = {
-  badge: 'bg-tern-teal-600 text-white hover:bg-tern-teal-600',
-  bg: 'from-tern-teal-600 via-teal-500 to-cyan-400',
+  badge: 'bg-phoenix-gold-600 text-white hover:bg-phoenix-gold-600',
+  bg: 'from-phoenix-gold-600 via-teal-500 to-cyan-400',
   icon: 'text-teal-200/40',
 }
 
@@ -68,8 +68,8 @@ export function TourCard({ tour, onSelect }: TourCardProps) {
     <Card
       className={cn(
         'group cursor-pointer overflow-hidden transition-all duration-200',
-        'hover:shadow-lg hover:border-tern-teal-300',
-        'focus-within:ring-2 focus-within:ring-tern-teal-500 focus-within:ring-offset-2',
+        'hover:shadow-lg hover:border-phoenix-gold-300',
+        'focus-within:ring-2 focus-within:ring-phoenix-gold-500 focus-within:ring-offset-2',
       )}
       onClick={onSelect}
     >
@@ -100,12 +100,12 @@ export function TourCard({ tour, onSelect }: TourCardProps) {
 
       <CardContent className="p-3 space-y-2">
         {/* Tour Name */}
-        <h3 className="font-semibold text-sm text-tern-gray-900 line-clamp-2 leading-tight min-h-[2.5rem]">
+        <h3 className="font-semibold text-sm text-ash-900 line-clamp-2 leading-tight min-h-[2.5rem]">
           {tour.name}
         </h3>
 
         {/* Tour details */}
-        <div className="flex items-center gap-3 text-xs text-tern-gray-500">
+        <div className="flex items-center gap-3 text-xs text-ash-500">
           {tour.days && (
             <div className="flex items-center gap-1">
               <Clock className="h-3 w-3 flex-shrink-0" />
@@ -123,21 +123,21 @@ export function TourCard({ tour, onSelect }: TourCardProps) {
         {/* Pricing & Departures */}
         <div className="flex items-center justify-between text-xs">
           {tour.lowestPriceCents ? (
-            <span className="font-medium text-tern-teal-700">
+            <span className="font-medium text-phoenix-gold-700">
               From ${(tour.lowestPriceCents / 100).toLocaleString()}
             </span>
           ) : (
-            <span className="text-tern-gray-400">Price on request</span>
+            <span className="text-ash-400">Price on request</span>
           )}
           {tour.departureCount && tour.departureCount > 0 && (
-            <span className="text-tern-gray-500">
+            <span className="text-ash-500">
               {tour.departureCount} departure{tour.departureCount !== 1 ? 's' : ''}
             </span>
           )}
         </div>
 
         {/* CTA */}
-        <div className="pt-2 border-t border-tern-gray-100">
+        <div className="pt-2 border-t border-ash-100">
           <Button
             size="sm"
             variant="outline"

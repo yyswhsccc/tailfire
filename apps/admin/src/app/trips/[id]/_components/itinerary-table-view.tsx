@@ -8,7 +8,7 @@ import type { TripResponseDto, ItineraryResponseDto } from '@tailfire/shared-typ
 import { useItineraryDaysWithActivities } from '@/hooks/use-itinerary-days'
 import { useDeleteActivity, useDuplicateActivity } from '@/hooks/use-activities'
 import { useToast } from '@/hooks/use-toast'
-import { TernBadge } from '@/components/tern/core'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -333,14 +333,14 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
       <div className={cn(ITINERARY_CARD_STYLES, 'overflow-hidden')} role="status" aria-label="Loading activities">
         <Table>
           <TableHeader>
-            <TableRow className="bg-tern-gray-50">
-              <TableHead className="w-20 text-xs font-medium uppercase tracking-wide text-tern-gray-600">Day</TableHead>
-              <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-tern-gray-600">Type</TableHead>
-              <TableHead className="text-xs font-medium uppercase tracking-wide text-tern-gray-600">Details</TableHead>
-              <TableHead className="w-32 text-xs font-medium uppercase tracking-wide text-tern-gray-600">Time</TableHead>
-              <TableHead className="w-40 text-xs font-medium uppercase tracking-wide text-tern-gray-600">Location</TableHead>
-              <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-tern-gray-600">Status</TableHead>
-              <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-tern-gray-600 text-right">Cost</TableHead>
+            <TableRow className="bg-ash-50">
+              <TableHead className="w-20 text-xs font-medium uppercase tracking-wide text-ash-600">Day</TableHead>
+              <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-ash-600">Type</TableHead>
+              <TableHead className="text-xs font-medium uppercase tracking-wide text-ash-600">Details</TableHead>
+              <TableHead className="w-32 text-xs font-medium uppercase tracking-wide text-ash-600">Time</TableHead>
+              <TableHead className="w-40 text-xs font-medium uppercase tracking-wide text-ash-600">Location</TableHead>
+              <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-ash-600">Status</TableHead>
+              <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-ash-600 text-right">Cost</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -374,9 +374,9 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
         )}
       >
         <div className={cn(ITINERARY_CARD_STYLES, 'p-8 text-center')}>
-          <Calendar className="h-12 w-12 text-tern-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-tern-gray-900 mb-2">No activities yet</h3>
-          <p className="text-sm text-tern-gray-500">
+          <Calendar className="h-12 w-12 text-ash-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-ash-900 mb-2">No activities yet</h3>
+          <p className="text-sm text-ash-500">
             Drag components from the sidebar to add activities to your itinerary.
           </p>
         </div>
@@ -396,14 +396,14 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
       <div className={cn(ITINERARY_CARD_STYLES, 'overflow-hidden')}>
       <Table>
         <TableHeader>
-          <TableRow className="bg-tern-gray-50">
-            <TableHead className="w-20 text-xs font-medium uppercase tracking-wide text-tern-gray-600">Day</TableHead>
-            <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-tern-gray-600">Type</TableHead>
-            <TableHead className="text-xs font-medium uppercase tracking-wide text-tern-gray-600">Details</TableHead>
-            <TableHead className="w-32 text-xs font-medium uppercase tracking-wide text-tern-gray-600">Time</TableHead>
-            <TableHead className="w-40 text-xs font-medium uppercase tracking-wide text-tern-gray-600">Location</TableHead>
-            <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-tern-gray-600">Status</TableHead>
-            <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-tern-gray-600 text-right">Cost</TableHead>
+          <TableRow className="bg-ash-50">
+            <TableHead className="w-20 text-xs font-medium uppercase tracking-wide text-ash-600">Day</TableHead>
+            <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-ash-600">Type</TableHead>
+            <TableHead className="text-xs font-medium uppercase tracking-wide text-ash-600">Details</TableHead>
+            <TableHead className="w-32 text-xs font-medium uppercase tracking-wide text-ash-600">Time</TableHead>
+            <TableHead className="w-40 text-xs font-medium uppercase tracking-wide text-ash-600">Location</TableHead>
+            <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-ash-600">Status</TableHead>
+            <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-ash-600 text-right">Cost</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
@@ -423,10 +423,10 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
                 tabIndex={0}
                 aria-label={`${row.activity.name} on Day ${row.dayNumber}${row.isSpanning ? ` (spans ${row.spanningInfo?.totalNights || 'multiple'} nights)` : ''}`}
                 className={cn(
-                  'hover:bg-tern-gray-50 cursor-pointer transition-colors',
+                  'hover:bg-ash-50 cursor-pointer transition-colors',
                   FOCUS_VISIBLE_RING,
-                  showDayInfo && index > 0 && 'border-t-2 border-tern-gray-200',
-                  cruiseColor ? cruiseColor.bg : row.isSpanning && 'bg-tern-teal-25/50'
+                  showDayInfo && index > 0 && 'border-t-2 border-ash-200',
+                  cruiseColor ? cruiseColor.bg : row.isSpanning && 'bg-phoenix-gold-25/50'
                 )}
                 onClick={() => handleRowClick(row.activity.id, row.dayId)}
                 onKeyDown={(e) => e.key === 'Enter' && handleRowClick(row.activity.id, row.dayId)}
@@ -444,7 +444,7 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
                   {!cruiseColor && row.isSpanning && row.spanPosition && (
                     <div
                       className={cn(
-                        'absolute left-0 w-1 bg-tern-teal-400',
+                        'absolute left-0 w-1 bg-phoenix-gold-400',
                         row.spanPosition === 'first' && 'top-1/2 bottom-0 rounded-t',
                         row.spanPosition === 'middle' && 'top-0 bottom-0',
                         row.spanPosition === 'last' && 'top-0 bottom-1/2 rounded-b'
@@ -454,9 +454,9 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
                   )}
                   {showDayInfo ? (
                     <div className="flex flex-col pl-2">
-                      <span className="font-medium text-xs text-tern-gray-900">Day {row.dayNumber}</span>
+                      <span className="font-medium text-xs text-ash-900">Day {row.dayNumber}</span>
                       {row.dayDate && (
-                        <span className="text-xs text-tern-gray-500">
+                        <span className="text-xs text-ash-500">
                           {formatDate(row.dayDate)}
                         </span>
                       )}
@@ -468,7 +468,7 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
 
                 {/* Type Column */}
                 <TableCell className="py-2">
-                  <div className="inline-flex items-center gap-2 text-xs font-medium text-tern-gray-900">
+                  <div className="inline-flex items-center gap-2 text-xs font-medium text-ash-900">
                     <ActivityIconBadge type={row.activity.activityType} size="xs" />
                     <span className="capitalize">{metadata.label}</span>
                   </div>
@@ -492,11 +492,11 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
                       <ActivityIconBadge type={row.activity.activityType} size="sm" />
                     )}
                     <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="font-medium text-sm text-tern-gray-900 truncate max-w-[250px]" title={row.activity.name}>
+                      <span className="font-medium text-sm text-ash-900 truncate max-w-[250px]" title={row.activity.name}>
                         {row.activity.name}
                       </span>
                       {row.activity.confirmationNumber && (
-                        <span className="text-xs text-tern-gray-500">
+                        <span className="text-xs text-ash-500">
                           Conf: {row.activity.confirmationNumber}
                         </span>
                       )}
@@ -508,8 +508,8 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
                 <TableCell className="py-2">
                   <div className="flex flex-col gap-0.5">
                     {row.activity.startDatetime ? (
-                      <div className="flex items-center gap-1 text-xs text-tern-gray-700">
-                        <Clock className="h-3 w-3 text-tern-gray-400" />
+                      <div className="flex items-center gap-1 text-xs text-ash-700">
+                        <Clock className="h-3 w-3 text-ash-400" />
                         <span>
                           {formatTime(row.activity.startDatetime)}
                           {row.activity.endDatetime && !row.isSpanning && (
@@ -518,11 +518,11 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
                         </span>
                       </div>
                     ) : (
-                      <span className="text-xs text-tern-gray-400">-</span>
+                      <span className="text-xs text-ash-400">-</span>
                     )}
                     {/* Show duration badge for spanning activities */}
                     {row.isSpanning && row.spanPosition === 'first' && row.spanningInfo?.totalNights && (
-                      <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium w-fit", cruiseColor ? cruiseColor.badge : 'bg-tern-teal-100 text-tern-teal-800')}>
+                      <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium w-fit", cruiseColor ? cruiseColor.badge : 'bg-phoenix-gold-100 text-phoenix-gold-800')}>
                         {row.spanningInfo.totalNights} Night{row.spanningInfo.totalNights > 1 ? 's' : ''}
                       </span>
                     )}
@@ -532,29 +532,29 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
                 {/* Location Column */}
                 <TableCell className="py-2">
                   {row.activity.location ? (
-                    <div className="flex items-center gap-1 text-xs text-tern-gray-700">
-                      <MapPin className="h-3 w-3 text-tern-gray-400 flex-shrink-0" />
+                    <div className="flex items-center gap-1 text-xs text-ash-700">
+                      <MapPin className="h-3 w-3 text-ash-400 flex-shrink-0" />
                       <span className="truncate max-w-[120px]" title={row.activity.location}>
                         {row.activity.location}
                       </span>
                     </div>
                   ) : (
-                    <span className="text-xs text-tern-gray-400">-</span>
+                    <span className="text-xs text-ash-400">-</span>
                   )}
                 </TableCell>
 
                 {/* Status Column */}
                 <TableCell className="py-2">
-                  <TernBadge variant={statusVariant}>
+                  <Badge variant={statusVariant}>
                     <span className="capitalize text-xs">
                       {row.activity.status}
                     </span>
-                  </TernBadge>
+                  </Badge>
                 </TableCell>
 
                 {/* Cost Column */}
                 <TableCell className="py-2 text-right">
-                  <span className="text-xs font-medium text-tern-gray-900">
+                  <span className="text-xs font-medium text-ash-900">
                     {row.activity.pricing?.totalPriceCents != null
                       ? formatCurrency(row.activity.pricing.totalPriceCents, row.activity.pricing.currency || row.activity.currency)
                       : '-'}
@@ -568,10 +568,10 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
                       <Button
                         variant="ghost"
                         size="sm"
-                        className={cn('h-8 w-8 p-0 hover:bg-tern-gray-100', FOCUS_VISIBLE_RING)}
+                        className={cn('h-8 w-8 p-0 hover:bg-ash-100', FOCUS_VISIBLE_RING)}
                         aria-label={`Actions for ${row.activity.name}`}
                       >
-                        <MoreVertical className="h-4 w-4 text-tern-gray-500" />
+                        <MoreVertical className="h-4 w-4 text-ash-500" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -609,11 +609,11 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
       </Table>
 
         {/* Summary Footer */}
-        <div className="border-t border-tern-gray-200 bg-tern-gray-50 px-4 py-2 flex items-center justify-between text-xs">
-          <span className="text-tern-gray-500">
+        <div className="border-t border-ash-200 bg-ash-50 px-4 py-2 flex items-center justify-between text-xs">
+          <span className="text-ash-500">
             {tableRows.length} activities across {daysWithActivities?.length || 0} days
           </span>
-          <span className="font-medium text-tern-gray-900">
+          <span className="font-medium text-ash-900">
             Total:{' '}
             {formatCurrency(
               tableRows.reduce((sum, row) => {

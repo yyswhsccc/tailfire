@@ -212,7 +212,7 @@ export function PackageTemplateModal({
               {/* Show template stats */}
               {template && (
                 <div className="border-t pt-4 mt-4">
-                  <p className="text-sm font-medium text-tern-gray-700 mb-2">Template Contents</p>
+                  <p className="text-sm font-medium text-ash-700 mb-2">Template Contents</p>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-muted-foreground">Days:</span>{' '}

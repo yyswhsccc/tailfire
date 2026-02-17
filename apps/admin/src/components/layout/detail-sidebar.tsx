@@ -24,37 +24,30 @@ export interface BackLink {
   label: string
 }
 
-interface TernDetailSidebarProps {
+interface DetailSidebarProps {
   backHref: string
   backLabel: string
-  /** Optional additional back links to show below the primary back link */
   additionalBackLinks?: BackLink[]
   sections: SidebarSection[]
-  /** Optional callback when navigation occurs (used to close mobile drawer) */
   onNavigate?: () => void
 }
 
-/**
- * Tern Detail Sidebar
- * Left sidebar that appears on detail views (e.g., trip detail, contact detail)
- * Based on the trip detail screenshot showing General/Finances/More sections
- */
-export function TernDetailSidebar({
+export function DetailSidebar({
   backHref,
   backLabel,
   additionalBackLinks,
   sections,
   onNavigate,
-}: TernDetailSidebarProps) {
+}: DetailSidebarProps) {
   const pathname = usePathname()
 
   return (
-    <aside className="w-44 h-full flex-shrink-0 border-r border-tern-gray-200 bg-white overflow-y-auto">
+    <aside className="w-44 h-full flex-shrink-0 border-r border-ash-200 bg-white overflow-y-auto">
       {/* Primary back link */}
       <Link
         href={backHref}
         onClick={onNavigate}
-        className="flex items-center gap-2 px-3 py-3 text-sm text-tern-gray-600 hover:text-tern-gray-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tern-teal-500 focus-visible:ring-offset-2 focus-visible:ring-inset"
+        className="flex items-center gap-2 px-3 py-3 text-sm text-ash-600 hover:text-ash-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-phoenix-gold-500 focus-visible:ring-offset-2 focus-visible:ring-inset"
       >
         <ChevronLeft className="h-4 w-4" />
         {backLabel}
@@ -62,13 +55,13 @@ export function TernDetailSidebar({
 
       {/* Additional back links */}
       {additionalBackLinks && additionalBackLinks.length > 0 && (
-        <div className="border-b border-tern-gray-200 pb-2">
+        <div className="border-b border-ash-200 pb-2">
           {additionalBackLinks.map((link, idx) => (
             <Link
               key={idx}
               href={link.href}
               onClick={onNavigate}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-tern-gray-600 hover:text-tern-gray-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tern-teal-500 focus-visible:ring-offset-2 focus-visible:ring-inset"
+              className="flex items-center gap-2 px-3 py-2 text-sm text-ash-600 hover:text-ash-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-phoenix-gold-500 focus-visible:ring-offset-2 focus-visible:ring-inset"
             >
               <ChevronLeft className="h-4 w-4" />
               {link.label}
@@ -82,7 +75,7 @@ export function TernDetailSidebar({
         {sections.map((section, idx) => (
           <div key={idx} className="mb-4">
             {section.title && (
-              <h4 className="px-2 py-1 text-xs font-medium text-tern-gray-500 uppercase tracking-wider">
+              <h4 className="px-2 py-1 text-xs font-medium text-ash-500 uppercase tracking-wider">
                 {section.title}
               </h4>
             )}
@@ -91,7 +84,6 @@ export function TernDetailSidebar({
                 const isActive = item.isActive !== undefined ? item.isActive : pathname === item.href
                 const Icon = item.icon
 
-                // If onClick is provided, render as button instead of link
                 if (item.onClick) {
                   return (
                     <li key={item.href}>
@@ -101,16 +93,16 @@ export function TernDetailSidebar({
                           onNavigate?.()
                         }}
                         className={cn(
-                          'w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tern-teal-500 focus-visible:ring-offset-2',
+                          'w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-phoenix-gold-500 focus-visible:ring-offset-2',
                           isActive
-                            ? 'bg-tern-teal-50 text-tern-teal-700 font-medium'
-                            : 'text-tern-gray-700 hover:bg-tern-gray-50'
+                            ? 'bg-phoenix-gold-50 text-phoenix-gold-700 font-medium'
+                            : 'text-ash-700 hover:bg-ash-50'
                         )}
                       >
                         <Icon className="h-4 w-4 flex-shrink-0" />
                         <span className="flex-1 text-left">{item.name}</span>
                         {item.badge && (
-                          <span className="text-xs text-tern-gray-500">
+                          <span className="text-xs text-ash-500">
                             {item.badge}
                           </span>
                         )}
@@ -125,16 +117,16 @@ export function TernDetailSidebar({
                       href={item.href}
                       onClick={onNavigate}
                       className={cn(
-                        'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tern-teal-500 focus-visible:ring-offset-2',
+                        'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-phoenix-gold-500 focus-visible:ring-offset-2',
                         isActive
-                          ? 'bg-tern-teal-50 text-tern-teal-700 font-medium'
-                          : 'text-tern-gray-700 hover:bg-tern-gray-50'
+                          ? 'bg-phoenix-gold-50 text-phoenix-gold-700 font-medium'
+                          : 'text-ash-700 hover:bg-ash-50'
                       )}
                     >
                       <Icon className="h-4 w-4 flex-shrink-0" />
                       <span className="flex-1">{item.name}</span>
                       {item.badge && (
-                        <span className="text-xs text-tern-gray-500">
+                        <span className="text-xs text-ash-500">
                           {item.badge}
                         </span>
                       )}

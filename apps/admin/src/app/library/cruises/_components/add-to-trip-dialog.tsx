@@ -324,14 +324,14 @@ export function AddToTripDialog({
             {step === 'select-trip' ? (
               <>
                 Create a new trip or add to an existing one.
-                <span className="block mt-1 text-tern-teal-600 font-medium">
+                <span className="block mt-1 text-phoenix-gold-600 font-medium">
                   {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(sailing.endDate), 'MMM d, yyyy')} ({sailing.nights} nights)
                 </span>
               </>
             ) : (
               <>
                 This trip has multiple itineraries. Choose one.
-                <span className="block mt-1 text-tern-teal-600 font-medium">
+                <span className="block mt-1 text-phoenix-gold-600 font-medium">
                   Cruise dates: {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(sailing.endDate), 'MMM d, yyyy')}
                 </span>
               </>
@@ -346,24 +346,24 @@ export function AddToTripDialog({
               className={cn(
                 'p-3 rounded-lg border-2 border-dashed transition-colors cursor-pointer',
                 showCreateTrip
-                  ? 'border-tern-teal-500 bg-tern-teal-50'
-                  : 'border-tern-gray-200 hover:border-tern-teal-300 hover:bg-tern-gray-50'
+                  ? 'border-phoenix-gold-500 bg-phoenix-gold-50'
+                  : 'border-ash-200 hover:border-phoenix-gold-300 hover:bg-ash-50'
               )}
               onClick={() => setShowCreateTrip(true)}
             >
               <div className="flex items-center gap-2">
                 <div className={cn(
                   'flex items-center justify-center h-8 w-8 rounded-full',
-                  showCreateTrip ? 'bg-tern-teal-100' : 'bg-tern-gray-100'
+                  showCreateTrip ? 'bg-phoenix-gold-100' : 'bg-ash-100'
                 )}>
                   <Plus className={cn(
                     'h-4 w-4',
-                    showCreateTrip ? 'text-tern-teal-600' : 'text-tern-gray-500'
+                    showCreateTrip ? 'text-phoenix-gold-600' : 'text-ash-500'
                   )} />
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-sm text-tern-gray-900">Create New Trip</p>
-                  <p className="text-xs text-tern-gray-500">Start a new trip with this cruise</p>
+                  <p className="font-medium text-sm text-ash-900">Create New Trip</p>
+                  <p className="text-xs text-ash-500">Start a new trip with this cruise</p>
                 </div>
               </div>
               {showCreateTrip && (
@@ -383,7 +383,7 @@ export function AddToTripDialog({
                   <Button
                     onClick={handleCreateTripAndAdd}
                     disabled={!newTripName.trim() || isProcessing}
-                    className="w-full bg-tern-teal-600 hover:bg-tern-teal-700"
+                    className="w-full bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
                     size="sm"
                   >
                     {processingTripId === 'new' ? (
@@ -408,7 +408,7 @@ export function AddToTripDialog({
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-tern-gray-500">
+                <span className="bg-white px-2 text-ash-500">
                   or add to existing trip
                 </span>
               </div>
@@ -433,10 +433,10 @@ export function AddToTripDialog({
                 </div>
               ) : trips.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                  <Ship className="h-12 w-12 text-tern-gray-300 mb-2" />
-                  <p className="text-sm text-tern-gray-500">No trips found</p>
+                  <Ship className="h-12 w-12 text-ash-300 mb-2" />
+                  <p className="text-sm text-ash-500">No trips found</p>
                   {searchQuery && (
-                    <p className="text-xs text-tern-gray-400 mt-1">
+                    <p className="text-xs text-ash-400 mt-1">
                       Try a different search term
                     </p>
                   )}
@@ -453,18 +453,18 @@ export function AddToTripDialog({
                         className={cn(
                           'w-full p-3 rounded-lg border text-left transition-colors',
                           isBusy
-                            ? 'border-tern-teal-500 bg-tern-teal-50'
-                            : 'hover:bg-tern-gray-50 hover:border-tern-teal-300',
-                          'focus:outline-none focus:ring-2 focus:ring-tern-teal-500',
+                            ? 'border-phoenix-gold-500 bg-phoenix-gold-50'
+                            : 'hover:bg-ash-50 hover:border-phoenix-gold-300',
+                          'focus:outline-none focus:ring-2 focus:ring-phoenix-gold-500',
                           isProcessing && !isBusy && 'opacity-50 cursor-not-allowed'
                         )}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-tern-gray-900 truncate">
+                            <p className="font-medium text-sm text-ash-900 truncate">
                               {trip.name}
                             </p>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-tern-gray-500">
+                            <div className="flex items-center gap-3 mt-1 text-xs text-ash-500">
                               {trip.startDate && (
                                 <span className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
@@ -477,9 +477,9 @@ export function AddToTripDialog({
                             </div>
                           </div>
                           {isBusy ? (
-                            <Loader2 className="h-4 w-4 text-tern-teal-600 animate-spin flex-shrink-0" />
+                            <Loader2 className="h-4 w-4 text-phoenix-gold-600 animate-spin flex-shrink-0" />
                           ) : (
-                            <ChevronRight className="h-4 w-4 text-tern-gray-400 flex-shrink-0" />
+                            <ChevronRight className="h-4 w-4 text-ash-400 flex-shrink-0" />
                           )}
                         </div>
                       </button>
@@ -516,7 +516,7 @@ export function AddToTripDialog({
               }}
             >
               <div className="space-y-2">
-                <Label className="text-xs text-tern-gray-500 uppercase tracking-wide">
+                <Label className="text-xs text-ash-500 uppercase tracking-wide">
                   Existing Itineraries
                 </Label>
                 {itineraries.map((itinerary) => {
@@ -527,8 +527,8 @@ export function AddToTripDialog({
                       className={cn(
                         'flex items-start space-x-3 p-3 rounded-lg border transition-colors cursor-pointer',
                         isSelected
-                          ? 'border-tern-teal-500 bg-tern-teal-50'
-                          : 'hover:bg-tern-gray-50'
+                          ? 'border-phoenix-gold-500 bg-phoenix-gold-50'
+                          : 'hover:bg-ash-50'
                       )}
                       onClick={() => {
                         setCreateNewItinerary(false)
@@ -547,20 +547,20 @@ export function AddToTripDialog({
                         >
                           {itinerary.name}
                         </Label>
-                        <p className="text-xs text-tern-gray-500 mt-0.5">
+                        <p className="text-xs text-ash-500 mt-0.5">
                           {itinerary.startDate && itinerary.endDate ? (
                             <>
                               {format(parseISO(itinerary.startDate), 'MMM d')} - {format(parseISO(itinerary.endDate), 'MMM d, yyyy')}
                               <span className="mx-1">•</span>
                             </>
                           ) : (
-                            <span className="text-tern-gray-400">No dates set • </span>
+                            <span className="text-ash-400">No dates set • </span>
                           )}
                           {itinerary.status}
                         </p>
                       </div>
                       {itinerary.isSelected && (
-                        <Check className="h-4 w-4 text-tern-teal-600 flex-shrink-0" />
+                        <Check className="h-4 w-4 text-phoenix-gold-600 flex-shrink-0" />
                       )}
                     </div>
                   )
@@ -569,15 +569,15 @@ export function AddToTripDialog({
 
               {/* Create New Itinerary Option */}
               <div className="pt-2">
-                <Label className="text-xs text-tern-gray-500 uppercase tracking-wide">
+                <Label className="text-xs text-ash-500 uppercase tracking-wide">
                   Or Create New
                 </Label>
                 <div
                   className={cn(
                     'flex items-start space-x-3 p-3 mt-2 rounded-lg border cursor-pointer transition-colors',
                     createNewItinerary
-                      ? 'border-tern-teal-500 bg-tern-teal-50'
-                      : 'hover:bg-tern-gray-50'
+                      ? 'border-phoenix-gold-500 bg-phoenix-gold-50'
+                      : 'hover:bg-ash-50'
                   )}
                   onClick={() => {
                     setCreateNewItinerary(true)
@@ -593,7 +593,7 @@ export function AddToTripDialog({
                       <Plus className="h-3.5 w-3.5" />
                       Create new itinerary
                     </Label>
-                    <p className="text-xs text-tern-gray-500 mt-0.5">
+                    <p className="text-xs text-ash-500 mt-0.5">
                       Will use cruise dates: {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(sailing.endDate), 'MMM d, yyyy')}
                     </p>
                     {createNewItinerary && (
@@ -621,7 +621,7 @@ export function AddToTripDialog({
             <Button
               onClick={handleAddToSelectedItinerary}
               disabled={!canProceedItinerary || isProcessing}
-              className="bg-tern-teal-600 hover:bg-tern-teal-700"
+              className="bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
             >
               {isProcessing ? (
                 <>
@@ -653,7 +653,7 @@ export function AddToTripDialog({
                 {pendingExtendParams && (
                   <div className="bg-amber-50 rounded-lg p-3 space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-tern-gray-600">Cruise dates:</span>
+                      <span className="text-ash-600">Cruise dates:</span>
                       <span className="font-medium">
                         {format(parseISO(pendingExtendParams.cruiseDates.start), 'MMM d')} -{' '}
                         {format(parseISO(pendingExtendParams.cruiseDates.end), 'MMM d, yyyy')}
@@ -661,7 +661,7 @@ export function AddToTripDialog({
                     </div>
                     {pendingExtendParams.itineraryDates.start && pendingExtendParams.itineraryDates.end && (
                       <div className="flex justify-between">
-                        <span className="text-tern-gray-600">Itinerary dates:</span>
+                        <span className="text-ash-600">Itinerary dates:</span>
                         <span className="font-medium">
                           {format(parseISO(pendingExtendParams.itineraryDates.start), 'MMM d')} -{' '}
                           {format(parseISO(pendingExtendParams.itineraryDates.end), 'MMM d, yyyy')}
@@ -682,7 +682,7 @@ export function AddToTripDialog({
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmExtend}
-              className="bg-tern-teal-600 hover:bg-tern-teal-700"
+              className="bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
               disabled={addCruiseMutation.isPending}
             >
               {addCruiseMutation.isPending ? (

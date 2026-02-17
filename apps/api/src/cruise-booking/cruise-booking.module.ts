@@ -18,12 +18,17 @@ import { TraveltekAuthService } from './services/traveltek-auth.service'
 import { FusionApiService } from './services/fusion-api.service'
 import { BookingSessionService } from './services/booking-session.service'
 import { BookingService } from './services/booking.service'
+import { ImportBookingService } from './services/import-booking.service'
 import { DatabaseModule } from '../db/database.module'
+import { TripsModule } from '../trips/trips.module'
+import { ContactsModule } from '../contacts/contacts.module'
 
 @Module({
   imports: [
     ConfigModule,
     DatabaseModule,
+    TripsModule,
+    ContactsModule,
     HttpModule.register({
       timeout: 30000, // FusionAPI can be slow for searches
       maxRedirects: 3,
@@ -35,6 +40,7 @@ import { DatabaseModule } from '../db/database.module'
     FusionApiService,
     BookingSessionService,
     BookingService,
+    ImportBookingService,
   ],
   exports: [BookingService, BookingSessionService],
 })

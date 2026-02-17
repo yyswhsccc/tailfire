@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Pencil, Save, X } from 'lucide-react'
-import { TernDashboardLayout } from '@/components/tern/layout'
+import { DashboardLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -22,8 +22,8 @@ import { useTasks } from '@/hooks/use-tasks'
 import { TaskList } from '@/app/tasks/_components/task-list'
 import { TaskFormDialog } from '@/app/tasks/_components/task-form-dialog'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
-import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'
-import { TernBadge } from '@/components/tern/core'
+import { TableSkeleton } from '@/components/shared/loading-skeleton'
+import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import type { UpdateContactDto, TaskResponseDto } from '@tailfire/shared-types/api'
 import { ContactAvatar } from '@/components/contacts/contact-avatar'
@@ -293,45 +293,45 @@ export default function ContactDetailPage() {
 
   if (isLoading) {
     return (
-      <TernDashboardLayout>
+      <DashboardLayout>
         <div className="space-y-6">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => router.push('/contacts')}
-              className="text-tern-gray-600 hover:text-tern-gray-900"
+              className="text-ash-600 hover:text-ash-900"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Contacts
             </Button>
           </div>
-          <Card className="border-tern-gray-200">
+          <Card className="border-ash-200">
             <CardContent className="p-6">
               <TableSkeleton rows={8} />
             </CardContent>
           </Card>
         </div>
-      </TernDashboardLayout>
+      </DashboardLayout>
     )
   }
 
   if (error || !contact) {
     return (
-      <TernDashboardLayout>
+      <DashboardLayout>
         <div className="space-y-6">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => router.push('/contacts')}
-              className="text-tern-gray-600 hover:text-tern-gray-900"
+              className="text-ash-600 hover:text-ash-900"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Contacts
             </Button>
           </div>
-          <Card className="border-tern-gray-200">
+          <Card className="border-ash-200">
             <CardContent className="p-6">
               <div className="text-center py-12">
                 <p className="text-red-600 mb-4">
@@ -344,12 +344,12 @@ export default function ContactDetailPage() {
             </CardContent>
           </Card>
         </div>
-      </TernDashboardLayout>
+      </DashboardLayout>
     )
   }
 
   return (
-    <TernDashboardLayout>
+    <DashboardLayout>
       <div className="space-y-6">
         {/* Back Button */}
         <div>
@@ -357,7 +357,7 @@ export default function ContactDetailPage() {
             variant="ghost"
             size="sm"
             onClick={() => router.push('/contacts')}
-            className="text-tern-gray-600 hover:text-tern-gray-900"
+            className="text-ash-600 hover:text-ash-900"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Contacts
@@ -369,7 +369,7 @@ export default function ContactDetailPage() {
           {/* Left Column - Fixed width profile sections */}
           <div className="w-96 flex-shrink-0 space-y-4">
             {/* Contact Info Card */}
-            <Card className="border-tern-gray-200">
+            <Card className="border-ash-200">
               <CardContent className="pt-6">
                 <div className="grid grid-cols-[auto_1fr] gap-4">
                   {/* Left: Avatar */}
@@ -385,40 +385,40 @@ export default function ContactDetailPage() {
                   {/* Right: Contact Info */}
                   <div className="space-y-2">
                     {/* Display Name */}
-                    <h2 className="text-lg font-semibold text-tern-gray-900">
+                    <h2 className="text-lg font-semibold text-ash-900">
                       {contact.displayName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown Contact'}
                     </h2>
 
                     {/* Email - only show if exists */}
                     {contact.email && (
-                      <p className="text-sm text-tern-gray-600">{contact.email}</p>
+                      <p className="text-sm text-ash-600">{contact.email}</p>
                     )}
 
                     {/* Badges */}
                     <div className="flex items-center gap-2 pt-1 flex-wrap">
                       {/* Contact Type Badge */}
-                      <TernBadge
+                      <Badge
                         variant={contact.contactType === 'lead' ? 'inbound' : 'secondary'}
                       >
                         {contact.contactType === 'lead' ? 'Lead' : 'Client'}
-                      </TernBadge>
+                      </Badge>
 
                       {/* Lifecycle Status Badge (skip for leads — already shown by Contact Type Badge) */}
                       {contact.contactType !== 'lead' && contact.contactStatus && (
-                        <TernBadge
+                        <Badge
                           variant={getLifecycleBadgeVariant(contact.contactType, contact.contactStatus)}
                         >
                           {getLifecycleLabel(contact.contactType, contact.contactStatus)}
-                        </TernBadge>
+                        </Badge>
                       )}
 
                       {/* Marketable Badge */}
                       {(contact.marketingEmailOptIn || contact.marketingSmsOptIn) && (
-                        <TernBadge
+                        <Badge
                           variant="planning"
                         >
                           Marketable
-                        </TernBadge>
+                        </Badge>
                       )}
                     </div>
                   </div>
@@ -427,9 +427,9 @@ export default function ContactDetailPage() {
             </Card>
 
             {/* Identity Section */}
-            <Card className="border-tern-gray-200">
+            <Card className="border-ash-200">
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-tern-gray-900">Identity</CardTitle>
+                <CardTitle className="text-sm font-semibold text-ash-900">Identity</CardTitle>
                 {editingSection === 'identity' ? (
                   <div className="flex gap-2">
                     <Button
@@ -445,7 +445,7 @@ export default function ContactDetailPage() {
                       size="sm"
                       onClick={handleSave}
                       disabled={updateContact.isPending}
-                      className="h-7 px-2 bg-tern-teal-500 hover:bg-tern-teal-600"
+                      className="h-7 px-2 bg-phoenix-gold-500 hover:bg-phoenix-gold-600"
                     >
                       <Save className="h-3.5 w-3.5 mr-1" />
                       Save
@@ -468,7 +468,7 @@ export default function ContactDetailPage() {
                 {editingSection === 'identity' ? (
                   <>
                     <div>
-                      <Label htmlFor="preferredName" className="text-xs text-tern-gray-600">Preferred Name</Label>
+                      <Label htmlFor="preferredName" className="text-xs text-ash-600">Preferred Name</Label>
                       <Input
                         id="preferredName"
                         value={formData.preferredName || ''}
@@ -477,7 +477,7 @@ export default function ContactDetailPage() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="firstName" className="text-xs text-tern-gray-600">First Name</Label>
+                      <Label htmlFor="firstName" className="text-xs text-ash-600">First Name</Label>
                       <Input
                         id="firstName"
                         value={formData.firstName || ''}
@@ -489,7 +489,7 @@ export default function ContactDetailPage() {
                       )}
                     </div>
                     <div>
-                      <Label htmlFor="lastName" className="text-xs text-tern-gray-600">Last Name</Label>
+                      <Label htmlFor="lastName" className="text-xs text-ash-600">Last Name</Label>
                       <Input
                         id="lastName"
                         value={formData.lastName || ''}
@@ -501,7 +501,7 @@ export default function ContactDetailPage() {
                       )}
                     </div>
                     <div>
-                      <Label htmlFor="legalFirstName" className="text-xs text-tern-gray-600">Legal First Name</Label>
+                      <Label htmlFor="legalFirstName" className="text-xs text-ash-600">Legal First Name</Label>
                       <Input
                         id="legalFirstName"
                         value={formData.legalFirstName || ''}
@@ -510,7 +510,7 @@ export default function ContactDetailPage() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="legalLastName" className="text-xs text-tern-gray-600">Legal Last Name</Label>
+                      <Label htmlFor="legalLastName" className="text-xs text-ash-600">Legal Last Name</Label>
                       <Input
                         id="legalLastName"
                         value={formData.legalLastName || ''}
@@ -519,7 +519,7 @@ export default function ContactDetailPage() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="pronouns" className="text-xs text-tern-gray-600">Pronouns</Label>
+                      <Label htmlFor="pronouns" className="text-xs text-ash-600">Pronouns</Label>
                       <Input
                         id="pronouns"
                         value={formData.pronouns || ''}
@@ -532,23 +532,23 @@ export default function ContactDetailPage() {
                 ) : (
                   <>
                     <div>
-                      <p className="text-xs text-tern-gray-600">Display Name</p>
-                      <p className="text-sm text-tern-gray-900">{contact.displayName || '-'}</p>
+                      <p className="text-xs text-ash-600">Display Name</p>
+                      <p className="text-sm text-ash-900">{contact.displayName || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-tern-gray-600">Legal Name</p>
-                      <p className="text-sm text-tern-gray-900">{contact.legalFullName || '-'}</p>
+                      <p className="text-xs text-ash-600">Legal Name</p>
+                      <p className="text-sm text-ash-900">{contact.legalFullName || '-'}</p>
                     </div>
                     {contact.preferredName && (
                       <div>
-                        <p className="text-xs text-tern-gray-600">Preferred Name</p>
-                        <p className="text-sm text-tern-gray-900">{contact.preferredName}</p>
+                        <p className="text-xs text-ash-600">Preferred Name</p>
+                        <p className="text-sm text-ash-900">{contact.preferredName}</p>
                       </div>
                     )}
                     {contact.pronouns && (
                       <div>
-                        <p className="text-xs text-tern-gray-600">Pronouns</p>
-                        <p className="text-sm text-tern-gray-900">{contact.pronouns}</p>
+                        <p className="text-xs text-ash-600">Pronouns</p>
+                        <p className="text-sm text-ash-900">{contact.pronouns}</p>
                       </div>
                     )}
                   </>
@@ -557,9 +557,9 @@ export default function ContactDetailPage() {
             </Card>
 
             {/* Contact Section */}
-            <Card className="border-tern-gray-200">
+            <Card className="border-ash-200">
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-tern-gray-900">Contact</CardTitle>
+                <CardTitle className="text-sm font-semibold text-ash-900">Contact</CardTitle>
                 {editingSection === 'contact' ? (
                   <div className="flex gap-2">
                     <Button
@@ -575,7 +575,7 @@ export default function ContactDetailPage() {
                       size="sm"
                       onClick={handleSave}
                       disabled={updateContact.isPending}
-                      className="h-7 px-2 bg-tern-teal-500 hover:bg-tern-teal-600"
+                      className="h-7 px-2 bg-phoenix-gold-500 hover:bg-phoenix-gold-600"
                     >
                       <Save className="h-3.5 w-3.5 mr-1" />
                       Save
@@ -598,7 +598,7 @@ export default function ContactDetailPage() {
                 {editingSection === 'contact' ? (
                   <>
                     <div>
-                      <Label htmlFor="email" className="text-xs text-tern-gray-600">Email</Label>
+                      <Label htmlFor="email" className="text-xs text-ash-600">Email</Label>
                       <Input
                         id="email"
                         type="email"
@@ -611,7 +611,7 @@ export default function ContactDetailPage() {
                       )}
                     </div>
                     <div>
-                      <Label htmlFor="phone" className="text-xs text-tern-gray-600">Phone</Label>
+                      <Label htmlFor="phone" className="text-xs text-ash-600">Phone</Label>
                       <Input
                         id="phone"
                         type="tel"
@@ -627,12 +627,12 @@ export default function ContactDetailPage() {
                 ) : (
                   <>
                     <div>
-                      <p className="text-xs text-tern-gray-600">Email</p>
-                      <p className="text-sm text-tern-gray-900">{contact.email || '-'}</p>
+                      <p className="text-xs text-ash-600">Email</p>
+                      <p className="text-sm text-ash-900">{contact.email || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-tern-gray-600">Phone</p>
-                      <p className="text-sm text-tern-gray-900">{contact.phone || '-'}</p>
+                      <p className="text-xs text-ash-600">Phone</p>
+                      <p className="text-sm text-ash-900">{contact.phone || '-'}</p>
                     </div>
                   </>
                 )}
@@ -640,9 +640,9 @@ export default function ContactDetailPage() {
             </Card>
 
             {/* Professional Section */}
-            <Card className="border-tern-gray-200">
+            <Card className="border-ash-200">
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-tern-gray-900">Professional</CardTitle>
+                <CardTitle className="text-sm font-semibold text-ash-900">Professional</CardTitle>
                 {editingSection === 'professional' ? (
                   <div className="flex gap-2">
                     <Button
@@ -658,7 +658,7 @@ export default function ContactDetailPage() {
                       size="sm"
                       onClick={handleSave}
                       disabled={updateContact.isPending}
-                      className="h-7 px-2 bg-tern-teal-500 hover:bg-tern-teal-600"
+                      className="h-7 px-2 bg-phoenix-gold-500 hover:bg-phoenix-gold-600"
                     >
                       <Save className="h-3.5 w-3.5 mr-1" />
                       Save
@@ -681,7 +681,7 @@ export default function ContactDetailPage() {
                 {editingSection === 'professional' ? (
                   <>
                     <div>
-                      <Label htmlFor="contactType" className="text-xs text-tern-gray-600">Type</Label>
+                      <Label htmlFor="contactType" className="text-xs text-ash-600">Type</Label>
                       <Select
                         value={formData.contactType || 'lead'}
                         onValueChange={(value) => setFormData({ ...formData, contactType: value as 'lead' | 'client' })}
@@ -696,7 +696,7 @@ export default function ContactDetailPage() {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="contactStatus" className="text-xs text-tern-gray-600">Status</Label>
+                      <Label htmlFor="contactStatus" className="text-xs text-ash-600">Status</Label>
                       <Select
                         value={formData.contactStatus || 'prospecting'}
                         onValueChange={(value) => setFormData({ ...formData, contactStatus: value as any })}
@@ -719,12 +719,12 @@ export default function ContactDetailPage() {
                 ) : (
                   <>
                     <div>
-                      <p className="text-xs text-tern-gray-600">Type</p>
-                      <p className="text-sm text-tern-gray-900 capitalize">{contact.contactType || '-'}</p>
+                      <p className="text-xs text-ash-600">Type</p>
+                      <p className="text-sm text-ash-900 capitalize">{contact.contactType || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-tern-gray-600">Status</p>
-                      <p className="text-sm text-tern-gray-900">{getLifecycleLabel(contact.contactType, contact.contactStatus)}</p>
+                      <p className="text-xs text-ash-600">Status</p>
+                      <p className="text-sm text-ash-900">{getLifecycleLabel(contact.contactType, contact.contactStatus)}</p>
                     </div>
                   </>
                 )}
@@ -732,9 +732,9 @@ export default function ContactDetailPage() {
             </Card>
 
             {/* Personal Section */}
-            <Card className="border-tern-gray-200">
+            <Card className="border-ash-200">
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-tern-gray-900">Personal</CardTitle>
+                <CardTitle className="text-sm font-semibold text-ash-900">Personal</CardTitle>
                 {editingSection === 'personal' ? (
                   <div className="flex gap-2">
                     <Button
@@ -750,7 +750,7 @@ export default function ContactDetailPage() {
                       size="sm"
                       onClick={handleSave}
                       disabled={updateContact.isPending}
-                      className="h-7 px-2 bg-tern-teal-500 hover:bg-tern-teal-600"
+                      className="h-7 px-2 bg-phoenix-gold-500 hover:bg-phoenix-gold-600"
                     >
                       <Save className="h-3.5 w-3.5 mr-1" />
                       Save
@@ -773,7 +773,7 @@ export default function ContactDetailPage() {
                 {editingSection === 'personal' ? (
                   <>
                     <div>
-                      <Label htmlFor="dateOfBirth" className="text-xs text-tern-gray-600">Date of Birth</Label>
+                      <Label htmlFor="dateOfBirth" className="text-xs text-ash-600">Date of Birth</Label>
                       <DatePickerEnhanced
                         value={formData.dateOfBirth || null}
                         onChange={(date) => setFormData({ ...formData, dateOfBirth: date || '' })}
@@ -782,7 +782,7 @@ export default function ContactDetailPage() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="maritalStatus" className="text-xs text-tern-gray-600">Marital Status</Label>
+                      <Label htmlFor="maritalStatus" className="text-xs text-ash-600">Marital Status</Label>
                       <Select
                         value={formData.maritalStatus || ''}
                         onValueChange={(value) => setFormData({ ...formData, maritalStatus: value })}
@@ -800,7 +800,7 @@ export default function ContactDetailPage() {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="gender" className="text-xs text-tern-gray-600">Gender</Label>
+                      <Label htmlFor="gender" className="text-xs text-ash-600">Gender</Label>
                       <Select
                         value={formData.gender || ''}
                         onValueChange={(value) => setFormData({ ...formData, gender: value })}
@@ -821,20 +821,20 @@ export default function ContactDetailPage() {
                   <>
                     {contact.dateOfBirth && (
                       <div>
-                        <p className="text-xs text-tern-gray-600">Date of Birth</p>
-                        <p className="text-sm text-tern-gray-900">{contact.dateOfBirth}</p>
+                        <p className="text-xs text-ash-600">Date of Birth</p>
+                        <p className="text-sm text-ash-900">{contact.dateOfBirth}</p>
                       </div>
                     )}
                     {contact.maritalStatus && (
                       <div>
-                        <p className="text-xs text-tern-gray-600">Marital Status</p>
-                        <p className="text-sm text-tern-gray-900 capitalize">{contact.maritalStatus.replace('_', ' ')}</p>
+                        <p className="text-xs text-ash-600">Marital Status</p>
+                        <p className="text-sm text-ash-900 capitalize">{contact.maritalStatus.replace('_', ' ')}</p>
                       </div>
                     )}
                     {contact.gender && (
                       <div>
-                        <p className="text-xs text-tern-gray-600">Gender</p>
-                        <p className="text-sm text-tern-gray-900 capitalize">{contact.gender}</p>
+                        <p className="text-xs text-ash-600">Gender</p>
+                        <p className="text-sm text-ash-900 capitalize">{contact.gender}</p>
                       </div>
                     )}
                   </>
@@ -843,9 +843,9 @@ export default function ContactDetailPage() {
             </Card>
 
             {/* Address Section */}
-            <Card className="border-tern-gray-200">
+            <Card className="border-ash-200">
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-tern-gray-900">Address</CardTitle>
+                <CardTitle className="text-sm font-semibold text-ash-900">Address</CardTitle>
                 {editingSection === 'address' ? (
                   <div className="flex gap-2">
                     <Button
@@ -861,7 +861,7 @@ export default function ContactDetailPage() {
                       size="sm"
                       onClick={handleSave}
                       disabled={updateContact.isPending}
-                      className="h-7 px-2 bg-tern-teal-500 hover:bg-tern-teal-600"
+                      className="h-7 px-2 bg-phoenix-gold-500 hover:bg-phoenix-gold-600"
                     >
                       <Save className="h-3.5 w-3.5 mr-1" />
                       Save
@@ -884,7 +884,7 @@ export default function ContactDetailPage() {
                 {editingSection === 'address' ? (
                   <>
                     <div>
-                      <Label htmlFor="addressLine1" className="text-xs text-tern-gray-600">Address Line 1</Label>
+                      <Label htmlFor="addressLine1" className="text-xs text-ash-600">Address Line 1</Label>
                       <Input
                         id="addressLine1"
                         value={formData.addressLine1 || ''}
@@ -893,7 +893,7 @@ export default function ContactDetailPage() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="addressLine2" className="text-xs text-tern-gray-600">Address Line 2</Label>
+                      <Label htmlFor="addressLine2" className="text-xs text-ash-600">Address Line 2</Label>
                       <Input
                         id="addressLine2"
                         value={formData.addressLine2 || ''}
@@ -903,7 +903,7 @@ export default function ContactDetailPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="city" className="text-xs text-tern-gray-600">City</Label>
+                        <Label htmlFor="city" className="text-xs text-ash-600">City</Label>
                         <Input
                           id="city"
                           value={formData.city || ''}
@@ -912,7 +912,7 @@ export default function ContactDetailPage() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="province" className="text-xs text-tern-gray-600">Province</Label>
+                        <Label htmlFor="province" className="text-xs text-ash-600">Province</Label>
                         <Input
                           id="province"
                           value={formData.province || ''}
@@ -923,7 +923,7 @@ export default function ContactDetailPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="postalCode" className="text-xs text-tern-gray-600">Postal Code</Label>
+                        <Label htmlFor="postalCode" className="text-xs text-ash-600">Postal Code</Label>
                         <Input
                           id="postalCode"
                           value={formData.postalCode || ''}
@@ -932,7 +932,7 @@ export default function ContactDetailPage() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="country" className="text-xs text-tern-gray-600">Country</Label>
+                        <Label htmlFor="country" className="text-xs text-ash-600">Country</Label>
                         <Input
                           id="country"
                           value={formData.country || ''}
@@ -946,36 +946,36 @@ export default function ContactDetailPage() {
                   <>
                     {contact.addressLine1 && (
                       <div>
-                        <p className="text-xs text-tern-gray-600">Street</p>
-                        <p className="text-sm text-tern-gray-900">{contact.addressLine1}</p>
-                        {contact.addressLine2 && <p className="text-sm text-tern-gray-900">{contact.addressLine2}</p>}
+                        <p className="text-xs text-ash-600">Street</p>
+                        <p className="text-sm text-ash-900">{contact.addressLine1}</p>
+                        {contact.addressLine2 && <p className="text-sm text-ash-900">{contact.addressLine2}</p>}
                       </div>
                     )}
                     <div className="grid grid-cols-2 gap-3">
                       {contact.city && (
                         <div>
-                          <p className="text-xs text-tern-gray-600">City</p>
-                          <p className="text-sm text-tern-gray-900">{contact.city}</p>
+                          <p className="text-xs text-ash-600">City</p>
+                          <p className="text-sm text-ash-900">{contact.city}</p>
                         </div>
                       )}
                       {contact.province && (
                         <div>
-                          <p className="text-xs text-tern-gray-600">Province</p>
-                          <p className="text-sm text-tern-gray-900">{contact.province}</p>
+                          <p className="text-xs text-ash-600">Province</p>
+                          <p className="text-sm text-ash-900">{contact.province}</p>
                         </div>
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       {contact.postalCode && (
                         <div>
-                          <p className="text-xs text-tern-gray-600">Postal Code</p>
-                          <p className="text-sm text-tern-gray-900">{contact.postalCode}</p>
+                          <p className="text-xs text-ash-600">Postal Code</p>
+                          <p className="text-sm text-ash-900">{contact.postalCode}</p>
                         </div>
                       )}
                       {contact.country && (
                         <div>
-                          <p className="text-xs text-tern-gray-600">Country</p>
-                          <p className="text-sm text-tern-gray-900">{contact.country}</p>
+                          <p className="text-xs text-ash-600">Country</p>
+                          <p className="text-sm text-ash-900">{contact.country}</p>
                         </div>
                       )}
                     </div>
@@ -985,9 +985,9 @@ export default function ContactDetailPage() {
             </Card>
 
             {/* Lifecycle & Status Section */}
-            <Card className="border-tern-gray-200">
+            <Card className="border-ash-200">
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-tern-gray-900">Lifecycle & Status</CardTitle>
+                <CardTitle className="text-sm font-semibold text-ash-900">Lifecycle & Status</CardTitle>
                 {editingSection === 'lifecycle' ? (
                   <div className="flex gap-2">
                     <Button
@@ -1003,7 +1003,7 @@ export default function ContactDetailPage() {
                       size="sm"
                       onClick={handleSave}
                       disabled={updateContact.isPending}
-                      className="h-7 px-2 bg-tern-teal-500 hover:bg-tern-teal-600"
+                      className="h-7 px-2 bg-phoenix-gold-500 hover:bg-phoenix-gold-600"
                     >
                       <Save className="h-3.5 w-3.5 mr-1" />
                       Save
@@ -1024,27 +1024,27 @@ export default function ContactDetailPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <p className="text-xs text-tern-gray-600">Lifecycle Stage</p>
-                  <TernBadge variant={getLifecycleBadgeVariant(contact.contactType, contact.contactStatus)}>
+                  <p className="text-xs text-ash-600">Lifecycle Stage</p>
+                  <Badge variant={getLifecycleBadgeVariant(contact.contactType, contact.contactStatus)}>
                     {getLifecycleLabel(contact.contactType, contact.contactStatus)}
-                  </TernBadge>
+                  </Badge>
                 </div>
                 {contact.becameClientAt && (
                   <div>
-                    <p className="text-xs text-tern-gray-600">Became Client</p>
-                    <p className="text-sm text-tern-gray-900">{new Date(contact.becameClientAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-ash-600">Became Client</p>
+                    <p className="text-sm text-ash-900">{new Date(contact.becameClientAt).toLocaleDateString()}</p>
                   </div>
                 )}
                 {editingSection === 'lifecycle' ? (
                   <div className="space-y-2">
-                    <p className="text-xs text-tern-gray-600">Marketing Consent</p>
+                    <p className="text-xs text-ash-600">Marketing Consent</p>
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="marketingEmailOptIn"
                         checked={formData.marketingEmailOptIn || false}
                         onCheckedChange={(checked) => setFormData({ ...formData, marketingEmailOptIn: checked as boolean })}
                       />
-                      <Label htmlFor="marketingEmailOptIn" className="text-sm text-tern-gray-900 font-normal">
+                      <Label htmlFor="marketingEmailOptIn" className="text-sm text-ash-900 font-normal">
                         Email
                       </Label>
                     </div>
@@ -1054,7 +1054,7 @@ export default function ContactDetailPage() {
                         checked={formData.marketingSmsOptIn || false}
                         onCheckedChange={(checked) => setFormData({ ...formData, marketingSmsOptIn: checked as boolean })}
                       />
-                      <Label htmlFor="marketingSmsOptIn" className="text-sm text-tern-gray-900 font-normal">
+                      <Label htmlFor="marketingSmsOptIn" className="text-sm text-ash-900 font-normal">
                         SMS
                       </Label>
                     </div>
@@ -1064,20 +1064,20 @@ export default function ContactDetailPage() {
                         checked={formData.marketingPhoneOptIn || false}
                         onCheckedChange={(checked) => setFormData({ ...formData, marketingPhoneOptIn: checked as boolean })}
                       />
-                      <Label htmlFor="marketingPhoneOptIn" className="text-sm text-tern-gray-900 font-normal">
+                      <Label htmlFor="marketingPhoneOptIn" className="text-sm text-ash-900 font-normal">
                         Phone
                       </Label>
                     </div>
                   </div>
                 ) : (
                   <div>
-                    <p className="text-xs text-tern-gray-600">Marketing Consent</p>
+                    <p className="text-xs text-ash-600">Marketing Consent</p>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {contact.marketingEmailOptIn && <TernBadge variant="teal">Email</TernBadge>}
-                      {contact.marketingSmsOptIn && <TernBadge variant="teal">SMS</TernBadge>}
-                      {contact.marketingPhoneOptIn && <TernBadge variant="teal">Phone</TernBadge>}
+                      {contact.marketingEmailOptIn && <Badge variant="teal">Email</Badge>}
+                      {contact.marketingSmsOptIn && <Badge variant="teal">SMS</Badge>}
+                      {contact.marketingPhoneOptIn && <Badge variant="teal">Phone</Badge>}
                       {!contact.marketingEmailOptIn && !contact.marketingSmsOptIn && !contact.marketingPhoneOptIn && (
-                        <span className="text-sm text-tern-gray-500">None</span>
+                        <span className="text-sm text-ash-500">None</span>
                       )}
                     </div>
                   </div>
@@ -1097,7 +1097,7 @@ export default function ContactDetailPage() {
           {/* Right Column - Dynamic tabbed content */}
           <div className="flex-1 min-w-0 flex flex-col gap-4">
             {/* Navigation Header */}
-            <div className="bg-white border border-tern-gray-200 rounded-lg">
+            <div className="bg-white border border-ash-200 rounded-lg">
               <ContactNavigation
                 activeSection={activeSection}
                 onSectionChange={setActiveSection}
@@ -1105,11 +1105,11 @@ export default function ContactDetailPage() {
             </div>
 
             {/* Dynamic Content Area */}
-            <div className="bg-white border border-tern-gray-200 rounded-lg">
+            <div className="bg-white border border-ash-200 rounded-lg">
               {activeSection === 'timeline' && (
                 <Card>
                   <CardHeader>
-                    <h2 className="text-lg font-semibold text-tern-gray-900">Activity Timeline</h2>
+                    <h2 className="text-lg font-semibold text-ash-900">Activity Timeline</h2>
                   </CardHeader>
                   <CardContent>
                     <ContactActivityFeed contactId={contactId} limit={20} showLoadMore={true} />
@@ -1214,14 +1214,14 @@ export default function ContactDetailPage() {
                             <div className="min-w-0">
                               <p className="font-medium truncate">{trip.name}</p>
                               <div className="flex items-center gap-2 mt-1">
-                                <TernBadge variant={trip.status === 'booked' ? 'booked' : trip.status === 'completed' ? 'completed' : 'secondary'}>
+                                <Badge variant={trip.status === 'booked' ? 'booked' : trip.status === 'completed' ? 'completed' : 'secondary'}>
                                   {trip.status}
-                                </TernBadge>
+                                </Badge>
                                 {trip.tripType && (
                                   <span className="text-xs text-muted-foreground">{trip.tripType}</span>
                                 )}
                                 {trip.isPrimaryContact && (
-                                  <TernBadge variant="inbound">Primary</TernBadge>
+                                  <Badge variant="inbound">Primary</Badge>
                                 )}
                               </div>
                             </div>
@@ -1277,6 +1277,6 @@ export default function ContactDetailPage() {
         task={editingTask}
         contactId={contactId}
       />
-    </TernDashboardLayout>
+    </DashboardLayout>
   )
 }

@@ -509,7 +509,7 @@ export function EditItineraryDialog({
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Name */}
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Name *
             </label>
             <Input
@@ -518,7 +518,7 @@ export function EditItineraryDialog({
               placeholder="e.g., Option A - Luxury Experience"
               autoFocus
             />
-            <p className="text-xs text-tern-gray-500 mt-1">
+            <p className="text-xs text-ash-500 mt-1">
               Give this itinerary option a descriptive name
             </p>
           </div>
@@ -526,7 +526,7 @@ export function EditItineraryDialog({
           {/* Travel Dates */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Start Date
               </label>
               <DatePickerEnhanced
@@ -538,7 +538,7 @@ export function EditItineraryDialog({
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 End Date
               </label>
               <DatePickerEnhanced
@@ -551,12 +551,12 @@ export function EditItineraryDialog({
             </div>
           </div>
           {tripStartDate && tripEndDate && (
-            <p className="text-xs text-tern-gray-500 -mt-3">
+            <p className="text-xs text-ash-500 -mt-3">
               Dates must be within trip dates: {tripStartDate} to {tripEndDate}
             </p>
           )}
           {(!tripStartDate || !tripEndDate) && (
-            <p className="text-xs text-tern-gray-500 -mt-3">
+            <p className="text-xs text-ash-500 -mt-3">
               Optional: Set travel dates for this itinerary
             </p>
           )}
@@ -572,11 +572,11 @@ export function EditItineraryDialog({
             <Label htmlFor="editIncludePreTravel" className="text-sm cursor-pointer">
               Include Pre-Travel Day (Day 0)
               {(createDay.isPending || deleteDay.isPending) && (
-                <span className="ml-2 text-tern-gray-400">Saving...</span>
+                <span className="ml-2 text-ash-400">Saving...</span>
               )}
             </Label>
           </div>
-          <p className="text-xs text-tern-gray-500 -mt-3">
+          <p className="text-xs text-ash-500 -mt-3">
             {hasPreTravel
               ? 'Uncheck to remove Day 0 from the itinerary'
               : 'Check to add a Day 0 for pre-trip information'}
@@ -584,7 +584,7 @@ export function EditItineraryDialog({
 
           {/* Cover Photo */}
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Cover Photo
             </label>
 
@@ -595,7 +595,7 @@ export function EditItineraryDialog({
                   <img
                     src={formData.coverPhoto}
                     alt="Cover photo preview"
-                    className="h-32 w-48 object-cover rounded-lg border border-tern-gray-200"
+                    className="h-32 w-48 object-cover rounded-lg border border-ash-200"
                   />
                   <Button
                     type="button"
@@ -641,14 +641,14 @@ export function EditItineraryDialog({
                 <Upload className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-xs text-tern-gray-500 mt-1">
+            <p className="text-xs text-ash-500 mt-1">
               Optional: Add a cover photo for this itinerary option
             </p>
           </div>
 
           {/* Overview Statement */}
           <div>
-            <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+            <label className="text-sm font-medium text-ash-900 block mb-2">
               Overview Statement
             </label>
             <Textarea
@@ -657,7 +657,7 @@ export function EditItineraryDialog({
               placeholder="Describe this itinerary option for travelers..."
               rows={6}
             />
-            <p className="text-xs text-tern-gray-500 mt-1">
+            <p className="text-xs text-ash-500 mt-1">
               Optional: Write a brief overview of what makes this itinerary special
             </p>
           </div>
@@ -665,7 +665,7 @@ export function EditItineraryDialog({
           {/* Destinations */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Primary Destination
               </label>
               <LocationAutocomplete
@@ -673,12 +673,12 @@ export function EditItineraryDialog({
                 onChange={setPrimaryDestination}
                 placeholder="Main destination..."
               />
-              <p className="text-xs text-tern-gray-500 mt-1">
+              <p className="text-xs text-ash-500 mt-1">
                 Default location for itinerary days
               </p>
             </div>
             <div>
-              <label className="text-sm font-medium text-tern-gray-900 block mb-2">
+              <label className="text-sm font-medium text-ash-900 block mb-2">
                 Secondary Destination
               </label>
               <LocationAutocomplete
@@ -703,7 +703,7 @@ export function EditItineraryDialog({
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="bg-tern-teal-500 hover:bg-tern-teal-600 text-white"
+              className="bg-phoenix-gold-500 hover:bg-phoenix-gold-600 text-white"
             >
               <Check className="h-4 w-4 mr-2" />
               {isSubmitting ? 'Saving...' : 'Save Changes'}

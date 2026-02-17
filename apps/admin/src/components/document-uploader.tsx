@@ -411,7 +411,7 @@ export function DocumentUploader(props: DocumentUploaderProps | LegacyDocumentUp
     <div className="space-y-4">
       {/* Document type selector */}
       <div className="flex items-center gap-4">
-        <label className="text-sm font-medium text-tern-gray-700">{docTypeLabel}:</label>
+        <label className="text-sm font-medium text-ash-700">{docTypeLabel}:</label>
         <Select value={selectedType} onValueChange={setSelectedType}>
           <SelectTrigger className="w-48">
             <SelectValue />
@@ -433,8 +433,8 @@ export function DocumentUploader(props: DocumentUploaderProps | LegacyDocumentUp
           transition-colors duration-200
           ${
             isDragging
-              ? 'border-tern-blue-500 bg-tern-blue-50'
-              : 'border-tern-gray-300 hover:border-tern-gray-400'
+              ? 'border-blue-500 bg-blue-50'
+              : 'border-ash-300 hover:border-ash-400'
           }
         `}
         onDragOver={handleDragOver}
@@ -451,24 +451,24 @@ export function DocumentUploader(props: DocumentUploaderProps | LegacyDocumentUp
           onChange={(e) => handleFiles(e.target.files)}
         />
 
-        <Upload className="mx-auto h-8 w-8 text-tern-gray-400" />
-        <p className="mt-2 text-sm text-tern-gray-600">
+        <Upload className="mx-auto h-8 w-8 text-ash-400" />
+        <p className="mt-2 text-sm text-ash-600">
           {isDragging ? (
             'Drop files here...'
           ) : (
             <>
-              <span className="font-medium text-tern-blue-600">Click to upload</span> or drag and
+              <span className="font-medium text-blue-600">Click to upload</span> or drag and
               drop
             </>
           )}
         </p>
-        <p className="mt-1 text-xs text-tern-gray-500">
+        <p className="mt-1 text-xs text-ash-500">
           PDF, DOC, XLS, JPG, PNG up to 10MB
         </p>
 
         {uploadMutation.isPending && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg">
-            <Loader2 className="h-6 w-6 animate-spin text-tern-blue-500" />
+            <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
           </div>
         )}
       </div>
@@ -490,7 +490,7 @@ export function DocumentUploader(props: DocumentUploaderProps | LegacyDocumentUp
       {/* Documents list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-4">
-          <Loader2 className="h-5 w-5 animate-spin text-tern-gray-400" />
+          <Loader2 className="h-5 w-5 animate-spin text-ash-400" />
         </div>
       ) : fetchError ? (
         <div className="text-sm text-red-600">Failed to load documents</div>
@@ -503,18 +503,18 @@ export function DocumentUploader(props: DocumentUploaderProps | LegacyDocumentUp
 
           return filteredDocuments.length > 0 ? (
             <div className="space-y-2">
-              <h4 className="text-sm font-medium text-tern-gray-700">
+              <h4 className="text-sm font-medium text-ash-700">
                 Uploaded Documents ({filteredDocuments.length})
               </h4>
-              <div className="divide-y divide-tern-gray-100 rounded-lg border border-tern-gray-200">
+              <div className="divide-y divide-ash-100 rounded-lg border border-ash-200">
                 {filteredDocuments.map((rawDoc) => {
                   const doc = normalizeDoc(rawDoc)
                   return (
                     <div
                       key={doc.id}
-                      className="flex items-center gap-3 p-3 hover:bg-tern-gray-50"
+                      className="flex items-center gap-3 p-3 hover:bg-ash-50"
                     >
-                      <div className="flex-shrink-0 text-tern-gray-400">
+                      <div className="flex-shrink-0 text-ash-400">
                         {getFileIcon(doc.fileName)}
                       </div>
                       <div className="flex-grow min-w-0">
@@ -525,12 +525,12 @@ export function DocumentUploader(props: DocumentUploaderProps | LegacyDocumentUp
                             fileSize: doc.fileSize,
                             documentType: doc.documentType,
                           })}
-                          className="text-sm font-medium text-tern-gray-900 truncate hover:text-tern-blue-600 hover:underline text-left block w-full"
+                          className="text-sm font-medium text-ash-900 truncate hover:text-blue-600 hover:underline text-left block w-full"
                           title="Click to preview"
                         >
                           {doc.fileName}
                         </button>
-                        <p className="text-xs text-tern-gray-500">
+                        <p className="text-xs text-ash-500">
                           {doc.documentType && (
                             <span className="capitalize">{doc.documentType}</span>
                           )}
@@ -592,13 +592,13 @@ export function DocumentUploader(props: DocumentUploaderProps | LegacyDocumentUp
               </div>
             </div>
           ) : (
-            <p className="text-sm text-tern-gray-500 text-center py-2">
+            <p className="text-sm text-ash-500 text-center py-2">
               No documents uploaded yet
             </p>
           )
         })()
       ) : (
-        <p className="text-sm text-tern-gray-500 text-center py-2">
+        <p className="text-sm text-ash-500 text-center py-2">
           No documents uploaded yet
         </p>
       )}

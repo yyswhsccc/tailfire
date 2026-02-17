@@ -192,6 +192,21 @@ The public schema contains all application data:
 | `service_fees` | Service fees via Stripe Connect |
 | `trip_orders` | Versioned trip order JSON snapshots |
 
+### Import Booking Fields (custom_cruise_details)
+
+The `custom_cruise_details` table was extended with import-specific columns for storing data from imported cruise bookings:
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `cabin_location` | varchar | Ship location (Mid-ship, Aft, Forward) |
+| `dining_preferences` | jsonb | Seating, table size, smoking preferences |
+| `selected_extras` | jsonb | Array of beverage packages, wifi, excursions |
+| `selected_promotions` | jsonb | Applied promotion codes |
+| `traveltek_booking_id` | bigint | Traveltek booking ID for re-sync |
+| `traveltek_portfolio_id` | bigint | Traveltek portfolio ID for re-sync |
+
+**Migration**: `20260216120000_add_import_fields_to_cruise_details.sql`
+
 ### Cruise Booking Sessions (FusionAPI Integration)
 
 | Table | Purpose |
@@ -470,6 +485,7 @@ Tailfire uses **Drizzle-only** migrations:
 | `20251231300000_enable_rls_policies.sql` | Row-level security |
 | `20260107000000_enable_rls_api_lockdown.sql` | RLS lockdown |
 | `20251231200000_jwt_custom_claims_hook.sql` | JWT claim injection |
+| `20260216120000_add_import_fields_to_cruise_details.sql` | Import booking fields for custom_cruise_details |
 
 ### Migration Execution
 

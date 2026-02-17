@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { Plus, Search } from 'lucide-react'
-import { TernDashboardLayout } from '@/components/tern/layout'
-import { PageHeader } from '@/components/tern/shared'
-import { TernButton } from '@/components/tern/core'
+import { useRouter } from 'next/navigation'
+import { Plus, Search, Download } from 'lucide-react'
+import { DashboardLayout } from '@/components/layout'
+import { PageHeader } from '@/components/shared'
+import { Button } from '@/components/ui/button'
 import {
   useTrips,
   useBulkDeleteTrips,
@@ -19,21 +20,21 @@ import {
   TripsBulkActions,
   TripsPagination,
   type TripsViewMode,
-} from '@/components/tern/trips'
+} from '@/components/trips'
 import { TripFormDialog } from './_components/trip-form-dialog'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { EmptyState } from '@/components/tern/shared'
-import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'
+import { EmptyState } from '@/components/shared'
+import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { useToast } from '@/hooks/use-toast'
 import type { TripFilterDto } from '@tailfire/shared-types/api'
 import type { TripStatus } from '@tailfire/shared-types'
 
 /**
- * Tern-styled Trips Page
+ * Trips Page
  * Supports both Kanban and Table views with bulk operations
  */
 export default function TernTripsPage() {
+  const router = useRouter()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [viewMode, setViewMode] = useState<TripsViewMode>('kanban')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -163,7 +164,7 @@ export default function TernTripsPage() {
   }
 
   return (
-    <TernDashboardLayout>
+    <DashboardLayout>
       {/* Page Header */}
       <PageHeader
         title="Trips"
@@ -192,10 +193,19 @@ export default function TernTripsPage() {
               />
             </div>
 
-            <TernButton onClick={() => setIsCreateOpen(true)} size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/trips/import')}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Import Booking
+            </Button>
+
+            <Button onClick={() => setIsCreateOpen(true)} size="sm">
               <Plus className="mr-2 h-4 w-4" />
               New Trip
-            </TernButton>
+            </Button>
           </div>
         }
       />
@@ -278,6 +288,6 @@ export default function TernTripsPage() {
         onOpenChange={setIsCreateOpen}
         mode="create"
       />
-    </TernDashboardLayout>
+    </DashboardLayout>
   )
 }

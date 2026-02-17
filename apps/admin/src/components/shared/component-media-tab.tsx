@@ -10,8 +10,8 @@
 import { useState, useCallback } from 'react'
 import { ImageIcon, Plus, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { TernCard } from '@/components/tern/core'
-import { EmptyState } from '@/components/tern/shared/empty-state'
+import { Card } from '@/components/ui/card'
+import { EmptyState } from './empty-state'
 import {
   Dialog,
   DialogContent,
@@ -96,24 +96,24 @@ export function ComponentMediaTab({
   // Loading state
   if (isLoading) {
     return (
-      <TernCard>
+      <Card className="p-6">
         <div className="py-12 text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-tern-gray-400 mx-auto mb-4" />
-          <p className="text-tern-gray-500">Loading media...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-ash-400 mx-auto mb-4" />
+          <p className="text-ash-500">Loading media...</p>
         </div>
-      </TernCard>
+      </Card>
     )
   }
 
   return (
     <div className="space-y-6">
       {/* Gallery Section */}
-      <TernCard>
+      <Card className="p-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-tern-gray-900">{title}</h2>
-              <p className="text-sm text-tern-gray-600">{description}</p>
+              <h2 className="text-lg font-semibold text-ash-900">{title}</h2>
+              <p className="text-sm text-ash-600">{description}</p>
             </div>
             <Button onClick={() => setShowAddMediaDialog(true)} size="sm">
               <Plus className="h-4 w-4 mr-2" />
@@ -143,7 +143,7 @@ export function ComponentMediaTab({
             />
           )}
         </div>
-      </TernCard>
+      </Card>
 
       {/* Add Media Dialog */}
       <Dialog open={showAddMediaDialog} onOpenChange={setShowAddMediaDialog}>
@@ -213,7 +213,7 @@ interface MediaCardProps {
 
 function MediaCard({ media, onDelete }: MediaCardProps) {
   return (
-    <div className="group relative aspect-square overflow-hidden rounded-lg border border-tern-gray-200">
+    <div className="group relative aspect-square overflow-hidden rounded-lg border border-ash-200">
       <img
         src={media.fileUrl}
         alt={media.caption || 'Photo'}

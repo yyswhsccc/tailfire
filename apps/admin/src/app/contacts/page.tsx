@@ -2,15 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, SlidersHorizontal } from 'lucide-react'
-import { TernDashboardLayout } from '@/components/tern/layout'
-import { PageHeader } from '@/components/tern/shared'
-import { TernButton } from '@/components/tern/core'
+import { DashboardLayout } from '@/components/layout'
+import { PageHeader } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useContacts, useDeleteContact } from '@/hooks/use-contacts'
 import { ContactsTable } from './_components/contacts-table'
 import { QuickContactDialog } from './_components/quick-contact-dialog'
-import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'
+import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { useToast } from '@/hooks/use-toast'
 
 export default function ContactsPage() {
@@ -55,7 +54,7 @@ export default function ContactsPage() {
   }
 
   return (
-    <TernDashboardLayout>
+    <DashboardLayout>
       {/* Page Header */}
       <PageHeader
         title="Contacts"
@@ -72,16 +71,16 @@ export default function ContactsPage() {
               onChange={(e) => setSearchInput(e.target.value)}
               className="w-64"
             />
-            <TernButton onClick={() => setIsCreateOpen(true)} size="sm">
+            <Button onClick={() => setIsCreateOpen(true)} size="sm">
               <Plus className="mr-2 h-4 w-4" />
               New Contact
-            </TernButton>
+            </Button>
           </div>
         }
       />
 
       {/* Content */}
-      <div className="bg-white border border-tern-gray-200 rounded-lg">
+      <div className="bg-white border border-ash-200 rounded-lg">
         {error ? (
           <div className="text-center py-12">
             <p className="text-destructive mb-4">
@@ -93,12 +92,12 @@ export default function ContactsPage() {
           <TableSkeleton rows={limit} />
         ) : !data?.data || data.data.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-tern-gray-500">
+            <p className="text-ash-500">
               {debouncedSearch ? `No contacts found matching "${debouncedSearch}"` : 'No contacts found'}
             </p>
             {!debouncedSearch && (
               <Button
-                className="mt-4 bg-tern-teal-500 hover:bg-tern-teal-600 text-white"
+                className="mt-4 bg-phoenix-gold-500 hover:bg-phoenix-gold-600 text-white"
                 onClick={() => setIsCreateOpen(true)}
               >
                 <Plus className="mr-2 h-4 w-4" />
@@ -113,8 +112,8 @@ export default function ContactsPage() {
               onDelete={handleDelete}
             />
             {data.pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-3 border-t border-tern-gray-200">
-                <p className="text-sm text-tern-gray-600">
+              <div className="flex items-center justify-between px-6 py-3 border-t border-ash-200">
+                <p className="text-sm text-ash-600">
                   Showing {data.pagination.total} contact{data.pagination.total === 1 ? '' : 's'}
                 </p>
                 <div className="flex items-center gap-2">
@@ -126,7 +125,7 @@ export default function ContactsPage() {
                   >
                     ←
                   </Button>
-                  <span className="text-sm text-tern-gray-700">
+                  <span className="text-sm text-ash-700">
                     {data.pagination.page}
                   </span>
                   <Button
@@ -148,6 +147,6 @@ export default function ContactsPage() {
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
       />
-    </TernDashboardLayout>
+    </DashboardLayout>
   )
 }

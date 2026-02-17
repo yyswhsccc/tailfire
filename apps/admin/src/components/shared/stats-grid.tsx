@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { TernCard } from '../core/tern-card'
+import { Card } from '@/components/ui/card'
 
 interface StatCardProps {
   title: string
@@ -14,16 +14,16 @@ interface StatCardProps {
 }
 
 /**
- * Tern Stat Card
+ * Stat Card
  * Individual KPI card for dashboard stats
  */
 export function StatCard({ title, value, icon, trend, className }: StatCardProps) {
   return (
-    <TernCard className={cn('p-5', className)}>
+    <Card className={cn('p-5', className)}>
       <div className="flex items-start justify-between">
         <div className="space-y-1">
-          <p className="text-sm font-medium text-tern-gray-500">{title}</p>
-          <p className="text-2xl font-bold text-tern-gray-900">{value}</p>
+          <p className="text-sm font-medium text-ash-500">{title}</p>
+          <p className="text-2xl font-bold text-ash-900">{value}</p>
           {trend && (
             <p
               className={cn(
@@ -36,12 +36,12 @@ export function StatCard({ title, value, icon, trend, className }: StatCardProps
           )}
         </div>
         {icon && (
-          <div className="rounded-md bg-tern-teal-50 p-2 text-tern-teal-600">
+          <div className="rounded-md bg-phoenix-gold-50 p-2 text-phoenix-gold-600">
             {icon}
           </div>
         )}
       </div>
-    </TernCard>
+    </Card>
   )
 }
 
@@ -52,7 +52,7 @@ interface StatsGridProps {
 }
 
 /**
- * Tern Stats Grid
+ * Stats Grid
  * Responsive grid container for stat cards
  */
 export function StatsGrid({

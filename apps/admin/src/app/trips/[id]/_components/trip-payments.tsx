@@ -17,7 +17,7 @@ import { TripResponseDto, ActivityResponseDto } from '@tailfire/shared-types'
 import { useItineraries } from '@/hooks/use-itineraries'
 import { useItineraryDaysWithActivities } from '@/hooks/use-itinerary-days'
 import { PaymentsDataTable } from '@/components/payments/payments-data-table'
-import { EmptyState } from '@/components/tern/shared/empty-state'
+import { EmptyState } from '@/components/shared/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Activity } from 'lucide-react'
 

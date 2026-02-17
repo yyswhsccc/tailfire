@@ -122,12 +122,12 @@ export function StripeConnectCard({ agencyId }: StripeConnectCardProps) {
       <CardContent className="space-y-4">
         {/* Status Details */}
         {status === 'not_connected' ? (
-          <div className="p-4 border border-dashed border-tern-gray-200 rounded-lg text-center">
-            <CreditCard className="mx-auto h-12 w-12 text-tern-gray-400" />
-            <h4 className="mt-4 text-sm font-medium text-tern-gray-900">
+          <div className="p-4 border border-dashed border-ash-200 rounded-lg text-center">
+            <CreditCard className="mx-auto h-12 w-12 text-ash-400" />
+            <h4 className="mt-4 text-sm font-medium text-ash-900">
               Connect your Stripe account
             </h4>
-            <p className="mt-1 text-sm text-tern-gray-500">
+            <p className="mt-1 text-sm text-ash-500">
               Enable payment collection by connecting to Stripe.
             </p>
             <Button
@@ -169,8 +169,8 @@ export function StripeConnectCard({ agencyId }: StripeConnectCardProps) {
           <div className="space-y-4">
             {/* Account Status */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-tern-gray-50 rounded-lg">
-                <p className="text-sm text-tern-gray-500">Charges</p>
+              <div className="p-3 bg-ash-50 rounded-lg">
+                <p className="text-sm text-ash-500">Charges</p>
                 <p className="flex items-center gap-2 font-medium">
                   {stripeStatus?.chargesEnabled ? (
                     <>
@@ -185,8 +185,8 @@ export function StripeConnectCard({ agencyId }: StripeConnectCardProps) {
                   )}
                 </p>
               </div>
-              <div className="p-3 bg-tern-gray-50 rounded-lg">
-                <p className="text-sm text-tern-gray-500">Payouts</p>
+              <div className="p-3 bg-ash-50 rounded-lg">
+                <p className="text-sm text-ash-500">Payouts</p>
                 <p className="flex items-center gap-2 font-medium">
                   {stripeStatus?.payoutsEnabled ? (
                     <>

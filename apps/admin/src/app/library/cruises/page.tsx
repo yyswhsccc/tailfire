@@ -252,13 +252,13 @@ function CruiseLibraryContent() {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <Ship className="h-8 w-8 text-tern-teal-600" />
-            <h1 className="text-2xl font-bold text-tern-gray-900">Cruise Library</h1>
+            <Ship className="h-8 w-8 text-phoenix-gold-600" />
+            <h1 className="text-2xl font-bold text-ash-900">Cruise Library</h1>
           </div>
-          <p className="mt-1 text-sm text-tern-gray-500">
+          <p className="mt-1 text-sm text-ash-500">
             {hasTripContext && itinerary?.startDate && itinerary?.endDate ? (
               <>
-                Showing cruises that fit within your itinerary dates: <span className="font-medium text-tern-teal-600">{itinerary.startDate}</span> to <span className="font-medium text-tern-teal-600">{itinerary.endDate}</span>
+                Showing cruises that fit within your itinerary dates: <span className="font-medium text-phoenix-gold-600">{itinerary.startDate}</span> to <span className="font-medium text-phoenix-gold-600">{itinerary.endDate}</span>
               </>
             ) : (
               'Browse and add cruises from our sailing database'
@@ -283,7 +283,7 @@ function CruiseLibraryContent() {
 
       {/* Results Header */}
       <div className="flex items-center justify-between">
-        <div className="text-sm text-tern-gray-500">
+        <div className="text-sm text-ash-500">
           {isLoading ? (
             <span className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -304,7 +304,7 @@ function CruiseLibraryContent() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-tern-gray-500">Sort by:</span>
+          <span className="text-sm text-ash-500">Sort by:</span>
           <Select value={sortValue} onValueChange={handleSortChange}>
             <SelectTrigger className="w-[180px]">
               <SelectValue />
@@ -327,24 +327,24 @@ function CruiseLibraryContent() {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-64 bg-tern-gray-100 rounded-lg animate-pulse" />
+            <div key={i} className="h-64 bg-ash-100 rounded-lg animate-pulse" />
           ))}
         </div>
       ) : error ? (
         <div className="text-center py-12">
           <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-          <h3 className="mt-2 text-sm font-medium text-tern-gray-900">Error loading cruises</h3>
-          <p className="mt-1 text-sm text-tern-gray-500">
+          <h3 className="mt-2 text-sm font-medium text-ash-900">Error loading cruises</h3>
+          <p className="mt-1 text-sm text-ash-500">
             Please try again later or contact support if the problem persists.
           </p>
         </div>
       ) : !allSailings.length ? (
         <div className="text-center py-12">
-          <Ship className="mx-auto h-12 w-12 text-tern-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-tern-gray-900">No cruises found</h3>
+          <Ship className="mx-auto h-12 w-12 text-ash-400" />
+          <h3 className="mt-2 text-sm font-medium text-ash-900">No cruises found</h3>
           {hasTripContext && itinerary?.startDate && itinerary?.endDate ? (
             <div className="mt-2 space-y-2">
-              <p className="text-sm text-tern-gray-500">
+              <p className="text-sm text-ash-500">
                 No cruises are available that depart and return within your itinerary dates
                 ({itinerary.startDate} to {itinerary.endDate}).
               </p>
@@ -353,7 +353,7 @@ function CruiseLibraryContent() {
               </p>
             </div>
           ) : (
-            <p className="mt-1 text-sm text-tern-gray-500">
+            <p className="mt-1 text-sm text-ash-500">
               Try adjusting your filters or search criteria.
             </p>
           )}
@@ -373,14 +373,14 @@ function CruiseLibraryContent() {
           {/* Infinite Scroll Sentinel */}
           <div ref={loadMoreRef} className="flex justify-center py-8">
             {isFetchingNextPage ? (
-              <div className="flex items-center gap-2 text-tern-gray-500">
+              <div className="flex items-center gap-2 text-ash-500">
                 <Loader2 className="h-5 w-5 animate-spin" />
                 <span>Loading more cruises...</span>
               </div>
             ) : hasNextPage ? (
-              <span className="text-sm text-tern-gray-400">Scroll for more</span>
+              <span className="text-sm text-ash-400">Scroll for more</span>
             ) : allSailings.length > 0 ? (
-              <span className="text-sm text-tern-gray-400">
+              <span className="text-sm text-ash-400">
                 You&apos;ve seen all {totalItems.toLocaleString()} cruises
               </span>
             ) : null}
@@ -415,23 +415,23 @@ function CruiseLibraryLoading() {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <Ship className="h-8 w-8 text-tern-teal-600" />
-            <h1 className="text-2xl font-bold text-tern-gray-900">Cruise Library</h1>
+            <Ship className="h-8 w-8 text-phoenix-gold-600" />
+            <h1 className="text-2xl font-bold text-ash-900">Cruise Library</h1>
           </div>
-          <p className="mt-1 text-sm text-tern-gray-500">
+          <p className="mt-1 text-sm text-ash-500">
             Browse and add cruises from our sailing database
           </p>
         </div>
       </div>
 
       {/* Loading Skeleton */}
-      <div className="bg-white border border-tern-gray-200 rounded-lg p-4">
-        <div className="h-10 bg-tern-gray-100 rounded animate-pulse" />
+      <div className="bg-white border border-ash-200 rounded-lg p-4">
+        <div className="h-10 bg-ash-100 rounded animate-pulse" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-64 bg-tern-gray-100 rounded-lg animate-pulse" />
+          <div key={i} className="h-64 bg-ash-100 rounded-lg animate-pulse" />
         ))}
       </div>
     </div>

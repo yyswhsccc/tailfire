@@ -16,7 +16,7 @@ import {
   FOCUS_VISIBLE_RING,
 } from '@/lib/itinerary-styles'
 import { Button } from '@/components/ui/button'
-import { TernBadge } from '@/components/tern/core'
+import { Badge } from '@/components/ui/badge'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { ActivityListItem } from './activity-list-item'
@@ -96,20 +96,20 @@ export function DayColumn({ day, itineraryId, filteredActivities, hideHeader, cr
       <div className={cn(COLUMN_WIDTH, ITINERARY_CARD_STYLES, 'p-0')}>
         {/* Day Header - only shown when not using separate DayHeadersRow */}
         {!hideHeader && (
-          <div className="group p-3 border-b border-tern-gray-200">
+          <div className="group p-3 border-b border-ash-200">
             <div className="flex items-center justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="font-medium text-sm text-tern-gray-900">
+                  <p className="font-medium text-sm text-ash-900">
                     {dayHeaderTitle}
                   </p>
-                  <TernBadge variant="secondary">
+                  <Badge variant="secondary">
                     {activities.length}
-                  </TernBadge>
+                  </Badge>
                 </div>
                 {day.title && (
                   <p
-                    className="text-xs text-tern-gray-500 truncate mt-0.5"
+                    className="text-xs text-ash-500 truncate mt-0.5"
                     title={day.title}
                   >
                     {day.title}
@@ -126,7 +126,7 @@ export function DayColumn({ day, itineraryId, filteredActivities, hideHeader, cr
                   FOCUS_VISIBLE_RING
                 )}
               >
-                <Pencil className="h-3.5 w-3.5 text-tern-gray-500" />
+                <Pencil className="h-3.5 w-3.5 text-ash-500" />
               </Button>
             </div>
           </div>
@@ -168,7 +168,7 @@ export function DayColumn({ day, itineraryId, filteredActivities, hideHeader, cr
             size="sm"
             aria-label="Add activity"
             className={cn(
-              'w-full mt-2 h-8 text-tern-gray-500 hover:text-tern-gray-900 hover:bg-tern-gray-50',
+              'w-full mt-2 h-8 text-ash-500 hover:text-ash-900 hover:bg-ash-50',
               FOCUS_VISIBLE_RING
             )}
           >

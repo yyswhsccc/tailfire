@@ -11,14 +11,18 @@
  */
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Download } from 'lucide-react'
 import type { TripWithDetailsResponseDto, ItineraryResponseDto } from '@tailfire/shared-types'
 import { PackagesTable } from '@/components/packages/packages-table'
+import { Button } from '@/components/ui/button'
 import { useItineraries, useSelectItinerary } from '@/hooks/use-itineraries'
 import { useToast } from '@/hooks/use-toast'
 import { ItinerarySelector } from './itinerary-selector'
 import { CreateItineraryDialog } from './create-itinerary-dialog'
 
 export function TripPackages({ trip }: { trip: TripWithDetailsResponseDto }) {
+  const router = useRouter()
   const currency = trip.currency || 'CAD'
   const { toast } = useToast()
 
@@ -78,18 +82,30 @@ export function TripPackages({ trip }: { trip: TripWithDetailsResponseDto }) {
 
   return (
     <div className="space-y-3">
-      {/* Itinerary Selector (read-only on Bookings page - no Create/Import buttons) */}
-      <ItinerarySelector
-        tripId={trip.id}
-        tripStartDate={trip.startDate}
-        tripEndDate={trip.endDate}
-        itineraries={itineraries}
-        selectedItinerary={selectedItinerary}
-        onSelectItinerary={handleSelectItinerary}
-        onCreateClick={() => setShowCreateDialog(true)}
-        isLoading={itinerariesLoading}
-        hideActionButtons
-      />
+      {/* Itinerary Selector + Import Button */}
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <ItinerarySelector
+            tripId={trip.id}
+            tripStartDate={trip.startDate}
+            tripEndDate={trip.endDate}
+            itineraries={itineraries}
+            selectedItinerary={selectedItinerary}
+            onSelectItinerary={handleSelectItinerary}
+            onCreateClick={() => setShowCreateDialog(true)}
+            isLoading={itinerariesLoading}
+            hideActionButtons
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push(`/trips/import?tripId=${trip.id}`)}
+        >
+          <Download className="h-4 w-4 mr-1.5" />
+          Import Booking
+        </Button>
+      </div>
 
       {/* Bookings Table with Overview */}
       <PackagesTable

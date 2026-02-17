@@ -4,7 +4,7 @@ import { useMemo, useEffect, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { CalendarDays, Plus } from 'lucide-react'
 import { useLoading } from '@/context/loading-context'
-import { TernDetailLayout } from '@/components/tern/layout'
+import { DetailLayout } from '@/components/layout'
 import { FlightForm } from '../../_components/flight-form'
 import { CustomCruiseForm } from '../../_components/custom-cruise-form'
 import { LodgingForm } from '../../_components/lodging-form'
@@ -221,11 +221,11 @@ function ActivityTypeSelector({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-tern-gray-200 p-6">
-      <h2 className="text-lg font-semibold text-tern-gray-900 mb-2">
+    <div className="bg-white rounded-lg border border-ash-200 p-6">
+      <h2 className="text-lg font-semibold text-ash-900 mb-2">
         Select Activity Type
       </h2>
-      <p className="text-sm text-tern-gray-500 mb-6">
+      <p className="text-sm text-ash-500 mb-6">
         Choose the type of activity you want to add
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -239,9 +239,9 @@ function ActivityTypeSelector({
               onClick={() => handleSelectType(type as UIActivityType)}
               className={cn(
                 'flex flex-col items-center gap-2 p-4 rounded-lg',
-                'border border-tern-gray-200',
-                'hover:bg-tern-gray-50 hover:border-tern-gray-300',
-                'focus:outline-none focus:ring-2 focus:ring-tern-teal-500 focus:ring-offset-2',
+                'border border-ash-200',
+                'hover:bg-ash-50 hover:border-ash-300',
+                'focus:outline-none focus:ring-2 focus:ring-phoenix-gold-500 focus:ring-offset-2',
                 'transition-all'
               )}
             >
@@ -253,7 +253,7 @@ function ActivityTypeSelector({
               >
                 <Icon className="h-5 w-5" />
               </div>
-              <span className="text-sm font-medium text-tern-gray-700">
+              <span className="text-sm font-medium text-ash-700">
                 {metadata.label}
               </span>
             </button>
@@ -337,78 +337,78 @@ export default function NewActivityPage() {
   // Case 1: Standard mode requires dayId (except packages which are trip-scoped)
   if (!pendingDay && activityType !== 'package' && !dayId) {
     return (
-      <TernDetailLayout
+      <DetailLayout
         backHref={`/trips/${tripId}?tab=itinerary`}
         backLabel="Back to Itinerary"
         sidebarSections={sidebarSections}
       >
         <div className="p-6">
-          <p className="text-tern-gray-600">Day ID is required to create an activity.</p>
+          <p className="text-ash-600">Day ID is required to create an activity.</p>
         </div>
-      </TernDetailLayout>
+      </DetailLayout>
     )
   }
 
   // Case 2: Pending day mode with no days - show empty state with CTA
   if (pendingDay && (!days || days.length === 0)) {
     return (
-      <TernDetailLayout
+      <DetailLayout
         backHref={`/trips/${tripId}?tab=itinerary`}
         backLabel="Back to Itinerary"
         sidebarSections={sidebarSections}
       >
         <div className="p-6">
-          <div className="border-b border-tern-gray-200 pb-6 mb-6">
-            <h1 className="text-2xl font-bold text-tern-gray-900 mb-2">Add Activity</h1>
-            <p className="text-sm text-tern-gray-600">
+          <div className="border-b border-ash-200 pb-6 mb-6">
+            <h1 className="text-2xl font-bold text-ash-900 mb-2">Add Activity</h1>
+            <p className="text-sm text-ash-600">
               Select a date for this activity
             </p>
           </div>
 
-          <div className="text-center py-12 border-2 border-dashed border-tern-gray-200 rounded-lg">
-            <CalendarDays className="h-12 w-12 mx-auto mb-4 text-tern-gray-400" />
-            <h3 className="text-lg font-medium text-tern-gray-900 mb-2">
+          <div className="text-center py-12 border-2 border-dashed border-ash-200 rounded-lg">
+            <CalendarDays className="h-12 w-12 mx-auto mb-4 text-ash-400" />
+            <h3 className="text-lg font-medium text-ash-900 mb-2">
               No Days Available
             </h3>
-            <p className="text-sm text-tern-gray-500 mb-4 max-w-md mx-auto">
+            <p className="text-sm text-ash-500 mb-4 max-w-md mx-auto">
               This itinerary doesn&apos;t have any days yet. Generate days based on trip dates to add activities.
             </p>
             {trip?.startDate && trip?.endDate ? (
               <Button
                 onClick={handleGenerateDays}
                 disabled={isGenerating || daysLoading}
-                className="bg-tern-teal-500 hover:bg-tern-teal-600 text-white"
+                className="bg-phoenix-gold-500 hover:bg-phoenix-gold-600 text-white"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 {isGenerating ? 'Generating...' : 'Generate Days'}
               </Button>
             ) : (
-              <p className="text-xs text-tern-gray-400">
+              <p className="text-xs text-ash-400">
                 Set trip dates first to generate days automatically.
               </p>
             )}
           </div>
         </div>
-      </TernDetailLayout>
+      </DetailLayout>
     )
   }
 
   return (
-    <TernDetailLayout
+    <DetailLayout
       backHref={`/trips/${tripId}?tab=itinerary`}
       backLabel="Back to Itinerary"
       sidebarSections={sidebarSections}
     >
       <div className="p-6">
         {/* Header */}
-        <div className="border-b border-tern-gray-200 pb-6 mb-6">
-          <h1 className="text-2xl font-bold text-tern-gray-900 mb-2">Add Activity</h1>
+        <div className="border-b border-ash-200 pb-6 mb-6">
+          <h1 className="text-2xl font-bold text-ash-900 mb-2">Add Activity</h1>
           {pendingDay ? (
-            <p className="text-sm text-tern-gray-600">
+            <p className="text-sm text-ash-600">
               Select a date below to assign this activity to the appropriate day
             </p>
           ) : day ? (
-            <p className="text-sm text-tern-gray-600">
+            <p className="text-sm text-ash-600">
               {day.title || `Day ${day.dayNumber}`}
               {day.date && parseISODate(day.date) && (
                 <span className="ml-2">• {parseISODate(day.date)!.toLocaleDateString()}</span>
@@ -439,6 +439,6 @@ export default function NewActivityPage() {
           />
         )}
       </div>
-    </TernDetailLayout>
+    </DetailLayout>
   )
 }

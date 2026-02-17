@@ -35,7 +35,7 @@ import { EditTravelersDialog } from './edit-travelers-dialog'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
 import { DocumentUploader } from '@/components/document-uploader'
-import { ComponentMediaTab } from '@/components/tern/shared'
+import { ComponentMediaTab } from '@/components/shared'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { type PricingData } from '@/lib/pricing'
@@ -813,7 +813,7 @@ export function OptionsForm({
                   {pendingDay && (
                     <div className="mt-2">
                       {availabilityStartDateValue && matchedDay ? (
-                        <p className="text-sm text-tern-teal-700 flex items-center gap-1.5">
+                        <p className="text-sm text-phoenix-gold-700 flex items-center gap-1.5">
                           <Check className="h-4 w-4" />
                           This option will be added to <strong>Day {matchedDay.dayNumber}</strong>
                         </p>

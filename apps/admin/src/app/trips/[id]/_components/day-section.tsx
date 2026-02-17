@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ItineraryDayWithActivitiesDto } from '@tailfire/shared-types/api'
-import { TernCard } from '@/components/tern/core'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   DndContext,
@@ -114,29 +114,29 @@ export function DaySection({ day, itineraryId, cruiseColorMap }: DaySectionProps
   }
 
   return (
-    <TernCard
+    <Card
       ref={setDroppableRef}
-      className={`overflow-hidden transition-all duration-200 ${
-        isOver ? 'ring-2 ring-tern-teal-500 ring-offset-2 bg-tern-teal-50/30' : ''
+      className={`p-6 overflow-hidden transition-all duration-200 ${
+        isOver ? 'ring-2 ring-phoenix-gold-500 ring-offset-2 bg-phoenix-gold-50/30' : ''
       }`}
     >
       {/* Day Header */}
       <div
-        className="flex items-center justify-between cursor-pointer hover:bg-tern-gray-50 p-6 -m-6 mb-0"
+        className="flex items-center justify-between cursor-pointer hover:bg-ash-50 p-6 -m-6 mb-0"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-4">
           {isExpanded ? (
-            <ChevronUp className="h-5 w-5 text-tern-gray-400" />
+            <ChevronUp className="h-5 w-5 text-ash-400" />
           ) : (
-            <ChevronDown className="h-5 w-5 text-tern-gray-400" />
+            <ChevronDown className="h-5 w-5 text-ash-400" />
           )}
           <div>
-            <h3 className="text-lg font-semibold text-tern-gray-900">
+            <h3 className="text-lg font-semibold text-ash-900">
               {day.title || `Day ${day.dayNumber}`}
             </h3>
             {day.date && parseISODate(day.date) && (
-              <p className="text-sm text-tern-gray-500">
+              <p className="text-sm text-ash-500">
                 {parseISODate(day.date)!.toLocaleDateString('en-US', {
                   weekday: 'long',
                   month: 'long',
@@ -149,7 +149,7 @@ export function DaySection({ day, itineraryId, cruiseColorMap }: DaySectionProps
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm text-tern-gray-500">
+          <span className="text-sm text-ash-500">
             {hasActivities ? `${localActivities.length} activities` : 'No activities'}
           </span>
         </div>
@@ -184,8 +184,8 @@ export function DaySection({ day, itineraryId, cruiseColorMap }: DaySectionProps
               </SortableContext>
             </DndContext>
           ) : (
-            <div className="text-center py-8 border-2 border-dashed border-tern-gray-200 rounded-lg">
-              <p className="text-sm text-tern-gray-400">No activities for this day</p>
+            <div className="text-center py-8 border-2 border-dashed border-ash-200 rounded-lg">
+              <p className="text-sm text-ash-400">No activities for this day</p>
             </div>
           )}
 
@@ -215,7 +215,7 @@ export function DaySection({ day, itineraryId, cruiseColorMap }: DaySectionProps
                 variant="outline"
                 size="sm"
                 onClick={(e) => e.stopPropagation()}
-                className="w-full border-dashed border-tern-gray-300 hover:border-tern-teal-500 hover:bg-tern-teal-50 hover:text-tern-teal-700"
+                className="w-full border-dashed border-ash-300 hover:border-phoenix-gold-500 hover:bg-phoenix-gold-50 hover:text-phoenix-gold-700"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Activity
@@ -224,6 +224,6 @@ export function DaySection({ day, itineraryId, cruiseColorMap }: DaySectionProps
           </div>
         </div>
       )}
-    </TernCard>
+    </Card>
   )
 }

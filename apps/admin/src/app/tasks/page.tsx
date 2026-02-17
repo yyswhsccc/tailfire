@@ -2,13 +2,12 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { Plus, Search } from 'lucide-react'
-import { TernDashboardLayout } from '@/components/tern/layout'
-import { PageHeader } from '@/components/tern/shared'
-import { TernButton } from '@/components/tern/core'
-import { Input } from '@/components/ui/input'
+import { DashboardLayout } from '@/components/layout'
+import { PageHeader } from '@/components/shared'
 import { Button } from '@/components/ui/button'
-import { EmptyState } from '@/components/tern/shared'
-import { TableSkeleton } from '@/components/tern/shared/loading-skeleton'
+import { Input } from '@/components/ui/input'
+import { EmptyState } from '@/components/shared'
+import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { useTasks } from '@/hooks/use-tasks'
 import { TaskList, TaskFormDialog, TaskFilters } from './_components'
 import type { TaskFilterDto, TaskResponseDto } from '@tailfire/shared-types/api'
@@ -78,7 +77,7 @@ export default function TasksPage() {
     filters.isOverdue
 
   return (
-    <TernDashboardLayout>
+    <DashboardLayout>
       {/* Page Header */}
       <PageHeader
         title="Tasks"
@@ -102,10 +101,10 @@ export default function TasksPage() {
               />
             </div>
 
-            <TernButton onClick={() => setIsCreateOpen(true)} size="sm">
+            <Button onClick={() => setIsCreateOpen(true)} size="sm">
               <Plus className="mr-2 h-4 w-4" />
               New Task
-            </TernButton>
+            </Button>
           </div>
         }
       />
@@ -189,6 +188,6 @@ export default function TasksPage() {
         onOpenChange={handleDialogClose}
         task={selectedTask}
       />
-    </TernDashboardLayout>
+    </DashboardLayout>
   )
 }

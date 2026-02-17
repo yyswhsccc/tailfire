@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { Menu } from 'lucide-react'
-import { TernTopNav } from './tern-top-nav'
-import { TernDetailSidebar, type SidebarSection, type BackLink } from './tern-detail-sidebar'
+import { TopNav } from './top-nav'
+import { DetailSidebar, type SidebarSection, type BackLink } from './detail-sidebar'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -13,7 +13,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 
-interface TernDetailLayoutProps {
+interface DetailLayoutProps {
   children: React.ReactNode
   backHref: string
   backLabel: string
@@ -21,27 +21,22 @@ interface TernDetailLayoutProps {
   sidebarSections: SidebarSection[]
 }
 
-/**
- * Tern Detail Layout
- * Layout for detail views with top nav + left sidebar (e.g., trip detail, contact detail)
- * Includes mobile drawer navigation for smaller screens
- */
-export function TernDetailLayout({
+export function DetailLayout({
   children,
   backHref,
   backLabel,
   additionalBackLinks,
   sidebarSections,
-}: TernDetailLayoutProps) {
+}: DetailLayoutProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-white">
-      <TernTopNav />
+      <TopNav />
       <div className="flex h-[calc(100vh-3.5rem)]">
         {/* Desktop sidebar - hidden on mobile */}
         <div className="hidden md:flex md:h-full">
-          <TernDetailSidebar
+          <DetailSidebar
             backHref={backHref}
             backLabel={backLabel}
             additionalBackLinks={additionalBackLinks}
@@ -55,7 +50,7 @@ export function TernDetailLayout({
             <Button
               variant="ghost"
               size="icon"
-              className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full bg-tern-teal-600 text-white shadow-lg hover:bg-tern-teal-700 md:hidden"
+              className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full bg-phoenix-gold-600 text-white shadow-lg hover:bg-phoenix-gold-700 md:hidden"
               aria-label="Open navigation menu"
             >
               <Menu className="h-6 w-6" />
@@ -65,7 +60,7 @@ export function TernDetailLayout({
             <SheetHeader className="sr-only">
               <SheetTitle>Navigation</SheetTitle>
             </SheetHeader>
-            <TernDetailSidebar
+            <DetailSidebar
               backHref={backHref}
               backLabel={backLabel}
               additionalBackLinks={additionalBackLinks}

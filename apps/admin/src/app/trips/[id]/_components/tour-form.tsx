@@ -41,7 +41,7 @@ import { useMyProfile } from '@/hooks/use-user-profile'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
 import { DocumentUploader } from '@/components/document-uploader'
-import { ComponentMediaTab } from '@/components/tern/shared'
+import { ComponentMediaTab } from '@/components/shared'
 import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
 import { ChildOfPackageBookingSection } from '@/components/activities/child-of-package-booking-section'
 import { useMarkActivityBooked } from '@/hooks/use-activity-bookings'
@@ -970,7 +970,7 @@ export function TourForm({
                 {pendingDay && (
                   <div className="mt-2">
                     {tourDateValue && matchedDay ? (
-                      <p className="text-sm text-tern-teal-700 flex items-center gap-1.5">
+                      <p className="text-sm text-phoenix-gold-700 flex items-center gap-1.5">
                         <Check className="h-4 w-4" />
                         This tour will be added to <strong>Day {matchedDay.dayNumber}</strong>
                       </p>

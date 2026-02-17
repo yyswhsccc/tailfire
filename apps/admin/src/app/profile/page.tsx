@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react'
 import { Loader2 } from 'lucide-react'
-import { TernDashboardLayout } from '@/components/tern/layout'
+import { DashboardLayout } from '@/components/layout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -154,12 +154,12 @@ function ProfilePageLoading() {
 
 export default function ProfilePage() {
   return (
-    <TernDashboardLayout>
+    <DashboardLayout>
       <Suspense fallback={<ProfilePageLoading />}>
         <ProfileFormProvider defaultTab="public">
           <ProfileContent />
         </ProfileFormProvider>
       </Suspense>
-    </TernDashboardLayout>
+    </DashboardLayout>
   )
 }

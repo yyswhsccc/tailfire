@@ -91,7 +91,7 @@ export function CalendarNavbarPopover() {
       <HoverCardTrigger asChild>
         <Button variant="ghost" size="icon" className="h-8 w-8 relative" asChild>
           <Link href="/calendar">
-            <Calendar className="h-4 w-4 text-tern-gray-600" />
+            <Calendar className="h-4 w-4 text-ash-600" />
             {eventCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-phoenix-gold-500 text-[10px] text-white flex items-center justify-center font-medium">
                 {eventCount > 9 ? '9+' : eventCount}

@@ -130,7 +130,7 @@ export function SaveAsTemplateDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Library className="h-5 w-5 text-tern-teal-600" />
+            <Library className="h-5 w-5 text-phoenix-gold-600" />
             Save {typeLabel} as Template
           </DialogTitle>
           <DialogDescription>

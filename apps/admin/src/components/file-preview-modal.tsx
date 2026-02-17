@@ -123,7 +123,7 @@ export function FilePreviewModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="px-6 py-4 border-b border-tern-gray-200 flex-shrink-0">
+        <DialogHeader className="px-6 py-4 border-b border-ash-200 flex-shrink-0">
           <DialogDescription className="sr-only">
             Preview of {file.fileName}
           </DialogDescription>
@@ -132,7 +132,7 @@ export function FilePreviewModal({
               <DialogTitle className="text-base font-medium truncate">
                 {file.fileName}
               </DialogTitle>
-              <p className="text-xs text-tern-gray-500 mt-0.5">
+              <p className="text-xs text-ash-500 mt-0.5">
                 {file.documentType && (
                   <span className="capitalize">{file.documentType}</span>
                 )}
@@ -152,7 +152,7 @@ export function FilePreviewModal({
                   >
                     <ZoomOut className="h-4 w-4" />
                   </Button>
-                  <span className="text-xs text-tern-gray-500 w-12 text-center">
+                  <span className="text-xs text-ash-500 w-12 text-center">
                     {imageZoom}%
                   </span>
                   <Button
@@ -172,7 +172,7 @@ export function FilePreviewModal({
                   >
                     <RotateCw className="h-4 w-4" />
                   </Button>
-                  <div className="w-px h-4 bg-tern-gray-200" />
+                  <div className="w-px h-4 bg-ash-200" />
                 </>
               )}
               <Button
@@ -198,7 +198,7 @@ export function FilePreviewModal({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-auto bg-tern-gray-50 min-h-0">
+        <div className="flex-1 overflow-auto bg-ash-50 min-h-0">
           {canPreview ? (
             <div className="h-full flex items-center justify-center p-4">
               {/* Image Preview */}
@@ -206,7 +206,7 @@ export function FilePreviewModal({
                 <div className="relative w-full h-full flex items-center justify-center overflow-auto">
                   {isLoading && (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-tern-gray-400" />
+                      <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
                     </div>
                   )}
                   <img
@@ -230,7 +230,7 @@ export function FilePreviewModal({
                 <div className="w-full h-full min-h-[500px]">
                   {isLoading && (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-tern-gray-400" />
+                      <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
                     </div>
                   )}
                   <iframe
@@ -251,14 +251,14 @@ export function FilePreviewModal({
                 <div className="w-full h-full overflow-auto">
                   {isLoading ? (
                     <div className="flex items-center justify-center h-full">
-                      <Loader2 className="h-8 w-8 animate-spin text-tern-gray-400" />
+                      <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
                     </div>
                   ) : error ? (
                     <div className="flex items-center justify-center h-full text-red-500">
                       {error}
                     </div>
                   ) : (
-                    <pre className="p-4 text-sm font-mono whitespace-pre-wrap break-words bg-white rounded-lg border border-tern-gray-200">
+                    <pre className="p-4 text-sm font-mono whitespace-pre-wrap break-words bg-white rounded-lg border border-ash-200">
                       {textContent}
                     </pre>
                   )}
@@ -284,17 +284,17 @@ export function FilePreviewModal({
           ) : (
             /* No Preview Available */
             <div className="h-full flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
-              <div className="rounded-full bg-tern-gray-100 p-4 mb-4">
+              <div className="rounded-full bg-ash-100 p-4 mb-4">
                 {getFileExtension(file.fileName) === 'pdf' ? (
-                  <FileText className="h-8 w-8 text-tern-gray-400" />
+                  <FileText className="h-8 w-8 text-ash-400" />
                 ) : (
-                  <File className="h-8 w-8 text-tern-gray-400" />
+                  <File className="h-8 w-8 text-ash-400" />
                 )}
               </div>
-              <h3 className="text-lg font-medium text-tern-gray-900 mb-1">
+              <h3 className="text-lg font-medium text-ash-900 mb-1">
                 Preview not available
               </h3>
-              <p className="text-sm text-tern-gray-500 mb-4">
+              <p className="text-sm text-ash-500 mb-4">
                 {file.downloadUrl
                   ? 'This file type cannot be previewed in the browser.'
                   : 'No download URL available for this file.'}

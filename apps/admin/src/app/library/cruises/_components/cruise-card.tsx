@@ -46,13 +46,13 @@ export function CruiseCard({ sailing, onSelect }: CruiseCardProps) {
     <Card
       className={cn(
         'group cursor-pointer overflow-hidden transition-all duration-200',
-        'hover:shadow-lg hover:border-tern-teal-300',
-        'focus-within:ring-2 focus-within:ring-tern-teal-500 focus-within:ring-offset-2'
+        'hover:shadow-lg hover:border-phoenix-gold-300',
+        'focus-within:ring-2 focus-within:ring-phoenix-gold-500 focus-within:ring-offset-2'
       )}
       onClick={onSelect}
     >
       {/* Ship Image */}
-      <div className="relative h-36 bg-tern-gray-100">
+      <div className="relative h-36 bg-ash-100">
         {sailing.ship.imageUrl && !shipImageError ? (
           <Image
             src={sailing.ship.imageUrl}
@@ -65,7 +65,7 @@ export function CruiseCard({ sailing, onSelect }: CruiseCardProps) {
           />
         ) : (
           <div className="flex items-center justify-center h-full">
-            <Ship className="h-12 w-12 text-tern-gray-300" />
+            <Ship className="h-12 w-12 text-ash-300" />
           </div>
         )}
 
@@ -87,19 +87,19 @@ export function CruiseCard({ sailing, onSelect }: CruiseCardProps) {
         )}
 
         {/* Nights Badge */}
-        <div className="absolute top-2 right-2 bg-tern-teal-600 text-white text-xs font-medium px-2 py-1 rounded-full">
+        <div className="absolute top-2 right-2 bg-phoenix-gold-600 text-white text-xs font-medium px-2 py-1 rounded-full">
           {sailing.nights} Nights
         </div>
       </div>
 
       <CardContent className="p-3 space-y-2">
         {/* Title */}
-        <h3 className="font-semibold text-sm text-tern-gray-900 line-clamp-2 leading-tight">
+        <h3 className="font-semibold text-sm text-ash-900 line-clamp-2 leading-tight">
           {sailing.name}
         </h3>
 
         {/* Ship & Cruise Line */}
-        <div className="flex items-center gap-1.5 text-xs text-tern-gray-500">
+        <div className="flex items-center gap-1.5 text-xs text-ash-500">
           <Anchor className="h-3 w-3 flex-shrink-0" />
           <span className="truncate">
             {sailing.cruiseLine.name} - {sailing.ship.name}
@@ -107,29 +107,29 @@ export function CruiseCard({ sailing, onSelect }: CruiseCardProps) {
         </div>
 
         {/* Departure Date */}
-        <div className="flex items-center gap-1.5 text-xs text-tern-gray-500">
+        <div className="flex items-center gap-1.5 text-xs text-ash-500">
           <Calendar className="h-3 w-3 flex-shrink-0" />
           <span>{format(sailDate, 'MMM d, yyyy')}</span>
         </div>
 
         {/* Departure Port */}
-        <div className="flex items-center gap-1.5 text-xs text-tern-gray-500">
+        <div className="flex items-center gap-1.5 text-xs text-ash-500">
           <MapPin className="h-3 w-3 flex-shrink-0" />
           <span className="truncate">{sailing.embarkPort.name}</span>
         </div>
 
         {/* Price & CTA */}
-        <div className="flex items-center justify-between pt-2 border-t border-tern-gray-100">
+        <div className="flex items-center justify-between pt-2 border-t border-ash-100">
           <div>
             {cheapestPrice !== null ? (
               <>
-                <span className="text-xs text-tern-gray-500">From</span>
-                <p className="text-lg font-bold text-tern-teal-600">
+                <span className="text-xs text-ash-500">From</span>
+                <p className="text-lg font-bold text-phoenix-gold-600">
                   {formatPrice(cheapestPrice)}
                 </p>
               </>
             ) : (
-              <p className="text-sm font-medium text-tern-gray-500">
+              <p className="text-sm font-medium text-ash-500">
                 Contact for Pricing
               </p>
             )}

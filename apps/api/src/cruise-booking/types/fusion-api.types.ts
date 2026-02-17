@@ -296,6 +296,110 @@ export interface PastPaxResult {
 }
 
 // ============================================================================
+// Import Booking (cruiseimportbooking.pl)
+// ============================================================================
+
+export interface ImportBookingParams {
+  lineid: number
+  bookingreference: string
+  viewonly?: 0 | 1
+  currency?: string
+  language?: string
+}
+
+export interface ImportBookingResult {
+  bookingdate: string
+  commission: number
+  cruiseitem: ImportBookingCruiseItem
+  passengers: ImportBookingPassenger[]
+  bookingid?: number
+  portfolioid?: number
+}
+
+export interface ImportBookingCruiseItem {
+  name: string
+  voyagecode: string
+  codetocruiseid: number
+  reservation: string
+  status: string
+  startdate: string
+  enddate: string
+  nights: number
+  sailnights: number
+  grossprice: string | number
+  nettprice: string | number
+  price: number
+  sprice: string | number
+  scurrency: string
+  cabin: { number: string; name: string; cabintype: string; farecode: string; deck?: string; location?: string }
+  ship: { code: string; id: number; name: string; imageurl: string }
+  suppliername: string
+  itinerary: ImportBookingItineraryPort[]
+  breakdown: ImportBookingBreakdownItem[]
+  perperson: ImportBookingPerPerson[]
+  dining: {
+    seatings: { description: string; seating: string; tablesize: string }[]
+    smoking: string
+  }
+  paymentinfo: {
+    receivedtotal: string | number
+    nonrefundable: number
+    nonrefundabledeposit: number
+    paymentschedule: { amount: number | string; duedate: string }[]
+  }
+  selectedpromotions: Record<string, string>
+  selectedextras?: Array<Record<string, unknown>>
+  onboardcredit: number
+  obccurrency: string
+}
+
+export interface ImportBookingItineraryPort {
+  day: number
+  itineraryname: string
+  arrivedate: string
+  arrivetime?: string
+  departdate?: string
+  departtime?: string
+  extrainfo: string
+  latitude?: string
+  longitude?: string
+  uniqueportid?: number
+}
+
+export interface ImportBookingPassenger {
+  paxno: number
+  title: string
+  firstname: string
+  lastname: string
+  middlename?: string
+  gender: string
+  dob: string
+  age: number
+  nationality: string
+  paxtype: string
+}
+
+export interface ImportBookingBreakdownItem {
+  category: string
+  description: string
+  itemprice: number
+  currency: string
+  commissionable: number
+  quantity: number
+}
+
+export interface ImportBookingPerPerson {
+  category: string
+  description: string
+  prices: {
+    currency: string
+    guestno: number
+    price: string | number
+    sprice?: string | number
+  }[]
+}
+
+// ============================================================================
 // Error Types
 // ============================================================================
 

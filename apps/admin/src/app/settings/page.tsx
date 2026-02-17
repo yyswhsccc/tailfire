@@ -60,14 +60,14 @@ export default function SettingsPage() {
             key={category.title}
             className={
               category.available
-                ? 'transition-colors hover:border-tern-teal-500'
+                ? 'transition-colors hover:border-phoenix-gold-500'
                 : 'opacity-60'
             }
           >
             {category.available ? (
               <Link href={category.href} className="block">
                 <CardHeader className="flex flex-row items-center gap-4">
-                  <div className="rounded-lg bg-tern-teal-50 p-2 text-tern-teal-600">
+                  <div className="rounded-lg bg-phoenix-gold-50 p-2 text-phoenix-gold-600">
                     {category.icon}
                   </div>
                   <div className="flex-1">
@@ -79,7 +79,7 @@ export default function SettingsPage() {
             ) : (
               <>
                 <CardHeader className="flex flex-row items-center gap-4">
-                  <div className="rounded-lg bg-tern-gray-100 p-2 text-tern-gray-400">
+                  <div className="rounded-lg bg-ash-100 p-2 text-ash-400">
                     {category.icon}
                   </div>
                   <div className="flex-1">
@@ -99,7 +99,7 @@ export default function SettingsPage() {
       {/* System Info - for verifying deployments */}
       <Card className="mt-8">
         <CardHeader className="flex flex-row items-center gap-4">
-          <div className="rounded-lg bg-tern-gray-100 p-2 text-tern-gray-600">
+          <div className="rounded-lg bg-ash-100 p-2 text-ash-600">
             <Info className="h-6 w-6" />
           </div>
           <div className="flex-1">

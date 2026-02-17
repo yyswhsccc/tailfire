@@ -31,7 +31,7 @@ const navigation = [
   { name: 'Reporting', href: '/reporting' },
 ]
 
-export function TernTopNav() {
+export function TopNav() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout: clearStore } = useAuthStore()
@@ -51,7 +51,7 @@ export function TernTopNav() {
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-tern-gray-200 bg-white">
+    <header className="sticky top-0 z-50 w-full border-b border-ash-200 bg-white">
       <div className="flex h-14 items-center px-4 gap-4">
         {/* Logo */}
         <Link href="/dashboard" className="flex items-center gap-2">
@@ -73,15 +73,15 @@ export function TernTopNav() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'relative px-3 py-2 text-sm font-medium transition-colors hover:text-tern-gray-900',
+                  'relative px-3 py-2 text-sm font-medium transition-colors hover:text-ash-900',
                   isActive
-                    ? 'text-tern-teal-600'
-                    : 'text-tern-gray-600'
+                    ? 'text-phoenix-gold-600'
+                    : 'text-ash-600'
                 )}
               >
                 {item.name}
                 {isActive && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-tern-teal-600" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-phoenix-gold-600" />
                 )}
               </Link>
             )
@@ -94,11 +94,11 @@ export function TernTopNav() {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 w-64 justify-start text-sm text-tern-gray-500 border-tern-gray-200"
+            className="h-8 w-64 justify-start text-sm text-ash-500 border-ash-200"
           >
             <Search className="mr-2 h-4 w-4" />
             Search
-            <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-tern-gray-200 bg-tern-gray-50 px-1.5 font-mono text-[10px] font-medium text-tern-gray-600">
+            <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-ash-200 bg-ash-50 px-1.5 font-mono text-[10px] font-medium text-ash-600">
               <span className="text-xs">⌘</span>K
             </kbd>
           </Button>
@@ -113,7 +113,7 @@ export function TernTopNav() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">
-                <HelpCircle className="h-4 w-4 text-tern-gray-600" />
+                <HelpCircle className="h-4 w-4 text-ash-600" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -145,7 +145,7 @@ export function TernTopNav() {
                       ? `${profile.firstName} ${profile.lastName}`
                       : user?.name || 'User'}
                   </p>
-                  <p className="text-xs text-tern-gray-500">{profile?.email || user?.email || ''}</p>
+                  <p className="text-xs text-ash-500">{profile?.email || user?.email || ''}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
