@@ -52,3 +52,6 @@ COMMENT ON COLUMN custom_cruise_details.reservation_number IS 'Cruise line own c
 COMMENT ON COLUMN custom_cruise_details.stateroom_category_code IS 'Berthed stateroom category code (e.g., XB, D5)';
 COMMENT ON COLUMN custom_cruise_details.onboard_credit_cents IS 'Onboard credit amount in cents';
 COMMENT ON COLUMN custom_cruise_details.onboard_credit_currency IS 'Onboard credit currency (e.g., CAD, USD)';
+
+-- 4. Add 'contact_loyalty_program' to the activity_entity_type enum (for audit logging)
+ALTER TYPE activity_entity_type ADD VALUE IF NOT EXISTS 'contact_loyalty_program';

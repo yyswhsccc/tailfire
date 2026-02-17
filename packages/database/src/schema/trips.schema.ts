@@ -79,6 +79,7 @@ export const activityEntityTypeEnum = pgEnum('activity_entity_type', [
   'activity_media',
   'trip_media',
   'trip_group',
+  'contact_loyalty_program',
 ])
 
 export const activityActionEnum = pgEnum('activity_action', [
