@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { LayoutGrid, Table2, Map, CalendarPlus } from 'lucide-react'
+import { LayoutGrid, Table2, Map, CalendarPlus, Download } from 'lucide-react'
 import type { TripResponseDto, ItineraryResponseDto, ActivityResponseDto, MoveActivityDto, ItineraryDayWithActivitiesDto } from '@tailfire/shared-types/api'
 import { useToast } from '@/hooks/use-toast'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
@@ -581,16 +581,27 @@ export function TripItinerary({ trip }: TripItineraryProps) {
             <div className="flex items-center gap-2">
               {/* Add Days Button - only when itinerary is selected */}
               {selectedItinerary && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAddDaysDialog(true)}
-                  className="h-7 text-xs"
-                  aria-label="Add days to itinerary"
-                >
-                  <CalendarPlus className="h-3.5 w-3.5 mr-1" />
-                  Add Days
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAddDaysDialog(true)}
+                    className="h-7 text-xs"
+                    aria-label="Add days to itinerary"
+                  >
+                    <CalendarPlus className="h-3.5 w-3.5 mr-1" />
+                    Add Days
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => router.push(`/trips/import?tripId=${trip.id}`)}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1" />
+                    Import Booking
+                  </Button>
+                </>
               )}
 
               {/* View Toggle - icon only */}
