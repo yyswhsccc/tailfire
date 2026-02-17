@@ -785,6 +785,13 @@
       "when": 1771416000000,
       "tag": "20260217120000_add_pricing_breakdown_json",
       "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1771437600000,
+      "tag": "20260217180000_add_loyalty_and_booking_fields",
+      "breakpoints": true
     }
   ]
 }

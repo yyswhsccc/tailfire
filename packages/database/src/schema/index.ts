@@ -29,6 +29,7 @@
 export * from './contacts.schema'
 export * from './contact-shares.schema'
 export * from './contact-documents.schema'
+export * from './contact-loyalty-programs.schema'
 export * from './trips.schema'
 export * from './trip-shares.schema'
 export * from './trip-media.schema'
