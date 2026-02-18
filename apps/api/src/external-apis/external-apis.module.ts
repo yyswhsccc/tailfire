@@ -24,6 +24,7 @@ import { HotelsModule } from './providers/hotels'
 import { FlightsOffersModule } from './providers/flights'
 import { TransfersModule } from './providers/transfers'
 import { ActivitiesModule } from './providers/activities'
+import { OpenAiModule } from './providers/openai'
 
 @Global()
 @Module({
@@ -41,6 +42,7 @@ import { ActivitiesModule } from './providers/activities'
     FlightsOffersModule,
     TransfersModule,
     ActivitiesModule,
+    OpenAiModule,
   ],
   providers: [
     RateLimiterService,
@@ -60,6 +62,7 @@ import { ActivitiesModule } from './providers/activities'
     FlightsOffersModule,
     TransfersModule,
     ActivitiesModule,
+    OpenAiModule,
   ],
 })
 export class ExternalApisModule {}

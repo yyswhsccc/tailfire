@@ -22,6 +22,7 @@ export const apiProviderEnum = pgEnum('api_provider', [
   'amadeus_hotels',
   'google_places',
   'booking_com',
+  'open_ai',
 ])
 
 export const credentialStatusEnum = pgEnum('credential_status', [

@@ -91,5 +91,8 @@ export * from './notes.types.js'
 // Calendar Events (standalone meetings, calls, follow-ups)
 export * from './calendar-events.types.js'
 
+// OCR Document Import
+export * from './ocr-import.types.js'
+
 // Future exports:
 // export * from './auth.types'

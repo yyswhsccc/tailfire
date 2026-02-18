@@ -15,8 +15,11 @@
 
 import { Module, forwardRef } from '@nestjs/common'
 import { BullModule } from '@nestjs/bullmq'
+import { HttpModule } from '@nestjs/axios'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { DatabaseModule } from '../db/database.module'
+import { OcrModule } from '../ocr/ocr.module'
+import { TripsModule } from '../trips/trips.module'
 import { NotificationModule } from '../notifications/notification.module'
 import { EmailModule } from '../email/email.module'
 import { AutomationService } from './automation.service'
@@ -24,7 +27,11 @@ import { TripAutomationProcessor } from './processors/trip-automation.processor'
 import { ClientCareProcessor } from './processors/client-care.processor'
 import { NotificationsProcessor } from './processors/notifications.processor'
 import { TripLifecycleListener } from './listeners/trip-lifecycle.listener'
+import { OcrProcessingProcessor } from './processors/ocr-processing.processor'
+import { EnrichmentProcessor } from './processors/enrichment.processor'
 import { AutomationController } from './admin/automation.controller'
+import { GooglePlacesModule } from '../external-apis/providers/google-places/google-places.module'
+import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
 import { QUEUES } from './automation.types'
 
 @Module({
@@ -97,11 +104,30 @@ import { QUEUES } from './automation.types'
           removeOnFail: { age: 24 * 3600 },
         },
       },
+      {
+        name: QUEUES.OCR_PROCESSING,
+        defaultJobOptions: {
+          removeOnComplete: { age: 24 * 3600, count: 100 },
+          removeOnFail: { age: 7 * 24 * 3600 },
+        },
+      },
+      {
+        name: QUEUES.ENRICHMENT,
+        defaultJobOptions: {
+          removeOnComplete: { age: 24 * 3600, count: 200 },
+          removeOnFail: { age: 7 * 24 * 3600 },
+        },
+      },
     ),
 
     DatabaseModule,
+    OcrModule,
+    forwardRef(() => TripsModule),
     forwardRef(() => NotificationModule),
     EmailModule,
+    HttpModule,
+    GooglePlacesModule,
+    ApiCredentialsModule,
   ],
   controllers: [AutomationController],
   providers: [
@@ -109,6 +135,8 @@ import { QUEUES } from './automation.types'
     TripAutomationProcessor,
     ClientCareProcessor,
     NotificationsProcessor,
+    OcrProcessingProcessor,
+    EnrichmentProcessor,
     TripLifecycleListener,
   ],
   exports: [AutomationService],

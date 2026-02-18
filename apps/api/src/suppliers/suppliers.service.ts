@@ -4,7 +4,7 @@
  * Business logic for managing suppliers (hotels, airlines, tour operators, etc.)
  */
 
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common'
 import { eq, ilike, sql, and, asc } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import type {
@@ -17,6 +17,8 @@ import type {
 
 @Injectable()
 export class SuppliersService {
+  private readonly logger = new Logger(SuppliersService.name)
+
   constructor(private readonly db: DatabaseService) {}
 
   /**
@@ -82,6 +84,70 @@ export class SuppliersService {
     }
 
     return this.mapToDto(supplier)
+  }
+
+  /**
+   * Find a supplier by name (case-insensitive) or create one if not found.
+   * Used by OCR import to auto-create suppliers from extracted invoice data.
+   */
+  async findOrCreateByName(
+    name: string,
+    defaults?: Partial<CreateSupplierDto>,
+  ): Promise<SupplierDto> {
+    const normalizedName = name.trim()
+    if (!normalizedName) {
+      throw new Error('Supplier name is required')
+    }
+
+    // Prefer match with matching supplierType to avoid cross-type collisions
+    if (defaults?.supplierType) {
+      const exactMatch = await this.db.client
+        .select()
+        .from(this.db.schema.suppliers)
+        .where(
+          and(
+            ilike(this.db.schema.suppliers.name, normalizedName),
+            eq(this.db.schema.suppliers.supplierType, defaults.supplierType),
+          ),
+        )
+        .orderBy(asc(this.db.schema.suppliers.createdAt))
+        .limit(1)
+
+      if (exactMatch[0]) {
+        this.logger.log(`Found existing supplier (type match): ${exactMatch[0].name} (${exactMatch[0].id})`)
+        return this.mapToDto(exactMatch[0])
+      }
+    }
+
+    // Fall back to name-only lookup
+    const existing = await this.db.client
+      .select()
+      .from(this.db.schema.suppliers)
+      .where(ilike(this.db.schema.suppliers.name, normalizedName))
+      .orderBy(asc(this.db.schema.suppliers.createdAt))
+      .limit(1)
+
+    if (existing[0]) {
+      this.logger.log(`Found existing supplier: ${existing[0].name} (${existing[0].id})`)
+      return this.mapToDto(existing[0])
+    }
+
+    // Create new supplier
+    this.logger.log(`Creating new supplier: ${normalizedName}`)
+    const [supplier] = await this.db.client
+      .insert(this.db.schema.suppliers)
+      .values({
+        name: normalizedName,
+        legalName: defaults?.legalName?.trim() || null,
+        supplierType: defaults?.supplierType?.trim() || null,
+        contactInfo: defaults?.contactInfo || null,
+        defaultCommissionRate: defaults?.defaultCommissionRate || null,
+        isActive: true,
+        isPreferred: false,
+      })
+      .returning()
+
+    return this.mapToDto(supplier!)
   }
 
   /**

@@ -596,6 +596,7 @@ export class ActivitiesService {
           taxesAndFeesCents: dto.taxesCents ?? 0,
           commissionTotalCents: dto.commissionTotalCents ?? null,
           commissionSplitPercentage: dto.commissionSplitPercentage?.toString() ?? null,
+          pricingBreakdownJson: dto.pricingBreakdownJson ?? null,
         })
         .onConflictDoNothing({ target: this.db.schema.activityPricing.activityId })
         .returning({ id: this.db.schema.activityPricing.id })

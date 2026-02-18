@@ -322,6 +322,14 @@ const ExpandedPackageActivities = memo(function ExpandedPackageActivities({
   )
 })
 
+// Sort helper: by dayNumber ascending then name alphabetically
+function sortByDayThenName<T extends { dayNumber?: number | null; name: string }>(a: T, b: T): number {
+  const dayA = a.dayNumber ?? Infinity
+  const dayB = b.dayNumber ?? Infinity
+  if (dayA !== dayB) return dayA - dayB
+  return a.name.localeCompare(b.name)
+}
+
 function groupActivitiesByParent(activities: PackageLinkedActivityDto[]) {
   // Build a set of activity IDs that are in this list (direct children of the package)
   const activityIds = new Set(activities.map(a => a.id))
@@ -347,10 +355,11 @@ function groupActivitiesByParent(activities: PackageLinkedActivityDto[]) {
     if (activity.parentActivityId && activityIds.has(activity.parentActivityId)) continue
     result.push({
       activity,
-      children: childrenMap.get(activity.id) || [],
+      children: (childrenMap.get(activity.id) || []).sort(sortByDayThenName),
     })
   }
-  return result
+  // Sort top-level items by day number then name
+  return result.sort((a, b) => sortByDayThenName(a.activity, b.activity))
 }
 
 // Type for unlinked activities (imported from shared-types includes parentActivityId)
@@ -389,10 +398,11 @@ function groupUnlinkedByParent(activities: UnlinkedActivity[]) {
     if (activity.parentActivityId) continue
     result.push({
       activity,
-      children: childrenMap.get(activity.id) || [],
+      children: (childrenMap.get(activity.id) || []).sort(sortByDayThenName),
     })
   }
-  return result
+  // Sort top-level items by day number then name
+  return result.sort((a, b) => sortByDayThenName(a.activity, b.activity))
 }
 
 // ============================================================================
