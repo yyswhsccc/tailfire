@@ -6,26 +6,66 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type')
+  const invite_token = searchParams.get('invite_token')
   const next = searchParams.get('next') ?? '/'
+
+  const supabase = await createClient()
 
   // Handle PKCE flow (OAuth, magic links)
   if (code) {
-    const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // If invite_token is present, activate the client portal account
+      if (invite_token) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.access_token) {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+            await fetch(`${apiUrl}/client-portal/activate`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ inviteToken: invite_token }),
+            })
+          }
+        } catch {
+          // Activation failure should not block login - user can retry
+          console.error('Failed to activate client portal account')
+        }
+      }
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
 
   // Handle token-based flows (invites, recovery)
   if (token_hash && type) {
-    const supabase = await createClient()
     const { error } = await supabase.auth.verifyOtp({
       token_hash,
       type: type as 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change',
     })
     if (!error) {
-      // For password recovery, redirect to reset password page
+      // If invite_token is present, activate the client portal account
+      if (invite_token) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.access_token) {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+            await fetch(`${apiUrl}/client-portal/activate`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ inviteToken: invite_token }),
+            })
+          }
+        } catch {
+          console.error('Failed to activate client portal account')
+        }
+      }
+
       if (type === 'recovery') {
         return NextResponse.redirect(`${origin}/reset-password`)
       }
@@ -34,7 +74,6 @@ export async function GET(request: Request) {
   }
 
   // Handle hash fragment flows (implicit grants)
-  // These are handled client-side, redirect to let client handle
   const hash = new URL(request.url).hash
   if (hash && hash.includes('access_token')) {
     return NextResponse.redirect(`${origin}${next}${hash}`)

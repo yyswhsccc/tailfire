@@ -230,7 +230,7 @@ export const tripTravelers = pgTable('trip_travelers', {
 
   // Foreign Keys
   tripId: uuid('trip_id').notNull().references(() => trips.id, { onDelete: 'cascade' }),
-  contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
+  contactId: uuid('contact_id').notNull().references(() => contacts.id, { onDelete: 'restrict' }),
 
   // Traveler Role (Sprint 2.1 Phase 3)
   role: travelerRoleEnum('role').default('limited_access').notNull(),

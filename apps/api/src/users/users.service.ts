@@ -320,6 +320,7 @@ export class UsersService {
           dto.email,
           linkData.properties.action_link,
           dto.firstName,
+          agencyId,
           inviterName,
         )
       } catch (emailError) {
@@ -406,6 +407,7 @@ export class UsersService {
         dto.email,
         linkData.properties.action_link,
         dto.firstName,
+        agencyId,
         inviterName,
       )
     } catch (emailError) {
@@ -612,6 +614,7 @@ export class UsersService {
       user.email,
       linkData.properties.action_link,
       user.firstName || 'there',
+      agencyId,
       inviterName,
     )
 

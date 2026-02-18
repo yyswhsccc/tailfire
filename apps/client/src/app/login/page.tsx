@@ -1,10 +1,9 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Image from "next/image";
-import { useMockAuth } from "@/lib/mock-auth";
-import { mockClients } from "@/data/mock-clients";
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import Image from "next/image"
+import { useAuth } from "@/lib/auth"
 import {
   Button,
   Card,
@@ -14,52 +13,53 @@ import {
   CardTitle,
   Input,
   Label,
-} from "@tailfire/ui-public";
+} from "@tailfire/ui-public"
+import { Mail, ArrowLeft, CheckCircle2 } from "lucide-react"
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { user, loading, login } = useMockAuth();
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter()
+  const { user, loading, signInWithOtp } = useAuth()
+  const [email, setEmail] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Redirect if already logged in
   useEffect(() => {
     if (!loading && user) {
-      router.push("/");
+      router.push("/")
     }
-  }, [user, loading, router]);
+  }, [user, loading, router])
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !name) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) return
 
-    setIsLoading(true);
-    // Find if this is an existing mock client
-    const existingClient = mockClients.find(
-      (c) => c.email.toLowerCase() === email.toLowerCase()
-    );
+    setIsSubmitting(true)
+    setError(null)
 
-    void login(email, name, existingClient?.associatedConsultantId).then(() => {
-      setIsLoading(false);
-      router.push("/");
-    });
-  };
+    const { error: signInError } = await signInWithOtp(email)
 
-  const handleQuickLogin = (client: (typeof mockClients)[0]) => {
-    setIsLoading(true);
-    void login(client.email, client.name, client.associatedConsultantId).then(() => {
-      setIsLoading(false);
-      router.push("/");
-    });
-  };
+    setIsSubmitting(false)
+
+    if (signInError) {
+      if (signInError.message?.includes("Signups not allowed")) {
+        setError("No account found for this email. Please contact your travel advisor for an invitation.")
+      } else {
+        setError(signInError.message || "Failed to send login link. Please try again.")
+      }
+      return
+    }
+
+    setEmailSent(true)
+  }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-phoenix-charcoal flex items-center justify-center">
         <div className="animate-pulse text-phoenix-gold">Loading...</div>
       </div>
-    );
+    )
   }
 
   return (
@@ -82,85 +82,83 @@ export default function LoginPage() {
               Client Portal
             </CardTitle>
             <CardDescription className="text-phoenix-text-muted">
-              Sign in to manage your trips and documents
+              {emailSent
+                ? "Check your email"
+                : "Sign in to manage your trips and documents"}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-phoenix-text-light">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="bg-phoenix-charcoal/50 border-phoenix-gold/30 text-white placeholder:text-phoenix-text-muted"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-phoenix-text-light">
-                  Name
-                </Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="bg-phoenix-charcoal/50 border-phoenix-gold/30 text-white placeholder:text-phoenix-text-muted"
-                  required
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full btn-phoenix-primary"
-                disabled={isLoading}
-              >
-                {isLoading ? "Signing in..." : "Sign In"}
-              </Button>
-            </form>
-
-            {/* Quick login options */}
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-phoenix-gold/30" />
+            {emailSent ? (
+              <div className="text-center space-y-4">
+                <div className="flex justify-center">
+                  <CheckCircle2 className="h-16 w-16 text-phoenix-gold" />
                 </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="bg-phoenix-charcoal/50 px-2 text-phoenix-text-muted">
-                    Quick login (demo)
-                  </span>
+                <div className="space-y-2">
+                  <p className="text-white">
+                    We sent a magic link to
+                  </p>
+                  <p className="text-phoenix-gold font-medium">{email}</p>
+                  <p className="text-phoenix-text-muted text-sm">
+                    Click the link in your email to sign in. The link expires in 1 hour.
+                  </p>
                 </div>
+                <Button
+                  variant="outline"
+                  className="mt-4 border-phoenix-gold/30 text-phoenix-text-light hover:bg-phoenix-gold/10"
+                  onClick={() => {
+                    setEmailSent(false)
+                    setEmail("")
+                  }}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Use a different email
+                </Button>
               </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-phoenix-text-light">
+                    Email Address
+                  </Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-phoenix-text-muted" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10 bg-phoenix-charcoal/50 border-phoenix-gold/30 text-white placeholder:text-phoenix-text-muted"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                </div>
 
-              <div className="mt-4 space-y-2">
-                {mockClients.map((client) => (
-                  <Button
-                    key={client.id}
-                    variant="outline"
-                    className="w-full border-phoenix-gold/30 text-phoenix-text-light hover:bg-phoenix-gold/10 justify-start"
-                    onClick={() => handleQuickLogin(client)}
-                    disabled={isLoading}
-                  >
-                    <span className="truncate">{client.name}</span>
-                    <span className="ml-auto text-xs text-phoenix-text-muted truncate">
-                      {client.email}
-                    </span>
-                  </Button>
-                ))}
-              </div>
-            </div>
+                {error && (
+                  <p className="text-red-400 text-sm">{error}</p>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full btn-phoenix-primary"
+                  disabled={isSubmitting || !email}
+                >
+                  {isSubmitting ? "Sending..." : "Send Magic Link"}
+                </Button>
+
+                <p className="text-phoenix-text-muted text-xs text-center">
+                  We&apos;ll send you a secure login link. No password needed.
+                </p>
+              </form>
+            )}
           </CardContent>
         </Card>
 
         <p className="text-center text-xs text-phoenix-text-muted mt-4">
-          This is a demo portal. No real authentication is performed.
+          Don&apos;t have an account? Contact your travel advisor for an invitation.
         </p>
       </div>
     </div>
-  );
+  )
 }

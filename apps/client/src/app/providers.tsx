@@ -1,9 +1,10 @@
-"use client";
+"use client"
 
-import type { ReactNode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { TooltipProvider, Toaster, SonnerToaster } from "@tailfire/ui-public";
-import { ConsultantProvider } from "@/context/consultant-context";
+import type { ReactNode } from "react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { TooltipProvider, Toaster, SonnerToaster } from "@tailfire/ui-public"
+import { ConsultantProvider } from "@/context/consultant-context"
+import { AuthProvider } from "@/context/auth-context"
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -12,18 +13,20 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
     },
   },
-});
+})
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <ConsultantProvider>
-          {children}
-          <Toaster />
-          <SonnerToaster />
-        </ConsultantProvider>
+        <AuthProvider>
+          <ConsultantProvider>
+            {children}
+            <Toaster />
+            <SonnerToaster />
+          </ConsultantProvider>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
-  );
+  )
 }
