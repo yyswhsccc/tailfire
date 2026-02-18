@@ -147,7 +147,7 @@ export class ImportBookingService {
       const trip = await this.tripsService.create(
         {
           name: tripName,
-          status: 'booked',
+          status: 'inbound',
           startDate: cruiseItem.startdate,
           endDate: cruiseItem.enddate,
           tripType: 'leisure',
@@ -195,15 +195,6 @@ export class ImportBookingService {
       bookingReference: dto.bookingReference,
       customCruiseDetails: cruiseDetails,
     })
-
-    // 8b. Mark the imported cruise as booked — it's an existing confirmed booking
-    await this.db.client
-      .update(this.db.schema.itineraryActivities)
-      .set({
-        isBooked: true,
-        bookingDate: new Date(),
-      })
-      .where(eq(this.db.schema.itineraryActivities.id, cruiseActivity.id))
 
     // 9. Create trip travelers for each passenger
     const travelerIds: string[] = []
