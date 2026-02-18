@@ -176,7 +176,7 @@ export class TripTravelersService {
         .insert(this.db.schema.tripTravelers)
         .values({
           tripId,
-          contactId: hasContactId ? dto.contactId : autoCreatedContactId ?? undefined,
+          contactId: hasContactId ? dto.contactId! : autoCreatedContactId!,
           contactSnapshot: resolvedSnapshot ?? null,
           role,
           isPrimaryTraveler: role === 'primary_contact', // Sync isPrimaryTraveler with role

@@ -806,6 +806,41 @@
       "when": 1771444800000,
       "tag": "20260217200000_create_ocr_supplier_runbooks",
       "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "7",
+      "when": 1771451400000,
+      "tag": "20260217140000_update_jwt_hook_for_client_portal",
+      "breakpoints": true
+    },
+    {
+      "idx": 115,
+      "version": "7",
+      "when": 1771451401000,
+      "tag": "20260217140001_enforce_contact_id_not_null",
+      "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1771451402000,
+      "tag": "20260217140002_create_client_portal_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1771451403000,
+      "tag": "20260217140003_create_itinerary_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1771451404000,
+      "tag": "20260217150000_fix_jwt_hook_invited_status",
+      "breakpoints": true
     }
   ]
 }

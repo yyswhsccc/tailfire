@@ -46,8 +46,14 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       throw new UnauthorizedException(info?.message || 'Invalid token')
     }
 
-    // Defense in depth: Block locked users (JWT hook should block, but verify)
+    // Role isolation: Reject client_portal tokens from staff endpoints.
+    // Client portal users must only access @Public() + ClientPortalAuthGuard routes.
     const authUser = user as unknown as AuthContext
+    if ((authUser as any).role === 'client_portal') {
+      throw new UnauthorizedException('Client portal tokens cannot access staff endpoints')
+    }
+
+    // Defense in depth: Block locked users (JWT hook should block, but verify)
     if (authUser.userStatus === 'locked') {
       throw new ForbiddenException('Account is locked')
     }

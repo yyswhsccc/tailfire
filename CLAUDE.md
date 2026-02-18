@@ -521,12 +521,25 @@ When collaborating with Codex for plan validation or code review, **USE THE SKIL
 
 This skill provides a complete 7-step workflow including:
 1. Prepare the query
-2. Send to Codex (with **CRITICAL** `tmux send-keys -t 1 Enter` step)
+2. Detect current tmux window, then send to Codex pane
 3. Wait for response
 4. Capture the response
 5. Read and analyze
 6. **Loop back to Step 1 if issues found** - iterate until approved
 7. Present summary to user
+
+### CRITICAL: tmux Pane Targeting
+
+**NEVER use bare pane numbers like `-t 1`.** Multiple tmux windows exist (Main Dev, Library, Client Portal, etc.). Bare `-t 1` targets the ACTIVE window, which may not be YOUR window if the user is working in another window.
+
+**ALWAYS use fully-qualified `session:window.pane` targets:**
+```bash
+# Detect your current session:window, then target panes within it
+TMUX_TARGET=$(tmux display-message -p '#{session_name}:#{window_index}')
+tmux paste-buffer -t ${TMUX_TARGET}.1    # Codex pane in YOUR window
+tmux send-keys -t ${TMUX_TARGET}.1 Enter # Enter to YOUR Codex pane
+tmux capture-pane -t ${TMUX_TARGET}.1 -p -S -200  # Capture from YOUR Codex pane
+```
 
 ### Common Use Cases
 - **Plan validation**: Send implementation plans before coding
@@ -541,17 +554,20 @@ cat > /tmp/codex_query.txt << 'EOF'
 Your query for Codex...
 EOF
 
+# Detect current window
+TMUX_TARGET=$(tmux display-message -p '#{session_name}:#{window_index}')
+
 # Send to Codex - ALL STEPS REQUIRED
 tmux load-buffer /tmp/codex_query.txt
-tmux paste-buffer -t 1
+tmux paste-buffer -t ${TMUX_TARGET}.1
 # CRITICAL: Send Enter SEPARATELY after paste. C-m often fails silently.
 # If Codex shows "[Pasted Content ...]" instead of processing, Enter was not received.
-tmux send-keys -t 1 Enter
+sleep 1 && tmux send-keys -t ${TMUX_TARGET}.1 Enter
 
 # Wait and capture
 sleep 10
-tmux capture-pane -t 1 -p -S -200 > /tmp/codex_response.txt
+tmux capture-pane -t ${TMUX_TARGET}.1 -p -S -200 > /tmp/codex_response.txt
 cat /tmp/codex_response.txt
 ```
 
-> **Note**: Always send `Enter` as a separate `tmux send-keys -t 1 Enter` command after pasting. `C-m` is unreliable and often results in Codex showing `[Pasted Content ...]` without processing.
+> **Note**: Always send `Enter` as a separate tmux send-keys command after pasting. `C-m` is unreliable and often results in Codex showing `[Pasted Content ...]` without processing.

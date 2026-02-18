@@ -12,7 +12,7 @@ import {
   Plane,
   MapPin,
 } from "lucide-react";
-import { useMockAuth } from "@/lib/mock-auth";
+import { useAuth } from "@/lib/auth";
 import { useConsultant } from "@/context/consultant-context";
 import {
   Button,
@@ -65,7 +65,7 @@ const quickActions = [
 ];
 
 export default function DashboardPage() {
-  const { user } = useMockAuth();
+  const { user } = useAuth();
   const { consultant } = useConsultant();
 
   const advisorInitials = consultant.name
@@ -80,7 +80,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white font-display">
-            Welcome back, {user?.name?.split(" ")[0]}!
+            Welcome back, {user?.user_metadata?.full_name?.split(" ")[0] || "there"}!
           </h1>
           <p className="text-phoenix-text-muted mt-1">
             Here&apos;s an overview of your travel plans
