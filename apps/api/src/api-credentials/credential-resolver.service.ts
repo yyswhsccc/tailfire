@@ -88,6 +88,12 @@ export const PROVIDER_CREDENTIAL_CONFIG: Record<ApiProvider, ProviderCredentialC
     required: ['rapidApiKey'],
     isShared: true,
   },
+  [ApiProvider.OPEN_AI]: {
+    policy: 'env-only',
+    envVars: { apiKey: 'OPENAI_API_KEY' },
+    required: ['apiKey'],
+    isShared: true,
+  },
 
   // Storage providers (env-specific secrets)
   [ApiProvider.SUPABASE_STORAGE]: {

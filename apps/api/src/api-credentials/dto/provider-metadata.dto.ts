@@ -473,4 +473,33 @@ export const PROVIDER_METADATA: Record<ApiProvider, Omit<ProviderMetadataDto, 'i
       },
     ],
   },
+  [ApiProvider.OPEN_AI]: {
+    provider: ApiProvider.OPEN_AI,
+    displayName: 'OpenAI',
+    description: 'GPT-4o Vision for OCR document extraction (booking confirmations, passports)',
+    documentation: 'Get credentials from: https://platform.openai.com/api-keys',
+    sourcePolicy: 'env-only',
+    envVars: {
+      apiKey: 'OPENAI_API_KEY',
+    },
+    isShared: true,
+    costTier: 'medium',
+    features: [
+      'PDF booking confirmation extraction',
+      'Passport MRZ scanning',
+      'Multi-document type detection',
+      'Structured data output with Zod validation',
+    ],
+    requiredFields: [
+      {
+        name: 'apiKey',
+        label: 'API Key',
+        type: 'password',
+        description: 'Your OpenAI API key',
+        required: true,
+        placeholder: 'sk-...',
+        pattern: '^sk-',
+      },
+    ],
+  },
 }

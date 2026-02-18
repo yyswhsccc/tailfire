@@ -54,12 +54,22 @@ function getDateFromDatetime(datetime: string | null | undefined): string | null
  * An activity is considered "spanning" if:
  * 1. It has both startDatetime and endDatetime
  * 2. The end date is at least 1 day after the start date
+ * 3. The activity type naturally spans multiple days (lodging, package, tour, cruise)
+ *
+ * Flights and transportation are never spanning — they are point-in-time events
+ * that belong to their departure/pickup day, even if UTC timestamps cross midnight.
  *
  * @param activity - The activity to check
  * @returns true if the activity spans 2+ days
  */
 export function isSpanningActivity(activity: ActivityResponseDto): boolean {
-  const { startDatetime, endDatetime } = activity
+  const { startDatetime, endDatetime, activityType } = activity
+
+  // Flights and transportation are never spanning — they sit on their departure day
+  const NON_SPANNING_TYPES = ['flight', 'transportation', 'dining']
+  if (NON_SPANNING_TYPES.includes(activityType)) {
+    return false
+  }
 
   // Must have both start and end
   if (!startDatetime || !endDatetime) {

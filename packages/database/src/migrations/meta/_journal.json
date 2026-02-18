@@ -785,6 +785,20 @@
       "when": 1771416000000,
       "tag": "20260217120000_add_pricing_breakdown_json",
       "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1771437600000,
+      "tag": "20260217180000_add_openai_and_ocr_import_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1771444800000,
+      "tag": "20260217200000_create_ocr_supplier_runbooks",
+      "breakpoints": true
     }
   ]
 }

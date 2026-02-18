@@ -200,41 +200,43 @@ export function FilePreviewModal({
 
         <div className="flex-1 overflow-auto bg-ash-50 min-h-0">
           {canPreview ? (
-            <div className="h-full flex items-center justify-center p-4">
+            <>
               {/* Image Preview */}
               {previewType === 'image' && (
-                <div className="relative w-full h-full flex items-center justify-center overflow-auto">
-                  {isLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
-                    </div>
-                  )}
-                  <img
-                    src={file.downloadUrl!}
-                    alt={file.fileName}
-                    className="max-w-full max-h-full object-contain transition-transform duration-200"
-                    style={{
-                      transform: `scale(${imageZoom / 100}) rotate(${imageRotation}deg)`,
-                    }}
-                    onLoad={() => setIsLoading(false)}
-                    onError={() => {
-                      setIsLoading(false)
-                      setError('Failed to load image')
-                    }}
-                  />
+                <div className="h-full flex items-center justify-center p-4">
+                  <div className="relative w-full h-full flex items-center justify-center overflow-auto">
+                    {isLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
+                      </div>
+                    )}
+                    <img
+                      src={file.downloadUrl!}
+                      alt={file.fileName}
+                      className="max-w-full max-h-full object-contain transition-transform duration-200"
+                      style={{
+                        transform: `scale(${imageZoom / 100}) rotate(${imageRotation}deg)`,
+                      }}
+                      onLoad={() => setIsLoading(false)}
+                      onError={() => {
+                        setIsLoading(false)
+                        setError('Failed to load image')
+                      }}
+                    />
+                  </div>
                 </div>
               )}
 
-              {/* PDF Preview */}
+              {/* PDF Preview — fill the entire available space */}
               {previewType === 'pdf' && (
-                <div className="w-full h-full min-h-[500px]">
+                <div className="relative w-full" style={{ height: 'calc(90vh - 80px)' }}>
                   {isLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
                       <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
                     </div>
                   )}
                   <iframe
-                    src={file.downloadUrl!}
+                    src={`${file.downloadUrl!}#view=FitH`}
                     className="w-full h-full border-0"
                     title={file.fileName}
                     onLoad={() => setIsLoading(false)}
@@ -248,39 +250,43 @@ export function FilePreviewModal({
 
               {/* Text Preview */}
               {previewType === 'text' && (
-                <div className="w-full h-full overflow-auto">
-                  {isLoading ? (
-                    <div className="flex items-center justify-center h-full">
-                      <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
-                    </div>
-                  ) : error ? (
-                    <div className="flex items-center justify-center h-full text-red-500">
-                      {error}
-                    </div>
-                  ) : (
-                    <pre className="p-4 text-sm font-mono whitespace-pre-wrap break-words bg-white rounded-lg border border-ash-200">
-                      {textContent}
-                    </pre>
-                  )}
+                <div className="h-full flex items-center justify-center p-4">
+                  <div className="w-full h-full overflow-auto">
+                    {isLoading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
+                      </div>
+                    ) : error ? (
+                      <div className="flex items-center justify-center h-full text-red-500">
+                        {error}
+                      </div>
+                    ) : (
+                      <pre className="p-4 text-sm font-mono whitespace-pre-wrap break-words bg-white rounded-lg border border-ash-200">
+                        {textContent}
+                      </pre>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* Error State */}
               {error && previewType !== 'text' && (
-                <div className="text-center text-red-500">
-                  <p>{error}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={handleDownload}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download instead
-                  </Button>
+                <div className="h-full flex items-center justify-center p-4">
+                  <div className="text-center text-red-500">
+                    <p>{error}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={handleDownload}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download instead
+                    </Button>
+                  </div>
                 </div>
               )}
-            </div>
+            </>
           ) : (
             /* No Preview Available */
             <div className="h-full flex flex-col items-center justify-center p-8 text-center min-h-[300px]">

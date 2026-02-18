@@ -169,6 +169,20 @@ export const bookingComCredentialsSchema = z.object({
 export type ValidatedBookingComCredentials = z.infer<typeof bookingComCredentialsSchema>
 
 // ============================================================================
+// OPENAI CREDENTIALS SCHEMA
+// ============================================================================
+
+export const openAiCredentialsSchema = z.object({
+  apiKey: z
+    .string()
+    .trim()
+    .min(1, 'API key is required')
+    .startsWith('sk-', 'Must be a valid OpenAI API key (starts with sk-)'),
+})
+
+export type ValidatedOpenAiCredentials = z.infer<typeof openAiCredentialsSchema>
+
+// ============================================================================
 // CREDENTIAL VALIDATION SCHEMA MAP
 // ============================================================================
 
@@ -184,6 +198,7 @@ export const credentialSchemaMap = {
   [ApiProvider.AMADEUS]: amadeusCredentialsSchema,
   [ApiProvider.GOOGLE_PLACES]: googlePlacesCredentialsSchema,
   [ApiProvider.BOOKING_COM]: bookingComCredentialsSchema,
+  [ApiProvider.OPEN_AI]: openAiCredentialsSchema,
 } as const
 
 // ============================================================================

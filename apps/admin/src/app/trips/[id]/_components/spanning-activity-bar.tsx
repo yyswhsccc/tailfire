@@ -114,9 +114,11 @@ export function SpanningActivityBar({
     if (e.key === 'Enter') handleEdit()
   }
 
-  // Duration label (e.g., "7 Nights")
+  // Duration label — type-appropriate (lodging = "Nights", others = "Days")
   const durationLabel = nights !== null && nights > 0
-    ? `${nights} Night${nights > 1 ? 's' : ''}`
+    ? ['lodging', 'custom_cruise'].includes(activity.activityType)
+      ? `${nights} Night${nights > 1 ? 's' : ''}`
+      : `${nights + 1} Days`
     : null
 
   return (
