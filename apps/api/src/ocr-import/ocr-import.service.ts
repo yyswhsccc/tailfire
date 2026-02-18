@@ -1005,6 +1005,12 @@ export class OcrImportService {
       },
     )
 
+    // 6b. Mark package as booked (confirmed invoices are booked + paid)
+    await this.db.client
+      .update(schema.itineraryActivities)
+      .set({ isBooked: true, bookingDate: new Date(), updatedAt: new Date() })
+      .where(eq(schema.itineraryActivities.id, packageActivity.id))
+
     // 7. Create child activities for each component (using normalized components)
     const childIds: string[] = []
     for (const component of components) {
@@ -1125,19 +1131,18 @@ export class OcrImportService {
       auth,
     )
 
-    // 11. Store extracted policies in package_details (NOT activity_pricing)
-    if (extractedTC || extractedCP) {
-      try {
-        await this.activitiesService.updatePackageDetails(packageActivity.id, {
-          ...(extractedTC && { termsAndConditions: extractedTC }),
-          ...(extractedCP && { cancellationPolicy: extractedCP }),
-        })
-      } catch (error) {
-        this.logger.warn({
-          message: 'Failed to store package-level policies — non-blocking',
-          error: error instanceof Error ? error.message : String(error),
-        })
-      }
+    // 11. Store extracted policies + mark as paid in package_details
+    try {
+      await this.activitiesService.updatePackageDetails(packageActivity.id, {
+        paymentStatus: 'paid',
+        ...(extractedTC && { termsAndConditions: extractedTC }),
+        ...(extractedCP && { cancellationPolicy: extractedCP }),
+      })
+    } catch (error) {
+      this.logger.warn({
+        message: 'Failed to update package details — non-blocking',
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
 
     // 12. Link document to parent package
