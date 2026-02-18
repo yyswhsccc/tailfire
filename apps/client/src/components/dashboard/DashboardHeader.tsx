@@ -13,7 +13,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useMockAuth } from "@/lib/mock-auth";
+import { useAuth } from "@/lib/auth";
 import { useConsultant } from "@/context/consultant-context";
 import {
   Button,
@@ -34,18 +34,19 @@ import { DashboardNav } from "./DashboardNav";
 
 export function DashboardHeader() {
   const router = useRouter();
-  const { user, logout } = useMockAuth();
+  const { user, signOut } = useAuth();
   const { consultant } = useConsultant();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await signOut();
     router.push("/login");
   };
 
-  const userInitials = user?.name
-    ? user.name
-        .split(" ")
+  const userInitials = user?.email
+    ? user.email
+        .split("@")[0]!
+        .split(".")
         .map((n) => n[0])
         .join("")
         .toUpperCase()
@@ -157,7 +158,7 @@ export function DashboardHeader() {
                     </AvatarFallback>
                   </Avatar>
                   <span className="hidden md:inline text-white text-sm">
-                    {user?.name}
+                    {user?.user_metadata?.full_name || user?.email}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
@@ -167,7 +168,7 @@ export function DashboardHeader() {
               >
                 <DropdownMenuLabel className="text-white">
                   <div className="flex flex-col">
-                    <span>{user?.name}</span>
+                    <span>{user?.user_metadata?.full_name || user?.email}</span>
                     <span className="text-xs text-phoenix-text-muted font-normal">
                       {user?.email}
                     </span>

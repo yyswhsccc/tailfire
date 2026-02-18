@@ -153,6 +153,10 @@ export * from './ocr-import-jobs.schema'
 // OCR supplier runbooks (extraction hints per supplier/document type)
 export * from './ocr-supplier-runbooks.schema'
 
+// Client Portal
+export * from './client-portal-users.schema'
+export * from './itinerary-feedback.schema'
+
 // Later phases:
 // export * from './financials.schema'
 // export * from './tasks.schema'
