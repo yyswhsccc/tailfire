@@ -28,6 +28,7 @@ import { TripAccessService } from '../trips/trip-access.service'
 import { ActivitiesService } from '../trips/activities.service'
 import { StorageService } from '../trips/storage.service'
 import { SuppliersService } from '../suppliers/suppliers.service'
+import { PaymentSchedulesService } from '../trips/payment-schedules.service'
 import { AutomationService } from '../automation/automation.service'
 import type { AuthContext } from '../auth/auth.types'
 import type { OcrPreviewDto, OcrConfirmDto } from './dto/ocr-import.dto'
@@ -72,6 +73,7 @@ export class OcrImportService {
     private readonly tripAccessService: TripAccessService,
     private readonly storageService: StorageService,
     private readonly suppliersService: SuppliersService,
+    private readonly paymentSchedulesService: PaymentSchedulesService,
     private readonly automationService: AutomationService,
     @InjectQueue(QUEUES.OCR_PROCESSING) private readonly ocrQueue: Queue,
   ) {}
@@ -426,6 +428,12 @@ export class OcrImportService {
       },
     })
 
+    // Mark as booked (confirmed invoices are booked)
+    await this.db.client
+      .update(schema.itineraryActivities)
+      .set({ isBooked: true, bookingDate: new Date(), updatedAt: new Date() })
+      .where(eq(schema.itineraryActivities.id, activity.id))
+
     // Create travelers and link
     const { travelersCreated, travelersMatched } = await this.createAndLinkTravelers(
       extraction.travelers,
@@ -435,6 +443,12 @@ export class OcrImportService {
       activity.id,
       auth,
     )
+
+    // Create payment schedule (non-blocking)
+    const totalPriceCents = flight.totalPriceCents || 0
+    if (totalPriceCents > 0 && activity.activityPricingId) {
+      await this.createPaidPaymentSchedule(activity.activityPricingId, totalPriceCents, flight.currency || 'CAD')
+    }
 
     // Store extracted policies at activity level
     await this.storeActivityPolicies(activity.id, extractedTC, extractedCP)
@@ -520,6 +534,12 @@ export class OcrImportService {
       },
     })
 
+    // Mark as booked (confirmed invoices are booked)
+    await this.db.client
+      .update(schema.itineraryActivities)
+      .set({ isBooked: true, bookingDate: new Date(), updatedAt: new Date() })
+      .where(eq(schema.itineraryActivities.id, activity.id))
+
     const { travelersCreated, travelersMatched } = await this.createAndLinkTravelers(
       extraction.travelers,
       contactMatches,
@@ -528,6 +548,12 @@ export class OcrImportService {
       activity.id,
       auth,
     )
+
+    // Create payment schedule (non-blocking)
+    const totalPriceCents = lodging.totalPriceCents || 0
+    if (totalPriceCents > 0 && activity.activityPricingId) {
+      await this.createPaidPaymentSchedule(activity.activityPricingId, totalPriceCents, lodging.currency || 'CAD')
+    }
 
     // Store extracted policies at activity level
     await this.storeActivityPolicies(activity.id, extractedTC, extractedCP)
@@ -631,6 +657,12 @@ export class OcrImportService {
       },
     })
 
+    // Mark as booked (confirmed invoices are booked)
+    await this.db.client
+      .update(schema.itineraryActivities)
+      .set({ isBooked: true, bookingDate: new Date(), updatedAt: new Date() })
+      .where(eq(schema.itineraryActivities.id, activity.id))
+
     const { travelersCreated, travelersMatched } = await this.createAndLinkTravelers(
       extraction.travelers,
       contactMatches,
@@ -639,6 +671,12 @@ export class OcrImportService {
       activity.id,
       auth,
     )
+
+    // Create payment schedule (non-blocking)
+    const totalPriceCents = cruise.totalPriceCents || 0
+    if (totalPriceCents > 0 && activity.activityPricingId) {
+      await this.createPaidPaymentSchedule(activity.activityPricingId, totalPriceCents, cruise.currency || 'CAD')
+    }
 
     // Store extracted policies at activity level
     await this.storeActivityPolicies(activity.id, extractedTC, extractedCP)
@@ -1130,6 +1168,18 @@ export class OcrImportService {
       packageActivity.id,
       auth,
     )
+
+    // 10b. Create payment schedule for package (non-blocking)
+    if (totalPriceCents) {
+      const [pricingRow] = await this.db.client
+        .select({ id: schema.activityPricing.id })
+        .from(schema.activityPricing)
+        .where(eq(schema.activityPricing.activityId, packageActivity.id))
+        .limit(1)
+      if (pricingRow?.id) {
+        await this.createPaidPaymentSchedule(pricingRow.id, totalPriceCents, pkg.currency || 'CAD')
+      }
+    }
 
     // 11. Store extracted policies + mark as paid in package_details
     try {
@@ -1657,6 +1707,71 @@ export class OcrImportService {
       this.logger.warn({
         message: 'Failed to store activity-level policies — non-blocking',
         activityId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  // ============================================================================
+  // Payment Schedule Helper
+  // ============================================================================
+
+  /**
+   * Create a "fully paid" payment schedule from OCR import.
+   * Creates the schedule config + expected item + payment transaction.
+   * Non-blocking: logs warnings on failure but does not throw.
+   */
+  private async createPaidPaymentSchedule(
+    activityPricingId: string,
+    totalPriceCents: number,
+    currency: string,
+  ): Promise<void> {
+    try {
+      // Check if schedule config already exists (packages auto-create an empty one)
+      const existing = await this.paymentSchedulesService.findByActivityPricingId(activityPricingId)
+
+      let schedule: { expectedPaymentItems?: Array<{ id: string }> }
+      if (existing) {
+        // Package case: config exists, add expected items via update
+        schedule = await this.paymentSchedulesService.update(activityPricingId, {
+          expectedPaymentItems: [{
+            paymentName: 'Full Payment',
+            expectedAmountCents: totalPriceCents,
+            dueDate: null,
+            sequenceOrder: 1,
+          }],
+        })
+      } else {
+        // Flight/lodging/cruise: create config + items from scratch
+        schedule = await this.paymentSchedulesService.create({
+          activityPricingId,
+          scheduleType: 'full',
+          expectedPaymentItems: [{
+            paymentName: 'Full Payment',
+            expectedAmountCents: totalPriceCents,
+            dueDate: null,
+            sequenceOrder: 1,
+          }],
+        })
+      }
+
+      // Mark as paid with a transaction
+      const expectedItemId = schedule.expectedPaymentItems?.[0]?.id
+      if (expectedItemId) {
+        await this.paymentSchedulesService.createTransaction({
+          expectedPaymentItemId: expectedItemId,
+          transactionType: 'payment',
+          amountCents: totalPriceCents,
+          currency,
+          paymentMethod: null,
+          transactionDate: new Date().toISOString(),
+          notes: 'Auto-created from OCR import (invoice marked as paid)',
+        })
+      }
+    } catch (error) {
+      this.logger.warn({
+        message: 'Failed to create payment schedule from import — non-blocking',
+        activityPricingId,
         error: error instanceof Error ? error.message : String(error),
       })
     }
