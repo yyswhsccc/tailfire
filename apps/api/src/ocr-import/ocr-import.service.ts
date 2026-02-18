@@ -428,12 +428,6 @@ export class OcrImportService {
       },
     })
 
-    // Mark as booked (confirmed invoices are booked)
-    await this.db.client
-      .update(schema.itineraryActivities)
-      .set({ isBooked: true, bookingDate: new Date(), updatedAt: new Date() })
-      .where(eq(schema.itineraryActivities.id, activity.id))
-
     // Create travelers and link
     const { travelersCreated, travelersMatched } = await this.createAndLinkTravelers(
       extraction.travelers,
@@ -447,7 +441,7 @@ export class OcrImportService {
     // Create payment schedule (non-blocking)
     const totalPriceCents = flight.totalPriceCents || 0
     if (totalPriceCents > 0 && activity.activityPricingId) {
-      await this.createPaidPaymentSchedule(activity.activityPricingId, totalPriceCents, flight.currency || 'CAD')
+      await this.createPaymentSchedule(activity.activityPricingId, totalPriceCents, flight.currency || 'CAD')
     }
 
     // Store extracted policies at activity level
@@ -534,12 +528,6 @@ export class OcrImportService {
       },
     })
 
-    // Mark as booked (confirmed invoices are booked)
-    await this.db.client
-      .update(schema.itineraryActivities)
-      .set({ isBooked: true, bookingDate: new Date(), updatedAt: new Date() })
-      .where(eq(schema.itineraryActivities.id, activity.id))
-
     const { travelersCreated, travelersMatched } = await this.createAndLinkTravelers(
       extraction.travelers,
       contactMatches,
@@ -552,7 +540,7 @@ export class OcrImportService {
     // Create payment schedule (non-blocking)
     const totalPriceCents = lodging.totalPriceCents || 0
     if (totalPriceCents > 0 && activity.activityPricingId) {
-      await this.createPaidPaymentSchedule(activity.activityPricingId, totalPriceCents, lodging.currency || 'CAD')
+      await this.createPaymentSchedule(activity.activityPricingId, totalPriceCents, lodging.currency || 'CAD')
     }
 
     // Store extracted policies at activity level
@@ -657,12 +645,6 @@ export class OcrImportService {
       },
     })
 
-    // Mark as booked (confirmed invoices are booked)
-    await this.db.client
-      .update(schema.itineraryActivities)
-      .set({ isBooked: true, bookingDate: new Date(), updatedAt: new Date() })
-      .where(eq(schema.itineraryActivities.id, activity.id))
-
     const { travelersCreated, travelersMatched } = await this.createAndLinkTravelers(
       extraction.travelers,
       contactMatches,
@@ -675,7 +657,7 @@ export class OcrImportService {
     // Create payment schedule (non-blocking)
     const totalPriceCents = cruise.totalPriceCents || 0
     if (totalPriceCents > 0 && activity.activityPricingId) {
-      await this.createPaidPaymentSchedule(activity.activityPricingId, totalPriceCents, cruise.currency || 'CAD')
+      await this.createPaymentSchedule(activity.activityPricingId, totalPriceCents, cruise.currency || 'CAD')
     }
 
     // Store extracted policies at activity level
@@ -1043,12 +1025,6 @@ export class OcrImportService {
       },
     )
 
-    // 6b. Mark package as booked (confirmed invoices are booked + paid)
-    await this.db.client
-      .update(schema.itineraryActivities)
-      .set({ isBooked: true, bookingDate: new Date(), updatedAt: new Date() })
-      .where(eq(schema.itineraryActivities.id, packageActivity.id))
-
     // 7. Create child activities for each component (using normalized components)
     const childIds: string[] = []
     for (const component of components) {
@@ -1177,14 +1153,13 @@ export class OcrImportService {
         .where(eq(schema.activityPricing.activityId, packageActivity.id))
         .limit(1)
       if (pricingRow?.id) {
-        await this.createPaidPaymentSchedule(pricingRow.id, totalPriceCents, pkg.currency || 'CAD')
+        await this.createPaymentSchedule(pricingRow.id, totalPriceCents, pkg.currency || 'CAD')
       }
     }
 
     // 11. Store extracted policies + mark as paid in package_details
     try {
       await this.activitiesService.updatePackageDetails(packageActivity.id, {
-        paymentStatus: 'paid',
         ...(extractedTC && { termsAndConditions: extractedTC }),
         ...(extractedCP && { cancellationPolicy: extractedCP }),
       })
@@ -1717,23 +1692,22 @@ export class OcrImportService {
   // ============================================================================
 
   /**
-   * Create a "fully paid" payment schedule from OCR import.
-   * Creates the schedule config + expected item + payment transaction.
+   * Create expected payment items from OCR import (unpaid).
+   * Creates the schedule config + expected item but no transaction.
    * Non-blocking: logs warnings on failure but does not throw.
    */
-  private async createPaidPaymentSchedule(
+  private async createPaymentSchedule(
     activityPricingId: string,
     totalPriceCents: number,
-    currency: string,
+    _currency: string,
   ): Promise<void> {
     try {
       // Check if schedule config already exists (packages auto-create an empty one)
       const existing = await this.paymentSchedulesService.findByActivityPricingId(activityPricingId)
 
-      let schedule: { expectedPaymentItems?: Array<{ id: string }> }
       if (existing) {
         // Package case: config exists, add expected items via update
-        schedule = await this.paymentSchedulesService.update(activityPricingId, {
+        await this.paymentSchedulesService.update(activityPricingId, {
           expectedPaymentItems: [{
             paymentName: 'Full Payment',
             expectedAmountCents: totalPriceCents,
@@ -1743,7 +1717,7 @@ export class OcrImportService {
         })
       } else {
         // Flight/lodging/cruise: create config + items from scratch
-        schedule = await this.paymentSchedulesService.create({
+        await this.paymentSchedulesService.create({
           activityPricingId,
           scheduleType: 'full',
           expectedPaymentItems: [{
@@ -1752,20 +1726,6 @@ export class OcrImportService {
             dueDate: null,
             sequenceOrder: 1,
           }],
-        })
-      }
-
-      // Mark as paid with a transaction
-      const expectedItemId = schedule.expectedPaymentItems?.[0]?.id
-      if (expectedItemId) {
-        await this.paymentSchedulesService.createTransaction({
-          expectedPaymentItemId: expectedItemId,
-          transactionType: 'payment',
-          amountCents: totalPriceCents,
-          currency,
-          paymentMethod: null,
-          transactionDate: new Date().toISOString(),
-          notes: 'Auto-created from OCR import (invoice marked as paid)',
         })
       }
     } catch (error) {
@@ -1793,7 +1753,7 @@ export class OcrImportService {
     const trip = await this.tripsService.create(
       {
         name: defaults.name,
-        status: 'booked',
+        status: 'inbound',
         startDate: defaults.startDate,
         endDate: defaults.endDate,
         tripType: 'leisure',
