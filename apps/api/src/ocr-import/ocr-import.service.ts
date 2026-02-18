@@ -1160,6 +1160,7 @@ export class OcrImportService {
     // 11. Store extracted policies + mark as paid in package_details
     try {
       await this.activitiesService.updatePackageDetails(packageActivity.id, {
+        paymentStatus: 'paid',
         ...(extractedTC && { termsAndConditions: extractedTC }),
         ...(extractedCP && { cancellationPolicy: extractedCP }),
       })
@@ -1692,22 +1693,23 @@ export class OcrImportService {
   // ============================================================================
 
   /**
-   * Create expected payment items from OCR import (unpaid).
-   * Creates the schedule config + expected item but no transaction.
+   * Create a paid payment schedule from OCR import.
+   * Creates the schedule config + expected item + payment transaction.
    * Non-blocking: logs warnings on failure but does not throw.
    */
   private async createPaymentSchedule(
     activityPricingId: string,
     totalPriceCents: number,
-    _currency: string,
+    currency: string,
   ): Promise<void> {
     try {
       // Check if schedule config already exists (packages auto-create an empty one)
       const existing = await this.paymentSchedulesService.findByActivityPricingId(activityPricingId)
 
+      let schedule: { expectedPaymentItems?: Array<{ id: string }> }
       if (existing) {
         // Package case: config exists, add expected items via update
-        await this.paymentSchedulesService.update(activityPricingId, {
+        schedule = await this.paymentSchedulesService.update(activityPricingId, {
           expectedPaymentItems: [{
             paymentName: 'Full Payment',
             expectedAmountCents: totalPriceCents,
@@ -1717,7 +1719,7 @@ export class OcrImportService {
         })
       } else {
         // Flight/lodging/cruise: create config + items from scratch
-        await this.paymentSchedulesService.create({
+        schedule = await this.paymentSchedulesService.create({
           activityPricingId,
           scheduleType: 'full',
           expectedPaymentItems: [{
@@ -1726,6 +1728,20 @@ export class OcrImportService {
             dueDate: null,
             sequenceOrder: 1,
           }],
+        })
+      }
+
+      // Mark as paid with a transaction
+      const expectedItemId = schedule.expectedPaymentItems?.[0]?.id
+      if (expectedItemId) {
+        await this.paymentSchedulesService.createTransaction({
+          expectedPaymentItemId: expectedItemId,
+          transactionType: 'payment',
+          amountCents: totalPriceCents,
+          currency,
+          paymentMethod: null,
+          transactionDate: new Date().toISOString(),
+          notes: 'Auto-created from OCR import (invoice marked as paid)',
         })
       }
     } catch (error) {
