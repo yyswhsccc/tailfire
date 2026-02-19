@@ -59,12 +59,15 @@ interface PaymentScheduleSectionProps {
   activityPricingId: string | null
   totalPriceCents: number
   currency: string
+  /** Trip ID for contact picker in Record Payment modal */
+  tripId?: string
 }
 
 export function PaymentScheduleSection({
   activityPricingId,
   totalPriceCents,
   currency,
+  tripId,
 }: PaymentScheduleSectionProps) {
   const { data: existingSchedule, isLoading } = usePaymentSchedule(activityPricingId)
   const createSchedule = useCreatePaymentSchedule()
@@ -435,12 +438,13 @@ export function PaymentScheduleSection({
       </div>
 
       {/* Record Payment Modal */}
-      {selectedPaymentItem && activityPricingId && (
+      {selectedPaymentItem && activityPricingId && tripId && (
         <RecordPaymentModal
           open={recordPaymentModalOpen}
           onOpenChange={setRecordPaymentModalOpen}
           expectedPaymentItem={selectedPaymentItem}
           activityPricingId={activityPricingId}
+          tripId={tripId}
           currency={currency}
         />
       )}

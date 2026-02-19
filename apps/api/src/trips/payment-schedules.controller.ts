@@ -203,6 +203,26 @@ export class PaymentSchedulesController {
   }
 
   /**
+   * Update the contact ("Paid By") on a payment transaction
+   * PATCH /payment-schedules/transactions/:transactionId/contact
+   *
+   * Access check: User must have write access to the trip.
+   */
+  @Patch('transactions/:transactionId/contact')
+  async updateTransactionContact(
+    @GetAuthContext() auth: AuthContext,
+    @Param('transactionId') transactionId: string,
+    @Body() dto: { contactId: string | null },
+  ): Promise<PaymentTransactionDto> {
+    const tripId = await this.paymentSchedulesService.getTripIdFromTransactionId(transactionId)
+    if (!tripId) {
+      throw new NotFoundException(`Payment transaction with ID ${transactionId} not found`)
+    }
+    await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    return this.paymentSchedulesService.updateTransactionContact(transactionId, dto.contactId, auth.agencyId)
+  }
+
+  /**
    * Delete a payment transaction
    * DELETE /payment-schedules/transactions/:transactionId
    *

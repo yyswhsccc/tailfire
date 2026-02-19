@@ -1952,6 +1952,7 @@ export function CustomCruiseForm({
               activityPricingId={activityPricingId}
               totalPriceCents={pricingData.totalPriceCents}
               currency={pricingData.currency}
+              tripId={trip?.id || ''}
             />
           </div>
 

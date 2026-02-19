@@ -18,6 +18,7 @@ import type {
   PaymentTransactionListResponseDto,
   TripExpectedPaymentDto,
   TripPaymentTransactionDto,
+  ContactPaymentTransactionDto,
 } from '@tailfire/shared-types/api'
 import { useToast } from './use-toast'
 
@@ -35,6 +36,8 @@ export const paymentScheduleKeys = {
     [...paymentScheduleKeys.all, 'trip-expected-payments', tripId] as const,
   tripTransactions: (tripId: string) =>
     [...paymentScheduleKeys.all, 'trip-transactions', tripId] as const,
+  contactTransactions: (contactId: string) =>
+    [...paymentScheduleKeys.all, 'contact-transactions', contactId] as const,
 }
 
 // ============================================================================
@@ -302,6 +305,39 @@ export function useUpdateExpectedPaymentItem(activityPricingId: string) {
   })
 }
 
+/**
+ * Assign a contact to an expected payment item (trip-level, invalidates trip caches)
+ */
+export function useAssignPaymentContact(tripId: string) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: async ({ itemId, contactId }: { itemId: string; contactId: string | null }) => {
+      return api.patch<ExpectedPaymentItemDto>(
+        `/payment-schedules/expected-payment-items/${itemId}`,
+        { contactId }
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: paymentScheduleKeys.tripExpectedPayments(tripId),
+      })
+      // Also invalidate contact transaction caches (any contact)
+      queryClient.invalidateQueries({
+        queryKey: [...paymentScheduleKeys.all, 'contact-transactions'],
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to assign contact',
+        description: error?.message || 'An unexpected error occurred.',
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
 // ============================================================================
 // Payment Transaction Queries
 // ============================================================================
@@ -438,5 +474,102 @@ export function useDeletePaymentTransaction(activityPricingId: string, expectedP
         variant: 'destructive',
       })
     },
+  })
+}
+
+/**
+ * Update the contact ("Paid By") on a payment transaction
+ */
+export function useUpdateTransactionContact(tripId: string) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: async ({ transactionId, contactId }: { transactionId: string; contactId: string | null }) => {
+      return api.patch<PaymentTransactionDto>(
+        `/payment-schedules/transactions/${transactionId}/contact`,
+        { contactId }
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: paymentScheduleKeys.tripTransactions(tripId),
+      })
+      // Also invalidate contact transaction caches
+      queryClient.invalidateQueries({
+        queryKey: [...paymentScheduleKeys.all, 'contact-transactions'],
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to update contact',
+        description: error?.message || 'An unexpected error occurred.',
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+/**
+ * Delete a payment transaction from trip-level view (invalidates trip + contact keys)
+ */
+export function useDeletePaymentTransactionFromTrip(tripId: string, contactId?: string) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: async (transactionId: string) => {
+      return api.delete(`/payment-schedules/transactions/${transactionId}`)
+    },
+    onSuccess: () => {
+      // Invalidate trip-level payment keys
+      queryClient.invalidateQueries({
+        queryKey: paymentScheduleKeys.tripTransactions(tripId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: paymentScheduleKeys.tripExpectedPayments(tripId),
+      })
+      // Invalidate contact transactions if provided
+      if (contactId) {
+        queryClient.invalidateQueries({
+          queryKey: paymentScheduleKeys.contactTransactions(contactId),
+        })
+      }
+      // Broad invalidation for activity-level caches
+      queryClient.invalidateQueries({
+        queryKey: paymentScheduleKeys.all,
+        predicate: (query) =>
+          query.queryKey[1] === 'activity-pricing' || query.queryKey[1] === 'transactions',
+      })
+      // Refresh bookings tab
+      queryClient.invalidateQueries({ queryKey: ['bookings', 'list'] })
+      queryClient.invalidateQueries({ queryKey: ['bookings', 'tripTotals', tripId] })
+
+      toast({
+        title: 'Transaction deleted',
+        description: 'Payment transaction has been successfully deleted.',
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to delete transaction',
+        description: error?.message || 'An unexpected error occurred.',
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+/**
+ * Fetch payment transactions for a contact across all their trips
+ */
+export function useContactPaymentTransactions(contactId: string | null) {
+  return useQuery({
+    queryKey: paymentScheduleKeys.contactTransactions(contactId || ''),
+    queryFn: async () => {
+      if (!contactId) return []
+      return api.get<ContactPaymentTransactionDto[]>(`/contacts/${contactId}/payment-transactions`)
+    },
+    enabled: !!contactId,
   })
 }

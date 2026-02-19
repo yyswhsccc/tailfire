@@ -799,6 +799,27 @@
       "when": 1771444800000,
       "tag": "20260217200000_create_ocr_supplier_runbooks",
       "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "7",
+      "when": 1771506600000,
+      "tag": "20260219141000_drop_duplicate_no_action_fks",
+      "breakpoints": true
+    },
+    {
+      "idx": 115,
+      "version": "7",
+      "when": 1771516800000,
+      "tag": "20260219160000_add_contact_id_to_expected_payment_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1771520400000,
+      "tag": "20260219170000_add_contact_id_to_payment_transactions",
+      "breakpoints": true
     }
   ]
 }
