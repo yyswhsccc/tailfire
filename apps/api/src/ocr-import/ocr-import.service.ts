@@ -1848,7 +1848,7 @@ export class OcrImportService {
           transactionType: 'payment',
           amountCents: txAmountCents,
           currency,
-          paymentMethod: null, // preserve raw method text in notes instead
+          paymentMethod: this.inferPaymentMethod(item.method),
           referenceNumber: item.referenceNumber || undefined,
           transactionDate,
           notes,
@@ -1980,6 +1980,32 @@ export class OcrImportService {
       return `${bookingDate}T12:00:00`
     }
     return new Date().toISOString()
+  }
+
+  /**
+   * Map free-text OCR payment method to PaymentMethod enum.
+   * Returns null if no match found.
+   */
+  private inferPaymentMethod(method?: string | null): 'credit_card' | 'bank_transfer' | 'cash' | 'check' | 'stripe' | 'other' | null {
+    if (!method) return null
+    const lower = method.toLowerCase()
+    if (/visa|master\s?card|mastercard|amex|american express|discover|diners|jcb|credit|debit|card|\d{4}\*+\d{3,4}/.test(lower)) {
+      return 'credit_card'
+    }
+    if (/wire|transfer|eft|ach|e-transfer|etransfer|bank/.test(lower)) {
+      return 'bank_transfer'
+    }
+    if (/cash/.test(lower)) {
+      return 'cash'
+    }
+    if (/cheque|check/.test(lower)) {
+      return 'check'
+    }
+    if (/stripe/.test(lower)) {
+      return 'stripe'
+    }
+    // Has method text but doesn't match known patterns
+    return 'other'
   }
 
   // ============================================================================

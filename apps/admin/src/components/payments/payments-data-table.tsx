@@ -65,6 +65,20 @@ function formatDate(date: string | null): string {
   })
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  credit_card: 'Credit Card',
+  bank_transfer: 'Bank Transfer',
+  cash: 'Cash',
+  check: 'Check',
+  stripe: 'Stripe',
+  other: 'Other',
+}
+
+function formatPaymentMethod(method: string | null | undefined): string {
+  if (!method) return '—'
+  return PAYMENT_METHOD_LABELS[method] || method
+}
+
 function statusBadgeVariant(status: TripExpectedPaymentDto['status']): 'default' | 'secondary' | 'outline' {
   switch (status) {
     case 'paid':
@@ -425,7 +439,7 @@ export function PaymentsDataTable({ activities, tripId }: PaymentsDataTableProps
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell>{transaction.paymentMethod || '—'}</TableCell>
+                    <TableCell>{formatPaymentMethod(transaction.paymentMethod)}</TableCell>
                     <TableCell>{transaction.referenceNumber || '—'}</TableCell>
                   </TableRow>
                 ))
@@ -502,7 +516,7 @@ export function PaymentsDataTable({ activities, tripId }: PaymentsDataTableProps
                 </div>
                 <div>
                   <p className="text-gray-500">Payment Method</p>
-                  <p className="font-medium">{selectedTransaction.paymentMethod || 'Not specified'}</p>
+                  <p className="font-medium">{formatPaymentMethod(selectedTransaction.paymentMethod) === '—' ? 'Not specified' : formatPaymentMethod(selectedTransaction.paymentMethod)}</p>
                 </div>
                 <div>
                   <p className="text-gray-500">Reference</p>
