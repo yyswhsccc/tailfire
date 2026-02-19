@@ -463,6 +463,8 @@ export class OcrService {
       commissionRate: typeof data.commissionRate === 'number' ? data.commissionRate : null,
       commissionAmount: typeof data.commissionAmount === 'number' ? data.commissionAmount : null,
       taxesAndFees: typeof data.taxesAndFees === 'number' ? data.taxesAndFees : null,
+      addOns: typeof data.addOns === 'number' ? data.addOns : null,
+      remarks: data.remarks ? String(data.remarks) : null,
       components: components
         .filter((c): c is Record<string, unknown> => typeof c === 'object' && c !== null)
         .map((c) => ({

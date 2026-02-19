@@ -479,6 +479,7 @@ export const ocrPackageExtractionSchema = z.object({
   commissionAmount: z.number().nullish(),
   taxesAndFees: z.number().nullish(),
   addOns: z.number().nullish(),
+  remarks: z.string().nullish(),
   components: z.array(ocrPackageComponentSchema).default([]),
   perPersonPricing: z.array(ocrPerPersonPriceSchema).default([]),
   termsAndConditions: z.string().nullish(),

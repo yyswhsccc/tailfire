@@ -2,7 +2,7 @@
  * OCR Import Service
  *
  * Orchestrates the full OCR import flow: preview + confirm.
- * Follows the same patterns as ImportBookingService for cruise imports.
+ * Follows the same patterns as ImportBookingService for booking imports.
  */
 
 import {
@@ -428,6 +428,12 @@ export class OcrImportService {
       },
     })
 
+    // Mark as booked (confirmed invoices are booked)
+    await this.db.client
+      .update(schema.itineraryActivities)
+      .set({ isBooked: true, bookingDate: flight.bookingDate ? new Date(`${flight.bookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
+      .where(eq(schema.itineraryActivities.id, activity.id))
+
     // Create travelers and link
     const { travelersCreated, travelersMatched } = await this.createAndLinkTravelers(
       extraction.travelers,
@@ -441,7 +447,7 @@ export class OcrImportService {
     // Create payment schedule (non-blocking)
     const totalPriceCents = flight.totalPriceCents || 0
     if (totalPriceCents > 0 && activity.activityPricingId) {
-      await this.createPaymentSchedule(activity.activityPricingId, totalPriceCents, flight.currency || 'CAD')
+      await this.createPaymentSchedule(activity.activityPricingId, totalPriceCents, flight.currency || 'CAD', flight.bookingDate || undefined)
     }
 
     // Store extracted policies at activity level
@@ -528,6 +534,12 @@ export class OcrImportService {
       },
     })
 
+    // Mark as booked (confirmed invoices are booked)
+    await this.db.client
+      .update(schema.itineraryActivities)
+      .set({ isBooked: true, bookingDate: lodging.bookingDate ? new Date(`${lodging.bookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
+      .where(eq(schema.itineraryActivities.id, activity.id))
+
     const { travelersCreated, travelersMatched } = await this.createAndLinkTravelers(
       extraction.travelers,
       contactMatches,
@@ -540,7 +552,7 @@ export class OcrImportService {
     // Create payment schedule (non-blocking)
     const totalPriceCents = lodging.totalPriceCents || 0
     if (totalPriceCents > 0 && activity.activityPricingId) {
-      await this.createPaymentSchedule(activity.activityPricingId, totalPriceCents, lodging.currency || 'CAD')
+      await this.createPaymentSchedule(activity.activityPricingId, totalPriceCents, lodging.currency || 'CAD', lodging.bookingDate || undefined)
     }
 
     // Store extracted policies at activity level
@@ -645,6 +657,13 @@ export class OcrImportService {
       },
     })
 
+    // Mark as booked (confirmed invoices are booked)
+    const cruiseBookingDate = extraction.booking?.bookingDate
+    await this.db.client
+      .update(schema.itineraryActivities)
+      .set({ isBooked: true, bookingDate: cruiseBookingDate ? new Date(`${cruiseBookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
+      .where(eq(schema.itineraryActivities.id, activity.id))
+
     const { travelersCreated, travelersMatched } = await this.createAndLinkTravelers(
       extraction.travelers,
       contactMatches,
@@ -657,7 +676,7 @@ export class OcrImportService {
     // Create payment schedule (non-blocking)
     const totalPriceCents = cruise.totalPriceCents || 0
     if (totalPriceCents > 0 && activity.activityPricingId) {
-      await this.createPaymentSchedule(activity.activityPricingId, totalPriceCents, cruise.currency || 'CAD')
+      await this.createPaymentSchedule(activity.activityPricingId, totalPriceCents, cruise.currency || 'CAD', cruiseBookingDate || undefined)
     }
 
     // Store extracted policies at activity level
@@ -714,8 +733,8 @@ export class OcrImportService {
       }
     } else {
       // Match or create contact
-      const firstName = passport.firstName || 'Unknown'
-      const lastName = passport.lastName || 'Unknown'
+      const firstName = this.titleCase(passport.firstName || 'Unknown')
+      const lastName = this.titleCase(passport.lastName || 'Unknown')
 
       const existing = await this.db.client
         .select({ id: this.db.schema.contacts.id })
@@ -1025,6 +1044,12 @@ export class OcrImportService {
       },
     )
 
+    // 6b. Mark package as booked (confirmed invoices are booked)
+    await this.db.client
+      .update(schema.itineraryActivities)
+      .set({ isBooked: true, bookingDate: pkg.bookingDate ? new Date(`${pkg.bookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
+      .where(eq(schema.itineraryActivities.id, packageActivity.id))
+
     // 7. Create child activities for each component (using normalized components)
     const childIds: string[] = []
     for (const component of components) {
@@ -1153,7 +1178,7 @@ export class OcrImportService {
         .where(eq(schema.activityPricing.activityId, packageActivity.id))
         .limit(1)
       if (pricingRow?.id) {
-        await this.createPaymentSchedule(pricingRow.id, totalPriceCents, pkg.currency || 'CAD')
+        await this.createPaymentSchedule(pricingRow.id, totalPriceCents, pkg.currency || 'CAD', pkg.bookingDate || undefined)
       }
     }
 
@@ -1323,7 +1348,12 @@ export class OcrImportService {
   /**
    * Normalize package components:
    * 1. Combine consecutive same-direction flight segments into single flights with segments
-   * 2. Split multi-day transfers into separate arrival + departure transfers
+   * 2. Split round-trip or multi-day transfers into separate arrival + departure transfers
+   *
+   * Round-trip detection:
+   * - Explicit: pickupDate !== dropoffDate (different days)
+   * - Implicit: name/description contains "round trip" even if dates are same or missing.
+   *   In that case, infer the return date from sibling components (return flight or lodging checkout).
    */
   private normalizePackageComponents(
     components: OcrPackageExtraction['components'],
@@ -1331,39 +1361,74 @@ export class OcrImportService {
     // Pass 1: Combine consecutive flights into multi-segment flights
     const afterFlightMerge = this.mergeConsecutiveFlights(components)
 
-    // Pass 2: Split multi-day transfers
+    // Pass 2: Split round-trip / multi-day transfers
     const result: OcrPackageExtraction['components'] = []
     for (const comp of afterFlightMerge) {
-      if (
-        comp.componentType === 'transportation' &&
-        comp.transportation?.pickupDate &&
-        comp.transportation?.dropoffDate &&
-        comp.transportation.pickupDate !== comp.transportation.dropoffDate
-      ) {
-        const t = comp.transportation
-        const providerName = comp.name || 'Transfer'
-
-        result.push({
-          ...comp,
-          name: `Airport Transfer (Arrival) — ${providerName}`,
-          transportation: { ...t, dropoffDate: t.pickupDate },
-        })
-        result.push({
-          ...comp,
-          name: `Airport Transfer (Departure) — ${providerName}`,
-          transportation: {
-            ...t,
-            pickupDate: t.dropoffDate,
-            pickupLocation: t.dropoffLocation || t.pickupLocation,
-            dropoffLocation: t.pickupLocation || t.dropoffLocation,
-          },
-        })
-        this.logger.log(
-          `Split round-trip transfer "${comp.name}" into arrival (${t.pickupDate}) + departure (${t.dropoffDate})`,
-        )
-      } else {
+      if (comp.componentType !== 'transportation' || !comp.transportation) {
         result.push(comp)
+        continue
       }
+
+      const t = comp.transportation
+      const isRoundTripText = /round\s*trip/i.test(`${comp.name || ''} ${comp.description || ''}`)
+      const hasDifferentDates = t.pickupDate && t.dropoffDate && t.pickupDate !== t.dropoffDate
+
+      if (!hasDifferentDates && !isRoundTripText) {
+        result.push(comp)
+        continue
+      }
+
+      // Determine the return date
+      let returnDate = hasDifferentDates ? t.dropoffDate! : null
+
+      if (!returnDate) {
+        // Infer from sibling components: prefer return flight, fall back to lodging checkout
+        for (const sibling of afterFlightMerge) {
+          if (sibling.componentType === 'flight' && sibling.flight?.departureDate) {
+            // Use the latest flight departure as the return date
+            if (!returnDate || sibling.flight.departureDate > returnDate) {
+              returnDate = sibling.flight.departureDate
+            }
+          }
+        }
+        if (!returnDate) {
+          for (const sibling of afterFlightMerge) {
+            if (sibling.componentType === 'lodging' && sibling.lodging?.checkOutDate) {
+              if (!returnDate || sibling.lodging.checkOutDate > returnDate) {
+                returnDate = sibling.lodging.checkOutDate
+              }
+            }
+          }
+        }
+      }
+
+      if (!returnDate || returnDate === t.pickupDate) {
+        // Can't determine a return date — keep as single transfer
+        result.push(comp)
+        continue
+      }
+
+      const providerName = comp.name || 'Transfer'
+
+      result.push({
+        ...comp,
+        name: `Airport Transfer (Arrival) — ${providerName}`,
+        transportation: { ...t, dropoffDate: t.pickupDate },
+      })
+      result.push({
+        ...comp,
+        name: `Airport Transfer (Departure) — ${providerName}`,
+        transportation: {
+          ...t,
+          pickupDate: returnDate,
+          dropoffDate: returnDate,
+          pickupLocation: t.dropoffLocation || t.pickupLocation,
+          dropoffLocation: t.pickupLocation || t.dropoffLocation,
+        },
+      })
+      this.logger.log(
+        `Split round-trip transfer "${comp.name}" into arrival (${t.pickupDate}) + departure (${returnDate})`,
+      )
     }
 
     return result
@@ -1701,6 +1766,7 @@ export class OcrImportService {
     activityPricingId: string,
     totalPriceCents: number,
     currency: string,
+    bookingDate?: string,
   ): Promise<void> {
     try {
       // Check if schedule config already exists (packages auto-create an empty one)
@@ -1740,7 +1806,8 @@ export class OcrImportService {
           amountCents: totalPriceCents,
           currency,
           paymentMethod: null,
-          transactionDate: new Date().toISOString(),
+          transactionDate: bookingDate && /^\d{4}-\d{2}-\d{2}$/.test(bookingDate)
+            ? `${bookingDate}T12:00:00` : new Date().toISOString(),
           notes: 'Auto-created from OCR import (invoice marked as paid)',
         })
       }
@@ -1986,6 +2053,8 @@ export class OcrImportService {
           commissionRate: extraction.package.commissionRate || null,
           commissionAmountCents: extraction.package.commissionAmount ? Math.round(extraction.package.commissionAmount * 100) : null,
           taxesAndFeesCents: extraction.package.taxesAndFees ? Math.round(extraction.package.taxesAndFees * 100) : null,
+          addOnsCents: extraction.package.addOns != null ? Math.round(extraction.package.addOns * 100) : null,
+          remarks: extraction.package.remarks || null,
           components: extraction.package.components,
           perPersonPricing: extraction.package.perPersonPricing,
         } : null,
@@ -2008,9 +2077,7 @@ export class OcrImportService {
   private titleCase(name: string): string {
     return name
       .toLowerCase()
-      .split(/[\s-]+/)
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
+      .replace(/(?:^|\s|-)(\w)/g, (match) => match.toUpperCase())
   }
 
   private async findRunbookHints(

@@ -198,6 +198,8 @@ export interface OcrPackageData {
   commissionRate?: number | null
   commissionAmountCents?: number | null
   taxesAndFeesCents?: number | null
+  addOnsCents?: number | null
+  remarks?: string | null
   components: OcrPackageComponent[]
   perPersonPricing: OcrPerPersonPrice[]
   termsAndConditions?: string | null

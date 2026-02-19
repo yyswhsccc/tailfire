@@ -359,6 +359,15 @@ export function OcrPreview({
             {extraction.package.taxesAndFeesCents && (
               <DataRow label="Taxes & Fees" value={formatPrice(extraction.package.taxesAndFeesCents, extraction.package.currency)} />
             )}
+            {extraction.package.addOnsCents != null && extraction.package.addOnsCents > 0 && (
+              <DataRow label="Add-ons" value={formatPrice(extraction.package.addOnsCents, extraction.package.currency)} />
+            )}
+            {extraction.package.bookingDate && (
+              <DataRow label="Booking Date" value={extraction.package.bookingDate} />
+            )}
+            {extraction.package.remarks && (
+              <p className="text-xs text-ash-500">{extraction.package.remarks}</p>
+            )}
 
             {/* Components */}
             {extraction.package.components?.length > 0 && (
@@ -425,6 +434,17 @@ export function OcrPreview({
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+
+            {/* Import Summary */}
+            {extraction.package.totalPriceCents != null && extraction.package.totalPriceCents > 0 && (
+              <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
+                <p className="text-sm text-blue-800 font-medium mb-1">Import Summary</p>
+                <ul className="text-sm text-blue-700 list-disc list-inside space-y-0.5">
+                  <li>Booking will be marked as confirmed and paid</li>
+                  <li>A payment schedule will be created with the full amount recorded as received</li>
+                </ul>
               </div>
             )}
           </CardContent>
