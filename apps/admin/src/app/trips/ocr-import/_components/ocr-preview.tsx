@@ -50,6 +50,83 @@ function formatPrice(cents: number | null | undefined, currency: string | null |
   }).format(amount)
 }
 
+function getPaymentInfo(extraction: OcrExtractionData): {
+  totalPriceCents: number
+  currency: string
+  bookingDate: string | null
+} | null {
+  const sources = [
+    extraction.package && {
+      totalPriceCents: extraction.package.totalPriceCents,
+      currency: extraction.package.currency,
+      bookingDate: extraction.package.bookingDate ?? null,
+    },
+    extraction.flight && {
+      totalPriceCents: extraction.flight.totalPriceCents,
+      currency: extraction.flight.currency,
+      bookingDate: extraction.booking?.bookingDate ?? null,
+    },
+    extraction.lodging && {
+      totalPriceCents: extraction.lodging.totalPriceCents,
+      currency: extraction.lodging.currency,
+      bookingDate: extraction.booking?.bookingDate ?? null,
+    },
+    extraction.cruise && {
+      totalPriceCents: extraction.cruise.totalPriceCents,
+      currency: extraction.cruise.currency,
+      bookingDate: extraction.booking?.bookingDate ?? null,
+    },
+    extraction.transportation && {
+      totalPriceCents: extraction.transportation.totalPriceCents,
+      currency: extraction.transportation.currency,
+      bookingDate: extraction.booking?.bookingDate ?? null,
+    },
+    extraction.dining && {
+      totalPriceCents: extraction.dining.totalPriceCents,
+      currency: extraction.dining.currency,
+      bookingDate: extraction.booking?.bookingDate ?? null,
+    },
+  ] as const
+
+  for (const src of sources) {
+    if (src && src.totalPriceCents != null && src.totalPriceCents > 0) {
+      return {
+        totalPriceCents: src.totalPriceCents,
+        currency: src.currency || 'CAD',
+        bookingDate: src.bookingDate ?? null,
+      }
+    }
+  }
+  return null
+}
+
+function PaymentPreview({ extraction }: { extraction: OcrExtractionData }) {
+  const info = getPaymentInfo(extraction)
+  if (!info) return null
+
+  const formattedAmount = formatPrice(info.totalPriceCents, info.currency)
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Payment Preview</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <DataRow label="Schedule" value="Full Payment" />
+        <DataRow label="Amount" value={formattedAmount} />
+        <DataRow label="Transaction Date" value={info.bookingDate || 'Date of import'} />
+        <div className="flex gap-3">
+          <span className="text-sm text-ash-500 w-28 shrink-0">Status</span>
+          <Badge variant="default" className="text-xs">Paid</Badge>
+        </div>
+        <p className="text-xs text-ash-400 mt-1">
+          A payment schedule will be created automatically with the full amount recorded as received.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
 interface OcrPreviewProps {
   preview: OcrPreviewResponse
   existingTripId?: string
@@ -437,19 +514,12 @@ export function OcrPreview({
               </div>
             )}
 
-            {/* Import Summary */}
-            {extraction.package.totalPriceCents != null && extraction.package.totalPriceCents > 0 && (
-              <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
-                <p className="text-sm text-blue-800 font-medium mb-1">Import Summary</p>
-                <ul className="text-sm text-blue-700 list-disc list-inside space-y-0.5">
-                  <li>Booking will be marked as confirmed and paid</li>
-                  <li>A payment schedule will be created with the full amount recorded as received</li>
-                </ul>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
+
+      {/* Payment Preview — shown for any type with a price */}
+      <PaymentPreview extraction={extraction} />
 
       {/* Traveler Matches */}
       {contactMatches.length > 0 && (
