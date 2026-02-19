@@ -1178,7 +1178,20 @@ export class OcrImportService {
         .where(eq(schema.activityPricing.activityId, packageActivity.id))
         .limit(1)
       if (pricingRow?.id) {
-        await this.createPaymentSchedule(pricingRow.id, totalPriceCents, pkg.currency || 'CAD', pkg.bookingDate || undefined)
+        const paymentEntries = pkg.payments?.length
+          ? pkg.payments.map((p) => ({
+              paymentName: p.paymentName,
+              amountCents: Math.round(p.amount * 100),
+              date: p.date || null,
+              method: p.method || null,
+              referenceNumber: p.referenceNumber || null,
+            }))
+          : undefined
+
+        await this.createPaymentSchedule(
+          pricingRow.id, totalPriceCents, pkg.currency || 'CAD',
+          pkg.bookingDate || undefined, paymentEntries,
+        )
       }
     }
 
@@ -1759,7 +1772,8 @@ export class OcrImportService {
 
   /**
    * Create a paid payment schedule from OCR import.
-   * Creates the schedule config + expected item + payment transaction.
+   * Creates the schedule config + expected items + payment transactions.
+   * Supports multiple extracted payments (deposits, balance payments, etc.)
    * Non-blocking: logs warnings on failure but does not throw.
    */
   private async createPaymentSchedule(
@@ -1767,48 +1781,69 @@ export class OcrImportService {
     totalPriceCents: number,
     currency: string,
     bookingDate?: string,
+    payments?: Array<{
+      paymentName: string
+      amountCents: number
+      date?: string | null
+      method?: string | null
+      referenceNumber?: string | null
+    }>,
   ): Promise<void> {
     try {
+      // Build expected payment items based on extracted payments
+      const expectedItems = this.buildExpectedPaymentItems(totalPriceCents, payments)
+
       // Check if schedule config already exists (packages auto-create an empty one)
       const existing = await this.paymentSchedulesService.findByActivityPricingId(activityPricingId)
 
       let schedule: { expectedPaymentItems?: Array<{ id: string }> }
       if (existing) {
-        // Package case: config exists, add expected items via update
         schedule = await this.paymentSchedulesService.update(activityPricingId, {
-          expectedPaymentItems: [{
-            paymentName: 'Full Payment',
-            expectedAmountCents: totalPriceCents,
+          expectedPaymentItems: expectedItems.map((item, i) => ({
+            paymentName: item.paymentName,
+            expectedAmountCents: item.amountCents,
             dueDate: null,
-            sequenceOrder: 1,
-          }],
+            sequenceOrder: i + 1,
+          })),
         })
       } else {
-        // Flight/lodging/cruise: create config + items from scratch
         schedule = await this.paymentSchedulesService.create({
           activityPricingId,
           scheduleType: 'full',
-          expectedPaymentItems: [{
-            paymentName: 'Full Payment',
-            expectedAmountCents: totalPriceCents,
+          expectedPaymentItems: expectedItems.map((item, i) => ({
+            paymentName: item.paymentName,
+            expectedAmountCents: item.amountCents,
             dueDate: null,
-            sequenceOrder: 1,
-          }],
+            sequenceOrder: i + 1,
+          })),
         })
       }
 
-      // Mark as paid with a transaction
-      const expectedItemId = schedule.expectedPaymentItems?.[0]?.id
-      if (expectedItemId) {
+      // Create transactions for each payment that has a corresponding expected item
+      const createdItems = schedule.expectedPaymentItems || []
+      for (let i = 0; i < expectedItems.length; i++) {
+        const item = expectedItems[i]!
+        const expectedItemId = createdItems[i]?.id
+        if (!expectedItemId || !item.hasTransaction) continue
+
+        const transactionDate = this.resolveTransactionDate(item.date, bookingDate)
+        const notes = item.method || item.referenceNumber
+          ? [
+              'Auto-created from OCR import',
+              item.method ? `Method: ${item.method}` : null,
+              item.referenceNumber ? `Ref: ${item.referenceNumber}` : null,
+            ].filter(Boolean).join(' | ')
+          : 'Auto-created from OCR import (invoice marked as paid)'
+
         await this.paymentSchedulesService.createTransaction({
           expectedPaymentItemId: expectedItemId,
           transactionType: 'payment',
-          amountCents: totalPriceCents,
+          amountCents: item.amountCents,
           currency,
-          paymentMethod: null,
-          transactionDate: bookingDate && /^\d{4}-\d{2}-\d{2}$/.test(bookingDate)
-            ? `${bookingDate}T12:00:00` : new Date().toISOString(),
-          notes: 'Auto-created from OCR import (invoice marked as paid)',
+          paymentMethod: null, // preserve raw method text in notes instead
+          referenceNumber: item.referenceNumber || undefined,
+          transactionDate,
+          notes,
         })
       }
     } catch (error) {
@@ -1818,6 +1853,103 @@ export class OcrImportService {
         error: error instanceof Error ? error.message : String(error),
       })
     }
+  }
+
+  /**
+   * Build expected payment items from extracted payments.
+   * Handles three cases:
+   * 1. Payments sum matches total (within $1): use extracted payments, adjust last for rounding
+   * 2. Payments sum < total (gap > $1): use extracted payments + "Remaining Balance" item (no transaction)
+   * 3. Payments sum > total or no payments: fall back to single "Full Payment"
+   */
+  private buildExpectedPaymentItems(
+    totalPriceCents: number,
+    payments?: Array<{
+      paymentName: string
+      amountCents: number
+      date?: string | null
+      method?: string | null
+      referenceNumber?: string | null
+    }>,
+  ): Array<{
+    paymentName: string
+    amountCents: number
+    hasTransaction: boolean
+    date?: string | null
+    method?: string | null
+    referenceNumber?: string | null
+  }> {
+    if (!payments?.length) {
+      return [{
+        paymentName: 'Full Payment',
+        amountCents: totalPriceCents,
+        hasTransaction: true,
+      }]
+    }
+
+    const paymentSum = payments.reduce((sum, p) => sum + p.amountCents, 0)
+    const gap = totalPriceCents - paymentSum
+
+    // Case 3: payments exceed total — fall back to single Full Payment
+    if (gap < -100) {
+      this.logger.warn({
+        message: 'Extracted payments exceed total — falling back to single Full Payment',
+        paymentSum,
+        totalPriceCents,
+        gap,
+      })
+      return [{
+        paymentName: 'Full Payment',
+        amountCents: totalPriceCents,
+        hasTransaction: true,
+      }]
+    }
+
+    // Case 1: sum matches total (within $1 / 100 cents) — adjust last for exact rounding
+    if (Math.abs(gap) <= 100) {
+      const items = payments.map((p) => ({
+        paymentName: p.paymentName,
+        amountCents: p.amountCents,
+        hasTransaction: true as boolean,
+        date: p.date,
+        method: p.method,
+        referenceNumber: p.referenceNumber,
+      }))
+      // Adjust last item to absorb rounding difference
+      if (gap !== 0 && items.length > 0) {
+        items[items.length - 1]!.amountCents += gap
+      }
+      return items
+    }
+
+    // Case 2: sum < total (gap > $1) — add "Remaining Balance" with no transaction
+    const items = payments.map((p) => ({
+      paymentName: p.paymentName,
+      amountCents: p.amountCents,
+      hasTransaction: true as boolean,
+      date: p.date,
+      method: p.method,
+      referenceNumber: p.referenceNumber,
+    }))
+    items.push({
+      paymentName: 'Remaining Balance',
+      amountCents: gap,
+      hasTransaction: false,
+      date: undefined,
+      method: undefined,
+      referenceNumber: undefined,
+    })
+    return items
+  }
+
+  private resolveTransactionDate(paymentDate?: string | null, bookingDate?: string): string {
+    if (paymentDate && /^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
+      return `${paymentDate}T12:00:00`
+    }
+    if (bookingDate && /^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) {
+      return `${bookingDate}T12:00:00`
+    }
+    return new Date().toISOString()
   }
 
   // ============================================================================
@@ -2055,6 +2187,15 @@ export class OcrImportService {
           taxesAndFeesCents: extraction.package.taxesAndFees ? Math.round(extraction.package.taxesAndFees * 100) : null,
           addOnsCents: extraction.package.addOns != null ? Math.round(extraction.package.addOns * 100) : null,
           remarks: extraction.package.remarks || null,
+          payments: extraction.package.payments?.length
+            ? extraction.package.payments.map((p) => ({
+                paymentName: p.paymentName,
+                amountCents: Math.round(p.amount * 100),
+                date: p.date || null,
+                method: p.method || null,
+                referenceNumber: p.referenceNumber || null,
+              }))
+            : [],
           components: extraction.package.components,
           perPersonPricing: extraction.package.perPersonPricing,
         } : null,

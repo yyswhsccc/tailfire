@@ -16,6 +16,7 @@ import type {
   OcrConfirmRequest,
   OcrDocumentType,
   OcrExtractionData,
+  OcrPackagePayment,
   PolicyDiff,
 } from '@tailfire/shared-types'
 
@@ -50,17 +51,24 @@ function formatPrice(cents: number | null | undefined, currency: string | null |
   }).format(amount)
 }
 
-function getPaymentInfo(extraction: OcrExtractionData): {
+interface PaymentInfo {
   totalPriceCents: number
   currency: string
   bookingDate: string | null
-} | null {
-  const sources = [
-    extraction.package && {
+  payments?: OcrPackagePayment[]
+}
+
+function getPaymentInfo(extraction: OcrExtractionData): PaymentInfo | null {
+  if (extraction.package && extraction.package.totalPriceCents != null && extraction.package.totalPriceCents > 0) {
+    return {
       totalPriceCents: extraction.package.totalPriceCents,
-      currency: extraction.package.currency,
+      currency: extraction.package.currency || 'CAD',
       bookingDate: extraction.package.bookingDate ?? null,
-    },
+      payments: extraction.package.payments,
+    }
+  }
+
+  const sources = [
     extraction.flight && {
       totalPriceCents: extraction.flight.totalPriceCents,
       currency: extraction.flight.currency,
@@ -103,6 +111,58 @@ function getPaymentInfo(extraction: OcrExtractionData): {
 function PaymentPreview({ extraction }: { extraction: OcrExtractionData }) {
   const info = getPaymentInfo(extraction)
   if (!info) return null
+
+  const payments = info.payments && info.payments.length > 0 ? info.payments : null
+
+  if (payments) {
+    const paymentTotal = payments.reduce((sum, p) => sum + p.amountCents, 0)
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Payment Preview</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="rounded-md border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-ash-50 text-left">
+                  <th className="px-3 py-1.5 text-xs font-medium text-ash-500">Payment</th>
+                  <th className="px-3 py-1.5 text-xs font-medium text-ash-500 text-right">Amount</th>
+                  <th className="px-3 py-1.5 text-xs font-medium text-ash-500">Date</th>
+                  <th className="px-3 py-1.5 text-xs font-medium text-ash-500">Method</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((p, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="px-3 py-1.5">{p.paymentName}</td>
+                    <td className="px-3 py-1.5 text-right">{formatPrice(p.amountCents, info.currency)}</td>
+                    <td className="px-3 py-1.5 text-ash-500">{p.date || '—'}</td>
+                    <td className="px-3 py-1.5 text-ash-500">{p.method || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t bg-ash-50">
+                  <td className="px-3 py-1.5 font-medium">Total</td>
+                  <td className="px-3 py-1.5 text-right font-medium">{formatPrice(paymentTotal, info.currency)}</td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="flex gap-3">
+            <span className="text-sm text-ash-500 w-28 shrink-0">Status</span>
+            <Badge variant="default" className="text-xs">Paid</Badge>
+          </div>
+          <p className="text-xs text-ash-400 mt-1">
+            A payment schedule will be created with {payments.length} payment{payments.length > 1 ? 's' : ''} recorded.
+            {paymentTotal < info.totalPriceCents && ' A remaining balance item will be added for the difference.'}
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   const formattedAmount = formatPrice(info.totalPriceCents, info.currency)
 
