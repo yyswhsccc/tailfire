@@ -463,6 +463,20 @@ export class OcrService {
       commissionRate: typeof data.commissionRate === 'number' ? data.commissionRate : null,
       commissionAmount: typeof data.commissionAmount === 'number' ? data.commissionAmount : null,
       taxesAndFees: typeof data.taxesAndFees === 'number' ? data.taxesAndFees : null,
+      addOns: typeof data.addOns === 'number' ? data.addOns : null,
+      remarks: data.remarks ? String(data.remarks) : null,
+      payments: Array.isArray(data.payments)
+        ? data.payments
+            .filter((p): p is Record<string, unknown> => typeof p === 'object' && p !== null)
+            .map((p) => ({
+              paymentName: p.paymentName ? String(p.paymentName) : 'Payment',
+              amount: typeof p.amount === 'number' ? p.amount : 0,
+              date: p.date ? String(p.date) : null,
+              method: p.method ? String(p.method) : null,
+              referenceNumber: p.referenceNumber ? String(p.referenceNumber) : null,
+            }))
+            .filter((p) => p.amount > 0)
+        : [],
       components: components
         .filter((c): c is Record<string, unknown> => typeof c === 'object' && c !== null)
         .map((c) => ({

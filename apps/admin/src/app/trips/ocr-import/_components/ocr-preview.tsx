@@ -16,6 +16,7 @@ import type {
   OcrConfirmRequest,
   OcrDocumentType,
   OcrExtractionData,
+  OcrPackagePayment,
   PolicyDiff,
 } from '@tailfire/shared-types'
 
@@ -48,6 +49,142 @@ function formatPrice(cents: number | null | undefined, currency: string | null |
     style: 'currency',
     currency: currency || 'CAD',
   }).format(amount)
+}
+
+interface PaymentInfo {
+  totalPriceCents: number
+  currency: string
+  bookingDate: string | null
+  payments?: OcrPackagePayment[]
+}
+
+function getPaymentInfo(extraction: OcrExtractionData): PaymentInfo | null {
+  if (extraction.package && extraction.package.totalPriceCents != null && extraction.package.totalPriceCents > 0) {
+    return {
+      totalPriceCents: extraction.package.totalPriceCents,
+      currency: extraction.package.currency || 'CAD',
+      bookingDate: extraction.package.bookingDate ?? null,
+      payments: extraction.package.payments,
+    }
+  }
+
+  const sources = [
+    extraction.flight && {
+      totalPriceCents: extraction.flight.totalPriceCents,
+      currency: extraction.flight.currency,
+      bookingDate: extraction.booking?.bookingDate ?? null,
+    },
+    extraction.lodging && {
+      totalPriceCents: extraction.lodging.totalPriceCents,
+      currency: extraction.lodging.currency,
+      bookingDate: extraction.booking?.bookingDate ?? null,
+    },
+    extraction.cruise && {
+      totalPriceCents: extraction.cruise.totalPriceCents,
+      currency: extraction.cruise.currency,
+      bookingDate: extraction.booking?.bookingDate ?? null,
+    },
+    extraction.transportation && {
+      totalPriceCents: extraction.transportation.totalPriceCents,
+      currency: extraction.transportation.currency,
+      bookingDate: extraction.booking?.bookingDate ?? null,
+    },
+    extraction.dining && {
+      totalPriceCents: extraction.dining.totalPriceCents,
+      currency: extraction.dining.currency,
+      bookingDate: extraction.booking?.bookingDate ?? null,
+    },
+  ] as const
+
+  for (const src of sources) {
+    if (src && src.totalPriceCents != null && src.totalPriceCents > 0) {
+      return {
+        totalPriceCents: src.totalPriceCents,
+        currency: src.currency || 'CAD',
+        bookingDate: src.bookingDate ?? null,
+      }
+    }
+  }
+  return null
+}
+
+function PaymentPreview({ extraction }: { extraction: OcrExtractionData }) {
+  const info = getPaymentInfo(extraction)
+  if (!info) return null
+
+  const payments = info.payments && info.payments.length > 0 ? info.payments : null
+
+  if (payments) {
+    const paymentTotal = payments.reduce((sum, p) => sum + p.amountCents, 0)
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Payment Preview</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="rounded-md border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-ash-50 text-left">
+                  <th className="px-3 py-1.5 text-xs font-medium text-ash-500">Payment</th>
+                  <th className="px-3 py-1.5 text-xs font-medium text-ash-500 text-right">Amount</th>
+                  <th className="px-3 py-1.5 text-xs font-medium text-ash-500">Date</th>
+                  <th className="px-3 py-1.5 text-xs font-medium text-ash-500">Method</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((p, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="px-3 py-1.5">{p.paymentName}</td>
+                    <td className="px-3 py-1.5 text-right">{formatPrice(p.amountCents, info.currency)}</td>
+                    <td className="px-3 py-1.5 text-ash-500">{p.date || '—'}</td>
+                    <td className="px-3 py-1.5 text-ash-500">{p.method || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t bg-ash-50">
+                  <td className="px-3 py-1.5 font-medium">Total</td>
+                  <td className="px-3 py-1.5 text-right font-medium">{formatPrice(paymentTotal, info.currency)}</td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="flex gap-3">
+            <span className="text-sm text-ash-500 w-28 shrink-0">Status</span>
+            <Badge variant="default" className="text-xs">Paid</Badge>
+          </div>
+          <p className="text-xs text-ash-400 mt-1">
+            A payment schedule will be created with {payments.length} payment{payments.length > 1 ? 's' : ''} recorded.
+            {paymentTotal < info.totalPriceCents && ' A remaining balance item will be added for the difference.'}
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const formattedAmount = formatPrice(info.totalPriceCents, info.currency)
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Payment Preview</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <DataRow label="Schedule" value="Full Payment" />
+        <DataRow label="Amount" value={formattedAmount} />
+        <DataRow label="Transaction Date" value={info.bookingDate || 'Date of import'} />
+        <div className="flex gap-3">
+          <span className="text-sm text-ash-500 w-28 shrink-0">Status</span>
+          <Badge variant="default" className="text-xs">Paid</Badge>
+        </div>
+        <p className="text-xs text-ash-400 mt-1">
+          A payment schedule will be created automatically with the full amount recorded as received.
+        </p>
+      </CardContent>
+    </Card>
+  )
 }
 
 interface OcrPreviewProps {
@@ -359,6 +496,15 @@ export function OcrPreview({
             {extraction.package.taxesAndFeesCents && (
               <DataRow label="Taxes & Fees" value={formatPrice(extraction.package.taxesAndFeesCents, extraction.package.currency)} />
             )}
+            {extraction.package.addOnsCents != null && extraction.package.addOnsCents > 0 && (
+              <DataRow label="Add-ons" value={formatPrice(extraction.package.addOnsCents, extraction.package.currency)} />
+            )}
+            {extraction.package.bookingDate && (
+              <DataRow label="Booking Date" value={extraction.package.bookingDate} />
+            )}
+            {extraction.package.remarks && (
+              <p className="text-xs text-ash-500">{extraction.package.remarks}</p>
+            )}
 
             {/* Components */}
             {extraction.package.components?.length > 0 && (
@@ -427,9 +573,13 @@ export function OcrPreview({
                 </div>
               </div>
             )}
+
           </CardContent>
         </Card>
       )}
+
+      {/* Payment Preview — shown for any type with a price */}
+      <PaymentPreview extraction={extraction} />
 
       {/* Traveler Matches */}
       {contactMatches.length > 0 && (

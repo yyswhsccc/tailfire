@@ -91,6 +91,15 @@ You MUST respond with a JSON object containing these fields:
     }
   ],
   "remarks": <string or null — any Remarks, Special Requests, Important Notes, or booking conditions found in the document, concatenated as-is>,
+  "payments": [
+    {
+      "paymentName": "Deposit" | "Balance Payment" | "Full Payment" | <descriptive name>,
+      "amount": <payment amount as decimal, e.g. 1500.00>,
+      "date": <ISO date "YYYY-MM-DD" of when payment was made, or null>,
+      "method": <payment method as shown on document, e.g. "Visa ****4321", "Mastercard", "Cheque", or null>,
+      "referenceNumber": <authorization/reference/confirmation number, e.g. "AUTH123456", or null>
+    }
+  ],
   "termsAndConditions": <string or null — any Terms and Conditions, booking rules, or general conditions, concatenated as-is>,
   "cancellationPolicy": <string or null — any Cancellation Policy, change fees, refund rules, or penalty clauses, concatenated as-is>
 }
@@ -106,8 +115,12 @@ Rules:
 - The travelerIndex in perPersonPricing must match the 0-based position in the travelers array
 - If commission is shown as a percentage, extract both the rate and calculated amount
 - addOns captures optional extras charged separately from the per-person package price (e.g. seat selections, excursions, insurance). Grand total often = sum of per-person totals + addOns. Set to null if no separate add-on charges exist
+- Extract ALL individual payment entries from the payment history/details/payments received section. Each deposit, balance payment, or installment is a separate entry in the payments array
+- If no itemized payment section exists (only a grand total), return an empty array []
+- The sum of payment amounts should normally equal totalPrice — extract what's visible even if it doesn't match
+- Do NOT infer or fabricate payment entries — only extract explicitly listed payments
 - Extract Terms & Conditions and Cancellation Policy sections verbatim if present. Return null if no explicit T&C or cancellation policy section exists — do NOT fabricate or infer policies
 - Only extract clearly labeled policy sections (e.g., "Terms and Conditions", "Cancellation Policy", "Change Fees", "Refund Policy"). Do NOT extract general booking notes or remarks as policies. The "remarks" field captures general notes — T&C and cancellation are separate
 - If a field is not visible, set it to null — do NOT guess`
 
-export const PACKAGE_EXTRACTION_USER_PROMPT = `Extract all package booking details from this document. This is an all-inclusive vacation package invoice. Return structured JSON with supplier info, booking reference, components (flights, hotel, transfers), per-person pricing breakdown, and traveler information.`
+export const PACKAGE_EXTRACTION_USER_PROMPT = `Extract all package booking details from this document. This is an all-inclusive vacation package invoice. Return structured JSON with supplier info, booking reference, components (flights, hotel, transfers), per-person pricing breakdown, payment history (deposits, balance payments), and traveler information.`
