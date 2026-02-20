@@ -476,9 +476,11 @@ export default function TripDetailPage() {
       return
     }
     try {
-      // Always call publishTrip — it's idempotent and ensures v1 snapshot exists
-      const updated = await publishTrip.mutateAsync(trip.id)
-      const shareToken = updated.shareToken || trip.shareToken
+      let shareToken = trip.shareToken
+      if (!shareToken) {
+        const updated = await publishTrip.mutateAsync(trip.id)
+        shareToken = updated.shareToken
+      }
       tab.location.href = `${getClientOrigin()}/shared/trips/${shareToken}`
     } catch {
       tab.close()
@@ -746,17 +748,10 @@ export default function TripDetailPage() {
               <Eye className="h-4 w-4" />
               Preview
             </Button>
-{trip.isPublished ? (
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCopyShareLink}>
-                <LinkIcon className="h-4 w-4" />
-                Copy Link
-              </Button>
-            ) : (
-              <Button size="sm" className="gap-1.5" onClick={handlePublish} disabled={publishTrip.isPending}>
-                <Send className="h-4 w-4" />
-                {publishTrip.isPending ? 'Publishing...' : 'Publish'}
-              </Button>
-            )}
+            <Button size="sm" className="gap-1.5" onClick={handlePublish} disabled={publishTrip.isPending}>
+              <Send className="h-4 w-4" />
+              {publishTrip.isPending ? 'Publishing...' : 'Publish'}
+            </Button>
           </div>
         </div>
 
