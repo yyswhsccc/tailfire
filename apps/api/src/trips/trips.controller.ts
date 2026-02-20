@@ -16,7 +16,9 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  UseGuards,
 } from '@nestjs/common'
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
 import { Public } from '../auth/decorators/public.decorator'
 import { ApiTags } from '@nestjs/swagger'
 import { TripsService } from './trips.service'
@@ -34,6 +36,8 @@ import {
   BulkArchiveTripsDto,
   BulkChangeStatusDto,
   SendBookingConfirmationDto,
+  CreateProposalCommentDto,
+  CreateActivityResponseDto,
   type BulkTripOperationResult,
   type TripFilterOptionsResponseDto,
 } from './dto'
@@ -171,6 +175,83 @@ export class TripsController {
   @Get('share/:token')
   async getSharedTrip(@Param('token') token: string) {
     return this.tripsService.findByShareToken(token)
+  }
+
+  /**
+   * Get comments for a shared proposal (public, no auth)
+   * GET /trips/share/:token/comments
+   */
+  @Public()
+  @Get('share/:token/comments')
+  async getProposalComments(@Param('token') token: string) {
+    return this.tripsService.getProposalComments(token)
+  }
+
+  /**
+   * Create a client comment on a shared proposal (public, no auth, rate-limited)
+   * POST /trips/share/:token/comments
+   */
+  @Public()
+  @Post('share/:token/comments')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async createProposalComment(
+    @Param('token') token: string,
+    @Body() dto: CreateProposalCommentDto,
+  ) {
+    return this.tripsService.createProposalComment(token, dto)
+  }
+
+  /**
+   * Approve a shared proposal (public, no auth, rate-limited)
+   * POST /trips/share/:token/approve
+   */
+  @Public()
+  @Post('share/:token/approve')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async approveProposal(@Param('token') token: string) {
+    return this.tripsService.approveProposal(token)
+  }
+
+  /**
+   * Create or update an activity response (public, no auth, rate-limited)
+   * POST /trips/share/:token/responses
+   */
+  @Public()
+  @Post('share/:token/responses')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async createActivityResponse(
+    @Param('token') token: string,
+    @Body() dto: CreateActivityResponseDto,
+  ) {
+    return this.tripsService.createActivityResponse(token, dto)
+  }
+
+  /**
+   * Get activity responses for the published version (public, no auth)
+   * GET /trips/share/:token/responses
+   */
+  @Public()
+  @Get('share/:token/responses')
+  async getActivityResponses(@Param('token') token: string) {
+    return this.tripsService.getActivityResponses(token)
+  }
+
+  /**
+   * Decline a shared proposal (public, no auth, rate-limited)
+   * POST /trips/share/:token/decline
+   */
+  @Public()
+  @Post('share/:token/decline')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async declineProposal(
+    @Param('token') token: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.tripsService.declineProposal(token, body.reason)
   }
 
   /**
@@ -525,5 +606,39 @@ export class TripsController {
   }> {
     await this.tripAccessService.verifyWriteAccess(tripId, auth)
     return this.tripsService.sendBookingConfirmation(tripId, auth.agencyId, dto)
+  }
+
+  /**
+   * Create an agent comment on a proposal (authenticated)
+   * POST /trips/:tripId/itineraries/:itineraryId/comments
+   *
+   * Access check: User must have write access to the trip.
+   */
+  @Post(':tripId/itineraries/:itineraryId/comments')
+  async createAgentComment(
+    @GetAuthContext() auth: AuthContext,
+    @Param('tripId') tripId: string,
+    @Param('itineraryId') itineraryId: string,
+    @Body() dto: CreateProposalCommentDto,
+  ) {
+    await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    return this.tripsService.createAgentComment(tripId, itineraryId, dto, auth.userId)
+  }
+
+  /**
+   * Get comments for an itinerary (authenticated, for admin Comments tab)
+   * GET /trips/:tripId/itineraries/:itineraryId/comments?activityId=xxx
+   *
+   * Access check: User must have read access to the trip.
+   */
+  @Get(':tripId/itineraries/:itineraryId/comments')
+  async getAgentComments(
+    @GetAuthContext() auth: AuthContext,
+    @Param('tripId') tripId: string,
+    @Param('itineraryId') itineraryId: string,
+    @Query('activityId') activityId?: string,
+  ) {
+    await this.tripAccessService.verifyReadAccess(tripId, auth)
+    return this.tripsService.getAgentComments(tripId, itineraryId, activityId)
   }
 }

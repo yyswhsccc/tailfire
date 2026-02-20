@@ -68,6 +68,7 @@ import { ChildOfPackageBookingSection } from '@/components/activities/child-of-p
 import { useToast } from '@/hooks/use-toast'
 import { DocumentUploader } from '@/components/document-uploader'
 import { ComponentMediaTab } from '@/components/shared'
+import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { type PricingData, type PricingBreakdownItem } from '@/lib/pricing'
@@ -821,7 +822,7 @@ export function TransportationForm({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Car className="h-4 w-4" />
             General
@@ -837,6 +838,9 @@ export function TransportationForm({
           <TabsTrigger value="pricing" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             Booking & Pricing
+          </TabsTrigger>
+          <TabsTrigger value="comments" className="flex items-center gap-2">
+            Comments
           </TabsTrigger>
         </TabsList>
 
@@ -1443,6 +1447,20 @@ export function TransportationForm({
             userSplitValue={userProfile?.commissionSettings?.splitValue}
             userSplitType={userProfile?.commissionSettings?.splitType}
           />
+        </TabsContent>
+
+        <TabsContent value="comments" className="mt-6">
+          {isEditing && activity?.id ? (
+            <ActivityCommentsPanel
+              tripId={trip?.id || ''}
+              itineraryId={itineraryId}
+              activityId={activity.id}
+            />
+          ) : (
+            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
+              Save the activity first to view comments.
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

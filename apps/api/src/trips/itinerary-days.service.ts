@@ -412,6 +412,12 @@ export class ItineraryDaysService {
         .values(valuesToInsert)
 
       createdCount = valuesToInsert.length
+
+      // Mark itinerary as having unpublished changes
+      await db
+        .update(this.db.schema.itineraries)
+        .set({ hasUnpublishedChanges: true })
+        .where(eq(this.db.schema.itineraries.id, itineraryId))
     }
 
     // SELECT all days for the requested dates (includes pre-existing + just-created)
@@ -513,6 +519,12 @@ export class ItineraryDaysService {
       })
       .returning()
 
+    // Mark itinerary as having unpublished changes
+    await this.db.client
+      .update(this.db.schema.itineraries)
+      .set({ hasUnpublishedChanges: true })
+      .where(eq(this.db.schema.itineraries.id, dto.itineraryId))
+
     return this.formatDayResponse(day)
   }
 
@@ -567,6 +579,12 @@ export class ItineraryDaysService {
       .where(eq(this.db.schema.itineraryDays.id, id))
       .returning()
 
+    // Mark itinerary as having unpublished changes
+    await this.db.client
+      .update(this.db.schema.itineraries)
+      .set({ hasUnpublishedChanges: true })
+      .where(eq(this.db.schema.itineraries.id, existing.itineraryId))
+
     return this.formatDayResponse(day)
   }
 
@@ -615,6 +633,12 @@ export class ItineraryDaysService {
     if (updates.length > 0) {
       await Promise.all(updates)
     }
+
+    // Mark itinerary as having unpublished changes
+    await this.db.client
+      .update(this.db.schema.itineraries)
+      .set({ hasUnpublishedChanges: true })
+      .where(eq(this.db.schema.itineraries.id, dayToDelete.itineraryId))
   }
 
   /**
@@ -649,6 +673,12 @@ export class ItineraryDaysService {
           .where(eq(this.db.schema.itineraryDays.id, order.id))
       )
     )
+
+    // Mark itinerary as having unpublished changes
+    await this.db.client
+      .update(this.db.schema.itineraries)
+      .set({ hasUnpublishedChanges: true })
+      .where(eq(this.db.schema.itineraries.id, itineraryId))
 
     // Return updated days
     return this.findAll(itineraryId)
@@ -736,6 +766,12 @@ export class ItineraryDaysService {
       .insert(this.db.schema.itineraryDays)
       .values(daysToCreate)
       .returning()
+
+    // Mark itinerary as having unpublished changes
+    await this.db.client
+      .update(this.db.schema.itineraries)
+      .set({ hasUnpublishedChanges: true })
+      .where(eq(this.db.schema.itineraries.id, dto.itineraryId))
 
     return created.map(this.formatDayResponse)
   }
@@ -920,6 +956,12 @@ export class ItineraryDaysService {
       .values(daysToCreate)
       .returning()
 
+    // Mark itinerary as having unpublished changes
+    await this.db.client
+      .update(this.db.schema.itineraries)
+      .set({ hasUnpublishedChanges: true })
+      .where(eq(this.db.schema.itineraries.id, itineraryId))
+
     return created.map(this.formatDayResponse)
   }
 
@@ -1030,6 +1072,12 @@ export class ItineraryDaysService {
           }
         }
       }
+
+      // Mark itinerary as having unpublished changes
+      await tx
+        .update(this.db.schema.itineraries)
+        .set({ hasUnpublishedChanges: true })
+        .where(eq(this.db.schema.itineraries.id, itinerary.id))
 
       return inserted
     })

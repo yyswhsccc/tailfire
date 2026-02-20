@@ -40,6 +40,7 @@ import {
 } from '@tailfire/shared-types'
 import type { AuthContext } from '../auth/auth.types'
 import type { TripAccessService } from './trip-access.service'
+import { ItineraryDaysService } from './itinerary-days.service'
 import { UserValidationService } from '../common/user-validation.service'
 import { AutomationService } from '../automation/automation.service'
 import { EmailService } from '../email/email.service'
@@ -51,6 +52,19 @@ import {
   getDepartureReminderJobId,
 } from '../automation/automation.types'
 import type { SendBookingConfirmationDto } from './dto'
+import type {
+  SharedTripProposalDto,
+  SharedItineraryDto,
+  SharedItineraryDayDto,
+  SharedActivityDto,
+  SharedActivityDetailDto,
+  SharedActivityPricingDto,
+  SharedPricingBreakdownItem,
+  ProposalCommentDto,
+  ProposalCommentsResponseDto,
+} from '@tailfire/shared-types'
+import { ItinerariesService } from './itineraries.service'
+import { ItineraryVersionsService } from './itinerary-versions.service'
 
 @Injectable()
 export class TripsService {
@@ -66,6 +80,11 @@ export class TripsService {
     private readonly emailService: EmailService,
     @Inject(forwardRef(() => EmailTemplatesService))
     private readonly emailTemplatesService: EmailTemplatesService,
+    private readonly itineraryDaysService: ItineraryDaysService,
+    @Inject(forwardRef(() => ItinerariesService))
+    private readonly itinerariesService: ItinerariesService,
+    @Inject(forwardRef(() => ItineraryVersionsService))
+    private readonly itineraryVersionsService: ItineraryVersionsService,
   ) {}
 
   /**
@@ -1385,6 +1404,17 @@ export class TripsService {
       metadata: { shareToken },
     })
 
+    // Auto-publish v1 of the selected itinerary so clients see a snapshot immediately
+    // Fix G: Let error propagate — trip publish must fail atomically if snapshot fails
+    const itineraries = await this.db.client.query.itineraries.findMany({
+      where: eq(this.db.schema.itineraries.tripId, id),
+    })
+    const selectedItinerary = this.resolvePublishedItinerary(itineraries)
+
+    if (selectedItinerary && !selectedItinerary.publishedVersion) {
+      await this.itineraryVersionsService.publishVersion(id, selectedItinerary.id, actorId, 'Initial publish')
+    }
+
     return this.mapToResponseDto(updated)
   }
 
@@ -1414,7 +1444,7 @@ export class TripsService {
     return this.mapToResponseDto(updated)
   }
 
-  async findByShareToken(token: string) {
+  async findByShareToken(token: string): Promise<SharedTripProposalDto> {
     const [trip] = await this.db.client
       .select()
       .from(this.db.schema.trips)
@@ -1430,13 +1460,79 @@ export class TripsService {
       throw new NotFoundException('Shared trip not found')
     }
 
-    // Fetch itineraries for public display
-    const itineraries = await this.db.client
-      .select()
-      .from(this.db.schema.itineraries)
-      .where(eq(this.db.schema.itineraries.tripId, trip.id))
+    // Fetch itineraries, agent profile, and primary contact in parallel
+    const [itineraries, agentProfile, primaryContact] = await Promise.all([
+      this.db.client
+        .select()
+        .from(this.db.schema.itineraries)
+        .where(eq(this.db.schema.itineraries.tripId, trip.id))
+        .orderBy(asc(this.db.schema.itineraries.sequenceOrder)),
+      trip.ownerId
+        ? this.db.client
+            .select({
+              firstName: this.db.schema.userProfiles.firstName,
+              lastName: this.db.schema.userProfiles.lastName,
+              avatarUrl: this.db.schema.userProfiles.avatarUrl,
+              publicPhone: this.db.schema.userProfiles.publicPhone,
+              bio: this.db.schema.userProfiles.bio,
+            })
+            .from(this.db.schema.userProfiles)
+            .where(
+              and(
+                eq(this.db.schema.userProfiles.id, trip.ownerId),
+                eq(this.db.schema.userProfiles.isPublicProfile, true),
+              ),
+            )
+            .limit(1)
+            .then((rows) => rows[0] || null)
+        : Promise.resolve(null),
+      trip.primaryContactId
+        ? this.db.client
+            .select({
+              firstName: this.db.schema.contacts.firstName,
+              lastName: this.db.schema.contacts.lastName,
+            })
+            .from(this.db.schema.contacts)
+            .where(eq(this.db.schema.contacts.id, trip.primaryContactId))
+            .limit(1)
+            .then((rows) => rows[0] || null)
+        : Promise.resolve(null),
+    ])
 
-    // Return safe public subset only
+    // Determine pricing visibility
+    const pricingVisible = trip.pricingVisibility === 'show_all'
+
+    // Fix E: Use centralized publish-aware selection
+    const selectedItinerary = this.resolvePublishedItinerary(itineraries)
+
+    // Build full proposal if an itinerary exists (publish-gated)
+    let itineraryDto: SharedItineraryDto | null = null
+    if (selectedItinerary) {
+      if (selectedItinerary.publishedVersion) {
+        // STRICT: Once published, always serve snapshot — never leak live drafts
+        const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(selectedItinerary.id)
+        if (snapshot) {
+          itineraryDto = snapshot
+        }
+        // If snapshot lookup fails (shouldn't happen), return null itinerary rather than leaking live data
+      } else {
+        // LEGACY FALLBACK: Never-published trips still show live data for backward compat
+        itineraryDto = await this.buildProposalItinerary(
+          selectedItinerary,
+          pricingVisible,
+        )
+      }
+
+      // Include publishedVersion on the itinerary DTO for client-side response tracking
+      if (itineraryDto) {
+        itineraryDto.publishedVersion = selectedItinerary.publishedVersion
+      }
+    }
+
+    const primaryContactName = primaryContact
+      ? [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(' ') || null
+      : null
+
     return {
       id: trip.id,
       name: trip.name,
@@ -1445,6 +1541,8 @@ export class TripsService {
       startDate: trip.startDate,
       endDate: trip.endDate,
       coverPhotoUrl: trip.coverPhotoUrl,
+      pricingVisible,
+      currency: trip.currency || 'USD',
       itineraries: itineraries.map((it) => ({
         id: it.id,
         name: it.name,
@@ -1454,6 +1552,1109 @@ export class TripsService {
         startDate: it.startDate,
         endDate: it.endDate,
       })),
+      itinerary: itineraryDto,
+      agent: agentProfile
+        ? {
+            firstName: agentProfile.firstName,
+            lastName: agentProfile.lastName,
+            avatarUrl: agentProfile.avatarUrl,
+            publicPhone: agentProfile.publicPhone,
+            bio: agentProfile.bio,
+          }
+        : null,
+      primaryContactName,
+      publishedVersion: selectedItinerary?.publishedVersion ?? null,
+    }
+  }
+
+  // ============================================================================
+  // SHARED PROPOSAL COMMENTS & APPROVAL
+  // ============================================================================
+
+  /**
+   * Resolve a share token to its trip + selected itinerary.
+   * Reusable helper for all public share endpoints.
+   */
+  private async resolveShareToken(token: string) {
+    const [trip] = await this.db.client
+      .select()
+      .from(this.db.schema.trips)
+      .where(
+        and(
+          eq(this.db.schema.trips.shareToken, token),
+          eq(this.db.schema.trips.isPublished, true),
+        ),
+      )
+      .limit(1)
+
+    if (!trip) {
+      throw new NotFoundException('Shared trip not found')
+    }
+
+    const itineraries = await this.db.client
+      .select()
+      .from(this.db.schema.itineraries)
+      .where(eq(this.db.schema.itineraries.tripId, trip.id))
+      .orderBy(asc(this.db.schema.itineraries.sequenceOrder))
+
+    // Fix E: Use centralized publish-aware selection
+    const selectedItinerary = this.resolvePublishedItinerary(itineraries)
+
+    return { trip, selectedItinerary, itineraries }
+  }
+
+  /**
+   * Fix E: Centralized publish-aware itinerary selection.
+   * Priority: isSelected > approved status > first by sequenceOrder.
+   * Prefers an itinerary with a publishedVersion when the primary selection has none.
+   */
+  private resolvePublishedItinerary(itineraries: any[]): any | null {
+    let selected = itineraries.find((it) => it.isSelected)
+      || itineraries.find((it) => it.status === 'approved')
+      || itineraries[0] || null
+
+    // Prefer published itinerary if selected has no published version
+    if (selected && !selected.publishedVersion) {
+      const publishedAlt = itineraries.find((it) => it.publishedVersion)
+      if (publishedAlt) selected = publishedAlt
+    }
+
+    return selected
+  }
+
+  /**
+   * Get all comments for a proposal (public, no auth)
+   */
+  async getProposalComments(token: string): Promise<ProposalCommentsResponseDto> {
+    const { trip, selectedItinerary } = await this.resolveShareToken(token)
+
+    if (!selectedItinerary) {
+      return { comments: [], commentCounts: {} }
+    }
+
+    const rows = await this.db.client
+      .select()
+      .from(this.db.schema.proposalComments)
+      .where(
+        and(
+          eq(this.db.schema.proposalComments.tripId, trip.id),
+          eq(this.db.schema.proposalComments.itineraryId, selectedItinerary.id),
+          eq(this.db.schema.proposalComments.isDeleted, false),
+        ),
+      )
+      .orderBy(asc(this.db.schema.proposalComments.createdAt))
+
+    const comments: ProposalCommentDto[] = rows.map((row) => ({
+      id: row.id,
+      activityId: row.activityId,
+      dayId: row.dayId || null,
+      versionNumber: row.versionNumber || null,
+      authorType: row.authorType,
+      authorName: row.authorName,
+      content: row.content,
+      createdAt: row.createdAt.toISOString(),
+    }))
+
+    // Build comment counts per activity and per day
+    const commentCounts: Record<string, number> = {}
+    for (const c of comments) {
+      const key = c.activityId || 'general'
+      commentCounts[key] = (commentCounts[key] || 0) + 1
+      // Also count day-level comments
+      if (c.dayId) {
+        const dayKey = `day:${c.dayId}`
+        commentCounts[dayKey] = (commentCounts[dayKey] || 0) + 1
+      }
+    }
+
+    return { comments, commentCounts }
+  }
+
+  /**
+   * Create a client comment on a proposal (public, no auth)
+   * Fix F: Validate activityId/dayId against snapshot when published.
+   * Change 5: Accept dayId, auto-set versionNumber, emit event.
+   */
+  async createProposalComment(
+    token: string,
+    dto: { activityId?: string; dayId?: string; content: string },
+  ): Promise<ProposalCommentDto> {
+    const { trip, selectedItinerary } = await this.resolveShareToken(token)
+
+    if (!selectedItinerary) {
+      throw new BadRequestException('No itinerary found for this proposal')
+    }
+
+    if (!trip.primaryContactId) {
+      throw new BadRequestException('No primary contact set for this trip — cannot post client comment')
+    }
+
+    // Fix F: Validate activityId/dayId against snapshot when published
+    if (dto.activityId && selectedItinerary.publishedVersion) {
+      const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(selectedItinerary.id)
+      const snapshotActivityIds = snapshot?.days?.flatMap(d => d.activities?.map(a => a.id) ?? []) ?? []
+      if (!snapshotActivityIds.includes(dto.activityId)) {
+        throw new BadRequestException('Activity not found in published version')
+      }
+    } else if (dto.activityId) {
+      // Legacy: validate against live tables
+      const [activity] = await this.db.client
+        .select({ id: this.db.schema.itineraryActivities.id })
+        .from(this.db.schema.itineraryActivities)
+        .innerJoin(
+          this.db.schema.itineraryDays,
+          eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id),
+        )
+        .where(
+          and(
+            eq(this.db.schema.itineraryActivities.id, dto.activityId),
+            eq(this.db.schema.itineraryDays.itineraryId, selectedItinerary.id),
+          ),
+        )
+        .limit(1)
+      if (!activity) {
+        throw new BadRequestException('Activity not found in this proposal')
+      }
+    }
+
+    if (dto.dayId && selectedItinerary.publishedVersion) {
+      const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(selectedItinerary.id)
+      const snapshotDayIds = snapshot?.days?.map(d => d.id) ?? []
+      if (!snapshotDayIds.includes(dto.dayId)) {
+        throw new BadRequestException('Day not found in published version')
+      }
+    }
+
+    // Resolve primary contact name
+    let authorName = 'Client'
+    if (trip.primaryContactId) {
+      const [contact] = await this.db.client
+        .select({
+          firstName: this.db.schema.contacts.firstName,
+          lastName: this.db.schema.contacts.lastName,
+        })
+        .from(this.db.schema.contacts)
+        .where(eq(this.db.schema.contacts.id, trip.primaryContactId))
+        .limit(1)
+
+      if (contact) {
+        authorName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Client'
+      }
+    }
+
+    // Auto-set versionNumber from current publishedVersion
+    const versionNumber = selectedItinerary.publishedVersion || null
+
+    const [comment] = await this.db.client
+      .insert(this.db.schema.proposalComments)
+      .values({
+        tripId: trip.id,
+        itineraryId: selectedItinerary.id,
+        activityId: dto.activityId || null,
+        dayId: dto.dayId || null,
+        versionNumber,
+        authorType: 'client',
+        contactId: trip.primaryContactId,
+        authorName,
+        content: dto.content,
+      })
+      .returning()
+
+    if (!comment) {
+      throw new BadRequestException('Failed to create comment')
+    }
+
+    // Emit event for notifications
+    this.eventEmitter.emit('proposal.comment_created', {
+      tripId: trip.id,
+      itineraryId: selectedItinerary.id,
+      commentId: comment.id,
+      authorType: 'client',
+      authorName,
+      activityId: dto.activityId || null,
+      dayId: dto.dayId || null,
+    })
+
+    return {
+      id: comment.id,
+      activityId: comment.activityId,
+      dayId: comment.dayId || null,
+      versionNumber: comment.versionNumber || null,
+      authorType: comment.authorType,
+      authorName: comment.authorName,
+      content: comment.content,
+      createdAt: comment.createdAt.toISOString(),
+    }
+  }
+
+  /**
+   * Create an agent comment on a proposal (authenticated)
+   */
+  async createAgentComment(
+    tripId: string,
+    itineraryId: string,
+    dto: { activityId?: string; dayId?: string; content: string },
+    userId: string,
+  ): Promise<ProposalCommentDto> {
+    // Validate itineraryId belongs to tripId
+    const [itinerary] = await this.db.client
+      .select({
+        id: this.db.schema.itineraries.id,
+        publishedVersion: this.db.schema.itineraries.publishedVersion,
+      })
+      .from(this.db.schema.itineraries)
+      .where(
+        and(
+          eq(this.db.schema.itineraries.id, itineraryId),
+          eq(this.db.schema.itineraries.tripId, tripId),
+        ),
+      )
+      .limit(1)
+
+    if (!itinerary) {
+      throw new BadRequestException('Itinerary not found for this trip')
+    }
+
+    // Fix F: Validate activityId against snapshot when published
+    if (dto.activityId && itinerary.publishedVersion) {
+      const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(itineraryId)
+      const snapshotActivityIds = snapshot?.days?.flatMap(d => d.activities?.map(a => a.id) ?? []) ?? []
+      if (!snapshotActivityIds.includes(dto.activityId)) {
+        // Also check live tables for agent comments (they can comment on live activities too)
+        const [activity] = await this.db.client
+          .select({ id: this.db.schema.itineraryActivities.id })
+          .from(this.db.schema.itineraryActivities)
+          .innerJoin(
+            this.db.schema.itineraryDays,
+            eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id),
+          )
+          .where(
+            and(
+              eq(this.db.schema.itineraryActivities.id, dto.activityId),
+              eq(this.db.schema.itineraryDays.itineraryId, itineraryId),
+            ),
+          )
+          .limit(1)
+        if (!activity) {
+          throw new BadRequestException('Activity not found in this itinerary')
+        }
+      }
+    } else if (dto.activityId) {
+      const [activity] = await this.db.client
+        .select({ id: this.db.schema.itineraryActivities.id })
+        .from(this.db.schema.itineraryActivities)
+        .innerJoin(
+          this.db.schema.itineraryDays,
+          eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id),
+        )
+        .where(
+          and(
+            eq(this.db.schema.itineraryActivities.id, dto.activityId),
+            eq(this.db.schema.itineraryDays.itineraryId, itineraryId),
+          ),
+        )
+        .limit(1)
+      if (!activity) {
+        throw new BadRequestException('Activity not found in this itinerary')
+      }
+    }
+
+    // Get agent name
+    const [profile] = await this.db.client
+      .select({
+        firstName: this.db.schema.userProfiles.firstName,
+        lastName: this.db.schema.userProfiles.lastName,
+      })
+      .from(this.db.schema.userProfiles)
+      .where(eq(this.db.schema.userProfiles.id, userId))
+      .limit(1)
+
+    const authorName = profile
+      ? [profile.firstName, profile.lastName].filter(Boolean).join(' ') || 'Agent'
+      : 'Agent'
+
+    // Auto-set versionNumber from current publishedVersion
+    const versionNumber = itinerary.publishedVersion || null
+
+    const [comment] = await this.db.client
+      .insert(this.db.schema.proposalComments)
+      .values({
+        tripId,
+        itineraryId,
+        activityId: dto.activityId || null,
+        dayId: dto.dayId || null,
+        versionNumber,
+        authorType: 'agent',
+        userId,
+        authorName,
+        content: dto.content,
+      })
+      .returning()
+
+    if (!comment) {
+      throw new BadRequestException('Failed to create comment')
+    }
+
+    // Emit event for notifications
+    this.eventEmitter.emit('proposal.comment_created', {
+      tripId,
+      itineraryId,
+      commentId: comment.id,
+      authorType: 'agent',
+      authorName,
+      activityId: dto.activityId || null,
+      dayId: dto.dayId || null,
+    })
+
+    return {
+      id: comment.id,
+      activityId: comment.activityId,
+      dayId: comment.dayId || null,
+      versionNumber: comment.versionNumber || null,
+      authorType: comment.authorType,
+      authorName: comment.authorName,
+      content: comment.content,
+      createdAt: comment.createdAt.toISOString(),
+    }
+  }
+
+  /**
+   * Approve a proposal (public, no auth — idempotent)
+   */
+  async approveProposal(token: string): Promise<{ success: boolean; status: string }> {
+    const { trip, selectedItinerary } = await this.resolveShareToken(token)
+
+    if (!selectedItinerary) {
+      throw new BadRequestException('No itinerary found for this proposal')
+    }
+
+    // Idempotent: already approved
+    if (selectedItinerary.status === 'approved') {
+      return { success: true, status: 'approved' }
+    }
+
+    // Use itinerariesService.update which handles single-approved rule
+    await this.itinerariesService.update(
+      selectedItinerary.id,
+      { status: 'approved' },
+      trip.id,
+    )
+
+    return { success: true, status: 'approved' }
+  }
+
+  // ============================================================================
+  // ACTIVITY RESPONSES (public share endpoints)
+  // ============================================================================
+
+  /**
+   * Create or update a client's response to an activity (confirm/decline).
+   * Upserts per (itinerary, activity, version).
+   */
+  async createActivityResponse(
+    token: string,
+    dto: { activityId: string; response: 'confirmed' | 'declined'; note?: string },
+  ) {
+    const { trip, selectedItinerary } = await this.resolveShareToken(token)
+
+    if (!selectedItinerary) {
+      throw new BadRequestException('No itinerary found for this proposal')
+    }
+    if (!selectedItinerary.publishedVersion) {
+      throw new BadRequestException('No published version — cannot respond to activities')
+    }
+
+    // Validate activityId against snapshot
+    const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(selectedItinerary.id)
+    const snapshotActivityIds = snapshot?.days?.flatMap(d => d.activities?.map(a => a.id) ?? []) ?? []
+    if (!snapshotActivityIds.includes(dto.activityId)) {
+      throw new BadRequestException('Activity not found in published version')
+    }
+
+    // Resolve contact name
+    let contactName = 'Client'
+    if (trip.primaryContactId) {
+      const [contact] = await this.db.client
+        .select({ firstName: this.db.schema.contacts.firstName, lastName: this.db.schema.contacts.lastName })
+        .from(this.db.schema.contacts)
+        .where(eq(this.db.schema.contacts.id, trip.primaryContactId))
+        .limit(1)
+      if (contact) {
+        contactName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Client'
+      }
+    }
+
+    // Upsert: ON CONFLICT (itinerary_id, activity_id, version_number) → UPDATE
+    const [upserted] = await this.db.client
+      .insert(this.db.schema.clientActivityResponses)
+      .values({
+        tripId: trip.id,
+        itineraryId: selectedItinerary.id,
+        activityId: dto.activityId,
+        versionNumber: selectedItinerary.publishedVersion,
+        response: dto.response,
+        contactId: trip.primaryContactId || null,
+        contactName,
+        note: dto.note || null,
+      })
+      .onConflictDoUpdate({
+        target: [
+          this.db.schema.clientActivityResponses.itineraryId,
+          this.db.schema.clientActivityResponses.activityId,
+          this.db.schema.clientActivityResponses.versionNumber,
+        ],
+        set: {
+          response: dto.response,
+          note: dto.note || null,
+          updatedAt: new Date(),
+        },
+      })
+      .returning()
+
+    if (!upserted) {
+      throw new BadRequestException('Failed to save activity response')
+    }
+
+    // Find activity name from snapshot for notification
+    const activityName = snapshot?.days
+      ?.flatMap(d => d.activities ?? [])
+      ?.find(a => a.id === dto.activityId)?.name || 'activity'
+
+    // Emit event for notifications
+    this.eventEmitter.emit('proposal.activity_response', {
+      tripId: trip.id,
+      itineraryId: selectedItinerary.id,
+      activityId: dto.activityId,
+      activityName,
+      response: dto.response,
+      contactName,
+    })
+
+    return {
+      id: upserted.id,
+      activityId: upserted.activityId,
+      versionNumber: upserted.versionNumber,
+      response: upserted.response,
+      contactName: upserted.contactName,
+      note: upserted.note,
+      createdAt: upserted.createdAt.toISOString(),
+    }
+  }
+
+  /**
+   * Get all activity responses for the current published version.
+   */
+  async getActivityResponses(token: string) {
+    const { selectedItinerary } = await this.resolveShareToken(token)
+
+    if (!selectedItinerary || !selectedItinerary.publishedVersion) {
+      return { responses: [], responseMap: {} }
+    }
+
+    const rows = await this.db.client
+      .select()
+      .from(this.db.schema.clientActivityResponses)
+      .where(
+        and(
+          eq(this.db.schema.clientActivityResponses.itineraryId, selectedItinerary.id),
+          eq(this.db.schema.clientActivityResponses.versionNumber, selectedItinerary.publishedVersion),
+        ),
+      )
+
+    const responses = rows.map((r) => ({
+      id: r.id,
+      activityId: r.activityId,
+      versionNumber: r.versionNumber,
+      response: r.response,
+      contactName: r.contactName,
+      note: r.note,
+      createdAt: r.createdAt.toISOString(),
+    }))
+
+    const responseMap: Record<string, string> = {}
+    for (const r of responses) {
+      responseMap[r.activityId] = r.response
+    }
+
+    return { responses, responseMap }
+  }
+
+  /**
+   * Decline a proposal (public, no auth).
+   * Sets itinerary status to 'declined' and optionally posts a reason as a comment.
+   */
+  async declineProposal(
+    token: string,
+    reason?: string,
+  ): Promise<{ success: boolean; status: string }> {
+    const { trip, selectedItinerary } = await this.resolveShareToken(token)
+
+    if (!selectedItinerary) {
+      throw new BadRequestException('No itinerary found for this proposal')
+    }
+
+    // Idempotent: already declined
+    if (selectedItinerary.status === 'declined') {
+      return { success: true, status: 'declined' }
+    }
+
+    await this.itinerariesService.update(
+      selectedItinerary.id,
+      { status: 'declined' },
+      trip.id,
+    )
+
+    // If reason provided, post as general comment
+    if (reason) {
+      await this.createProposalComment(token, { content: reason })
+    }
+
+    // Emit event for notifications
+    this.eventEmitter.emit('proposal.declined', {
+      tripId: trip.id,
+      tripName: trip.name,
+      itineraryId: selectedItinerary.id,
+    })
+
+    return { success: true, status: 'declined' }
+  }
+
+  // ============================================================================
+  // AGENT COMMENTS QUERY (authenticated)
+  // ============================================================================
+
+  /**
+   * Get comments for an itinerary, optionally filtered by activity.
+   * Used by the admin Comments tab.
+   */
+  async getAgentComments(
+    tripId: string,
+    itineraryId: string,
+    activityId?: string,
+  ): Promise<ProposalCommentDto[]> {
+    const conditions = [
+      eq(this.db.schema.proposalComments.tripId, tripId),
+      eq(this.db.schema.proposalComments.itineraryId, itineraryId),
+      eq(this.db.schema.proposalComments.isDeleted, false),
+    ]
+
+    if (activityId) {
+      conditions.push(eq(this.db.schema.proposalComments.activityId, activityId))
+    }
+
+    const rows = await this.db.client
+      .select()
+      .from(this.db.schema.proposalComments)
+      .where(and(...conditions))
+      .orderBy(asc(this.db.schema.proposalComments.createdAt))
+
+    return rows.map((row) => ({
+      id: row.id,
+      activityId: row.activityId,
+      dayId: row.dayId || null,
+      versionNumber: row.versionNumber || null,
+      authorType: row.authorType,
+      authorName: row.authorName,
+      content: row.content,
+      createdAt: row.createdAt.toISOString(),
+    }))
+  }
+
+  // ============================================================================
+  // SHARED PROPOSAL HELPERS (private)
+  // ============================================================================
+
+  /**
+   * Public wrapper for buildProposalItinerary — used by ItineraryVersionsService
+   * to build a snapshot for publishing.
+   */
+  async buildItinerarySnapshot(
+    itinerary: typeof this.db.schema.itineraries.$inferSelect,
+    pricingVisible: boolean,
+  ): Promise<SharedItineraryDto> {
+    return this.buildProposalItinerary(itinerary, pricingVisible)
+  }
+
+  private async buildProposalItinerary(
+    itinerary: typeof this.db.schema.itineraries.$inferSelect,
+    pricingVisible: boolean,
+  ): Promise<SharedItineraryDto> {
+    // Reuse existing tested code path for fetching days + activities
+    const daysWithActivities = await this.itineraryDaysService.findAllWithActivities(itinerary.id)
+
+    // Collect all activity IDs across all days
+    const allActivityIds: string[] = []
+    for (const day of daysWithActivities) {
+      for (const activity of day.activities) {
+        allActivityIds.push(activity.id)
+      }
+    }
+
+    if (allActivityIds.length === 0) {
+      return {
+        id: itinerary.id,
+        name: itinerary.name,
+        description: itinerary.description,
+        coverPhoto: itinerary.coverPhoto,
+        overview: itinerary.overview,
+        startDate: itinerary.startDate,
+        endDate: itinerary.endDate,
+        status: itinerary.status,
+        publishedVersion: itinerary.publishedVersion,
+        days: daysWithActivities.map((day) => ({
+          id: day.id,
+          dayNumber: day.dayNumber,
+          date: day.date,
+          title: day.title,
+          sequenceOrder: day.sequenceOrder,
+          activities: [],
+        })),
+      }
+    }
+
+    // Batch-fetch all detail tables, pricing, and child activities in parallel
+    const [
+      flightDetailsMap,
+      flightSegmentsMap,
+      lodgingDetailsMap,
+      transportDetailsMap,
+      diningDetailsMap,
+      cruiseDetailsMap,
+      tourDetailsMap,
+      packageDetailsMap,
+      portInfoDetailsMap,
+      optionsDetailsMap,
+      tourDayDetailsMap,
+      pricingMap,
+      childActivitiesMap,
+    ] = await Promise.all([
+      this.batchFetchByActivityIds(this.db.schema.flightDetails, allActivityIds),
+      this.batchFetchFlightSegments(allActivityIds),
+      this.batchFetchByActivityIds(this.db.schema.lodgingDetails, allActivityIds),
+      this.batchFetchByActivityIds(this.db.schema.transportationDetails, allActivityIds),
+      this.batchFetchByActivityIds(this.db.schema.diningDetails, allActivityIds),
+      this.batchFetchByActivityIds(this.db.schema.customCruiseDetails, allActivityIds),
+      this.batchFetchByActivityIds(this.db.schema.customTourDetails, allActivityIds),
+      this.batchFetchByActivityIds(this.db.schema.packageDetails, allActivityIds),
+      this.batchFetchByActivityIds(this.db.schema.portInfoDetails, allActivityIds),
+      this.batchFetchByActivityIds(this.db.schema.optionsDetails, allActivityIds),
+      this.batchFetchByActivityIds(this.db.schema.tourDayDetails, allActivityIds),
+      this.batchFetchPricing(allActivityIds),
+      this.batchFetchChildActivities(allActivityIds, pricingVisible),
+    ])
+
+    // Build day DTOs
+    let days: SharedItineraryDayDto[] = daysWithActivities.map((day) => ({
+      id: day.id,
+      dayNumber: day.dayNumber,
+      date: day.date,
+      title: day.title,
+      sequenceOrder: day.sequenceOrder,
+      activities: day.activities.map((activity) =>
+        this.toPublicActivity(activity, {
+          flightDetails: flightDetailsMap.get(activity.id),
+          flightSegments: flightSegmentsMap.get(activity.id) || [],
+          lodgingDetails: lodgingDetailsMap.get(activity.id),
+          transportDetails: transportDetailsMap.get(activity.id),
+          diningDetails: diningDetailsMap.get(activity.id),
+          cruiseDetails: cruiseDetailsMap.get(activity.id),
+          tourDetails: tourDetailsMap.get(activity.id),
+          packageDetails: packageDetailsMap.get(activity.id),
+          portInfoDetails: portInfoDetailsMap.get(activity.id),
+          optionsDetails: optionsDetailsMap.get(activity.id),
+          tourDayDetails: tourDayDetailsMap.get(activity.id),
+          pricing: pricingMap.get(activity.id),
+          childActivities: childActivitiesMap.get(activity.id) || [],
+          pricingVisible,
+        }),
+      ),
+    }))
+
+    // Trim trailing empty days (e.g. Day 9 after return flight)
+    // Mid-trip free days are preserved
+    let lastIdx = days.length - 1
+    while (lastIdx >= 0 && days[lastIdx]!.activities.length === 0) lastIdx--
+    days = days.slice(0, lastIdx + 1)
+
+    return {
+      id: itinerary.id,
+      name: itinerary.name,
+      description: itinerary.description,
+      coverPhoto: itinerary.coverPhoto,
+      overview: itinerary.overview,
+      startDate: itinerary.startDate,
+      endDate: itinerary.endDate,
+      status: itinerary.status,
+      publishedVersion: itinerary.publishedVersion,
+      days,
+    }
+  }
+
+  /**
+   * Generic batch-fetch for any detail table with an activityId column.
+   * Returns a Map<activityId, row>.
+   */
+  private async batchFetchByActivityIds<T extends { activityId: string }>(
+    table: any,
+    activityIds: string[],
+  ): Promise<Map<string, T>> {
+    if (activityIds.length === 0) return new Map()
+    const rows: T[] = await this.db.client
+      .select()
+      .from(table)
+      .where(inArray(table.activityId, activityIds))
+    const map = new Map<string, T>()
+    for (const row of rows) {
+      map.set(row.activityId, row)
+    }
+    return map
+  }
+
+  private async batchFetchFlightSegments(activityIds: string[]) {
+    if (activityIds.length === 0) return new Map<string, any[]>()
+    const rows = await this.db.client
+      .select()
+      .from(this.db.schema.flightSegments)
+      .where(inArray(this.db.schema.flightSegments.activityId, activityIds))
+      .orderBy(asc(this.db.schema.flightSegments.segmentOrder))
+    const map = new Map<string, any[]>()
+    for (const row of rows) {
+      if (!map.has(row.activityId)) map.set(row.activityId, [])
+      map.get(row.activityId)!.push(row)
+    }
+    return map
+  }
+
+  private async batchFetchPricing(activityIds: string[]) {
+    if (activityIds.length === 0) return new Map<string, any>()
+    const rows = await this.db.client
+      .select()
+      .from(this.db.schema.activityPricing)
+      .where(inArray(this.db.schema.activityPricing.activityId, activityIds))
+    const map = new Map<string, any>()
+    for (const row of rows) {
+      map.set(row.activityId, row)
+    }
+    return map
+  }
+
+  private async batchFetchChildActivities(
+    parentActivityIds: string[],
+    pricingVisible: boolean,
+  ): Promise<Map<string, SharedActivityDto[]>> {
+    if (parentActivityIds.length === 0) return new Map()
+    const children = await this.db.client
+      .select()
+      .from(this.db.schema.itineraryActivities)
+      .where(inArray(this.db.schema.itineraryActivities.parentActivityId, parentActivityIds))
+      .orderBy(asc(this.db.schema.itineraryActivities.sequenceOrder))
+
+    // Fetch pricing for children
+    const childIds = children.map((c) => c.id)
+    const childPricingMap = await this.batchFetchPricing(childIds)
+
+    // Fetch thumbnails for children
+    const childThumbnailMap = await this.batchFetchThumbnails(childIds)
+
+    const map = new Map<string, SharedActivityDto[]>()
+    for (const child of children) {
+      const parentId = child.parentActivityId!
+      if (!map.has(parentId)) map.set(parentId, [])
+      map.get(parentId)!.push(
+        this.toPublicActivity(
+          {
+            ...child,
+            startDatetime: child.startDatetime?.toISOString() || null,
+            endDatetime: child.endDatetime?.toISOString() || null,
+            status: child.status || 'proposed',
+            isBooked: child.isBooked ?? false,
+            confirmationNumber: child.confirmationNumber || null,
+            thumbnail: childThumbnailMap.get(child.id) || child.photos?.[0]?.url || null,
+          } as any,
+          {
+            pricing: childPricingMap.get(child.id),
+            pricingVisible,
+            flightSegments: [],
+            childActivities: [],
+          },
+        ),
+      )
+    }
+    return map
+  }
+
+  private async batchFetchThumbnails(activityIds: string[]): Promise<Map<string, string>> {
+    if (activityIds.length === 0) return new Map()
+    const mediaRows = await this.db.client
+      .select({
+        activityId: this.db.schema.activityMedia.activityId,
+        fileUrl: this.db.schema.activityMedia.fileUrl,
+      })
+      .from(this.db.schema.activityMedia)
+      .where(
+        and(
+          inArray(this.db.schema.activityMedia.activityId, activityIds),
+          eq(this.db.schema.activityMedia.mediaType, 'image'),
+        ),
+      )
+      .orderBy(asc(this.db.schema.activityMedia.orderIndex))
+
+    const map = new Map<string, string>()
+    for (const row of mediaRows) {
+      // First image wins per activity
+      if (!map.has(row.activityId)) {
+        map.set(row.activityId, row.fileUrl)
+      }
+    }
+    return map
+  }
+
+  /**
+   * Whitelist-only public DTO mapper. Strips notes, commission, internal IDs, timestamps.
+   */
+  private toPublicActivity(
+    activity: any,
+    context: {
+      flightDetails?: any
+      flightSegments?: any[]
+      lodgingDetails?: any
+      transportDetails?: any
+      diningDetails?: any
+      cruiseDetails?: any
+      tourDetails?: any
+      packageDetails?: any
+      portInfoDetails?: any
+      optionsDetails?: any
+      tourDayDetails?: any
+      pricing?: any
+      childActivities?: SharedActivityDto[]
+      pricingVisible: boolean
+    },
+  ): SharedActivityDto {
+    const detail = this.buildActivityDetail(activity.activityType, context)
+    const pricing = context.pricingVisible
+      ? this.toPublicPricing(context.pricing)
+      : null
+
+    return {
+      id: activity.id,
+      activityType: activity.activityType,
+      name: activity.name,
+      description: activity.description || null,
+      sequenceOrder: activity.sequenceOrder,
+      startDatetime: activity.startDatetime || null,
+      endDatetime: activity.endDatetime || null,
+      timezone: activity.timezone || null,
+      location: activity.location || null,
+      address: activity.address || null,
+      status: activity.status || 'proposed',
+      isBooked: activity.isBooked ?? false,
+      confirmationNumber: activity.confirmationNumber || null,
+      thumbnail: activity.thumbnail || null,
+      pricing,
+      detail,
+    }
+  }
+
+  private toPublicPricing(pricing: any): SharedActivityPricingDto | null {
+    if (!pricing) return null
+    const breakdownItems: SharedPricingBreakdownItem[] | null =
+      pricing.pricingBreakdownJson
+        ? (pricing.pricingBreakdownJson as any[]).map((item) => ({
+            // Sanitize labels: strip traveler names, use generic descriptions
+            description: this.sanitizePricingLabel(item.label || ''),
+            amountCents: item.priceCents ?? 0,
+          }))
+        : null
+
+    return {
+      totalPriceCents: pricing.totalPriceCents ?? 0,
+      currency: pricing.currency || 'USD',
+      pricingType: pricing.pricingType || null,
+      breakdownItems,
+    }
+  }
+
+  private sanitizePricingLabel(label: string): string {
+    // Replace full names with generic labels like "Traveler 1", "Traveler 2"
+    // Common patterns: "Mrs Jacqueline Belanger", "Adult 1", "Child 1"
+    // Keep generic labels as-is, replace name-like labels
+    if (/^(adult|child|infant|senior|student|traveler|guest)/i.test(label)) {
+      return label
+    }
+    // If it looks like a person's name (2+ capitalized words), genericize it
+    if (/^[A-Z][a-z]+ [A-Z]/.test(label) || /^(Mr|Mrs|Ms|Dr|Miss)\b/.test(label)) {
+      return 'Traveler'
+    }
+    return label
+  }
+
+  private buildActivityDetail(
+    activityType: string,
+    context: any,
+  ): SharedActivityDetailDto | null {
+    switch (activityType) {
+      case 'flight': {
+        const d = context.flightDetails
+        const segments = (context.flightSegments || []).map((s: any) => ({
+          segmentOrder: s.segmentOrder ?? 0,
+          airline: s.airline || null,
+          flightNumber: s.flightNumber || null,
+          departureAirportCode: s.departureAirportCode || null,
+          departureAirportName: s.departureAirportName || null,
+          departureDate: s.departureDate || null,
+          departureTime: s.departureTime || null,
+          departureTerminal: s.departureTerminal || null,
+          arrivalAirportCode: s.arrivalAirportCode || null,
+          arrivalAirportName: s.arrivalAirportName || null,
+          arrivalDate: s.arrivalDate || null,
+          arrivalTime: s.arrivalTime || null,
+          arrivalTerminal: s.arrivalTerminal || null,
+        }))
+        return {
+          type: 'flight' as const,
+          airline: d?.airline || null,
+          flightNumber: d?.flightNumber || null,
+          departureAirportCode: d?.departureAirportCode || null,
+          departureDate: d?.departureDate || null,
+          departureTime: d?.departureTime || null,
+          departureTerminal: d?.departureTerminal || null,
+          arrivalAirportCode: d?.arrivalAirportCode || null,
+          arrivalDate: d?.arrivalDate || null,
+          arrivalTime: d?.arrivalTime || null,
+          arrivalTerminal: d?.arrivalTerminal || null,
+          segments,
+        }
+      }
+      case 'lodging': {
+        const d = context.lodgingDetails
+        if (!d) return null
+        return {
+          type: 'lodging' as const,
+          propertyName: d.propertyName || null,
+          checkInDate: d.checkInDate || null,
+          checkInTime: d.checkInTime || null,
+          checkOutDate: d.checkOutDate || null,
+          checkOutTime: d.checkOutTime || null,
+          roomType: d.roomType || null,
+          roomCount: d.roomCount ?? 1,
+          amenities: d.amenities || [],
+        }
+      }
+      case 'transportation': {
+        const d = context.transportDetails
+        if (!d) return null
+        return {
+          type: 'transportation' as const,
+          subtype: d.subtype || null,
+          providerName: d.providerName || null,
+          vehicleType: d.vehicleType || null,
+          pickupDate: d.pickupDate || null,
+          pickupTime: d.pickupTime || null,
+          pickupAddress: d.pickupAddress || null,
+          dropoffDate: d.dropoffDate || null,
+          dropoffTime: d.dropoffTime || null,
+          dropoffAddress: d.dropoffAddress || null,
+          isRoundTrip: d.isRoundTrip === 1,
+        }
+      }
+      case 'dining': {
+        const d = context.diningDetails
+        if (!d) return null
+        return {
+          type: 'dining' as const,
+          restaurantName: d.restaurantName || null,
+          cuisineType: d.cuisineType || null,
+          mealType: d.mealType || null,
+          reservationDate: d.reservationDate || null,
+          reservationTime: d.reservationTime || null,
+          partySize: d.partySize || null,
+          priceRange: d.priceRange || null,
+          dressCode: d.dressCode || null,
+        }
+      }
+      case 'custom_cruise': {
+        const d = context.cruiseDetails
+        if (!d) return null
+        const portCalls = (d.portCallsJson as any[] || []).map((p: any) => ({
+          day: p.day ?? 0,
+          portName: p.portName || '',
+          arriveTime: p.arriveTime || null,
+          departTime: p.departTime || null,
+        }))
+        return {
+          type: 'custom_cruise' as const,
+          cruiseLineName: d.cruiseLineName || null,
+          shipName: d.shipName || null,
+          itineraryName: d.itineraryName || null,
+          nights: d.nights || null,
+          departurePort: d.departurePort || null,
+          departureDate: d.departureDate || null,
+          arrivalPort: d.arrivalPort || null,
+          arrivalDate: d.arrivalDate || null,
+          cabinCategory: d.cabinCategory || null,
+          cabinDescription: d.cabinDescription || null,
+          region: d.region || null,
+          portCalls,
+        }
+      }
+      case 'custom_tour': {
+        const d = context.tourDetails
+        if (!d) return null
+        const itineraryDays = (d.itineraryJson as any[] || []).map((day: any) => ({
+          dayNumber: day.dayNumber ?? 0,
+          title: day.title || null,
+          description: day.description || null,
+          overnightCity: day.overnightCity || null,
+        }))
+        return {
+          type: 'custom_tour' as const,
+          tourName: d.tourName || null,
+          days: d.days || null,
+          nights: d.nights || null,
+          startCity: d.startCity || null,
+          endCity: d.endCity || null,
+          itineraryDays,
+        }
+      }
+      case 'package': {
+        const d = context.packageDetails
+        return {
+          type: 'package' as const,
+          supplierName: d?.supplierName || null,
+          childActivities: context.childActivities || [],
+        }
+      }
+      case 'port_info': {
+        const d = context.portInfoDetails
+        if (!d) return null
+        return {
+          type: 'port_info' as const,
+          portType: d.portType || null,
+          portName: d.portName || null,
+          portLocation: d.portLocation || null,
+          arrivalDate: d.arrivalDate || null,
+          arrivalTime: d.arrivalTime || null,
+          departureDate: d.departureDate || null,
+          departureTime: d.departureTime || null,
+          tenderRequired: d.tenderRequired ?? false,
+        }
+      }
+      case 'options': {
+        const d = context.optionsDetails
+        if (!d) return null
+        return {
+          type: 'options' as const,
+          optionCategory: d.optionCategory || null,
+          isSelected: d.isSelected ?? false,
+          providerName: d.providerName || null,
+          durationMinutes: d.durationMinutes || null,
+          inclusions: d.inclusions || [],
+        }
+      }
+      // Legacy types and tour_day use generic fallback
+      default:
+        return { type: 'generic' as const }
     }
   }
 

@@ -1,91 +1,80 @@
-'use client'
+import type { Metadata } from 'next'
+import type { SharedTripProposalDto } from '@tailfire/shared-types'
+import { ProposalHero } from './_components/ProposalHero'
+import { AgentProfileCard } from './_components/AgentProfileCard'
+import { ProposalClientShell } from './_components/ProposalClientShell'
 
-import { useParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
 
-interface SharedTrip {
-  id: string
-  name: string
-  description: string | null
-  tripType: string | null
-  startDate: string | null
-  endDate: string | null
-  coverPhotoUrl: string | null
+async function fetchTrip(token: string): Promise<SharedTripProposalDto | null> {
+  try {
+    const res = await fetch(`${API_URL}/trips/share/${token}`, {
+      cache: 'no-store',
+    })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
 }
 
-export default function SharedTripPage() {
-  const { token } = useParams<{ token: string }>()
-  const [trip, setTrip] = useState<SharedTrip | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
-    fetch(`${apiUrl}/trips/share/${token}`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Trip not found')
-        return res.json()
-      })
-      .then(setTrip)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [token])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Loading trip...</p>
-      </div>
-    )
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>
+}): Promise<Metadata> {
+  const { token } = await params
+  const trip = await fetchTrip(token)
+  if (!trip) {
+    return { title: 'Trip Not Found | Phoenix Voyages' }
   }
+  return {
+    title: `${trip.name} | Phoenix Voyages`,
+    description: trip.description || `Trip proposal from Phoenix Voyages`,
+  }
+}
 
-  if (error || !trip) {
+export default async function SharedTripPage({
+  params,
+}: {
+  params: Promise<{ token: string }>
+}) {
+  const { token } = await params
+  const trip = await fetchTrip(token)
+
+  if (!trip) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Trip Not Found</h1>
-          <p className="text-muted-foreground">This trip is no longer available or the link has expired.</p>
+          <h1 className="font-display text-2xl font-bold mb-2">Trip Not Found</h1>
+          <p className="text-muted-foreground">
+            This trip is no longer available or the link has expired.
+          </p>
         </div>
       </div>
     )
-  }
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return null
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
   }
 
   return (
     <div className="min-h-screen bg-background">
-      {trip.coverPhotoUrl && (
-        <div className="w-full h-64 md:h-96 relative">
-          <img
-            src={trip.coverPhotoUrl}
-            alt={trip.name}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      )}
+      {/* Hero (server-rendered) */}
+      <ProposalHero
+        name={trip.name}
+        description={trip.description}
+        startDate={trip.startDate}
+        endDate={trip.endDate}
+        tripType={trip.tripType}
+        coverPhotoUrl={trip.coverPhotoUrl}
+      />
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-2">{trip.name}</h1>
+      {/* Agent profile card (server-rendered) */}
+      {trip.agent && <AgentProfileCard agent={trip.agent} />}
 
-        {(trip.startDate || trip.endDate) && (
-          <p className="text-muted-foreground mb-4">
-            {formatDate(trip.startDate)}
-            {trip.startDate && trip.endDate && ' — '}
-            {formatDate(trip.endDate)}
-          </p>
-        )}
+      {/* Interactive shell: itinerary, comments, pricing, approval */}
+      <ProposalClientShell trip={trip} token={token} />
 
-        {trip.description && (
-          <p className="text-lg leading-relaxed">{trip.description}</p>
-        )}
-      </div>
+      {/* Footer spacing */}
+      <div className="pb-16" />
     </div>
   )
 }

@@ -436,7 +436,7 @@ export default function TripDetailPage() {
     if (!trip) return
     try {
       const updated = await publishTrip.mutateAsync(trip.id)
-      const shareUrl = `${window.location.origin.replace('admin', 'client')}/shared/trips/${updated.shareToken}`
+      const shareUrl = `${getClientOrigin()}/shared/trips/${updated.shareToken}`
       await navigator.clipboard.writeText(shareUrl)
       toast({ title: 'Trip published', description: 'Share link copied to clipboard.' })
     } catch (error) {
@@ -454,11 +454,39 @@ export default function TripDetailPage() {
     }
   }
 
+  const getClientOrigin = () => {
+    const origin = window.location.origin
+    if (origin.includes(':3100')) return origin.replace(':3100', ':3103')
+    return origin.replace('admin', 'client')
+  }
+
   const handleCopyShareLink = () => {
     if (!trip?.shareToken) return
-    const shareUrl = `${window.location.origin.replace('admin', 'client')}/shared/trips/${trip.shareToken}`
+    const shareUrl = `${getClientOrigin()}/shared/trips/${trip.shareToken}`
     navigator.clipboard.writeText(shareUrl)
     toast({ title: 'Share link copied to clipboard' })
+  }
+
+  const handlePreview = async () => {
+    if (!trip) return
+    // Open blank tab synchronously to avoid popup blocker
+    const tab = window.open('', '_blank')
+    if (!tab) {
+      toast({ title: 'Please allow popups for this site', variant: 'destructive' })
+      return
+    }
+    try {
+      let shareToken = trip.shareToken
+      if (!shareToken) {
+        // Auto-publish first
+        const updated = await publishTrip.mutateAsync(trip.id)
+        shareToken = updated.shareToken
+      }
+      tab.location.href = `${getClientOrigin()}/shared/trips/${shareToken}`
+    } catch {
+      tab.close()
+      toast({ title: 'Error', description: 'Failed to preview trip.', variant: 'destructive' })
+    }
   }
 
   const handleDuplicate = async () => {
@@ -717,11 +745,7 @@ export default function TripDetailPage() {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-{/* TODO: Implement Preview functionality
-                  - Opens a preview of the client&apos;s proposal view
-                  - Shows how the trip will appear on the B2C/Client Portal
-                  - Allows agents to review before publishing */}
-            <Button variant="outline" size="sm" className="gap-1.5">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={handlePreview}>
               <Eye className="h-4 w-4" />
               Preview
             </Button>

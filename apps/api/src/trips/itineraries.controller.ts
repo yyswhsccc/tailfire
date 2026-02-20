@@ -15,24 +15,32 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  ParseIntPipe,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { ItinerariesService } from './itineraries.service'
+import { ItineraryVersionsService } from './itinerary-versions.service'
 import { TripAccessService } from './trip-access.service'
 import {
   CreateItineraryDto,
   UpdateItineraryDto,
   ItineraryFilterDto,
+  PublishItineraryBodyDto,
 } from './dto'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
-import type { ItineraryResponseDto } from '../../../../packages/shared-types/src/api'
+import type {
+  ItineraryResponseDto,
+  ItineraryVersionSummaryDto,
+  SharedItineraryDto,
+} from '../../../../packages/shared-types/src/api'
 
 @ApiTags('Itineraries')
 @Controller('trips/:tripId/itineraries')
 export class ItinerariesController {
   constructor(
     private readonly itinerariesService: ItinerariesService,
+    private readonly itineraryVersionsService: ItineraryVersionsService,
     private readonly tripAccessService: TripAccessService,
   ) {}
 
@@ -102,6 +110,57 @@ export class ItinerariesController {
   ): Promise<ItineraryResponseDto> {
     await this.tripAccessService.verifyWriteAccess(tripId, auth)
     return this.itinerariesService.selectItinerary(id, tripId)
+  }
+
+  /**
+   * Publish a new version of an itinerary
+   * POST /trips/:tripId/itineraries/:id/publish
+   * Creates a JSONB snapshot of the itinerary content for the shared proposal page.
+   *
+   * Access check: User must have write access to the trip.
+   */
+  @Post(':id/publish')
+  async publishVersion(
+    @GetAuthContext() auth: AuthContext,
+    @Param('tripId') tripId: string,
+    @Param('id') id: string,
+    @Body() body: PublishItineraryBodyDto,
+  ) {
+    await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    return this.itineraryVersionsService.publishVersion(tripId, id, auth.userId, body.changeSummary)
+  }
+
+  /**
+   * Get version history for an itinerary
+   * GET /trips/:tripId/itineraries/:id/versions
+   *
+   * Access check: User must have read access to the trip.
+   */
+  @Get(':id/versions')
+  async getVersions(
+    @GetAuthContext() auth: AuthContext,
+    @Param('tripId') tripId: string,
+    @Param('id') id: string,
+  ): Promise<ItineraryVersionSummaryDto[]> {
+    await this.tripAccessService.verifyReadAccess(tripId, auth)
+    return this.itineraryVersionsService.getVersions(tripId, id)
+  }
+
+  /**
+   * Get a specific version snapshot
+   * GET /trips/:tripId/itineraries/:id/versions/:version
+   *
+   * Access check: User must have read access to the trip.
+   */
+  @Get(':id/versions/:version')
+  async getVersionSnapshot(
+    @GetAuthContext() auth: AuthContext,
+    @Param('tripId') tripId: string,
+    @Param('id') id: string,
+    @Param('version', ParseIntPipe) version: number,
+  ): Promise<SharedItineraryDto | null> {
+    await this.tripAccessService.verifyReadAccess(tripId, auth)
+    return this.itineraryVersionsService.getVersionSnapshot(tripId, id, version)
   }
 
   /**

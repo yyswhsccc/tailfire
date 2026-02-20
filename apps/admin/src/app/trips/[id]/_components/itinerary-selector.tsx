@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { Plus, Check, MoreVertical, Trash2, Pencil, FileText, Send, CheckCircle2, Archive, Library, Download } from 'lucide-react'
+import { Plus, Check, MoreVertical, Trash2, Pencil, FileText, Send, CheckCircle2, Archive, Library, Download, Globe, History } from 'lucide-react'
 import type { ItineraryResponseDto } from '@tailfire/shared-types/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,13 +24,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useLoading } from '@/context/loading-context'
 import { useDeleteItinerary, useSelectItinerary, useUpdateItineraryStatus, type ItineraryStatus } from '@/hooks/use-itineraries'
+import { usePublishItinerary } from '@/hooks/use-itinerary-versions'
 import { cn } from '@/lib/utils'
 import { FOCUS_VISIBLE_RING, SKELETON_BG } from '@/lib/itinerary-styles'
 import { EditItineraryDialog } from './edit-itinerary-dialog'
 import { SaveAsTemplateDialog } from './save-as-template-dialog'
+import { ItineraryVersionHistory } from './itinerary-version-history'
 
 interface ItinerarySelectorProps {
   tripId: string
@@ -74,10 +85,16 @@ export function ItinerarySelector({
   const [itineraryToEdit, setItineraryToEdit] = useState<ItineraryResponseDto | null>(null)
   const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false)
   const [itineraryToSave, setItineraryToSave] = useState<ItineraryResponseDto | null>(null)
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false)
+  const [itineraryToPublish, setItineraryToPublish] = useState<ItineraryResponseDto | null>(null)
+  const [publishChangeSummary, setPublishChangeSummary] = useState('')
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
+  const [versionHistoryItineraryId, setVersionHistoryItineraryId] = useState<string | undefined>()
 
   const deleteItinerary = useDeleteItinerary(tripId)
   const selectItinerary = useSelectItinerary(tripId)
   const updateStatus = useUpdateItineraryStatus(tripId)
+  const publishItinerary = usePublishItinerary(tripId)
 
   // Status labels for toast messages
   const STATUS_LABELS: Record<ItineraryStatus, string> = {
@@ -253,6 +270,10 @@ export function ItinerarySelector({
                   </Badge>
                 )}
 
+                {itinerary.hasUnpublishedChanges && (
+                  <span className="h-2 w-2 rounded-full bg-amber-500 flex-shrink-0" title="Unpublished changes" />
+                )}
+
               </button>
 
               {/* Overflow Menu */}
@@ -288,6 +309,32 @@ export function ItinerarySelector({
                   >
                     <Library className="h-4 w-4 mr-2" />
                     Save as Template
+                  </DropdownMenuItem>
+
+                  {(itinerary.status === 'proposing' || itinerary.status === 'approved') && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setItineraryToPublish(itinerary)
+                          setPublishChangeSummary('')
+                          setPublishDialogOpen(true)
+                        }}
+                      >
+                        <Globe className="h-4 w-4 mr-2" />
+                        Publish to Client
+                      </DropdownMenuItem>
+                    </>
+                  )}
+
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setVersionHistoryItineraryId(itinerary.id)
+                      setVersionHistoryOpen(true)
+                    }}
+                  >
+                    <History className="h-4 w-4 mr-2" />
+                    Version History
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
@@ -451,6 +498,67 @@ export function ItinerarySelector({
           })
           setItineraryToSave(null)
         }}
+      />
+
+      {/* Publish to Client Dialog */}
+      <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              Publish v{(itineraryToPublish?.currentVersion ?? 0) + 1} to Client
+            </DialogTitle>
+            <DialogDescription>
+              This will create a snapshot of &quot;{itineraryToPublish?.name}&quot; visible to clients on the shared proposal link.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Textarea
+              placeholder="What changed? (optional)"
+              value={publishChangeSummary}
+              onChange={(e) => setPublishChangeSummary(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPublishDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!itineraryToPublish) return
+                try {
+                  const result = await publishItinerary.mutateAsync({
+                    itineraryId: itineraryToPublish.id,
+                    changeSummary: publishChangeSummary || undefined,
+                  })
+                  toast({
+                    title: 'Published',
+                    description: `v${result.versionNumber} is now live for clients.`,
+                  })
+                  setPublishDialogOpen(false)
+                  setItineraryToPublish(null)
+                } catch {
+                  toast({
+                    title: 'Publish Failed',
+                    description: 'Failed to publish. Please try again.',
+                    variant: 'destructive',
+                  })
+                }
+              }}
+              disabled={publishItinerary.isPending}
+            >
+              {publishItinerary.isPending ? 'Publishing...' : 'Publish'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Version History Sheet */}
+      <ItineraryVersionHistory
+        tripId={tripId}
+        itineraryId={versionHistoryItineraryId}
+        open={versionHistoryOpen}
+        onOpenChange={setVersionHistoryOpen}
       />
     </div>
   )

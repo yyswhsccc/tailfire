@@ -42,6 +42,7 @@ import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
 import { DocumentUploader } from '@/components/document-uploader'
 import { ComponentMediaTab } from '@/components/shared'
+import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
 import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
 import { ChildOfPackageBookingSection } from '@/components/activities/child-of-package-booking-section'
 import { useMarkActivityBooked } from '@/hooks/use-activity-bookings'
@@ -809,6 +810,12 @@ export function TourForm({
           >
             Booking & Pricing
           </TabsTrigger>
+          <TabsTrigger
+            value="comments"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-orange-600 data-[state=active]:bg-transparent px-6 py-3"
+          >
+            Comments
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="mt-6 space-y-6">
@@ -1414,6 +1421,20 @@ export function TourForm({
             userSplitValue={userProfile?.commissionSettings?.splitValue}
             userSplitType={userProfile?.commissionSettings?.splitType}
           />
+        </TabsContent>
+
+        <TabsContent value="comments" className="mt-6">
+          {isEditing && activity?.id ? (
+            <ActivityCommentsPanel
+              tripId={trip?.id || ''}
+              itineraryId={itineraryId}
+              activityId={activity.id}
+            />
+          ) : (
+            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
+              Save the activity first to view comments.
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

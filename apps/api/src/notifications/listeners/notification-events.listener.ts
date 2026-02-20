@@ -356,6 +356,114 @@ export class NotificationEventsListener {
   }
 
   // =========================================================================
+  // Proposal Events (Client Feedback)
+  // =========================================================================
+
+  /**
+   * Handle proposal.comment_created event
+   * Notify trip owner when a client posts a comment on their proposal
+   */
+  @OnEvent('proposal.comment_created')
+  async handleProposalCommentCreated(event: {
+    tripId: string
+    itineraryId: string
+    commentId: string
+    authorType: 'client' | 'agent'
+    authorName: string
+    activityId: string | null
+    dayId: string | null
+  }): Promise<void> {
+    // Only notify on client comments (agent comments are from the trip owner themselves)
+    if (event.authorType !== 'client') return
+
+    const trip = await this.getTrip(event.tripId)
+    if (!trip || !trip.ownerId) return
+
+    await this.notificationService.send({
+      userId: trip.ownerId,
+      category: 'collaboration',
+      title: 'New Client Comment',
+      body: `${event.authorName} commented on proposal for "${trip.name}"`,
+      actionUrl: `/trips/${event.tripId}`,
+      data: {
+        tripId: event.tripId,
+        itineraryId: event.itineraryId,
+        commentId: event.commentId,
+        activityId: event.activityId,
+        dayId: event.dayId,
+        notificationType: 'proposal.comment_created',
+      },
+    })
+
+    this.logger.debug(`Sent proposal.comment_created notification to user ${trip.ownerId} for trip ${event.tripId}`)
+  }
+
+  /**
+   * Handle proposal.activity_response event
+   * Notify trip owner when a client confirms or declines an activity
+   */
+  @OnEvent('proposal.activity_response')
+  async handleActivityResponse(event: {
+    tripId: string
+    itineraryId: string
+    activityId: string
+    activityName: string
+    response: 'confirmed' | 'declined'
+    contactName: string
+  }): Promise<void> {
+    const trip = await this.getTrip(event.tripId)
+    if (!trip || !trip.ownerId) return
+
+    const verb = event.response === 'confirmed' ? 'approved' : 'declined'
+
+    await this.notificationService.send({
+      userId: trip.ownerId,
+      category: 'collaboration',
+      title: `Activity ${verb.charAt(0).toUpperCase() + verb.slice(1)}`,
+      body: `${event.contactName} ${verb} "${event.activityName}" in "${trip.name}"`,
+      actionUrl: `/trips/${event.tripId}`,
+      data: {
+        tripId: event.tripId,
+        itineraryId: event.itineraryId,
+        activityId: event.activityId,
+        response: event.response,
+        notificationType: 'proposal.activity_response',
+      },
+    })
+
+    this.logger.debug(`Sent proposal.activity_response notification to user ${trip.ownerId} for trip ${event.tripId}`)
+  }
+
+  /**
+   * Handle proposal.declined event
+   * Notify trip owner when a client declines the entire proposal
+   */
+  @OnEvent('proposal.declined')
+  async handleProposalDeclined(event: {
+    tripId: string
+    tripName: string
+    itineraryId: string
+  }): Promise<void> {
+    const trip = await this.getTrip(event.tripId)
+    if (!trip || !trip.ownerId) return
+
+    await this.notificationService.send({
+      userId: trip.ownerId,
+      category: 'collaboration',
+      title: 'Proposal Declined',
+      body: `Client declined proposal for "${event.tripName}"`,
+      actionUrl: `/trips/${event.tripId}`,
+      data: {
+        tripId: event.tripId,
+        itineraryId: event.itineraryId,
+        notificationType: 'proposal.declined',
+      },
+    })
+
+    this.logger.debug(`Sent proposal.declined notification to user ${trip.ownerId} for trip ${event.tripId}`)
+  }
+
+  // =========================================================================
   // Helper Methods
   // =========================================================================
 

@@ -32,6 +32,7 @@ import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
 import { DocumentUploader } from '@/components/document-uploader'
 import { ComponentMediaTab } from '@/components/shared'
+import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
 import {
   portInfoFormSchema,
   toPortInfoDefaults,
@@ -571,6 +572,12 @@ export function PortInfoForm({
           >
             Booking Status
           </TabsTrigger>
+          <TabsTrigger
+            value="comments"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent px-6 py-3"
+          >
+            Comments
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="mt-6 space-y-6">
@@ -881,6 +888,20 @@ export function PortInfoForm({
               </div>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="comments" className="mt-6">
+          {isEditing && activity?.id ? (
+            <ActivityCommentsPanel
+              tripId={trip?.id || ''}
+              itineraryId={itineraryId}
+              activityId={activity.id}
+            />
+          ) : (
+            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
+              Save the activity first to view comments.
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
