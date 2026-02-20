@@ -1797,12 +1797,19 @@ export class OcrImportService {
       const existing = await this.paymentSchedulesService.findByActivityPricingId(activityPricingId)
 
       let schedule: { expectedPaymentItems?: Array<{ id: string }> }
+      const parseValidDate = (d?: string | null): string | null => {
+        if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null
+        const parsed = new Date(d + 'T00:00:00')
+        if (isNaN(parsed.getTime())) return null
+        return d
+      }
+
       if (existing) {
         schedule = await this.paymentSchedulesService.update(activityPricingId, {
           expectedPaymentItems: expectedItems.map((item, i) => ({
             paymentName: item.paymentName,
             expectedAmountCents: item.amountCents,
-            dueDate: null,
+            dueDate: parseValidDate(item.date),
             sequenceOrder: i + 1,
           })),
         })
@@ -1813,7 +1820,7 @@ export class OcrImportService {
           expectedPaymentItems: expectedItems.map((item, i) => ({
             paymentName: item.paymentName,
             expectedAmountCents: item.amountCents,
-            dueDate: null,
+            dueDate: parseValidDate(item.date),
             sequenceOrder: i + 1,
           })),
         })

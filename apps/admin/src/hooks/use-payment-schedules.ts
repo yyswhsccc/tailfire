@@ -11,6 +11,7 @@ import type {
   PaymentScheduleConfigDto,
   CreatePaymentScheduleConfigDto,
   UpdatePaymentScheduleConfigDto,
+  CreateExpectedPaymentItemDto,
   UpdateExpectedPaymentItemDto,
   ExpectedPaymentItemDto,
   PaymentTransactionDto,
@@ -300,6 +301,71 @@ export function useUpdateExpectedPaymentItem(activityPricingId: string) {
       toast({
         title: 'Payment item updated',
         description: 'Expected payment item has been successfully updated.',
+      })
+    },
+  })
+}
+
+/**
+ * Add an expected payment item to an existing payment schedule config
+ */
+export function useAddExpectedPaymentItem(activityPricingId: string) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: async ({ configId, data }: { configId: string; data: CreateExpectedPaymentItemDto }) => {
+      return api.post<ExpectedPaymentItemDto>(
+        `/payment-schedules/${configId}/expected-payment-items`,
+        data
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: paymentScheduleKeys.byActivityPricing(activityPricingId),
+      })
+
+      toast({
+        title: 'Payment item added',
+        description: 'Expected payment item has been added.',
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to add payment item',
+        description: error?.message || 'An unexpected error occurred.',
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+/**
+ * Delete an expected payment item
+ */
+export function useDeleteExpectedPaymentItem(activityPricingId: string) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: async (itemId: string) => {
+      return api.delete(`/payment-schedules/expected-payment-items/${itemId}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: paymentScheduleKeys.byActivityPricing(activityPricingId),
+      })
+
+      toast({
+        title: 'Payment item deleted',
+        description: 'Expected payment item has been deleted.',
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to delete payment item',
+        description: error?.message || 'An unexpected error occurred.',
+        variant: 'destructive',
       })
     },
   })

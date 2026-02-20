@@ -534,6 +534,15 @@ export class PaymentSchedulesService {
       throw new NotFoundException(`Expected payment item with ID ${itemId} not found`)
     }
 
+    // Validate amount >= paidAmountCents (prevent setting below what's already paid)
+    if (data.expectedAmountCents !== undefined) {
+      if (data.expectedAmountCents < existing.paidAmountCents) {
+        throw new BadRequestException(
+          `Cannot set expected amount (${data.expectedAmountCents}) below paid amount (${existing.paidAmountCents})`,
+        )
+      }
+    }
+
     // Validate contactId if provided
     if (data.contactId !== undefined && data.contactId !== null) {
       const tripId = await this.getTripIdFromExpectedPaymentItemId(itemId)
@@ -568,6 +577,25 @@ export class PaymentSchedulesService {
       throw new NotFoundException(`Expected payment item with ID ${itemId} not found`)
     }
 
+    // Re-sync status if amount changed (e.g., may go from 'paid' to 'partial' or vice versa)
+    let finalItem = updated
+    if (data.expectedAmountCents !== undefined && data.expectedAmountCents !== existing.expectedAmountCents) {
+      await this.syncPaidAmountCents(itemId)
+      // Re-fetch to get updated status from sync
+      const [refetched] = await this.db.client
+        .select()
+        .from(this.db.schema.expectedPaymentItems)
+        .where(eq(this.db.schema.expectedPaymentItems.id, itemId))
+        .limit(1)
+      if (refetched) {
+        // If sync changed status to 'paid', cancel reminders
+        if (refetched.status === 'paid' && updated.status !== 'paid') {
+          await this.cancelPaymentReminders(itemId)
+        }
+        finalItem = refetched
+      }
+    }
+
     // Reschedule payment reminders if due date changed
     const dueDateChanged = data.dueDate !== undefined && data.dueDate !== existing.dueDate
     const statusChangedToPaid = data.status === 'paid' && existing.status !== 'paid'
@@ -592,7 +620,7 @@ export class PaymentSchedulesService {
       await this.cancelPaymentReminders(itemId)
     }
 
-    return this.formatExpectedPaymentItem(updated)
+    return this.formatExpectedPaymentItem(finalItem)
   }
 
   /**
@@ -2166,8 +2194,142 @@ export class PaymentSchedulesService {
   }
 
   // ============================================================================
+  // Single Expected Payment Item Operations (Add/Delete)
+  // ============================================================================
+
+  /**
+   * Add a single expected payment item to an existing payment schedule config.
+   * Does NOT enforce sum == totalPrice (UI shows warning instead).
+   */
+  async addExpectedPaymentItem(
+    configId: string,
+    agencyId: string,
+    data: CreateExpectedPaymentItemDto,
+  ): Promise<ExpectedPaymentItemDto> {
+    // Validate config exists and belongs to agency
+    const [config] = await this.db.client
+      .select({
+        id: this.db.schema.paymentScheduleConfig.id,
+        activityPricingId: this.db.schema.paymentScheduleConfig.activityPricingId,
+      })
+      .from(this.db.schema.paymentScheduleConfig)
+      .innerJoin(
+        this.db.schema.activityPricing,
+        eq(this.db.schema.paymentScheduleConfig.activityPricingId, this.db.schema.activityPricing.id),
+      )
+      .where(
+        and(
+          eq(this.db.schema.paymentScheduleConfig.id, configId),
+          eq(this.db.schema.activityPricing.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!config) {
+      throw new NotFoundException(`Payment schedule config with ID ${configId} not found`)
+    }
+
+    // Always assign server-side sequenceOrder (ignore client value to prevent duplicates/collisions)
+    const existingItems = await this.findExpectedPaymentItems(configId)
+    const maxSeq = existingItems.reduce((max, item) => Math.max(max, item.sequenceOrder), -1)
+    const sequenceOrder = maxSeq + 1
+
+    // Insert the item
+    const [created] = await this.db.client
+      .insert(this.db.schema.expectedPaymentItems)
+      .values({
+        paymentScheduleConfigId: configId,
+        agencyId,
+        paymentName: data.paymentName,
+        expectedAmountCents: data.expectedAmountCents,
+        dueDate: data.dueDate || null,
+        sequenceOrder,
+      })
+      .returning()
+
+    // Schedule payment reminders if dueDate provided
+    if (created!.dueDate) {
+      const tripContext = await this.getTripContextFromActivityPricingId(config.activityPricingId)
+      if (tripContext) {
+        await this.schedulePaymentReminders(
+          created!.id,
+          tripContext.tripId,
+          tripContext.contactId,
+          agencyId,
+          created!.dueDate,
+        )
+      }
+    }
+
+    return this.formatExpectedPaymentItem(created!)
+  }
+
+  /**
+   * Delete a single expected payment item.
+   * Blocks if any payment_transactions exist for the item.
+   */
+  async deleteExpectedPaymentItem(
+    itemId: string,
+    agencyId: string,
+  ): Promise<void> {
+    // Validate item exists and belongs to agency
+    const [item] = await this.db.client
+      .select()
+      .from(this.db.schema.expectedPaymentItems)
+      .where(
+        and(
+          eq(this.db.schema.expectedPaymentItems.id, itemId),
+          eq(this.db.schema.expectedPaymentItems.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!item) {
+      throw new NotFoundException(`Expected payment item with ID ${itemId} not found`)
+    }
+
+    // Block if any transactions exist (use EXISTS, not paidAmountCents — refunds can net to 0)
+    const [txCheck] = await this.db.client
+      .select({ count: sql<number>`count(*)::int` })
+      .from(this.db.schema.paymentTransactions)
+      .where(eq(this.db.schema.paymentTransactions.expectedPaymentItemId, itemId))
+
+    if (txCheck && txCheck.count > 0) {
+      throw new BadRequestException(
+        'Cannot delete expected payment item that has payment transactions. Delete the transactions first.',
+      )
+    }
+
+    // Cancel payment reminders
+    await this.cancelPaymentReminders(itemId)
+
+    // Delete the item
+    await this.db.client
+      .delete(this.db.schema.expectedPaymentItems)
+      .where(eq(this.db.schema.expectedPaymentItems.id, itemId))
+  }
+
+  // ============================================================================
   // Trip Access Helpers (for TripAccessService integration)
   // ============================================================================
+
+  /**
+   * Get tripId from paymentScheduleConfigId
+   * Path: paymentScheduleConfig → activityPricing → activity → trip
+   */
+  async getTripIdFromPaymentScheduleConfigId(configId: string): Promise<string | null> {
+    const [config] = await this.db.client
+      .select({ activityPricingId: this.db.schema.paymentScheduleConfig.activityPricingId })
+      .from(this.db.schema.paymentScheduleConfig)
+      .where(eq(this.db.schema.paymentScheduleConfig.id, configId))
+      .limit(1)
+
+    if (!config?.activityPricingId) {
+      return null
+    }
+
+    return this.getTripIdFromActivityPricingId(config.activityPricingId)
+  }
 
   /**
    * Get tripId from activityPricingId
