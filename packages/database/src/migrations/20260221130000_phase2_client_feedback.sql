@@ -47,7 +47,10 @@ CREATE INDEX IF NOT EXISTS idx_proposal_comments_version ON proposal_comments(it
 ALTER TYPE itinerary_status ADD VALUE IF NOT EXISTS 'declined';
 
 -- 1d. Enable Realtime on proposal_comments
-ALTER PUBLICATION supabase_realtime ADD TABLE proposal_comments;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE proposal_comments;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 1d. Add agency-scoped read policy for collaborators
 CREATE POLICY "agency_member_read" ON proposal_comments
@@ -56,8 +59,7 @@ CREATE POLICY "agency_member_read" ON proposal_comments
   USING (
     trip_id IN (
       SELECT t.id FROM trips t
-      JOIN agencies a ON t.agency_id = a.id
-      JOIN agency_members am ON am.agency_id = a.id
-      WHERE am.user_id = auth.uid()
+      JOIN user_profiles up ON up.agency_id = t.agency_id
+      WHERE up.id = auth.uid()
     )
   );
