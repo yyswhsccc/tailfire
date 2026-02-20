@@ -78,8 +78,8 @@ export function DaySection({
               commentButton={renderCommentButton?.(activity.id)}
               onClickTitle={onActivityClick ? () => onActivityClick(activity) : undefined}
               response={responseMap?.[activity.id] ?? null}
-              onConfirm={onConfirmActivity ? () => onConfirmActivity(activity.id) : undefined}
-              onDecline={onDeclineActivity ? () => onDeclineActivity(activity.id) : undefined}
+              onConfirm={activity.status !== 'confirmed' && onConfirmActivity ? () => onConfirmActivity(activity.id) : undefined}
+              onDecline={activity.status !== 'confirmed' && onDeclineActivity ? () => onDeclineActivity(activity.id) : undefined}
             />
           ))}
         </div>

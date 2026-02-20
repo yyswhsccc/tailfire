@@ -1381,6 +1381,14 @@ export class TripsService {
   async publishTrip(id: string, actorId: string): Promise<TripResponseDto> {
     const trip = await this.findOne(id)
     if (trip.isPublished) {
+      // Trip already published — still ensure a version snapshot exists
+      const itineraries = await this.db.client.query.itineraries.findMany({
+        where: eq(this.db.schema.itineraries.tripId, id),
+      })
+      const selectedItinerary = this.resolvePublishedItinerary(itineraries)
+      if (selectedItinerary && !selectedItinerary.publishedVersion) {
+        await this.itineraryVersionsService.publishVersion(id, selectedItinerary.id, actorId, 'Initial publish')
+      }
       return trip
     }
 

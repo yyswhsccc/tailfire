@@ -45,7 +45,8 @@ export function useActivityResponses(token: string, publishedVersion: number | n
     })
 
     if (!res.ok) {
-      throw new Error('Failed to submit response')
+      const errorBody = await res.json().catch(() => ({}))
+      throw new Error(errorBody.message || `Failed to submit response (${res.status})`)
     }
 
     // Optimistic update
