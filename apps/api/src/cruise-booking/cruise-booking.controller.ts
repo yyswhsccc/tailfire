@@ -480,7 +480,7 @@ export class CruiseBookingController {
    */
   @Post('import/preview')
   @Roles('admin', 'user')
-  @ApiOperation({ summary: 'Preview an existing cruise booking for import' })
+  @ApiOperation({ summary: 'Preview an existing booking for import' })
   @ApiResponse({ status: 200, description: 'Booking preview data' })
   async importPreview(
     @Body() dto: ImportBookingPreviewDto,
@@ -496,7 +496,7 @@ export class CruiseBookingController {
    */
   @Post('import/confirm')
   @Roles('admin', 'user')
-  @ApiOperation({ summary: 'Import an existing cruise booking into Tailfire' })
+  @ApiOperation({ summary: 'Import an existing booking into Tailfire' })
   @ApiResponse({ status: 201, description: 'Imported trip details' })
   async importConfirm(
     @Body() dto: ImportBookingConfirmDto,
