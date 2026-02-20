@@ -18,7 +18,7 @@
  * - Supplier
  * - Confirmation #
  * - Payment status badge
- * - Commission/Status badge
+ * - Commission amount
  */
 
 import React, { useState, useMemo, useCallback, memo } from 'react'
@@ -120,6 +120,7 @@ type UnifiedBookingRow =
       status: string
       dateBooked: string | null
       activityCount: number
+      commissionTotalCents: number | null
     }
   | {
       kind: 'activity'
@@ -128,12 +129,14 @@ type UnifiedBookingRow =
       date: string | null
       activityType: string
       dayNumber: number | null
+      endDayNumber: number | null
       totalPriceCents: number | null
       supplierName: string | null
       isBooked: boolean
       confirmationNumber: string | null
       paymentStatus: string | null
       currency: string | null
+      commissionTotalCents: number | null
       children: UnlinkedActivity[]
     }
 
@@ -141,31 +144,88 @@ type UnifiedBookingRow =
 // Helpers
 // ============================================================================
 
-function getCommissionStatus(
-  isBooked: boolean,
-  status: string
-): { label: string; variant: 'default' | 'secondary' | 'outline' } {
-  if (isBooked || status === 'confirmed') {
-    return { label: 'Booked', variant: 'default' }
-  }
-  if (status === 'pending') {
-    return { label: 'Upcoming', variant: 'secondary' }
-  }
-  return { label: 'Not Booked', variant: 'outline' }
+// Activity type priority maps for day-aware ordering
+// First day: Flight → Transfer → Lodging → Cruise → Port → Other
+const FIRST_DAY_PRIORITY: Record<string, number> = {
+  flight: 1,
+  transportation: 2,
+  lodging: 3,
+  custom_cruise: 4,
+  port_info: 5,
+}
+// Last day: Cruise → Lodging → Transfer → Other → Flight (always last)
+const LAST_DAY_PRIORITY: Record<string, number> = {
+  custom_cruise: 1,
+  lodging: 2,
+  transportation: 3,
+  flight: 99, // Always last on departure day
+}
+// Middle days: default ordering
+const MIDDLE_DAY_PRIORITY: Record<string, number> = {
+  custom_cruise: 1,
+  lodging: 2,
+  flight: 3,
+  transportation: 4,
+  port_info: 5,
+}
+const DEFAULT_PRIORITY = 50
+
+function getActivityTypePriority(
+  activityType: string,
+  dayNumber: number | null,
+  firstDay: number,
+  lastDay: number
+): number {
+  if (dayNumber == null) return DEFAULT_PRIORITY
+  if (dayNumber === firstDay) return FIRST_DAY_PRIORITY[activityType] ?? DEFAULT_PRIORITY
+  if (dayNumber === lastDay) return LAST_DAY_PRIORITY[activityType] ?? DEFAULT_PRIORITY
+  return MIDDLE_DAY_PRIORITY[activityType] ?? DEFAULT_PRIORITY
 }
 
-// Sort unified rows by date (nulls at bottom)
-function sortByDate(a: UnifiedBookingRow, b: UnifiedBookingRow): number {
-  const dateA = a.date
-  const dateB = b.date
+// Sort unified rows by date then activity type priority
+function sortUnifiedRows(
+  rows: UnifiedBookingRow[],
+  firstDay: number,
+  lastDay: number
+): UnifiedBookingRow[] {
+  return [...rows].sort((a, b) => {
+    // 1. Sort by date (nulls at bottom)
+    const dateA = a.date
+    const dateB = b.date
+    if (!dateA && !dateB) {
+      // both null — compare by name
+    } else if (!dateA) return 1
+    else if (!dateB) return -1
+    else {
+      const dateCompare = dateA.localeCompare(dateB)
+      if (dateCompare !== 0) return dateCompare
+    }
 
-  // Nulls go to the bottom
-  if (!dateA && !dateB) return 0
-  if (!dateA) return 1
-  if (!dateB) return -1
+    // 2. Within same date, sort activities by type priority
+    if (a.kind === 'activity' && b.kind === 'activity') {
+      const dayA = a.dayNumber ?? Infinity
+      const dayB = b.dayNumber ?? Infinity
+      if (dayA !== dayB) return dayA - dayB
+      const priA = getActivityTypePriority(a.activityType, a.dayNumber, firstDay, lastDay)
+      const priB = getActivityTypePriority(b.activityType, b.dayNumber, firstDay, lastDay)
+      if (priA !== priB) return priA - priB
+    }
 
-  // Compare dates
-  return dateA.localeCompare(dateB)
+    // 3. Packages before activities at same date
+    if (a.kind !== b.kind) return a.kind === 'package' ? -1 : 1
+
+    return a.name.localeCompare(b.name)
+  })
+}
+
+// Format day badge label with optional spanning (e.g., "Day 1" or "Day 1-8")
+// Only lodging and custom_cruise activity types can show day spans
+const SPAN_ELIGIBLE_TYPES = new Set(['lodging', 'custom_cruise'])
+function formatDayLabel(dayNumber: number | null | undefined, endDayNumber?: number | null, activityType?: string): string | null {
+  if (dayNumber == null) return null
+  if (endDayNumber != null && endDayNumber > dayNumber && activityType && SPAN_ELIGIBLE_TYPES.has(activityType))
+    return `Day ${dayNumber}-${endDayNumber}`
+  return `Day ${dayNumber}`
 }
 
 // ============================================================================
@@ -233,8 +293,13 @@ const ExpandedPackageActivities = memo(function ExpandedPackageActivities({
     )
   }
 
+  // Compute first/last day from activity placement (not spans) for type-priority ordering
+  const dayNumbers = activities.map(a => a.dayNumber).filter((d): d is number => d != null)
+  const pkgFirstDay = dayNumbers.length > 0 ? Math.min(...dayNumbers) : 1
+  const pkgLastDay = dayNumbers.length > 0 ? Math.max(...dayNumbers) : 1
+
   // Group by parent for hierarchical display
-  const grouped = groupActivitiesByParent(activities)
+  const grouped = groupActivitiesByParent(activities, pkgFirstDay, pkgLastDay)
 
   return (
     <>
@@ -270,9 +335,9 @@ const ExpandedPackageActivities = memo(function ExpandedPackageActivities({
                   <span className="text-gray-300">├</span>
                   <ActivityIconBadge type={activity.activityType} size="sm" />
                   <span className="text-xs text-gray-700">{activity.name}</span>
-                  {activity.dayNumber && (
+                  {activity.dayNumber != null && (
                     <Badge variant="outline" className="text-xs ml-auto">
-                      Day {activity.dayNumber}
+                      {formatDayLabel(activity.dayNumber, activity.endDayNumber, activity.activityType)}
                     </Badge>
                   )}
                   {isCruise && hasChildren && (
@@ -322,15 +387,30 @@ const ExpandedPackageActivities = memo(function ExpandedPackageActivities({
   )
 })
 
-// Sort helper: by dayNumber ascending then name alphabetically
-function sortByDayThenName<T extends { dayNumber?: number | null; name: string }>(a: T, b: T): number {
+// Sort helper: by dayNumber ascending, then activity type priority, then name
+function sortByDayThenType<T extends { dayNumber?: number | null; name: string; activityType?: string }>(
+  a: T,
+  b: T,
+  firstDay: number,
+  lastDay: number
+): number {
   const dayA = a.dayNumber ?? Infinity
   const dayB = b.dayNumber ?? Infinity
   if (dayA !== dayB) return dayA - dayB
+  // Within same day, sort by activity type priority
+  if (a.activityType && b.activityType) {
+    const priA = getActivityTypePriority(a.activityType, a.dayNumber ?? null, firstDay, lastDay)
+    const priB = getActivityTypePriority(b.activityType, b.dayNumber ?? null, firstDay, lastDay)
+    if (priA !== priB) return priA - priB
+  }
   return a.name.localeCompare(b.name)
 }
 
-function groupActivitiesByParent(activities: PackageLinkedActivityDto[]) {
+function groupActivitiesByParent(
+  activities: PackageLinkedActivityDto[],
+  firstDay: number,
+  lastDay: number,
+) {
   // Build a set of activity IDs that are in this list (direct children of the package)
   const activityIds = new Set(activities.map(a => a.id))
 
@@ -355,11 +435,11 @@ function groupActivitiesByParent(activities: PackageLinkedActivityDto[]) {
     if (activity.parentActivityId && activityIds.has(activity.parentActivityId)) continue
     result.push({
       activity,
-      children: (childrenMap.get(activity.id) || []).sort(sortByDayThenName),
+      children: (childrenMap.get(activity.id) || []).sort((a, b) => sortByDayThenType(a, b, firstDay, lastDay)),
     })
   }
-  // Sort top-level items by day number then name
-  return result.sort((a, b) => sortByDayThenName(a.activity, b.activity))
+  // Sort top-level items by day then type priority
+  return result.sort((a, b) => sortByDayThenType(a.activity, b.activity, firstDay, lastDay))
 }
 
 // Type for unlinked activities (imported from shared-types includes parentActivityId)
@@ -370,6 +450,7 @@ type UnlinkedActivity = {
   itineraryId: string
   itineraryDayId: string
   dayNumber: number | null
+  endDayNumber: number | null
   date: string | null
   sequenceOrder: number
   totalPriceCents: number | null
@@ -380,9 +461,14 @@ type UnlinkedActivity = {
   paymentStatus: string | null
   paidCents: number | null
   currency: string | null
+  commissionTotalCents: number | null
 }
 
-function groupUnlinkedByParent(activities: UnlinkedActivity[]) {
+function groupUnlinkedByParent(
+  activities: UnlinkedActivity[],
+  firstDay: number,
+  lastDay: number,
+) {
   const childrenMap = new Map<string, UnlinkedActivity[]>()
 
   for (const activity of activities) {
@@ -398,11 +484,11 @@ function groupUnlinkedByParent(activities: UnlinkedActivity[]) {
     if (activity.parentActivityId) continue
     result.push({
       activity,
-      children: (childrenMap.get(activity.id) || []).sort(sortByDayThenName),
+      children: (childrenMap.get(activity.id) || []).sort((a, b) => sortByDayThenType(a, b, firstDay, lastDay)),
     })
   }
-  // Sort top-level items by day number then name
-  return result.sort((a, b) => sortByDayThenName(a.activity, b.activity))
+  // Sort top-level items by day then type priority
+  return result.sort((a, b) => sortByDayThenType(a.activity, b.activity, firstDay, lastDay))
 }
 
 // ============================================================================
@@ -765,12 +851,26 @@ export function PackagesTable({
     return unlinkedData?.activities || []
   }, [unlinkedData])
 
-  // Group unlinked activities by parent for cruise → port nesting
-  const groupedUnlinkedActivities = useMemo(() => {
-    return groupUnlinkedByParent(unlinkedActivities)
+  // Compute first and last day numbers from activity placement (not spans)
+  // lastDay = last day that has activities, used for type-priority ordering
+  const { firstDay, lastDay } = useMemo(() => {
+    let min = Infinity
+    let max = -Infinity
+    for (const a of unlinkedActivities) {
+      if (a.dayNumber != null) {
+        if (a.dayNumber < min) min = a.dayNumber
+        if (a.dayNumber > max) max = a.dayNumber
+      }
+    }
+    return { firstDay: min === Infinity ? 1 : min, lastDay: max === -Infinity ? 1 : max }
   }, [unlinkedActivities])
 
-  // Create unified rows combining packages + unlinked activities, sorted by date
+  // Group unlinked activities by parent for cruise → port nesting
+  const groupedUnlinkedActivities = useMemo(() => {
+    return groupUnlinkedByParent(unlinkedActivities, firstDay, lastDay)
+  }, [unlinkedActivities, firstDay, lastDay])
+
+  // Create unified rows combining packages + unlinked activities, sorted by date then activity type
   const unifiedRows = useMemo((): UnifiedBookingRow[] => {
     const rows: UnifiedBookingRow[] = []
 
@@ -789,6 +889,7 @@ export function PackagesTable({
         status: pkg.status,
         dateBooked: pkg.dateBooked || null,
         activityCount: pkg.activityCount ?? 0,
+        commissionTotalCents: pkg.pricing?.commissionTotalCents ?? null,
       })
     }
 
@@ -801,19 +902,20 @@ export function PackagesTable({
         date: activity.date,
         activityType: activity.activityType,
         dayNumber: activity.dayNumber,
+        endDayNumber: activity.endDayNumber ?? null,
         totalPriceCents: activity.totalPriceCents,
         supplierName: activity.supplierName ?? null,
         isBooked: activity.isBooked ?? false,
         confirmationNumber: activity.confirmationNumber ?? null,
         paymentStatus: activity.paymentStatus ?? null,
         currency: activity.currency ?? null,
+        commissionTotalCents: activity.commissionTotalCents ?? null,
         children,
       })
     }
 
-    // Sort by date (nulls at bottom)
-    return rows.sort(sortByDate)
-  }, [packages, groupedUnlinkedActivities])
+    return sortUnifiedRows(rows, firstDay, lastDay)
+  }, [packages, groupedUnlinkedActivities, firstDay, lastDay])
 
   // Toggle package expansion
   const togglePackageExpand = useCallback((packageId: string, e: React.MouseEvent) => {
@@ -1041,11 +1143,6 @@ export function PackagesTable({
                     // Package row
                     const isExpanded = expandedPackages.has(row.id)
                     const hasActivities = row.activityCount > 0
-                    const commissionStatus = getCommissionStatus(
-                      row.dateBooked != null,
-                      row.status
-                    )
-
                     return (
                       <React.Fragment key={row.id}>
                         <tr
@@ -1114,10 +1211,10 @@ export function PackagesTable({
                               {getPaymentStatusLabel(row.paymentStatus)}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3">
-                            <Badge variant={commissionStatus.variant as any}>
-                              {commissionStatus.label}
-                            </Badge>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {row.commissionTotalCents
+                              ? formatCurrency(row.commissionTotalCents, row.currency)
+                              : '–'}
                           </td>
                           <td className="px-4 py-3">
                             <DropdownMenu>
@@ -1218,9 +1315,9 @@ export function PackagesTable({
                             <div className="flex items-center gap-2">
                               <ActivityIconBadge type={row.activityType} size="md" />
                               <span className="text-sm font-medium text-gray-900">{row.name}</span>
-                              {row.dayNumber ? (
+                              {row.dayNumber != null ? (
                                 <Badge variant="outline" className="text-xs ml-2">
-                                  Day {row.dayNumber}
+                                  {formatDayLabel(row.dayNumber, row.endDayNumber, row.activityType)}
                                 </Badge>
                               ) : (
                                 <Badge variant="secondary" className="text-xs ml-2 text-gray-400">
@@ -1248,10 +1345,10 @@ export function PackagesTable({
                               <span className="text-sm text-gray-400">–</span>
                             )}
                           </td>
-                          <td className="px-4 py-3">
-                            <Badge variant={row.isBooked ? 'default' : 'outline'}>
-                              {row.isBooked ? 'Booked' : 'Not Booked'}
-                            </Badge>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {row.commissionTotalCents
+                              ? formatCurrency(row.commissionTotalCents, row.currency || 'CAD')
+                              : '–'}
                           </td>
                           <td className="px-4 py-3"></td>
                         </tr>
@@ -1294,9 +1391,9 @@ export function PackagesTable({
                                   <span className="text-gray-300">{isLast ? '└' : '├'}</span>
                                   <ActivityIconBadge type={child.activityType} size="sm" />
                                   <span className="text-xs text-gray-700">{child.name}</span>
-                                  {child.dayNumber && (
+                                  {child.dayNumber != null && (
                                     <Badge variant="outline" className="text-xs ml-auto">
-                                      Day {child.dayNumber}
+                                      {formatDayLabel(child.dayNumber, child.endDayNumber, child.activityType)}
                                     </Badge>
                                   )}
                                 </div>
@@ -1315,10 +1412,10 @@ export function PackagesTable({
                                   <span className="text-xs text-gray-400">–</span>
                                 )}
                               </td>
-                              <td className="px-4 py-2">
-                                <Badge variant={child.isBooked ? 'default' : 'outline'} className="text-xs">
-                                  {child.isBooked ? 'Booked' : 'Not Booked'}
-                                </Badge>
+                              <td className="px-4 py-2 text-xs text-gray-500">
+                                {child.commissionTotalCents
+                                  ? formatCurrency(child.commissionTotalCents, child.currency || 'CAD')
+                                  : '–'}
                               </td>
                               <td className="px-4 py-2"></td>
                             </tr>

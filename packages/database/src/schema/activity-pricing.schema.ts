@@ -7,6 +7,7 @@
 import { pgTable, pgEnum, uuid, varchar, decimal, text, date, timestamp, integer, boolean, jsonb } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { itineraryActivities } from './activities.schema'
+import { contacts } from './contacts.schema'
 
 // Reuse pricing type enum from activities
 import { pricingTypeEnum } from './activities.schema'
@@ -154,6 +155,9 @@ export const expectedPaymentItems = pgTable('expected_payment_items', {
   // Tracking (for future payment logging)
   paidAmountCents: integer('paid_amount_cents').default(0).notNull(),
 
+  // Contact/payer assignment (who is responsible for this payment)
+  contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
+
   // TICO compliance - lock items once paid to prevent modification
   isLocked: boolean('is_locked').notNull().default(false),
   lockedAt: timestamp('locked_at', { withTimezone: true }),
@@ -205,6 +209,9 @@ export const paymentTransactions = pgTable('payment_transactions', {
   transactionDate: timestamp('transaction_date', { withTimezone: true }).notNull(),
   notes: text('notes'),
 
+  // Who made this payment ("Paid By")
+  contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
+
   // Audit fields
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid('created_by'),
@@ -255,6 +262,10 @@ export const expectedPaymentItemsRelations = relations(expectedPaymentItems, ({ 
     fields: [expectedPaymentItems.paymentScheduleConfigId],
     references: [paymentScheduleConfig.id],
   }),
+  contact: one(contacts, {
+    fields: [expectedPaymentItems.contactId],
+    references: [contacts.id],
+  }),
   transactions: many(paymentTransactions),
 }))
 
@@ -269,6 +280,10 @@ export const paymentTransactionsRelations = relations(paymentTransactions, ({ on
   expectedPaymentItem: one(expectedPaymentItems, {
     fields: [paymentTransactions.expectedPaymentItemId],
     references: [expectedPaymentItems.id],
+  }),
+  contact: one(contacts, {
+    fields: [paymentTransactions.contactId],
+    references: [contacts.id],
   }),
 }))
 

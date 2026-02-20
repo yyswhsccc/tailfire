@@ -483,10 +483,11 @@ export class TripsController {
         id: a.id,
         name: a.name,
         activityType: a.activityType,
-        itineraryId: '', // Not returned by findUnlinkedByTrip - frontend doesn't use this
+        itineraryId: '',
         itineraryDayId: a.itineraryDayId || '',
-        dayNumber: null, // Would require additional query - frontend doesn't use this
-        date: null, // Would require additional query - frontend doesn't use this
+        dayNumber: a._dayNumber ?? null,
+        endDayNumber: a._endDayNumber ?? null,
+        date: a._dayDate ?? null,
         sequenceOrder: a.sequenceOrder,
         totalPriceCents: a.pricing?.totalPriceCents ?? null,
         parentActivityId: a.parentActivityId,
@@ -496,6 +497,7 @@ export class TripsController {
         paymentStatus: a.paymentStatus ?? null,
         paidCents: a.paidCents ?? null,
         currency: a.currency ?? null,
+        commissionTotalCents: a.pricing?.commissionTotalCents ?? null,
       })),
       total: activities.length,
     }

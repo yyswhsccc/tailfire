@@ -33,13 +33,28 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ActivityIconBadge } from '@/components/ui/activity-icon-badge'
 import { RecordPaymentModal } from '@/components/packages/record-payment-modal'
-import { DollarSign } from 'lucide-react'
-import { useTripExpectedPayments, useTripPaymentTransactions } from '@/hooks/use-payment-schedules'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { DollarSign, Trash2, User } from 'lucide-react'
+import { useTripExpectedPayments, useTripPaymentTransactions, useDeletePaymentTransactionFromTrip, useUpdateTransactionContact } from '@/hooks/use-payment-schedules'
+import { useTripTravelers } from '@/hooks/use-trip-travelers'
 import { useBookingStatus } from '@/hooks/use-booking-status'
 import { formatCurrency } from '@/lib/pricing/currency-helpers'
 
 import type { ActivityResponseDto } from '@tailfire/shared-types'
-import type { TripExpectedPaymentDto } from '@tailfire/shared-types/api'
+import type { TripExpectedPaymentDto, TripPaymentTransactionDto } from '@tailfire/shared-types/api'
 
 function formatDate(date: string | null): string {
   if (!date) return '–'
@@ -48,6 +63,20 @@ function formatDate(date: string | null): string {
     month: 'short',
     day: 'numeric',
   })
+}
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  credit_card: 'Credit Card',
+  bank_transfer: 'Bank Transfer',
+  cash: 'Cash',
+  check: 'Check',
+  stripe: 'Stripe',
+  other: 'Other',
+}
+
+function formatPaymentMethod(method: string | null | undefined): string {
+  if (!method) return '—'
+  return PAYMENT_METHOD_LABELS[method] || method
 }
 
 function statusBadgeVariant(status: TripExpectedPaymentDto['status']): 'default' | 'secondary' | 'outline' {
@@ -77,10 +106,40 @@ export function PaymentsDataTable({ activities, tripId }: PaymentsDataTableProps
   const [rowSelection, setRowSelection] = React.useState({})
   const [selectedPayment, setSelectedPayment] = React.useState<TripExpectedPaymentDto | null>(null)
   const [recordPaymentOpen, setRecordPaymentOpen] = React.useState(false)
+  const [selectedTransaction, setSelectedTransaction] = React.useState<TripPaymentTransactionDto | null>(null)
+  const [detailDialogOpen, setDetailDialogOpen] = React.useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
+  const deleteTransaction = useDeletePaymentTransactionFromTrip(tripId)
+  const updateTransactionContact = useUpdateTransactionContact(tripId)
 
   const { data: expectedPayments = [] } = useTripExpectedPayments(tripId)
   const { data: paymentTransactions = [] } = useTripPaymentTransactions(tripId)
   const { data: bookingStatus } = useBookingStatus(tripId)
+  const { data: travelers = [] } = useTripTravelers(tripId)
+
+  // Build deduplicated contact options for "Paid By" dropdown on transactions
+  const contactOptions = React.useMemo(() => {
+    const seen = new Set<string>()
+    const options: { id: string; name: string; isPrimary: boolean }[] = []
+
+    for (const traveler of travelers) {
+      if (!traveler.contactId || seen.has(traveler.contactId)) continue
+      seen.add(traveler.contactId)
+      const name = traveler.contact
+        ? `${traveler.contact.firstName || ''} ${traveler.contact.lastName || ''}`.trim()
+        : `Traveler ${traveler.sequenceOrder}`
+      if (name) {
+        options.push({
+          id: traveler.contactId,
+          name,
+          isPrimary: traveler.isPrimaryTraveler ?? false,
+        })
+      }
+    }
+
+    return options
+  }, [travelers])
+
   const sortedTransactions = React.useMemo(() => {
     return [...paymentTransactions].sort((a, b) => {
       return new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime()
@@ -315,6 +374,7 @@ export function PaymentsDataTable({ activities, tripId }: PaymentsDataTableProps
                 <TableHead>Item</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Amount</TableHead>
+                <TableHead>Paid By</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead>Reference</TableHead>
               </TableRow>
@@ -322,7 +382,14 @@ export function PaymentsDataTable({ activities, tripId }: PaymentsDataTableProps
             <TableBody>
               {sortedTransactions.length ? (
                 sortedTransactions.map((transaction) => (
-                  <TableRow key={transaction.id}>
+                  <TableRow
+                    key={transaction.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => {
+                      setSelectedTransaction(transaction)
+                      setDetailDialogOpen(true)
+                    }}
+                  >
                     <TableCell>{formatDate(transaction.transactionDate)}</TableCell>
                     <TableCell>
                       <div className="text-sm font-medium">{transaction.activityName}</div>
@@ -334,13 +401,51 @@ export function PaymentsDataTable({ activities, tripId }: PaymentsDataTableProps
                     <TableCell>
                       {formatCurrency(transaction.amountCents, transaction.currency)}
                     </TableCell>
-                    <TableCell>{transaction.paymentMethod || '—'}</TableCell>
+                    <TableCell>
+                      <Select
+                        value={transaction.contactId ?? 'unknown'}
+                        onValueChange={(value) => {
+                          const newContactId = value === 'unknown' ? null : value
+                          if (newContactId === transaction.contactId) return
+                          updateTransactionContact.mutate({
+                            transactionId: transaction.id,
+                            contactId: newContactId,
+                          })
+                        }}
+                        disabled={updateTransactionContact.isPending}
+                      >
+                        <SelectTrigger
+                          className="h-8 w-[160px]"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <SelectValue>
+                            {transaction.contactName ? (
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {transaction.contactName}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">Unknown</span>
+                            )}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent onClick={(e) => e.stopPropagation()}>
+                          <SelectItem value="unknown">Unknown</SelectItem>
+                          {contactOptions.map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.name}{option.isPrimary ? ' (primary)' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>{formatPaymentMethod(transaction.paymentMethod)}</TableCell>
                     <TableCell>{transaction.referenceNumber || '—'}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={7} className="h-24 text-center">
                     <div className="flex flex-col items-center justify-center py-12">
                       <DollarSign className="h-12 w-12 text-gray-400 mb-4" />
                       <p className="text-sm text-gray-500">No past payments recorded yet</p>
@@ -371,6 +476,115 @@ export function PaymentsDataTable({ activities, tripId }: PaymentsDataTableProps
           currency={selectedPayment.currency}
         />
       )}
+
+      {/* Transaction Detail Dialog */}
+      <Dialog open={detailDialogOpen} onOpenChange={(open) => {
+        setDetailDialogOpen(open)
+        if (!open) {
+          setSelectedTransaction(null)
+          setDeleteConfirmOpen(false)
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+          </DialogHeader>
+          {selectedTransaction && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500">Activity</p>
+                  <p className="font-medium">{selectedTransaction.activityName}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Payment</p>
+                  <p className="font-medium">{selectedTransaction.paymentName}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Type</p>
+                  <Badge variant="outline">{selectedTransaction.transactionType}</Badge>
+                </div>
+                <div>
+                  <p className="text-gray-500">Amount</p>
+                  <p className="font-medium">
+                    {formatCurrency(selectedTransaction.amountCents, selectedTransaction.currency)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Paid By</p>
+                  <p className="font-medium">{selectedTransaction.contactName || 'Unknown'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Payment Method</p>
+                  <p className="font-medium">{formatPaymentMethod(selectedTransaction.paymentMethod) === '—' ? 'Not specified' : formatPaymentMethod(selectedTransaction.paymentMethod)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Reference</p>
+                  <p className="font-medium">{selectedTransaction.referenceNumber || 'None'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Transaction Date</p>
+                  <p className="font-medium">{formatDate(selectedTransaction.transactionDate)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Created</p>
+                  <p className="font-medium">{formatDate(selectedTransaction.createdAt)}</p>
+                </div>
+              </div>
+              {selectedTransaction.notes && (
+                <div className="text-sm">
+                  <p className="text-gray-500">Notes</p>
+                  <p className="font-medium">{selectedTransaction.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="flex justify-between sm:justify-between">
+            {!deleteConfirmOpen ? (
+              <>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete
+                </Button>
+                <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
+                  Close
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-destructive self-center">Are you sure? This cannot be undone.</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setDeleteConfirmOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      if (selectedTransaction) {
+                        deleteTransaction.mutate(selectedTransaction.id, {
+                          onSuccess: () => {
+                            setDetailDialogOpen(false)
+                            setSelectedTransaction(null)
+                            setDeleteConfirmOpen(false)
+                          },
+                        })
+                      }
+                    }}
+                    disabled={deleteTransaction.isPending}
+                  >
+                    {deleteTransaction.isPending ? 'Deleting...' : 'Confirm Delete'}
+                  </Button>
+                </div>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

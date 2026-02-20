@@ -425,6 +425,19 @@ export class ActivitiesService {
         dayNumber: this.db.schema.itineraryDays.dayNumber,
         dayDate: this.db.schema.itineraryDays.date,
         totalPriceCents: this.db.schema.activityPricing.totalPriceCents,
+        // Compute endDayNumber in SQL — only for activity types that span days
+        // Uses date(endDatetime at time zone 'UTC') to avoid local-tz date shift on late-night times
+        endDayNumber: sql<number | null>`
+          CASE
+            WHEN ${this.db.schema.itineraryActivities.activityType} IN ('lodging', 'custom_cruise')
+              AND ${this.db.schema.itineraryActivities.endDatetime} IS NOT NULL
+              AND ${this.db.schema.itineraryDays.date} IS NOT NULL
+              AND date(${this.db.schema.itineraryActivities.endDatetime} at time zone 'UTC') > ${this.db.schema.itineraryDays.date}
+            THEN ${this.db.schema.itineraryDays.dayNumber}
+              + (date(${this.db.schema.itineraryActivities.endDatetime} at time zone 'UTC') - ${this.db.schema.itineraryDays.date})
+            ELSE NULL
+          END
+        `,
       })
       .from(this.db.schema.itineraryActivities)
       .leftJoin(
@@ -455,6 +468,8 @@ export class ActivitiesService {
         activityType: r.activityType as any,
         status: r.status as any,
         dayNumber: r.dayNumber,
+        // Defensive: only lodging/custom_cruise can have spans
+        endDayNumber: ['lodging', 'custom_cruise'].includes(r.activityType) ? (r.endDayNumber ?? null) : null,
         dayDate: formattedDate,
         parentActivityId: r.parentActivityId,
         sequenceOrder: r.sequenceOrder,
@@ -1884,6 +1899,21 @@ export class ActivitiesService {
     const activities = await this.db.client
       .select({
         activity: this.db.schema.itineraryActivities,
+        dayNumber: this.db.schema.itineraryDays.dayNumber,
+        dayDate: this.db.schema.itineraryDays.date,
+        // Compute endDayNumber in SQL — only for activity types that span days
+        // Uses date(endDatetime at time zone 'UTC') to avoid local-tz date shift on late-night times
+        endDayNumber: sql<number | null>`
+          CASE
+            WHEN ${this.db.schema.itineraryActivities.activityType} IN ('lodging', 'custom_cruise')
+              AND ${this.db.schema.itineraryActivities.endDatetime} IS NOT NULL
+              AND ${this.db.schema.itineraryDays.date} IS NOT NULL
+              AND date(${this.db.schema.itineraryActivities.endDatetime} at time zone 'UTC') > ${this.db.schema.itineraryDays.date}
+            THEN ${this.db.schema.itineraryDays.dayNumber}
+              + (date(${this.db.schema.itineraryActivities.endDatetime} at time zone 'UTC') - ${this.db.schema.itineraryDays.date})
+            ELSE NULL
+          END
+        `,
       })
       .from(this.db.schema.itineraryActivities)
       .leftJoin(
@@ -1983,7 +2013,7 @@ export class ActivitiesService {
       cruiseLineData.map(c => [c.activityId, c.cruiseLineName])
     )
 
-    // Return activities with pricing, supplier, and payment data enriched
+    // Return activities with pricing, supplier, payment, and day data enriched
     return activities.map(r => {
       const baseResponse = this.formatActivityResponse(r.activity)
       const pricing = pricingMap.get(r.activity.id)
@@ -2005,6 +2035,14 @@ export class ActivitiesService {
         }
       }
 
+      // Format day date
+      let formattedDayDate: string | null = null
+      if (r.dayDate) {
+        formattedDayDate = typeof r.dayDate === 'object' && 'toISOString' in (r.dayDate as any)
+          ? (r.dayDate as unknown as Date).toISOString().split('T')[0]!
+          : String(r.dayDate).split('T')[0]!
+      }
+
       return {
         ...baseResponse,
         supplierName,
@@ -2018,6 +2056,11 @@ export class ActivitiesService {
           currency: pricing.currency ?? 'CAD',
           pricingType: null,
         } : null,
+        // Day data for display (endDayNumber computed in SQL)
+        _dayNumber: r.dayNumber ?? null,
+        _dayDate: formattedDayDate,
+        // Defensive: only lodging/custom_cruise can have spans
+        _endDayNumber: ['lodging', 'custom_cruise'].includes(r.activity.activityType) ? (r.endDayNumber ?? null) : null,
       }
     })
   }

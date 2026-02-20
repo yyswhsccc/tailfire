@@ -24,6 +24,7 @@ import { ContactsService } from './contacts.service'
 import { ContactAccessService } from './contact-access.service'
 import { ActivityLogsService } from '../activity-logs/activity-logs.service'
 import { TripAccessService } from '../trips/trip-access.service'
+import { PaymentSchedulesService } from '../trips/payment-schedules.service'
 import {
   CreateContactDto,
   UpdateContactDto,
@@ -45,6 +46,7 @@ export class ContactsController {
     private readonly contactAccessService: ContactAccessService,
     private readonly activityLogsService: ActivityLogsService,
     private readonly tripAccessService: TripAccessService,
+    private readonly paymentSchedulesService: PaymentSchedulesService,
   ) {}
 
   /**
@@ -120,6 +122,20 @@ export class ContactsController {
     const parsedLimit = limit ? Number(limit) : 50
     const parsedOffset = offset ? Number(offset) : 0
     return this.activityLogsService.getActivityForContact(id, auth.agencyId, accessibleTripIds, parsedLimit, parsedOffset)
+  }
+
+  /**
+   * Get payment transactions for a contact across all their trips
+   * GET /contacts/:contactId/payment-transactions
+   */
+  @Get(':contactId/payment-transactions')
+  async getContactPaymentTransactions(
+    @GetAuthContext() auth: AuthContext,
+    @Param('contactId') contactId: string,
+  ) {
+    // Verify contact access
+    await this.contactsService.findOne(contactId, auth.agencyId)
+    return this.paymentSchedulesService.getContactPaymentTransactions(contactId, auth.agencyId)
   }
 
   /**

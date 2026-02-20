@@ -751,6 +751,7 @@ export function PackageForm({
               activityPricingId={activityPricingId}
               totalPriceCents={pricingData.totalPriceCents}
               currency={pricingData.currency}
+              tripId={tripId}
             />
           </div>
 

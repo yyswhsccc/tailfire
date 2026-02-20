@@ -841,6 +841,27 @@
       "when": 1771451404000,
       "tag": "20260217150000_fix_jwt_hook_invited_status",
       "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1771506600000,
+      "tag": "20260219141000_drop_duplicate_no_action_fks",
+      "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1771516800000,
+      "tag": "20260219160000_add_contact_id_to_expected_payment_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1771520400000,
+      "tag": "20260219170000_add_contact_id_to_payment_transactions",
+      "breakpoints": true
     }
   ]
 }

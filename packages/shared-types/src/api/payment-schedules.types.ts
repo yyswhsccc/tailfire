@@ -38,6 +38,7 @@ export type ExpectedPaymentItemDto = {
   status: ExpectedPaymentStatus
   sequenceOrder: number
   paidAmountCents: number
+  contactId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -62,6 +63,7 @@ export type UpdateExpectedPaymentItemDto = {
   status?: ExpectedPaymentStatus
   sequenceOrder?: number
   paidAmountCents?: number
+  contactId?: string | null
 }
 
 // =============================================================================
@@ -220,6 +222,7 @@ export type PaymentTransactionDto = {
   referenceNumber: string | null
   transactionDate: string // ISO timestamp
   notes: string | null
+  contactId: string | null
   createdAt: string
   createdBy: string | null
 }
@@ -236,6 +239,7 @@ export type CreatePaymentTransactionDto = {
   referenceNumber?: string | null
   transactionDate: string // ISO timestamp
   notes?: string | null
+  contactId?: string | null
 }
 
 /**
@@ -263,6 +267,7 @@ export type TripExpectedPaymentDto = ExpectedPaymentItemDto & {
   currency: string
   remainingCents: number
   isLocked: boolean
+  contactName: string | null
 }
 
 /**
@@ -272,6 +277,15 @@ export type TripPaymentTransactionDto = PaymentTransactionDto & {
   activityId: string
   activityName: string
   paymentName: string
+  contactName: string | null
+}
+
+/**
+ * Contact-level payment transaction with trip context
+ */
+export type ContactPaymentTransactionDto = TripPaymentTransactionDto & {
+  tripId: string
+  tripName: string
 }
 
 /**

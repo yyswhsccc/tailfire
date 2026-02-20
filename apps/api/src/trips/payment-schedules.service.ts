@@ -44,6 +44,7 @@ import type {
   PaymentScheduleValidationWarning,
   TripExpectedPaymentDto,
   TripPaymentTransactionDto,
+  ContactPaymentTransactionDto,
 } from '@tailfire/shared-types'
 
 /**
@@ -533,6 +534,28 @@ export class PaymentSchedulesService {
       throw new NotFoundException(`Expected payment item with ID ${itemId} not found`)
     }
 
+    // Validate amount >= paidAmountCents (prevent setting below what's already paid)
+    if (data.expectedAmountCents !== undefined) {
+      if (data.expectedAmountCents < existing.paidAmountCents) {
+        throw new BadRequestException(
+          `Cannot set expected amount (${data.expectedAmountCents}) below paid amount (${existing.paidAmountCents})`,
+        )
+      }
+    }
+
+    // Validate contactId if provided
+    if (data.contactId !== undefined && data.contactId !== null) {
+      const tripId = await this.getTripIdFromExpectedPaymentItemId(itemId)
+      if (tripId) {
+        const isValidContact = await this.validateContactForTrip(data.contactId, tripId, existing.agencyId)
+        if (!isValidContact) {
+          throw new BadRequestException(
+            'Contact must be the primary contact or a traveler on the trip',
+          )
+        }
+      }
+    }
+
     const [updated] = await this.db.client
       .update(this.db.schema.expectedPaymentItems)
       .set({
@@ -544,6 +567,7 @@ export class PaymentSchedulesService {
         ...(data.status !== undefined && { status: data.status }),
         ...(data.sequenceOrder !== undefined && { sequenceOrder: data.sequenceOrder }),
         ...(data.paidAmountCents !== undefined && { paidAmountCents: data.paidAmountCents }),
+        ...(data.contactId !== undefined && { contactId: data.contactId }),
         updatedAt: new Date(),
       })
       .where(eq(this.db.schema.expectedPaymentItems.id, itemId))
@@ -551,6 +575,25 @@ export class PaymentSchedulesService {
 
     if (!updated) {
       throw new NotFoundException(`Expected payment item with ID ${itemId} not found`)
+    }
+
+    // Re-sync status if amount changed (e.g., may go from 'paid' to 'partial' or vice versa)
+    let finalItem = updated
+    if (data.expectedAmountCents !== undefined && data.expectedAmountCents !== existing.expectedAmountCents) {
+      await this.syncPaidAmountCents(itemId)
+      // Re-fetch to get updated status from sync
+      const [refetched] = await this.db.client
+        .select()
+        .from(this.db.schema.expectedPaymentItems)
+        .where(eq(this.db.schema.expectedPaymentItems.id, itemId))
+        .limit(1)
+      if (refetched) {
+        // If sync changed status to 'paid', cancel reminders
+        if (refetched.status === 'paid' && updated.status !== 'paid') {
+          await this.cancelPaymentReminders(itemId)
+        }
+        finalItem = refetched
+      }
     }
 
     // Reschedule payment reminders if due date changed
@@ -577,7 +620,7 @@ export class PaymentSchedulesService {
       await this.cancelPaymentReminders(itemId)
     }
 
-    return this.formatExpectedPaymentItem(updated)
+    return this.formatExpectedPaymentItem(finalItem)
   }
 
   /**
@@ -690,6 +733,44 @@ export class PaymentSchedulesService {
   // ============================================================================
 
   /**
+   * Resolve the contact ID for a payment transaction.
+   * Resolution chain:
+   * 1. Use requestedContactId if provided
+   * 2. Else fallback to expected_payment_item.contact_id
+   * 3. Else fallback to trip's primary_contact_id
+   * 4. Return null if none found
+   */
+  private async resolveTransactionContactId(
+    expectedPaymentItemId: string,
+    requestedContactId?: string | null,
+  ): Promise<string | null> {
+    // 1. Use explicit contactId if provided
+    if (requestedContactId) {
+      return requestedContactId
+    }
+
+    // 2. Try expected payment item's assigned contact
+    const [epi] = await this.db.client
+      .select({ contactId: this.db.schema.expectedPaymentItems.contactId })
+      .from(this.db.schema.expectedPaymentItems)
+      .where(eq(this.db.schema.expectedPaymentItems.id, expectedPaymentItemId))
+      .limit(1)
+
+    if (epi?.contactId) {
+      return epi.contactId
+    }
+
+    // 3. Try trip's primary contact
+    const tripContext = await this.getTripContextFromPaymentItemId(expectedPaymentItemId)
+    if (tripContext?.contactId) {
+      return tripContext.contactId
+    }
+
+    // 4. No contact found
+    return null
+  }
+
+  /**
    * Create a payment transaction and sync paidAmountCents cache
    * Validates currency matches parent and wraps operations in a transaction
    */
@@ -733,6 +814,12 @@ export class PaymentSchedulesService {
       await this.validateTripHasTravelersForPayment(data.expectedPaymentItemId)
     }
 
+    // Resolve contact ID (explicit → epi.contact_id → trip primary contact → null)
+    const resolvedContactId = await this.resolveTransactionContactId(
+      data.expectedPaymentItemId,
+      data.contactId,
+    )
+
     // Wrap insert + cache sync in a transaction for consistency
     const result = await this.db.client.transaction(async (tx) => {
       // Create the transaction
@@ -748,6 +835,7 @@ export class PaymentSchedulesService {
           referenceNumber: data.referenceNumber || null,
           transactionDate: new Date(data.transactionDate),
           notes: data.notes || null,
+          contactId: resolvedContactId,
         })
         .returning()
 
@@ -946,6 +1034,8 @@ export class PaymentSchedulesService {
       activity_type: string
       currency: string
       is_locked: boolean
+      contact_id: string | null
+      contact_name: string | null
     }
 
     const rows = await this.db.client.execute(sql`
@@ -961,17 +1051,20 @@ export class PaymentSchedulesService {
         epi.created_at,
         epi.updated_at,
         epi.is_locked,
+        epi.contact_id,
         psc.component_pricing_id AS activity_pricing_id,
         ia.id AS activity_id,
         ia.name AS activity_name,
         ia.activity_type,
-        ap.currency
+        ap.currency,
+        CASE WHEN c.id IS NOT NULL THEN TRIM(CONCAT(c.first_name, ' ', c.last_name)) ELSE NULL END AS contact_name
       FROM expected_payment_items epi
       JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
       JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
       JOIN itinerary_activities ia ON ia.id = ap.activity_id
       LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
       LEFT JOIN itineraries it ON it.id = iday.itinerary_id
+      LEFT JOIN contacts c ON c.id = epi.contact_id
       WHERE (it.trip_id = ${tripId} OR ia.trip_id = ${tripId})
         AND ap.agency_id = ${agencyId}
         AND ia.agency_id = ${agencyId}
@@ -998,6 +1091,7 @@ export class PaymentSchedulesService {
         dueDate,
         status: row.status as TripExpectedPaymentDto['status'],
         sequenceOrder: row.sequence_order,
+        contactId: row.contact_id || null,
         createdAt,
         updatedAt,
         activityId: row.activity_id,
@@ -1007,6 +1101,7 @@ export class PaymentSchedulesService {
         currency: row.currency,
         remainingCents,
         isLocked: row.is_locked ?? false,
+        contactName: row.contact_name || null,
       }
     })
   }
@@ -1035,6 +1130,8 @@ export class PaymentSchedulesService {
       created_by: string | null
       activity_id: string
       activity_name: string
+      contact_id: string | null
+      contact_name: string | null
     }
 
     // NOTE: payment_schedule_config uses component_pricing_id (legacy name), not activity_pricing_id
@@ -1052,8 +1149,10 @@ export class PaymentSchedulesService {
         pt.notes,
         pt.created_at,
         pt.created_by,
+        pt.contact_id,
         ia.id AS activity_id,
-        ia.name AS activity_name
+        ia.name AS activity_name,
+        CASE WHEN c.id IS NOT NULL THEN TRIM(CONCAT(c.first_name, ' ', c.last_name)) ELSE NULL END AS contact_name
       FROM payment_transactions pt
       JOIN expected_payment_items epi ON epi.id = pt.expected_payment_item_id
       JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
@@ -1061,6 +1160,7 @@ export class PaymentSchedulesService {
       JOIN itinerary_activities ia ON ia.id = ap.activity_id
       LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
       LEFT JOIN itineraries it ON it.id = iday.itinerary_id
+      LEFT JOIN contacts c ON c.id = pt.contact_id
       WHERE (it.trip_id = ${tripId} OR ia.trip_id = ${tripId})
         AND pt.agency_id = ${agencyId}
         AND ap.agency_id = ${agencyId}
@@ -1084,11 +1184,121 @@ export class PaymentSchedulesService {
         referenceNumber: row.reference_number,
         transactionDate,
         notes: row.notes,
+        contactId: row.contact_id || null,
         createdAt,
         createdBy: row.created_by,
         activityId: row.activity_id,
         activityName: row.activity_name,
         paymentName: row.payment_name,
+        contactName: row.contact_name || null,
+      }
+    })
+  }
+
+  /**
+   * Get payment transactions for a contact across all their trips
+   * Includes trips where contact is primary contact OR a traveler
+   */
+  async getContactPaymentTransactions(
+    contactId: string,
+    agencyId: string,
+  ): Promise<ContactPaymentTransactionDto[]> {
+    type ContactPaymentTransactionRow = {
+      transaction_id: string
+      expected_payment_item_id: string
+      payment_name: string
+      transaction_type: string
+      amount_cents: number
+      currency: string
+      payment_method: string | null
+      reference_number: string | null
+      transaction_date: string | Date
+      notes: string | null
+      created_at: string | Date
+      created_by: string | null
+      activity_id: string
+      activity_name: string
+      trip_id: string
+      trip_name: string
+      contact_id: string | null
+      contact_name: string | null
+    }
+
+    const rows = await this.db.client.execute(sql`
+      SELECT
+        pt.id AS transaction_id,
+        pt.expected_payment_item_id,
+        epi.payment_name,
+        pt.transaction_type,
+        pt.amount_cents,
+        pt.currency,
+        pt.payment_method,
+        pt.reference_number,
+        pt.transaction_date,
+        pt.notes,
+        pt.created_at,
+        pt.created_by,
+        pt.contact_id,
+        ia.id AS activity_id,
+        ia.name AS activity_name,
+        t.id AS trip_id,
+        t.name AS trip_name,
+        CASE WHEN c.id IS NOT NULL THEN TRIM(CONCAT(c.first_name, ' ', c.last_name)) ELSE NULL END AS contact_name
+      FROM payment_transactions pt
+      JOIN expected_payment_items epi ON epi.id = pt.expected_payment_item_id
+      JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
+      JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
+      JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+      LEFT JOIN itineraries it ON it.id = iday.itinerary_id
+      JOIN trips t ON t.id = COALESCE(it.trip_id, ia.trip_id)
+      LEFT JOIN contacts c ON c.id = pt.contact_id
+      WHERE (
+        -- Explicitly paid by this contact
+        pt.contact_id = ${contactId}
+        OR (
+          -- Legacy/unassigned: payment belongs to contact's trip and has no payer
+          pt.contact_id IS NULL
+          AND t.id IN (
+            SELECT DISTINCT trip_id FROM (
+              SELECT id AS trip_id FROM trips WHERE primary_contact_id = ${contactId} AND agency_id = ${agencyId}
+              UNION
+              SELECT trip_id FROM trip_travelers WHERE contact_id = ${contactId}
+            ) contact_trips
+          )
+        )
+      )
+        AND pt.agency_id = ${agencyId}
+        AND ap.agency_id = ${agencyId}
+        AND ia.agency_id = ${agencyId}
+      ORDER BY pt.transaction_date DESC, pt.created_at DESC
+    `) as unknown as ContactPaymentTransactionRow[]
+
+    return rows.map((row) => {
+      const transactionDate = row.transaction_date instanceof Date
+        ? row.transaction_date.toISOString()
+        : row.transaction_date
+      const createdAt = row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at
+
+      return {
+        id: row.transaction_id,
+        expectedPaymentItemId: row.expected_payment_item_id,
+        transactionType: row.transaction_type as ContactPaymentTransactionDto['transactionType'],
+        amountCents: row.amount_cents,
+        currency: row.currency,
+        paymentMethod: row.payment_method as ContactPaymentTransactionDto['paymentMethod'],
+        referenceNumber: row.reference_number,
+        transactionDate,
+        notes: row.notes,
+        contactId: row.contact_id || null,
+        createdAt,
+        createdBy: row.created_by,
+        activityId: row.activity_id,
+        activityName: row.activity_name,
+        paymentName: row.payment_name,
+        tripId: row.trip_id,
+        tripName: row.trip_name,
+        contactName: row.contact_name || null,
       }
     })
   }
@@ -1119,6 +1329,52 @@ export class PaymentSchedulesService {
 
     // Sync paidAmountCents cache
     await this.syncPaidAmountCents(expectedPaymentItemId)
+  }
+
+  /**
+   * Update the contact ("Paid By") on a payment transaction
+   */
+  async updateTransactionContact(
+    transactionId: string,
+    contactId: string | null,
+    agencyId: string,
+  ): Promise<PaymentTransactionDto> {
+    // Get the transaction
+    const [transaction] = await this.db.client
+      .select()
+      .from(this.db.schema.paymentTransactions)
+      .where(eq(this.db.schema.paymentTransactions.id, transactionId))
+      .limit(1)
+
+    if (!transaction) {
+      throw new NotFoundException(`Payment transaction with ID ${transactionId} not found`)
+    }
+
+    // Validate contactId if provided
+    if (contactId) {
+      const tripId = await this.getTripIdFromExpectedPaymentItemId(transaction.expectedPaymentItemId)
+      if (tripId) {
+        const isValid = await this.validateContactForTrip(contactId, tripId, agencyId)
+        if (!isValid) {
+          throw new BadRequestException(
+            'Contact must be the primary contact or a traveler on the trip',
+          )
+        }
+      }
+    }
+
+    // Update contact_id
+    const [updated] = await this.db.client
+      .update(this.db.schema.paymentTransactions)
+      .set({ contactId })
+      .where(eq(this.db.schema.paymentTransactions.id, transactionId))
+      .returning()
+
+    if (!updated) {
+      throw new Error('Failed to update transaction contact')
+    }
+
+    return this.formatPaymentTransaction(updated)
   }
 
   /**
@@ -1275,6 +1531,7 @@ export class PaymentSchedulesService {
       referenceNumber: transaction.referenceNumber,
       transactionDate: transaction.transactionDate.toISOString(),
       notes: transaction.notes,
+      contactId: transaction.contactId || null,
       createdAt: transaction.createdAt.toISOString(),
       createdBy: transaction.createdBy,
     }
@@ -1877,6 +2134,7 @@ export class PaymentSchedulesService {
       status: item.status,
       sequenceOrder: item.sequenceOrder,
       paidAmountCents: item.paidAmountCents,
+      contactId: item.contactId || null,
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString(),
     }
@@ -1910,6 +2168,7 @@ export class PaymentSchedulesService {
       status: item.status,
       sequenceOrder: item.sequenceOrder,
       paidAmountCents: item.paidAmountCents,
+      contactId: item.contactId || null,
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString(),
       // TODO: Enable when is_locked, locked_at, locked_by columns are added via migration
@@ -1935,8 +2194,142 @@ export class PaymentSchedulesService {
   }
 
   // ============================================================================
+  // Single Expected Payment Item Operations (Add/Delete)
+  // ============================================================================
+
+  /**
+   * Add a single expected payment item to an existing payment schedule config.
+   * Does NOT enforce sum == totalPrice (UI shows warning instead).
+   */
+  async addExpectedPaymentItem(
+    configId: string,
+    agencyId: string,
+    data: CreateExpectedPaymentItemDto,
+  ): Promise<ExpectedPaymentItemDto> {
+    // Validate config exists and belongs to agency
+    const [config] = await this.db.client
+      .select({
+        id: this.db.schema.paymentScheduleConfig.id,
+        activityPricingId: this.db.schema.paymentScheduleConfig.activityPricingId,
+      })
+      .from(this.db.schema.paymentScheduleConfig)
+      .innerJoin(
+        this.db.schema.activityPricing,
+        eq(this.db.schema.paymentScheduleConfig.activityPricingId, this.db.schema.activityPricing.id),
+      )
+      .where(
+        and(
+          eq(this.db.schema.paymentScheduleConfig.id, configId),
+          eq(this.db.schema.activityPricing.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!config) {
+      throw new NotFoundException(`Payment schedule config with ID ${configId} not found`)
+    }
+
+    // Always assign server-side sequenceOrder (ignore client value to prevent duplicates/collisions)
+    const existingItems = await this.findExpectedPaymentItems(configId)
+    const maxSeq = existingItems.reduce((max, item) => Math.max(max, item.sequenceOrder), -1)
+    const sequenceOrder = maxSeq + 1
+
+    // Insert the item
+    const [created] = await this.db.client
+      .insert(this.db.schema.expectedPaymentItems)
+      .values({
+        paymentScheduleConfigId: configId,
+        agencyId,
+        paymentName: data.paymentName,
+        expectedAmountCents: data.expectedAmountCents,
+        dueDate: data.dueDate || null,
+        sequenceOrder,
+      })
+      .returning()
+
+    // Schedule payment reminders if dueDate provided
+    if (created!.dueDate) {
+      const tripContext = await this.getTripContextFromActivityPricingId(config.activityPricingId)
+      if (tripContext) {
+        await this.schedulePaymentReminders(
+          created!.id,
+          tripContext.tripId,
+          tripContext.contactId,
+          agencyId,
+          created!.dueDate,
+        )
+      }
+    }
+
+    return this.formatExpectedPaymentItem(created!)
+  }
+
+  /**
+   * Delete a single expected payment item.
+   * Blocks if any payment_transactions exist for the item.
+   */
+  async deleteExpectedPaymentItem(
+    itemId: string,
+    agencyId: string,
+  ): Promise<void> {
+    // Validate item exists and belongs to agency
+    const [item] = await this.db.client
+      .select()
+      .from(this.db.schema.expectedPaymentItems)
+      .where(
+        and(
+          eq(this.db.schema.expectedPaymentItems.id, itemId),
+          eq(this.db.schema.expectedPaymentItems.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!item) {
+      throw new NotFoundException(`Expected payment item with ID ${itemId} not found`)
+    }
+
+    // Block if any transactions exist (use EXISTS, not paidAmountCents — refunds can net to 0)
+    const [txCheck] = await this.db.client
+      .select({ count: sql<number>`count(*)::int` })
+      .from(this.db.schema.paymentTransactions)
+      .where(eq(this.db.schema.paymentTransactions.expectedPaymentItemId, itemId))
+
+    if (txCheck && txCheck.count > 0) {
+      throw new BadRequestException(
+        'Cannot delete expected payment item that has payment transactions. Delete the transactions first.',
+      )
+    }
+
+    // Cancel payment reminders
+    await this.cancelPaymentReminders(itemId)
+
+    // Delete the item
+    await this.db.client
+      .delete(this.db.schema.expectedPaymentItems)
+      .where(eq(this.db.schema.expectedPaymentItems.id, itemId))
+  }
+
+  // ============================================================================
   // Trip Access Helpers (for TripAccessService integration)
   // ============================================================================
+
+  /**
+   * Get tripId from paymentScheduleConfigId
+   * Path: paymentScheduleConfig → activityPricing → activity → trip
+   */
+  async getTripIdFromPaymentScheduleConfigId(configId: string): Promise<string | null> {
+    const [config] = await this.db.client
+      .select({ activityPricingId: this.db.schema.paymentScheduleConfig.activityPricingId })
+      .from(this.db.schema.paymentScheduleConfig)
+      .where(eq(this.db.schema.paymentScheduleConfig.id, configId))
+      .limit(1)
+
+    if (!config?.activityPricingId) {
+      return null
+    }
+
+    return this.getTripIdFromActivityPricingId(config.activityPricingId)
+  }
 
   /**
    * Get tripId from activityPricingId
@@ -1988,6 +2381,28 @@ export class PaymentSchedulesService {
     }
 
     return this.getTripIdFromActivityPricingId(config.activityPricingId)
+  }
+
+  /**
+   * Validate that a contact is the primary contact or a traveler on the trip
+   */
+  private async validateContactForTrip(
+    contactId: string,
+    tripId: string,
+    agencyId: string,
+  ): Promise<boolean> {
+    const rows = await this.db.client.execute(sql`
+      SELECT 1 FROM (
+        SELECT id AS contact_id FROM trips
+        WHERE id = ${tripId} AND primary_contact_id = ${contactId} AND agency_id = ${agencyId}
+        UNION
+        SELECT contact_id FROM trip_travelers
+        WHERE trip_id = ${tripId} AND contact_id = ${contactId}
+      ) valid_contacts
+      LIMIT 1
+    `) as unknown as { contact_id: string }[]
+
+    return rows.length > 0
   }
 
   /**

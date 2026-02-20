@@ -1797,12 +1797,19 @@ export class OcrImportService {
       const existing = await this.paymentSchedulesService.findByActivityPricingId(activityPricingId)
 
       let schedule: { expectedPaymentItems?: Array<{ id: string }> }
+      const parseValidDate = (d?: string | null): string | null => {
+        if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null
+        const parsed = new Date(d + 'T00:00:00')
+        if (isNaN(parsed.getTime())) return null
+        return d
+      }
+
       if (existing) {
         schedule = await this.paymentSchedulesService.update(activityPricingId, {
           expectedPaymentItems: expectedItems.map((item, i) => ({
             paymentName: item.paymentName,
             expectedAmountCents: item.amountCents,
-            dueDate: null,
+            dueDate: parseValidDate(item.date),
             sequenceOrder: i + 1,
           })),
         })
@@ -1813,7 +1820,7 @@ export class OcrImportService {
           expectedPaymentItems: expectedItems.map((item, i) => ({
             paymentName: item.paymentName,
             expectedAmountCents: item.amountCents,
-            dueDate: null,
+            dueDate: parseValidDate(item.date),
             sequenceOrder: i + 1,
           })),
         })
@@ -1827,20 +1834,28 @@ export class OcrImportService {
         if (!expectedItemId || !item.hasTransaction) continue
 
         const transactionDate = this.resolveTransactionDate(item.date, bookingDate)
-        const notes = item.method || item.referenceNumber
+        // Use expected amount for transaction (not gross) — constraint: paid <= expected.
+        // When payments include commission (Case 3), transactionAmountCents > amountCents;
+        // record net amount and note the gross in notes for reference.
+        const txAmountCents = item.amountCents
+        const grossNote = item.transactionAmountCents !== item.amountCents
+          ? `Gross payment: $${(item.transactionAmountCents / 100).toFixed(2)} (includes commission)`
+          : null
+        const notes = item.method || item.referenceNumber || grossNote
           ? [
               'Auto-created from OCR import',
               item.method ? `Method: ${item.method}` : null,
               item.referenceNumber ? `Ref: ${item.referenceNumber}` : null,
+              grossNote,
             ].filter(Boolean).join(' | ')
           : 'Auto-created from OCR import (invoice marked as paid)'
 
         await this.paymentSchedulesService.createTransaction({
           expectedPaymentItemId: expectedItemId,
           transactionType: 'payment',
-          amountCents: item.amountCents,
+          amountCents: txAmountCents,
           currency,
-          paymentMethod: null, // preserve raw method text in notes instead
+          paymentMethod: this.inferPaymentMethod(item.method),
           referenceNumber: item.referenceNumber || undefined,
           transactionDate,
           notes,
@@ -1874,6 +1889,7 @@ export class OcrImportService {
   ): Array<{
     paymentName: string
     amountCents: number
+    transactionAmountCents: number
     hasTransaction: boolean
     date?: string | null
     method?: string | null
@@ -1883,6 +1899,7 @@ export class OcrImportService {
       return [{
         paymentName: 'Full Payment',
         amountCents: totalPriceCents,
+        transactionAmountCents: totalPriceCents,
         hasTransaction: true,
       }]
     }
@@ -1890,26 +1907,12 @@ export class OcrImportService {
     const paymentSum = payments.reduce((sum, p) => sum + p.amountCents, 0)
     const gap = totalPriceCents - paymentSum
 
-    // Case 3: payments exceed total — fall back to single Full Payment
-    if (gap < -100) {
-      this.logger.warn({
-        message: 'Extracted payments exceed total — falling back to single Full Payment',
-        paymentSum,
-        totalPriceCents,
-        gap,
-      })
-      return [{
-        paymentName: 'Full Payment',
-        amountCents: totalPriceCents,
-        hasTransaction: true,
-      }]
-    }
-
     // Case 1: sum matches total (within $1 / 100 cents) — adjust last for exact rounding
     if (Math.abs(gap) <= 100) {
       const items = payments.map((p) => ({
         paymentName: p.paymentName,
         amountCents: p.amountCents,
+        transactionAmountCents: p.amountCents,
         hasTransaction: true as boolean,
         date: p.date,
         method: p.method,
@@ -1918,26 +1921,60 @@ export class OcrImportService {
       // Adjust last item to absorb rounding difference
       if (gap !== 0 && items.length > 0) {
         items[items.length - 1]!.amountCents += gap
+        items[items.length - 1]!.transactionAmountCents += gap
       }
       return items
     }
 
     // Case 2: sum < total (gap > $1) — add "Remaining Balance" with no transaction
-    const items = payments.map((p) => ({
-      paymentName: p.paymentName,
-      amountCents: p.amountCents,
-      hasTransaction: true as boolean,
-      date: p.date,
-      method: p.method,
-      referenceNumber: p.referenceNumber,
-    }))
-    items.push({
-      paymentName: 'Remaining Balance',
-      amountCents: gap,
-      hasTransaction: false,
-      date: undefined,
-      method: undefined,
-      referenceNumber: undefined,
+    if (gap > 100) {
+      const items = payments.map((p) => ({
+        paymentName: p.paymentName,
+        amountCents: p.amountCents,
+        transactionAmountCents: p.amountCents,
+        hasTransaction: true as boolean,
+        date: p.date,
+        method: p.method,
+        referenceNumber: p.referenceNumber,
+      }))
+      items.push({
+        paymentName: 'Remaining Balance',
+        amountCents: gap,
+        transactionAmountCents: 0,
+        hasTransaction: false,
+        date: undefined,
+        method: undefined,
+        referenceNumber: undefined,
+      })
+      return items
+    }
+
+    // Case 3: sum > total (common for tour operators — payments include commission)
+    // Scale expected amounts proportionally to sum to totalPriceCents,
+    // but record actual payment amounts as transactions.
+    this.logger.log({
+      message: 'Payments exceed total (likely includes commission) — scaling expected amounts',
+      paymentSum,
+      totalPriceCents,
+      diff: paymentSum - totalPriceCents,
+    })
+    const ratio = totalPriceCents / paymentSum
+    let allocated = 0
+    const items = payments.map((p, i) => {
+      const isLast = i === payments.length - 1
+      const scaledAmount = isLast
+        ? totalPriceCents - allocated // last item gets remainder to avoid rounding drift
+        : Math.round(p.amountCents * ratio)
+      allocated += scaledAmount
+      return {
+        paymentName: p.paymentName,
+        amountCents: scaledAmount,
+        transactionAmountCents: p.amountCents, // record actual payment amount
+        hasTransaction: true as boolean,
+        date: p.date,
+        method: p.method,
+        referenceNumber: p.referenceNumber,
+      }
     })
     return items
   }
@@ -1950,6 +1987,32 @@ export class OcrImportService {
       return `${bookingDate}T12:00:00`
     }
     return new Date().toISOString()
+  }
+
+  /**
+   * Map free-text OCR payment method to PaymentMethod enum.
+   * Returns null if no match found.
+   */
+  private inferPaymentMethod(method?: string | null): 'credit_card' | 'bank_transfer' | 'cash' | 'check' | 'stripe' | 'other' | null {
+    if (!method) return null
+    const lower = method.toLowerCase()
+    if (/visa|master\s?card|mastercard|amex|american express|discover|diners|jcb|credit|debit|card|\d{4}\*+\d{3,4}/.test(lower)) {
+      return 'credit_card'
+    }
+    if (/wire|transfer|eft|ach|e-transfer|etransfer|bank/.test(lower)) {
+      return 'bank_transfer'
+    }
+    if (/cash/.test(lower)) {
+      return 'cash'
+    }
+    if (/cheque|check/.test(lower)) {
+      return 'check'
+    }
+    if (/stripe/.test(lower)) {
+      return 'stripe'
+    }
+    // Has method text but doesn't match known patterns
+    return 'other'
   }
 
   // ============================================================================

@@ -1513,6 +1513,7 @@ export function LodgingForm({
               activityPricingId={activityPricingId}
               totalPriceCents={pricingData.totalPriceCents}
               currency={pricingData.currency}
+              tripId={trip?.id || ''}
             />
           </div>
 
