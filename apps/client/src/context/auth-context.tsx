@@ -1,15 +1,12 @@
 "use client"
 
 import { createContext, useContext, type ReactNode } from "react"
-import { useAuth } from "@/lib/auth"
-import type { User } from "@supabase/supabase-js"
+import { useAuth, type PortalUser } from "@/lib/auth"
 
 interface AuthContextValue {
-  user: User | null
+  user: PortalUser | null
   loading: boolean
-  signInWithOtp: (email: string) => Promise<{ error: any }>
-  signOut: () => Promise<void>
-  getAccessToken: () => Promise<string | null>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
