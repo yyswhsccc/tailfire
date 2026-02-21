@@ -188,7 +188,7 @@ jobs:
           curl -s -X PATCH "https://api.vercel.com/v9/projects/$VERCEL_CLIENT_PROJECT_ID" \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"rootDirectory":"apps/client","installCommand":"pnpm install","buildCommand":"pnpm --filter @tailfire/client build"}'
+            -d '{"rootDirectory":"apps/client","installCommand":"pnpm install","buildCommand":"pnpm --filter @tailfire/database build && pnpm --filter @tailfire/shared-types build && pnpm --filter @tailfire/client build"}'
 
       - name: Deploy Client (Preview)
         run: VERCEL_ORG_ID=$VERCEL_ORG_ID VERCEL_PROJECT_ID=$VERCEL_CLIENT_PROJECT_ID vercel deploy --token=$VERCEL_TOKEN --yes
