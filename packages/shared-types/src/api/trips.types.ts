@@ -334,6 +334,7 @@ export interface TripResponseDto {
   coverPhotoUrl: string | null // URL of the trip's cover photo
   shareToken: string | null
   tripGroupId: string | null
+  clientSelectedItineraryId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -908,6 +909,7 @@ export interface ProposalCommentDto {
 
 /** Request to create a comment on a proposal */
 export interface CreateProposalCommentDto {
+  itineraryId?: string
   activityId?: string
   dayId?: string
   content: string
@@ -939,6 +941,7 @@ export interface ClientActivityResponseDto {
 
 /** Request to create/update an activity response */
 export interface CreateActivityResponseDto {
+  itineraryId?: string
   activityId: string
   response: ClientActivityResponseType
   note?: string
@@ -954,10 +957,26 @@ export interface ActivityResponsesSummaryDto {
 export interface SharedTripProposalDto extends TripShareDto {
   pricingVisible: boolean
   currency: string
+  /** @deprecated Use proposedItineraries instead */
   itinerary: SharedItineraryDto | null
+  /** All proposing itineraries with published content */
+  proposedItineraries: SharedItineraryDto[]
   agent: SharedAgentProfileDto | null
   primaryContactName: string | null
+  /** @deprecated Each itinerary has its own publishedVersion */
   publishedVersion: number | null
+  /** ID of the itinerary the client has selected */
+  clientSelectedItineraryId: string | null
+}
+
+/** Client selects their preferred itinerary */
+export interface SelectItineraryDto {
+  itineraryId: string
+}
+
+/** Agent confirms client's selection */
+export interface ConfirmSelectionDto {
+  itineraryId: string
 }
 
 // ============================================================================
