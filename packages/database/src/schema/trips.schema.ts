@@ -163,7 +163,8 @@ export const trips = pgTable('trips', {
   tripGroupId: uuid('trip_group_id'),
 
   // Client's preferred itinerary selection (multi-itinerary proposals)
-  clientSelectedItineraryId: uuid('client_selected_itinerary_id').references(() => itineraries.id, { onDelete: 'set null' }),
+  // FK constraint defined in migration SQL (not inline — avoids circular type reference with itineraries table)
+  clientSelectedItineraryId: uuid('client_selected_itinerary_id'),
 
   // Cover Photo (denormalized for quick access - synced from trip_media)
   coverPhotoUrl: text('cover_photo_url'),
