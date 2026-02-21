@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Check, MessageCircle, X } from 'lucide-react'
 import { Button, Card, CardContent, Textarea } from '@tailfire/ui-public'
 import type { ProposalCommentDto } from '@tailfire/shared-types'
@@ -13,13 +13,26 @@ export function ApprovalSection({
   initialStatus,
   generalComments,
   onAddComment,
+  isMulti = false,
+  clientSelectedId = null,
+  selectedItineraryName = null,
+  onChangeSelection,
 }: {
   token: string
   initialStatus: string
   generalComments: ProposalCommentDto[]
   onAddComment: (content: string) => Promise<void>
+  isMulti?: boolean
+  clientSelectedId?: string | null
+  selectedItineraryName?: string | null
+  onChangeSelection?: () => void
 }) {
   const [status, setStatus] = useState(initialStatus)
+
+  // Sync status when switching itineraries (prop changes)
+  useEffect(() => {
+    setStatus(initialStatus)
+  }, [initialStatus])
   const [isApproving, setIsApproving] = useState(false)
   const [isDeclining, setIsDeclining] = useState(false)
   const [showCommentForm, setShowCommentForm] = useState(false)
@@ -103,13 +116,33 @@ export function ApprovalSection({
     <Card className="bg-card border-border">
       <CardContent className="p-6 space-y-4">
         <h3 className="font-display text-lg font-bold text-foreground">Ready to proceed?</h3>
-        <p className="text-sm text-muted-foreground">
-          Review the proposal above and let your advisor know your decision.
-        </p>
+        {isMulti && !clientSelectedId && (
+          <p className="text-sm text-muted-foreground">
+            Please select your preferred itinerary option above before approving.
+          </p>
+        )}
+        {isMulti && clientSelectedId && selectedItineraryName && (
+          <p className="text-sm text-muted-foreground">
+            You selected: <strong className="text-foreground">{selectedItineraryName}</strong>.{' '}
+            {onChangeSelection && (
+              <button
+                onClick={onChangeSelection}
+                className="text-primary hover:underline"
+              >
+                Change
+              </button>
+            )}
+          </p>
+        )}
+        {!isMulti && (
+          <p className="text-sm text-muted-foreground">
+            Review the proposal above and let your advisor know your decision.
+          </p>
+        )}
         <div className="flex gap-3">
           <Button
             onClick={handleApprove}
-            disabled={isApproving || isDeclining}
+            disabled={isApproving || isDeclining || (isMulti && !clientSelectedId)}
             className="bg-green-600 hover:bg-green-700 text-white"
           >
             <Check className="h-4 w-4 mr-1.5" />

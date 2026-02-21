@@ -9,7 +9,7 @@ function getLastSeenKey(token: string) {
   return `tailfire_comments_seen_${token}`
 }
 
-export function useProposalComments(token: string) {
+export function useProposalComments(token: string, itineraryId?: string) {
   const [comments, setComments] = useState<ProposalCommentDto[]>([])
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -28,7 +28,8 @@ export function useProposalComments(token: string) {
 
   const fetchComments = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/trips/share/${token}/comments`)
+      const qs = itineraryId ? `?itineraryId=${itineraryId}` : ''
+      const res = await fetch(`${API_URL}/trips/share/${token}/comments${qs}`)
       if (!res.ok) return
       const data: ProposalCommentsResponseDto = await res.json()
       setComments(data.comments)
@@ -52,7 +53,7 @@ export function useProposalComments(token: string) {
     } finally {
       setIsLoading(false)
     }
-  }, [token])
+  }, [token, itineraryId])
 
   useEffect(() => {
     fetchComments()
@@ -65,6 +66,7 @@ export function useProposalComments(token: string) {
     const body: Record<string, string> = { content }
     if (activityId) body.activityId = activityId
     if (dayId) body.dayId = dayId
+    if (itineraryId) body.itineraryId = itineraryId
 
     const res = await fetch(`${API_URL}/trips/share/${token}/comments`, {
       method: 'POST',

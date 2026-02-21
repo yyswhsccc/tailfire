@@ -5,7 +5,7 @@ import type { ClientActivityResponseType } from '@tailfire/shared-types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
 
-export function useActivityResponses(token: string, publishedVersion: number | null) {
+export function useActivityResponses(token: string, publishedVersion: number | null, itineraryId?: string) {
   const [responseMap, setResponseMap] = useState<Record<string, ClientActivityResponseType>>({})
   const [isLoading, setIsLoading] = useState(true)
 
@@ -15,7 +15,8 @@ export function useActivityResponses(token: string, publishedVersion: number | n
       return
     }
     try {
-      const res = await fetch(`${API_URL}/trips/share/${token}/responses`)
+      const qs = itineraryId ? `?itineraryId=${itineraryId}` : ''
+      const res = await fetch(`${API_URL}/trips/share/${token}/responses${qs}`)
       if (!res.ok) return
       const data = await res.json()
       setResponseMap(data.responseMap || {})
@@ -24,7 +25,7 @@ export function useActivityResponses(token: string, publishedVersion: number | n
     } finally {
       setIsLoading(false)
     }
-  }, [token, publishedVersion])
+  }, [token, publishedVersion, itineraryId])
 
   useEffect(() => {
     fetchResponses()
@@ -38,10 +39,13 @@ export function useActivityResponses(token: string, publishedVersion: number | n
     response: ClientActivityResponseType,
     note?: string,
   ) => {
+    const body: Record<string, any> = { activityId, response, note }
+    if (itineraryId) body.itineraryId = itineraryId
+
     const res = await fetch(`${API_URL}/trips/share/${token}/responses`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ activityId, response, note }),
+      body: JSON.stringify(body),
     })
 
     if (!res.ok) {

@@ -42,13 +42,13 @@ export function ActivityCard({
   const handleConfirm = async () => {
     if (!onConfirm || isSubmitting) return
     setIsSubmitting(true)
-    try { onConfirm() } finally { setIsSubmitting(false) }
+    try { await onConfirm() } catch { /* handled upstream */ } finally { setIsSubmitting(false) }
   }
 
   const handleDecline = async () => {
     if (!onDecline || isSubmitting) return
     setIsSubmitting(true)
-    try { onDecline() } finally { setIsSubmitting(false) }
+    try { await onDecline() } catch { /* handled upstream */ } finally { setIsSubmitting(false) }
   }
 
   return (
