@@ -20,6 +20,7 @@ import { EditItineraryDialog } from './edit-itinerary-dialog'
 import { useSpanningActivities } from '@/hooks/use-spanning-activities'
 import type { ActivityWithSpan } from '@/lib/spanning-activity-utils'
 import { buildCruiseColorMap, getCruiseColor } from '@/lib/cruise-color-utils'
+import type { ClientActivityResponseType } from '@tailfire/shared-types/api'
 
 interface TripSummaryColumnProps {
   days: ItineraryDayWithActivitiesDto[]
@@ -27,9 +28,11 @@ interface TripSummaryColumnProps {
   tripStartDate?: string | null
   tripEndDate?: string | null
   itinerary: ItineraryResponseDto
+  responseMap?: Record<string, ClientActivityResponseType>
+  commentCounts?: Record<string, number>
 }
 
-export function TripSummaryColumn({ days, tripId, tripStartDate, tripEndDate, itinerary }: TripSummaryColumnProps) {
+export function TripSummaryColumn({ days, tripId, tripStartDate, tripEndDate, itinerary, responseMap, commentCounts }: TripSummaryColumnProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   // Droppable zone for the summary column
   const { setNodeRef, isOver } = useDroppable({
@@ -179,6 +182,8 @@ export function TripSummaryColumn({ days, tripId, tripStartDate, tripEndDate, it
                           activity={spanning}
                           dayId={dayId}
                           cruiseColor={color}
+                          clientResponse={responseMap?.[spanning.id] ?? null}
+                          commentCount={commentCounts?.[spanning.id]}
                         />
                         {/* Vertical line indicator extending down */}
                         <div
@@ -224,6 +229,8 @@ export function TripSummaryColumn({ days, tripId, tripStartDate, tripEndDate, it
                       activity={activity}
                       dayId={dayId}
                       cruiseColor={getCruiseColor(activity, cruiseColorMap)}
+                      clientResponse={responseMap?.[activity.id] ?? null}
+                      commentCount={commentCounts?.[activity.id]}
                     />
                   ))}
                 </div>

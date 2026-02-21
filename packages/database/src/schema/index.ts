@@ -158,6 +158,12 @@ export * from './ocr-supplier-runbooks.schema'
 export * from './client-portal-users.schema'
 export * from './itinerary-feedback.schema'
 
+// Proposal comments (per-activity commenting on shared proposals)
+export * from './proposal-comments.schema'
+
+// Client activity responses (per-activity confirm/decline on published versions)
+export * from './client-activity-responses.schema'
+
 // Later phases:
 // export * from './financials.schema'
 // export * from './tasks.schema'

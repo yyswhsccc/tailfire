@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
+import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
 import { useCreateCustomCruise, useUpdateCustomCruise, useCustomCruise, useGenerateCruisePortSchedule, useCruisePortSchedule } from '@/hooks/use-custom-cruise'
 import { useMarkActivityBooked } from '@/hooks/use-activity-bookings'
 import { useIsChildOfPackage } from '@/hooks/use-is-child-of-package'
@@ -1033,7 +1034,7 @@ export function CustomCruiseForm({
 
       {/* Tabbed Interface - 5 tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Ship className="h-4 w-4" />
             General
@@ -1053,6 +1054,9 @@ export function CustomCruiseForm({
           <TabsTrigger value="pricing" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             Booking & Pricing
+          </TabsTrigger>
+          <TabsTrigger value="comments" className="flex items-center gap-2">
+            Comments
           </TabsTrigger>
         </TabsList>
 
@@ -2272,6 +2276,20 @@ export function CustomCruiseForm({
                 )}
               </CardContent>
             </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="comments" className="mt-6">
+          {isEditMode && activity?.id ? (
+            <ActivityCommentsPanel
+              tripId={trip?.id || ''}
+              itineraryId={itineraryId}
+              activityId={activity.id}
+            />
+          ) : (
+            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
+              Save the activity first to view comments.
+            </div>
           )}
         </TabsContent>
       </Tabs>

@@ -263,6 +263,7 @@ export class ItinerariesService {
           ...(asdLng !== undefined ? { secondaryDestinationLng: asdLng != null ? String(asdLng) : null } : {}),
           status: 'approved',
           isSelected: true,
+          hasUnpublishedChanges: true,
           updatedAt: new Date(),
         })
         .where(eq(this.db.schema.itineraries.id, id))
@@ -291,6 +292,7 @@ export class ItinerariesService {
         ...(secondaryDestinationLat !== undefined ? { secondaryDestinationLat: secondaryDestinationLat != null ? String(secondaryDestinationLat) : null } : {}),
         ...(secondaryDestinationLng !== undefined ? { secondaryDestinationLng: secondaryDestinationLng != null ? String(secondaryDestinationLng) : null } : {}),
         ...(shouldClearSelected ? { isSelected: false } : {}),
+        hasUnpublishedChanges: true,
         updatedAt: new Date(),
       })
       .where(eq(this.db.schema.itineraries.id, id))
@@ -397,6 +399,10 @@ export class ItinerariesService {
       status: itinerary.status,
       isSelected: itinerary.isSelected,
       sequenceOrder: itinerary.sequenceOrder,
+      currentVersion: itinerary.currentVersion ?? 0,
+      publishedVersion: itinerary.publishedVersion ?? null,
+      lastPublishedAt: itinerary.lastPublishedAt?.toISOString() ?? null,
+      hasUnpublishedChanges: itinerary.hasUnpublishedChanges ?? false,
       createdAt: itinerary.createdAt.toISOString(),
       updatedAt: itinerary.updatedAt.toISOString(),
     }

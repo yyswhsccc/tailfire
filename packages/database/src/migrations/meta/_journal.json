@@ -862,6 +862,34 @@
       "when": 1771520400000,
       "tag": "20260219170000_add_contact_id_to_payment_transactions",
       "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1771588800000,
+      "tag": "20260220120000_create_proposal_comments",
+      "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1771675200000,
+      "tag": "20260221120000_add_itinerary_versioning",
+      "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1771678800000,
+      "tag": "20260221130000_phase2_client_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1771682400000,
+      "tag": "20260221140000_multi_itinerary_proposals",
+      "breakpoints": true
     }
   ]
 }

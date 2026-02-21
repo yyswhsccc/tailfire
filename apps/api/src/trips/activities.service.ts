@@ -659,6 +659,9 @@ export class ActivitiesService {
       )
     }
 
+    // Mark itinerary as having unpublished changes
+    await this.markItineraryChanged(activity.itineraryDayId)
+
     return this.formatActivityResponse(activity)
   }
 
@@ -910,6 +913,9 @@ export class ActivitiesService {
       }
     }
 
+    // Mark itinerary as having unpublished changes
+    await this.markItineraryChanged(activity.itineraryDayId)
+
     return this.formatActivityResponse(activity)
   }
 
@@ -979,6 +985,9 @@ export class ActivitiesService {
         )
       )
     }
+
+    // Mark itinerary as having unpublished changes
+    await this.markItineraryChanged(activity.itineraryDayId)
   }
 
   /**
@@ -1013,6 +1022,9 @@ export class ActivitiesService {
           .where(eq(this.db.schema.itineraryActivities.id, order.id))
       )
     )
+
+    // Mark itinerary as having unpublished changes
+    await this.markItineraryChanged(itineraryDayId)
 
     // Return updated activities
     return this.findByDay(itineraryDayId)
@@ -1118,6 +1130,12 @@ export class ActivitiesService {
       })
       .where(eq(this.db.schema.itineraryActivities.id, id))
       .returning()
+
+    // Mark both source and target days' itineraries as having unpublished changes
+    if (currentActivity.itineraryDayId) {
+      await this.markItineraryChanged(currentActivity.itineraryDayId)
+    }
+    await this.markItineraryChanged(dto.targetDayId)
 
     return this.formatActivityResponse(activity)
   }
@@ -1245,6 +1263,25 @@ export class ActivitiesService {
   }
 
   /**
+   * Mark the parent itinerary as having unpublished changes.
+   * Called after activity create/update/remove/reorder.
+   */
+  private async markItineraryChanged(dayId: string | null): Promise<void> {
+    if (!dayId) return
+    const [day] = await this.db.client
+      .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+      .from(this.db.schema.itineraryDays)
+      .where(eq(this.db.schema.itineraryDays.id, dayId))
+      .limit(1)
+    if (day) {
+      await this.db.client
+        .update(this.db.schema.itineraries)
+        .set({ hasUnpublishedChanges: true })
+        .where(eq(this.db.schema.itineraries.id, day.itineraryId))
+    }
+  }
+
+  /**
    * Get trip data (currency, agencyId) from day ID
    * Used to propagate trip-level data to activities
    */
@@ -1364,6 +1401,9 @@ export class ActivitiesService {
     })
 
     this.logger.log(`Duplicated activity ${activityId} -> ${newActivityId} (deep copy)`)
+
+    // Mark itinerary as having unpublished changes
+    await this.markItineraryChanged(dayId)
 
     // Emit audit event for the duplicated activity (after transaction succeeds)
     const resolvedTripId = await this.getTripIdFromDayId(dayId)
@@ -1824,6 +1864,11 @@ export class ActivitiesService {
         )
       )
     }
+
+    // Mark itinerary as having unpublished changes
+    if (pkg.itineraryDayId) {
+      await this.markItineraryChanged(pkg.itineraryDayId)
+    }
   }
 
   /**
@@ -1870,6 +1915,11 @@ export class ActivitiesService {
             { childrenUnlinked: activityIds, unlinkedNames, count: activityIds.length, subType: 'package' }
           )
         )
+      }
+
+      // Mark itinerary as having unpublished changes
+      if (pkg.itineraryDayId) {
+        await this.markItineraryChanged(pkg.itineraryDayId)
       }
     }
   }

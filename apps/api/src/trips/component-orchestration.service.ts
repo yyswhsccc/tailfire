@@ -109,6 +109,29 @@ export class ComponentOrchestrationService {
   }
 
   /**
+   * Mark the parent itinerary as having unpublished changes after detail updates.
+   */
+  private async markItineraryChangedForActivity(activityId: string): Promise<void> {
+    const [activity] = await this.db.client
+      .select({ itineraryDayId: this.db.schema.itineraryActivities.itineraryDayId })
+      .from(this.db.schema.itineraryActivities)
+      .where(eq(this.db.schema.itineraryActivities.id, activityId))
+      .limit(1)
+    if (!activity?.itineraryDayId) return
+    const [day] = await this.db.client
+      .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+      .from(this.db.schema.itineraryDays)
+      .where(eq(this.db.schema.itineraryDays.id, activity.itineraryDayId))
+      .limit(1)
+    if (day) {
+      await this.db.client
+        .update(this.db.schema.itineraries)
+        .set({ hasUnpublishedChanges: true })
+        .where(eq(this.db.schema.itineraries.id, day.itineraryId))
+    }
+  }
+
+  /**
    * Get agencyId from itinerary day (needed for RLS on activity creates)
    */
   private async getAgencyIdFromDayId(dayId: string | null | undefined): Promise<string> {
@@ -248,6 +271,8 @@ export class ComponentOrchestrationService {
         })
         .where(eq(this.db.schema.activityPricing.activityId, activityId))
     }
+
+    await this.markItineraryChangedForActivity(activityId)
 
     // Return the complete flight component
     return this.getFlight(activityId)
@@ -461,6 +486,9 @@ export class ComponentOrchestrationService {
       }
     }
 
+    // Mark itinerary as having unpublished changes
+    await this.markItineraryChangedForActivity(id)
+
     // Return the updated flight component
     return this.getFlight(id)
   }
@@ -469,6 +497,7 @@ export class ComponentOrchestrationService {
    * Delete a flight component (cascades to details via FK)
    */
   async deleteFlight(id: string): Promise<void> {
+    await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
@@ -708,6 +737,8 @@ export class ComponentOrchestrationService {
       }
     }
 
+    await this.markItineraryChangedForActivity(id)
+
     return this.getLodging(id)
   }
 
@@ -715,6 +746,7 @@ export class ComponentOrchestrationService {
    * Delete a lodging component (cascades to details via FK)
    */
   async deleteLodging(id: string): Promise<void> {
+    await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
@@ -1000,6 +1032,8 @@ export class ComponentOrchestrationService {
       }
     }
 
+    await this.markItineraryChangedForActivity(id)
+
     return this.getTransportation(id)
   }
 
@@ -1007,6 +1041,7 @@ export class ComponentOrchestrationService {
    * Delete a transportation component (cascades to details via FK)
    */
   async deleteTransportation(id: string): Promise<void> {
+    await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
@@ -1254,6 +1289,8 @@ export class ComponentOrchestrationService {
       }
     }
 
+    await this.markItineraryChangedForActivity(id)
+
     return this.getDining(id)
   }
 
@@ -1261,6 +1298,7 @@ export class ComponentOrchestrationService {
    * Delete a dining component (cascades to details via FK)
    */
   async deleteDining(id: string): Promise<void> {
+    await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
@@ -1392,6 +1430,8 @@ export class ComponentOrchestrationService {
       }
     }
 
+    await this.markItineraryChangedForActivity(id)
+
     return this.getPortInfo(id)
   }
 
@@ -1399,6 +1439,7 @@ export class ComponentOrchestrationService {
    * Delete a port info component (cascades to details via FK)
    */
   async deletePortInfo(id: string): Promise<void> {
+    await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
@@ -1635,6 +1676,8 @@ export class ComponentOrchestrationService {
       }
     }
 
+    await this.markItineraryChangedForActivity(id)
+
     return this.getOptions(id)
   }
 
@@ -1642,6 +1685,7 @@ export class ComponentOrchestrationService {
    * Delete an options component (cascades to details via FK)
    */
   async deleteOptions(id: string): Promise<void> {
+    await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
@@ -1923,6 +1967,8 @@ export class ComponentOrchestrationService {
       }
     }
 
+    await this.markItineraryChangedForActivity(id)
+
     return this.getCustomCruise(id)
   }
 
@@ -1930,6 +1976,7 @@ export class ComponentOrchestrationService {
    * Delete a custom cruise component (cascades to details via FK)
    */
   async deleteCustomCruise(id: string): Promise<void> {
+    await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
@@ -2209,6 +2256,8 @@ export class ComponentOrchestrationService {
       }
     }
 
+    await this.markItineraryChangedForActivity(id)
+
     return this.getCustomTour(id)
   }
 
@@ -2375,6 +2424,8 @@ export class ComponentOrchestrationService {
       await this.tourDayDetailsService.upsert(id, dto.tourDayDetails)
     }
 
+    await this.markItineraryChangedForActivity(id)
+
     return this.getTourDay(id)
   }
 
@@ -2382,6 +2433,7 @@ export class ComponentOrchestrationService {
    * Delete a tour day component
    */
   async deleteTourDay(id: string): Promise<void> {
+    await this.markItineraryChangedForActivity(id)
     await this.baseService.delete(id)
   }
 

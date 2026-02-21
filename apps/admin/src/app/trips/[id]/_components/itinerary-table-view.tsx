@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { MoreVertical, MapPin, Clock, Calendar, Pencil, Copy, Trash2 } from 'lucide-react'
+import { MoreVertical, MapPin, Clock, Calendar, Pencil, Copy, Trash2, Check, X, MessageSquare } from 'lucide-react'
 import type { TripResponseDto, ItineraryResponseDto } from '@tailfire/shared-types/api'
 import { useItineraryDaysWithActivities } from '@/hooks/use-itinerary-days'
 import { useDeleteActivity, useDuplicateActivity } from '@/hooks/use-activities'
@@ -52,10 +52,13 @@ import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import { useSpanningActivities } from '@/hooks/use-spanning-activities'
 import { isSpanningActivity, getActivityNights } from '@/lib/spanning-activity-utils'
 import { buildCruiseColorMap, getCruiseColor } from '@/lib/cruise-color-utils'
+import type { ClientActivityResponseType } from '@tailfire/shared-types/api'
 
 interface ItineraryTableViewProps {
   trip: TripResponseDto
   itinerary: ItineraryResponseDto
+  responseMap?: Record<string, ClientActivityResponseType>
+  commentCounts?: Record<string, number>
 }
 
 // Status badge variants
@@ -106,7 +109,7 @@ function formatDate(datetime: string | null): string {
  * Displays all activities across all days in a flat table format.
  * Columns: Day | Type | Details | Time | Location | Status | Cost | Actions
  */
-export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps) {
+export function ItineraryTableView({ trip, itinerary, responseMap, commentCounts }: ItineraryTableViewProps) {
   const router = useRouter()
   const { toast } = useToast()
   const { storeReturnContext } = useActivityNavigation()
@@ -545,11 +548,31 @@ export function ItineraryTableView({ trip, itinerary }: ItineraryTableViewProps)
 
                 {/* Status Column */}
                 <TableCell className="py-2">
-                  <Badge variant={statusVariant}>
-                    <span className="capitalize text-xs">
-                      {row.activity.status}
-                    </span>
-                  </Badge>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <Badge variant={statusVariant}>
+                      <span className="capitalize text-xs">
+                        {row.activity.status}
+                      </span>
+                    </Badge>
+                    {responseMap?.[row.activity.id] === 'confirmed' && (
+                      <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium bg-emerald-100 text-emerald-800">
+                        <Check className="h-2.5 w-2.5" />
+                        Client
+                      </span>
+                    )}
+                    {responseMap?.[row.activity.id] === 'declined' && (
+                      <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium bg-red-100 text-red-800">
+                        <X className="h-2.5 w-2.5" />
+                        Client
+                      </span>
+                    )}
+                    {(commentCounts?.[row.activity.id] ?? 0) > 0 && (
+                      <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium bg-blue-100 text-blue-800">
+                        <MessageSquare className="h-2.5 w-2.5" />
+                        {commentCounts?.[row.activity.id]}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
 
                 {/* Cost Column */}

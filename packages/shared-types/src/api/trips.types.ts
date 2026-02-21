@@ -161,7 +161,7 @@ export interface CreateItineraryDto {
   overview?: string // Rich text overview statement (TERN pattern)
   startDate?: string // ISO date string - can override trip start date (TERN pattern)
   endDate?: string // ISO date string - can override trip end date (TERN pattern)
-  status?: 'draft' | 'proposing' | 'approved' | 'archived'
+  status?: 'draft' | 'proposing' | 'approved' | 'archived' | 'declined'
   sequenceOrder?: number
 }
 
@@ -235,7 +235,7 @@ export interface UpdateItineraryDto {
   secondaryDestinationName?: string | null
   secondaryDestinationLat?: number | null
   secondaryDestinationLng?: number | null
-  status?: 'draft' | 'proposing' | 'approved' | 'archived'
+  status?: 'draft' | 'proposing' | 'approved' | 'archived' | 'declined'
   isSelected?: boolean
   sequenceOrder?: number
 }
@@ -288,7 +288,7 @@ export interface TravelerGroupFilterDto {
 
 export interface ItineraryFilterDto {
   tripId?: string
-  status?: 'draft' | 'proposing' | 'approved' | 'archived'
+  status?: 'draft' | 'proposing' | 'approved' | 'archived' | 'declined'
   isSelected?: boolean
 }
 
@@ -334,6 +334,7 @@ export interface TripResponseDto {
   coverPhotoUrl: string | null // URL of the trip's cover photo
   shareToken: string | null
   tripGroupId: string | null
+  clientSelectedItineraryId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -432,6 +433,11 @@ export interface ItineraryResponseDto {
   status: string
   isSelected: boolean
   sequenceOrder: number
+  // Versioning
+  currentVersion: number
+  publishedVersion: number | null
+  lastPublishedAt: string | null
+  hasUnpublishedChanges: boolean
   createdAt: string
   updatedAt: string
 }
@@ -647,4 +653,346 @@ export interface UpdateTripOwnerDto {
  */
 export interface CancelTripDto {
   reason?: string // Optional cancellation reason
+}
+
+// ============================================================================
+// SHARED TRIP PROPOSAL DTOs (public share page with full itinerary)
+// ============================================================================
+
+/** Activity type discriminator for shared proposal */
+export type SharedActivityType =
+  | 'flight'
+  | 'lodging'
+  | 'transportation'
+  | 'dining'
+  | 'custom_cruise'
+  | 'custom_tour'
+  | 'package'
+  | 'port_info'
+  | 'options'
+  | 'tour'
+  | 'cruise'
+  | 'tour_day'
+
+/** Activity status for display */
+export type SharedActivityStatus = 'proposed' | 'confirmed' | 'cancelled' | 'optional'
+
+/** Sanitized pricing breakdown item (no traveler names) */
+export interface SharedPricingBreakdownItem {
+  description: string
+  amountCents: number
+}
+
+/** Public-safe pricing for an activity */
+export interface SharedActivityPricingDto {
+  totalPriceCents: number
+  currency: string
+  pricingType: string | null
+  breakdownItems: SharedPricingBreakdownItem[] | null
+}
+
+// --- Type-specific detail DTOs ---
+
+export interface SharedFlightSegmentDto {
+  segmentOrder: number
+  airline: string | null
+  flightNumber: string | null
+  departureAirportCode: string | null
+  departureAirportName: string | null
+  departureDate: string | null
+  departureTime: string | null
+  departureTerminal: string | null
+  arrivalAirportCode: string | null
+  arrivalAirportName: string | null
+  arrivalDate: string | null
+  arrivalTime: string | null
+  arrivalTerminal: string | null
+}
+
+export interface SharedFlightDetailDto {
+  type: 'flight'
+  airline: string | null
+  flightNumber: string | null
+  departureAirportCode: string | null
+  departureDate: string | null
+  departureTime: string | null
+  departureTerminal: string | null
+  arrivalAirportCode: string | null
+  arrivalDate: string | null
+  arrivalTime: string | null
+  arrivalTerminal: string | null
+  segments: SharedFlightSegmentDto[]
+}
+
+export interface SharedLodgingDetailDto {
+  type: 'lodging'
+  propertyName: string | null
+  checkInDate: string | null
+  checkInTime: string | null
+  checkOutDate: string | null
+  checkOutTime: string | null
+  roomType: string | null
+  roomCount: number
+  amenities: string[]
+}
+
+export interface SharedTransportDetailDto {
+  type: 'transportation'
+  subtype: string | null
+  providerName: string | null
+  vehicleType: string | null
+  pickupDate: string | null
+  pickupTime: string | null
+  pickupAddress: string | null
+  dropoffDate: string | null
+  dropoffTime: string | null
+  dropoffAddress: string | null
+  isRoundTrip: boolean
+}
+
+export interface SharedDiningDetailDto {
+  type: 'dining'
+  restaurantName: string | null
+  cuisineType: string | null
+  mealType: string | null
+  reservationDate: string | null
+  reservationTime: string | null
+  partySize: number | null
+  priceRange: string | null
+  dressCode: string | null
+}
+
+export interface SharedCruiseDetailDto {
+  type: 'custom_cruise'
+  cruiseLineName: string | null
+  shipName: string | null
+  itineraryName: string | null
+  nights: number | null
+  departurePort: string | null
+  departureDate: string | null
+  arrivalPort: string | null
+  arrivalDate: string | null
+  cabinCategory: string | null
+  cabinDescription: string | null
+  region: string | null
+  portCalls: Array<{
+    day: number
+    portName: string
+    arriveTime: string | null
+    departTime: string | null
+  }>
+}
+
+export interface SharedTourDetailDto {
+  type: 'custom_tour'
+  tourName: string | null
+  days: number | null
+  nights: number | null
+  startCity: string | null
+  endCity: string | null
+  itineraryDays: Array<{
+    dayNumber: number
+    title: string | null
+    description: string | null
+    overnightCity: string | null
+  }>
+}
+
+export interface SharedPackageDetailDto {
+  type: 'package'
+  supplierName: string | null
+  childActivities: SharedActivityDto[]
+}
+
+export interface SharedPortInfoDetailDto {
+  type: 'port_info'
+  portType: string | null
+  portName: string | null
+  portLocation: string | null
+  arrivalDate: string | null
+  arrivalTime: string | null
+  departureDate: string | null
+  departureTime: string | null
+  tenderRequired: boolean
+}
+
+export interface SharedOptionsDetailDto {
+  type: 'options'
+  optionCategory: string | null
+  isSelected: boolean
+  providerName: string | null
+  durationMinutes: number | null
+  inclusions: string[]
+}
+
+export interface SharedGenericDetailDto {
+  type: 'generic'
+}
+
+/** Discriminated union of all detail types */
+export type SharedActivityDetailDto =
+  | SharedFlightDetailDto
+  | SharedLodgingDetailDto
+  | SharedTransportDetailDto
+  | SharedDiningDetailDto
+  | SharedCruiseDetailDto
+  | SharedTourDetailDto
+  | SharedPackageDetailDto
+  | SharedPortInfoDetailDto
+  | SharedOptionsDetailDto
+  | SharedGenericDetailDto
+
+/** Public-safe activity for shared proposal */
+export interface SharedActivityDto {
+  id: string
+  activityType: SharedActivityType
+  name: string
+  description: string | null
+  sequenceOrder: number
+  startDatetime: string | null
+  endDatetime: string | null
+  timezone: string | null
+  location: string | null
+  address: string | null
+  status: SharedActivityStatus
+  isBooked: boolean
+  confirmationNumber: string | null
+  thumbnail: string | null
+  pricing: SharedActivityPricingDto | null
+  detail: SharedActivityDetailDto | null
+}
+
+/** Public-safe itinerary day */
+export interface SharedItineraryDayDto {
+  id: string
+  dayNumber: number
+  date: string | null
+  title: string | null
+  sequenceOrder: number
+  activities: SharedActivityDto[]
+}
+
+/** Public-safe itinerary summary */
+export interface SharedItineraryDto {
+  id: string
+  name: string
+  description: string | null
+  coverPhoto: string | null
+  overview: string | null
+  startDate: string | null
+  endDate: string | null
+  status: string
+  publishedVersion: number | null
+  days: SharedItineraryDayDto[]
+}
+
+/** Agent profile for public display (no email) */
+export interface SharedAgentProfileDto {
+  firstName: string | null
+  lastName: string | null
+  avatarUrl: string | null
+  publicPhone: string | null
+  bio: string | null
+}
+
+/** Comment on a proposal activity or day */
+export interface ProposalCommentDto {
+  id: string
+  activityId: string | null
+  dayId: string | null
+  versionNumber: number | null
+  authorType: 'client' | 'agent'
+  authorName: string
+  content: string
+  createdAt: string
+}
+
+/** Request to create a comment on a proposal */
+export interface CreateProposalCommentDto {
+  itineraryId?: string
+  activityId?: string
+  dayId?: string
+  content: string
+}
+
+/** Response with comments and per-activity/day counts */
+export interface ProposalCommentsResponseDto {
+  comments: ProposalCommentDto[]
+  commentCounts: Record<string, number>
+}
+
+// ============================================================================
+// CLIENT ACTIVITY RESPONSES
+// ============================================================================
+
+/** Per-activity client response type */
+export type ClientActivityResponseType = 'confirmed' | 'declined'
+
+/** Per-activity response from client */
+export interface ClientActivityResponseDto {
+  id: string
+  activityId: string
+  versionNumber: number
+  response: ClientActivityResponseType
+  contactName: string
+  note: string | null
+  createdAt: string
+}
+
+/** Request to create/update an activity response */
+export interface CreateActivityResponseDto {
+  itineraryId?: string
+  activityId: string
+  response: ClientActivityResponseType
+  note?: string
+}
+
+/** Activity responses with a lookup map */
+export interface ActivityResponsesSummaryDto {
+  responses: ClientActivityResponseDto[]
+  responseMap: Record<string, ClientActivityResponseType>
+}
+
+/** Full shared trip proposal (extends TripShareDto) */
+export interface SharedTripProposalDto extends TripShareDto {
+  pricingVisible: boolean
+  currency: string
+  /** @deprecated Use proposedItineraries instead */
+  itinerary: SharedItineraryDto | null
+  /** All proposing itineraries with published content */
+  proposedItineraries: SharedItineraryDto[]
+  agent: SharedAgentProfileDto | null
+  primaryContactName: string | null
+  /** @deprecated Each itinerary has its own publishedVersion */
+  publishedVersion: number | null
+  /** ID of the itinerary the client has selected */
+  clientSelectedItineraryId: string | null
+}
+
+/** Client selects their preferred itinerary */
+export interface SelectItineraryDto {
+  itineraryId: string
+}
+
+/** Agent confirms client's selection */
+export interface ConfirmSelectionDto {
+  itineraryId: string
+}
+
+// ============================================================================
+// ITINERARY VERSIONING DTOs
+// ============================================================================
+
+/** Summary of a published itinerary version (for version history list) */
+export interface ItineraryVersionSummaryDto {
+  id: string
+  versionNumber: number
+  changeSummary: string | null
+  publishedByName: string | null
+  publishedAt: string
+}
+
+/** Request body for publishing an itinerary version */
+export interface PublishItineraryDto {
+  changeSummary?: string
 }

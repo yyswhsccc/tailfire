@@ -63,7 +63,7 @@ export class TemplateExtractorService {
     }
 
     // 2. Extract payload
-    const payload = await this.extractItineraryPayload(days)
+    const payload = await this._extractPayloadFromDays(days)
 
     // 3. Create template
     return this.itineraryTemplatesService.create({
@@ -133,9 +133,23 @@ export class TemplateExtractorService {
   }
 
   /**
+   * Extract itinerary payload directly from an itinerary ID.
+   * Public method for use by ItineraryCloneService and other consumers.
+   */
+  async extractItineraryPayload(itineraryId: string): Promise<ItineraryTemplatePayload> {
+    const days = await this.db.client
+      .select()
+      .from(this.db.schema.itineraryDays)
+      .where(eq(this.db.schema.itineraryDays.itineraryId, itineraryId))
+      .orderBy(asc(this.db.schema.itineraryDays.sequenceOrder))
+    if (days.length === 0) return { dayOffsets: [] }
+    return this._extractPayloadFromDays(days)
+  }
+
+  /**
    * Extract itinerary payload from days.
    */
-  private async extractItineraryPayload(
+  private async _extractPayloadFromDays(
     days: Array<typeof this.db.schema.itineraryDays.$inferSelect>
   ): Promise<ItineraryTemplatePayload> {
     // Get all activities for these days

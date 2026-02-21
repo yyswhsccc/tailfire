@@ -46,6 +46,7 @@ import {
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { DocumentUploader } from '@/components/document-uploader'
+import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
 import { SupplierCombobox } from '@/components/suppliers/supplier-combobox'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import type { PricingData, PricingBreakdownItem } from '@/lib/pricing'
@@ -59,7 +60,7 @@ import {
 import { scrollToFirstError } from '@/lib/validation/utils'
 
 /** Tab values for the package form - exported for use in page component */
-export type PackageTab = 'general' | 'documents' | 'booking'
+export type PackageTab = 'general' | 'documents' | 'booking' | 'comments'
 
 interface PackageFormProps {
   tripId: string
@@ -538,7 +539,7 @@ export function PackageForm({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PackageTab)}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             General Info
@@ -550,6 +551,9 @@ export function PackageForm({
           <TabsTrigger value="booking" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             Booking & Pricing
+          </TabsTrigger>
+          <TabsTrigger value="comments" className="flex items-center gap-2">
+            Comments
           </TabsTrigger>
         </TabsList>
 
@@ -775,6 +779,20 @@ export function PackageForm({
             userSplitValue={userProfile?.commissionSettings?.splitValue ?? null}
             userSplitType={userProfile?.commissionSettings?.splitType ?? null}
           />
+        </TabsContent>
+
+        <TabsContent value="comments" className="mt-6">
+          {isEditing && currentPackageId ? (
+            <ActivityCommentsPanel
+              tripId={tripId}
+              itineraryId=""
+              activityId={currentPackageId}
+            />
+          ) : (
+            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
+              Save the activity first to view comments.
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

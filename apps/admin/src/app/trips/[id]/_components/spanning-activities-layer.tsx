@@ -4,12 +4,15 @@ import type { ItineraryDayWithActivitiesDto } from '@tailfire/shared-types/api'
 import type { ActivityWithSpan } from '@/lib/spanning-activity-utils'
 import { SpanningActivityBar } from './spanning-activity-bar'
 import type { CruiseColorSet } from '@/lib/cruise-color-utils'
+import type { ClientActivityResponseType } from '@tailfire/shared-types/api'
 
 interface SpanningActivitiesLayerProps {
   spanningActivities: ActivityWithSpan[]
   days: ItineraryDayWithActivitiesDto[]
   itineraryId: string
   cruiseColorMap?: Map<string, CruiseColorSet>
+  responseMap?: Record<string, ClientActivityResponseType>
+  commentCounts?: Record<string, number>
 }
 
 /**
@@ -38,6 +41,8 @@ export function SpanningActivitiesLayer({
   days,
   itineraryId,
   cruiseColorMap,
+  responseMap,
+  commentCounts,
 }: SpanningActivitiesLayerProps) {
   // Don't render anything if no spanning activities
   if (spanningActivities.length === 0) {
@@ -69,6 +74,8 @@ export function SpanningActivitiesLayer({
           gridColumnStart={activity.spanStartIndex + 1}
           gridColumnSpan={activity.spanWidth}
           cruiseColor={cruiseColorMap?.get(activity.id)}
+          clientResponse={responseMap?.[activity.id] ?? null}
+          commentCount={commentCounts?.[activity.id]}
         />
       ))}
     </div>

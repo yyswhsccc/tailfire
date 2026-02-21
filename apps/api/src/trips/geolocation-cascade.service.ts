@@ -165,6 +165,13 @@ export class GeolocationCascadeService {
 
     if (updates.length > 0) {
       await Promise.all(updates)
+
+      // Mark itinerary as having unpublished changes
+      await this.db.client
+        .update(this.db.schema.itineraries)
+        .set({ hasUnpublishedChanges: true })
+        .where(eq(this.db.schema.itineraries.id, itineraryId))
+
       this.logger.log(`Applied cascade to ${updates.length} days in itinerary ${itineraryId}`)
     }
   }

@@ -306,6 +306,20 @@ export function usePublishTrip() {
   })
 }
 
+export function usePublishTripSnapshot() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (tripId: string) =>
+      api.post<TripResponseDto & {
+        versionNumber?: number
+        publishedItineraries?: Array<{ itineraryId: string; name: string; versionNumber: number }>
+      }>(`/trips/${tripId}/publish-snapshot`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: tripKeys.all })
+    },
+  })
+}
+
 export function useUnpublishTrip() {
   const queryClient = useQueryClient()
   return useMutation({

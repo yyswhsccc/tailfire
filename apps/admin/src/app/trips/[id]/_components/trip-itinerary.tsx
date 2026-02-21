@@ -24,6 +24,9 @@ import { ItineraryTableView } from './itinerary-table-view'
 import { CreateItineraryDialog } from './create-itinerary-dialog'
 import { ComponentLibrarySidebar } from './component-library-sidebar'
 import { AddDaysDialog } from './add-days-dialog'
+import { ClientFeedbackBanner } from './client-feedback-banner'
+import { useActivityResponses } from '@/hooks/use-activity-responses'
+import { useProposalComments } from '@/hooks/use-proposal-comments'
 
 type ViewMode = 'board' | 'table'
 
@@ -105,6 +108,20 @@ export function TripItinerary({ trip }: TripItineraryProps) {
 
   // Fetch days for DnD operations
   const { data: days } = useItineraryDaysWithActivities(selectedItinerary?.id || '')
+
+  // Client feedback data — only fetch for proposal-related statuses
+  const isProposalStatus = selectedItinerary && ['proposing', 'approved', 'declined'].includes(selectedItinerary.status)
+  const { data: activityResponsesData } = useActivityResponses(
+    trip.id,
+    selectedItinerary?.id || '',
+    isProposalStatus ? (selectedItinerary?.publishedVersion ?? null) : null,
+  )
+  const { data: commentsData } = useProposalComments(
+    trip.id,
+    selectedItinerary?.id || '',
+  )
+  const responseMap = isProposalStatus ? activityResponsesData?.responseMap : undefined
+  const commentCounts = isProposalStatus ? commentsData?.commentCounts : undefined
 
   // DnD sensors
   const sensors = useDndSensors()
@@ -574,6 +591,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
                 onSelectItinerary={handleSelectItinerary}
                 onCreateClick={() => setShowCreateDialog(true)}
                 isLoading={isLoading}
+                clientSelectedItineraryId={trip.clientSelectedItineraryId}
               />
             </div>
 
@@ -628,12 +646,21 @@ export function TripItinerary({ trip }: TripItineraryProps) {
             </div>
           </div>
 
+          {/* Client Feedback Banner */}
+          {selectedItinerary && isProposalStatus && (
+            <ClientFeedbackBanner
+              itinerary={selectedItinerary}
+              responseMap={responseMap}
+              commentCounts={commentCounts}
+            />
+          )}
+
           {/* Content with Empty State fallback */}
           {selectedItinerary ? (
             viewMode === 'board' ? (
-              <ItineraryDaysList trip={trip} itinerary={selectedItinerary} />
+              <ItineraryDaysList trip={trip} itinerary={selectedItinerary} responseMap={responseMap} commentCounts={commentCounts} />
             ) : (
-              <ItineraryTableView trip={trip} itinerary={selectedItinerary} />
+              <ItineraryTableView trip={trip} itinerary={selectedItinerary} responseMap={responseMap} commentCounts={commentCounts} />
             )
           ) : (
             <EmptyState

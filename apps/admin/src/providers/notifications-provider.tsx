@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from './auth-provider'
 import { notificationKeys } from '@/hooks/use-notifications'
+import { useToast } from '@/hooks/use-toast'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 interface NotificationsContextValue {
@@ -28,6 +29,7 @@ interface NotificationsProviderProps {
 export function NotificationsProvider({ children }: NotificationsProviderProps) {
   const queryClient = useQueryClient()
   const { claims } = useAuth()
+  const { toast } = useToast()
   const supabase = useMemo(() => createClient(), [])
 
   const userId = claims?.userId
@@ -58,6 +60,17 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
             // Invalidate queries to refresh data
             queryClient.invalidateQueries({ queryKey: notificationKeys.lists() })
             queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount() })
+
+            // Show toast for new notifications
+            if (payload.eventType === 'INSERT' && payload.new) {
+              const notif = payload.new as { title?: string; body?: string }
+              if (notif.title) {
+                toast({
+                  title: notif.title,
+                  description: notif.body || undefined,
+                })
+              }
+            }
 
             // If it's an update to a specific notification, invalidate its detail query
             if (payload.eventType === 'UPDATE' && payload.new?.id) {

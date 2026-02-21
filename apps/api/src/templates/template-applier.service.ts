@@ -151,6 +151,54 @@ export class TemplateApplierService {
   }
 
   /**
+   * Apply a raw payload directly to an existing itinerary (no template lookup).
+   * Used by ItineraryCloneService for duplication.
+   */
+  async applyPayloadToItinerary(
+    itineraryId: string,
+    _tripId: string,
+    payload: { dayOffsets: Array<{ dayIndex: number; activities: TemplateActivity[] }> },
+    anchorDateStr: string | null,
+    agencyId: string,
+  ): Promise<void> {
+    let anchorDate: Date | null = null
+    if (anchorDateStr) {
+      const parsed = parseISO(anchorDateStr)
+      anchorDate = isValid(parsed) ? parsed : null
+    }
+
+    if (!payload?.dayOffsets) return
+
+    const sortedDayOffsets = [...payload.dayOffsets].sort((a, b) => a.dayIndex - b.dayIndex)
+    const seenDayIndices = new Set<number>()
+
+    for (const dayOffset of sortedDayOffsets) {
+      if (seenDayIndices.has(dayOffset.dayIndex)) continue
+      seenDayIndices.add(dayOffset.dayIndex)
+      let day: { id: string }
+      let dayDate: Date | null = null
+
+      if (anchorDate) {
+        dayDate = addDays(anchorDate, dayOffset.dayIndex)
+        const dayDateStr = format(dayDate, 'yyyy-MM-dd')
+        day = await this.itineraryDaysService.findOrCreateByDate(itineraryId, dayDateStr)
+      } else {
+        const dayNumber = dayOffset.dayIndex + 1
+        day = await this.itineraryDaysService.create({
+          itineraryId,
+          dayNumber,
+          date: null,
+          title: `Day ${dayNumber}`,
+        })
+      }
+
+      for (const activity of dayOffset.activities || []) {
+        await this.createActivityFromTemplate(activity, day.id, dayDate, agencyId)
+      }
+    }
+  }
+
+  /**
    * Apply a package template to an existing itinerary.
    * Creates a package and inserts activities across days from anchor.
    *

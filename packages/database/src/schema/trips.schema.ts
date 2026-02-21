@@ -9,6 +9,8 @@ import { pgTable, uuid, varchar, text, date, decimal, boolean, timestamp, pgEnum
 import { relations } from 'drizzle-orm'
 import { contacts } from './contacts.schema'
 import { itineraryDays } from './itinerary-days.schema'
+import { agencies } from './agencies.schema'
+import { userProfiles } from './user-profiles.schema'
 
 // ============================================================================
 // ENUMS
@@ -57,7 +59,8 @@ export const itineraryStatusEnum = pgEnum('itinerary_status', [
   'draft',
   'proposing',  // was 'presented' - ready for client review
   'approved',   // was 'selected' - client approved this option
-  'archived'    // was 'rejected' - no longer active
+  'archived',   // was 'rejected' - no longer active
+  'declined'    // client explicitly declined the proposal
 ])
 
 export const activityEntityTypeEnum = pgEnum('activity_entity_type', [
@@ -158,6 +161,9 @@ export const trips = pgTable('trips', {
   isPublished: boolean('is_published').default(false).notNull(),
   shareToken: varchar('share_token', { length: 64 }),
   tripGroupId: uuid('trip_group_id'),
+
+  // Client's preferred itinerary selection (multi-itinerary proposals)
+  clientSelectedItineraryId: uuid('client_selected_itinerary_id').references(() => itineraries.id, { onDelete: 'set null' }),
 
   // Cover Photo (denormalized for quick access - synced from trip_media)
   coverPhotoUrl: text('cover_photo_url'),
@@ -360,10 +366,33 @@ export const itineraries = pgTable('itineraries', {
   // Ordering
   sequenceOrder: integer('sequence_order').default(0),
 
+  // Versioning (publish-gated itinerary content)
+  currentVersion: integer('current_version').notNull().default(0),
+  publishedVersion: integer('published_version'),
+  lastPublishedAt: timestamp('last_published_at', { withTimezone: true }),
+  hasUnpublishedChanges: boolean('has_unpublished_changes').notNull().default(false),
+
   // Audit Fields
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })
+
+// ============================================================================
+// TABLE: itinerary_versions (publish-gated snapshots)
+// ============================================================================
+
+export const itineraryVersions = pgTable('itinerary_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  itineraryId: uuid('itinerary_id').notNull().references(() => itineraries.id, { onDelete: 'cascade' }),
+  agencyId: uuid('agency_id').notNull().references(() => agencies.id, { onDelete: 'cascade' }),
+  versionNumber: integer('version_number').notNull(),
+  snapshot: jsonb('snapshot').notNull(),
+  changeSummary: text('change_summary'),
+  publishedBy: uuid('published_by').references(() => userProfiles.id, { onDelete: 'set null' }),
+  publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  uniqueVersion: unique().on(table.itineraryId, table.versionNumber),
+}))
 
 // ============================================================================
 // TABLE: activity_logs
@@ -417,6 +446,11 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   tripGroup: one(tripGroups, {
     fields: [trips.tripGroupId],
     references: [tripGroups.id]
+  }),
+  // Client's selected itinerary (multi-proposal)
+  clientSelectedItinerary: one(itineraries, {
+    fields: [trips.clientSelectedItineraryId],
+    references: [itineraries.id]
   }),
   // Media relation defined in trip-media.schema.ts to avoid circular imports
 }))
@@ -478,6 +512,14 @@ export const itinerariesRelations = relations(itineraries, ({ one, many }) => ({
     references: [trips.id]
   }),
   days: many(itineraryDays),
+  versions: many(itineraryVersions),
+}))
+
+export const itineraryVersionsRelations = relations(itineraryVersions, ({ one }) => ({
+  itinerary: one(itineraries, {
+    fields: [itineraryVersions.itineraryId],
+    references: [itineraries.id]
+  }),
 }))
 
 export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
