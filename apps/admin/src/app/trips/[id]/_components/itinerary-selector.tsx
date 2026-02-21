@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { Plus, Check, MoreVertical, Trash2, Pencil, FileText, Send, CheckCircle2, Archive, Library, Download, Globe, History } from 'lucide-react'
+import { Plus, Check, MoreVertical, Trash2, Pencil, FileText, Send, CheckCircle2, Archive, Library, Download, Globe, History, Copy, Star } from 'lucide-react'
 import type { ItineraryResponseDto } from '@tailfire/shared-types/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useLoading } from '@/context/loading-context'
-import { useDeleteItinerary, useSelectItinerary, useUpdateItineraryStatus, type ItineraryStatus } from '@/hooks/use-itineraries'
+import { useDeleteItinerary, useSelectItinerary, useUpdateItineraryStatus, useDuplicateItinerary, type ItineraryStatus } from '@/hooks/use-itineraries'
 import { usePublishItinerary } from '@/hooks/use-itinerary-versions'
 import { cn } from '@/lib/utils'
 import { FOCUS_VISIBLE_RING, SKELETON_BG } from '@/lib/itinerary-styles'
@@ -53,6 +53,8 @@ interface ItinerarySelectorProps {
   isLoading?: boolean
   /** Hide the Create and Import buttons (e.g., on Bookings page where they're not needed) */
   hideActionButtons?: boolean
+  /** ID of the itinerary the client selected (from trip.clientSelectedItineraryId) */
+  clientSelectedItineraryId?: string | null
 }
 
 /**
@@ -74,6 +76,7 @@ export function ItinerarySelector({
   onCreateClick,
   isLoading = false,
   hideActionButtons = false,
+  clientSelectedItineraryId,
 }: ItinerarySelectorProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -95,6 +98,7 @@ export function ItinerarySelector({
   const selectItinerary = useSelectItinerary(tripId)
   const updateStatus = useUpdateItineraryStatus(tripId)
   const publishItinerary = usePublishItinerary(tripId)
+  const duplicateItinerary = useDuplicateItinerary(tripId)
 
   // Status labels for toast messages
   const STATUS_LABELS: Record<ItineraryStatus, string> = {
@@ -220,6 +224,7 @@ export function ItinerarySelector({
           const isProposing = itinerary.status === 'proposing'
           const isApproved = itinerary.status === 'approved'
           const isArchived = itinerary.status === 'archived'
+          const isClientPick = clientSelectedItineraryId === itinerary.id
 
           return (
             <div key={itinerary.id} className="relative group flex items-center">
@@ -270,6 +275,12 @@ export function ItinerarySelector({
                   </Badge>
                 )}
 
+                {isClientPick && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-600" title="Client's selection">
+                    <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                  </span>
+                )}
+
                 {itinerary.hasUnpublishedChanges && (
                   <span className="h-2 w-2 rounded-full bg-amber-500 flex-shrink-0" title="Unpublished changes" />
                 )}
@@ -309,6 +320,27 @@ export function ItinerarySelector({
                   >
                     <Library className="h-4 w-4 mr-2" />
                     Save as Template
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={async () => {
+                      try {
+                        const result = await duplicateItinerary.mutateAsync(itinerary.id)
+                        toast({
+                          title: 'Duplicated',
+                          description: `"${result.name}" created.`,
+                        })
+                        onSelectItinerary(result)
+                      } catch {
+                        toast({
+                          title: 'Duplicate Failed',
+                          description: 'Could not duplicate itinerary. Please try again.',
+                          variant: 'destructive',
+                        })
+                      }
+                    }}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Duplicate
                   </DropdownMenuItem>
 
                   {(itinerary.status === 'proposing' || itinerary.status === 'approved') && (

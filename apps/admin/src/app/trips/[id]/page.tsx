@@ -35,7 +35,7 @@ import { useRouter } from 'next/navigation'
 import { DetailLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useTrip, useDeleteTrip, usePublishTrip, useUnpublishTrip, useDuplicateTrip } from '@/hooks/use-trips'
+import { useTrip, useDeleteTrip, usePublishTrip, usePublishTripSnapshot, useUnpublishTrip, useDuplicateTrip } from '@/hooks/use-trips'
 import { MoveToGroupDialog } from '@/components/trips/MoveToGroupDialog'
 import { TripOverview } from './_components/trip-overview'
 import { TripItinerary } from './_components/trip-itinerary'
@@ -397,6 +397,7 @@ export default function TripDetailPage() {
 
   const deleteTrip = useDeleteTrip()
   const publishTrip = usePublishTrip()
+  const publishSnapshot = usePublishTripSnapshot()
   const unpublishTrip = useUnpublishTrip()
   const duplicateTrip = useDuplicateTrip()
   const [showMoveToGroupDialog, setShowMoveToGroupDialog] = useState(false)
@@ -435,12 +436,31 @@ export default function TripDetailPage() {
   const handlePublish = async () => {
     if (!trip) return
     try {
-      const updated = await publishTrip.mutateAsync(trip.id)
-      const shareUrl = `${getClientOrigin()}/shared/trips/${updated.shareToken}`
+      const updated = await publishSnapshot.mutateAsync(trip.id)
+      const token = updated.shareToken || trip.shareToken
+      if (!token) {
+        toast({ title: 'Error', description: 'No share token generated. Try again.', variant: 'destructive' })
+        return
+      }
+      const shareUrl = `${getClientOrigin()}/shared/trips/${token}`
       await navigator.clipboard.writeText(shareUrl)
-      toast({ title: 'Trip published', description: 'Share link copied to clipboard.' })
-    } catch (error) {
-      toast({ title: 'Error', description: 'Failed to publish trip.', variant: 'destructive' })
+
+      // Multi-itinerary: show which itineraries were published
+      if (updated.publishedItineraries && updated.publishedItineraries.length > 0) {
+        const names = updated.publishedItineraries
+          .map((it) => `${it.name} v${it.versionNumber}`)
+          .join(', ')
+        toast({
+          title: `Published ${updated.publishedItineraries.length} itinerar${updated.publishedItineraries.length === 1 ? 'y' : 'ies'}`,
+          description: `${names}. Share link copied.`,
+        })
+      } else {
+        const versionLabel = updated.versionNumber ? ` (v${updated.versionNumber})` : ''
+        toast({ title: 'Published' + versionLabel, description: 'New version live for clients. Share link copied.' })
+      }
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || error?.message || 'Failed to publish trip.'
+      toast({ title: 'Error', description: msg, variant: 'destructive' })
     }
   }
 
@@ -698,9 +718,9 @@ export default function TripDetailPage() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {!trip?.isPublished ? (
-                  <DropdownMenuItem onClick={handlePublish} disabled={publishTrip.isPending}>
+                  <DropdownMenuItem onClick={handlePublish} disabled={publishSnapshot.isPending}>
                     <Send className="h-4 w-4 mr-2" />
-                    {publishTrip.isPending ? 'Publishing...' : 'Publish Trip'}
+                    {publishSnapshot.isPending ? 'Publishing...' : 'Publish Trip'}
                   </DropdownMenuItem>
                 ) : (
                   <>
@@ -748,9 +768,9 @@ export default function TripDetailPage() {
               <Eye className="h-4 w-4" />
               Preview
             </Button>
-            <Button size="sm" className="gap-1.5" onClick={handlePublish} disabled={publishTrip.isPending}>
+            <Button size="sm" className="gap-1.5" onClick={handlePublish} disabled={publishSnapshot.isPending}>
               <Send className="h-4 w-4" />
-              {publishTrip.isPending ? 'Publishing...' : 'Publish'}
+              {publishSnapshot.isPending ? 'Publishing...' : 'Publish'}
             </Button>
           </div>
         </div>

@@ -130,6 +130,22 @@ export function useDeleteItinerary(tripId: string) {
 }
 
 /**
+ * Duplicate an itinerary within the same trip
+ * Creates a copy with all days and activities
+ */
+export function useDuplicateItinerary(tripId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (itineraryId: string) =>
+      api.post<ItineraryResponseDto>(`/trips/${tripId}/itineraries/${itineraryId}/duplicate`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: itineraryKeys.list(tripId) })
+    },
+  })
+}
+
+/**
  * Update itinerary status
  * Specialized mutation for status transitions with proper cache invalidation
  * When status is set to 'approved', backend enforces single-approved rule
