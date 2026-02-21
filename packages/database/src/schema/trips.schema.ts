@@ -161,6 +161,9 @@ export const trips = pgTable('trips', {
   shareToken: varchar('share_token', { length: 64 }),
   tripGroupId: uuid('trip_group_id'),
 
+  // Client's preferred itinerary selection (multi-itinerary proposals)
+  clientSelectedItineraryId: uuid('client_selected_itinerary_id').references(() => itineraries.id, { onDelete: 'set null' }),
+
   // Cover Photo (denormalized for quick access - synced from trip_media)
   coverPhotoUrl: text('cover_photo_url'),
 
@@ -442,6 +445,11 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   tripGroup: one(tripGroups, {
     fields: [trips.tripGroupId],
     references: [tripGroups.id]
+  }),
+  // Client's selected itinerary (multi-proposal)
+  clientSelectedItinerary: one(itineraries, {
+    fields: [trips.clientSelectedItineraryId],
+    references: [itineraries.id]
   }),
   // Media relation defined in trip-media.schema.ts to avoid circular imports
 }))

@@ -841,6 +841,13 @@
       "when": 1771678800000,
       "tag": "20260221130000_phase2_client_feedback",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1771682400000,
+      "tag": "20260221140000_multi_itinerary_proposals",
+      "breakpoints": true
     }
   ]
 }
