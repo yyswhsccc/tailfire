@@ -27,6 +27,7 @@ import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
 import type { CruiseColorSet } from '@/lib/cruise-color-utils'
+import type { ClientActivityResponseType } from '@tailfire/shared-types/api'
 
 interface DayColumnProps {
   day: ItineraryDayWithActivitiesDto
@@ -36,9 +37,11 @@ interface DayColumnProps {
   /** Hide the header (rendered separately in DayHeadersRow) */
   hideHeader?: boolean
   cruiseColorMap?: Map<string, CruiseColorSet>
+  responseMap?: Record<string, ClientActivityResponseType>
+  commentCounts?: Record<string, number>
 }
 
-export function DayColumn({ day, itineraryId, filteredActivities, hideHeader, cruiseColorMap }: DayColumnProps) {
+export function DayColumn({ day, itineraryId, filteredActivities, hideHeader, cruiseColorMap, responseMap, commentCounts }: DayColumnProps) {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const [showEditModal, setShowEditModal] = useState(false)
@@ -156,6 +159,8 @@ export function DayColumn({ day, itineraryId, filteredActivities, hideHeader, cr
                 dayId={day.id}
                 dayDate={day.date}
                 cruiseColor={cruiseColorMap?.get(activity.id)}
+                clientResponse={responseMap?.[activity.id] ?? null}
+                commentCount={commentCounts?.[activity.id]}
               />
             ))}
           </div>

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { GripVertical, Pencil, Trash2, MoreHorizontal, Package } from 'lucide-react'
+import { GripVertical, Pencil, Trash2, MoreHorizontal, Package, Check, X, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
@@ -39,6 +39,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { ActivityIconBadge } from '@/components/ui/activity-icon-badge'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import type { CruiseColorSet } from '@/lib/cruise-color-utils'
+import type { ClientActivityResponseType } from '@tailfire/shared-types/api'
 
 interface ActivityListItemProps {
   itineraryId: string
@@ -46,9 +47,11 @@ interface ActivityListItemProps {
   dayId: string
   dayDate?: string | null
   cruiseColor?: CruiseColorSet
+  clientResponse?: ClientActivityResponseType | null
+  commentCount?: number
 }
 
-export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDate, cruiseColor }: ActivityListItemProps) {
+export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDate, cruiseColor, clientResponse, commentCount }: ActivityListItemProps) {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const { toast } = useToast()
@@ -202,6 +205,24 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                )}
+                {clientResponse === 'confirmed' && (
+                  <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium bg-emerald-100 text-emerald-800 flex-shrink-0">
+                    <Check className="h-2.5 w-2.5" />
+                    Client
+                  </span>
+                )}
+                {clientResponse === 'declined' && (
+                  <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium bg-red-100 text-red-800 flex-shrink-0">
+                    <X className="h-2.5 w-2.5" />
+                    Client
+                  </span>
+                )}
+                {!!commentCount && commentCount > 0 && (
+                  <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium bg-blue-100 text-blue-800 flex-shrink-0">
+                    <MessageSquare className="h-2.5 w-2.5" />
+                    {commentCount}
+                  </span>
                 )}
               </div>
             </div>

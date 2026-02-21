@@ -38,6 +38,7 @@ import {
   SendBookingConfirmationDto,
   CreateProposalCommentDto,
   CreateActivityResponseDto,
+  SelectItineraryDto,
   type BulkTripOperationResult,
   type TripFilterOptionsResponseDto,
 } from './dto'
@@ -169,22 +170,28 @@ export class TripsController {
 
   /**
    * Get shared trip by token (public, no auth)
-   * GET /trips/share/:token
+   * GET /trips/share/:token?preview=draft
+   * When preview=draft, serves live data instead of published snapshot.
    */
   @Public()
   @Get('share/:token')
-  async getSharedTrip(@Param('token') token: string) {
+  async getSharedTrip(
+    @Param('token') token: string,
+  ) {
     return this.tripsService.findByShareToken(token)
   }
 
   /**
    * Get comments for a shared proposal (public, no auth)
-   * GET /trips/share/:token/comments
+   * GET /trips/share/:token/comments?itineraryId=xxx
    */
   @Public()
   @Get('share/:token/comments')
-  async getProposalComments(@Param('token') token: string) {
-    return this.tripsService.getProposalComments(token)
+  async getProposalComments(
+    @Param('token') token: string,
+    @Query('itineraryId') itineraryId?: string,
+  ) {
+    return this.tripsService.getProposalComments(token, itineraryId)
   }
 
   /**
@@ -231,12 +238,15 @@ export class TripsController {
 
   /**
    * Get activity responses for the published version (public, no auth)
-   * GET /trips/share/:token/responses
+   * GET /trips/share/:token/responses?itineraryId=xxx
    */
   @Public()
   @Get('share/:token/responses')
-  async getActivityResponses(@Param('token') token: string) {
-    return this.tripsService.getActivityResponses(token)
+  async getActivityResponses(
+    @Param('token') token: string,
+    @Query('itineraryId') itineraryId?: string,
+  ) {
+    return this.tripsService.getActivityResponses(token, itineraryId)
   }
 
   /**
@@ -252,6 +262,21 @@ export class TripsController {
     @Body() body: { reason?: string },
   ) {
     return this.tripsService.declineProposal(token, body.reason)
+  }
+
+  /**
+   * Client selects their preferred itinerary (public, no auth, rate-limited)
+   * POST /trips/share/:token/select
+   */
+  @Public()
+  @Post('share/:token/select')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async selectItinerary(
+    @Param('token') token: string,
+    @Body() body: SelectItineraryDto,
+  ) {
+    return this.tripsService.selectItinerary(token, body.itineraryId)
   }
 
   /**
@@ -319,6 +344,22 @@ export class TripsController {
    *
    * Access check: User must have write access.
    */
+  /**
+   * Preview proposal with live data (authenticated admin endpoint)
+   * GET /trips/:id/preview-proposal
+   *
+   * Returns the same shape as the public proposal but uses live data.
+   * Access check: User must have write access.
+   */
+  @Get(':id/preview-proposal')
+  async previewProposal(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ) {
+    await this.tripAccessService.verifyWriteAccess(id, auth)
+    return this.tripsService.previewProposal(id)
+  }
+
   @Patch(':id/publish')
   async publishTrip(
     @GetAuthContext() auth: AuthContext,
@@ -326,6 +367,23 @@ export class TripsController {
   ) {
     await this.tripAccessService.verifyWriteAccess(id, auth)
     return this.tripsService.publishTrip(id, auth.userId)
+  }
+
+  /**
+   * Publish a trip snapshot (ensure published + create new version)
+   * POST /trips/:id/publish-snapshot
+   *
+   * Creates a new itinerary version snapshot for the selected itinerary.
+   * Also ensures the trip is published (has a share token).
+   * Access check: User must have write access.
+   */
+  @Post(':id/publish-snapshot')
+  async publishTripSnapshot(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ) {
+    await this.tripAccessService.verifyWriteAccess(id, auth)
+    return this.tripsService.publishTripSnapshot(id, auth.userId)
   }
 
   /**
@@ -640,5 +698,22 @@ export class TripsController {
   ) {
     await this.tripAccessService.verifyReadAccess(tripId, auth)
     return this.tripsService.getAgentComments(tripId, itineraryId, activityId)
+  }
+
+  /**
+   * Get activity responses for an itinerary (authenticated, for admin feedback view)
+   * GET /trips/:tripId/itineraries/:itineraryId/responses
+   *
+   * Returns client activity responses for the published version.
+   * Access check: User must have read access to the trip.
+   */
+  @Get(':tripId/itineraries/:itineraryId/responses')
+  async getAdminActivityResponses(
+    @GetAuthContext() auth: AuthContext,
+    @Param('tripId') tripId: string,
+    @Param('itineraryId') itineraryId: string,
+  ) {
+    await this.tripAccessService.verifyReadAccess(tripId, auth)
+    return this.tripsService.getAdminActivityResponses(tripId, itineraryId)
   }
 }

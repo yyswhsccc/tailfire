@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Pencil, Trash2, Check, X, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
@@ -30,19 +30,22 @@ import { useDeleteFlight } from '@/hooks/use-flights'
 import { ActivityIconBadge } from '@/components/ui/activity-icon-badge'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import type { CruiseColorSet } from '@/lib/cruise-color-utils'
+import type { ClientActivityResponseType } from '@tailfire/shared-types/api'
 
 interface ActivitySummaryItemProps {
   itineraryId: string
   activity: ActivityResponseDto
   dayId: string
   cruiseColor?: CruiseColorSet
+  clientResponse?: ClientActivityResponseType | null
+  commentCount?: number
 }
 
 /**
  * Compact activity item for the Trip Summary column.
  * Uses dropdown menu for actions to fit the narrow width.
  */
-export function ActivitySummaryItem({ itineraryId, activity, dayId, cruiseColor }: ActivitySummaryItemProps) {
+export function ActivitySummaryItem({ itineraryId, activity, dayId, cruiseColor, clientResponse, commentCount }: ActivitySummaryItemProps) {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const { toast } = useToast()
@@ -112,9 +115,27 @@ export function ActivitySummaryItem({ itineraryId, activity, dayId, cruiseColor 
           >
             {activity.name}
           </p>
-          <Badge variant="secondary" className="text-[10px] px-1 py-0">
-            {activity.status}
-          </Badge>
+          <div className="flex items-center gap-1 flex-wrap">
+            <Badge variant="secondary" className="text-[10px] px-1 py-0">
+              {activity.status}
+            </Badge>
+            {clientResponse === 'confirmed' && (
+              <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium bg-emerald-100 text-emerald-800">
+                <Check className="h-2 w-2" />
+              </span>
+            )}
+            {clientResponse === 'declined' && (
+              <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium bg-red-100 text-red-800">
+                <X className="h-2 w-2" />
+              </span>
+            )}
+            {!!commentCount && commentCount > 0 && (
+              <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium bg-blue-100 text-blue-800">
+                <MessageSquare className="h-2 w-2" />
+                {commentCount}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Actions Dropdown */}

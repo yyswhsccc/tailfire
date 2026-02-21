@@ -7,7 +7,7 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger, Inject, forwardRef } from '@nestjs/common'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import * as crypto from 'crypto'
-import { eq, and, or, gte, lte, ilike, sql, desc, asc, inArray } from 'drizzle-orm'
+import { eq, and, or, gte, lte, ilike, sql, desc, asc, inArray, isNull } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TripBookedEvent } from './events/trip-booked.event'
 import { TripCancelledEvent } from './events/trip-cancelled.event'
@@ -1369,6 +1369,7 @@ export class TripsService {
       coverPhotoUrl: trip.coverPhotoUrl || null,
       shareToken: trip.shareToken || null,
       tripGroupId: trip.tripGroupId || null,
+      clientSelectedItineraryId: trip.clientSelectedItineraryId || null,
       createdAt: trip.createdAt.toISOString(),
       updatedAt: trip.updatedAt.toISOString(),
     }
@@ -1380,19 +1381,11 @@ export class TripsService {
 
   async publishTrip(id: string, actorId: string): Promise<TripResponseDto> {
     const trip = await this.findOne(id)
-    if (trip.isPublished) {
-      // Trip already published — still ensure a version snapshot exists
-      const itineraries = await this.db.client.query.itineraries.findMany({
-        where: eq(this.db.schema.itineraries.tripId, id),
-      })
-      const selectedItinerary = this.resolvePublishedItinerary(itineraries)
-      if (selectedItinerary && !selectedItinerary.publishedVersion) {
-        await this.itineraryVersionsService.publishVersion(id, selectedItinerary.id, actorId, 'Initial publish')
-      }
+    if (trip.isPublished && trip.shareToken) {
       return trip
     }
 
-    const shareToken = crypto.randomBytes(32).toString('hex')
+    const shareToken = trip.shareToken || crypto.randomBytes(32).toString('hex')
     const [updated] = await this.db.client
       .update(this.db.schema.trips)
       .set({
@@ -1412,18 +1405,50 @@ export class TripsService {
       metadata: { shareToken },
     })
 
-    // Auto-publish v1 of the selected itinerary so clients see a snapshot immediately
-    // Fix G: Let error propagate — trip publish must fail atomically if snapshot fails
+    return this.mapToResponseDto(updated)
+  }
+
+  /**
+   * Publish version snapshots of ALL proposing itineraries.
+   * Ensures the trip is published first (creates shareToken if needed).
+   * All-or-nothing: if any itinerary publish fails, none are published.
+   */
+  async publishTripSnapshot(id: string, actorId: string): Promise<TripResponseDto & { publishedItineraries?: Array<{ itineraryId: string; name: string; versionNumber: number }> }> {
+    // Ensure trip is published (idempotent)
+    let trip = await this.publishTrip(id, actorId)
+
     const itineraries = await this.db.client.query.itineraries.findMany({
       where: eq(this.db.schema.itineraries.tripId, id),
     })
-    const selectedItinerary = this.resolvePublishedItinerary(itineraries)
 
-    if (selectedItinerary && !selectedItinerary.publishedVersion) {
-      await this.itineraryVersionsService.publishVersion(id, selectedItinerary.id, actorId, 'Initial publish')
+    const proposing = itineraries.filter((it) => it.status === 'proposing')
+    if (proposing.length === 0) {
+      // Fallback to legacy single-itinerary behavior
+      const selectedItinerary = itineraries.find((it) => it.isSelected)
+        || itineraries.find((it) => it.status === 'approved')
+        || itineraries[0] || null
+
+      if (!selectedItinerary) {
+        throw new BadRequestException('No itinerary found to publish. Create an itinerary first.')
+      }
+
+      const result = await this.itineraryVersionsService.publishVersion(id, selectedItinerary.id, actorId)
+      trip = await this.findOne(id)
+      this.logger.log(`publishTripSnapshot: tripId=${id}, version=${result.versionNumber}`)
+      return { ...trip, publishedItineraries: [{ itineraryId: selectedItinerary.id, name: selectedItinerary.name, versionNumber: result.versionNumber }] }
     }
 
-    return this.mapToResponseDto(updated)
+    // All-or-nothing: publish all proposing itineraries
+    const results: Array<{ itineraryId: string; name: string; versionNumber: number }> = []
+    for (const itin of proposing) {
+      const result = await this.itineraryVersionsService.publishVersion(id, itin.id, actorId)
+      results.push({ itineraryId: itin.id, name: itin.name, versionNumber: result.versionNumber })
+    }
+
+    // Re-fetch trip to get updated state
+    trip = await this.findOne(id)
+    this.logger.log(`publishTripSnapshot: tripId=${id}, published ${results.length} itineraries`)
+    return { ...trip, publishedItineraries: results }
   }
 
   async unpublishTrip(id: string, actorId: string): Promise<TripResponseDto> {
@@ -1510,32 +1535,39 @@ export class TripsService {
     // Determine pricing visibility
     const pricingVisible = trip.pricingVisibility === 'show_all'
 
-    // Fix E: Use centralized publish-aware selection
-    const selectedItinerary = this.resolvePublishedItinerary(itineraries)
+    // Multi-itinerary: include 'proposing' always, plus 'approved' (so client can see their approved choice)
+    // Legacy fallback: approved itineraries without clientSelectedItineraryId still appear
+    const qualifyingItineraries = itineraries.filter(
+      (it) => it.status === 'proposing' || it.status === 'approved',
+    )
 
-    // Build full proposal if an itinerary exists (publish-gated)
-    let itineraryDto: SharedItineraryDto | null = null
-    if (selectedItinerary) {
-      if (selectedItinerary.publishedVersion) {
+    // Build proposed itineraries from published snapshots
+    const proposedItineraries: SharedItineraryDto[] = []
+    for (const itin of qualifyingItineraries) {
+      let dto: SharedItineraryDto | null = null
+      if (itin.publishedVersion) {
         // STRICT: Once published, always serve snapshot — never leak live drafts
-        const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(selectedItinerary.id)
+        const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(itin.id)
         if (snapshot) {
-          itineraryDto = snapshot
+          dto = snapshot
+          dto.publishedVersion = itin.publishedVersion
         }
-        // If snapshot lookup fails (shouldn't happen), return null itinerary rather than leaking live data
       } else {
         // LEGACY FALLBACK: Never-published trips still show live data for backward compat
-        itineraryDto = await this.buildProposalItinerary(
-          selectedItinerary,
-          pricingVisible,
-        )
+        dto = await this.buildProposalItinerary(itin, pricingVisible)
+        if (dto) {
+          dto.publishedVersion = itin.publishedVersion
+        }
       }
-
-      // Include publishedVersion on the itinerary DTO for client-side response tracking
-      if (itineraryDto) {
-        itineraryDto.publishedVersion = selectedItinerary.publishedVersion
+      if (dto) {
+        proposedItineraries.push(dto)
       }
     }
+
+    // Legacy compat: pick client-selected or first
+    const selectedId = trip.clientSelectedItineraryId
+    const legacyItinerary = proposedItineraries.find((it) => it.id === selectedId)
+      || proposedItineraries[0] || null
 
     const primaryContactName = primaryContact
       ? [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(' ') || null
@@ -1560,7 +1592,8 @@ export class TripsService {
         startDate: it.startDate,
         endDate: it.endDate,
       })),
-      itinerary: itineraryDto,
+      itinerary: legacyItinerary,
+      proposedItineraries,
       agent: agentProfile
         ? {
             firstName: agentProfile.firstName,
@@ -1571,8 +1604,139 @@ export class TripsService {
           }
         : null,
       primaryContactName,
-      publishedVersion: selectedItinerary?.publishedVersion ?? null,
+      publishedVersion: legacyItinerary?.publishedVersion ?? null,
+      clientSelectedItineraryId: trip.clientSelectedItineraryId,
     }
+  }
+
+  /**
+   * Preview proposal with live data (authenticated admin endpoint).
+   * Used by the admin "Preview" button to see current draft state.
+   */
+  async previewProposal(tripId: string): Promise<SharedTripProposalDto> {
+    const trip = await this.findOne(tripId)
+    if (!trip) {
+      throw new NotFoundException('Trip not found')
+    }
+
+    const itineraries = await this.db.client
+      .select()
+      .from(this.db.schema.itineraries)
+      .where(eq(this.db.schema.itineraries.tripId, tripId))
+      .orderBy(asc(this.db.schema.itineraries.sequenceOrder))
+
+    const pricingVisible = trip.pricingVisibility === 'show_all'
+
+    // Build all proposing itineraries with LIVE data
+    const proposing = itineraries.filter((it) => it.status === 'proposing')
+    const proposedItineraries: SharedItineraryDto[] = []
+    for (const itin of proposing) {
+      const dto = await this.buildProposalItinerary(itin, pricingVisible)
+      if (dto) {
+        dto.publishedVersion = itin.publishedVersion
+        proposedItineraries.push(dto)
+      }
+    }
+
+    const legacyItinerary = proposedItineraries[0] || null
+
+    // Get agent profile
+    let agentProfile = null
+    if (trip.ownerId) {
+      const [profile] = await this.db.client
+        .select({
+          firstName: this.db.schema.userProfiles.firstName,
+          lastName: this.db.schema.userProfiles.lastName,
+          avatarUrl: this.db.schema.userProfiles.avatarUrl,
+          publicPhone: this.db.schema.userProfiles.publicPhone,
+          bio: this.db.schema.userProfiles.bio,
+        })
+        .from(this.db.schema.userProfiles)
+        .where(eq(this.db.schema.userProfiles.id, trip.ownerId))
+        .limit(1)
+      if (profile) {
+        agentProfile = profile
+      }
+    }
+
+    // Get primary contact name
+    let primaryContactName: string | null = null
+    if (trip.primaryContactId) {
+      const [contact] = await this.db.client
+        .select({
+          firstName: this.db.schema.contacts.firstName,
+          lastName: this.db.schema.contacts.lastName,
+        })
+        .from(this.db.schema.contacts)
+        .where(eq(this.db.schema.contacts.id, trip.primaryContactId))
+        .limit(1)
+      if (contact) {
+        primaryContactName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || null
+      }
+    }
+
+    return {
+      id: trip.id,
+      name: trip.name,
+      description: trip.description,
+      tripType: trip.tripType,
+      startDate: trip.startDate,
+      endDate: trip.endDate,
+      coverPhotoUrl: trip.coverPhotoUrl,
+      pricingVisible,
+      currency: trip.currency || 'USD',
+      itineraries: itineraries.map((it) => ({
+        id: it.id,
+        name: it.name,
+        description: it.description,
+        coverPhoto: it.coverPhoto,
+        overview: it.overview,
+        startDate: it.startDate,
+        endDate: it.endDate,
+      })),
+      itinerary: legacyItinerary,
+      proposedItineraries,
+      agent: agentProfile,
+      primaryContactName,
+      publishedVersion: legacyItinerary?.publishedVersion ?? null,
+      clientSelectedItineraryId: trip.clientSelectedItineraryId,
+    }
+  }
+
+  // ============================================================================
+  // CLIENT ITINERARY SELECTION
+  // ============================================================================
+
+  /**
+   * Client selects their preferred itinerary from multiple proposals.
+   * Selection is reversible until an itinerary is approved.
+   */
+  async selectItinerary(token: string, itineraryId: string) {
+    const { trip, itineraries } = await this.resolveShareToken(token)
+
+    // Verify the itinerary belongs to this trip and is proposing
+    const target = itineraries.find((it) => it.id === itineraryId && it.status === 'proposing')
+    if (!target) {
+      throw new BadRequestException('Itinerary not available for selection')
+    }
+
+    // Cannot change if already approved
+    const approved = itineraries.find((it) => it.status === 'approved')
+    if (approved) {
+      throw new BadRequestException('An itinerary has already been approved')
+    }
+
+    await this.db.client.update(this.db.schema.trips)
+      .set({ clientSelectedItineraryId: itineraryId, updatedAt: new Date() })
+      .where(eq(this.db.schema.trips.id, trip.id))
+
+    this.eventEmitter.emit('proposal.itinerary_selected', {
+      tripId: trip.id,
+      itineraryId,
+      itineraryName: target.name,
+    })
+
+    return { success: true, selectedItineraryId: itineraryId }
   }
 
   // ============================================================================
@@ -1605,20 +1769,28 @@ export class TripsService {
       .where(eq(this.db.schema.itineraries.tripId, trip.id))
       .orderBy(asc(this.db.schema.itineraries.sequenceOrder))
 
-    // Fix E: Use centralized publish-aware selection
-    const selectedItinerary = this.resolvePublishedItinerary(itineraries)
+    // Multi-itinerary: resolve the selected itinerary based on client selection or legacy logic
+    const selectedItinerary = this.resolveSelectedItinerary(trip, itineraries)
 
     return { trip, selectedItinerary, itineraries }
   }
 
   /**
-   * Fix E: Centralized publish-aware itinerary selection.
-   * Priority: isSelected > approved status > first by sequenceOrder.
-   * Prefers an itinerary with a publishedVersion when the primary selection has none.
+   * Resolve the selected itinerary for share endpoints.
+   * Multi-itinerary: uses clientSelectedItineraryId if set.
+   * Legacy: falls back to isSelected > approved > first.
    */
-  private resolvePublishedItinerary(itineraries: any[]): any | null {
+  private resolveSelectedItinerary(trip: any, itineraries: any[]): any | null {
+    // Multi-itinerary: prefer client's selection
+    if (trip.clientSelectedItineraryId) {
+      const clientSelected = itineraries.find((it) => it.id === trip.clientSelectedItineraryId)
+      if (clientSelected) return clientSelected
+    }
+
+    // Legacy fallback
     let selected = itineraries.find((it) => it.isSelected)
       || itineraries.find((it) => it.status === 'approved')
+      || itineraries.find((it) => it.status === 'proposing')
       || itineraries[0] || null
 
     // Prefer published itinerary if selected has no published version
@@ -1631,25 +1803,42 @@ export class TripsService {
   }
 
   /**
-   * Get all comments for a proposal (public, no auth)
+   * Get all comments for a proposal (public, no auth).
+   * Scoped by itineraryId and filtered to the current published version.
    */
-  async getProposalComments(token: string): Promise<ProposalCommentsResponseDto> {
-    const { trip, selectedItinerary } = await this.resolveShareToken(token)
+  async getProposalComments(token: string, itineraryId?: string): Promise<ProposalCommentsResponseDto> {
+    const { trip, selectedItinerary, itineraries } = await this.resolveShareToken(token)
 
-    if (!selectedItinerary) {
+    // Resolve which itinerary to use: explicit param > selected > legacy
+    let targetItinerary = selectedItinerary
+    if (itineraryId) {
+      targetItinerary = itineraries.find((it) => it.id === itineraryId) || selectedItinerary
+    }
+
+    if (!targetItinerary) {
       return { comments: [], commentCounts: {} }
+    }
+
+    const publishedVersion = targetItinerary.publishedVersion
+
+    // Build filter conditions: tripId + itineraryId + not deleted
+    const conditions = [
+      eq(this.db.schema.proposalComments.tripId, trip.id),
+      eq(this.db.schema.proposalComments.itineraryId, targetItinerary.id),
+      eq(this.db.schema.proposalComments.isDeleted, false),
+    ]
+
+    // Version-scoped: only show comments for current published version (or null for legacy)
+    if (publishedVersion) {
+      conditions.push(eq(this.db.schema.proposalComments.versionNumber, publishedVersion))
+    } else {
+      conditions.push(isNull(this.db.schema.proposalComments.versionNumber))
     }
 
     const rows = await this.db.client
       .select()
       .from(this.db.schema.proposalComments)
-      .where(
-        and(
-          eq(this.db.schema.proposalComments.tripId, trip.id),
-          eq(this.db.schema.proposalComments.itineraryId, selectedItinerary.id),
-          eq(this.db.schema.proposalComments.isDeleted, false),
-        ),
-      )
+      .where(and(...conditions))
       .orderBy(asc(this.db.schema.proposalComments.createdAt))
 
     const comments: ProposalCommentDto[] = rows.map((row) => ({
@@ -1682,24 +1871,34 @@ export class TripsService {
    * Create a client comment on a proposal (public, no auth)
    * Fix F: Validate activityId/dayId against snapshot when published.
    * Change 5: Accept dayId, auto-set versionNumber, emit event.
+   * Change 6: Accept itineraryId for multi-itinerary scoping.
    */
   async createProposalComment(
     token: string,
-    dto: { activityId?: string; dayId?: string; content: string },
+    dto: { itineraryId?: string; activityId?: string; dayId?: string; content: string },
   ): Promise<ProposalCommentDto> {
-    const { trip, selectedItinerary } = await this.resolveShareToken(token)
+    const { trip, selectedItinerary, itineraries } = await this.resolveShareToken(token)
 
-    if (!selectedItinerary) {
+    // Resolve target itinerary: explicit param > selected > legacy
+    let targetItinerary = selectedItinerary
+    if (dto.itineraryId) {
+      targetItinerary = itineraries.find((it) => it.id === dto.itineraryId) || selectedItinerary
+    }
+
+    if (!targetItinerary) {
       throw new BadRequestException('No itinerary found for this proposal')
     }
+
+    // Alias for backward compat with the rest of the method
+    const selectedItineraryRef = targetItinerary
 
     if (!trip.primaryContactId) {
       throw new BadRequestException('No primary contact set for this trip — cannot post client comment')
     }
 
     // Fix F: Validate activityId/dayId against snapshot when published
-    if (dto.activityId && selectedItinerary.publishedVersion) {
-      const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(selectedItinerary.id)
+    if (dto.activityId && selectedItineraryRef.publishedVersion) {
+      const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(selectedItineraryRef.id)
       const snapshotActivityIds = snapshot?.days?.flatMap(d => d.activities?.map(a => a.id) ?? []) ?? []
       if (!snapshotActivityIds.includes(dto.activityId)) {
         throw new BadRequestException('Activity not found in published version')
@@ -1716,7 +1915,7 @@ export class TripsService {
         .where(
           and(
             eq(this.db.schema.itineraryActivities.id, dto.activityId),
-            eq(this.db.schema.itineraryDays.itineraryId, selectedItinerary.id),
+            eq(this.db.schema.itineraryDays.itineraryId, selectedItineraryRef.id),
           ),
         )
         .limit(1)
@@ -1725,8 +1924,8 @@ export class TripsService {
       }
     }
 
-    if (dto.dayId && selectedItinerary.publishedVersion) {
-      const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(selectedItinerary.id)
+    if (dto.dayId && selectedItineraryRef.publishedVersion) {
+      const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(selectedItineraryRef.id)
       const snapshotDayIds = snapshot?.days?.map(d => d.id) ?? []
       if (!snapshotDayIds.includes(dto.dayId)) {
         throw new BadRequestException('Day not found in published version')
@@ -1751,13 +1950,13 @@ export class TripsService {
     }
 
     // Auto-set versionNumber from current publishedVersion
-    const versionNumber = selectedItinerary.publishedVersion || null
+    const versionNumber = selectedItineraryRef.publishedVersion || null
 
     const [comment] = await this.db.client
       .insert(this.db.schema.proposalComments)
       .values({
         tripId: trip.id,
-        itineraryId: selectedItinerary.id,
+        itineraryId: selectedItineraryRef.id,
         activityId: dto.activityId || null,
         dayId: dto.dayId || null,
         versionNumber,
@@ -1775,7 +1974,7 @@ export class TripsService {
     // Emit event for notifications
     this.eventEmitter.emit('proposal.comment_created', {
       tripId: trip.id,
-      itineraryId: selectedItinerary.id,
+      itineraryId: selectedItineraryRef.id,
       commentId: comment.id,
       authorType: 'client',
       authorName,
@@ -1927,26 +2126,60 @@ export class TripsService {
   }
 
   /**
-   * Approve a proposal (public, no auth — idempotent)
+   * Approve a proposal (public, no auth — idempotent).
+   * Multi-itinerary: requires clientSelectedItineraryId to be set first.
+   * Single-itinerary: auto-selects the only proposing itinerary.
    */
   async approveProposal(token: string): Promise<{ success: boolean; status: string }> {
-    const { trip, selectedItinerary } = await this.resolveShareToken(token)
+    const { trip, itineraries } = await this.resolveShareToken(token)
 
-    if (!selectedItinerary) {
-      throw new BadRequestException('No itinerary found for this proposal')
-    }
+    const proposing = itineraries.filter((it) => it.status === 'proposing')
 
-    // Idempotent: already approved
-    if (selectedItinerary.status === 'approved') {
+    // Idempotent: check if any itinerary is already approved
+    const alreadyApproved = itineraries.find((it) => it.status === 'approved')
+    if (alreadyApproved) {
       return { success: true, status: 'approved' }
     }
 
-    // Use itinerariesService.update which handles single-approved rule
+    // Determine target itinerary
+    let targetId = trip.clientSelectedItineraryId
+
+    // Auto-select for single-itinerary proposals
+    if (!targetId && proposing.length === 1) {
+      targetId = proposing[0]!.id
+    }
+
+    if (!targetId) {
+      throw new BadRequestException('Please select an itinerary option before approving')
+    }
+
+    // Verify target is actually proposing
+    const target = proposing.find((it) => it.id === targetId)
+    if (!target) {
+      throw new BadRequestException('Selected itinerary is not available for approval')
+    }
+
+    // Set the selected itinerary to 'approved' + isSelected
     await this.itinerariesService.update(
-      selectedItinerary.id,
-      { status: 'approved' },
+      targetId,
+      { status: 'approved', isSelected: true },
       trip.id,
     )
+
+    // Also persist the selection if it wasn't already set
+    if (!trip.clientSelectedItineraryId) {
+      await this.db.client.update(this.db.schema.trips)
+        .set({ clientSelectedItineraryId: targetId, updatedAt: new Date() })
+        .where(eq(this.db.schema.trips.id, trip.id))
+    }
+
+    // Emit event for notifications
+    this.eventEmitter.emit('proposal.approved', {
+      tripId: trip.id,
+      tripName: trip.name,
+      itineraryId: targetId,
+      itineraryName: target.name,
+    })
 
     return { success: true, status: 'approved' }
   }
@@ -1958,22 +2191,32 @@ export class TripsService {
   /**
    * Create or update a client's response to an activity (confirm/decline).
    * Upserts per (itinerary, activity, version).
+   * Change 6: Accept itineraryId for multi-itinerary scoping.
    */
   async createActivityResponse(
     token: string,
-    dto: { activityId: string; response: 'confirmed' | 'declined'; note?: string },
+    dto: { itineraryId?: string; activityId: string; response: 'confirmed' | 'declined'; note?: string },
   ) {
-    const { trip, selectedItinerary } = await this.resolveShareToken(token)
+    const { trip, selectedItinerary, itineraries } = await this.resolveShareToken(token)
 
-    if (!selectedItinerary) {
+    // Resolve target itinerary: explicit param > selected > legacy
+    let targetItinerary = selectedItinerary
+    if (dto.itineraryId) {
+      targetItinerary = itineraries.find((it) => it.id === dto.itineraryId) || selectedItinerary
+    }
+
+    if (!targetItinerary) {
       throw new BadRequestException('No itinerary found for this proposal')
     }
-    if (!selectedItinerary.publishedVersion) {
+    if (!targetItinerary.publishedVersion) {
       throw new BadRequestException('No published version — cannot respond to activities')
     }
 
+    // Alias for readability
+    const selectedItineraryRef = targetItinerary
+
     // Validate activityId against snapshot
-    const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(selectedItinerary.id)
+    const snapshot = await this.itineraryVersionsService.getPublishedSnapshot(selectedItineraryRef.id)
     const snapshotActivityIds = snapshot?.days?.flatMap(d => d.activities?.map(a => a.id) ?? []) ?? []
     if (!snapshotActivityIds.includes(dto.activityId)) {
       throw new BadRequestException('Activity not found in published version')
@@ -1997,9 +2240,9 @@ export class TripsService {
       .insert(this.db.schema.clientActivityResponses)
       .values({
         tripId: trip.id,
-        itineraryId: selectedItinerary.id,
+        itineraryId: selectedItineraryRef.id,
         activityId: dto.activityId,
-        versionNumber: selectedItinerary.publishedVersion,
+        versionNumber: selectedItineraryRef.publishedVersion,
         response: dto.response,
         contactId: trip.primaryContactId || null,
         contactName,
@@ -2031,7 +2274,7 @@ export class TripsService {
     // Emit event for notifications
     this.eventEmitter.emit('proposal.activity_response', {
       tripId: trip.id,
-      itineraryId: selectedItinerary.id,
+      itineraryId: selectedItineraryRef.id,
       activityId: dto.activityId,
       activityName,
       response: dto.response,
@@ -2051,11 +2294,18 @@ export class TripsService {
 
   /**
    * Get all activity responses for the current published version.
+   * Change 6: Accept itineraryId for multi-itinerary scoping.
    */
-  async getActivityResponses(token: string) {
-    const { selectedItinerary } = await this.resolveShareToken(token)
+  async getActivityResponses(token: string, itineraryId?: string) {
+    const { selectedItinerary, itineraries } = await this.resolveShareToken(token)
 
-    if (!selectedItinerary || !selectedItinerary.publishedVersion) {
+    // Resolve target itinerary: explicit param > selected > legacy
+    let targetItinerary = selectedItinerary
+    if (itineraryId) {
+      targetItinerary = itineraries.find((it) => it.id === itineraryId) || selectedItinerary
+    }
+
+    if (!targetItinerary || !targetItinerary.publishedVersion) {
       return { responses: [], responseMap: {} }
     }
 
@@ -2064,8 +2314,8 @@ export class TripsService {
       .from(this.db.schema.clientActivityResponses)
       .where(
         and(
-          eq(this.db.schema.clientActivityResponses.itineraryId, selectedItinerary.id),
-          eq(this.db.schema.clientActivityResponses.versionNumber, selectedItinerary.publishedVersion),
+          eq(this.db.schema.clientActivityResponses.itineraryId, targetItinerary.id),
+          eq(this.db.schema.clientActivityResponses.versionNumber, targetItinerary.publishedVersion),
         ),
       )
 
@@ -2128,6 +2378,53 @@ export class TripsService {
   }
 
   // ============================================================================
+  // ADMIN ACTIVITY RESPONSES (authenticated)
+  // ============================================================================
+
+  /**
+   * Get activity responses for an itinerary's published version (admin endpoint).
+   * Returns responses scoped to the published version only.
+   */
+  async getAdminActivityResponses(
+    tripId: string,
+    itineraryId: string,
+  ): Promise<{ responses: any[]; responseMap: Record<string, string> }> {
+    // Validate itinerary belongs to trip (throws NotFoundException if not found)
+    const itinerary = await this.itinerariesService.findOne(itineraryId, tripId)
+
+    if (!itinerary.publishedVersion) {
+      return { responses: [], responseMap: {} }
+    }
+
+    const rows = await this.db.client
+      .select()
+      .from(this.db.schema.clientActivityResponses)
+      .where(
+        and(
+          eq(this.db.schema.clientActivityResponses.itineraryId, itineraryId),
+          eq(this.db.schema.clientActivityResponses.versionNumber, itinerary.publishedVersion),
+        ),
+      )
+
+    const responses = rows.map((r) => ({
+      id: r.id,
+      activityId: r.activityId,
+      versionNumber: r.versionNumber,
+      response: r.response,
+      contactName: r.contactName,
+      note: r.note,
+      createdAt: r.createdAt.toISOString(),
+    }))
+
+    const responseMap: Record<string, string> = {}
+    for (const r of responses) {
+      responseMap[r.activityId] = r.response
+    }
+
+    return { responses, responseMap }
+  }
+
+  // ============================================================================
   // AGENT COMMENTS QUERY (authenticated)
   // ============================================================================
 
@@ -2139,7 +2436,7 @@ export class TripsService {
     tripId: string,
     itineraryId: string,
     activityId?: string,
-  ): Promise<ProposalCommentDto[]> {
+  ): Promise<ProposalCommentsResponseDto> {
     const conditions = [
       eq(this.db.schema.proposalComments.tripId, tripId),
       eq(this.db.schema.proposalComments.itineraryId, itineraryId),
@@ -2156,7 +2453,7 @@ export class TripsService {
       .where(and(...conditions))
       .orderBy(asc(this.db.schema.proposalComments.createdAt))
 
-    return rows.map((row) => ({
+    const comments = rows.map((row) => ({
       id: row.id,
       activityId: row.activityId,
       dayId: row.dayId || null,
@@ -2166,6 +2463,20 @@ export class TripsService {
       content: row.content,
       createdAt: row.createdAt.toISOString(),
     }))
+
+    // Build comment counts keyed by activityId and dayId
+    const commentCounts: Record<string, number> = {}
+    for (const c of comments) {
+      if (c.activityId) {
+        commentCounts[c.activityId] = (commentCounts[c.activityId] || 0) + 1
+      }
+      if (c.dayId) {
+        const key = `day:${c.dayId}`
+        commentCounts[key] = (commentCounts[key] || 0) + 1
+      }
+    }
+
+    return { comments, commentCounts }
   }
 
   // ============================================================================
