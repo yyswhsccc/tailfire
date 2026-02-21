@@ -17,6 +17,7 @@ import { ItineraryTemplatesService } from './itinerary-templates.service'
 import { PackageTemplatesService } from './package-templates.service'
 import { TemplateApplierService } from './template-applier.service'
 import { TemplateExtractorService } from './template-extractor.service'
+import { ItineraryCloneService } from './itinerary-clone.service'
 
 // Controllers
 import { ItineraryTemplatesController } from './itinerary-templates.controller'
@@ -40,12 +41,14 @@ import { TemplateSaveController } from './template-save.controller'
     PackageTemplatesService,
     TemplateApplierService,
     TemplateExtractorService,
+    ItineraryCloneService,
   ],
   exports: [
     ItineraryTemplatesService,
     PackageTemplatesService,
     TemplateApplierService,
     TemplateExtractorService,
+    ItineraryCloneService,
   ],
 })
 export class TemplatesModule {}
