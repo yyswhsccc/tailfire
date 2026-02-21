@@ -34,19 +34,18 @@ import { DashboardNav } from "./DashboardNav";
 
 export function DashboardHeader() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, logout } = useAuth();
   const { consultant } = useConsultant();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
-    await signOut();
+    await logout();
     router.push("/login");
   };
 
-  const userInitials = user?.email
-    ? user.email
-        .split("@")[0]!
-        .split(".")
+  const userInitials = user?.name
+    ? user.name
+        .split(" ")
         .map((n) => n[0])
         .join("")
         .toUpperCase()
@@ -158,7 +157,7 @@ export function DashboardHeader() {
                     </AvatarFallback>
                   </Avatar>
                   <span className="hidden md:inline text-white text-sm">
-                    {user?.user_metadata?.full_name || user?.email}
+                    {user?.name}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
@@ -168,7 +167,7 @@ export function DashboardHeader() {
               >
                 <DropdownMenuLabel className="text-white">
                   <div className="flex flex-col">
-                    <span>{user?.user_metadata?.full_name || user?.email}</span>
+                    <span>{user?.name}</span>
                     <span className="text-xs text-phoenix-text-muted font-normal">
                       {user?.email}
                     </span>

@@ -144,6 +144,12 @@ export const contacts = pgTable('contacts', {
   // Timezone (Phase 3.5 - Date/Time Management)
   timezone: varchar('timezone', { length: 64 }), // IANA timezone identifier (e.g., 'America/Toronto')
 
+  // Portal Authentication
+  portalUserId: uuid('portal_user_id'),
+  portalInvitedAt: timestamp('portal_invited_at', { withTimezone: true }),
+  portalInvitedBy: uuid('portal_invited_by'),
+  portalActivatedAt: timestamp('portal_activated_at', { withTimezone: true }),
+
   // Audit Fields
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

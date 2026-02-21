@@ -7,6 +7,7 @@ import type {
   UpdateContactDto,
   ContactFilterDto,
   PaginatedContactsResponseDto,
+  PortalInviteResponseDto,
 } from '@tailfire/shared-types/api'
 
 // Query Keys
@@ -181,6 +182,22 @@ export function useUpdateContactStatus() {
       queryClient.invalidateQueries({
         queryKey: contactKeys.detail(variables.id),
       })
+      queryClient.invalidateQueries({ queryKey: contactKeys.lists() })
+    },
+  })
+}
+
+/**
+ * Send portal invite to a contact
+ */
+export function useSendPortalInvite() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.post<PortalInviteResponseDto>(`/contacts/${id}/portal-invite`, {}),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: contactKeys.detail(id) })
       queryClient.invalidateQueries({ queryKey: contactKeys.lists() })
     },
   })

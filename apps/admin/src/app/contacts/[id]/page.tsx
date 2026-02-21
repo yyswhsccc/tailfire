@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useContact, useUpdateContact, useContactTrips } from '@/hooks/use-contacts'
+import { useContact, useUpdateContact, useContactTrips, useSendPortalInvite } from '@/hooks/use-contacts'
 import { useTasks } from '@/hooks/use-tasks'
 import { TaskList } from '@/app/tasks/_components/task-list'
 import { TaskFormDialog } from '@/app/tasks/_components/task-form-dialog'
@@ -124,6 +124,46 @@ function getLifecycleLabel(contactType: string | null, contactStatus: string | n
 }
 
 type EditSection = 'identity' | 'contact' | 'professional' | 'personal' | 'address' | 'lifecycle' | null
+
+/**
+ * Portal Invite Button component
+ */
+function PortalInviteButton({ contactId, email, isResend }: { contactId: string; email: string; isResend?: boolean }) {
+  const { toast } = useToast()
+  const sendPortalInvite = useSendPortalInvite()
+
+  return (
+    <Button
+      size="sm"
+      variant={isResend ? 'outline' : 'default'}
+      className="mt-2 h-7 text-xs"
+      disabled={sendPortalInvite.isPending}
+      onClick={() => {
+        sendPortalInvite.mutate(contactId, {
+          onSuccess: () => {
+            toast({
+              title: isResend ? 'Invitation resent' : 'Portal invitation sent',
+              description: `Portal invitation sent to ${email}`,
+            })
+          },
+          onError: (error) => {
+            toast({
+              title: 'Failed to send invitation',
+              description: error instanceof Error ? error.message : 'Something went wrong',
+              variant: 'destructive',
+            })
+          },
+        })
+      }}
+    >
+      {sendPortalInvite.isPending
+        ? 'Sending...'
+        : isResend
+          ? 'Resend Portal Invite'
+          : 'Invite to Portal'}
+    </Button>
+  )
+}
 
 /**
  * Contact Detail Page
@@ -473,7 +513,23 @@ export default function ContactDetailPage() {
                           Marketable
                         </Badge>
                       )}
+
+                      {/* Portal Status Badge */}
+                      {contact.portalStatus === 'active' && (
+                        <Badge variant="booked">Portal Active</Badge>
+                      )}
+                      {contact.portalStatus === 'pending' && (
+                        <Badge variant="traveling">Portal Pending</Badge>
+                      )}
                     </div>
+
+                    {/* Portal Invite Section */}
+                    {contact.email && contact.portalStatus === 'not_invited' && (
+                      <PortalInviteButton contactId={contact.id} email={contact.email} />
+                    )}
+                    {contact.email && contact.portalStatus === 'pending' && (
+                      <PortalInviteButton contactId={contact.id} email={contact.email} isResend />
+                    )}
                   </div>
                 </div>
               </CardContent>

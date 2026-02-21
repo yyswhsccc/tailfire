@@ -20,11 +20,13 @@ import { ContactDocumentsService } from './contact-documents.service'
 import { ContactLoyaltyProgramsController } from './contact-loyalty-programs.controller'
 import { ContactLoyaltyProgramsService } from './contact-loyalty-programs.service'
 import { ActivityLogsModule } from '../activity-logs/activity-logs.module'
+import { EmailModule } from '../email/email.module'
 import { TripsModule } from '../trips/trips.module'
 
 @Module({
   imports: [
     ActivityLogsModule,
+    EmailModule,
     forwardRef(() => TripsModule), // forwardRef to avoid circular dependency (TripsModule already imports ContactsModule)
   ],
   controllers: [
