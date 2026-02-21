@@ -463,6 +463,67 @@ export class NotificationEventsListener {
     this.logger.debug(`Sent proposal.declined notification to user ${trip.ownerId} for trip ${event.tripId}`)
   }
 
+  /**
+   * Handle proposal.itinerary_selected event
+   * Notify trip owner when a client selects a preferred itinerary
+   */
+  @OnEvent('proposal.itinerary_selected')
+  async handleItinerarySelected(event: {
+    tripId: string
+    itineraryId: string
+    itineraryName: string
+  }): Promise<void> {
+    const trip = await this.getTrip(event.tripId)
+    if (!trip || !trip.ownerId) return
+
+    await this.notificationService.send({
+      userId: trip.ownerId,
+      category: 'collaboration',
+      title: 'Itinerary Selected',
+      body: `Client selected "${event.itineraryName}" for "${trip.name}"`,
+      actionUrl: `/trips/${event.tripId}`,
+      data: {
+        tripId: event.tripId,
+        itineraryId: event.itineraryId,
+        itineraryName: event.itineraryName,
+        notificationType: 'proposal.itinerary_selected',
+      },
+    })
+
+    this.logger.debug(`Sent proposal.itinerary_selected notification to user ${trip.ownerId} for trip ${event.tripId}`)
+  }
+
+  /**
+   * Handle proposal.approved event
+   * Notify trip owner when a client approves the proposal
+   */
+  @OnEvent('proposal.approved')
+  async handleProposalApproved(event: {
+    tripId: string
+    tripName: string
+    itineraryId: string
+    itineraryName: string
+  }): Promise<void> {
+    const trip = await this.getTrip(event.tripId)
+    if (!trip || !trip.ownerId) return
+
+    await this.notificationService.send({
+      userId: trip.ownerId,
+      category: 'collaboration',
+      title: 'Proposal Approved',
+      body: `Client approved "${event.itineraryName}" for "${event.tripName}"`,
+      actionUrl: `/trips/${event.tripId}`,
+      data: {
+        tripId: event.tripId,
+        itineraryId: event.itineraryId,
+        itineraryName: event.itineraryName,
+        notificationType: 'proposal.approved',
+      },
+    })
+
+    this.logger.debug(`Sent proposal.approved notification to user ${trip.ownerId} for trip ${event.tripId}`)
+  }
+
   // =========================================================================
   // Helper Methods
   // =========================================================================

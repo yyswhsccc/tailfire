@@ -20,6 +20,7 @@ import {
 import { ApiTags } from '@nestjs/swagger'
 import { ItinerariesService } from './itineraries.service'
 import { ItineraryVersionsService } from './itinerary-versions.service'
+import { ItineraryCloneService } from '../templates/itinerary-clone.service'
 import { TripAccessService } from './trip-access.service'
 import {
   CreateItineraryDto,
@@ -41,6 +42,7 @@ export class ItinerariesController {
   constructor(
     private readonly itinerariesService: ItinerariesService,
     private readonly itineraryVersionsService: ItineraryVersionsService,
+    private readonly itineraryCloneService: ItineraryCloneService,
     private readonly tripAccessService: TripAccessService,
   ) {}
 
@@ -110,6 +112,23 @@ export class ItinerariesController {
   ): Promise<ItineraryResponseDto> {
     await this.tripAccessService.verifyWriteAccess(tripId, auth)
     return this.itinerariesService.selectItinerary(id, tripId)
+  }
+
+  /**
+   * Duplicate an itinerary within the same trip
+   * POST /trips/:tripId/itineraries/:id/duplicate
+   *
+   * Creates a copy of the itinerary with all days and activities.
+   * Access check: User must have write access to the trip.
+   */
+  @Post(':id/duplicate')
+  async duplicateItinerary(
+    @GetAuthContext() auth: AuthContext,
+    @Param('tripId') tripId: string,
+    @Param('id') id: string,
+  ): Promise<ItineraryResponseDto> {
+    await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    return this.itineraryCloneService.duplicateItinerary(tripId, id, auth.userId)
   }
 
   /**

@@ -21,6 +21,7 @@ import { FinancialsModule } from '../financials/financials.module'
 import { ContactsModule } from '../contacts/contacts.module'
 import { AutomationModule } from '../automation/automation.module'
 import { EmailModule } from '../email/email.module'
+import { TemplatesModule } from '../templates/templates.module'
 
 // Services
 import { TripsService } from './trips.service'
@@ -91,6 +92,7 @@ import { TripSharesService } from './trip-shares.service'
     EmailModule, // For booking confirmation emails
     forwardRef(() => ContactsModule), // For ContactAccessService (access control)
     forwardRef(() => AutomationModule), // For trip status auto-transitions
+    forwardRef(() => TemplatesModule), // For ItineraryCloneService (duplication)
   ],
   controllers: [
     TripsController,

@@ -7,6 +7,10 @@ import { IsString, IsOptional, IsUUID, MaxLength, MinLength } from 'class-valida
 export class CreateProposalCommentDto {
   @IsOptional()
   @IsUUID()
+  itineraryId?: string
+
+  @IsOptional()
+  @IsUUID()
   activityId?: string
 
   @IsOptional()

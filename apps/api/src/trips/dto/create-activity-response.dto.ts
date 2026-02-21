@@ -5,6 +5,10 @@
 import { IsString, IsOptional, IsUUID, IsIn, MaxLength } from 'class-validator'
 
 export class CreateActivityResponseDto {
+  @IsOptional()
+  @IsUUID()
+  itineraryId?: string
+
   @IsUUID()
   activityId!: string
 

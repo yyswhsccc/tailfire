@@ -54,3 +54,6 @@ export { PublishItineraryBodyDto } from './publish-itinerary.dto'
 
 // Activity Response DTOs
 export { CreateActivityResponseDto } from './create-activity-response.dto'
+
+// Itinerary Selection DTOs
+export { SelectItineraryDto } from './select-itinerary.dto'
