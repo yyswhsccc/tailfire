@@ -8,7 +8,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { eq, and, desc, asc, ilike, or, gte, lte, sql } from 'drizzle-orm'
 import { getResendClient } from './resend.client'
-import { getPasswordResetTemplate, getWelcomeTemplate, getInviteTemplate } from './templates'
+import { getPasswordResetTemplate, getWelcomeTemplate, getInviteTemplate, getClientPortalInviteTemplate } from './templates'
 import { getEmailDomainFilter } from './email-domain-filter'
 import { DatabaseService } from '../db/database.service'
 import type { EmailLogsFilterDto } from './dto'
@@ -448,5 +448,31 @@ export class EmailService {
     })
     this.logger.log('Invite email sent')
     this.logger.debug(`Invite email sent to ${email}`)
+  }
+
+  async sendClientPortalInviteEmail(
+    email: string,
+    inviteLink: string,
+    firstName: string,
+    agencyId: string,
+    agentName?: string,
+    contactId?: string,
+  ): Promise<EmailResult> {
+    const html = getClientPortalInviteTemplate({ inviteLink, firstName, agentName })
+    const result = await this.sendEmail({
+      to: [email],
+      subject: 'Access Your Phoenix Voyages Travel Portal',
+      html,
+      agencyId,
+      contactId,
+      templateSlug: 'client-portal-invite',
+      variables: {
+        invite_link: inviteLink,
+        'contact.first_name': firstName,
+        agent_name: agentName || '',
+      },
+    })
+    this.logger.log(`Client portal invite email sent to ${email}`)
+    return result
   }
 }

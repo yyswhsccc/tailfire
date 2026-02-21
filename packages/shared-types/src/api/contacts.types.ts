@@ -347,6 +347,11 @@ export interface ContactResponseDto {
   // Date/Time Management (Phase 3.5)
   timezone: string | null // IANA timezone identifier (e.g., 'America/Toronto')
 
+  // Portal
+  portalUserId: string | null
+  portalStatus: 'not_invited' | 'pending' | 'active' // computed
+  portalInvitedAt: string | null
+
   // Audit
   createdAt: string // ISO timestamp
   updatedAt: string // ISO timestamp
@@ -488,4 +493,15 @@ export interface ContactShareResponseDto {
  */
 export interface UpdateContactOwnerDto {
   ownerId: string | null // null = agency-wide contact
+}
+
+// ============================================================================
+// PORTAL DTOs
+// ============================================================================
+
+export interface PortalInviteResponseDto {
+  contactId: string
+  portalUserId: string
+  email: string
+  inviteSent: boolean
 }

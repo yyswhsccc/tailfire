@@ -2,114 +2,68 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ArrowLeft,
   Calendar,
   Filter,
-  MapPin,
-  MoreVertical,
-  Plus,
+  Plane,
   Search,
 } from "lucide-react";
+import { usePortalTrips } from "@/hooks/use-portal-data";
 import {
   Button,
   Card,
   CardContent,
   Badge,
   Input,
-  Progress,
+  Skeleton,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
 } from "@tailfire/ui-public";
 
-// Mock trip data
-const trips = [
-  {
-    id: "trip-1",
-    name: "Mediterranean Cruise",
-    destination: "Greece & Italy",
-    image: "/destinations/santorini.jpg",
-    startDate: "June 15, 2025",
-    endDate: "June 28, 2025",
-    status: "Confirmed",
-    progress: 85,
-    travelers: 2,
-    totalCost: 8500,
-    paidAmount: 7225,
-  },
-  {
-    id: "trip-2",
-    name: "Safari Adventure",
-    destination: "Tanzania",
-    image: "/destinations/safari.jpg",
-    startDate: "September 5, 2025",
-    endDate: "September 15, 2025",
-    status: "Pending Payment",
-    progress: 45,
-    travelers: 4,
-    totalCost: 12000,
-    paidAmount: 5400,
-  },
-  {
-    id: "trip-3",
-    name: "Northern Lights Expedition",
-    destination: "Iceland",
-    image: "/destinations/iceland.jpg",
-    startDate: "December 1, 2025",
-    endDate: "December 8, 2025",
-    status: "Planning",
-    progress: 20,
-    travelers: 2,
-    totalCost: 6800,
-    paidAmount: 1360,
-  },
-];
+function getStatusBadgeClass(status: string) {
+  switch (status) {
+    case "confirmed":
+    case "in_progress":
+      return "bg-green-600 text-white border-0";
+    case "booked":
+      return "bg-blue-600 text-white border-0";
+    case "completed":
+      return "bg-phoenix-gold text-white border-0";
+    default:
+      return "bg-phoenix-orange text-white border-0";
+  }
+}
 
-const pastTrips = [
-  {
-    id: "past-1",
-    name: "Japanese Cultural Journey",
-    destination: "Japan",
-    image: "/destinations/japan.jpg",
-    startDate: "March 10, 2024",
-    endDate: "March 24, 2024",
-    status: "Completed",
-    progress: 100,
-    travelers: 2,
-  },
-];
+function formatTripStatus(status: string) {
+  return status
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export default function TripsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("upcoming");
+  const { data: allTrips = [], isLoading } = usePortalTrips();
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Confirmed":
-        return "bg-green-600";
-      case "Pending Payment":
-        return "bg-phoenix-orange";
-      case "Planning":
-        return "bg-blue-600";
-      case "Completed":
-        return "bg-phoenix-gold";
-      default:
-        return "bg-gray-600";
-    }
-  };
+  const upcomingTrips = allTrips.filter((t) => t.status !== "completed");
+  const pastTrips = allTrips.filter((t) => t.status === "completed");
 
-  const displayedTrips = activeTab === "upcoming" ? trips : pastTrips;
-  const filteredTrips = displayedTrips.filter(
-    (trip) =>
-      trip.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      trip.destination.toLowerCase().includes(searchQuery.toLowerCase())
+  const displayedTrips = activeTab === "upcoming" ? upcomingTrips : pastTrips;
+  const filteredTrips = displayedTrips.filter((trip) =>
+    trip.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -145,15 +99,6 @@ export default function TripsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Button
-            variant="outline"
-            className="border-phoenix-gold/30 text-phoenix-gold hover:bg-phoenix-gold/10"
-          >
-            <Filter className="h-4 w-4 mr-2" /> Filter
-          </Button>
-          <Button className="btn-phoenix-primary">
-            <Plus className="h-4 w-4 mr-2" /> New Trip Request
-          </Button>
         </div>
       </div>
 
@@ -164,7 +109,7 @@ export default function TripsPage() {
             value="upcoming"
             className="data-[state=active]:bg-phoenix-gold data-[state=active]:text-white text-phoenix-text-light"
           >
-            Upcoming ({trips.length})
+            Upcoming ({upcomingTrips.length})
           </TabsTrigger>
           <TabsTrigger
             value="past"
@@ -175,94 +120,82 @@ export default function TripsPage() {
         </TabsList>
 
         <TabsContent value={activeTab} className="pt-6">
-          {filteredTrips.length > 0 ? (
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              <Skeleton className="h-48 w-full bg-phoenix-charcoal/30 rounded-lg" />
+              <Skeleton className="h-48 w-full bg-phoenix-charcoal/30 rounded-lg" />
+              <Skeleton className="h-48 w-full bg-phoenix-charcoal/30 rounded-lg" />
+            </div>
+          ) : filteredTrips.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredTrips.map((trip) => (
                 <Card
                   key={trip.id}
                   className="bg-phoenix-charcoal/50 border-phoenix-gold/30 overflow-hidden hover:border-phoenix-gold/50 transition-all"
                 >
-                  <div className="relative h-48">
-                    <Image
-                      src={trip.image}
-                      alt={trip.destination}
-                      fill
-                      className="object-cover"
-                    />
-                    <div className="absolute top-3 right-3">
-                      <Badge className={`${getStatusColor(trip.status)} text-white border-0`}>
-                        {trip.status}
-                      </Badge>
+                  {trip.coverImageUrl ? (
+                    <div
+                      className="relative h-48 bg-cover bg-center"
+                      style={{ backgroundImage: `url(${trip.coverImageUrl})` }}
+                    >
+                      <div className="absolute top-3 right-3">
+                        <Badge className={getStatusBadgeClass(trip.status)}>
+                          {formatTripStatus(trip.status)}
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="relative h-48 bg-gradient-to-br from-phoenix-gold/20 to-phoenix-charcoal/80 flex items-center justify-center">
+                      <Plane className="h-16 w-16 text-phoenix-gold/40" />
+                      <div className="absolute top-3 right-3">
+                        <Badge className={getStatusBadgeClass(trip.status)}>
+                          {formatTripStatus(trip.status)}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
                   <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-white text-lg">{trip.name}</h3>
-                        <div className="flex items-center gap-1 text-phoenix-text-muted text-sm mt-1">
-                          <MapPin className="h-4 w-4" />
-                          {trip.destination}
-                        </div>
+                    <div>
+                      <h3 className="font-semibold text-white text-lg">
+                        {trip.name}
+                      </h3>
+                    </div>
+
+                    <div className="flex items-center gap-4 mt-3 text-sm text-phoenix-text-muted">
+                      {trip.startDate && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          {formatDate(trip.startDate)}
+                          {trip.endDate && ` - ${formatDate(trip.endDate)}`}
+                        </span>
+                      )}
+                    </div>
+
+                    {trip.tripType && (
+                      <div className="mt-2">
+                        <Badge
+                          variant="outline"
+                          className="border-phoenix-gold/30 text-phoenix-text-muted text-xs"
+                        >
+                          {trip.tripType}
+                        </Badge>
                       </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-phoenix-text-muted hover:text-white"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="bg-phoenix-charcoal border-phoenix-gold/30">
-                          <DropdownMenuItem className="text-phoenix-text-light hover:bg-phoenix-gold/10">
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-phoenix-text-light hover:bg-phoenix-gold/10">
-                            Download Itinerary
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-phoenix-text-light hover:bg-phoenix-gold/10">
-                            View Documents
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-
-                    <div className="flex items-center gap-4 mt-4 text-sm text-phoenix-text-muted">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {trip.startDate}
-                      </span>
-                      <span>{trip.travelers} travelers</span>
-                    </div>
-
-                    <div className="mt-4">
-                      <div className="flex justify-between text-xs text-phoenix-text-muted mb-1">
-                        <span>Trip Progress</span>
-                        <span>{trip.progress}%</span>
-                      </div>
-                      <Progress value={trip.progress} className="h-2" />
-                    </div>
-
-                    <div className="mt-4 pt-4 border-t border-phoenix-gold/20">
-                      <Button className="w-full btn-phoenix-primary">View Trip Details</Button>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
             </div>
           ) : (
             <div className="text-center py-12">
-              <MapPin className="h-12 w-12 mx-auto text-phoenix-text-muted mb-4" />
+              <Plane className="h-12 w-12 mx-auto text-phoenix-text-muted mb-4" />
               <h3 className="text-xl font-medium text-white">No trips found</h3>
               <p className="text-phoenix-text-muted mt-2">
                 {searchQuery
                   ? `No trips matching "${searchQuery}"`
-                  : "You don't have any trips yet. Start planning your next adventure!"}
+                  : activeTab === "upcoming"
+                    ? "You don't have any upcoming trips yet. Your trips will appear here once your advisor creates them."
+                    : "No past trips to show."}
               </p>
-              <Button className="mt-6 btn-phoenix-primary">
-                <Plus className="h-4 w-4 mr-2" /> Request a New Trip
-              </Button>
             </div>
           )}
         </TabsContent>

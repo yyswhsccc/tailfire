@@ -10,7 +10,9 @@ import { PassportModule } from '@nestjs/passport'
 import { JwtModule } from '@nestjs/jwt'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { JwtStrategy } from './strategies/jwt.strategy'
+import { PortalJwtStrategy } from './strategies/portal-jwt.strategy'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
+import { PortalAuthGuard } from './guards/portal-auth.guard'
 import { RolesGuard } from './guards/roles.guard'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
@@ -30,7 +32,7 @@ import { EmailModule } from '../email/email.module'
     EmailModule, // Required for password reset emails
   ],
   controllers: [AuthController],
-  providers: [JwtStrategy, JwtAuthGuard, RolesGuard, AuthService],
-  exports: [JwtStrategy, JwtAuthGuard, RolesGuard, PassportModule, JwtModule, AuthService],
+  providers: [JwtStrategy, PortalJwtStrategy, JwtAuthGuard, PortalAuthGuard, RolesGuard, AuthService],
+  exports: [JwtStrategy, PortalJwtStrategy, JwtAuthGuard, PortalAuthGuard, RolesGuard, PassportModule, JwtModule, AuthService],
 })
 export class AuthModule {}

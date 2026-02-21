@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useMockAuth } from "@/lib/mock-auth";
+import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@tailfire/ui-public";
 
 type AuthGuardProps = {
@@ -12,7 +12,7 @@ type AuthGuardProps = {
 };
 
 export function AuthGuard({ children, fallback, redirectTo }: AuthGuardProps) {
-  const { user, loading } = useMockAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   // Show loading state while checking auth

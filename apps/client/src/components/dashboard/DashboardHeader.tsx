@@ -13,7 +13,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useMockAuth } from "@/lib/mock-auth";
+import { useAuth } from "@/lib/auth";
 import { useConsultant } from "@/context/consultant-context";
 import {
   Button,
@@ -34,12 +34,12 @@ import { DashboardNav } from "./DashboardNav";
 
 export function DashboardHeader() {
   const router = useRouter();
-  const { user, logout } = useMockAuth();
+  const { user, logout } = useAuth();
   const { consultant } = useConsultant();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push("/login");
   };
 

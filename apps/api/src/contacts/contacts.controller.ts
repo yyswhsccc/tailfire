@@ -34,6 +34,7 @@ import type {
   ContactResponseDto,
   PaginatedContactsResponseDto,
   UpdateContactOwnerDto,
+  PortalInviteResponseDto,
 } from '../../../../packages/shared-types/src/api'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
@@ -282,6 +283,27 @@ export class ContactsController {
       }
     }
     return this.contactsService.updateMarketingConsent(id, dto, auth.agencyId)
+  }
+
+  /**
+   * Send portal invitation to a contact
+   * POST /contacts/:id/portal-invite
+   * - Admins can invite any contact
+   * - Users can only invite contacts they own
+   */
+  @Post(':id/portal-invite')
+  async sendPortalInvite(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<PortalInviteResponseDto> {
+    // Check ownership for non-admins
+    if (auth.role !== 'admin') {
+      const existing = await this.contactsService.findOne(id, auth.agencyId)
+      if (existing.ownerId !== null && existing.ownerId !== auth.userId) {
+        throw new ForbiddenException('You can only invite contacts you own')
+      }
+    }
+    return this.contactsService.sendPortalInvite(id, auth.userId, auth.agencyId)
   }
 
   /**

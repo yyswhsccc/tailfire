@@ -14,6 +14,33 @@ export interface AuthContext {
   userStatus: UserStatus
 }
 
+export interface PortalAuthContext {
+  userId: string
+  email: string
+  contactId: string
+  agencyId: string
+}
+
+export interface PortalJwtPayload {
+  sub: string
+  email: string
+  user_id?: string
+  portal_user?: boolean
+  contact_id?: string
+  agency_id?: string
+  iat: number
+  exp: number
+  aud: string
+  iss: string
+  app_metadata?: {
+    portal_user?: boolean
+    contact_id?: string
+    agency_id?: string
+    provider?: string
+    providers?: string[]
+  }
+}
+
 export interface JwtPayload {
   sub: string // user id
   email: string

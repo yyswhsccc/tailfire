@@ -1,5 +1,21 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+async function activatePortalAccount(supabase: SupabaseClient) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+      await fetch(`${apiUrl}/portal/activate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      }).catch(() => {}) // Non-blocking, ignore errors
+    }
+  } catch {
+    // Non-blocking activation — don't fail the auth callback
+  }
+}
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -13,6 +29,8 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // Fire portal activation (non-blocking)
+      await activatePortalAccount(supabase)
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
@@ -29,6 +47,8 @@ export async function GET(request: Request) {
       if (type === 'recovery') {
         return NextResponse.redirect(`${origin}/reset-password`)
       }
+      // Fire portal activation (non-blocking)
+      await activatePortalAccount(supabase)
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
