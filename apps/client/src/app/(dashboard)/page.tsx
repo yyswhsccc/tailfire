@@ -4,13 +4,11 @@ import Link from "next/link";
 import {
   Briefcase,
   Calendar,
-  CreditCard,
   FileText,
-  MessageSquare,
-  Users,
   ArrowRight,
   Plane,
-  MapPin,
+  Mail,
+  User,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { usePortalProfile, usePortalTrips, usePortalDocuments } from "@/hooks/use-portal-data";
@@ -29,11 +27,8 @@ import {
 
 const quickActions = [
   { icon: Briefcase, label: "My Trips", href: "/trips", color: "text-blue-400" },
-  { icon: Users, label: "Travelers", href: "/travelers", color: "text-green-400" },
-  { icon: MessageSquare, label: "Messages", href: "/messages", color: "text-purple-400" },
   { icon: FileText, label: "Documents", href: "/documents", color: "text-orange-400" },
-  { icon: CreditCard, label: "Payments", href: "/payments", color: "text-pink-400" },
-  { icon: Calendar, label: "Preferences", href: "/preferences", color: "text-cyan-400" },
+  { icon: User, label: "My Profile", href: "/travelers", color: "text-purple-400" },
 ];
 
 function getStatusBadgeClass(status: string) {
@@ -88,25 +83,17 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white font-display">
-            Welcome back, {firstName}!
-          </h1>
-          <p className="text-phoenix-text-muted mt-1">
-            Here&apos;s an overview of your travel plans
-          </p>
-        </div>
-        <Link href="/messages">
-          <Button className="btn-phoenix-primary">
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Message Your Advisor
-          </Button>
-        </Link>
+      <div>
+        <h1 className="text-3xl font-bold text-white font-display">
+          Welcome back, {firstName}!
+        </h1>
+        <p className="text-phoenix-text-muted mt-1">
+          Here&apos;s an overview of your travel plans
+        </p>
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {quickActions.map((action) => {
           const Icon = action.icon;
           return (
@@ -210,29 +197,25 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : (
-                <>
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-16 w-16 border-2 border-phoenix-gold">
-                      <AvatarFallback className="bg-phoenix-gold text-white text-xl">
-                        {advisorInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-medium text-white">{advisorName}</h3>
-                      {agent?.email && (
-                        <p className="text-sm text-phoenix-text-muted">{agent.email}</p>
-                      )}
-                    </div>
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-16 w-16 border-2 border-phoenix-gold">
+                    <AvatarFallback className="bg-phoenix-gold text-white text-xl">
+                      {advisorInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="font-medium text-white">{advisorName}</h3>
+                    {agent?.email && (
+                      <a
+                        href={`mailto:${agent.email}`}
+                        className="text-sm text-phoenix-gold hover:underline flex items-center gap-1 mt-1"
+                      >
+                        <Mail className="h-3.5 w-3.5" />
+                        {agent.email}
+                      </a>
+                    )}
                   </div>
-                  <div className="mt-4 space-y-2">
-                    <Link href="/messages">
-                      <Button className="w-full btn-phoenix-primary">
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Send Message
-                      </Button>
-                    </Link>
-                  </div>
-                </>
+                </div>
               )}
             </CardContent>
           </Card>

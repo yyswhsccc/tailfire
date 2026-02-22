@@ -2,16 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Briefcase,
-  CreditCard,
-  FileText,
-  Heart,
-  Home,
-  MessageSquare,
-  Settings,
-  Users,
-} from "lucide-react";
+import { Briefcase, FileText, Home, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   NavigationMenu,
@@ -23,12 +14,8 @@ import {
 const navItems = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/trips", label: "My Trips", icon: Briefcase },
-  { href: "/travelers", label: "Travelers", icon: Users },
-  { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/payments", label: "Payments", icon: CreditCard },
-  { href: "/preferences", label: "Preferences", icon: Heart },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/travelers", label: "My Profile", icon: User },
 ];
 
 type DashboardNavProps = {
@@ -70,14 +57,15 @@ export function DashboardNav({ mobile, onNavigate }: DashboardNavProps) {
   return (
     <NavigationMenu>
       <NavigationMenuList className="flex gap-1">
-        {navItems.slice(0, 6).map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
 
           return (
             <NavigationMenuItem key={item.href}>
-              <Link href={item.href} legacyBehavior passHref>
-                <NavigationMenuLink
+              <NavigationMenuLink asChild>
+                <Link
+                  href={item.href}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                     isActive
@@ -87,8 +75,8 @@ export function DashboardNav({ mobile, onNavigate }: DashboardNavProps) {
                 >
                   <Icon className="h-4 w-4" />
                   <span className="hidden xl:inline">{item.label}</span>
-                </NavigationMenuLink>
-              </Link>
+                </Link>
+              </NavigationMenuLink>
             </NavigationMenuItem>
           );
         })}

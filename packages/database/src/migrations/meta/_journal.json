@@ -862,6 +862,13 @@
       "when": 1771686060000,
       "tag": "20260221150100_update_jwt_hook_portal_users",
       "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1771718400000,
+      "tag": "20260222000000_add_contact_photo_fields",
+      "breakpoints": true
     }
   ]
 }

@@ -929,6 +929,9 @@ export class ContactsService {
       // Date/Time Management
       timezone: contact.timezone,
 
+      // Photo
+      photoUrl: contact.photoUrl ?? null,
+
       // Portal
       portalUserId: contact.portalUserId ?? null,
       portalStatus: contact.portalActivatedAt ? 'active' : contact.portalUserId ? 'pending' : 'not_invited',

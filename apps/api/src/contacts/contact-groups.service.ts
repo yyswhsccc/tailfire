@@ -260,6 +260,8 @@ export class ContactGroupsService {
               // Metadata
               tags: m.contact.tags || [],
               isActive: m.contact.isActive,
+              // Photo
+              photoUrl: m.contact.photoUrl ?? null,
               // Portal
               portalUserId: m.contact.portalUserId ?? null,
               portalStatus: m.contact.portalActivatedAt
