@@ -709,11 +709,15 @@ export class ContactsService {
       },
     })
 
-    if (linkError || !linkData.properties?.action_link) {
+    if (linkError || !linkData.properties?.hashed_token) {
       await this.supabaseAdmin.auth.admin.deleteUser(userData.user.id)
       this.logger.error(`Failed to generate portal invite link: ${linkError?.message}`)
       throw new InternalServerErrorException('Failed to generate portal invitation')
     }
+
+    // Build direct callback URL with token_hash (avoids Supabase redirect using hash fragments
+    // which server-side route handlers can't read)
+    const inviteLink = `${clientPortalUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=invite`
 
     // 7. Update contact with portal fields
     try {
@@ -736,7 +740,7 @@ export class ContactsService {
     const firstName = contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Traveler'
     const emailResult = await this.emailService.sendClientPortalInviteEmail(
       contact.email,
-      linkData.properties.action_link,
+      inviteLink,
       firstName,
       agencyId,
       agentName,
@@ -781,18 +785,23 @@ export class ContactsService {
 
     const clientPortalUrl = this.configService.get<string>('CLIENT_PORTAL_URL') || 'http://localhost:3103'
 
+    // Use 'magiclink' for re-invites since the auth user already exists
+    // ('invite' type fails with "user already registered")
     const { data: linkData, error: linkError } = await this.supabaseAdmin.auth.admin.generateLink({
-      type: 'invite',
+      type: 'magiclink',
       email: contact.email,
       options: {
         redirectTo: `${clientPortalUrl}/auth/callback`,
       },
     })
 
-    if (linkError || !linkData.properties?.action_link) {
+    if (linkError || !linkData.properties?.hashed_token) {
       this.logger.error(`Failed to re-generate portal invite link: ${linkError?.message}`)
       throw new InternalServerErrorException('Failed to resend portal invitation')
     }
+
+    // Build direct callback URL with token_hash
+    const inviteLink = `${clientPortalUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=magiclink`
 
     // Update invited timestamp
     await this.db.client
@@ -803,7 +812,7 @@ export class ContactsService {
     const firstName = contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Traveler'
     const emailResult = await this.emailService.sendClientPortalInviteEmail(
       contact.email,
-      linkData.properties.action_link,
+      inviteLink,
       firstName,
       agencyId,
       agentName,
@@ -928,6 +937,9 @@ export class ContactsService {
 
       // Date/Time Management
       timezone: contact.timezone,
+
+      // Photo
+      photoUrl: contact.photoUrl ?? null,
 
       // Portal
       portalUserId: contact.portalUserId ?? null,

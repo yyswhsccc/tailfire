@@ -347,6 +347,9 @@ export interface ContactResponseDto {
   // Date/Time Management (Phase 3.5)
   timezone: string | null // IANA timezone identifier (e.g., 'America/Toronto')
 
+  // Photo
+  photoUrl: string | null
+
   // Portal
   portalUserId: string | null
   portalStatus: 'not_invited' | 'pending' | 'active' // computed

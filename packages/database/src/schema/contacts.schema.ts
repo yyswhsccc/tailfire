@@ -150,6 +150,10 @@ export const contacts = pgTable('contacts', {
   portalInvitedBy: uuid('portal_invited_by'),
   portalActivatedAt: timestamp('portal_activated_at', { withTimezone: true }),
 
+  // Photo (portal avatar)
+  photoUrl: text('photo_url'),
+  photoStoragePath: text('photo_storage_path'),
+
   // Audit Fields
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
