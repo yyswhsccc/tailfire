@@ -19,7 +19,7 @@ const lato = Lato({
 
 export const metadata: Metadata = {
   title: "Client Portal | Phoenix Voyages",
-  description: "Manage your trips, documents, and travel preferences",
+  description: "Manage your trips and documents",
 };
 
 export default function RootLayout({
