@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider, Toaster, SonnerToaster } from "@tailfire/ui-public";
-import { ConsultantProvider } from "@/context/consultant-context";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,11 +17,9 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <ConsultantProvider>
-          {children}
-          <Toaster />
-          <SonnerToaster />
-        </ConsultantProvider>
+        {children}
+        <Toaster />
+        <SonnerToaster />
       </TooltipProvider>
     </QueryClientProvider>
   );
