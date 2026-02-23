@@ -111,18 +111,39 @@ export async function runMigrations(connectionString: string) {
       console.log(`🔧 Reconciled ${reconciled} orphaned migration tracking row(s)`)
     }
 
+    // Reverse reconcile: remove ghost rows (DB rows with no matching journal entry).
+    // These are artifacts of timestamp reordering where old tracking rows survived cleanup.
+    const journalTimestamps = new Set(journal.entries.map((e: { when: number }) => e.when))
+    const currentDbRows = await sql`
+      SELECT id, created_at FROM drizzle.__drizzle_migrations
+    `
+    let ghostsRemoved = 0
+    for (const row of currentDbRows) {
+      if (!journalTimestamps.has(Number(row.created_at))) {
+        await sql`
+          DELETE FROM drizzle.__drizzle_migrations WHERE id = ${row.id}
+        `
+        ghostsRemoved++
+        console.log(`🧹 Removed ghost tracking row (created_at: ${row.created_at})`)
+      }
+    }
+    if (ghostsRemoved > 0) {
+      console.log(`🧹 Removed ${ghostsRemoved} ghost tracking row(s)`)
+    }
+
     // Verify final state
     const finalResult = await sql`
       SELECT COUNT(*) as count FROM drizzle.__drizzle_migrations
     `
     const finalCount = Number(finalResult[0]?.count || 0)
-    const newlyApplied = finalCount - appliedCount - reconciled
 
-    if (newlyApplied > 0) {
-      console.log(`✅ Applied ${newlyApplied} new migration(s)`)
+    if (finalCount !== journal.entries.length) {
+      console.warn(`⚠️ Count mismatch: DB has ${finalCount} rows, journal has ${journal.entries.length} entries`)
     }
-    if (reconciled > 0 || newlyApplied > 0) {
-      console.log(`✅ Migrations completed (${finalCount} total: ${newlyApplied} new, ${reconciled} reconciled)`)
+
+    const changes = reconciled + ghostsRemoved
+    if (changes > 0) {
+      console.log(`✅ Migrations completed (${finalCount} total, ${reconciled} reconciled, ${ghostsRemoved} ghosts removed)`)
     } else {
       console.log(`✅ Migrations completed successfully (${finalCount} total)`)
     }
