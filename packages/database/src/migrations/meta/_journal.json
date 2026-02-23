@@ -790,18 +790,11 @@
       "idx": 112,
       "version": "7",
       "when": 1771437600000,
-      "tag": "20260217180000_add_loyalty_and_booking_fields",
-      "breakpoints": true
-    },
-    {
-      "idx": 113,
-      "version": "7",
-      "when": 1771437600001,
       "tag": "20260217180000_add_openai_and_ocr_import_jobs",
       "breakpoints": true
     },
     {
-      "idx": 114,
+      "idx": 113,
       "version": "7",
       "when": 1771444800000,
       "tag": "20260217200000_create_ocr_supplier_runbooks",
@@ -810,54 +803,19 @@
     {
       "idx": 114,
       "version": "7",
-      "when": 1771451400000,
-      "tag": "20260217140000_update_jwt_hook_for_client_portal",
-      "breakpoints": true
-    },
-    {
-      "idx": 115,
-      "version": "7",
-      "when": 1771451401000,
-      "tag": "20260217140001_enforce_contact_id_not_null",
-      "breakpoints": true
-    },
-    {
-      "idx": 116,
-      "version": "7",
-      "when": 1771451402000,
-      "tag": "20260217140002_create_client_portal_users",
-      "breakpoints": true
-    },
-    {
-      "idx": 117,
-      "version": "7",
-      "when": 1771451403000,
-      "tag": "20260217140003_create_itinerary_feedback",
-      "breakpoints": true
-    },
-    {
-      "idx": 118,
-      "version": "7",
-      "when": 1771451404000,
-      "tag": "20260217150000_fix_jwt_hook_invited_status",
-      "breakpoints": true
-    },
-    {
-      "idx": 119,
-      "version": "7",
       "when": 1771506600000,
       "tag": "20260219141000_drop_duplicate_no_action_fks",
       "breakpoints": true
     },
     {
-      "idx": 120,
+      "idx": 115,
       "version": "7",
       "when": 1771516800000,
       "tag": "20260219160000_add_contact_id_to_expected_payment_items",
       "breakpoints": true
     },
     {
-      "idx": 121,
+      "idx": 116,
       "version": "7",
       "when": 1771520400000,
       "tag": "20260219170000_add_contact_id_to_payment_transactions",
@@ -910,6 +868,41 @@
       "version": "7",
       "when": 1771718400000,
       "tag": "20260222000000_add_contact_photo_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1771451400000,
+      "tag": "20260217140000_update_jwt_hook_for_client_portal",
+      "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1771451401000,
+      "tag": "20260217140001_enforce_contact_id_not_null",
+      "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1771451402000,
+      "tag": "20260217140002_create_client_portal_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1771451403000,
+      "tag": "20260217140003_create_itinerary_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1771451404000,
+      "tag": "20260217150000_fix_jwt_hook_invited_status",
       "breakpoints": true
     }
   ]

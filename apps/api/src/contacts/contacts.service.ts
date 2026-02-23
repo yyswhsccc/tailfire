@@ -372,22 +372,13 @@ export class ContactsService {
 
   /**
    * Hard delete a contact (permanent deletion)
-   * Fails if contact is linked to any trip as a traveler (ON DELETE RESTRICT).
-   * Unlink the contact from trips first before hard-deleting.
    */
   async hardDelete(id: string, agencyId: string): Promise<void> {
-    // Check if contact is linked to any trips
-    const linkedTravelers = await this.db.client
-      .select({ id: this.db.schema.tripTravelers.id })
-      .from(this.db.schema.tripTravelers)
+    // Mark affected travelers BEFORE deletion (FK cascade will null contactId)
+    await this.db.client
+      .update(this.db.schema.tripTravelers)
+      .set({ contactDeletedAt: new Date() })
       .where(eq(this.db.schema.tripTravelers.contactId, id))
-      .limit(1)
-
-    if (linkedTravelers.length > 0) {
-      throw new BadRequestException(
-        'Cannot delete contact that is linked to trips. Remove the contact from all trips first.'
-      )
-    }
 
     const [contact] = await this.db.client
       .delete(this.db.schema.contacts)

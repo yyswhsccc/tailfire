@@ -29,7 +29,6 @@
 export * from './contacts.schema'
 export * from './contact-shares.schema'
 export * from './contact-documents.schema'
-export * from './contact-loyalty-programs.schema'
 export * from './trips.schema'
 export * from './trip-shares.schema'
 export * from './trip-media.schema'
@@ -154,10 +153,6 @@ export * from './ocr-import-jobs.schema'
 // OCR supplier runbooks (extraction hints per supplier/document type)
 export * from './ocr-supplier-runbooks.schema'
 
-// Client Portal
-export * from './client-portal-users.schema'
-export * from './itinerary-feedback.schema'
-
 // Proposal comments (per-activity commenting on shared proposals)
 export * from './proposal-comments.schema'
 
@@ -169,3 +164,7 @@ export * from './client-activity-responses.schema'
 // export * from './tasks.schema'
 // export * from './cruise.schema'
 // export * from './lookups.schema'
+
+// Client Portal
+export * from './client-portal-users.schema'
+export * from './itinerary-feedback.schema'

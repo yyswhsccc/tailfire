@@ -41,7 +41,6 @@ import { CalendarModule } from './calendar/calendar.module'
 import { NotesModule } from './notes/notes.module'
 import { CalendarEventsModule } from './calendar-events/calendar-events.module'
 import { OcrImportModule } from './ocr-import/ocr-import.module'
-import { ClientPortalModule } from './client-portal/client-portal.module'
 import { PortalModule } from './portal/portal.module'
 
 @Module({
@@ -151,10 +150,7 @@ import { PortalModule } from './portal/portal.module'
     // OCR document import (PDF booking confirmations, passports)
     OcrImportModule,
 
-    // Client Portal (traveler-facing portal for trip review & approval)
-    ClientPortalModule,
-
-    // Portal Auth (portal user auth endpoints)
+    // Client Portal (portal user endpoints)
     PortalModule,
   ],
   controllers: [AppController],
