@@ -18,6 +18,8 @@ import type {
   MarkPackageAsBookedDto,
   UnlinkedActivitiesResponseDto,
   PackageLinkedActivityDto,
+  ActivityTravelerDto,
+  TravelerLinkItemDto,
 } from '@tailfire/shared-types'
 
 // Query Keys
@@ -33,9 +35,27 @@ export const bookingKeys = {
     [...bookingKeys.all, 'unlinkedActivities', tripId, itineraryId] as const,
 }
 
+export const activityTravelerKeys = {
+  all: ['activity-travelers'] as const,
+  lists: () => [...activityTravelerKeys.all, 'list'] as const,
+  list: (activityId: string) => [...activityTravelerKeys.lists(), activityId] as const,
+}
+
 // ============================================================================
 // QUERIES
 // ============================================================================
+
+/**
+ * Fetch travelers linked to a specific activity
+ * Uses endpoint: GET /activities/:id/travelers
+ */
+export function useActivityTravelers(activityId: string | null | undefined) {
+  return useQuery({
+    queryKey: activityTravelerKeys.list(activityId || ''),
+    queryFn: () => api.get<ActivityTravelerDto[]>(`/activities/${activityId}/travelers`),
+    enabled: !!activityId,
+  })
+}
 
 /**
  * Fetch list of bookings (packages) for a trip
@@ -352,17 +372,25 @@ export function useMarkAsBooked() {
 // ============================================================================
 
 /**
- * Link travelers to a booking (package)
+ * Link travelers to a booking (package) or activity
  * Uses travelers endpoint: POST /activities/:id/travelers
+ * Supports both legacy (tripTravelerIds) and v2 (links with loyalty) shapes
  */
 export function useLinkTravelers() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ bookingId, tripTravelerIds }: { bookingId: string; tripTravelerIds: string[] }) => {
-      await api.post(`/activities/${bookingId}/travelers`, {
-        tripTravelerIds,
-      })
+    mutationFn: async ({
+      bookingId,
+      tripTravelerIds,
+      links,
+    }: {
+      bookingId: string
+      tripTravelerIds?: string[]
+      links?: TravelerLinkItemDto[]
+    }) => {
+      const body = links ? { links } : { tripTravelerIds }
+      await api.post(`/activities/${bookingId}/travelers`, body)
       // Fetch the full package to return consistent type
       return api.get<PackageResponseDto>(`/activities/${bookingId}`)
     },
@@ -370,6 +398,7 @@ export function useLinkTravelers() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: bookingKeys.detail(result.id) })
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: activityTravelerKeys.list(result.id) })
     },
   })
 }
@@ -393,6 +422,7 @@ export function useUnlinkTravelers() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: bookingKeys.detail(result.id) })
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: activityTravelerKeys.list(result.id) })
     },
   })
 }

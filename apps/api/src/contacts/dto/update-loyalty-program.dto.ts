@@ -2,7 +2,7 @@
  * Update Loyalty Program DTO with runtime validation
  */
 
-import { IsString, IsOptional, MaxLength } from 'class-validator'
+import { IsString, IsOptional, IsUUID, MaxLength } from 'class-validator'
 
 export class UpdateLoyaltyProgramDto {
   @IsOptional()
@@ -31,4 +31,8 @@ export class UpdateLoyaltyProgramDto {
 
   @IsOptional()
   metadata?: Record<string, unknown>
+
+  @IsOptional()
+  @IsUUID()
+  loyaltyProgramId?: string
 }

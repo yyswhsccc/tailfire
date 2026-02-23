@@ -1,6 +1,6 @@
 'use client'
 
-import { Ship, CalendarClock, Map, Package, MapPin, Building2, Mail } from 'lucide-react'
+import { Ship, CalendarClock, Map, Package, MapPin, Building2, Mail, Award } from 'lucide-react'
 import { DetailLayout } from '@/components/layout/detail-layout'
 import type { SidebarSection } from '@/components/layout/detail-sidebar'
 
@@ -37,6 +37,11 @@ const librarySections: SidebarSection[] = [
         name: 'Suppliers',
         href: '/library/suppliers',
         icon: Building2,
+      },
+      {
+        name: 'Loyalty Programs',
+        href: '/library/loyalty-programs',
+        icon: Award,
       },
       {
         name: 'Payment Schedules',

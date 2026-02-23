@@ -6,10 +6,11 @@
  * Replaces the package_travelers junction table.
  */
 
-import { pgTable, uuid, timestamp, unique } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, timestamp, unique, index } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { itineraryActivities } from './activities.schema'
 import { tripTravelers, trips } from './trips.schema'
+import { contactLoyaltyPrograms } from './contact-loyalty-programs.schema'
 
 export const activityTravelers = pgTable(
   'activity_travelers',
@@ -30,6 +31,10 @@ export const activityTravelers = pgTable(
       .notNull()
       .references(() => trips.id, { onDelete: 'cascade' }),
 
+    // Optional loyalty program membership for this passenger on this booking
+    contactLoyaltyProgramId: uuid('contact_loyalty_program_id')
+      .references(() => contactLoyaltyPrograms.id, { onDelete: 'set null' }),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
@@ -38,6 +43,7 @@ export const activityTravelers = pgTable(
       table.activityId,
       table.tripTravelerId
     ),
+    loyaltyIdx: index('idx_at_loyalty').on(table.contactLoyaltyProgramId),
   })
 )
 
@@ -54,6 +60,10 @@ export const activityTravelersRelations = relations(activityTravelers, ({ one })
   trip: one(trips, {
     fields: [activityTravelers.tripId],
     references: [trips.id],
+  }),
+  contactLoyaltyProgram: one(contactLoyaltyPrograms, {
+    fields: [activityTravelers.contactLoyaltyProgramId],
+    references: [contactLoyaltyPrograms.id],
   }),
 }))
 

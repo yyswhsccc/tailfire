@@ -92,17 +92,33 @@ export class ContactLoyaltyProgramsService {
   ): Promise<LoyaltyProgramDto> {
     await this.checkAccess(contactId, auth)
 
+    // If loyaltyProgramId provided, auto-fill provider/program names from catalog
+    let providerName = dto.providerName
+    let programName = dto.programName
+    if (dto.loyaltyProgramId) {
+      const [catalogEntry] = await this.db.client
+        .select()
+        .from(this.db.schema.loyaltyPrograms)
+        .where(eq(this.db.schema.loyaltyPrograms.id, dto.loyaltyProgramId))
+        .limit(1)
+      if (catalogEntry) {
+        providerName = catalogEntry.providerName
+        programName = catalogEntry.programName
+      }
+    }
+
     try {
       const results = await this.db.client
         .insert(this.db.schema.contactLoyaltyPrograms)
         .values({
           contactId,
-          programName: dto.programName,
-          providerName: dto.providerName,
+          programName,
+          providerName,
           membershipNumber: dto.membershipNumber.trim(),
           tierLevel: dto.tierLevel || null,
           notes: dto.notes || null,
           metadata: dto.metadata || {},
+          loyaltyProgramId: dto.loyaltyProgramId || null,
         })
         .returning()
 
@@ -166,6 +182,7 @@ export class ContactLoyaltyProgramsService {
     if (dto.tierLevel !== undefined) updateData.tierLevel = dto.tierLevel || null
     if (dto.notes !== undefined) updateData.notes = dto.notes || null
     if (dto.metadata !== undefined) updateData.metadata = dto.metadata
+    if (dto.loyaltyProgramId !== undefined) updateData.loyaltyProgramId = dto.loyaltyProgramId || null
 
     try {
       const [updated] = await this.db.client
@@ -260,6 +277,7 @@ export class ContactLoyaltyProgramsService {
       membershipNumber: program.membershipNumber,
       tierLevel: program.tierLevel,
       notes: program.notes,
+      loyaltyProgramId: program.loyaltyProgramId ?? null,
       metadata: program.metadata || {},
       createdAt: program.createdAt.toISOString(),
       updatedAt: program.updatedAt.toISOString(),

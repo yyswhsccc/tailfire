@@ -423,6 +423,7 @@ export interface LoyaltyProgramDto {
   membershipNumber: string
   tierLevel: string | null
   notes: string | null
+  loyaltyProgramId: string | null
   metadata: Record<string, unknown>
   createdAt: string
   updatedAt: string

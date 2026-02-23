@@ -12,6 +12,7 @@ import {
   Patch,
   Delete,
   Body,
+  Param,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -30,6 +31,7 @@ import { GetPortalAuth } from '../auth/decorators/portal-auth-context.decorator'
 import type { PortalAuthContext } from '../auth/auth.types'
 import { PortalService } from './portal.service'
 import { UpdatePortalProfileDto } from './dto/update-portal-profile.dto'
+import { CreatePortalLoyaltyProgramDto, UpdatePortalLoyaltyProgramDto } from './dto/portal-loyalty-program.dto'
 
 @ApiTags('Portal')
 @Controller('portal')
@@ -127,5 +129,65 @@ export class PortalController {
   @Get('my-documents')
   async getDocuments(@GetPortalAuth() auth: PortalAuthContext) {
     return this.portalService.getDocumentsForPortalUser(auth.userId)
+  }
+
+  // ============================================================================
+  // LOYALTY PROGRAMS
+  // ============================================================================
+
+  /**
+   * Get own loyalty programs
+   * GET /portal/my-loyalty-programs
+   */
+  @Get('my-loyalty-programs')
+  async getMyLoyaltyPrograms(@GetPortalAuth() auth: PortalAuthContext) {
+    return this.portalService.getMyLoyaltyPrograms(auth.userId)
+  }
+
+  /**
+   * Create a loyalty program
+   * POST /portal/my-loyalty-programs
+   */
+  @Post('my-loyalty-programs')
+  async createMyLoyaltyProgram(
+    @GetPortalAuth() auth: PortalAuthContext,
+    @Body() dto: CreatePortalLoyaltyProgramDto,
+  ) {
+    return this.portalService.createMyLoyaltyProgram(auth.userId, dto)
+  }
+
+  /**
+   * Update a loyalty program
+   * PATCH /portal/my-loyalty-programs/:id
+   */
+  @Patch('my-loyalty-programs/:id')
+  async updateMyLoyaltyProgram(
+    @GetPortalAuth() auth: PortalAuthContext,
+    @Param('id') id: string,
+    @Body() dto: UpdatePortalLoyaltyProgramDto,
+  ) {
+    return this.portalService.updateMyLoyaltyProgram(auth.userId, id, dto)
+  }
+
+  /**
+   * Delete a loyalty program
+   * DELETE /portal/my-loyalty-programs/:id
+   */
+  @Delete('my-loyalty-programs/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteMyLoyaltyProgram(
+    @GetPortalAuth() auth: PortalAuthContext,
+    @Param('id') id: string,
+  ): Promise<void> {
+    return this.portalService.deleteMyLoyaltyProgram(auth.userId, id)
+  }
+
+  /**
+   * Get loyalty programs catalog (active programs for provider dropdown)
+   * GET /portal/loyalty-catalog
+   */
+  @Get('loyalty-catalog')
+  async getLoyaltyCatalog(@GetPortalAuth() auth: PortalAuthContext) {
+    return this.portalService.getLoyaltyCatalog(auth.userId)
   }
 }

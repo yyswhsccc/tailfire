@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Loader2 } from 'lucide-react'
 import {
@@ -18,13 +18,16 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
 import { useCreateLoyaltyProgram, useUpdateLoyaltyProgram } from '@/hooks/use-loyalty-programs'
+import { useLoyaltyProgramsCatalog } from '@/hooks/use-loyalty-programs-catalog'
 import { useToast } from '@/hooks/use-toast'
-import type { LoyaltyProgramDto } from '@tailfire/shared-types/api'
+import type { LoyaltyProgramDto, LoyaltyProgramCatalogDto } from '@tailfire/shared-types/api'
 
 interface LoyaltyProgramDialogProps {
   open: boolean
@@ -41,27 +44,12 @@ interface LoyaltyProgramFormData {
   notes: string
 }
 
-const COMMON_PROVIDERS = [
-  'Royal Caribbean',
-  'Celebrity Cruises',
-  'Norwegian Cruise Line',
-  'Carnival Cruise Line',
-  'Princess Cruises',
-  'Holland America Line',
-  'MSC Cruises',
-  'Disney Cruise Line',
-  'Viking',
-  'Cunard',
-  'Air Canada',
-  'WestJet',
-  'United Airlines',
-  'Delta Air Lines',
-  'American Airlines',
-  'Marriott Bonvoy',
-  'Hilton Honors',
-  'IHG One Rewards',
-  'World of Hyatt',
-] as const
+const TYPE_LABELS: Record<string, string> = {
+  cruise: 'Cruise Lines',
+  airline: 'Airlines',
+  hotel: 'Hotels',
+  other: 'Other',
+}
 
 export function LoyaltyProgramDialog({
   open,
@@ -74,6 +62,24 @@ export function LoyaltyProgramDialog({
   const createLoyaltyProgram = useCreateLoyaltyProgram()
   const updateLoyaltyProgram = useUpdateLoyaltyProgram()
 
+  // Fetch catalog programs (active only)
+  const { data: catalogData } = useLoyaltyProgramsCatalog({ active: 'true', limit: 100 })
+  const catalogPrograms = catalogData?.programs ?? []
+
+  // Track selected catalog item ID
+  const [selectedCatalogId, setSelectedCatalogId] = useState<string | null>(null)
+
+  // Group catalog programs by type
+  const groupedPrograms = useMemo(() => {
+    const groups: Record<string, LoyaltyProgramCatalogDto[]> = {}
+    for (const p of catalogPrograms) {
+      const type = p.programType || 'other'
+      if (!groups[type]) groups[type] = []
+      groups[type].push(p)
+    }
+    return groups
+  }, [catalogPrograms])
+
   const {
     register,
     handleSubmit,
@@ -83,15 +89,25 @@ export function LoyaltyProgramDialog({
     formState: { errors },
   } = useForm<LoyaltyProgramFormData>({
     defaultValues: {
-      providerName: loyaltyProgram?.providerName || '',
-      programName: loyaltyProgram?.programName || '',
-      membershipNumber: loyaltyProgram?.membershipNumber || '',
-      tierLevel: loyaltyProgram?.tierLevel || '',
-      notes: loyaltyProgram?.notes || '',
+      providerName: '',
+      programName: '',
+      membershipNumber: '',
+      tierLevel: '',
+      notes: '',
     },
   })
 
   const providerName = watch('providerName')
+
+  // Determine if current provider matches a catalog entry
+  const isCustomProvider = useMemo(() => {
+    if (selectedCatalogId === '__custom') return true
+    if (selectedCatalogId) return false
+    // Check if the current provider/program matches any catalog entry
+    return !catalogPrograms.some(
+      (p) => p.providerName === providerName,
+    )
+  }, [selectedCatalogId, providerName, catalogPrograms])
 
   useEffect(() => {
     if (open) {
@@ -102,11 +118,39 @@ export function LoyaltyProgramDialog({
         tierLevel: loyaltyProgram?.tierLevel || '',
         notes: loyaltyProgram?.notes || '',
       })
+      // Restore catalog selection for editing, or default to custom if catalog is empty
+      if (loyaltyProgram?.loyaltyProgramId) {
+        setSelectedCatalogId(loyaltyProgram.loyaltyProgramId)
+      } else if (catalogPrograms.length === 0) {
+        setSelectedCatalogId('__custom')
+      } else {
+        setSelectedCatalogId(null)
+      }
     }
-  }, [open, loyaltyProgram, reset])
+  }, [open, loyaltyProgram, reset, catalogPrograms.length])
+
+  const handleCatalogSelect = (value: string) => {
+    if (value === '__custom') {
+      setSelectedCatalogId('__custom')
+      setValue('providerName', '', { shouldDirty: true })
+      setValue('programName', '', { shouldDirty: true })
+      return
+    }
+
+    const item = catalogPrograms.find((p) => p.id === value)
+    if (item) {
+      setSelectedCatalogId(item.id)
+      setValue('providerName', item.providerName, { shouldDirty: true })
+      setValue('programName', item.programName, { shouldDirty: true })
+    }
+  }
 
   const onSubmit = async (data: LoyaltyProgramFormData) => {
     try {
+      const catalogId = selectedCatalogId && selectedCatalogId !== '__custom'
+        ? selectedCatalogId
+        : undefined
+
       if (isEditing && loyaltyProgram) {
         await updateLoyaltyProgram.mutateAsync({
           contactId,
@@ -117,6 +161,7 @@ export function LoyaltyProgramDialog({
             membershipNumber: data.membershipNumber,
             tierLevel: data.tierLevel || undefined,
             notes: data.notes || undefined,
+            loyaltyProgramId: catalogId,
           },
         })
 
@@ -133,6 +178,7 @@ export function LoyaltyProgramDialog({
             membershipNumber: data.membershipNumber,
             tierLevel: data.tierLevel || undefined,
             notes: data.notes || undefined,
+            loyaltyProgramId: catalogId,
           },
         })
 
@@ -153,6 +199,11 @@ export function LoyaltyProgramDialog({
     }
   }
 
+  // Build the select value
+  const selectValue = selectedCatalogId === '__custom'
+    ? '__custom'
+    : selectedCatalogId || (isCustomProvider ? '__custom' : '')
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
@@ -166,53 +217,73 @@ export function LoyaltyProgramDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Provider Name */}
-          <div className="space-y-2">
-            <Label htmlFor="providerName">Provider *</Label>
-            <Select
-              value={COMMON_PROVIDERS.includes(providerName as any) ? providerName : '__custom'}
-              onValueChange={(value) => {
-                if (value !== '__custom') {
-                  setValue('providerName', value, { shouldDirty: true })
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select or type a provider" />
-              </SelectTrigger>
-              <SelectContent>
-                {COMMON_PROVIDERS.map((provider) => (
-                  <SelectItem key={provider} value={provider}>
-                    {provider}
-                  </SelectItem>
-                ))}
-                <SelectItem value="__custom">Other (type below)</SelectItem>
-              </SelectContent>
-            </Select>
-            {(!COMMON_PROVIDERS.includes(providerName as any) || providerName === '') && (
-              <Input
-                id="providerName"
-                {...register('providerName', { required: 'Provider is required' })}
-                placeholder="e.g., Silversea Cruises"
-              />
-            )}
-            {errors.providerName && (
-              <p className="text-xs text-red-600">{errors.providerName.message}</p>
-            )}
-          </div>
+          {/* Provider Selection (from catalog) — only show dropdown if catalog has items */}
+          {catalogPrograms.length > 0 ? (
+            <div className="space-y-2">
+              <Label>Provider *</Label>
+              <Select value={selectValue} onValueChange={handleCatalogSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a program" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(groupedPrograms).map(([type, programs]) => (
+                    <SelectGroup key={type}>
+                      <SelectLabel>{TYPE_LABELS[type] || type}</SelectLabel>
+                      {programs.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.providerName} — {p.programName}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                  <SelectGroup>
+                    <SelectLabel>Custom</SelectLabel>
+                    <SelectItem value="__custom">Other (type below)</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
 
-          {/* Program Name */}
-          <div className="space-y-2">
-            <Label htmlFor="programName">Program Name *</Label>
-            <Input
-              id="programName"
-              {...register('programName', { required: 'Program name is required' })}
-              placeholder="e.g., Crown & Anchor Society, Aeroplan"
-            />
-            {errors.programName && (
-              <p className="text-xs text-red-600">{errors.programName.message}</p>
-            )}
-          </div>
+              {/* Custom provider fields */}
+              {isCustomProvider && (
+                <div className="space-y-2 pt-1">
+                  <Input
+                    {...register('providerName', { required: 'Provider is required' })}
+                    placeholder="e.g., Silversea Cruises"
+                  />
+                  {errors.providerName && (
+                    <p className="text-xs text-red-600">{errors.providerName.message}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* No catalog — show custom provider fields directly */
+            <div className="space-y-2">
+              <Label>Provider *</Label>
+              <Input
+                {...register('providerName', { required: 'Provider is required' })}
+                placeholder="e.g., Royal Caribbean, Air Canada"
+              />
+              {errors.providerName && (
+                <p className="text-xs text-red-600">{errors.providerName.message}</p>
+              )}
+            </div>
+          )}
+
+          {/* Program Name (editable for custom or when no catalog) */}
+          {(isCustomProvider || catalogPrograms.length === 0) && (
+            <div className="space-y-2">
+              <Label htmlFor="programName">Program Name *</Label>
+              <Input
+                id="programName"
+                {...register('programName', { required: 'Program name is required' })}
+                placeholder="e.g., Crown & Anchor Society"
+              />
+              {errors.programName && (
+                <p className="text-xs text-red-600">{errors.programName.message}</p>
+              )}
+            </div>
+          )}
 
           {/* Membership Number */}
           <div className="space-y-2">
