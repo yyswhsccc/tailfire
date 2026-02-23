@@ -33,6 +33,7 @@ import type {
   PaymentScheduleConfigDto,
   CreatePaymentScheduleConfigDto,
   UpdatePaymentScheduleConfigDto,
+  CreateExpectedPaymentItemDto,
   UpdateExpectedPaymentItemDto,
   ExpectedPaymentItemDto,
   PaymentTransactionDto,
@@ -159,6 +160,48 @@ export class PaymentSchedulesController {
     return this.paymentSchedulesService.updateExpectedPaymentItem(itemId, dto)
   }
 
+  /**
+   * Add an expected payment item to an existing payment schedule config
+   * POST /payment-schedules/:configId/expected-payment-items
+   *
+   * Access check: User must have write access to the trip.
+   */
+  @Post(':configId/expected-payment-items')
+  @HttpCode(HttpStatus.CREATED)
+  async addExpectedPaymentItem(
+    @GetAuthContext() auth: AuthContext,
+    @Param('configId') configId: string,
+    @Body() dto: CreateExpectedPaymentItemDto,
+  ): Promise<ExpectedPaymentItemDto> {
+    const tripId = await this.paymentSchedulesService.getTripIdFromPaymentScheduleConfigId(configId)
+    if (!tripId) {
+      throw new NotFoundException(`Payment schedule config with ID ${configId} not found`)
+    }
+    await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    return this.paymentSchedulesService.addExpectedPaymentItem(configId, auth.agencyId, dto)
+  }
+
+  /**
+   * Delete an expected payment item
+   * DELETE /payment-schedules/expected-payment-items/:itemId
+   *
+   * Access check: User must have write access to the trip.
+   * Blocks if any payment transactions exist for this item.
+   */
+  @Delete('expected-payment-items/:itemId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteExpectedPaymentItem(
+    @GetAuthContext() auth: AuthContext,
+    @Param('itemId') itemId: string,
+  ): Promise<void> {
+    const tripId = await this.paymentSchedulesService.getTripIdFromExpectedPaymentItemId(itemId)
+    if (!tripId) {
+      throw new NotFoundException(`Expected payment item with ID ${itemId} not found`)
+    }
+    await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    await this.paymentSchedulesService.deleteExpectedPaymentItem(itemId, auth.agencyId)
+  }
+
   // ============================================================================
   // Payment Transaction Endpoints
   // ============================================================================
@@ -200,6 +243,26 @@ export class PaymentSchedulesController {
     }
     await this.tripAccessService.verifyReadAccess(tripId, auth)
     return this.paymentSchedulesService.findTransactionsByExpectedPaymentItemId(itemId)
+  }
+
+  /**
+   * Update the contact ("Paid By") on a payment transaction
+   * PATCH /payment-schedules/transactions/:transactionId/contact
+   *
+   * Access check: User must have write access to the trip.
+   */
+  @Patch('transactions/:transactionId/contact')
+  async updateTransactionContact(
+    @GetAuthContext() auth: AuthContext,
+    @Param('transactionId') transactionId: string,
+    @Body() dto: { contactId: string | null },
+  ): Promise<PaymentTransactionDto> {
+    const tripId = await this.paymentSchedulesService.getTripIdFromTransactionId(transactionId)
+    if (!tripId) {
+      throw new NotFoundException(`Payment transaction with ID ${transactionId} not found`)
+    }
+    await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    return this.paymentSchedulesService.updateTransactionContact(transactionId, dto.contactId, auth.agencyId)
   }
 
   /**

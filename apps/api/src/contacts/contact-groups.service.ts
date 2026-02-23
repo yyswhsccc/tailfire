@@ -260,6 +260,18 @@ export class ContactGroupsService {
               // Metadata
               tags: m.contact.tags || [],
               isActive: m.contact.isActive,
+              // Photo
+              photoUrl: m.contact.photoUrl ?? null,
+              // Portal
+              portalUserId: m.contact.portalUserId ?? null,
+              portalStatus: m.contact.portalActivatedAt
+                ? 'active' as const
+                : m.contact.portalUserId
+                  ? 'pending' as const
+                  : 'not_invited' as const,
+              portalInvitedAt: m.contact.portalInvitedAt
+                ? m.contact.portalInvitedAt.toISOString()
+                : null,
               // Audit
               createdAt: m.contact.createdAt.toISOString(),
               updatedAt: m.contact.updatedAt.toISOString(),

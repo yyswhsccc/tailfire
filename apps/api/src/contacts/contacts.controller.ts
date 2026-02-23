@@ -24,6 +24,7 @@ import { ContactsService } from './contacts.service'
 import { ContactAccessService } from './contact-access.service'
 import { ActivityLogsService } from '../activity-logs/activity-logs.service'
 import { TripAccessService } from '../trips/trip-access.service'
+import { PaymentSchedulesService } from '../trips/payment-schedules.service'
 import {
   CreateContactDto,
   UpdateContactDto,
@@ -33,6 +34,7 @@ import type {
   ContactResponseDto,
   PaginatedContactsResponseDto,
   UpdateContactOwnerDto,
+  PortalInviteResponseDto,
 } from '../../../../packages/shared-types/src/api'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
@@ -45,6 +47,7 @@ export class ContactsController {
     private readonly contactAccessService: ContactAccessService,
     private readonly activityLogsService: ActivityLogsService,
     private readonly tripAccessService: TripAccessService,
+    private readonly paymentSchedulesService: PaymentSchedulesService,
   ) {}
 
   /**
@@ -120,6 +123,20 @@ export class ContactsController {
     const parsedLimit = limit ? Number(limit) : 50
     const parsedOffset = offset ? Number(offset) : 0
     return this.activityLogsService.getActivityForContact(id, auth.agencyId, accessibleTripIds, parsedLimit, parsedOffset)
+  }
+
+  /**
+   * Get payment transactions for a contact across all their trips
+   * GET /contacts/:contactId/payment-transactions
+   */
+  @Get(':contactId/payment-transactions')
+  async getContactPaymentTransactions(
+    @GetAuthContext() auth: AuthContext,
+    @Param('contactId') contactId: string,
+  ) {
+    // Verify contact access
+    await this.contactsService.findOne(contactId, auth.agencyId)
+    return this.paymentSchedulesService.getContactPaymentTransactions(contactId, auth.agencyId)
   }
 
   /**
@@ -266,6 +283,27 @@ export class ContactsController {
       }
     }
     return this.contactsService.updateMarketingConsent(id, dto, auth.agencyId)
+  }
+
+  /**
+   * Send portal invitation to a contact
+   * POST /contacts/:id/portal-invite
+   * - Admins can invite any contact
+   * - Users can only invite contacts they own
+   */
+  @Post(':id/portal-invite')
+  async sendPortalInvite(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<PortalInviteResponseDto> {
+    // Check ownership for non-admins
+    if (auth.role !== 'admin') {
+      const existing = await this.contactsService.findOne(id, auth.agencyId)
+      if (existing.ownerId !== null && existing.ownerId !== auth.userId) {
+        throw new ForbiddenException('You can only invite contacts you own')
+      }
+    }
+    return this.contactsService.sendPortalInvite(id, auth.userId, auth.agencyId)
   }
 
   /**

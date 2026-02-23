@@ -13,7 +13,8 @@
  */
 
 import { useMemo } from 'react'
-import { TripResponseDto, ActivityResponseDto } from '@tailfire/shared-types'
+import { ActivityResponseDto } from '@tailfire/shared-types'
+import type { TripWithDetailsResponseDto } from '@tailfire/shared-types/api'
 import { useItineraries } from '@/hooks/use-itineraries'
 import { useItineraryDaysWithActivities } from '@/hooks/use-itinerary-days'
 import { PaymentsDataTable } from '@/components/payments/payments-data-table'
@@ -21,7 +22,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Activity } from 'lucide-react'
 
-export function TripPayments({ trip }: { trip: TripResponseDto }) {
+export function TripPayments({ trip }: { trip: TripWithDetailsResponseDto }) {
   const { data: itineraries, isLoading: itinerariesLoading } = useItineraries(trip.id, { isSelected: true })
   const selectedItinerary = itineraries?.[0] || null
   const { data: days, isLoading: daysLoading } = useItineraryDaysWithActivities(selectedItinerary?.id || null)
@@ -54,7 +55,11 @@ export function TripPayments({ trip }: { trip: TripResponseDto }) {
   return (
     <div className="space-y-6">
       {/* Payments Table */}
-      <PaymentsDataTable activities={allActivities} currency={currency} tripId={trip.id} />
+      <PaymentsDataTable
+        activities={allActivities}
+        currency={currency}
+        tripId={trip.id}
+      />
     </div>
   )
 }

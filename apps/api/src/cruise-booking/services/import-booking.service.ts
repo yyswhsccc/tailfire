@@ -196,6 +196,15 @@ export class ImportBookingService {
       customCruiseDetails: cruiseDetails,
     })
 
+    // 8b. Mark the imported cruise as booked — it's an existing confirmed booking
+    await this.db.client
+      .update(this.db.schema.itineraryActivities)
+      .set({
+        isBooked: true,
+        bookingDate: new Date(),
+      })
+      .where(eq(this.db.schema.itineraryActivities.id, cruiseActivity.id))
+
     // 9. Create trip travelers for each passenger
     const travelerIds: string[] = []
     for (let i = 0; i < result.passengers.length; i++) {
@@ -228,7 +237,7 @@ export class ImportBookingService {
             return sum + (this.parsePriceToCents(paxPrice?.price) ?? 0)
           }, 0)
           return {
-            label: `${pax.title || ''} ${pax.firstname} ${pax.lastname}`.trim(),
+            label: `${pax.title ? this.normalizePrefix(pax.title) || '' : ''} ${this.titleCase(pax.firstname)} ${this.titleCase(pax.lastname)}`.trim(),
             priceCents: paxTotal,
             travelerId: travelerIds[i] || undefined,
           }
@@ -260,6 +269,7 @@ export class ImportBookingService {
           totalPriceCents,
           dto.currency ?? 'CAD',
           dto.bookingReference,
+          result.bookingdate,
         )
       } catch (error) {
         this.logger.warn({
@@ -313,7 +323,7 @@ export class ImportBookingService {
       .where(eq(customCruiseDetails.activityId, cruiseActivity.id))
 
     this.logger.log({
-      message: 'Cruise booking imported successfully',
+      message: 'Booking imported successfully',
       bookingReference: dto.bookingReference,
       tripId,
       cruiseActivityId: cruiseActivity.id,
@@ -412,6 +422,10 @@ export class ImportBookingService {
     const map = new Map<number, string>()
 
     for (const pax of passengers) {
+      // Normalize names to title case (API data is often ALL CAPS)
+      const firstName = this.titleCase(pax.firstname)
+      const lastName = this.titleCase(pax.lastname)
+
       // Validate DOB format before using in DB queries/writes
       const rawDob = pax.dob || null
       const dob = rawDob && /^\d{4}-\d{2}-\d{2}$/.test(rawDob) && !isNaN(Date.parse(rawDob))
@@ -423,8 +437,8 @@ export class ImportBookingService {
         .where(
           and(
             eq(this.db.schema.contacts.agencyId, auth.agencyId),
-            eq(this.db.schema.contacts.firstName, pax.firstname),
-            eq(this.db.schema.contacts.lastName, pax.lastname),
+            eq(this.db.schema.contacts.firstName, firstName),
+            eq(this.db.schema.contacts.lastName, lastName),
             ...(dob ? [eq(this.db.schema.contacts.dateOfBirth, dob)] : []),
           ),
         )
@@ -447,7 +461,7 @@ export class ImportBookingService {
             if (!contact.gender && pax.gender) updates.gender = this.normalizeGender(pax.gender)
             if (!contact.nationality && pax.nationality) updates.nationality = this.sanitizeNationality(pax.nationality)
             if (!contact.dateOfBirth && dob) updates.dateOfBirth = dob
-            if (!contact.middleName && pax.middlename) updates.middleName = pax.middlename
+            if (!contact.middleName && pax.middlename) updates.middleName = this.titleCase(pax.middlename)
             if (!contact.prefix && pax.title) updates.prefix = this.normalizePrefix(pax.title)
 
             if (Object.keys(updates).length > 0) {
@@ -460,7 +474,7 @@ export class ImportBookingService {
             }
           }
         } else {
-          this.logger.debug(`Skipping additive update for ${pax.firstname} ${pax.lastname} — low confidence match (no DOB)`)
+          this.logger.debug(`Skipping additive update for ${firstName} ${lastName} — low confidence match (no DOB)`)
         }
 
         map.set(pax.paxno, existing[0].id)
@@ -468,9 +482,9 @@ export class ImportBookingService {
         // Create new contact
         const contact = await this.contactsService.create(
           {
-            firstName: pax.firstname,
-            lastName: pax.lastname,
-            middleName: pax.middlename || undefined,
+            firstName,
+            lastName,
+            middleName: pax.middlename ? this.titleCase(pax.middlename) : undefined,
             prefix: this.normalizePrefix(pax.title),
             dateOfBirth: dob || undefined,
             gender: this.normalizeGender(pax.gender),
@@ -620,6 +634,12 @@ export class ImportBookingService {
     if (lower.includes('child')) return 'child'
     if (lower.includes('infant')) return 'infant'
     return 'adult'
+  }
+
+  private titleCase(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/(?:^|\s|-)(\w)/g, (match) => match.toUpperCase())
   }
 
   private normalizeGender(gender: string): string | undefined {
@@ -808,11 +828,21 @@ export class ImportBookingService {
     totalPriceCents: number | null,
     currency: string,
     bookingReference: string,
+    bookingDate?: string,
   ): Promise<void> {
     if (!totalPriceCents || totalPriceCents <= 0) {
       this.logger.debug('Skipping payment creation — no total price')
       return
     }
+
+    // Log paymentinfo shape for investigation (keys only — no raw values for PCI/PII safety)
+    this.logger.debug({
+      message: 'Paymentinfo shape from FusionAPI',
+      bookingReference,
+      paymentInfoKeys: Object.keys(paymentInfo),
+      hasPaymentRecords: !!(paymentInfo as any).paymentrecords,
+      receivedTotal: paymentInfo.receivedtotal,
+    })
 
     const receivedCents = this.parsePriceToCents(paymentInfo.receivedtotal) || 0
 
@@ -826,6 +856,7 @@ export class ImportBookingService {
           receivedCents,
           currency,
           bookingReference,
+          bookingDate,
         )
       }
       return
@@ -921,6 +952,7 @@ export class ImportBookingService {
         receivedCents,
         currency,
         bookingReference,
+        bookingDate,
       )
     }
   }
@@ -934,7 +966,17 @@ export class ImportBookingService {
     receivedCents: number,
     currency: string,
     bookingReference: string,
+    bookingDate?: string,
   ): Promise<void> {
+    // Use booking date if valid, otherwise fall back to now
+    let transactionDate: string
+    if (bookingDate && /^\d{4}-\d{2}-\d{2}$/.test(bookingDate) && !isNaN(Date.parse(bookingDate))) {
+      // Append T12:00:00 to avoid timezone drift (date-only strings parse as UTC midnight)
+      transactionDate = `${bookingDate}T12:00:00`
+    } else {
+      transactionDate = new Date().toISOString()
+    }
+
     let remainingCents = receivedCents
     for (const item of expectedItems) {
       if (remainingCents <= 0) break
@@ -946,8 +988,8 @@ export class ImportBookingService {
         currency,
         paymentMethod: null,
         referenceNumber: bookingReference,
-        transactionDate: new Date().toISOString(),
-        notes: `Imported from cruise line booking ${bookingReference}`,
+        transactionDate,
+        notes: `Imported from booking ${bookingReference}`,
       })
       remainingCents -= payAmount
     }

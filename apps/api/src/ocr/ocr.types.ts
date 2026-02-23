@@ -224,6 +224,14 @@ export interface OcrPerPersonPrice {
   totalPriceCents: number
 }
 
+export interface OcrPaymentEntry {
+  paymentName: string
+  amount: number
+  date?: string | null
+  method?: string | null
+  referenceNumber?: string | null
+}
+
 export interface OcrPackageExtraction {
   supplierName?: string | null
   bookingReference?: string | null
@@ -237,6 +245,7 @@ export interface OcrPackageExtraction {
   components: OcrPackageComponent[]
   perPersonPricing: OcrPerPersonPrice[]
   remarks?: string | null
+  payments?: OcrPaymentEntry[]
   termsAndConditions?: string | null
   cancellationPolicy?: string | null
 }
@@ -467,6 +476,14 @@ const ocrPerPersonPriceSchema = z.object({
   totalPriceCents: z.number(),
 })
 
+const ocrPaymentEntrySchema = z.object({
+  paymentName: z.string(),
+  amount: z.number(),
+  date: z.string().nullish(),
+  method: z.string().nullish(),
+  referenceNumber: z.string().nullish(),
+})
+
 export const ocrPackageExtractionSchema = z.object({
   documentType: z.literal('package_confirmation'),
   confidence: z.number().min(0).max(1),
@@ -479,6 +496,8 @@ export const ocrPackageExtractionSchema = z.object({
   commissionAmount: z.number().nullish(),
   taxesAndFees: z.number().nullish(),
   addOns: z.number().nullish(),
+  remarks: z.string().nullish(),
+  payments: z.array(ocrPaymentEntrySchema).default([]),
   components: z.array(ocrPackageComponentSchema).default([]),
   perPersonPricing: z.array(ocrPerPersonPriceSchema).default([]),
   termsAndConditions: z.string().nullish(),

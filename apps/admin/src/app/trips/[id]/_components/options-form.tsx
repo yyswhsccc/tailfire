@@ -36,6 +36,7 @@ import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
 import { DocumentUploader } from '@/components/document-uploader'
 import { ComponentMediaTab } from '@/components/shared'
+import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { type PricingData, type PricingBreakdownItem } from '@/lib/pricing'
@@ -670,7 +671,7 @@ export function OptionsForm({
 
       {/* Tabbed Interface - Full 5 tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             General
@@ -690,6 +691,9 @@ export function OptionsForm({
           <TabsTrigger value="pricing" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             Booking & Pricing
+          </TabsTrigger>
+          <TabsTrigger value="comments" className="flex items-center gap-2">
+            Comments
           </TabsTrigger>
         </TabsList>
 
@@ -1235,6 +1239,7 @@ Water bottle"
               activityPricingId={activityPricingId}
               totalPriceCents={pricingData.totalPriceCents}
               currency={pricingData.currency}
+              tripId={trip?.id || ''}
             />
           </div>
 
@@ -1260,6 +1265,20 @@ Water bottle"
             userSplitValue={userProfile?.commissionSettings?.splitValue ?? null}
             userSplitType={userProfile?.commissionSettings?.splitType ?? null}
           />
+        </TabsContent>
+
+        <TabsContent value="comments" className="mt-6">
+          {isEditing && activity?.id ? (
+            <ActivityCommentsPanel
+              tripId={trip?.id || ''}
+              itineraryId={itineraryId}
+              activityId={activity.id}
+            />
+          ) : (
+            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
+              Save the activity first to view comments.
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

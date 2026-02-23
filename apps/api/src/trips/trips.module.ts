@@ -21,12 +21,14 @@ import { FinancialsModule } from '../financials/financials.module'
 import { ContactsModule } from '../contacts/contacts.module'
 import { AutomationModule } from '../automation/automation.module'
 import { EmailModule } from '../email/email.module'
+import { TemplatesModule } from '../templates/templates.module'
 
 // Services
 import { TripsService } from './trips.service'
 import { TripAccessService } from './trip-access.service'
 import { TripTravelersService } from './trip-travelers.service'
 import { ItinerariesService } from './itineraries.service'
+import { ItineraryVersionsService } from './itinerary-versions.service'
 import { TravelerGroupsService } from './traveler-groups.service'
 import { ItineraryDaysService } from './itinerary-days.service'
 import { ActivitiesService } from './activities.service'
@@ -90,6 +92,7 @@ import { TripSharesService } from './trip-shares.service'
     EmailModule, // For booking confirmation emails
     forwardRef(() => ContactsModule), // For ContactAccessService (access control)
     forwardRef(() => AutomationModule), // For trip status auto-transitions
+    forwardRef(() => TemplatesModule), // For ItineraryCloneService (duplication)
   ],
   controllers: [
     TripsController,
@@ -121,6 +124,7 @@ import { TripSharesService } from './trip-shares.service'
     TripTravelersService,
     TripSharesService,
     ItinerariesService,
+    ItineraryVersionsService,
     TravelerGroupsService,
     ItineraryDaysService,
     ActivitiesService,
@@ -153,6 +157,7 @@ import { TripSharesService } from './trip-shares.service'
     TripAccessService,
     TripTravelersService,
     ItinerariesService,
+    ItineraryVersionsService,
     TravelerGroupsService,
     ItineraryDaysService,
     ActivitiesService,

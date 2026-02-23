@@ -189,6 +189,14 @@ export interface OcrDiningData {
   cancellationPolicy?: string | null
 }
 
+export interface OcrPackagePayment {
+  paymentName: string
+  amountCents: number
+  date?: string | null
+  method?: string | null
+  referenceNumber?: string | null
+}
+
 export interface OcrPackageData {
   supplierName?: string | null
   bookingReference?: string | null
@@ -198,6 +206,9 @@ export interface OcrPackageData {
   commissionRate?: number | null
   commissionAmountCents?: number | null
   taxesAndFeesCents?: number | null
+  addOnsCents?: number | null
+  remarks?: string | null
+  payments?: OcrPackagePayment[]
   components: OcrPackageComponent[]
   perPersonPricing: OcrPerPersonPrice[]
   termsAndConditions?: string | null

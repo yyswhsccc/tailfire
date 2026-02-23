@@ -1,21 +1,70 @@
-// Placeholder API client for future NestJS integration.
-// Currently returns resolved promises and logs payloads for visibility.
+/**
+ * Portal API Client
+ *
+ * Authenticated fetch wrapper that injects the Supabase access token.
+ */
 
-type InquiryPayload = Record<string, unknown>;
-type ProfilePayload = Record<string, unknown>;
-type EventPayload = Record<string, unknown>;
+import { createClient } from "@/lib/supabase/client";
 
-export function submitInquiry(payload: InquiryPayload): Promise<{ ok: boolean }> {
-  console.info("[mock] submitInquiry", payload);
-  return Promise.resolve({ ok: true });
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3101/api/v1";
+
+export async function portalApi<T>(path: string, options?: RequestInit): Promise<T> {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    throw new Error("Not authenticated");
+  }
+
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+      ...options?.headers,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+
+  // Handle 204 No Content
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  return res.json();
 }
 
-export function saveProfile(payload: ProfilePayload): Promise<{ ok: boolean }> {
-  console.info("[mock] saveProfile", payload);
-  return Promise.resolve({ ok: true });
-}
+export async function portalApiMultipart<T>(path: string, formData: FormData): Promise<T> {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-export function trackEvent(payload: EventPayload): Promise<{ ok: boolean }> {
-  console.info("[mock] trackEvent", payload);
-  return Promise.resolve({ ok: true });
+  if (!session?.access_token) {
+    throw new Error("Not authenticated");
+  }
+
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      // Do NOT set Content-Type — browser sets multipart boundary automatically
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  return res.json();
 }

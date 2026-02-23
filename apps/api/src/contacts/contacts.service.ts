@@ -4,11 +4,21 @@
  * Business logic for Contact CRUD operations.
  */
 
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { eq, and, ilike, or, sql, desc, asc, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { UserValidationService } from '../common/user-validation.service'
+import { EmailService } from '../email/email.service'
 import { TripBookedEvent } from '../trips/events/trip-booked.event'
 import { AuditEvent } from '../activity-logs/events/audit.event'
 import { sanitizeForAudit, computeAuditDiff } from '../activity-logs/audit-sanitizer'
@@ -18,15 +28,32 @@ import type {
   ContactFilterDto,
   ContactResponseDto,
   PaginatedContactsResponseDto,
+  PortalInviteResponseDto,
 } from '../../../../packages/shared-types/src/api'
 
 @Injectable()
 export class ContactsService {
+  private readonly logger = new Logger(ContactsService.name)
+  private readonly supabaseAdmin: SupabaseClient
+
   constructor(
+    private readonly configService: ConfigService,
     private readonly db: DatabaseService,
     private readonly userValidationService: UserValidationService,
+    private readonly emailService: EmailService,
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+  ) {
+    const supabaseUrl = this.configService.get<string>('SUPABASE_URL')
+    const serviceRoleKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
+    }
+
+    this.supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+  }
 
   /**
    * Create a new contact
@@ -345,22 +372,13 @@ export class ContactsService {
 
   /**
    * Hard delete a contact (permanent deletion)
-   * Fails if contact is linked to any trip as a traveler (ON DELETE RESTRICT).
-   * Unlink the contact from trips first before hard-deleting.
    */
   async hardDelete(id: string, agencyId: string): Promise<void> {
-    // Check if contact is linked to any trips
-    const linkedTravelers = await this.db.client
-      .select({ id: this.db.schema.tripTravelers.id })
-      .from(this.db.schema.tripTravelers)
+    // Mark affected travelers BEFORE deletion (FK cascade will null contactId)
+    await this.db.client
+      .update(this.db.schema.tripTravelers)
+      .set({ contactDeletedAt: new Date() })
       .where(eq(this.db.schema.tripTravelers.contactId, id))
-      .limit(1)
-
-    if (linkedTravelers.length > 0) {
-      throw new BadRequestException(
-        'Cannot delete contact that is linked to trips. Remove the contact from all trips first.'
-      )
-    }
 
     const [contact] = await this.db.client
       .delete(this.db.schema.contacts)
@@ -615,6 +633,198 @@ export class ContactsService {
   }
 
   /**
+   * Send portal invite to a contact
+   */
+  async sendPortalInvite(
+    contactId: string,
+    invitedBy: string,
+    agencyId: string,
+  ): Promise<PortalInviteResponseDto> {
+    // 1. Find the contact
+    const [contact] = await this.db.client
+      .select()
+      .from(this.db.schema.contacts)
+      .where(and(eq(this.db.schema.contacts.id, contactId), eq(this.db.schema.contacts.agencyId, agencyId)))
+      .limit(1)
+
+    if (!contact) {
+      throw new NotFoundException(`Contact with ID ${contactId} not found`)
+    }
+
+    if (!contact.email) {
+      throw new BadRequestException('Contact must have an email address to receive a portal invite')
+    }
+
+    // 2. Check if already active
+    if (contact.portalActivatedAt) {
+      throw new ConflictException('Contact already has an active portal account')
+    }
+
+    // 3. Re-invite if pending (already has portalUserId but not activated)
+    if (contact.portalUserId) {
+      return this.resendPortalInvite(contact, invitedBy, agencyId)
+    }
+
+    // 4. Get inviter info for personalized email
+    const inviter = await this.db.client
+      .select({ firstName: this.db.schema.userProfiles.firstName, lastName: this.db.schema.userProfiles.lastName })
+      .from(this.db.schema.userProfiles)
+      .where(eq(this.db.schema.userProfiles.id, invitedBy))
+      .limit(1)
+    const agentName = inviter[0] ? `${inviter[0].firstName} ${inviter[0].lastName}`.trim() : undefined
+
+    const clientPortalUrl = this.configService.get<string>('CLIENT_PORTAL_URL') || 'http://localhost:3103'
+
+    // 5. Create Supabase auth user
+    const { data: userData, error: userError } = await this.supabaseAdmin.auth.admin.createUser({
+      email: contact.email,
+      email_confirm: false,
+      app_metadata: {
+        portal_user: true,
+        contact_id: contactId,
+        agency_id: agencyId,
+      },
+    })
+
+    if (userError || !userData.user) {
+      this.logger.error(`Failed to create portal auth user: ${userError?.message}`)
+      throw new InternalServerErrorException('Failed to create portal invitation')
+    }
+
+    // 6. Generate invite link
+    const { data: linkData, error: linkError } = await this.supabaseAdmin.auth.admin.generateLink({
+      type: 'invite',
+      email: contact.email,
+      options: {
+        redirectTo: `${clientPortalUrl}/auth/callback`,
+      },
+    })
+
+    if (linkError || !linkData.properties?.hashed_token) {
+      await this.supabaseAdmin.auth.admin.deleteUser(userData.user.id)
+      this.logger.error(`Failed to generate portal invite link: ${linkError?.message}`)
+      throw new InternalServerErrorException('Failed to generate portal invitation')
+    }
+
+    // Build direct callback URL with token_hash (avoids Supabase redirect using hash fragments
+    // which server-side route handlers can't read)
+    const inviteLink = `${clientPortalUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=invite`
+
+    // 7. Update contact with portal fields
+    try {
+      await this.db.client
+        .update(this.db.schema.contacts)
+        .set({
+          portalUserId: userData.user.id,
+          portalInvitedAt: new Date(),
+          portalInvitedBy: invitedBy,
+          updatedAt: new Date(),
+        })
+        .where(eq(this.db.schema.contacts.id, contactId))
+    } catch (dbError) {
+      await this.supabaseAdmin.auth.admin.deleteUser(userData.user.id)
+      this.logger.error('Failed to update contact with portal fields, rolling back auth user')
+      throw new InternalServerErrorException('Failed to update contact with portal invitation')
+    }
+
+    // 8. Send branded email
+    const firstName = contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Traveler'
+    const emailResult = await this.emailService.sendClientPortalInviteEmail(
+      contact.email,
+      inviteLink,
+      firstName,
+      agencyId,
+      agentName,
+      contactId,
+    )
+
+    if (!emailResult.success) {
+      // Rollback: revert contact and delete auth user
+      this.logger.error(`Portal invite email failed, rolling back: ${emailResult.error}`)
+      await this.db.client
+        .update(this.db.schema.contacts)
+        .set({ portalUserId: null, portalInvitedAt: null, portalInvitedBy: null, updatedAt: new Date() })
+        .where(eq(this.db.schema.contacts.id, contactId))
+      await this.supabaseAdmin.auth.admin.deleteUser(userData.user.id)
+      throw new InternalServerErrorException('Failed to send portal invitation email')
+    }
+
+    this.logger.log(`Portal invite sent to contact ${contactId} (auth user ${userData.user.id})`)
+
+    return {
+      contactId,
+      portalUserId: userData.user.id,
+      email: contact.email,
+      inviteSent: true,
+    }
+  }
+
+  /**
+   * Re-send portal invite for a pending contact
+   */
+  private async resendPortalInvite(
+    contact: any,
+    invitedBy: string,
+    agencyId: string,
+  ): Promise<PortalInviteResponseDto> {
+    const inviter = await this.db.client
+      .select({ firstName: this.db.schema.userProfiles.firstName, lastName: this.db.schema.userProfiles.lastName })
+      .from(this.db.schema.userProfiles)
+      .where(eq(this.db.schema.userProfiles.id, invitedBy))
+      .limit(1)
+    const agentName = inviter[0] ? `${inviter[0].firstName} ${inviter[0].lastName}`.trim() : undefined
+
+    const clientPortalUrl = this.configService.get<string>('CLIENT_PORTAL_URL') || 'http://localhost:3103'
+
+    // Use 'magiclink' for re-invites since the auth user already exists
+    // ('invite' type fails with "user already registered")
+    const { data: linkData, error: linkError } = await this.supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: contact.email,
+      options: {
+        redirectTo: `${clientPortalUrl}/auth/callback`,
+      },
+    })
+
+    if (linkError || !linkData.properties?.hashed_token) {
+      this.logger.error(`Failed to re-generate portal invite link: ${linkError?.message}`)
+      throw new InternalServerErrorException('Failed to resend portal invitation')
+    }
+
+    // Build direct callback URL with token_hash
+    const inviteLink = `${clientPortalUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=magiclink`
+
+    // Update invited timestamp
+    await this.db.client
+      .update(this.db.schema.contacts)
+      .set({ portalInvitedAt: new Date(), portalInvitedBy: invitedBy, updatedAt: new Date() })
+      .where(eq(this.db.schema.contacts.id, contact.id))
+
+    const firstName = contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Traveler'
+    const emailResult = await this.emailService.sendClientPortalInviteEmail(
+      contact.email,
+      inviteLink,
+      firstName,
+      agencyId,
+      agentName,
+      contact.id,
+    )
+
+    if (!emailResult.success) {
+      throw new InternalServerErrorException('Failed to resend portal invitation email')
+    }
+
+    this.logger.log(`Portal invite re-sent to contact ${contact.id}`)
+
+    return {
+      contactId: contact.id,
+      portalUserId: contact.portalUserId,
+      email: contact.email,
+      inviteSent: true,
+    }
+  }
+
+  /**
    * Map database entity to response DTO
    */
   private mapToResponseDto(contact: any): ContactResponseDto {
@@ -718,6 +928,14 @@ export class ContactsService {
 
       // Date/Time Management
       timezone: contact.timezone,
+
+      // Photo
+      photoUrl: contact.photoUrl ?? null,
+
+      // Portal
+      portalUserId: contact.portalUserId ?? null,
+      portalStatus: contact.portalActivatedAt ? 'active' : contact.portalUserId ? 'pending' : 'not_invited',
+      portalInvitedAt: contact.portalInvitedAt?.toISOString() ?? null,
 
       // Audit
       createdAt: contact.createdAt.toISOString(),

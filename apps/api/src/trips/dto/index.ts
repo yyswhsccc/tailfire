@@ -45,3 +45,15 @@ export { CreateTripShareDto, UpdateTripShareDto } from './create-trip-share.dto'
 
 // Email DTOs
 export { SendBookingConfirmationDto } from './send-booking-confirmation.dto'
+
+// Proposal Comment DTOs
+export { CreateProposalCommentDto } from './proposal-comment.dto'
+
+// Publish Itinerary DTOs
+export { PublishItineraryBodyDto } from './publish-itinerary.dto'
+
+// Activity Response DTOs
+export { CreateActivityResponseDto } from './create-activity-response.dto'
+
+// Itinerary Selection DTOs
+export { SelectItineraryDto } from './select-itinerary.dto'

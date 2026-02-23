@@ -17,15 +17,32 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useContact, useUpdateContact, useContactTrips } from '@/hooks/use-contacts'
+import { useContact, useUpdateContact, useContactTrips, useSendPortalInvite } from '@/hooks/use-contacts'
 import { useTasks } from '@/hooks/use-tasks'
 import { TaskList } from '@/app/tasks/_components/task-list'
 import { TaskFormDialog } from '@/app/tasks/_components/task-form-dialog'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import type { UpdateContactDto, TaskResponseDto } from '@tailfire/shared-types/api'
+import { useContactPaymentTransactions, useDeletePaymentTransactionFromTrip } from '@/hooks/use-payment-schedules'
+import { formatCurrency } from '@/lib/pricing/currency-helpers'
+import type { UpdateContactDto, TaskResponseDto, ContactPaymentTransactionDto } from '@tailfire/shared-types/api'
 import { ContactAvatar } from '@/components/contacts/contact-avatar'
 import { ContactActivityFeed } from '@/components/contacts/ContactActivityFeed'
 import { ContactNavigation, type ContactSection } from './_components/contact-navigation'
@@ -42,10 +59,20 @@ import {
   MessageCircle,
   Plane,
   MapPin,
-  CreditCard,
-  Banknote
+  Banknote,
+  DollarSign,
+  Trash2,
 } from 'lucide-react'
 import type { ContactRelationshipResponseDto } from '@tailfire/shared-types/api'
+
+function formatPaymentDate(date: string | null): string {
+  if (!date) return '\u2013'
+  return new Date(date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
 
 // Map contact lifecycle to badge variant (same as table)
 function getLifecycleBadgeVariant(contactType: string | null, contactStatus: string | null): 'inbound' | 'planning' | 'booked' | 'traveling' | 'completed' | 'secondary' {
@@ -97,6 +124,46 @@ function getLifecycleLabel(contactType: string | null, contactStatus: string | n
 type EditSection = 'identity' | 'contact' | 'professional' | 'personal' | 'address' | 'lifecycle' | null
 
 /**
+ * Portal Invite Button component
+ */
+function PortalInviteButton({ contactId, email, isResend }: { contactId: string; email: string; isResend?: boolean }) {
+  const { toast } = useToast()
+  const sendPortalInvite = useSendPortalInvite()
+
+  return (
+    <Button
+      size="sm"
+      variant={isResend ? 'outline' : 'default'}
+      className="mt-2 h-7 text-xs"
+      disabled={sendPortalInvite.isPending}
+      onClick={() => {
+        sendPortalInvite.mutate(contactId, {
+          onSuccess: () => {
+            toast({
+              title: isResend ? 'Invitation resent' : 'Portal invitation sent',
+              description: `Portal invitation sent to ${email}`,
+            })
+          },
+          onError: (error) => {
+            toast({
+              title: 'Failed to send invitation',
+              description: error instanceof Error ? error.message : 'Something went wrong',
+              variant: 'destructive',
+            })
+          },
+        })
+      }}
+    >
+      {sendPortalInvite.isPending
+        ? 'Sending...'
+        : isResend
+          ? 'Resend Portal Invite'
+          : 'Invite to Portal'}
+    </Button>
+  )
+}
+
+/**
  * Contact Detail Page
  * Master-detail layout with inline editing per section
  */
@@ -126,6 +193,16 @@ export default function ContactDetailPage() {
     { contactId, sortBy: 'dueDate', sortOrder: 'asc', limit: 50 },
   )
   const contactTasks = tasksData?.data ?? []
+
+  // Payment state
+  const { data: contactPayments = [], isLoading: paymentsLoading } = useContactPaymentTransactions(contactId)
+  const [selectedPaymentTx, setSelectedPaymentTx] = useState<ContactPaymentTransactionDto | null>(null)
+  const [paymentDetailOpen, setPaymentDetailOpen] = useState(false)
+  const [paymentDeleteConfirm, setPaymentDeleteConfirm] = useState(false)
+  const deletePaymentTx = useDeletePaymentTransactionFromTrip(
+    selectedPaymentTx?.tripId || '',
+    contactId,
+  )
 
   const handleEdit = (section: EditSection) => {
     if (!contact) return
@@ -420,7 +497,23 @@ export default function ContactDetailPage() {
                           Marketable
                         </Badge>
                       )}
+
+                      {/* Portal Status Badge */}
+                      {contact.portalStatus === 'active' && (
+                        <Badge variant="booked">Portal Active</Badge>
+                      )}
+                      {contact.portalStatus === 'pending' && (
+                        <Badge variant="traveling">Portal Pending</Badge>
+                      )}
                     </div>
+
+                    {/* Portal Invite Section */}
+                    {contact.email && contact.portalStatus === 'not_invited' && (
+                      <PortalInviteButton contactId={contact.id} email={contact.email} />
+                    )}
+                    {contact.email && contact.portalStatus === 'pending' && (
+                      <PortalInviteButton contactId={contact.id} email={contact.email} isResend />
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -1244,11 +1337,71 @@ export default function ContactDetailPage() {
                 />
               )}
               {activeSection === 'payments' && (
-                <ComingSoonSection
-                  title="Payments"
-                  description="Payment history and invoices for this contact."
-                  icon={CreditCard}
-                />
+                <div className="bg-white border border-gray-200 rounded-lg">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h2 className="text-xl font-semibold text-gray-900">Payment History</h2>
+                    <p className="text-sm text-gray-500">Payments across all trips for this contact.</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    {paymentsLoading ? (
+                      <TableSkeleton />
+                    ) : contactPayments.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Trip</TableHead>
+                            <TableHead>Activity</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Method</TableHead>
+                            <TableHead>Reference</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {contactPayments.map((tx) => (
+                            <TableRow
+                              key={tx.id}
+                              className="cursor-pointer hover:bg-gray-50"
+                              onClick={() => {
+                                setSelectedPaymentTx(tx)
+                                setPaymentDetailOpen(true)
+                              }}
+                            >
+                              <TableCell>{formatPaymentDate(tx.transactionDate)}</TableCell>
+                              <TableCell>
+                                <button
+                                  className="text-blue-600 hover:underline text-sm font-medium"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    router.push(`/trips/${tx.tripId}`)
+                                  }}
+                                >
+                                  {tx.tripName}
+                                </button>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-sm font-medium">{tx.activityName}</div>
+                                <div className="text-xs text-gray-500">{tx.paymentName}</div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{tx.transactionType}</Badge>
+                              </TableCell>
+                              <TableCell>{formatCurrency(tx.amountCents, tx.currency)}</TableCell>
+                              <TableCell>{tx.paymentMethod || '\u2014'}</TableCell>
+                              <TableCell>{tx.referenceNumber || '\u2014'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12">
+                        <DollarSign className="h-12 w-12 text-gray-400 mb-4" />
+                        <p className="text-sm text-gray-500">No payments recorded for this contact</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
               {activeSection === 'trust' && (
                 <ComingSoonSection
@@ -1277,6 +1430,111 @@ export default function ContactDetailPage() {
         task={editingTask}
         contactId={contactId}
       />
+
+      {/* Payment Transaction Detail Dialog */}
+      <Dialog open={paymentDetailOpen} onOpenChange={(open) => {
+        setPaymentDetailOpen(open)
+        if (!open) {
+          setSelectedPaymentTx(null)
+          setPaymentDeleteConfirm(false)
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+          </DialogHeader>
+          {selectedPaymentTx && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500">Trip</p>
+                  <p className="font-medium">{selectedPaymentTx.tripName}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Activity</p>
+                  <p className="font-medium">{selectedPaymentTx.activityName}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Payment</p>
+                  <p className="font-medium">{selectedPaymentTx.paymentName}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Type</p>
+                  <Badge variant="outline">{selectedPaymentTx.transactionType}</Badge>
+                </div>
+                <div>
+                  <p className="text-gray-500">Amount</p>
+                  <p className="font-medium">
+                    {formatCurrency(selectedPaymentTx.amountCents, selectedPaymentTx.currency)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Payment Method</p>
+                  <p className="font-medium">{selectedPaymentTx.paymentMethod || 'Not specified'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Reference</p>
+                  <p className="font-medium">{selectedPaymentTx.referenceNumber || 'None'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Transaction Date</p>
+                  <p className="font-medium">{formatPaymentDate(selectedPaymentTx.transactionDate)}</p>
+                </div>
+              </div>
+              {selectedPaymentTx.notes && (
+                <div className="text-sm">
+                  <p className="text-gray-500">Notes</p>
+                  <p className="font-medium">{selectedPaymentTx.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="flex justify-between sm:justify-between">
+            {!paymentDeleteConfirm ? (
+              <>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setPaymentDeleteConfirm(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete
+                </Button>
+                <Button variant="outline" onClick={() => setPaymentDetailOpen(false)}>
+                  Close
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-destructive self-center">Are you sure? This cannot be undone.</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setPaymentDeleteConfirm(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      if (selectedPaymentTx) {
+                        deletePaymentTx.mutate(selectedPaymentTx.id, {
+                          onSuccess: () => {
+                            setPaymentDetailOpen(false)
+                            setSelectedPaymentTx(null)
+                            setPaymentDeleteConfirm(false)
+                          },
+                        })
+                      }
+                    }}
+                    disabled={deletePaymentTx.isPending}
+                  >
+                    {deletePaymentTx.isPending ? 'Deleting...' : 'Confirm Delete'}
+                  </Button>
+                </div>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   )
 }

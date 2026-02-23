@@ -296,6 +296,7 @@ export type PackageLinkedActivityDto = {
   activityType: ActivityType
   status: ActivityStatus
   dayNumber: number | null
+  endDayNumber: number | null // For spanning activities (lodging, cruise): last day number
   dayDate: string | null // ISO date
   parentActivityId: string | null // For nested relationships (e.g., port_info under cruise)
   sequenceOrder: number
@@ -349,6 +350,7 @@ export type UnlinkedActivityDto = {
   itineraryId: string
   itineraryDayId: string
   dayNumber: number | null
+  endDayNumber: number | null // For spanning activities (lodging, cruise): last day number
   date: string | null // ISO date
   sequenceOrder: number
   totalPriceCents: number | null
@@ -359,6 +361,7 @@ export type UnlinkedActivityDto = {
   paymentStatus: string | null // 'paid' | 'deposit_paid' | 'unpaid' | null (no schedule)
   paidCents: number | null
   currency: string | null
+  commissionTotalCents: number | null
 }
 
 /**

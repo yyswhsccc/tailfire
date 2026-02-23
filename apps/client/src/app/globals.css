@@ -18,3 +18,8 @@
 .dashboard-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #b1481a;
 }
+
+/* Hero text contrast for cover photos */
+.text-shadow-hero {
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}

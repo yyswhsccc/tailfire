@@ -4,16 +4,14 @@ import Link from "next/link";
 import {
   Briefcase,
   Calendar,
-  CreditCard,
   FileText,
-  MessageSquare,
-  Users,
   ArrowRight,
   Plane,
-  MapPin,
+  Mail,
+  User,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { useConsultant } from "@/context/consultant-context";
+import { usePortalProfile, usePortalTrips, usePortalDocuments } from "@/hooks/use-portal-data";
 import {
   Button,
   Card,
@@ -24,78 +22,78 @@ import {
   Avatar,
   AvatarFallback,
   Badge,
-  Progress,
+  Skeleton,
 } from "@tailfire/ui-public";
-
-// Mock data for dashboard
-const upcomingTrips = [
-  {
-    id: "trip-1",
-    name: "Mediterranean Cruise",
-    destination: "Greece & Italy",
-    startDate: "June 15, 2025",
-    endDate: "June 28, 2025",
-    status: "Confirmed",
-    progress: 85,
-  },
-  {
-    id: "trip-2",
-    name: "Safari Adventure",
-    destination: "Tanzania",
-    startDate: "September 5, 2025",
-    endDate: "September 15, 2025",
-    status: "Pending Payment",
-    progress: 45,
-  },
-];
-
-const recentDocuments = [
-  { id: "doc-1", name: "E-Tickets - Mediterranean", type: "PDF", date: "May 1" },
-  { id: "doc-2", name: "Travel Insurance", type: "PDF", date: "May 5" },
-  { id: "doc-3", name: "Shore Excursions", type: "PDF", date: "May 10" },
-];
 
 const quickActions = [
   { icon: Briefcase, label: "My Trips", href: "/trips", color: "text-blue-400" },
-  { icon: Users, label: "Travelers", href: "/travelers", color: "text-green-400" },
-  { icon: MessageSquare, label: "Messages", href: "/messages", color: "text-purple-400" },
   { icon: FileText, label: "Documents", href: "/documents", color: "text-orange-400" },
-  { icon: CreditCard, label: "Payments", href: "/payments", color: "text-pink-400" },
-  { icon: Calendar, label: "Preferences", href: "/preferences", color: "text-cyan-400" },
+  { icon: User, label: "My Profile", href: "/travelers", color: "text-purple-400" },
 ];
+
+function getStatusBadgeClass(status: string) {
+  switch (status) {
+    case "confirmed":
+    case "in_progress":
+      return "bg-green-600 text-white border-0";
+    case "booked":
+      return "bg-blue-600 text-white border-0";
+    case "completed":
+      return "bg-phoenix-gold text-white border-0";
+    default:
+      return "bg-phoenix-orange text-white border-0";
+  }
+}
+
+function formatTripStatus(status: string) {
+  return status
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { consultant } = useConsultant();
+  const { data: profile, isLoading: profileLoading } = usePortalProfile();
+  const { data: trips = [], isLoading: tripsLoading } = usePortalTrips();
+  const { data: documents = [], isLoading: docsLoading } = usePortalDocuments();
 
-  const advisorInitials = consultant.name
+  const displayName = profile?.displayName || user?.name || "Traveler";
+  const firstName = displayName.split(" ")[0];
+
+  const agent = profile?.agent;
+  const advisorName = agent?.name || "Your Travel Advisor";
+  const advisorInitials = advisorName
     .split(" ")
     .map((n) => n[0])
     .join("")
     .toUpperCase();
 
+  const recentDocs = documents.slice(0, 3);
+
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white font-display">
-            Welcome back, {user?.user_metadata?.full_name?.split(" ")[0] || "there"}!
-          </h1>
-          <p className="text-phoenix-text-muted mt-1">
-            Here&apos;s an overview of your travel plans
-          </p>
-        </div>
-        <Link href="/messages">
-          <Button className="btn-phoenix-primary">
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Message Your Advisor
-          </Button>
-        </Link>
+      <div>
+        <h1 className="text-3xl font-bold text-white font-display">
+          Welcome back, {firstName}!
+        </h1>
+        <p className="text-phoenix-text-muted mt-1">
+          Here&apos;s an overview of your travel plans
+        </p>
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {quickActions.map((action) => {
           const Icon = action.icon;
           return (
@@ -137,46 +135,47 @@ export default function DashboardPage() {
               </Link>
             </CardHeader>
             <CardContent className="space-y-4">
-              {upcomingTrips.map((trip) => (
-                <div
-                  key={trip.id}
-                  className="p-4 rounded-lg border border-phoenix-gold/20 bg-phoenix-charcoal/30 hover:border-phoenix-gold/40 transition-colors"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-white">{trip.name}</h3>
-                        <Badge
-                          className={
-                            trip.status === "Confirmed"
-                              ? "bg-green-600 text-white border-0"
-                              : "bg-phoenix-orange text-white border-0"
-                          }
-                        >
-                          {trip.status}
-                        </Badge>
+              {tripsLoading ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-24 w-full bg-phoenix-charcoal/30" />
+                  <Skeleton className="h-24 w-full bg-phoenix-charcoal/30" />
+                </div>
+              ) : trips.length === 0 ? (
+                <div className="text-center py-8">
+                  <Plane className="h-12 w-12 text-phoenix-text-muted mx-auto mb-3" />
+                  <p className="text-phoenix-text-muted">No trips yet</p>
+                  <p className="text-sm text-phoenix-text-muted mt-1">
+                    Your trips will appear here once your advisor creates them.
+                  </p>
+                </div>
+              ) : (
+                trips.map((trip) => (
+                  <div
+                    key={trip.id}
+                    className="p-4 rounded-lg border border-phoenix-gold/20 bg-phoenix-charcoal/30 hover:border-phoenix-gold/40 transition-colors"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium text-white">{trip.name}</h3>
+                          <Badge className={getStatusBadgeClass(trip.status)}>
+                            {formatTripStatus(trip.status)}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 mt-2 text-sm text-phoenix-text-muted">
+                          {trip.startDate && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              {formatDate(trip.startDate)}
+                              {trip.endDate && ` - ${formatDate(trip.endDate)}`}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-phoenix-text-muted">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {trip.destination}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {trip.startDate}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="w-full sm:w-32">
-                      <div className="flex justify-between text-xs text-phoenix-text-muted mb-1">
-                        <span>Progress</span>
-                        <span>{trip.progress}%</span>
-                      </div>
-                      <Progress value={trip.progress} className="h-2" />
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </div>
@@ -189,27 +188,35 @@ export default function DashboardPage() {
               <CardTitle className="text-white text-lg">Your Travel Advisor</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16 border-2 border-phoenix-gold">
-                  <AvatarFallback className="bg-phoenix-gold text-white text-xl">
-                    {advisorInitials}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="font-medium text-white">{consultant.name}</h3>
-                  <p className="text-sm text-phoenix-text-muted">
-                    {consultant.title || "Travel Consultant"}
-                  </p>
+              {profileLoading ? (
+                <div className="flex items-center gap-4">
+                  <Skeleton className="h-16 w-16 rounded-full bg-phoenix-charcoal/30" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32 bg-phoenix-charcoal/30" />
+                    <Skeleton className="h-3 w-24 bg-phoenix-charcoal/30" />
+                  </div>
                 </div>
-              </div>
-              <div className="mt-4 space-y-2">
-                <Link href="/messages">
-                  <Button className="w-full btn-phoenix-primary">
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Send Message
-                  </Button>
-                </Link>
-              </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-16 w-16 border-2 border-phoenix-gold">
+                    <AvatarFallback className="bg-phoenix-gold text-white text-xl">
+                      {advisorInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="font-medium text-white">{advisorName}</h3>
+                    {agent?.email && (
+                      <a
+                        href={`mailto:${agent.email}`}
+                        className="text-sm text-phoenix-gold hover:underline flex items-center gap-1 mt-1"
+                      >
+                        <Mail className="h-3.5 w-3.5" />
+                        {agent.email}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -227,25 +234,42 @@ export default function DashboardPage() {
               </Link>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {recentDocuments.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-2 rounded-md hover:bg-phoenix-gold/10 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded bg-phoenix-gold/20 flex items-center justify-center">
-                        <FileText className="h-4 w-4 text-phoenix-gold" />
+              {docsLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-10 w-full bg-phoenix-charcoal/30" />
+                  <Skeleton className="h-10 w-full bg-phoenix-charcoal/30" />
+                </div>
+              ) : recentDocs.length === 0 ? (
+                <p className="text-sm text-phoenix-text-muted text-center py-4">
+                  No documents yet
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {recentDocs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-2 rounded-md hover:bg-phoenix-gold/10 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded bg-phoenix-gold/20 flex items-center justify-center">
+                          <FileText className="h-4 w-4 text-phoenix-gold" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-white truncate max-w-[200px]">{doc.fileName}</p>
+                          <p className="text-xs text-phoenix-text-muted">
+                            {doc.documentType || "Document"}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-white">{doc.name}</p>
-                        <p className="text-xs text-phoenix-text-muted">{doc.type}</p>
-                      </div>
+                      {doc.uploadedAt && (
+                        <span className="text-xs text-phoenix-text-muted">
+                          {formatDate(doc.uploadedAt)}
+                        </span>
+                      )}
                     </div>
-                    <span className="text-xs text-phoenix-text-muted">{doc.date}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

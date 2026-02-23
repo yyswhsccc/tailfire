@@ -491,6 +491,9 @@ importers:
       '@tailfire/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@tailfire/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
       '@tailfire/ui-public':
         specifier: workspace:*
         version: link:../../packages/ui-public
