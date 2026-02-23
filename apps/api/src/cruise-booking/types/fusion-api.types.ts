@@ -332,6 +332,7 @@ export interface ImportBookingCruiseItem {
   sprice: string | number
   scurrency: string
   cabin: { number: string; name: string; cabintype: string; farecode: string; deck?: string; location?: string }
+  berthedcategorycode?: string
   ship: { code: string; id: number; name: string; imageurl: string }
   suppliername: string
   itinerary: ImportBookingItineraryPort[]

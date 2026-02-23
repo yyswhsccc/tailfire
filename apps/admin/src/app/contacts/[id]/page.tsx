@@ -50,6 +50,8 @@ import { ComingSoonSection } from './_components/coming-soon-section'
 import { RelationshipDialog } from './_components/relationship-dialog'
 import { RelationshipsCard } from './_components/relationships-card'
 import { RelationshipsSection } from './_components/relationships-section'
+import { LoyaltyProgramsSection } from './_components/loyalty-programs-section'
+import { LoyaltyProgramDialog } from './_components/loyalty-program-dialog'
 import { ContactDocumentsSection } from './_components/contact-documents-section'
 import { NotesSection } from '@/components/notes/NotesSection'
 import { ContactCalendarSection } from '@/components/calendar/ContactCalendarSection'
@@ -63,7 +65,7 @@ import {
   DollarSign,
   Trash2,
 } from 'lucide-react'
-import type { ContactRelationshipResponseDto } from '@tailfire/shared-types/api'
+import type { ContactRelationshipResponseDto, LoyaltyProgramDto } from '@tailfire/shared-types/api'
 
 function formatPaymentDate(date: string | null): string {
   if (!date) return '\u2013'
@@ -185,6 +187,10 @@ export default function ContactDetailPage() {
   // Relationship dialog state
   const [relationshipDialogOpen, setRelationshipDialogOpen] = useState(false)
   const [editingRelationship, setEditingRelationship] = useState<ContactRelationshipResponseDto | null>(null)
+
+  // Loyalty program dialog state
+  const [loyaltyDialogOpen, setLoyaltyDialogOpen] = useState(false)
+  const [editingLoyaltyProgram, setEditingLoyaltyProgram] = useState<LoyaltyProgramDto | null>(null)
 
   // Task state
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
@@ -366,6 +372,16 @@ export default function ContactDetailPage() {
 
   const handleViewAllRelationships = () => {
     setActiveSection('relationships')
+  }
+
+  const handleAddLoyaltyProgram = () => {
+    setEditingLoyaltyProgram(null)
+    setLoyaltyDialogOpen(true)
+  }
+
+  const handleEditLoyaltyProgram = (program: LoyaltyProgramDto) => {
+    setEditingLoyaltyProgram(program)
+    setLoyaltyDialogOpen(true)
   }
 
   if (isLoading) {
@@ -1260,6 +1276,15 @@ export default function ContactDetailPage() {
                   />
                 </div>
               )}
+              {activeSection === 'loyalty' && (
+                <div className="p-6">
+                  <LoyaltyProgramsSection
+                    contactId={contactId}
+                    onAdd={handleAddLoyaltyProgram}
+                    onEdit={handleEditLoyaltyProgram}
+                  />
+                </div>
+              )}
               {activeSection === 'notes' && (
                 <NotesSection contactId={contactId} />
               )}
@@ -1421,6 +1446,14 @@ export default function ContactDetailPage() {
         onOpenChange={setRelationshipDialogOpen}
         contactId={contactId}
         relationship={editingRelationship}
+      />
+
+      {/* Loyalty Program Dialog */}
+      <LoyaltyProgramDialog
+        open={loyaltyDialogOpen}
+        onOpenChange={setLoyaltyDialogOpen}
+        contactId={contactId}
+        loyaltyProgram={editingLoyaltyProgram}
       />
 
       {/* Task Dialog */}

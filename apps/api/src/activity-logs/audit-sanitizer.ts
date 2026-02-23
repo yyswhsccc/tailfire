@@ -62,6 +62,9 @@ const ALLOWED_FIELDS: Record<string, string[]> = {
   ],
   user: ['firstName', 'lastName', 'displayName', 'role'],
   trip_group: ['name', 'description'],
+  contact_loyalty_program: ['programName', 'providerName', 'membershipNumber', 'tierLevel', 'loyaltyProgramId'],
+  loyalty_program: ['providerName', 'programName', 'programType', 'isActive'],
+  activity_traveler: ['contactLoyaltyProgramId'],
 }
 
 /**

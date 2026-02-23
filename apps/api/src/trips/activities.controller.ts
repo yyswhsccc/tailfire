@@ -23,7 +23,8 @@ import {
 import { ApiTags } from '@nestjs/swagger'
 import { Request } from 'express'
 import { ActivitiesService } from './activities.service'
-import { ActivityTravelersService, LinkTravelersDto, ActivityTravelerDto } from './activity-travelers.service'
+import { ActivityTravelersService, type ActivityTravelerDto } from './activity-travelers.service'
+import { LinkTravelersClassDto } from './dto/link-travelers.dto'
 import { getActorId } from '../common/decorators/actor.decorator'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
@@ -442,7 +443,7 @@ export class ActivitiesGlobalController {
   async linkTravelers(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Body() dto: LinkTravelersDto,
+    @Body() dto: LinkTravelersClassDto,
   ): Promise<ActivityTravelerDto[]> {
     await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
     return this.activityTravelersService.linkTravelers(id, dto)
@@ -457,10 +458,10 @@ export class ActivitiesGlobalController {
   async unlinkTravelers(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Body() dto: LinkTravelersDto,
+    @Body() dto: LinkTravelersClassDto,
   ): Promise<ActivityTravelerDto[]> {
     await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
-    return this.activityTravelersService.unlinkTravelers(id, dto.tripTravelerIds)
+    return this.activityTravelersService.unlinkTravelers(id, dto.tripTravelerIds || [])
   }
 }
 

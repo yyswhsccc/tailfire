@@ -152,3 +152,103 @@ export function useDeletePortalAvatar() {
     },
   });
 }
+
+// ============================================================================
+// LOYALTY PROGRAMS
+// ============================================================================
+
+export interface PortalLoyaltyProgram {
+  id: string;
+  contactId: string;
+  loyaltyProgramId: string | null;
+  providerName: string;
+  programName: string;
+  membershipNumber: string;
+  tierLevel: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PortalLoyaltyCatalogItem {
+  id: string;
+  providerName: string;
+  programName: string;
+  programType: string;
+}
+
+export interface CreatePortalLoyaltyProgramInput {
+  loyaltyProgramId?: string;
+  providerName: string;
+  programName: string;
+  membershipNumber: string;
+  tierLevel?: string;
+  notes?: string;
+}
+
+export interface UpdatePortalLoyaltyProgramInput {
+  loyaltyProgramId?: string;
+  providerName?: string;
+  programName?: string;
+  membershipNumber?: string;
+  tierLevel?: string;
+  notes?: string;
+}
+
+export function usePortalLoyaltyPrograms() {
+  return useQuery({
+    queryKey: ["portal", "loyalty-programs"],
+    queryFn: () => portalApi<PortalLoyaltyProgram[]>("/portal/my-loyalty-programs"),
+  });
+}
+
+export function usePortalLoyaltyCatalog() {
+  return useQuery({
+    queryKey: ["portal", "loyalty-catalog"],
+    queryFn: async () => {
+      const res = await portalApi<{ programs: PortalLoyaltyCatalogItem[] }>("/portal/loyalty-catalog");
+      return res.programs;
+    },
+  });
+}
+
+export function useCreatePortalLoyaltyProgram() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreatePortalLoyaltyProgramInput) =>
+      portalApi<PortalLoyaltyProgram>("/portal/my-loyalty-programs", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal", "loyalty-programs"] });
+    },
+  });
+}
+
+export function useUpdatePortalLoyaltyProgram() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdatePortalLoyaltyProgramInput }) =>
+      portalApi<PortalLoyaltyProgram>(`/portal/my-loyalty-programs/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal", "loyalty-programs"] });
+    },
+  });
+}
+
+export function useDeletePortalLoyaltyProgram() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      portalApi<void>(`/portal/my-loyalty-programs/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal", "loyalty-programs"] });
+    },
+  });
+}

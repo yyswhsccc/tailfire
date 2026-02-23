@@ -227,32 +227,45 @@ export class ImportBookingService {
       })
     }
 
-    // 10c. Populate per-person pricing breakdown from FusionAPI perperson data
-    if (cruiseActivity.activityPricingId && cruiseItem.perperson?.length > 0) {
+    // 10c. Populate per-person pricing breakdown + universal booking fields from FusionAPI data
+    if (cruiseActivity.activityPricingId) {
       try {
-        const breakdown = result.passengers.map((pax, i) => {
-          // Sum all perperson category prices for this guest
-          const paxTotal = cruiseItem.perperson.reduce((sum, item) => {
-            const paxPrice = item.prices?.find(p => p.guestno === pax.paxno)
-            return sum + (this.parsePriceToCents(paxPrice?.price) ?? 0)
-          }, 0)
-          return {
-            label: `${pax.title ? this.normalizePrefix(pax.title) || '' : ''} ${this.titleCase(pax.firstname)} ${this.titleCase(pax.lastname)}`.trim(),
-            priceCents: paxTotal,
-            travelerId: travelerIds[i] || undefined,
-          }
-        })
+        const pricingUpdate: Record<string, unknown> = {}
 
-        await this.db.client
-          .update(activityPricing)
-          .set({
-            pricingBreakdownJson: breakdown,
-            pricingType: 'per_person',
+        // Per-person breakdown
+        if (cruiseItem.perperson?.length > 0) {
+          pricingUpdate.pricingBreakdownJson = result.passengers.map((pax, i) => {
+            const paxTotal = cruiseItem.perperson.reduce((sum, item) => {
+              const paxPrice = item.prices?.find(p => p.guestno === pax.paxno)
+              return sum + (this.parsePriceToCents(paxPrice?.price) ?? 0)
+            }, 0)
+            return {
+              label: `${pax.title || ''} ${pax.firstname} ${pax.lastname}`.trim(),
+              priceCents: paxTotal,
+              travelerId: travelerIds[i] || undefined,
+            }
           })
-          .where(eq(activityPricing.id, cruiseActivity.activityPricingId))
+          pricingUpdate.pricingType = 'per_person'
+        }
+
+        // Universal booking fields
+        const netPriceCents = this.parsePriceToCents(cruiseItem.nettprice)
+        if (netPriceCents !== null) {
+          pricingUpdate.netPriceCents = netPriceCents
+        }
+        if (cruiseItem.paymentinfo?.nonrefundabledeposit === 1) {
+          pricingUpdate.nonRefundableDeposit = true
+        }
+
+        if (Object.keys(pricingUpdate).length > 0) {
+          await this.db.client
+            .update(activityPricing)
+            .set(pricingUpdate)
+            .where(eq(activityPricing.id, cruiseActivity.activityPricingId))
+        }
       } catch (error) {
         this.logger.warn({
-          message: 'Failed to populate per-person pricing breakdown',
+          message: 'Failed to populate pricing fields from import',
           bookingReference: dto.bookingReference,
           error: error instanceof Error ? error.message : String(error),
         })
@@ -550,6 +563,10 @@ export class ImportBookingService {
       cabinLocation: cruiseItem.cabin?.location || null,
       bookingNumber: bookingReference,
       fareCode: cruiseItem.cabin?.farecode || null,
+      reservationNumber: cruiseItem.reservation || null,
+      stateroomCategoryCode: cruiseItem.berthedcategorycode || null,
+      onboardCreditCents: cruiseItem.onboardcredit ? Math.round(cruiseItem.onboardcredit * 100) : null,
+      onboardCreditCurrency: cruiseItem.obccurrency || null,
       portCallsJson,
       cabinPricingJson: {
         grossprice: cruiseItem.grossprice,

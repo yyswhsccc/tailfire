@@ -5,11 +5,13 @@
  * Portal users are contacts with linked Supabase auth accounts.
  */
 
-import { Injectable, NotFoundException, Logger } from '@nestjs/common'
-import { eq, and, or, desc, inArray } from 'drizzle-orm'
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common'
+import { eq, and, or, desc, asc, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { StorageService } from '../trips/storage.service'
 import type { UpdatePortalProfileDto } from './dto/update-portal-profile.dto'
+import type { CreatePortalLoyaltyProgramDto, UpdatePortalLoyaltyProgramDto } from './dto/portal-loyalty-program.dto'
+import type { LoyaltyProgramDto } from '@tailfire/shared-types'
 
 @Injectable()
 export class PortalService {
@@ -350,5 +352,198 @@ export class PortalService {
       fileSize: doc.fileSize,
       uploadedAt: doc.uploadedAt?.toISOString() ?? null,
     }))
+  }
+
+  // ============================================================================
+  // LOYALTY PROGRAMS
+  // ============================================================================
+
+  /**
+   * Get loyalty programs for the portal user's own contact
+   */
+  async getMyLoyaltyPrograms(portalUserId: string): Promise<LoyaltyProgramDto[]> {
+    const contact = await this.findContactByPortalUser(portalUserId)
+
+    const programs = await this.db.client
+      .select()
+      .from(this.db.schema.contactLoyaltyPrograms)
+      .where(eq(this.db.schema.contactLoyaltyPrograms.contactId, contact.id))
+      .orderBy(asc(this.db.schema.contactLoyaltyPrograms.providerName))
+
+    return programs.map((p) => this.formatLoyaltyProgram(p))
+  }
+
+  /**
+   * Create a loyalty program for the portal user's own contact
+   */
+  async createMyLoyaltyProgram(
+    portalUserId: string,
+    dto: CreatePortalLoyaltyProgramDto,
+  ): Promise<LoyaltyProgramDto> {
+    const contact = await this.findContactByPortalUser(portalUserId)
+
+    // If loyaltyProgramId provided, auto-fill from catalog
+    let providerName = dto.providerName
+    let programName = dto.programName
+    if (dto.loyaltyProgramId) {
+      const [catalogEntry] = await this.db.client
+        .select()
+        .from(this.db.schema.loyaltyPrograms)
+        .where(
+          and(
+            eq(this.db.schema.loyaltyPrograms.id, dto.loyaltyProgramId),
+            eq(this.db.schema.loyaltyPrograms.agencyId, contact.agencyId!),
+          ),
+        )
+        .limit(1)
+      if (catalogEntry) {
+        providerName = catalogEntry.providerName
+        programName = catalogEntry.programName
+      }
+    }
+
+    try {
+      const [program] = await this.db.client
+        .insert(this.db.schema.contactLoyaltyPrograms)
+        .values({
+          contactId: contact.id,
+          programName,
+          providerName,
+          membershipNumber: dto.membershipNumber.trim(),
+          tierLevel: dto.tierLevel || null,
+          notes: dto.notes || null,
+          metadata: {},
+          loyaltyProgramId: dto.loyaltyProgramId || null,
+        })
+        .returning()
+
+      return this.formatLoyaltyProgram(program!)
+    } catch (error: any) {
+      if (error.code === '23505') {
+        throw new ConflictException(
+          `A loyalty program for ${providerName} with this membership number already exists`,
+        )
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Update a loyalty program owned by the portal user
+   */
+  async updateMyLoyaltyProgram(
+    portalUserId: string,
+    programId: string,
+    dto: UpdatePortalLoyaltyProgramDto,
+  ): Promise<LoyaltyProgramDto> {
+    const contact = await this.findContactByPortalUser(portalUserId)
+
+    const updateData: Record<string, unknown> = { updatedAt: new Date() }
+    if (dto.providerName !== undefined) updateData.providerName = dto.providerName
+    if (dto.programName !== undefined) updateData.programName = dto.programName
+    if (dto.membershipNumber !== undefined) updateData.membershipNumber = dto.membershipNumber.trim()
+    if (dto.tierLevel !== undefined) updateData.tierLevel = dto.tierLevel || null
+    if (dto.notes !== undefined) updateData.notes = dto.notes || null
+    if (dto.loyaltyProgramId !== undefined) updateData.loyaltyProgramId = dto.loyaltyProgramId || null
+
+    try {
+      const [updated] = await this.db.client
+        .update(this.db.schema.contactLoyaltyPrograms)
+        .set(updateData)
+        .where(
+          and(
+            eq(this.db.schema.contactLoyaltyPrograms.id, programId),
+            eq(this.db.schema.contactLoyaltyPrograms.contactId, contact.id),
+          ),
+        )
+        .returning()
+
+      if (!updated) {
+        throw new NotFoundException(`Loyalty program ${programId} not found`)
+      }
+
+      return this.formatLoyaltyProgram(updated)
+    } catch (error: any) {
+      if (error.code === '23505') {
+        throw new ConflictException(
+          'A loyalty program with this provider and membership number already exists',
+        )
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Delete a loyalty program owned by the portal user
+   */
+  async deleteMyLoyaltyProgram(portalUserId: string, programId: string): Promise<void> {
+    const contact = await this.findContactByPortalUser(portalUserId)
+
+    const [deleted] = await this.db.client
+      .delete(this.db.schema.contactLoyaltyPrograms)
+      .where(
+        and(
+          eq(this.db.schema.contactLoyaltyPrograms.id, programId),
+          eq(this.db.schema.contactLoyaltyPrograms.contactId, contact.id),
+        ),
+      )
+      .returning()
+
+    if (!deleted) {
+      throw new NotFoundException(`Loyalty program ${programId} not found`)
+    }
+  }
+
+  /**
+   * Get the agency's loyalty programs catalog (active only, for provider dropdown)
+   */
+  async getLoyaltyCatalog(portalUserId: string) {
+    const contact = await this.findContactByPortalUser(portalUserId)
+
+    if (!contact.agencyId) {
+      return { programs: [] }
+    }
+
+    const programs = await this.db.client
+      .select()
+      .from(this.db.schema.loyaltyPrograms)
+      .where(
+        and(
+          eq(this.db.schema.loyaltyPrograms.agencyId, contact.agencyId),
+          eq(this.db.schema.loyaltyPrograms.isActive, true),
+        ),
+      )
+      .orderBy(
+        asc(this.db.schema.loyaltyPrograms.programType),
+        asc(this.db.schema.loyaltyPrograms.providerName),
+      )
+
+    return {
+      programs: programs.map((p) => ({
+        id: p.id,
+        providerName: p.providerName,
+        programName: p.programName,
+        programType: p.programType,
+      })),
+    }
+  }
+
+  /**
+   * Format a contact loyalty program row to DTO
+   */
+  private formatLoyaltyProgram(program: any): LoyaltyProgramDto {
+    return {
+      id: program.id,
+      contactId: program.contactId,
+      programName: program.programName,
+      providerName: program.providerName,
+      membershipNumber: program.membershipNumber,
+      tierLevel: program.tierLevel,
+      notes: program.notes,
+      loyaltyProgramId: program.loyaltyProgramId ?? null,
+      metadata: program.metadata || {},
+      createdAt: program.createdAt.toISOString(),
+      updatedAt: program.updatedAt.toISOString(),
+    }
   }
 }
