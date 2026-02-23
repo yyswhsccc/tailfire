@@ -1,5 +1,6 @@
 -- Create client_portal_users table
 -- Maps Supabase auth users to existing contacts for client portal access.
+-- Idempotent: safe to re-run if already applied.
 
 -- Enum for client portal user status
 DO $$ BEGIN
@@ -48,12 +49,12 @@ CREATE TABLE IF NOT EXISTS client_portal_users (
   CONSTRAINT unique_contact_agency UNIQUE (contact_id, agency_id)
 );
 
--- Indexes
-CREATE INDEX idx_client_portal_users_agency ON client_portal_users(agency_id);
-CREATE INDEX idx_client_portal_users_contact ON client_portal_users(contact_id);
-CREATE INDEX idx_client_portal_users_email ON client_portal_users(email);
-CREATE INDEX idx_client_portal_users_status ON client_portal_users(status);
-CREATE INDEX idx_client_portal_users_supabase ON client_portal_users(supabase_user_id);
+-- Indexes (IF NOT EXISTS for idempotency)
+CREATE INDEX IF NOT EXISTS idx_client_portal_users_agency ON client_portal_users(agency_id);
+CREATE INDEX IF NOT EXISTS idx_client_portal_users_contact ON client_portal_users(contact_id);
+CREATE INDEX IF NOT EXISTS idx_client_portal_users_email ON client_portal_users(email);
+CREATE INDEX IF NOT EXISTS idx_client_portal_users_status ON client_portal_users(status);
+CREATE INDEX IF NOT EXISTS idx_client_portal_users_supabase ON client_portal_users(supabase_user_id);
 
 -- Grant SELECT to supabase_auth_admin (needed by JWT hook to look up client users)
 GRANT SELECT ON public.client_portal_users TO supabase_auth_admin;

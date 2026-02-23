@@ -1,5 +1,6 @@
 -- Create itinerary_feedback table
 -- Tracks client approvals and change requests for itineraries.
+-- Idempotent: safe to re-run if already applied.
 
 -- Enum for feedback type
 DO $$ BEGIN
@@ -37,8 +38,8 @@ CREATE TABLE IF NOT EXISTS itinerary_feedback (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Indexes
-CREATE INDEX idx_itinerary_feedback_itinerary ON itinerary_feedback(itinerary_id);
-CREATE INDEX idx_itinerary_feedback_client ON itinerary_feedback(client_portal_user_id);
-CREATE INDEX idx_itinerary_feedback_agency ON itinerary_feedback(agency_id);
-CREATE INDEX idx_itinerary_feedback_status ON itinerary_feedback(status);
+-- Indexes (IF NOT EXISTS for idempotency)
+CREATE INDEX IF NOT EXISTS idx_itinerary_feedback_itinerary ON itinerary_feedback(itinerary_id);
+CREATE INDEX IF NOT EXISTS idx_itinerary_feedback_client ON itinerary_feedback(client_portal_user_id);
+CREATE INDEX IF NOT EXISTS idx_itinerary_feedback_agency ON itinerary_feedback(agency_id);
+CREATE INDEX IF NOT EXISTS idx_itinerary_feedback_status ON itinerary_feedback(status);
