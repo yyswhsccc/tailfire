@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import postgres from 'postgres'
+import crypto from 'node:crypto'
 import { join, resolve } from 'path'
 import { existsSync, readdirSync, readFileSync } from 'fs'
 
@@ -77,17 +78,54 @@ export async function runMigrations(connectionString: string) {
     // Run migrations
     await migrate(db, { migrationsFolder })
 
+    // Reconcile: register any journal entries missing from __drizzle_migrations.
+    // This fixes tracking gaps caused by non-monotonic journal timestamps where
+    // Drizzle applied the SQL (schema objects exist) but skipped inserting the
+    // tracking row because created_at < max(created_at).
+    const dbRows = await sql`
+      SELECT created_at FROM drizzle.__drizzle_migrations
+    `
+    const registeredTimestamps = new Set(dbRows.map(r => Number(r.created_at)))
+
+    let reconciled = 0
+    for (const entry of journal.entries) {
+      if (!registeredTimestamps.has(entry.when)) {
+        const sqlFilePath = join(migrationsFolder, `${entry.tag}.sql`)
+        if (!existsSync(sqlFilePath)) {
+          console.warn(`⚠️ Missing SQL file for journal entry ${entry.idx}: ${entry.tag}`)
+          continue
+        }
+        const sqlContent = readFileSync(sqlFilePath, 'utf-8')
+        const hash = crypto.createHash('sha256').update(sqlContent).digest('hex')
+
+        await sql`
+          INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+          VALUES (${hash}, ${entry.when})
+        `
+        reconciled++
+        console.log(`🔧 Reconciled orphaned entry ${entry.idx}: ${entry.tag}`)
+      }
+    }
+
+    if (reconciled > 0) {
+      console.log(`🔧 Reconciled ${reconciled} orphaned migration tracking row(s)`)
+    }
+
     // Verify final state
     const finalResult = await sql`
       SELECT COUNT(*) as count FROM drizzle.__drizzle_migrations
     `
     const finalCount = Number(finalResult[0]?.count || 0)
-    const newlyApplied = finalCount - appliedCount
+    const newlyApplied = finalCount - appliedCount - reconciled
 
     if (newlyApplied > 0) {
       console.log(`✅ Applied ${newlyApplied} new migration(s)`)
     }
-    console.log(`✅ Migrations completed successfully (${finalCount} total)`)
+    if (reconciled > 0 || newlyApplied > 0) {
+      console.log(`✅ Migrations completed (${finalCount} total: ${newlyApplied} new, ${reconciled} reconciled)`)
+    } else {
+      console.log(`✅ Migrations completed successfully (${finalCount} total)`)
+    }
   } catch (error) {
     console.error('❌ Migration failed:', error)
     throw error
