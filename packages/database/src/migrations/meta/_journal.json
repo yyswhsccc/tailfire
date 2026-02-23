@@ -904,6 +904,13 @@
       "when": 1771718405000,
       "tag": "20260217150000_fix_jwt_hook_invited_status",
       "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "7",
+      "when": 1771856788000,
+      "tag": "20260223000000_cleanup_duplicate_migration_rows",
+      "breakpoints": true
     }
   ]
 }
