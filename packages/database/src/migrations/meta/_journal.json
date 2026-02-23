@@ -925,6 +925,13 @@
       "when": 1771963200000,
       "tag": "20260223180000_loyalty_programs_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "7",
+      "when": 1771963201000,
+      "tag": "20260224000000_rename_itinerary_status_enums",
+      "breakpoints": true
     }
   ]
 }
