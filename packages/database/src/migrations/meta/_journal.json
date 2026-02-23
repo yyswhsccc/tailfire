@@ -873,35 +873,35 @@
     {
       "idx": 124,
       "version": "7",
-      "when": 1771451400000,
+      "when": 1771718401000,
       "tag": "20260217140000_update_jwt_hook_for_client_portal",
       "breakpoints": true
     },
     {
       "idx": 125,
       "version": "7",
-      "when": 1771451401000,
+      "when": 1771718402000,
       "tag": "20260217140001_enforce_contact_id_not_null",
       "breakpoints": true
     },
     {
       "idx": 126,
       "version": "7",
-      "when": 1771451402000,
+      "when": 1771718403000,
       "tag": "20260217140002_create_client_portal_users",
       "breakpoints": true
     },
     {
       "idx": 127,
       "version": "7",
-      "when": 1771451403000,
+      "when": 1771718404000,
       "tag": "20260217140003_create_itinerary_feedback",
       "breakpoints": true
     },
     {
       "idx": 128,
       "version": "7",
-      "when": 1771451404000,
+      "when": 1771718405000,
       "tag": "20260217150000_fix_jwt_hook_invited_status",
       "breakpoints": true
     }
