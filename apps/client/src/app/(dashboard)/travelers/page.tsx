@@ -1,14 +1,23 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ArrowLeft, Camera, Trash2, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Camera, Trash2, Save, Loader2, Plus, Pencil, Award } from "lucide-react";
 import Link from "next/link";
 import {
   usePortalProfile,
   useUpdatePortalProfile,
   useUploadPortalAvatar,
   useDeletePortalAvatar,
+  usePortalLoyaltyPrograms,
+  usePortalLoyaltyCatalog,
+  useCreatePortalLoyaltyProgram,
+  useUpdatePortalLoyaltyProgram,
+  useDeletePortalLoyaltyProgram,
   type UpdatePortalProfileInput,
+  type PortalLoyaltyProgram,
+  type PortalLoyaltyCatalogItem,
+  type CreatePortalLoyaltyProgramInput,
+  type UpdatePortalLoyaltyProgramInput,
 } from "@/hooks/use-portal-data";
 import {
   Button,
@@ -29,6 +38,12 @@ import {
   Skeleton,
   Separator,
   Textarea,
+  Badge,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
   useToast,
 } from "@tailfire/ui-public";
 
@@ -337,6 +352,9 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
+      {/* Loyalty & Memberships */}
+      <LoyaltyMembershipsSection />
+
       {/* Save Button */}
       <div className="flex justify-end pb-8">
         <Button
@@ -414,5 +432,394 @@ function SelectField({
         </SelectContent>
       </Select>
     </div>
+  );
+}
+
+// ============================================================================
+// Loyalty & Memberships Section
+// ============================================================================
+
+const PROGRAM_TYPE_LABELS: Record<string, string> = {
+  cruise: "Cruise",
+  airline: "Airline",
+  hotel: "Hotel",
+  other: "Other",
+};
+
+function LoyaltyMembershipsSection() {
+  const { data: programs, isLoading } = usePortalLoyaltyPrograms();
+  const deleteMutation = useDeletePortalLoyaltyProgram();
+  const { toast } = useToast();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<PortalLoyaltyProgram | null>(null);
+
+  const handleAdd = () => {
+    setEditing(null);
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (program: PortalLoyaltyProgram) => {
+    setEditing(program);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      toast({ title: "Membership removed", description: "Your loyalty membership has been deleted." });
+    } catch {
+      toast({ title: "Error", description: "Failed to delete membership.", variant: "destructive" });
+    }
+  };
+
+  return (
+    <>
+      <Card className="bg-phoenix-charcoal/50 border-phoenix-gold/30">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-white flex items-center gap-2">
+            <Award className="h-5 w-5 text-phoenix-gold" />
+            Loyalty & Memberships
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-phoenix-gold/30 text-phoenix-text-light hover:bg-phoenix-gold/10"
+            onClick={handleAdd}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-12 w-full bg-phoenix-charcoal/30" />
+              <Skeleton className="h-12 w-full bg-phoenix-charcoal/30" />
+            </div>
+          ) : !programs?.length ? (
+            <p className="text-phoenix-text-muted text-sm text-center py-6">
+              No loyalty memberships yet. Add your first one to get started.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {programs.map((program) => (
+                <div
+                  key={program.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-phoenix-charcoal/50 border border-phoenix-gold/10"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-white font-medium text-sm">{program.providerName}</span>
+                      <span className="text-phoenix-text-muted text-sm">{program.programName}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-phoenix-text-muted text-xs font-mono">#{program.membershipNumber}</span>
+                      {program.tierLevel && (
+                        <Badge variant="outline" className="text-xs border-phoenix-gold/30 text-phoenix-gold">
+                          {program.tierLevel}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 ml-2 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-phoenix-text-muted hover:text-white"
+                      onClick={() => handleEdit(program)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-phoenix-text-muted hover:text-red-400"
+                      onClick={() => handleDelete(program.id)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <LoyaltyProgramDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        editing={editing}
+      />
+    </>
+  );
+}
+
+function LoyaltyProgramDialog({
+  open,
+  onOpenChange,
+  editing,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editing: PortalLoyaltyProgram | null;
+}) {
+  const { data: catalog } = usePortalLoyaltyCatalog();
+  const createMutation = useCreatePortalLoyaltyProgram();
+  const updateMutation = useUpdatePortalLoyaltyProgram();
+  const { toast } = useToast();
+
+  const hasCatalog = (catalog?.length ?? 0) > 0;
+  const [mode, setMode] = useState<"catalog" | "custom">("custom");
+  const [selectedCatalogId, setSelectedCatalogId] = useState<string>("");
+  const [providerName, setProviderName] = useState("");
+  const [programName, setProgramName] = useState("");
+  const [membershipNumber, setMembershipNumber] = useState("");
+  const [tierLevel, setTierLevel] = useState("");
+  const [notes, setNotes] = useState("");
+
+  // Reset form when dialog opens/closes or editing changes
+  useEffect(() => {
+    if (open) {
+      if (editing) {
+        setProviderName(editing.providerName);
+        setProgramName(editing.programName);
+        setMembershipNumber(editing.membershipNumber);
+        setTierLevel(editing.tierLevel ?? "");
+        setNotes(editing.notes ?? "");
+        if (editing.loyaltyProgramId && hasCatalog) {
+          setMode("catalog");
+          setSelectedCatalogId(editing.loyaltyProgramId);
+        } else {
+          setMode("custom");
+          setSelectedCatalogId("");
+        }
+      } else {
+        setMode(hasCatalog ? "catalog" : "custom");
+        setSelectedCatalogId("");
+        setProviderName("");
+        setProgramName("");
+        setMembershipNumber("");
+        setTierLevel("");
+        setNotes("");
+      }
+    }
+  }, [open, editing, hasCatalog]);
+
+  // When selecting from catalog, auto-fill provider and program name
+  const handleCatalogSelect = (catalogId: string) => {
+    setSelectedCatalogId(catalogId);
+    const item = catalog?.find((c) => c.id === catalogId);
+    if (item) {
+      setProviderName(item.providerName);
+      setProgramName(item.programName);
+    }
+  };
+
+  // Group catalog items by type
+  const catalogGroups = catalog
+    ? Object.entries(
+        catalog.reduce<Record<string, PortalLoyaltyCatalogItem[]>>((acc, item) => {
+          const type = item.programType || "other";
+          if (!acc[type]) acc[type] = [];
+          acc[type].push(item);
+          return acc;
+        }, {}),
+      ).sort(([a], [b]) => {
+        const order = ["cruise", "airline", "hotel", "other"];
+        return order.indexOf(a) - order.indexOf(b);
+      })
+    : [];
+
+  const handleSubmit = async () => {
+    if (!membershipNumber.trim()) {
+      toast({ title: "Error", description: "Membership number is required.", variant: "destructive" });
+      return;
+    }
+    if (!providerName.trim() || !programName.trim()) {
+      toast({ title: "Error", description: "Provider and program name are required.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      if (editing) {
+        const data: UpdatePortalLoyaltyProgramInput = {
+          providerName: providerName.trim(),
+          programName: programName.trim(),
+          membershipNumber: membershipNumber.trim(),
+          tierLevel: tierLevel.trim() || undefined,
+          notes: notes.trim() || undefined,
+          loyaltyProgramId: mode === "catalog" && selectedCatalogId ? selectedCatalogId : undefined,
+        };
+        await updateMutation.mutateAsync({ id: editing.id, data });
+        toast({ title: "Membership updated", description: "Your loyalty membership has been updated." });
+      } else {
+        const data: CreatePortalLoyaltyProgramInput = {
+          providerName: providerName.trim(),
+          programName: programName.trim(),
+          membershipNumber: membershipNumber.trim(),
+          tierLevel: tierLevel.trim() || undefined,
+          notes: notes.trim() || undefined,
+          loyaltyProgramId: mode === "catalog" && selectedCatalogId ? selectedCatalogId : undefined,
+        };
+        await createMutation.mutateAsync(data);
+        toast({ title: "Membership added", description: "Your loyalty membership has been created." });
+      }
+      onOpenChange(false);
+    } catch {
+      toast({ title: "Error", description: "Failed to save membership. Please try again.", variant: "destructive" });
+    }
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-phoenix-charcoal border-phoenix-gold/30 text-white sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-white">
+            {editing ? "Edit Membership" : "Add Loyalty Membership"}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Mode toggle — only show when catalog has programs */}
+          {hasCatalog && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={mode === "catalog" ? "default" : "outline"}
+                size="sm"
+                className={mode === "catalog"
+                  ? "bg-phoenix-gold text-white hover:bg-phoenix-gold/90"
+                  : "border-phoenix-gold/30 text-phoenix-text-light hover:bg-phoenix-gold/10"}
+                onClick={() => setMode("catalog")}
+              >
+                From Catalog
+              </Button>
+              <Button
+                type="button"
+                variant={mode === "custom" ? "default" : "outline"}
+                size="sm"
+                className={mode === "custom"
+                  ? "bg-phoenix-gold text-white hover:bg-phoenix-gold/90"
+                  : "border-phoenix-gold/30 text-phoenix-text-light hover:bg-phoenix-gold/10"}
+                onClick={() => {
+                  setMode("custom");
+                  setSelectedCatalogId("");
+                }}
+              >
+                Custom
+              </Button>
+            </div>
+          )}
+
+          {/* Catalog selector */}
+          {mode === "catalog" && (
+            <div className="space-y-2">
+              <Label className="text-phoenix-text-light">Program</Label>
+              <Select value={selectedCatalogId || undefined} onValueChange={handleCatalogSelect}>
+                <SelectTrigger className="bg-phoenix-charcoal border-phoenix-gold/30 text-white">
+                  <SelectValue placeholder="Select a loyalty program..." />
+                </SelectTrigger>
+                <SelectContent className="bg-phoenix-charcoal border-phoenix-gold/30 max-h-60">
+                  {catalogGroups.map(([type, items]) => (
+                    <div key={type}>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-phoenix-text-muted uppercase tracking-wide">
+                        {PROGRAM_TYPE_LABELS[type] ?? type}
+                      </div>
+                      {items.map((item) => (
+                        <SelectItem
+                          key={item.id}
+                          value={item.id}
+                          className="text-white hover:bg-phoenix-gold/10"
+                        >
+                          {item.providerName} — {item.programName}
+                        </SelectItem>
+                      ))}
+                    </div>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Custom provider/program fields */}
+          {mode === "custom" && (
+            <>
+              <div className="space-y-2">
+                <Label className="text-phoenix-text-light">Provider Name</Label>
+                <Input
+                  value={providerName}
+                  onChange={(e) => setProviderName(e.target.value)}
+                  placeholder="e.g. Royal Caribbean"
+                  className="bg-phoenix-charcoal border-phoenix-gold/30 text-white placeholder:text-phoenix-text-muted"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-phoenix-text-light">Program Name</Label>
+                <Input
+                  value={programName}
+                  onChange={(e) => setProgramName(e.target.value)}
+                  placeholder="e.g. Crown & Anchor Society"
+                  className="bg-phoenix-charcoal border-phoenix-gold/30 text-white placeholder:text-phoenix-text-muted"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Common fields */}
+          <div className="space-y-2">
+            <Label className="text-phoenix-text-light">Membership Number</Label>
+            <Input
+              value={membershipNumber}
+              onChange={(e) => setMembershipNumber(e.target.value)}
+              placeholder="e.g. 12345678"
+              className="bg-phoenix-charcoal border-phoenix-gold/30 text-white placeholder:text-phoenix-text-muted"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-phoenix-text-light">Tier / Status Level</Label>
+            <Input
+              value={tierLevel}
+              onChange={(e) => setTierLevel(e.target.value)}
+              placeholder="e.g. Gold, Platinum, Diamond"
+              className="bg-phoenix-charcoal border-phoenix-gold/30 text-white placeholder:text-phoenix-text-muted"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-phoenix-text-light">Notes</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any additional details..."
+              className="bg-phoenix-charcoal border-phoenix-gold/30 text-white placeholder:text-phoenix-text-muted"
+              rows={2}
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button
+            variant="outline"
+            className="border-phoenix-gold/30 text-phoenix-text-light hover:bg-phoenix-gold/10"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="bg-phoenix-gold text-white hover:bg-phoenix-gold/90"
+            onClick={handleSubmit}
+            disabled={isPending}
+          >
+            {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {editing ? "Update" : "Add"} Membership
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

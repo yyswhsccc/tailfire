@@ -315,6 +315,33 @@ export type PackageTravelerDto = {
 }
 
 /**
+ * Activity Traveler DTO
+ * Represents a traveler linked to an activity with optional loyalty program
+ */
+export type ActivityTravelerDto = {
+  id: string
+  activityId: string
+  tripTravelerId: string
+  travelerName: string
+  contactLoyaltyProgramId: string | null
+  createdAt: string
+}
+
+/**
+ * Link Travelers DTO
+ * Supports both legacy (tripTravelerIds) and v2 (links with loyalty) shapes
+ */
+export type LinkTravelersDto = {
+  tripTravelerIds?: string[]
+  links?: TravelerLinkItemDto[]
+}
+
+export type TravelerLinkItemDto = {
+  tripTravelerId: string
+  contactLoyaltyProgramId?: string
+}
+
+/**
  * Package List Response DTO
  * Paginated list of packages
  */

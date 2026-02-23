@@ -16,11 +16,18 @@ export interface ActivityTravelerDto {
   activityId: string
   tripTravelerId: string
   travelerName: string
+  contactLoyaltyProgramId: string | null
   createdAt: string
 }
 
+export interface TravelerLinkItem {
+  tripTravelerId: string
+  contactLoyaltyProgramId?: string
+}
+
 export interface LinkTravelersDto {
-  tripTravelerIds: string[]
+  tripTravelerIds?: string[]
+  links?: TravelerLinkItem[]
 }
 
 @Injectable()
@@ -37,6 +44,7 @@ export class ActivityTravelersService {
         id: this.db.schema.activityTravelers.id,
         activityId: this.db.schema.activityTravelers.activityId,
         tripTravelerId: this.db.schema.activityTravelers.tripTravelerId,
+        contactLoyaltyProgramId: this.db.schema.activityTravelers.contactLoyaltyProgramId,
         createdAt: this.db.schema.activityTravelers.createdAt,
         contactSnapshot: this.db.schema.tripTravelers.contactSnapshot,
         contactFirstName: this.db.schema.contacts.firstName,
@@ -63,6 +71,7 @@ export class ActivityTravelersService {
         activityId: r.activityId,
         tripTravelerId: r.tripTravelerId,
         travelerName: `${firstName} ${lastName}`.trim() || 'Unknown',
+        contactLoyaltyProgramId: r.contactLoyaltyProgramId ?? null,
         createdAt: r.createdAt.toISOString(),
       }
     })
@@ -73,9 +82,15 @@ export class ActivityTravelersService {
    * Skips duplicates (uses onConflictDoNothing)
    */
   async linkTravelers(activityId: string, dto: LinkTravelersDto): Promise<ActivityTravelerDto[]> {
-    if (dto.tripTravelerIds.length === 0) {
+    // Support both old shape (tripTravelerIds[]) and new shape (links[])
+    const links: TravelerLinkItem[] = dto.links
+      ?? (dto.tripTravelerIds ?? []).map((id) => ({ tripTravelerId: id }))
+
+    if (links.length === 0) {
       return this.findByActivityId(activityId)
     }
+
+    const tripTravelerIds = links.map((l) => l.tripTravelerId)
 
     // Verify activity exists
     const [activity] = await this.db.client
@@ -95,11 +110,12 @@ export class ActivityTravelersService {
       .select({
         id: this.db.schema.tripTravelers.id,
         tripId: this.db.schema.tripTravelers.tripId,
+        contactId: this.db.schema.tripTravelers.contactId,
       })
       .from(this.db.schema.tripTravelers)
-      .where(inArray(this.db.schema.tripTravelers.id, dto.tripTravelerIds))
+      .where(inArray(this.db.schema.tripTravelers.id, tripTravelerIds))
 
-    if (travelers.length !== dto.tripTravelerIds.length) {
+    if (travelers.length !== tripTravelerIds.length) {
       throw new BadRequestException('One or more traveler IDs are invalid')
     }
 
@@ -113,10 +129,36 @@ export class ActivityTravelersService {
       throw new BadRequestException('All travelers must belong to the same trip')
     }
 
-    const values = dto.tripTravelerIds.map((tripTravelerId) => ({
+    // Build a map from tripTravelerId -> contactId for cross-contact validation
+    const travelerContactMap = new Map(travelers.map((t) => [t.id, t.contactId]))
+
+    // Validate loyalty programs belong to the correct contacts
+    for (const link of links) {
+      if (link.contactLoyaltyProgramId) {
+        const contactId = travelerContactMap.get(link.tripTravelerId)
+        if (contactId) {
+          const [lp] = await this.db.client
+            .select({ contactId: this.db.schema.contactLoyaltyPrograms.contactId })
+            .from(this.db.schema.contactLoyaltyPrograms)
+            .where(eq(this.db.schema.contactLoyaltyPrograms.id, link.contactLoyaltyProgramId))
+            .limit(1)
+          if (lp && lp.contactId !== contactId) {
+            throw new BadRequestException(
+              `Loyalty program ${link.contactLoyaltyProgramId} does not belong to the traveler's contact`,
+            )
+          }
+        }
+      }
+    }
+
+    // Build a lookup for loyalty program IDs
+    const loyaltyMap = new Map(links.map((l) => [l.tripTravelerId, l.contactLoyaltyProgramId || null]))
+
+    const values = tripTravelerIds.map((tripTravelerId) => ({
       tripId,
       activityId,
       tripTravelerId,
+      contactLoyaltyProgramId: loyaltyMap.get(tripTravelerId) ?? null,
     }))
 
     await this.db.client

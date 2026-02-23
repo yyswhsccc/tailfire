@@ -42,6 +42,7 @@ import { NotesModule } from './notes/notes.module'
 import { CalendarEventsModule } from './calendar-events/calendar-events.module'
 import { OcrImportModule } from './ocr-import/ocr-import.module'
 import { PortalModule } from './portal/portal.module'
+import { LoyaltyProgramsModule } from './loyalty-programs/loyalty-programs.module'
 
 @Module({
   imports: [
@@ -149,6 +150,9 @@ import { PortalModule } from './portal/portal.module'
 
     // OCR document import (PDF booking confirmations, passports)
     OcrImportModule,
+
+    // Loyalty Programs Catalog (Library)
+    LoyaltyProgramsModule,
 
     // Client Portal (portal user endpoints)
     PortalModule,

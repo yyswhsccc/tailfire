@@ -94,5 +94,8 @@ export * from './calendar-events.types.js'
 // OCR Document Import
 export * from './ocr-import.types.js'
 
+// Loyalty Programs Catalog (Library)
+export * from './loyalty-programs.types.js'
+
 // Future exports:
 // export * from './auth.types'

@@ -31,6 +31,7 @@ import { useBookings } from '@/hooks/use-bookings'
 import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
 import { ChildOfPackageBookingSection } from '@/components/activities/child-of-package-booking-section'
 import { EditTravelersDialog } from './edit-travelers-dialog'
+import { CruisePassengersSection } from './cruise-passengers-section'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
 import { Combobox } from '@/components/ui/combobox'
@@ -2013,6 +2014,14 @@ export function CustomCruiseForm({
             isChildOfPackage={isChildOfPackage}
             parentPackageName={parentPackageName}
             travelers={travelers}
+          />
+
+          <Separator />
+
+          {/* Passenger Loyalty Programs */}
+          <CruisePassengersSection
+            activityId={activityId}
+            tripId={trip?.id || ''}
           />
 
           <Separator />

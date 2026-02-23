@@ -38,6 +38,7 @@ interface CreateLoyaltyProgramData {
   membershipNumber: string
   tierLevel?: string
   notes?: string
+  loyaltyProgramId?: string
 }
 
 interface UpdateLoyaltyProgramData {
@@ -46,6 +47,7 @@ interface UpdateLoyaltyProgramData {
   membershipNumber?: string
   tierLevel?: string
   notes?: string
+  loyaltyProgramId?: string
 }
 
 /**

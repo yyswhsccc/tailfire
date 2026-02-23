@@ -82,8 +82,11 @@ export class PortalJwtStrategy extends PassportStrategy(Strategy, 'portal-jwt') 
   async validate(payload: PortalJwtPayload): Promise<PortalAuthContext> {
     const appMetadata = payload.app_metadata || {}
 
-    // Must be a portal user
-    const isPortalUser = payload.portal_user || appMetadata.portal_user
+    // Must be a portal user — check role from custom JWT hook or legacy portal_user flag
+    const isPortalUser =
+      payload.role === 'client_portal' ||
+      payload.portal_user ||
+      appMetadata.portal_user
     if (!isPortalUser) {
       throw new UnauthorizedException('Not a portal user')
     }

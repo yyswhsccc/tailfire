@@ -8,6 +8,7 @@
 import { pgTable, uuid, varchar, text, timestamp, jsonb, unique, index } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { contacts } from './contacts.schema'
+import { loyaltyPrograms } from './loyalty-programs.schema'
 
 export const contactLoyaltyPrograms = pgTable(
   'contact_loyalty_programs',
@@ -24,6 +25,10 @@ export const contactLoyaltyPrograms = pgTable(
     notes: text('notes'),
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
 
+    // Optional link to agency catalog
+    loyaltyProgramId: uuid('loyalty_program_id')
+      .references(() => loyaltyPrograms.id, { onDelete: 'set null' }),
+
     // Audit fields
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -36,6 +41,7 @@ export const contactLoyaltyPrograms = pgTable(
     ),
     contactIdIdx: index('idx_loyalty_contact').on(table.contactId),
     providerNameIdx: index('idx_loyalty_provider').on(table.providerName),
+    loyaltyProgramIdx: index('idx_clp_loyalty_program').on(table.loyaltyProgramId),
   }),
 )
 
@@ -44,6 +50,10 @@ export const contactLoyaltyProgramsRelations = relations(contactLoyaltyPrograms,
   contact: one(contacts, {
     fields: [contactLoyaltyPrograms.contactId],
     references: [contacts.id],
+  }),
+  loyaltyProgram: one(loyaltyPrograms, {
+    fields: [contactLoyaltyPrograms.loyaltyProgramId],
+    references: [loyaltyPrograms.id],
   }),
 }))
 
