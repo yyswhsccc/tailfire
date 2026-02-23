@@ -164,3 +164,7 @@ export * from './client-activity-responses.schema'
 // export * from './tasks.schema'
 // export * from './cruise.schema'
 // export * from './lookups.schema'
+
+// Client Portal
+export * from './client-portal-users.schema'
+export * from './itinerary-feedback.schema'
