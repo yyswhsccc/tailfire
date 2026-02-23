@@ -24,12 +24,20 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_provider ON contact_loyalty_programs(prov
 -- RLS: agency isolation through contacts table (follows contact_documents pattern)
 ALTER TABLE contact_loyalty_programs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY contact_loyalty_programs_agency_isolation ON contact_loyalty_programs
-  USING (EXISTS (
-    SELECT 1 FROM contacts
-    WHERE contacts.id = contact_loyalty_programs.contact_id
-    AND contacts.agency_id = current_setting('app.agency_id')::uuid
-  ));
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE policyname = 'contact_loyalty_programs_agency_isolation'
+      AND tablename = 'contact_loyalty_programs'
+  ) THEN
+    CREATE POLICY contact_loyalty_programs_agency_isolation ON contact_loyalty_programs
+      USING (EXISTS (
+        SELECT 1 FROM contacts
+        WHERE contacts.id = contact_loyalty_programs.contact_id
+        AND contacts.agency_id = current_setting('app.agency_id')::uuid
+      ));
+  END IF;
+END $$;
 
 -- 2. Add universal booking columns to activity_pricing
 ALTER TABLE activity_pricing

@@ -29,8 +29,16 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_programs_type ON loyalty_programs(program
 
 -- RLS
 ALTER TABLE loyalty_programs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY loyalty_programs_agency_policy ON loyalty_programs
-  USING (agency_id = current_setting('app.agency_id', true)::uuid);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE policyname = 'loyalty_programs_agency_policy'
+      AND tablename = 'loyalty_programs'
+  ) THEN
+    CREATE POLICY loyalty_programs_agency_policy ON loyalty_programs
+      USING (agency_id = current_setting('app.agency_id', true)::uuid);
+  END IF;
+END $$;
 
 -- ============================================================================
 -- 2. Link contact memberships to catalog (optional FK)
