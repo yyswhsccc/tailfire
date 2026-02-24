@@ -5,7 +5,7 @@
  * Supports both synchronous and async (BullMQ) processing flows.
  */
 
-import { pgTable, uuid, varchar, text, integer, timestamp, index, jsonb, check } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, text, integer, timestamp, index, jsonb, check, boolean } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
 export const OCR_JOB_STATUSES = ['pending', 'processing', 'preview_ready', 'confirmed', 'failed'] as const
@@ -50,6 +50,7 @@ export const ocrImportJobs = pgTable(
 
     // Runbook traceability
     runbookId: uuid('runbook_id'),
+    hintsApplied: boolean('hints_applied').notNull().default(false),
 
     // Performance tracking
     processingTimeMs: integer('processing_time_ms'),

@@ -1,6 +1,7 @@
 'use client'
 
-import { MapPin, Clock } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { MapPin, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { MoreHorizontal } from 'lucide-react'
 import {
   Dialog,
@@ -73,16 +74,19 @@ export function ActivityDetailModal({
   const statusInfo = statusVariants[activity.status] || statusVariants.proposed
   const dateRange = formatDateRange(activity.startDatetime, activity.endDatetime, activity.timezone)
 
+  // Use media array if available, fall back to thumbnail
+  const images = activity.media && activity.media.length > 0
+    ? activity.media
+    : activity.thumbnail
+      ? [{ url: activity.thumbnail, caption: null }]
+      : []
+
   return (
     <Dialog open={!!activity} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-0">
-        {/* Thumbnail */}
-        {activity.thumbnail && (
-          <img
-            src={activity.thumbnail}
-            alt={activity.name}
-            className="w-full h-48 object-cover rounded-t-lg"
-          />
+        {/* Image Gallery */}
+        {images.length > 0 && (
+          <ImageGallery images={images} activityName={activity.name} />
         )}
 
         <div className="px-6 pb-6 space-y-4">
@@ -172,5 +176,97 @@ export function ActivityDetailModal({
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * Image gallery with navigation for activity detail modal.
+ * Single image: shows full image with no controls.
+ * Multiple images: shows carousel with prev/next arrows and dot indicators.
+ */
+function ImageGallery({
+  images,
+  activityName,
+}: {
+  images: Array<{ url: string; caption: string | null }>
+  activityName: string
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  const goTo = useCallback((index: number) => {
+    setCurrentIndex(index)
+  }, [])
+
+  const goPrev = useCallback(() => {
+    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
+  }, [images.length])
+
+  const goNext = useCallback(() => {
+    setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))
+  }, [images.length])
+
+  const current = images[currentIndex]
+  if (!current) return null
+
+  return (
+    <div className="relative">
+      {/* Main image */}
+      <div className="relative w-full aspect-[16/9] bg-muted overflow-hidden rounded-t-lg">
+        <img
+          src={current.url}
+          alt={current.caption || activityName}
+          className="w-full h-full object-cover"
+        />
+
+        {/* Caption overlay */}
+        {current.caption && (
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-4 py-3">
+            <p className="text-sm text-white">{current.caption}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Navigation controls — only if multiple images */}
+      {images.length > 1 && (
+        <>
+          {/* Prev/Next arrows */}
+          <button
+            onClick={goPrev}
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-1.5 transition-colors"
+            aria-label="Previous image"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button
+            onClick={goNext}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-1.5 transition-colors"
+            aria-label="Next image"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+
+          {/* Dot indicators */}
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+            {images.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => goTo(index)}
+                className={`h-2 w-2 rounded-full transition-colors ${
+                  index === currentIndex
+                    ? 'bg-white'
+                    : 'bg-white/50 hover:bg-white/75'
+                }`}
+                aria-label={`Go to image ${index + 1}`}
+              />
+            ))}
+          </div>
+
+          {/* Counter */}
+          <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
+            {currentIndex + 1} / {images.length}
+          </div>
+        </>
+      )}
+    </div>
   )
 }

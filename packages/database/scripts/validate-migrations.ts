@@ -64,6 +64,49 @@ function validateMigrations(): ValidationResult {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Catalog DDL guard enforcement
+  //
+  // New migrations that touch the catalog schema MUST include an environment
+  // guard (pg_class.relkind check) to avoid breaking FDW on Dev/Preview.
+  //
+  // Grandfathered: migrations with timestamp <= 20260203051450
+  // Exempt: files with "_fdw" in the name (FDW setup/restore migrations)
+  // -------------------------------------------------------------------------
+  const CATALOG_DDL_PATTERNS = [
+    /CREATE\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?catalog\./i,
+    /ALTER\s+TABLE\s+(IF\s+EXISTS\s+)?catalog\./i,
+    /DROP\s+TABLE\s+(IF\s+EXISTS\s+)?catalog\./i,
+  ]
+  const GUARD_PATTERNS = [
+    /relkind/i,
+    /pg_class/i,
+  ]
+  const CATALOG_GRANDFATHER_CUTOFF = '20260203051450'
+
+  for (const file of files) {
+    // Only enforce on timestamp-format migrations after the cutoff
+    const tsMatch = file.match(/^(\d{14})_/)
+    if (!tsMatch) continue
+    if (tsMatch[1] <= CATALOG_GRANDFATHER_CUTOFF) continue
+
+    // Exempt FDW setup/restore migrations
+    if (file.includes('_fdw')) continue
+
+    const content = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf-8')
+    const hasCatalogDDL = CATALOG_DDL_PATTERNS.some(p => p.test(content))
+    if (!hasCatalogDDL) continue
+
+    const hasGuard = GUARD_PATTERNS.every(p => p.test(content))
+    if (!hasGuard) {
+      errors.push(
+        `Unguarded catalog DDL: ${file} — ` +
+        `migrations that CREATE/ALTER/DROP catalog.* tables must include a ` +
+        `pg_class.relkind environment guard. See MIGRATIONS.md > "Catalog Schema (FDW-Protected)".`
+      )
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,

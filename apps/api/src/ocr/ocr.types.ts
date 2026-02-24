@@ -115,10 +115,13 @@ export interface OcrCruiseExtraction {
   voyageCode?: string | null
   departurePort?: string | null
   departureDate?: string | null
+  departureTime?: string | null
   arrivalPort?: string | null
   arrivalDate?: string | null
+  arrivalTime?: string | null
   cabinCategory?: string | null
   cabinNumber?: string | null
+  cabinDeck?: string | null
   nights?: number | null
   totalPriceCents?: number | null
   currency?: string | null
@@ -257,6 +260,8 @@ export interface OcrPackageExtraction {
 export interface OcrExtractionResult {
   documentType: OcrDocumentType
   confidence: number
+  /** Supplier name from detection (e.g. "Transat", "Air Canada") */
+  supplierName?: string | null
   flight?: OcrFlightExtraction | null
   lodging?: OcrLodgingExtraction | null
   cruise?: OcrCruiseExtraction | null
@@ -364,10 +369,13 @@ export const ocrCruiseExtractionSchema = z.object({
   voyageCode: z.string().nullish(),
   departurePort: z.string().nullish(),
   departureDate: z.string().nullish(),
+  departureTime: z.string().nullish(),
   arrivalPort: z.string().nullish(),
   arrivalDate: z.string().nullish(),
+  arrivalTime: z.string().nullish(),
   cabinCategory: z.string().nullish(),
   cabinNumber: z.string().nullish(),
+  cabinDeck: z.string().nullish(),
   nights: z.number().nullish(),
   totalPrice: z.number().nullish(),
   currency: z.string().nullish(),
@@ -508,6 +516,7 @@ export const ocrPackageExtractionSchema = z.object({
 export const ocrDetectionSchema = z.object({
   documentType: z.enum(OCR_DOCUMENT_TYPES),
   confidence: z.number().min(0).max(1),
+  supplierName: z.string().nullish(),
 })
 
 /** Map document types to their Zod schemas */

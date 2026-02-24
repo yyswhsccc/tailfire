@@ -24,8 +24,16 @@ Tailfire uses PostgreSQL with two schemas:
 
 > **Architecture:** The catalog schema contains cruise reference data from Traveltek.
 > - **Production**: Local tables populated by daily FTP sync (source of truth)
-> - **Preview/Dev**: Foreign tables via FDW reading from Production
-> - **Local Dev**: Local tables for offline development (may drift from Prod)
+> - **Dev/Preview**: **Foreign tables** via FDW reading directly from Production (not local copies)
+>
+> **If FDW breaks on local dev** (catalog queries fail or return no data), restore with:
+> ```bash
+> ./scripts/setup-local-fdw.sh
+> ```
+>
+> **WARNING:** Never write unguarded DDL against the `catalog` schema in migrations.
+> `CREATE TABLE`, `ALTER TABLE`, and `DROP TABLE` on Dev/Preview will break FDW.
+> See `packages/database/MIGRATIONS.md` > "Catalog Schema (FDW-Protected)" for the guard template.
 
 The catalog schema contains read-only cruise reference data from Traveltek:
 
@@ -333,111 +341,43 @@ All schemas are exported from a single entry point:
 
 ## FDW Architecture
 
-> **Status:** The FDW architecture is designed and migrations exist. The catalog schema tables are present in all environments. FDW allows Preview/Dev to read catalog data from Production when Traveltek sync is active in Production only.
+> **Status:** FDW is active in Dev and Preview. The Drizzle migration
+> `20260104205000_setup_catalog_fdw.sql` is **dead code** (unconditional `RETURN` at line 23).
+> FDW is set up and restored via `./scripts/setup-local-fdw.sh` for local dev.
 
 ### Overview
 
-The Foreign Data Wrapper will allow Preview/Development to read catalog data from Production:
-
-| Environment | Project Ref | catalog Schema (Planned) |
-|-------------|-------------|--------------------------|
-| **Production** | `cmktvanwglszgadjrorm` | Local tables (cruise data from Traveltek) |
+| Environment | Project Ref | catalog Schema |
+|-------------|-------------|----------------|
+| **Production** | `cmktvanwglszgadjrorm` | Local tables (cruise data from Traveltek sync) |
+| **Dev** | `hplioumsywqgtnhwcivw` | Foreign tables (via FDW to Prod) |
 | **Preview** | `gaqacfstpnmwphekjzae` | Foreign tables (via FDW to Prod) |
 
-### FDW Migration
+### Setup & Restoration
 
-**Location**: `packages/database/src/migrations/20260104205000_setup_catalog_fdw.sql`
+FDW is configured by running:
 
-#### Guard Clause
-
-The migration detects the environment by checking if `catalog.cruise_lines` exists as a local table:
-
-```sql
-DO $$
-BEGIN
-  -- Check if catalog.cruise_lines exists as a local table ('r' = ordinary table)
-  IF EXISTS (
-    SELECT 1 FROM pg_class c
-    JOIN pg_namespace n ON c.relnamespace = n.oid
-    WHERE n.nspname = 'catalog'
-      AND c.relname = 'cruise_lines'
-      AND c.relkind = 'r'
-  ) THEN
-    RAISE NOTICE 'Local catalog tables exist - skipping FDW setup (Production)';
-    RETURN;
-  END IF;
-
-  -- FDW setup code runs here (Development only)
-END $$;
+```bash
+./scripts/setup-local-fdw.sh
 ```
 
-#### Foreign Server Creation
+This script:
+- Reads credentials from Doppler (no hardcoded passwords)
+- Verifies the target is the Dev database (refuses to run against Prod)
+- Drops and recreates the `prod_catalog` foreign server + catalog schema
+- Imports all tables from Production's catalog schema as foreign tables
+- Grants `SELECT` to `service_role` and `authenticated`
 
-```sql
-CREATE EXTENSION IF NOT EXISTS postgres_fdw;
-
-CREATE SERVER prod_catalog
-  FOREIGN DATA WRAPPER postgres_fdw
-  OPTIONS (
-    host 'db.cmktvanwglszgadjrorm.supabase.co',
-    port '5432',
-    dbname 'postgres'
-  );
-```
-
-#### User Mapping
-
-```sql
-CREATE USER MAPPING FOR current_user
-  SERVER prod_catalog
-  OPTIONS (
-    user 'fdw_catalog_ro',
-    password '__FDW_PASSWORD__'  -- Substituted by CI pipeline
-  );
-```
-
-**Note**: `__FDW_PASSWORD__` is replaced during CI/CD deployment. Never commit the actual password.
-
-#### Schema Import
-
-```sql
-IMPORT FOREIGN SCHEMA catalog
-  LIMIT TO (
-    cruise_alternate_sailings,
-    cruise_cabin_images,
-    cruise_ftp_file_sync,
-    cruise_lines,
-    cruise_ports,
-    cruise_regions,
-    cruise_sailing_cabin_prices,
-    cruise_sailing_regions,
-    cruise_sailing_stops,
-    cruise_sailings,
-    cruise_ship_cabin_types,
-    cruise_ship_decks,
-    cruise_ship_images,
-    cruise_ships,
-    cruise_sync_history,
-    cruise_sync_raw
-  )
-  FROM SERVER prod_catalog
-  INTO catalog;
-```
-
-#### Permissions
-
-```sql
-GRANT USAGE ON SCHEMA catalog TO service_role, authenticated;
-GRANT SELECT ON ALL TABLES IN SCHEMA catalog TO service_role, authenticated;
-```
+See `apps/ota/supabase/FDW_SETUP.md` for full documentation.
 
 ### Production Setup (Read-Only User)
 
-On the **Production** database, create the read-only user:
+On the **Production** database, the `fdw_catalog_ro` read-only user must exist.
+Password is stored in Doppler as `FDW_CATALOG_PASSWORD`.
 
 ```sql
--- Create read-only user for FDW
-CREATE USER fdw_catalog_ro WITH PASSWORD '<STRONG_PASSWORD>';
+-- Create read-only user for FDW (password from Doppler)
+CREATE USER fdw_catalog_ro WITH PASSWORD '<RETRIEVE_FROM_DOPPLER: FDW_CATALOG_PASSWORD>';
 
 -- Grant access to catalog schema
 GRANT USAGE ON SCHEMA catalog TO fdw_catalog_ro;
@@ -448,9 +388,17 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA catalog
   GRANT SELECT ON TABLES TO fdw_catalog_ro;
 ```
 
-### Development Setup (Vault Secret)
+### Dead Migration Note
 
-On the **Development** database, store the password in Supabase Vault:
+The Drizzle migration `20260104205000_setup_catalog_fdw.sql` contains FDW setup logic
+but has an unconditional `RETURN` at line 23 that prevents it from ever executing.
+The CI step in `deploy-preview.yml` that injects `__FDW_PASSWORD__` into this migration
+has no effect. FDW was always set up manually.
+
+### Development Setup (Vault Secret — Legacy)
+
+Previously the password was stored in Supabase Vault. This is no longer the primary method;
+use Doppler instead. For reference:
 
 ```sql
 SELECT vault.create_secret('fdw_password', '<STRONG_PASSWORD>');

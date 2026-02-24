@@ -54,7 +54,7 @@ import {
   TOUR_SUBTYPES,
   type TourFormData,
 } from '@/lib/validation/tour-validation'
-import { getErrorMessage, scrollToFirstError } from '@/lib/validation/utils'
+import { getErrorMessage, scrollToFirstError, flattenErrors, formatFieldLabel } from '@/lib/validation/utils'
 import { TripDateWarning } from '@/components/ui/trip-date-warning'
 import { getDefaultMonthHint } from '@/lib/date-utils'
 import { usePendingDayResolution } from '@/components/ui/pending-day-picker'
@@ -474,9 +474,11 @@ export function TourForm({
         setLastSavedAt(new Date())
       } catch (err: any) {
         setAutoSaveStatus('error')
+        const fieldErrors = err?.fieldErrors as Array<{ field: string; message: string }> | undefined
+        const details = fieldErrors?.map((e: any) => `${e.field}: ${e.message}`).join('; ')
         toast({
           title: 'Auto-save failed',
-          description: err.message,
+          description: details || err.message,
           variant: 'destructive',
         })
       }
@@ -507,9 +509,16 @@ export function TourForm({
   const forceSave = useCallback(async () => {
     if (!isValid) {
       scrollToFirstError(errors)
+      const errorFields = flattenErrors(errors as Record<string, unknown>)
+      const details = errorFields
+        .map(f => {
+          const msg = getErrorMessage(errors as Record<string, unknown>, f)
+          return `${formatFieldLabel(f)}: ${msg || 'invalid'}`
+        })
+        .join(', ')
       toast({
         title: 'Validation Error',
-        description: 'Please fix the errors before saving.',
+        description: details || 'Please fix the errors before saving.',
         variant: 'destructive',
       })
       return
@@ -538,9 +547,11 @@ export function TourForm({
       setLastSavedAt(new Date())
     } catch (err: any) {
       setAutoSaveStatus('error')
+      const fieldErrors = err?.fieldErrors as Array<{ field: string; message: string }> | undefined
+      const details = fieldErrors?.map((e: any) => `${e.field}: ${e.message}`).join('; ')
       toast({
         title: 'Save failed',
-        description: err.message,
+        description: details || err.message,
         variant: 'destructive',
       })
     }

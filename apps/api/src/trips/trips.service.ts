@@ -2531,7 +2531,7 @@ export class TripsService {
       }
     }
 
-    // Batch-fetch all detail tables, pricing, and child activities in parallel
+    // Batch-fetch all detail tables, pricing, media, and child activities in parallel
     const [
       flightDetailsMap,
       flightSegmentsMap,
@@ -2546,6 +2546,7 @@ export class TripsService {
       tourDayDetailsMap,
       pricingMap,
       childActivitiesMap,
+      mediaRows,
     ] = await Promise.all([
       this.batchFetchByActivityIds(this.db.schema.flightDetails, allActivityIds),
       this.batchFetchFlightSegments(allActivityIds),
@@ -2560,7 +2561,10 @@ export class TripsService {
       this.batchFetchByActivityIds(this.db.schema.tourDayDetails, allActivityIds),
       this.batchFetchPricing(allActivityIds),
       this.batchFetchChildActivities(allActivityIds, pricingVisible),
+      this.batchFetchMedia(allActivityIds),
     ])
+
+    const mediaMap = this.buildMediaMap(mediaRows)
 
     // Build day DTOs
     let days: SharedItineraryDayDto[] = daysWithActivities.map((day) => ({
@@ -2584,6 +2588,7 @@ export class TripsService {
           tourDayDetails: tourDayDetailsMap.get(activity.id),
           pricing: pricingMap.get(activity.id),
           childActivities: childActivitiesMap.get(activity.id) || [],
+          media: mediaMap.get(activity.id) || [],
           pricingVisible,
         }),
       ),
@@ -2668,12 +2673,14 @@ export class TripsService {
       .where(inArray(this.db.schema.itineraryActivities.parentActivityId, parentActivityIds))
       .orderBy(asc(this.db.schema.itineraryActivities.sequenceOrder))
 
-    // Fetch pricing for children
+    // Fetch pricing, thumbnails, and media for children
     const childIds = children.map((c) => c.id)
-    const childPricingMap = await this.batchFetchPricing(childIds)
-
-    // Fetch thumbnails for children
-    const childThumbnailMap = await this.batchFetchThumbnails(childIds)
+    const [childPricingMap, childThumbnailMap, childMediaRows] = await Promise.all([
+      this.batchFetchPricing(childIds),
+      this.batchFetchThumbnails(childIds),
+      this.batchFetchMedia(childIds),
+    ])
+    const childMediaMap = this.buildMediaMap(childMediaRows)
 
     const map = new Map<string, SharedActivityDto[]>()
     for (const child of children) {
@@ -2692,6 +2699,7 @@ export class TripsService {
           } as any,
           {
             pricing: childPricingMap.get(child.id),
+            media: childMediaMap.get(child.id) || [],
             pricingVisible,
             flightSegments: [],
             childActivities: [],
@@ -2704,10 +2712,25 @@ export class TripsService {
 
   private async batchFetchThumbnails(activityIds: string[]): Promise<Map<string, string>> {
     if (activityIds.length === 0) return new Map()
-    const mediaRows = await this.db.client
+    const mediaRows = await this.batchFetchMedia(activityIds)
+
+    const map = new Map<string, string>()
+    for (const row of mediaRows) {
+      // First image wins per activity
+      if (!map.has(row.activityId)) {
+        map.set(row.activityId, row.fileUrl)
+      }
+    }
+    return map
+  }
+
+  private async batchFetchMedia(activityIds: string[]): Promise<Array<{ activityId: string; fileUrl: string; caption: string | null }>> {
+    if (activityIds.length === 0) return []
+    return this.db.client
       .select({
         activityId: this.db.schema.activityMedia.activityId,
         fileUrl: this.db.schema.activityMedia.fileUrl,
+        caption: this.db.schema.activityMedia.caption,
       })
       .from(this.db.schema.activityMedia)
       .where(
@@ -2717,13 +2740,15 @@ export class TripsService {
         ),
       )
       .orderBy(asc(this.db.schema.activityMedia.orderIndex))
+  }
 
-    const map = new Map<string, string>()
+  private buildMediaMap(mediaRows: Array<{ activityId: string; fileUrl: string; caption: string | null }>): Map<string, Array<{ url: string; caption: string | null }>> {
+    const map = new Map<string, Array<{ url: string; caption: string | null }>>()
     for (const row of mediaRows) {
-      // First image wins per activity
       if (!map.has(row.activityId)) {
-        map.set(row.activityId, row.fileUrl)
+        map.set(row.activityId, [])
       }
+      map.get(row.activityId)!.push({ url: row.fileUrl, caption: row.caption })
     }
     return map
   }
@@ -2747,6 +2772,7 @@ export class TripsService {
       tourDayDetails?: any
       pricing?: any
       childActivities?: SharedActivityDto[]
+      media?: Array<{ url: string; caption: string | null }>
       pricingVisible: boolean
     },
   ): SharedActivityDto {
@@ -2754,6 +2780,8 @@ export class TripsService {
     const pricing = context.pricingVisible
       ? this.toPublicPricing(context.pricing)
       : null
+
+    const media = context.media || []
 
     return {
       id: activity.id,
@@ -2770,6 +2798,7 @@ export class TripsService {
       isBooked: activity.isBooked ?? false,
       confirmationNumber: activity.confirmationNumber || null,
       thumbnail: activity.thumbnail || null,
+      media,
       pricing,
       detail,
     }

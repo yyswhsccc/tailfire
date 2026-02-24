@@ -1,7 +1,7 @@
 'use client'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useState, lazy, Suspense } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { ConfirmationDialogProvider } from '@/components/ui/confirmation-dialog'
 import { LoadingProvider } from '@/context/loading-context'
 import { GlobalLoadingOverlay } from '@/components/ui/loading-overlay'
@@ -32,6 +32,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   )
 
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  const showDevtools =
+    mounted &&
+    process.env.NODE_ENV === 'development' &&
+    process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === 'true'
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -41,13 +49,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
               {children}
             <GlobalLoadingOverlay />
             <Toaster />
-            {typeof window !== 'undefined' &&
-              process.env.NODE_ENV === 'development' &&
-              process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === 'true' && (
-                <Suspense fallback={null}>
-                  <ReactQueryDevtools initialIsOpen={false} />
-                </Suspense>
-              )}
+            {showDevtools && (
+              <Suspense fallback={null}>
+                <ReactQueryDevtools initialIsOpen={false} />
+              </Suspense>
+            )}
             </ConfirmationDialogProvider>
           </LoadingProvider>
         </NotificationsProvider>

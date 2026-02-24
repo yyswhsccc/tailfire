@@ -842,6 +842,12 @@ export type SharedActivityDetailDto =
   | SharedOptionsDetailDto
   | SharedGenericDetailDto
 
+/** Public-safe media item for shared proposal */
+export interface SharedMediaDto {
+  url: string
+  caption: string | null
+}
+
 /** Public-safe activity for shared proposal */
 export interface SharedActivityDto {
   id: string
@@ -858,6 +864,7 @@ export interface SharedActivityDto {
   isBooked: boolean
   confirmationNumber: string | null
   thumbnail: string | null
+  media: SharedMediaDto[]
   pricing: SharedActivityPricingDto | null
   detail: SharedActivityDetailDto | null
 }

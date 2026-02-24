@@ -63,10 +63,12 @@ export function useCreateTour(itineraryId: string, dayId: string) {
       // Invalidate bookings cache (new tour affects unlinked activities list)
       void queryClient.invalidateQueries({ queryKey: bookingKeys.all })
     },
-    onError: (_error) => {
+    onError: (error: any) => {
+      const fieldErrors = error?.fieldErrors as Array<{ field: string; message: string }> | undefined
+      const details = fieldErrors?.map(e => `${e.field}: ${e.message}`).join('; ')
       toast({
-        title: 'Error',
-        description: 'Failed to create tour. Please try again.',
+        title: 'Failed to create tour',
+        description: details || error?.message || 'Please try again.',
         variant: 'destructive',
       })
     },
@@ -96,10 +98,12 @@ export function useUpdateTour(itineraryId: string, dayId: string) {
       // Invalidate bookings cache (tour pricing updates affect bookings tab)
       void queryClient.invalidateQueries({ queryKey: bookingKeys.all })
     },
-    onError: (_error) => {
+    onError: (error: any) => {
+      const fieldErrors = error?.fieldErrors as Array<{ field: string; message: string }> | undefined
+      const details = fieldErrors?.map(e => `${e.field}: ${e.message}`).join('; ')
       toast({
-        title: 'Error',
-        description: 'Failed to update tour. Please try again.',
+        title: 'Failed to update tour',
+        description: details || error?.message || 'Please try again.',
         variant: 'destructive',
       })
     },

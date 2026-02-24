@@ -68,7 +68,7 @@ export class ActivitiesController {
 
   private async initializeCredentials(): Promise<void> {
     try {
-      const creds = await this.credentialResolver.resolve(ApiProvider.AMADEUS)
+      const creds = await this.credentialResolver.resolve(ApiProvider.AMADEUS_ACTIVITIES)
       if (creds) {
         await this.amadeusActivities.setCredentials(creds)
       }

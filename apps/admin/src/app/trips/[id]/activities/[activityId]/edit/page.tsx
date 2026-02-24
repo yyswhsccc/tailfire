@@ -146,6 +146,8 @@ function renderActivityForm(
 
     // Tour - excursions, activities, attractions
     case 'tour':
+    case 'custom_tour':
+    case 'tour_day':
       return (
         <TourForm
           key={formKey}

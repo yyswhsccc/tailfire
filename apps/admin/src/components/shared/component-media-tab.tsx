@@ -5,12 +5,14 @@
  *
  * Shared media gallery tab for component-level media (activities, accommodations, flights, etc.)
  * No cover photo feature - just a simple gallery with add/delete functionality.
+ * Supports multi-select with Select All and batch delete.
  */
 
 import { useState, useCallback } from 'react'
-import { ImageIcon, Plus, Trash2, Loader2 } from 'lucide-react'
+import { ImageIcon, Plus, Trash2, Loader2, CheckSquare, Square, XCircle, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { EmptyState } from './empty-state'
 import {
   Dialog,
@@ -34,6 +36,8 @@ import { useToast } from '@/hooks/use-toast'
 import {
   useComponentMedia,
   useDeleteComponentMedia,
+  useDeleteBatchComponentMedia,
+  useSetPrimaryComponentMedia,
   componentMediaKeys,
   type ComponentEntityType,
   type ComponentMediaDto,
@@ -66,14 +70,48 @@ export function ComponentMediaTab({
   const { toast } = useToast()
   const [showAddMediaDialog, setShowAddMediaDialog] = useState(false)
   const [deleteMediaId, setDeleteMediaId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false)
 
   // Queries
   const { data: media = [], isLoading } = useComponentMedia(componentId, entityType)
 
   // Mutations
   const deleteMedia = useDeleteComponentMedia(componentId, entityType, itineraryId)
+  const batchDeleteMedia = useDeleteBatchComponentMedia(componentId, entityType, itineraryId)
+  const setPrimaryMedia = useSetPrimaryComponentMedia(componentId, entityType, itineraryId)
 
-  // Handle delete
+  const isSelecting = selectedIds.size > 0
+  const allSelected = media.length > 0 && selectedIds.size === media.length
+
+  // Toggle selection for a single item
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+
+  // Select all / deselect all
+  const toggleSelectAll = useCallback(() => {
+    if (allSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(media.map(m => m.id)))
+    }
+  }, [allSelected, media])
+
+  // Clear selection
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set())
+  }, [])
+
+  // Handle single delete
   const handleDelete = useCallback(async () => {
     if (!deleteMediaId) return
 
@@ -84,6 +122,12 @@ export function ComponentMediaTab({
         description: 'The image has been removed',
       })
       setDeleteMediaId(null)
+      // Remove from selection if it was selected
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        next.delete(deleteMediaId)
+        return next
+      })
     } catch (error) {
       toast({
         title: 'Delete failed',
@@ -92,6 +136,45 @@ export function ComponentMediaTab({
       })
     }
   }, [deleteMediaId, deleteMedia, toast])
+
+  // Handle batch delete
+  const handleBatchDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+
+    try {
+      await batchDeleteMedia.mutateAsync(ids)
+      toast({
+        title: `${ids.length} photo${ids.length > 1 ? 's' : ''} deleted`,
+        description: 'The selected images have been removed',
+      })
+      setSelectedIds(new Set())
+      setShowBatchDeleteConfirm(false)
+    } catch (error) {
+      toast({
+        title: 'Batch delete failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      })
+    }
+  }, [selectedIds, batchDeleteMedia, toast])
+
+  // Handle set primary
+  const handleSetPrimary = useCallback(async (id: string) => {
+    try {
+      await setPrimaryMedia.mutateAsync(id)
+      toast({
+        title: 'Primary image set',
+        description: 'This image will be used as the thumbnail',
+      })
+    } catch (error) {
+      toast({
+        title: 'Failed to set primary image',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      })
+    }
+  }, [setPrimaryMedia, toast])
 
   // Loading state
   if (isLoading) {
@@ -115,18 +198,66 @@ export function ComponentMediaTab({
               <h2 className="text-lg font-semibold text-ash-900">{title}</h2>
               <p className="text-sm text-ash-600">{description}</p>
             </div>
-            <Button onClick={() => setShowAddMediaDialog(true)} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Photo
-            </Button>
+            <div className="flex items-center gap-2">
+              {media.length > 0 && (
+                <>
+                  {isSelecting && (
+                    <>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setShowBatchDeleteConfirm(true)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete {selectedIds.size}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearSelection}
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Cancel
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleSelectAll}
+                  >
+                    {allSelected ? (
+                      <>
+                        <CheckSquare className="h-4 w-4 mr-2" />
+                        Deselect All
+                      </>
+                    ) : (
+                      <>
+                        <Square className="h-4 w-4 mr-2" />
+                        Select All
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+              <Button onClick={() => setShowAddMediaDialog(true)} size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Photo
+              </Button>
+            </div>
           </div>
 
           {media.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {media.map((photo) => (
+              {media.map((photo, index) => (
                 <MediaCard
                   key={photo.id}
                   media={photo}
+                  isPrimary={index === 0}
+                  selected={selectedIds.has(photo.id)}
+                  isSelecting={isSelecting}
+                  onToggleSelect={toggleSelect}
+                  onSetPrimary={handleSetPrimary}
                   onDelete={(id) => setDeleteMediaId(id)}
                 />
               ))}
@@ -175,7 +306,7 @@ export function ComponentMediaTab({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Single Delete Confirmation Dialog */}
       <AlertDialog
         open={!!deleteMediaId}
         onOpenChange={(open) => !open && setDeleteMediaId(null)}
@@ -199,6 +330,31 @@ export function ComponentMediaTab({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Batch Delete Confirmation Dialog */}
+      <AlertDialog
+        open={showBatchDeleteConfirm}
+        onOpenChange={setShowBatchDeleteConfirm}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Photo{selectedIds.size > 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedIds.size} selected photo{selectedIds.size > 1 ? 's' : ''}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBatchDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={batchDeleteMedia.isPending}
+            >
+              {batchDeleteMedia.isPending ? 'Deleting...' : `Delete ${selectedIds.size} Photo${selectedIds.size > 1 ? 's' : ''}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -208,17 +364,54 @@ export function ComponentMediaTab({
  */
 interface MediaCardProps {
   media: ComponentMediaDto
+  isPrimary: boolean
+  selected: boolean
+  isSelecting: boolean
+  onToggleSelect: (id: string) => void
+  onSetPrimary: (id: string) => void
   onDelete: (id: string) => void
 }
 
-function MediaCard({ media, onDelete }: MediaCardProps) {
+function MediaCard({ media, isPrimary, selected, isSelecting, onToggleSelect, onSetPrimary, onDelete }: MediaCardProps) {
   return (
-    <div className="group relative aspect-square overflow-hidden rounded-lg border border-ash-200">
+    <div
+      className={`group relative aspect-square overflow-hidden rounded-lg border-2 transition-colors cursor-pointer ${
+        selected
+          ? 'border-primary ring-2 ring-primary/20'
+          : isPrimary
+            ? 'border-amber-400 ring-1 ring-amber-200'
+            : 'border-ash-200 hover:border-ash-300'
+      }`}
+      onClick={() => onToggleSelect(media.id)}
+    >
       <img
         src={media.fileUrl}
         alt={media.caption || 'Photo'}
         className="h-full w-full object-cover"
       />
+
+      {/* Primary badge - always visible on the primary image */}
+      {isPrimary && (
+        <div className="absolute top-2 right-2 z-10">
+          <div className="bg-amber-500 text-white rounded-full px-2 py-0.5 flex items-center gap-1 text-xs font-medium shadow-sm">
+            <Star className="h-3 w-3 fill-current" />
+            Primary
+          </div>
+        </div>
+      )}
+
+      {/* Selection checkbox - always visible when selecting, visible on hover otherwise */}
+      <div className={`absolute top-2 left-2 transition-opacity ${
+        isSelecting || selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+      }`}>
+        <div className="bg-white rounded shadow-sm p-0.5">
+          <Checkbox
+            checked={selected}
+            onCheckedChange={() => onToggleSelect(media.id)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      </div>
 
       {/* Attribution overlay */}
       {media.attribution?.source === 'unsplash' && (
@@ -236,18 +429,37 @@ function MediaCard({ media, onDelete }: MediaCardProps) {
         </div>
       )}
 
-      {/* Hover actions */}
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button
-          size="sm"
-          variant="destructive"
-          className="h-7 w-7 p-0"
-          onClick={() => onDelete(media.id)}
-          title="Delete photo"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
+      {/* Hover actions - only show when NOT in selection mode */}
+      {!isSelecting && (
+        <div className={`absolute ${isPrimary ? 'top-10' : 'top-2'} right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
+          {!isPrimary && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 w-7 p-0 bg-white/90 hover:bg-amber-50"
+              onClick={(e) => {
+                e.stopPropagation()
+                onSetPrimary(media.id)
+              }}
+              title="Set as primary image"
+            >
+              <Star className="h-3.5 w-3.5 text-amber-500" />
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="destructive"
+            className="h-7 w-7 p-0"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(media.id)
+            }}
+            title="Delete photo"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
