@@ -55,6 +55,13 @@ Rules:
 - List ALL travelers/passengers mentioned in the document
 - Extract Terms & Conditions and Cancellation Policy sections verbatim if present. Return null if no explicit T&C or cancellation policy section exists — do NOT fabricate or infer policies
 - Only extract clearly labeled policy sections (e.g., "Terms and Conditions", "Cancellation Policy", "Change Fees", "Refund Policy", "Fare Rules"). Do NOT extract general booking notes or remarks as policies
-- If a field is not visible, set it to null — do NOT guess`
+- If a field is not visible, set it to null — do NOT guess
+
+Flight-Specific Extraction Guidance:
+- Codeshare flights: If a flight shows "Operated by [Carrier]", use the MARKETING carrier for flightNumber (the one on the ticket) and note the operating carrier in the segment airline field if different
+- Fare class to cabin class mapping: Y/B/H/K/M/L/V/S/N/Q/O = economy, W/P/E = premium economy, J/C/D/I/Z = business, F/A/R = first. Use the cabin class name (economy/premium_economy/business/first), not the fare letter
+- Connection vs stopover: If layover is <24h, treat as separate segments of the same journey. If >24h, may be a multi-city itinerary
+- Canadian carriers: AC (Air Canada, e-ticket 014-xxx), WS (WestJet), PD (Porter Airlines), TS (Air Transat), F8 (Flair Airlines)
+- PNR/confirmation code: Typically 6 alphanumeric characters (e.g. "ABCD12")`
 
 export const FLIGHT_EXTRACTION_USER_PROMPT = `Extract all flight booking details from this document. Return structured JSON with confirmation number, segments, pricing, and travelers.`

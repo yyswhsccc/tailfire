@@ -94,7 +94,7 @@ export class TransfersController {
 
   private async initializeCredentials(): Promise<void> {
     try {
-      const creds = await this.credentialResolver.resolve(ApiProvider.AMADEUS)
+      const creds = await this.credentialResolver.resolve(ApiProvider.AMADEUS_TRANSFERS)
       if (creds) {
         await this.amadeusTransfers.setCredentials(creds)
       }

@@ -19,6 +19,63 @@ Guidelines for creating and managing database migrations in the Tailfire project
 
 ---
 
+## Catalog Schema (FDW-Protected)
+
+> **Golden Rule: Never write unguarded DDL against the `catalog` schema.**
+>
+> On Dev and Preview, `catalog.*` tables are **foreign tables** (via FDW to Production).
+> Unguarded `CREATE TABLE`, `ALTER TABLE`, or `DROP TABLE` statements will either
+> silently create local tables (breaking FDW) or fail on foreign tables.
+
+### What Breaks FDW
+
+| DDL Statement | Effect on Dev/Preview |
+|---|---|
+| `CREATE TABLE catalog.foo (...)` | Creates a local table, shadows foreign table |
+| `ALTER TABLE catalog.foo ADD COLUMN ...` | Fails — cannot alter a foreign table |
+| `DROP TABLE catalog.foo` | Drops the foreign table, data disappears |
+
+### Environment Guard Template
+
+Wrap any `catalog` DDL in a guard that checks whether the table is a regular (local) table:
+
+```sql
+DO $$
+BEGIN
+  -- Only run on environments where catalog tables are LOCAL (Production)
+  IF EXISTS (
+    SELECT 1 FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'catalog'
+      AND c.relname = 'cruise_lines'
+      AND c.relkind = 'r'  -- 'r' = ordinary table, 'f' = foreign table
+  ) THEN
+    -- Safe to run DDL — this is Production with local catalog tables
+    -- YOUR DDL HERE
+  ELSE
+    RAISE NOTICE 'Skipping catalog DDL — foreign tables detected (Dev/Preview)';
+  END IF;
+END $$;
+```
+
+### Companion Migration Pattern
+
+When adding new catalog tables, create **two** pieces:
+1. **Production DDL** (guarded): `CREATE TABLE catalog.new_table (...)` inside the guard above
+2. **FDW re-import** is automatic — `./scripts/setup-local-fdw.sh` uses `IMPORT FOREIGN SCHEMA` which picks up all tables
+
+### Restoring FDW After Breakage
+
+If local dev FDW is broken (catalog queries fail or return no data):
+
+```bash
+./scripts/setup-local-fdw.sh
+```
+
+This drops and recreates the entire `catalog` schema as foreign tables from Production.
+
+---
+
 ## Naming Format
 
 New migrations must use UTC timestamp format:

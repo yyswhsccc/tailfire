@@ -18,6 +18,10 @@ export enum ApiProvider {
   // External APIs
   AERODATABOX = 'aerodatabox',
   AMADEUS = 'amadeus',
+  AMADEUS_ACTIVITIES = 'amadeus_activities',
+  AMADEUS_HOTELS = 'amadeus_hotels',
+  AMADEUS_OFFERS = 'amadeus_offers',
+  AMADEUS_TRANSFERS = 'amadeus_transfers',
   GOOGLE_PLACES = 'google_places',
   BOOKING_COM = 'booking_com',
   // AI providers

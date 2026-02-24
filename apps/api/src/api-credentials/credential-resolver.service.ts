@@ -76,6 +76,42 @@ export const PROVIDER_CREDENTIAL_CONFIG: Record<ApiProvider, ProviderCredentialC
     required: ['clientId', 'clientSecret'],
     isShared: true,
   },
+  [ApiProvider.AMADEUS_ACTIVITIES]: {
+    policy: 'env-only',
+    envVars: {
+      clientId: 'AMADEUS_CLIENT_ID',
+      clientSecret: 'AMADEUS_CLIENT_SECRET',
+    },
+    required: ['clientId', 'clientSecret'],
+    isShared: true,
+  },
+  [ApiProvider.AMADEUS_HOTELS]: {
+    policy: 'env-only',
+    envVars: {
+      clientId: 'AMADEUS_CLIENT_ID',
+      clientSecret: 'AMADEUS_CLIENT_SECRET',
+    },
+    required: ['clientId', 'clientSecret'],
+    isShared: true,
+  },
+  [ApiProvider.AMADEUS_OFFERS]: {
+    policy: 'env-only',
+    envVars: {
+      clientId: 'AMADEUS_CLIENT_ID',
+      clientSecret: 'AMADEUS_CLIENT_SECRET',
+    },
+    required: ['clientId', 'clientSecret'],
+    isShared: true,
+  },
+  [ApiProvider.AMADEUS_TRANSFERS]: {
+    policy: 'env-only',
+    envVars: {
+      clientId: 'AMADEUS_CLIENT_ID',
+      clientSecret: 'AMADEUS_CLIENT_SECRET',
+    },
+    required: ['clientId', 'clientSecret'],
+    isShared: true,
+  },
   [ApiProvider.GOOGLE_PLACES]: {
     policy: 'env-only',
     envVars: { apiKey: 'GOOGLE_PLACES_API_KEY' },

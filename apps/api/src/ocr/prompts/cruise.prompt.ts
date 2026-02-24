@@ -14,10 +14,13 @@ You MUST respond with a JSON object containing these fields:
   "voyageCode": <voyage/sailing code or null>,
   "departurePort": <embarkation port or null>,
   "departureDate": <ISO date "YYYY-MM-DD" or null>,
+  "departureTime": <"HH:mm" 24h embarkation time or null>,
   "arrivalPort": <disembarkation port or null>,
   "arrivalDate": <ISO date or null>,
+  "arrivalTime": <"HH:mm" 24h disembarkation time or null>,
   "cabinCategory": <cabin category/type or null>,
   "cabinNumber": <cabin number or null>,
+  "cabinDeck": <deck name or number, e.g. "Deck 9" or "9" or null>,
   "nights": <number of nights or null>,
   "totalPrice": <number in original currency or null>,
   "currency": <ISO currency code or null>,
@@ -42,6 +45,16 @@ Rules:
 - Price should be the total booking price as a decimal number
 - Extract Terms & Conditions and Cancellation Policy sections verbatim if present. Return null if no explicit T&C or cancellation policy section exists — do NOT fabricate or infer policies
 - Only extract clearly labeled policy sections (e.g., "Terms and Conditions", "Cancellation Policy", "Change Fees", "Refund Policy"). Do NOT extract general booking notes or remarks as policies
-- If a field is not visible, set it to null — do NOT guess`
+- If a field is not visible, set it to null — do NOT guess
+
+Cruise-Specific Extraction Guidance:
+- Per-person pricing: Cruise confirmations often list pricing per guest/passenger. Extract the TOTAL across all guests for totalPrice, not per-person amounts
+- Cabin number format varies: 4-digit (e.g. 8234), deck+number (e.g. D812), or alphanumeric (e.g. R724)
+- Port charges vs government taxes: Some lines separate "port charges/fees" from "government taxes/fees" — combine both into the total price
+- Cancellation penalties: Often a tiered schedule (e.g. "91-121 days: 25%, 61-90 days: 50%, 0-60 days: 100%"). Extract the full schedule verbatim into cancellationPolicy
+- Gratuities/service charges: May be pre-paid or noted as onboard expense — only include in totalPrice if pre-paid
+- "Cruise fare" + "Taxes, fees, and port expenses" = total booking price
+- Embarkation/disembarkation times may appear as "Board by 3:00 PM" or "All aboard 16:00" — normalize to 24h HH:mm format
+- Cabin deck is usually part of the cabin assignment (e.g. "Cabin 9234" → Deck 9, or "Deck 7, Cabin 7132") — extract just the deck number/name`
 
 export const CRUISE_EXTRACTION_USER_PROMPT = `Extract all cruise booking details from this document. Return structured JSON with cruise info, cabin, pricing, and passengers.`

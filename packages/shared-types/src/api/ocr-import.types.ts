@@ -124,6 +124,15 @@ export interface OcrLodgingData {
   cancellationPolicy?: string | null
 }
 
+export interface OcrCruiseCatalogMatch {
+  matched: boolean
+  providerIdentifier?: string | null
+  strategy?: string | null
+  sailingId?: string | null
+  shipName?: string | null
+  cruiseLineName?: string | null
+}
+
 export interface OcrCruiseData {
   confirmationNumber?: string | null
   cruiseLineName?: string | null
@@ -140,6 +149,7 @@ export interface OcrCruiseData {
   currency?: string | null
   termsAndConditions?: string | null
   cancellationPolicy?: string | null
+  catalogMatch?: OcrCruiseCatalogMatch | null
 }
 
 export interface OcrPassportData {

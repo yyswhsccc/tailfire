@@ -13,7 +13,10 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA catalog GRANT SELECT ON TABLES TO authenticat
 ALTER DEFAULT PRIVILEGES IN SCHEMA catalog GRANT ALL ON TABLES TO service_role;
 
 -- Step 3: Create FDW user
-CREATE USER fdw_catalog_ro WITH PASSWORD 'EsK6FGVUhpk0BAGzd/6KR21AL78dqoG7';
+-- SECURITY: Retrieve password from Doppler before running:
+--   doppler secrets get FDW_CATALOG_PASSWORD -p tailfire -c dev --plain
+-- NOTE: The previously committed password has been rotated.
+CREATE USER fdw_catalog_ro WITH PASSWORD '<RETRIEVE_FROM_DOPPLER: FDW_CATALOG_PASSWORD>';
 GRANT USAGE ON SCHEMA catalog TO fdw_catalog_ro;
 ALTER DEFAULT PRIVILEGES IN SCHEMA catalog GRANT SELECT ON TABLES TO fdw_catalog_ro;
 

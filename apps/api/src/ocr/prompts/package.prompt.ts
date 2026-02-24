@@ -121,6 +121,13 @@ Rules:
 - Do NOT infer or fabricate payment entries — only extract explicitly listed payments
 - Extract Terms & Conditions and Cancellation Policy sections verbatim if present. Return null if no explicit T&C or cancellation policy section exists — do NOT fabricate or infer policies
 - Only extract clearly labeled policy sections (e.g., "Terms and Conditions", "Cancellation Policy", "Change Fees", "Refund Policy"). Do NOT extract general booking notes or remarks as policies. The "remarks" field captures general notes — T&C and cancellation are separate
-- If a field is not visible, set it to null — do NOT guess`
+- If a field is not visible, set it to null — do NOT guess
+
+Common Tour Operator Formats:
+- Transat: "Dossier" = booking reference, TS flight codes, "Option" items = add-ons, "ITC" = transfers, French variants use "Prix par personne", "Commission agence"
+- Sunwing: WG flight codes, "Booking Number" = booking reference, "Protection Plan" = insurance add-on, French variant "Numéro de réservation"
+- WestJet Vacations: WS flight codes, "Booking ID" = booking reference, packages bundle WestJet flights + hotel
+- Air Canada Vacations: AC flight codes, bilingual invoices, "Référence de réservation" = booking reference in French, "Options"/"Extras" = add-ons
+- Nolitours: Sunwing subsidiary, French invoices, WG flight codes, "Numéro de dossier" = booking reference, "Assurance voyage" = travel insurance`
 
 export const PACKAGE_EXTRACTION_USER_PROMPT = `Extract all package booking details from this document. This is an all-inclusive vacation package invoice. Return structured JSON with supplier info, booking reference, components (flights, hotel, transfers), per-person pricing breakdown, payment history (deposits, balance payments), and traveler information.`

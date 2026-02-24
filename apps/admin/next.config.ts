@@ -47,6 +47,12 @@ const nextConfig: NextConfig = {
         hostname: 'cmktvanwglszgadjrorm.supabase.co',
         pathname: '/storage/**',
       },
+      // Holibob (Amadeus Activities tour images)
+      {
+        protocol: 'https',
+        hostname: 'images.holibob.tech',
+        pathname: '/**',
+      },
     ],
   },
 

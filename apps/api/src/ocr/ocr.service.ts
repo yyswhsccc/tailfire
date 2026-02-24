@@ -76,12 +76,14 @@ export class OcrService {
     // 2. Detect or use specified document type
     let documentType = context.documentType
     let detectionConfidence = 1.0
+    let detectedSupplierName: string | null | undefined = null
 
     if (!documentType) {
       const detection = await this.detectDocumentType(images[0] ? [images[0]] : images, signal)
       documentType = detection.documentType
       detectionConfidence = detection.confidence
-      this.logger.log(`Auto-detected document type: ${documentType} (confidence: ${detectionConfidence})`)
+      detectedSupplierName = detection.supplierName
+      this.logger.log(`Auto-detected document type: ${documentType} (confidence: ${detectionConfidence}, supplier: ${detectedSupplierName ?? 'unknown'})`)
     }
 
     // 3. Extract structured data using type-specific prompt
@@ -90,10 +92,16 @@ export class OcrService {
     const processingTimeMs = Date.now() - startTime
     this.logger.log(`Extraction complete in ${processingTimeMs}ms — type: ${documentType}`)
 
+    // Detection-level supplier wins if confidence is reasonable (>0.6); otherwise fall back to extraction-level
+    const supplierName = (detectionConfidence > 0.6 && detectedSupplierName)
+      ? detectedSupplierName
+      : (result.supplierName || detectedSupplierName || null)
+
     return {
       ...result,
       documentType,
       confidence: Math.min(result.confidence, detectionConfidence),
+      supplierName,
     }
   }
 
@@ -107,19 +115,26 @@ export class OcrService {
   ): Promise<OcrExtractionResult> {
     let documentType = context.documentType
     let detectionConfidence = 1.0
+    let detectedSupplierName: string | null | undefined = null
 
     if (!documentType) {
       const detection = await this.detectDocumentType(images.slice(0, 1), signal)
       documentType = detection.documentType
       detectionConfidence = detection.confidence
+      detectedSupplierName = detection.supplierName
     }
 
     const result = await this.extractByType(documentType, images, signal, context.extractionHints)
+
+    const supplierName = (detectionConfidence > 0.6 && detectedSupplierName)
+      ? detectedSupplierName
+      : (result.supplierName || detectedSupplierName || null)
 
     return {
       ...result,
       documentType,
       confidence: Math.min(result.confidence, detectionConfidence),
+      supplierName,
     }
   }
 
@@ -168,7 +183,7 @@ export class OcrService {
   private async detectDocumentType(
     images: OcrImageInput[],
     signal?: AbortSignal,
-  ): Promise<{ documentType: OcrDocumentType; confidence: number }> {
+  ): Promise<{ documentType: OcrDocumentType; confidence: number; supplierName?: string | null }> {
     const response = await this.openAiProvider.analyzeImages(
       images,
       DOCUMENT_DETECTION_SYSTEM_PROMPT,
@@ -269,24 +284,30 @@ export class OcrService {
     switch (documentType) {
       case 'flight_confirmation':
         result.flight = this.mapFlightExtraction(data)
+        result.supplierName = result.flight.airline || null
         break
       case 'hotel_confirmation':
         result.lodging = this.mapLodgingExtraction(data)
+        result.supplierName = result.lodging.propertyName || null
         break
       case 'cruise_confirmation':
         result.cruise = this.mapCruiseExtraction(data)
+        result.supplierName = result.cruise.cruiseLineName || null
         break
       case 'passport':
         result.passport = this.mapPassportExtraction(data)
         break
       case 'transportation_confirmation':
         result.transportation = this.mapTransportationExtraction(data)
+        result.supplierName = result.transportation.companyName || null
         break
       case 'dining_confirmation':
         result.dining = this.mapDiningExtraction(data)
+        result.supplierName = result.dining.restaurantName || null
         break
       case 'package_confirmation':
         result.package = this.mapPackageExtraction(data)
+        result.supplierName = result.package.supplierName || null
         break
     }
 
@@ -385,10 +406,13 @@ export class OcrService {
       voyageCode: data.voyageCode ? String(data.voyageCode) : null,
       departurePort: data.departurePort ? String(data.departurePort) : null,
       departureDate: data.departureDate ? String(data.departureDate) : null,
+      departureTime: data.departureTime ? String(data.departureTime) : null,
       arrivalPort: data.arrivalPort ? String(data.arrivalPort) : null,
       arrivalDate: data.arrivalDate ? String(data.arrivalDate) : null,
+      arrivalTime: data.arrivalTime ? String(data.arrivalTime) : null,
       cabinCategory: data.cabinCategory ? String(data.cabinCategory) : null,
       cabinNumber: data.cabinNumber ? String(data.cabinNumber) : null,
+      cabinDeck: data.cabinDeck ? String(data.cabinDeck) : null,
       nights: typeof data.nights === 'number' ? data.nights : null,
       totalPriceCents: typeof data.totalPrice === 'number' ? Math.round(data.totalPrice * 100) : null,
       currency: data.currency ? String(data.currency) : null,

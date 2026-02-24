@@ -571,6 +571,105 @@ export class ActivityMediaController {
   }
 
   /**
+   * Set a media item as the primary image (thumbnail)
+   *
+   * Moves the specified image to orderIndex 0 and shifts others.
+   * Access check: User must have write access to the trip.
+   */
+  @Post(':mediaId/set-primary')
+  async setPrimary(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityId') activityId: string,
+    @Param('mediaId') mediaId: string,
+    @Query('entityType') entityType?: string
+  ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
+
+    const media = await this.mediaService.findById(mediaId)
+    if (!media) {
+      throw new NotFoundException('Media not found')
+    }
+    if (media.activityId !== activityId) {
+      throw new BadRequestException('Media does not belong to this activity')
+    }
+
+    const resolvedEntityType = (entityType && VALID_ENTITY_TYPES.includes(entityType as any))
+      ? entityType as ComponentEntityType
+      : 'activity'
+
+    const updated = await this.mediaService.setPrimary(mediaId, activityId, resolvedEntityType)
+    return updated
+  }
+
+  /**
+   * Batch delete media items
+   *
+   * Access check: User must have write access to the trip.
+   */
+  @Post('batch-delete')
+  async batchDelete(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityId') activityId: string,
+    @Body() body: { ids: string[] }
+  ) {
+    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
+      throw new BadRequestException('ids must be a non-empty array')
+    }
+
+    if (body.ids.length > 100) {
+      throw new BadRequestException('Cannot delete more than 100 items at once')
+    }
+
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
+
+    // Verify all media items belong to this activity
+    const mediaItems = await Promise.all(
+      body.ids.map(id => this.mediaService.findById(id))
+    )
+
+    const notFound: string[] = []
+    const notOwned: string[] = []
+    const validItems: Array<{ id: string; fileUrl: string }> = []
+
+    for (let i = 0; i < body.ids.length; i++) {
+      const id = body.ids[i]!
+      const media = mediaItems[i]
+      if (!media) {
+        notFound.push(id)
+      } else if (media.activityId !== activityId) {
+        notOwned.push(id)
+      } else {
+        validItems.push({ id: media.id, fileUrl: media.fileUrl })
+      }
+    }
+
+    if (notFound.length > 0 || notOwned.length > 0) {
+      throw new BadRequestException(
+        `Invalid media IDs: ${[...notFound, ...notOwned].join(', ')}`
+      )
+    }
+
+    // Delete from storage (best effort)
+    if (this.storageService.isMediaAvailable()) {
+      await Promise.allSettled(
+        validItems.map(item => {
+          const urlParts = item.fileUrl.split('.r2.dev/')
+          const storagePath = urlParts.length > 1 ? urlParts[1] : null
+          if (storagePath) {
+            return this.storageService.deleteMedia(storagePath)
+          }
+          return Promise.resolve()
+        })
+      )
+    }
+
+    // Delete database records
+    const deleted = await this.mediaService.deleteMany(validItems.map(item => item.id))
+
+    return { success: true, deletedCount: deleted.length }
+  }
+
+  /**
    * Delete a media item
    *
    * Access check: User must have write access to the trip.
@@ -892,6 +991,102 @@ export class ComponentMediaController {
       throw new BadRequestException('Media does not belong to this component')
     }
     return this.mediaService.update(mediaId, { caption: body.caption })
+  }
+
+  /**
+   * Set a media item as the primary image (legacy endpoint)
+   */
+  @Post(':mediaId/set-primary')
+  async setPrimary(
+    @GetAuthContext() auth: AuthContext,
+    @Param('componentId') componentId: string,
+    @Param('mediaId') mediaId: string,
+    @Query('entityType') entityType?: string
+  ) {
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth, true)
+
+    const media = await this.mediaService.findById(mediaId)
+    if (!media) {
+      throw new NotFoundException('Media not found')
+    }
+    if (media.activityId !== componentId) {
+      throw new BadRequestException('Media does not belong to this component')
+    }
+
+    const resolvedEntityType = (entityType && VALID_ENTITY_TYPES.includes(entityType as any))
+      ? entityType as ComponentEntityType
+      : 'activity'
+
+    const updated = await this.mediaService.setPrimary(mediaId, componentId, resolvedEntityType)
+    return updated
+  }
+
+  /**
+   * Batch delete media items (legacy endpoint)
+   *
+   * Access check: User must have write access to the trip.
+   */
+  @Post('batch-delete')
+  async batchDelete(
+    @GetAuthContext() auth: AuthContext,
+    @Param('componentId') componentId: string,
+    @Body() body: { ids: string[] }
+  ) {
+    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
+      throw new BadRequestException('ids must be a non-empty array')
+    }
+
+    if (body.ids.length > 100) {
+      throw new BadRequestException('Cannot delete more than 100 items at once')
+    }
+
+    await this.activitiesService.verifyTripAccessFromActivityId(componentId, auth, true)
+
+    // Verify all media items belong to this component
+    const mediaItems = await Promise.all(
+      body.ids.map(id => this.mediaService.findById(id))
+    )
+
+    const notFound: string[] = []
+    const notOwned: string[] = []
+    const validItems: Array<{ id: string; fileUrl: string }> = []
+
+    for (let i = 0; i < body.ids.length; i++) {
+      const id = body.ids[i]!
+      const media = mediaItems[i]
+      if (!media) {
+        notFound.push(id)
+      } else if (media.activityId !== componentId) {
+        notOwned.push(id)
+      } else {
+        validItems.push({ id: media.id, fileUrl: media.fileUrl })
+      }
+    }
+
+    if (notFound.length > 0 || notOwned.length > 0) {
+      throw new BadRequestException(
+        `Invalid media IDs: ${[...notFound, ...notOwned].join(', ')}`
+      )
+    }
+
+    // Delete from storage (best effort)
+    if (this.storageService.isMediaAvailable()) {
+      await Promise.allSettled(
+        validItems.map(item => {
+          const urlParts = item.fileUrl.split('.r2.dev/')
+          const storagePath = urlParts.length > 1 ? urlParts[1] : null
+          if (storagePath) {
+            return this.storageService.deleteMedia(storagePath)
+          }
+          return Promise.resolve()
+        })
+      )
+    }
+
+    // Delete database records
+    const deleted = await this.mediaService.deleteMany(validItems.map(item => item.id))
+
+    return { success: true, deletedCount: deleted.length }
   }
 
   @Delete(':mediaId')

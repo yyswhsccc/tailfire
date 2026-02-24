@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Loader2, Plane, Hotel, Ship, Car, UtensilsCrossed, BookOpen, Package } from 'lucide-react'
+import { ArrowLeft, Loader2, Plane, Hotel, Ship, Car, UtensilsCrossed, BookOpen, Package, CheckCircle2, XCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -360,6 +360,30 @@ export function OcrPreview({
             <CardTitle className="text-base">Cruise Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {extraction.cruise.catalogMatch && (
+              <div className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
+                extraction.cruise.catalogMatch.matched
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+              }`}>
+                {extraction.cruise.catalogMatch.matched ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>
+                      Matched to catalog
+                      {extraction.cruise.catalogMatch.providerIdentifier && (
+                        <span className="font-medium"> — {extraction.cruise.catalogMatch.providerIdentifier}</span>
+                      )}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 shrink-0" />
+                    <span>No catalog match found — cruise will be created from OCR data only</span>
+                  </>
+                )}
+              </div>
+            )}
             {extraction.cruise.cruiseLineName && (
               <DataRow label="Cruise Line" value={extraction.cruise.cruiseLineName} />
             )}

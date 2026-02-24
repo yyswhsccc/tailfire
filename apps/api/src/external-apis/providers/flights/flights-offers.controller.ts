@@ -77,7 +77,7 @@ export class FlightsOffersController {
 
   private async initializeCredentials(): Promise<void> {
     try {
-      const creds = await this.credentialResolver.resolve(ApiProvider.AMADEUS)
+      const creds = await this.credentialResolver.resolve(ApiProvider.AMADEUS_OFFERS)
       if (creds) {
         await this.amadeusOffers.setCredentials(creds)
       }

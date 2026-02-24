@@ -545,7 +545,7 @@ export class HotelsController {
 
     try {
       // Get Amadeus credentials from env (Doppler)
-      const amadeusCreds = await this.credentialResolver.resolve(ApiProvider.AMADEUS)
+      const amadeusCreds = await this.credentialResolver.resolve(ApiProvider.AMADEUS_HOTELS)
       if (amadeusCreds) {
         await this.amadeus.setCredentials(amadeusCreds)
       }

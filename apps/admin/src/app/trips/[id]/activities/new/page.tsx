@@ -161,6 +161,8 @@ function renderActivityForm(
 
     // Tour - dedicated tour form with tour-specific fields
     case 'tour':
+    case 'custom_tour':
+    case 'tour_day':
       return (
         <TourForm
           itineraryId={itineraryId}

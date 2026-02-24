@@ -29,7 +29,7 @@
 
 **ALWAYS:**
 - Use **tmux pane 2** for all terminal interactions (dev server, builds, etc.)
-- Restart the **full turbo repo** (`turbo dev`), never just a single app (`turbo dev --filter=@tailfire/admin`)
+- Restart the **full turbo repo** (`turbo dev`), never just a single app
 - To restart: `tmux send-keys -t 2 C-c && sleep 2 && tmux send-keys -t 2 'turbo dev' Enter`
 
 **Pane layout:**
@@ -37,7 +37,17 @@
 - Pane 1: Codex
 - Pane 2: Dev server / terminal
 
-### 4. NEVER Run Cruise Sync on Non-Production Environments
+### 4. NEVER Write Unguarded DDL Against the `catalog` Schema
+
+**DO NOT:**
+- Write `CREATE TABLE catalog.*`, `ALTER TABLE catalog.*`, or `DROP TABLE catalog.*` without an environment guard
+- This silently creates local tables on Dev/Preview, breaking the FDW architecture
+
+**ALWAYS:**
+- Wrap catalog DDL in a `pg_class.relkind = 'r'` guard (only runs on Production where tables are local)
+- See `packages/database/MIGRATIONS.md` > "Catalog Schema (FDW-Protected)" for the template
+
+### 5. NEVER Run Cruise Sync on Non-Production Environments
 
 **DO NOT:**
 - Run `cruise-import/sync` endpoint against localhost or dev API
@@ -60,8 +70,8 @@
 │ 1. LOCAL DEVELOPMENT                                                         │
 │    Database: tailfire-Dev (hplioumsywqgtnhwcivw)                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│    turbo dev                      # Start all services                       │
-│    cd apps/api && pnpm db:migrate # Run migrations locally                   │
+│    turbo dev  # Start all services        │
+│    cd apps/api && pnpm db:migrate              # Run migrations locally     │
 │    # Test at localhost:3100 (admin) / localhost:3101 (api)                   │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -436,8 +446,18 @@ The cruise catalog data is synchronized from Traveltek FTP and uses Foreign Data
 - **Automatic retry on FTP failures** - 3 attempts with exponential backoff (5min, 10min delays)
 - **Dev and Preview use FDW** - foreign tables that read directly from Production
 - **DO NOT run sync locally** - it will create local tables that break FDW architecture
-- The FDW migration (`20260104205000_setup_catalog_fdw.sql`) auto-detects environment
+- The FDW migration (`20260104205000_setup_catalog_fdw.sql`) is **dead code** — it has an unconditional `RETURN` at line 23 and never executes FDW setup. FDW was always configured manually.
 - Production has 16 local catalog tables; Dev/Preview have 16 foreign tables pointing to Prod
+
+### Restoring FDW on Local Dev
+
+If catalog queries fail or return no data on local dev, restore with:
+
+```bash
+./scripts/setup-local-fdw.sh
+```
+
+Requires Doppler CLI and `psql`. See `apps/ota/supabase/FDW_SETUP.md` for details.
 
 ### Sync Endpoints (Production Only!)
 

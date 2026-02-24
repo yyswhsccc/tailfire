@@ -24,7 +24,7 @@ const isValidTimezone = (tz: string): boolean => {
     return false
   }
 }
-import { eq } from 'drizzle-orm'
+import { eq, and, or, isNull } from 'drizzle-orm'
 import { BaseComponentService } from './base-component.service'
 import { FlightDetailsService } from './flight-details.service'
 import { FlightSegmentsService } from './flight-segments.service'
@@ -3044,6 +3044,7 @@ export class ComponentOrchestrationService {
       departureTime: string | null
       tenderRequired: boolean
       currentDateISO: string
+      coordinates: { lat: number; lng: number } | null
     }
 
     const portInfoDataList: PortInfoData[] = []
@@ -3072,6 +3073,9 @@ export class ComponentOrchestrationService {
       let departureTime: string | null = null
       let tenderRequired = false
 
+      // Parse coordinates from port call data (if available from catalog enrichment)
+      let coordinates: { lat: number; lng: number } | null = null
+
       if (portCall) {
         // Use port call data from Traveltek
         portName = portCall.portName || 'Unknown Port'
@@ -3079,10 +3083,29 @@ export class ComponentOrchestrationService {
         arrivalTime = portCall.arriveTime !== '00:00:00' ? portCall.arriveTime : null
         departureTime = portCall.departTime !== '00:00:00' ? portCall.departTime : null
 
+        // Extract coordinates from catalog-enriched port call data
+        // Guard: reject null, undefined, empty/whitespace strings; allow numeric 0 (valid equator/meridian)
+        const latRaw = portCall.latitude
+        const lngRaw = portCall.longitude
+        const hasLat = latRaw !== null && latRaw !== undefined && String(latRaw).trim() !== ''
+        const hasLng = lngRaw !== null && lngRaw !== undefined && String(lngRaw).trim() !== ''
+        if (hasLat && hasLng) {
+          const parsedLat = Number(latRaw)
+          const parsedLng = Number(lngRaw)
+          if (
+            Number.isFinite(parsedLat) && Number.isFinite(parsedLng) &&
+            parsedLat >= -90 && parsedLat <= 90 &&
+            parsedLng >= -180 && parsedLng <= 180
+          ) {
+            coordinates = { lat: parsedLat, lng: parsedLng }
+          }
+        }
+
         if (portCall.isSeaDay) {
           portType = 'sea_day'
           portName = 'At Sea'
           description = 'Day at sea'
+          coordinates = null // Sea days have no meaningful coordinates
         } else if (dayIndex === 0) {
           portType = 'departure'
           description = `Embarkation at ${portName}`
@@ -3120,6 +3143,7 @@ export class ComponentOrchestrationService {
         departureTime,
         tenderRequired,
         currentDateISO: currentDate.toISOString(),
+        coordinates,
       })
     }
 
@@ -3136,6 +3160,8 @@ export class ComponentOrchestrationService {
       sequenceOrder: idx,
       startDatetime: data.currentDateISO,
       status: 'proposed' as const,
+      location: data.portName,
+      coordinates: data.coordinates,
     }))
 
     stepStart = Date.now()
@@ -3155,6 +3181,7 @@ export class ComponentOrchestrationService {
           departureDate: data.portType === 'departure' || data.portType === 'port_call' ? data.dateStr : null,
           departureTime: data.departureTime,
           tenderRequired: data.tenderRequired,
+          coordinates: data.coordinates,
         },
       }
     })
@@ -3162,6 +3189,86 @@ export class ComponentOrchestrationService {
     stepStart = Date.now()
     await this.portInfoDetailsService.bulkCreate(portInfoDetailsToCreate)
     timings['bulkCreateDetails'] = Date.now() - stepStart
+
+    // Step 5b: Update itinerary day start/end locations from port coordinates
+    // Non-blocking — if this fails, port schedule still works
+    try {
+      const dayLocationUpdates = portInfoDataList
+        .filter(data => data.coordinates && data.portType !== 'sea_day')
+        .map(data => ({
+          dayId: data.itineraryDayId,
+          portName: data.portName,
+          lat: String(data.coordinates!.lat),
+          lng: String(data.coordinates!.lng),
+        }))
+
+      if (dayLocationUpdates.length > 0) {
+        stepStart = Date.now()
+        const now = new Date()
+
+        // Update days in parallel — guard start/end overrides independently
+        await Promise.all(dayLocationUpdates.map(async (update) => {
+          // Update start location (only if not manually overridden)
+          await this.db.client
+            .update(this.db.schema.itineraryDays)
+            .set({
+              startLocationName: update.portName,
+              startLocationLat: update.lat,
+              startLocationLng: update.lng,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(this.db.schema.itineraryDays.id, update.dayId),
+                or(
+                  eq(this.db.schema.itineraryDays.startLocationOverride, false),
+                  isNull(this.db.schema.itineraryDays.startLocationOverride),
+                ),
+              ),
+            )
+
+          // Update end location (only if not manually overridden)
+          await this.db.client
+            .update(this.db.schema.itineraryDays)
+            .set({
+              endLocationName: update.portName,
+              endLocationLat: update.lat,
+              endLocationLng: update.lng,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(this.db.schema.itineraryDays.id, update.dayId),
+                or(
+                  eq(this.db.schema.itineraryDays.endLocationOverride, false),
+                  isNull(this.db.schema.itineraryDays.endLocationOverride),
+                ),
+              ),
+            )
+        }))
+
+        // Mark itinerary as having unpublished changes
+        await this.db.client
+          .update(this.db.schema.itineraries)
+          .set({ hasUnpublishedChanges: true })
+          .where(eq(this.db.schema.itineraries.id, itineraryId))
+
+        timings['updateDayLocations'] = Date.now() - stepStart
+        this.logger.log({
+          message: 'Updated itinerary day locations from port coordinates',
+          cruiseId,
+          itineraryId,
+          daysUpdated: dayLocationUpdates.length,
+        })
+      }
+    } catch (error) {
+      this.logger.warn({
+        message: 'Failed to update itinerary day locations from port coordinates (non-blocking)',
+        cruiseId,
+        itineraryId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
 
     // Step 6: Construct port info DTOs directly from local data (no N+1 queries)
     // We have all the data we need from portInfoDataList and createdActivities
@@ -3183,7 +3290,7 @@ export class ComponentOrchestrationService {
         timezone: null,
         location: data.portName,
         address: null,
-        coordinates: null,
+        coordinates: data.coordinates,
         notes: null,
         confirmationNumber: null,
         status: 'proposed' as const,
@@ -3218,7 +3325,7 @@ export class ComponentOrchestrationService {
           timezone: null,
           dockName: null,
           address: null,
-          coordinates: null,
+          coordinates: data.coordinates,
           phone: null,
           website: null,
           excursionNotes: null,

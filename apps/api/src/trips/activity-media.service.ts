@@ -7,7 +7,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common'
-import { eq, asc, and } from 'drizzle-orm'
+import { eq, asc, and, inArray } from 'drizzle-orm'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { DatabaseService } from '../db/database.service'
 import { AuditEvent } from '../activity-logs/events/audit.event'
@@ -332,6 +332,113 @@ export class ActivityMediaService {
     }
 
     return this.formatMedia(media)
+  }
+
+  /**
+   * Delete multiple media records by IDs
+   * Returns the deleted records for storage cleanup
+   */
+  async deleteMany(
+    ids: string[],
+    actorId?: string | null,
+    tripId?: string | null,
+  ): Promise<ActivityMediaDto[]> {
+    if (ids.length === 0) return []
+
+    const deleted = await this.db.client
+      .delete(this.db.schema.activityMedia)
+      .where(inArray(this.db.schema.activityMedia.id, ids))
+      .returning()
+
+    if (deleted.length === 0) return []
+
+    this.logger.log(`Batch deleted ${deleted.length} activity media items`)
+
+    // Emit audit events for each deleted item
+    const resolvedTripId = tripId ?? (await this.resolveTripIdFromActivity(deleted[0]!.activityId))
+    if (resolvedTripId) {
+      for (const media of deleted) {
+        this.eventEmitter.emit(
+          'audit.deleted',
+          new AuditEvent(
+            'activity_media',
+            media.id,
+            'deleted',
+            resolvedTripId,
+            actorId ?? null,
+            `Media - ${media.fileName}`,
+            {
+              before: sanitizeForAudit('activity_media', media),
+              parentId: media.activityId,
+            },
+          ),
+        )
+      }
+    }
+
+    return deleted.map(m => this.formatMedia(m))
+  }
+
+  /**
+   * Set a media item as primary (orderIndex = 0) and shift others
+   */
+  async setPrimary(
+    id: string,
+    activityId: string,
+    entityType: ComponentEntityType = 'activity',
+  ): Promise<ActivityMediaDto | null> {
+    // Get the target media item
+    const [target] = await this.db.client
+      .select()
+      .from(this.db.schema.activityMedia)
+      .where(eq(this.db.schema.activityMedia.id, id))
+      .limit(1)
+
+    if (!target) return null
+
+    // Already primary? No-op
+    if (target.orderIndex === 0) {
+      return this.formatMedia(target)
+    }
+
+    // Get all media for this activity/entityType ordered by current orderIndex
+    const allMedia = await this.db.client
+      .select()
+      .from(this.db.schema.activityMedia)
+      .where(
+        and(
+          eq(this.db.schema.activityMedia.activityId, activityId),
+          eq(this.db.schema.activityMedia.entityType, entityType),
+        ),
+      )
+      .orderBy(asc(this.db.schema.activityMedia.orderIndex))
+
+    // Build new order: target first, then rest in their existing order
+    const reordered = [
+      target,
+      ...allMedia.filter(m => m.id !== id),
+    ]
+
+    // Update all orderIndex values
+    await Promise.all(
+      reordered.map((media, idx) =>
+        this.db.client
+          .update(this.db.schema.activityMedia)
+          .set({ orderIndex: idx })
+          .where(eq(this.db.schema.activityMedia.id, media.id)),
+      ),
+    )
+
+    this.logger.log(`Set media ${id} as primary for activity ${activityId}`)
+
+    // Return updated target
+    const [updated] = await this.db.client
+      .select()
+      .from(this.db.schema.activityMedia)
+      .where(eq(this.db.schema.activityMedia.id, id))
+      .limit(1)
+
+    return updated ? this.formatMedia(updated) : null
   }
 
   /**

@@ -249,3 +249,63 @@ export function useDeleteComponentMedia(
     },
   })
 }
+
+/**
+ * Set a media item as the primary image (thumbnail)
+ * @param itineraryId - Optional itinerary ID to invalidate thumbnail cache
+ */
+export function useSetPrimaryComponentMedia(
+  componentId: string,
+  entityType: ComponentEntityType,
+  itineraryId?: string
+) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (mediaId: string) =>
+      api.post<ComponentMediaDto>(
+        `/components/${componentId}/media/${mediaId}/set-primary?entityType=${entityType}`,
+        {}
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: componentMediaKeys.list(componentId, entityType),
+      })
+      if (itineraryId) {
+        void queryClient.invalidateQueries({
+          queryKey: itineraryDayKeys.withActivities(itineraryId),
+        })
+      }
+    },
+  })
+}
+
+/**
+ * Batch delete multiple media items
+ * @param itineraryId - Optional itinerary ID to invalidate thumbnail cache
+ */
+export function useDeleteBatchComponentMedia(
+  componentId: string,
+  entityType: ComponentEntityType,
+  itineraryId?: string
+) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      api.post<{ success: boolean; deletedCount: number }>(
+        `/components/${componentId}/media/batch-delete?entityType=${entityType}`,
+        { ids }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: componentMediaKeys.list(componentId, entityType),
+      })
+      if (itineraryId) {
+        void queryClient.invalidateQueries({
+          queryKey: itineraryDayKeys.withActivities(itineraryId),
+        })
+      }
+    },
+  })
+}
