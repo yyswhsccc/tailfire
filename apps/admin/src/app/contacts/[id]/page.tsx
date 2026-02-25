@@ -472,7 +472,7 @@ export default function ContactDetailPage() {
                     <ContactAvatar
                       firstName={contact.firstName}
                       lastName={contact.lastName}
-                      // avatarUrl={contact.avatarUrl} // TODO: Add avatarUrl to ContactResponseDto
+                      avatarUrl={contact.photoUrl}
                       size="lg"
                     />
                   </div>

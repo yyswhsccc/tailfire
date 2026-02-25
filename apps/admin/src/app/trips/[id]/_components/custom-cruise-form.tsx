@@ -2118,6 +2118,8 @@ export function CustomCruiseForm({
                                 value={row.effectiveDate || ''}
                                 onChange={(e) => updateRow('effectiveDate', e.target.value || null)}
                                 className="h-8"
+                                min="1900-01-01"
+                                max="2099-12-31"
                               />
                             </td>
                             <td className="py-2 px-2">

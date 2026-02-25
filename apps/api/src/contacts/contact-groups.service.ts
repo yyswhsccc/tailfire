@@ -190,7 +190,7 @@ export class ContactGroupsService {
               prefix: m.contact.prefix,
               suffix: m.contact.suffix,
               // Computed display names
-              displayName: m.contact.preferredName ?? m.contact.firstName ?? m.contact.legalFirstName ?? 'Unknown',
+              displayName: m.contact.preferredName || m.contact.firstName || m.contact.legalFirstName || 'Unknown',
               legalFullName: m.contact.legalFirstName && m.contact.legalLastName
                 ? `${m.contact.legalFirstName} ${m.contact.legalLastName}`
                 : null,

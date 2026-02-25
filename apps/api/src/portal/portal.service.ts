@@ -94,7 +94,7 @@ export class PortalService {
       firstName: contact.firstName,
       lastName: contact.lastName,
       preferredName: contact.preferredName,
-      displayName: contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Traveler',
+      displayName: contact.preferredName || contact.firstName || contact.legalFirstName || 'Traveler',
       email: contact.email,
       phone: contact.phone,
       portalActivatedAt: contact.portalActivatedAt?.toISOString() ?? null,

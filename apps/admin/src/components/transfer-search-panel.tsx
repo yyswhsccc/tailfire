@@ -204,7 +204,7 @@ export function TransferSearchPanel({
 
       {/* Date/Time/Passengers */}
       <div className="grid grid-cols-3 gap-2">
-        <Input type="date" value={date} onChange={(e) => { setDate(e.target.value); setSearchEnabled(false) }} />
+        <Input type="date" value={date} onChange={(e) => { setDate(e.target.value); setSearchEnabled(false) }} min="1900-01-01" max="2099-12-31" />
         <Input type="time" value={time} onChange={(e) => { setTime(e.target.value); setSearchEnabled(false) }} />
         <Input type="number" min={1} max={20} value={passengers} onChange={(e) => { setPassengers(e.target.value); setSearchEnabled(false) }} placeholder="Pax" />
       </div>

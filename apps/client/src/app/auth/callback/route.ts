@@ -22,20 +22,30 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type')
+  const error_param = searchParams.get('error')
+  const error_description = searchParams.get('error_description')
   const next = searchParams.get('next') ?? '/'
 
-  // Handle PKCE flow (OAuth, magic links)
+  // Handle error redirects from Supabase (e.g. expired OTP)
+  if (error_param) {
+    console.error('[auth/callback] Supabase error redirect:', error_param, error_description)
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error_description || error_param)}`)
+  }
+
+  // Handle PKCE flow (OAuth, magic links via Supabase verify redirect)
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      // Fire portal activation (non-blocking)
       await activatePortalAccount(supabase)
       return NextResponse.redirect(`${origin}${next}`)
     }
+    console.error('[auth/callback] Code exchange failed:', error.message, error.code)
+    // Don't fall through — code was already consumed
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`)
   }
 
-  // Handle token-based flows (invites, recovery)
+  // Handle token-based flows (invites, recovery, magic links)
   if (token_hash && type) {
     const supabase = await createClient()
     const { error } = await supabase.auth.verifyOtp({
@@ -43,23 +53,23 @@ export async function GET(request: Request) {
       type: type as 'signup' | 'invite' | 'magiclink' | 'recovery' | 'email_change',
     })
     if (!error) {
-      // For password recovery, redirect to reset password page
       if (type === 'recovery') {
         return NextResponse.redirect(`${origin}/reset-password`)
       }
-      // Fire portal activation (non-blocking)
       await activatePortalAccount(supabase)
       return NextResponse.redirect(`${origin}${next}`)
     }
+    console.error('[auth/callback] OTP verification failed:', error.message, error.code)
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`)
   }
 
   // Handle hash fragment flows (implicit grants)
-  // These are handled client-side, redirect to let client handle
   const hash = new URL(request.url).hash
   if (hash && hash.includes('access_token')) {
     return NextResponse.redirect(`${origin}${next}${hash}`)
   }
 
-  // Auth failed, redirect to error page or login
+  // No auth params provided
+  console.error('[auth/callback] No auth params provided:', searchParams.toString())
   return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
 }

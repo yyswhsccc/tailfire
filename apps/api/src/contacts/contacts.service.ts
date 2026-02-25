@@ -746,9 +746,15 @@ export class ContactsService {
     const clientPortalUrl = this.configService.get<string>('CLIENT_PORTAL_URL') || 'http://localhost:3103'
 
     // 5. Create Supabase auth user
+    const displayFirstName = contact.preferredName || contact.firstName || contact.legalFirstName || ''
+    const displayLastName = contact.lastName || contact.legalLastName || ''
     const { data: userData, error: userError } = await this.supabaseAdmin.auth.admin.createUser({
       email: contact.email,
-      email_confirm: false,
+      email_confirm: true, // Auto-confirm since we send our own branded invite email
+      user_metadata: {
+        first_name: displayFirstName,
+        last_name: displayLastName,
+      },
       app_metadata: {
         portal_user: true,
         contact_id: contactId,
@@ -798,7 +804,7 @@ export class ContactsService {
     }
 
     // 8. Send branded email
-    const firstName = contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Traveler'
+    const firstName = contact.preferredName || contact.firstName || contact.legalFirstName || 'Traveler'
     const emailResult = await this.emailService.sendClientPortalInviteEmail(
       contact.email,
       inviteLink,
@@ -870,7 +876,7 @@ export class ContactsService {
       .set({ portalInvitedAt: new Date(), portalInvitedBy: invitedBy, updatedAt: new Date() })
       .where(eq(this.db.schema.contacts.id, contact.id))
 
-    const firstName = contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Traveler'
+    const firstName = contact.preferredName || contact.firstName || contact.legalFirstName || 'Traveler'
     const emailResult = await this.emailService.sendClientPortalInviteEmail(
       contact.email,
       inviteLink,
@@ -899,7 +905,7 @@ export class ContactsService {
    */
   private mapToResponseDto(contact: any): ContactResponseDto {
     // Compute display name: preferred > first > legal_first
-    const displayName = contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Unknown'
+    const displayName = contact.preferredName || contact.firstName || contact.legalFirstName || 'Unknown'
 
     // Compute legal full name for documents
     const legalFullName = [

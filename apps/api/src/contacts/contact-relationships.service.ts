@@ -236,7 +236,7 @@ export class ContactRelationshipsService {
    */
   private mapContactToDto(contact: any): any {
     // Compute display name: preferred > first > legal_first
-    const displayName = contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Unknown'
+    const displayName = contact.preferredName || contact.firstName || contact.legalFirstName || 'Unknown'
 
     // Compute legal full name for documents
     const legalFullName = [

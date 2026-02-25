@@ -8,6 +8,21 @@ import { createClient } from "@/lib/supabase/client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3101/api/v1";
 
+async function parseErrorResponse(res: Response): Promise<string> {
+  let message = `API error: ${res.status}`;
+  try {
+    const body = await res.json();
+    if (body.message) {
+      message = Array.isArray(body.message) ? body.message.join(", ") : body.message;
+    } else if (body.error) {
+      message = body.error;
+    }
+  } catch {
+    // Response body not JSON, use default message
+  }
+  return message;
+}
+
 export async function portalApi<T>(path: string, options?: RequestInit): Promise<T> {
   const supabase = createClient();
   const {
@@ -28,7 +43,7 @@ export async function portalApi<T>(path: string, options?: RequestInit): Promise
   });
 
   if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
+    throw new Error(await parseErrorResponse(res));
   }
 
   // Handle 204 No Content
@@ -59,7 +74,7 @@ export async function portalApiMultipart<T>(path: string, formData: FormData): P
   });
 
   if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
+    throw new Error(await parseErrorResponse(res));
   }
 
   if (res.status === 204) {
