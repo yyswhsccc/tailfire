@@ -7,6 +7,7 @@ import { runMigrations } from '@tailfire/database'
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'
 import { RolesGuard } from './auth/guards/roles.guard'
 import { setupBullBoard, getQueuesFromApp } from './automation/admin/bull-board.setup'
+import { StripEmptyStringsInterceptor } from './common/interceptors/strip-empty-strings.interceptor'
 
 async function bootstrap() {
   const databaseUrl = process.env.DATABASE_URL
@@ -73,6 +74,9 @@ async function bootstrap() {
   // Global prefix
   const apiPrefix = process.env.API_PREFIX || 'api/v1'
   app.setGlobalPrefix(apiPrefix)
+
+  // Normalize empty strings before validation ('' -> null in body, '' -> undefined in query)
+  app.useGlobalInterceptors(new StripEmptyStringsInterceptor())
 
   // Validation
   app.useGlobalPipes(

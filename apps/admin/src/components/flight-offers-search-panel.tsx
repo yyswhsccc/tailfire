@@ -76,6 +76,8 @@ export function FlightOffersSearchPanel({
           type="date"
           value={departureDate}
           onChange={(e) => { setDepartureDate(e.target.value); setSearchEnabled(false) }}
+          min="1900-01-01"
+          max="2099-12-31"
         />
         <div className="flex gap-1">
           <Select value={travelClass || ''} onValueChange={(v) => { setTravelClass(v as any || undefined); setSearchEnabled(false) }}>

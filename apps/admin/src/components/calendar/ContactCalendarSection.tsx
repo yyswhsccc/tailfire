@@ -357,6 +357,8 @@ export function ContactCalendarSection({ contactId }: ContactCalendarSectionProp
                   type="date"
                   value={formStartDate}
                   onChange={(e) => setFormStartDate(e.target.value)}
+                  min="1900-01-01"
+                  max="2099-12-31"
                 />
               </div>
               {!formAllDay && (
@@ -378,6 +380,8 @@ export function ContactCalendarSection({ contactId }: ContactCalendarSectionProp
                   type="date"
                   value={formEndDate}
                   onChange={(e) => setFormEndDate(e.target.value)}
+                  min="1900-01-01"
+                  max="2099-12-31"
                 />
               </div>
               {!formAllDay && (

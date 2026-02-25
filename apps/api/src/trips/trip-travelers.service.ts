@@ -720,7 +720,7 @@ export class TripTravelersService {
 
       if (foundContact) {
         // Add computed fields to match ContactResponseDto
-        const displayName = foundContact.preferredName ?? foundContact.firstName ?? foundContact.legalFirstName ?? 'Unknown'
+        const displayName = foundContact.preferredName || foundContact.firstName || foundContact.legalFirstName || 'Unknown'
         const legalFullName = [
           foundContact.prefix,
           foundContact.legalFirstName ?? foundContact.firstName,
@@ -800,14 +800,14 @@ export class TripTravelersService {
     canAccessSensitive = true,
   ): Record<string, any> {
     const firstName =
-      contact.firstName ??
-      contact.legalFirstName ??
-      contact.preferredName ??
+      contact.firstName ||
+      contact.legalFirstName ||
+      contact.preferredName ||
       'Traveler'
     const lastName =
-      contact.lastName ??
-      contact.legalLastName ??
-      contact.preferredName ??
+      contact.lastName ||
+      contact.legalLastName ||
+      contact.preferredName ||
       'Contact'
 
     // Basic fields always included

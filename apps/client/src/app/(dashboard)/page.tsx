@@ -21,6 +21,7 @@ import {
   CardTitle,
   Avatar,
   AvatarFallback,
+  AvatarImage,
   Badge,
   Skeleton,
 } from "@tailfire/ui-public";
@@ -199,6 +200,9 @@ export default function DashboardPage() {
               ) : (
                 <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16 border-2 border-phoenix-gold">
+                    {agent?.avatarUrl && (
+                      <AvatarImage src={agent.avatarUrl} alt={advisorName} />
+                    )}
                     <AvatarFallback className="bg-phoenix-gold text-white text-xl">
                       {advisorInitials}
                     </AvatarFallback>

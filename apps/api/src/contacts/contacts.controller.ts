@@ -105,6 +105,20 @@ export class ContactsController {
   }
 
   /**
+   * Get booked activities for a contact
+   * GET /contacts/:id/bookings
+   * Returns all booked activities across trips where the contact is a traveler
+   */
+  @Get(':id/bookings')
+  async getBookings(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ) {
+    await this.contactsService.findOne(id, auth.agencyId)
+    return this.contactsService.getBookingsForContact(id, auth.agencyId)
+  }
+
+  /**
    * Get activity timeline for a contact
    * GET /contacts/:id/activity
    * Returns combined timeline of contact changes and related trip activity

@@ -1,6 +1,7 @@
 -- Update JWT custom claims hook to support portal users
 -- Portal users have app_metadata.portal_user = true and no user_profiles row.
 -- Without this fix, the hook throws an exception for portal users.
+-- Uses coalesce() around to_jsonb() to prevent SQL NULL from poisoning jsonb_set.
 
 CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb
@@ -27,9 +28,10 @@ BEGIN
 
     claims := event->'claims';
     claims := jsonb_set(claims, '{portal_user}', 'true'::jsonb);
-    claims := jsonb_set(claims, '{contact_id}', to_jsonb(portal_contact_id));
-    claims := jsonb_set(claims, '{agency_id}', to_jsonb(portal_agency_id));
-    claims := jsonb_set(claims, '{user_id}', event->'user_id');
+    -- Use coalesce to avoid SQL NULL poisoning jsonb_set (to_jsonb(NULL) = SQL NULL, not JSON null)
+    claims := jsonb_set(claims, '{contact_id}', coalesce(to_jsonb(portal_contact_id), 'null'::jsonb));
+    claims := jsonb_set(claims, '{agency_id}', coalesce(to_jsonb(portal_agency_id), 'null'::jsonb));
+    claims := jsonb_set(claims, '{user_id}', coalesce(event->'user_id', 'null'::jsonb));
 
     event := jsonb_set(event, '{claims}', claims);
     RETURN event;
@@ -52,7 +54,7 @@ BEGIN
   claims := event->'claims';
   claims := jsonb_set(claims, '{agency_id}', to_jsonb(user_agency_id));
   claims := jsonb_set(claims, '{role}', to_jsonb(user_role));
-  claims := jsonb_set(claims, '{user_id}', event->'user_id');
+  claims := jsonb_set(claims, '{user_id}', coalesce(event->'user_id', 'null'::jsonb));
   claims := jsonb_set(claims, '{user_status}', to_jsonb(user_status));
 
   event := jsonb_set(event, '{claims}', claims);

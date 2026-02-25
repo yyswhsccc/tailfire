@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useContact, useUpdateContact, useContactTrips, useSendPortalInvite } from '@/hooks/use-contacts'
+import { useContact, useUpdateContact, useContactTrips, useContactBookings, useSendPortalInvite } from '@/hooks/use-contacts'
 import { useTasks } from '@/hooks/use-tasks'
 import { TaskList } from '@/app/tasks/_components/task-list'
 import { TaskFormDialog } from '@/app/tasks/_components/task-form-dialog'
@@ -177,6 +177,7 @@ export default function ContactDetailPage() {
 
   const { data: contact, isLoading, error } = useContact(contactId)
   const { data: contactTrips = [], isLoading: tripsLoading } = useContactTrips(contactId)
+  const { data: contactBookings = [], isLoading: bookingsLoading } = useContactBookings(contactId)
   const updateContact = useUpdateContact()
 
   const [editingSection, setEditingSection] = useState<EditSection>(null)
@@ -295,6 +296,7 @@ export default function ContactDetailPage() {
           updateData = {
             firstName: formData.firstName,
             lastName: formData.lastName,
+            middleName: formData.middleName,
             legalFirstName: formData.legalFirstName,
             legalLastName: formData.legalLastName,
             preferredName: formData.preferredName,
@@ -470,7 +472,7 @@ export default function ContactDetailPage() {
                     <ContactAvatar
                       firstName={contact.firstName}
                       lastName={contact.lastName}
-                      // avatarUrl={contact.avatarUrl} // TODO: Add avatarUrl to ContactResponseDto
+                      avatarUrl={contact.photoUrl}
                       size="lg"
                     />
                   </div>
@@ -610,6 +612,15 @@ export default function ContactDetailPage() {
                       )}
                     </div>
                     <div>
+                      <Label htmlFor="middleName" className="text-xs text-ash-600">Middle Name</Label>
+                      <Input
+                        id="middleName"
+                        value={formData.middleName || ''}
+                        onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
+                        className="mt-1 h-8 text-sm"
+                      />
+                    </div>
+                    <div>
                       <Label htmlFor="legalFirstName" className="text-xs text-ash-600">Legal First Name</Label>
                       <Input
                         id="legalFirstName"
@@ -648,6 +659,12 @@ export default function ContactDetailPage() {
                       <p className="text-xs text-ash-600">Legal Name</p>
                       <p className="text-sm text-ash-900">{contact.legalFullName || '-'}</p>
                     </div>
+                    {contact.middleName && (
+                      <div>
+                        <p className="text-xs text-ash-600">Middle Name</p>
+                        <p className="text-sm text-ash-900">{contact.middleName}</p>
+                      </div>
+                    )}
                     {contact.preferredName && (
                       <div>
                         <p className="text-xs text-ash-600">Preferred Name</p>
@@ -1355,11 +1372,77 @@ export default function ContactDetailPage() {
                 </Card>
               )}
               {activeSection === 'bookings' && (
-                <ComingSoonSection
-                  title="Bookings"
-                  description="Booking history and details for this contact."
-                  icon={MapPin}
-                />
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5" />
+                      Bookings
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {bookingsLoading ? (
+                      <TableSkeleton />
+                    ) : contactBookings.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center">No booked activities for this contact.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Activity</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Trip</TableHead>
+                              <TableHead>Dates</TableHead>
+                              <TableHead>Confirmation #</TableHead>
+                              <TableHead>Booked</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {contactBookings.map((booking) => (
+                              <TableRow
+                                key={booking.id}
+                                className="cursor-pointer hover:bg-muted/50"
+                                onClick={() => router.push(`/trips/${booking.trip.id}`)}
+                              >
+                                <TableCell className="font-medium">{booking.name}</TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className="capitalize">
+                                    {booking.activityType?.replace(/_/g, ' ') || 'Activity'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Link
+                                    href={`/trips/${booking.trip.id}`}
+                                    className="text-primary hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {booking.trip.name}
+                                  </Link>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                  {booking.startDatetime
+                                    ? new Date(booking.startDatetime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                    : '\u2013'}
+                                  {booking.endDatetime && (
+                                    <> &ndash; {new Date(booking.endDatetime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                  )}
+                                </TableCell>
+                                <TableCell className="font-mono text-sm">
+                                  {booking.confirmationNumber || '\u2013'}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {booking.bookingDate
+                                    ? new Date(booking.bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                    : '\u2013'}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               )}
               {activeSection === 'payments' && (
                 <div className="bg-white border border-gray-200 rounded-lg">

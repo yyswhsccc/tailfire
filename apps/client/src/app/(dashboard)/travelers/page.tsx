@@ -241,9 +241,12 @@ export default function ProfilePage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Last Name" value={form.lastName} onChange={(v) => updateField("lastName", v)} />
-            <FormField label="Preferred Name" value={form.preferredName} onChange={(v) => updateField("preferredName", v)} placeholder="What you go by" />
+            <FormField label="Middle Name" value={form.middleName} onChange={(v) => updateField("middleName", v)} />
           </div>
-          <FormField label="Phone" value={form.phone} onChange={(v) => updateField("phone", v)} placeholder="+1 (555) 123-4567" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField label="Preferred Name" value={form.preferredName} onChange={(v) => updateField("preferredName", v)} placeholder="What you go by" />
+            <FormField label="Phone" value={form.phone} onChange={(v) => updateField("phone", v)} placeholder="+1 (555) 123-4567" />
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Gender" value={form.gender} onChange={(v) => updateField("gender", v)} placeholder="e.g. male, female, non-binary" />
             <FormField label="Pronouns" value={form.pronouns} onChange={(v) => updateField("pronouns", v)} placeholder="e.g. she/her, he/him, they/them" />
@@ -263,7 +266,6 @@ export default function ProfilePage() {
             <FormField label="Legal Last Name" value={form.legalLastName} onChange={(v) => updateField("legalLastName", v)} placeholder="As on passport" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Middle Name" value={form.middleName} onChange={(v) => updateField("middleName", v)} />
             <FormField label="Suffix" value={form.suffix} onChange={(v) => updateField("suffix", v)} placeholder="Jr., Sr., III" />
           </div>
           <Separator className="bg-phoenix-gold/20" />
@@ -391,14 +393,29 @@ function FormField({
   placeholder?: string;
   type?: string;
 }) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+    // Prevent year overflow on date inputs (browsers allow >4 digit years)
+    if (type === "date" && val) {
+      const parts = val.split("-");
+      if (parts[0] && parts[0].length > 4) {
+        parts[0] = parts[0].slice(0, 4);
+        val = parts.join("-");
+      }
+    }
+    onChange(val);
+  };
+
   return (
     <div className="space-y-2">
       <Label className="text-phoenix-text-light">{label}</Label>
       <Input
         type={type}
         value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={handleChange}
         placeholder={placeholder}
+        max={type === "date" ? "2099-12-31" : undefined}
+        min={type === "date" ? "1900-01-01" : undefined}
         className="bg-phoenix-charcoal border-phoenix-gold/30 text-white placeholder:text-phoenix-text-muted"
       />
     </div>

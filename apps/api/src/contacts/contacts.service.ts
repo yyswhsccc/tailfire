@@ -633,6 +633,76 @@ export class ContactsService {
   }
 
   /**
+   * Get booked activities for a contact across all their trips.
+   * Returns activities where isBooked = true from trips the contact is a traveler on.
+   */
+  async getBookingsForContact(contactId: string, agencyId: string) {
+    // Get trip IDs where contact is a traveler
+    const travelerTrips = await this.db.client
+      .select({ tripId: this.db.schema.tripTravelers.tripId })
+      .from(this.db.schema.tripTravelers)
+      .where(eq(this.db.schema.tripTravelers.contactId, contactId))
+
+    const tripIds = travelerTrips.map((t) => t.tripId)
+    if (tripIds.length === 0) return []
+
+    // Fetch booked activities from those trips, joined with trip info
+    const rows = await this.db.client
+      .select({
+        activityId: this.db.schema.itineraryActivities.id,
+        activityName: this.db.schema.itineraryActivities.name,
+        activityType: this.db.schema.itineraryActivities.activityType,
+        status: this.db.schema.itineraryActivities.status,
+        startDatetime: this.db.schema.itineraryActivities.startDatetime,
+        endDatetime: this.db.schema.itineraryActivities.endDatetime,
+        location: this.db.schema.itineraryActivities.location,
+        confirmationNumber: this.db.schema.itineraryActivities.confirmationNumber,
+        bookingDate: this.db.schema.itineraryActivities.bookingDate,
+        tripId: this.db.schema.trips.id,
+        tripName: this.db.schema.trips.name,
+        tripStatus: this.db.schema.trips.status,
+      })
+      .from(this.db.schema.itineraryActivities)
+      .innerJoin(
+        this.db.schema.itineraryDays,
+        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id),
+      )
+      .innerJoin(
+        this.db.schema.itineraries,
+        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id),
+      )
+      .innerJoin(
+        this.db.schema.trips,
+        eq(this.db.schema.itineraries.tripId, this.db.schema.trips.id),
+      )
+      .where(
+        and(
+          inArray(this.db.schema.itineraries.tripId, tripIds),
+          eq(this.db.schema.itineraryActivities.isBooked, true),
+          eq(this.db.schema.trips.agencyId, agencyId),
+        ),
+      )
+      .orderBy(asc(this.db.schema.itineraryActivities.startDatetime))
+
+    return rows.map((r) => ({
+      id: r.activityId,
+      name: r.activityName,
+      activityType: r.activityType,
+      status: r.status,
+      startDatetime: r.startDatetime?.toISOString() || null,
+      endDatetime: r.endDatetime?.toISOString() || null,
+      location: r.location,
+      confirmationNumber: r.confirmationNumber,
+      bookingDate: r.bookingDate?.toISOString() || null,
+      trip: {
+        id: r.tripId,
+        name: r.tripName,
+        status: r.tripStatus,
+      },
+    }))
+  }
+
+  /**
    * Send portal invite to a contact
    */
   async sendPortalInvite(
@@ -676,9 +746,15 @@ export class ContactsService {
     const clientPortalUrl = this.configService.get<string>('CLIENT_PORTAL_URL') || 'http://localhost:3103'
 
     // 5. Create Supabase auth user
+    const displayFirstName = contact.preferredName || contact.firstName || contact.legalFirstName || ''
+    const displayLastName = contact.lastName || contact.legalLastName || ''
     const { data: userData, error: userError } = await this.supabaseAdmin.auth.admin.createUser({
       email: contact.email,
-      email_confirm: false,
+      email_confirm: true, // Auto-confirm since we send our own branded invite email
+      user_metadata: {
+        first_name: displayFirstName,
+        last_name: displayLastName,
+      },
       app_metadata: {
         portal_user: true,
         contact_id: contactId,
@@ -728,7 +804,7 @@ export class ContactsService {
     }
 
     // 8. Send branded email
-    const firstName = contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Traveler'
+    const firstName = contact.preferredName || contact.firstName || contact.legalFirstName || 'Traveler'
     const emailResult = await this.emailService.sendClientPortalInviteEmail(
       contact.email,
       inviteLink,
@@ -800,7 +876,7 @@ export class ContactsService {
       .set({ portalInvitedAt: new Date(), portalInvitedBy: invitedBy, updatedAt: new Date() })
       .where(eq(this.db.schema.contacts.id, contact.id))
 
-    const firstName = contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Traveler'
+    const firstName = contact.preferredName || contact.firstName || contact.legalFirstName || 'Traveler'
     const emailResult = await this.emailService.sendClientPortalInviteEmail(
       contact.email,
       inviteLink,
@@ -829,7 +905,7 @@ export class ContactsService {
    */
   private mapToResponseDto(contact: any): ContactResponseDto {
     // Compute display name: preferred > first > legal_first
-    const displayName = contact.preferredName ?? contact.firstName ?? contact.legalFirstName ?? 'Unknown'
+    const displayName = contact.preferredName || contact.firstName || contact.legalFirstName || 'Unknown'
 
     // Compute legal full name for documents
     const legalFullName = [

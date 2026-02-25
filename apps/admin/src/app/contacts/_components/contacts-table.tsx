@@ -68,7 +68,7 @@ export function ContactsTable({
                     <ContactAvatar
                       firstName={contact.firstName}
                       lastName={contact.lastName}
-                      // avatarUrl={contact.avatarUrl} // TODO: Add avatarUrl to ContactResponseDto
+                      avatarUrl={contact.photoUrl}
                       size="sm"
                     />
                     <span className="text-sm text-ash-900">{contact.firstName || '-'}</span>
