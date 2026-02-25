@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Calendar, MapPin, User, Users, Plus, ChevronDown, ChevronUp, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { TripResponseDto, ItineraryResponseDto } from '@tailfire/shared-types/api'
@@ -194,7 +195,18 @@ export function TripOverview({ trip }: TripOverviewProps) {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0 text-left">
-                        <p className="text-sm font-semibold text-ash-900 truncate">{name}</p>
+                        {traveler.contactId ? (
+                          <Link
+                            href={`/contacts/${traveler.contactId}`}
+                            target="_blank"
+                            className="text-sm font-semibold text-ash-900 truncate block hover:text-primary hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {name}
+                          </Link>
+                        ) : (
+                          <p className="text-sm font-semibold text-ash-900 truncate">{name}</p>
+                        )}
                         {!isExpanded && (
                           <p className="text-xs text-ash-500">No details</p>
                         )}

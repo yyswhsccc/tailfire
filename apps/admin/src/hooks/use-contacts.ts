@@ -97,6 +97,35 @@ export function useContactTrips(contactId: string | null) {
   })
 }
 
+/**
+ * Fetch booked activities for a contact
+ */
+export function useContactBookings(contactId: string | null) {
+  return useQuery({
+    queryKey: [...contactKeys.detail(contactId || ''), 'bookings'],
+    queryFn: () =>
+      api.get<
+        Array<{
+          id: string
+          name: string
+          activityType: string
+          status: string
+          startDatetime: string | null
+          endDatetime: string | null
+          location: string | null
+          confirmationNumber: string | null
+          bookingDate: string | null
+          trip: {
+            id: string
+            name: string
+            status: string
+          }
+        }>
+      >(`/contacts/${contactId}/bookings`),
+    enabled: !!contactId,
+  })
+}
+
 // ============================================================================
 // MUTATIONS
 // ============================================================================
