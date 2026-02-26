@@ -125,9 +125,6 @@ export class ContactsService {
         marketingPhoneOptIn: dto.marketingPhoneOptIn,
         marketingOptInSource: dto.marketingOptInSource,
 
-        // Metadata
-        tags: dto.tags,
-
         // Phase 3.5: Date/Time Management
         timezone: dto.timezone,
       })
@@ -151,6 +148,7 @@ export class ContactsService {
   async findAll(
     filters: ContactFilterDto,
     agencyId: string,
+    userId?: string,
   ): Promise<PaginatedContactsResponseDto> {
     const page = filters.page || 1
     const limit = filters.limit || 20
@@ -183,12 +181,16 @@ export class ContactsService {
     }
 
     if (filters.tags && filters.tags.length > 0) {
-      // Match any of the provided tags
+      // Match any of the provided tags (via junction table, visibility-scoped)
       conditions.push(
-        sql`${this.db.schema.contacts.tags} && ARRAY[${sql.join(
-          filters.tags.map((tag) => sql`${tag}`),
-          sql`, `,
-        )}]::text[]`,
+        sql`EXISTS (
+          SELECT 1 FROM contact_tags
+          JOIN tags ON tags.id = contact_tags.tag_id
+          WHERE contact_tags.contact_id = contacts.id
+          AND tags.name = ANY(${filters.tags})
+          AND tags.agency_id = ${agencyId}
+          AND (tags.type = 'system' OR (tags.type = 'agent' AND tags.created_by = ${userId}))
+        )`,
       )
     }
 
@@ -289,7 +291,9 @@ export class ContactsService {
       .where(and(eq(this.db.schema.contacts.id, id), eq(this.db.schema.contacts.agencyId, agencyId)))
       .limit(1)
 
-    const updateData: any = { ...dto }
+    // Strip legacy tags field — tags are managed via junction table endpoints
+    const { tags: _legacyTags, ...dtoWithoutTags } = dto as any
+    const updateData: any = { ...dtoWithoutTags }
 
     // Parse travelPreferences if it's a string
     if (typeof dto.travelPreferences === 'string') {

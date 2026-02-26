@@ -13,7 +13,7 @@ import {
   CommandList,
 } from './command'
 import { useTags } from '@/hooks/use-tags'
-import type { TagResponseDto } from '@tailfire/shared-types/api'
+import type { TagResponseDto, TagWithUsageDto } from '@tailfire/shared-types/api'
 
 interface TagInputProps {
   /**
@@ -26,15 +26,12 @@ interface TagInputProps {
    */
   onChange: (tagIds: string[]) => void
   /**
-   * Entity type for context (trip, contact, etc.)
+   * Filter dropdown to a specific tag type ('system' | 'agent')
+   * Leave undefined to show both grouped
    */
-  entityType?: 'trip' | 'contact'
+  tagType?: 'system' | 'agent'
   /**
-   * Entity ID - used for create-and-assign operations
-   */
-  entityId?: string
-  /**
-   * Callback when a new tag is created
+   * Callback when a new tag is created inline
    */
   onCreateTag?: (name: string) => Promise<TagResponseDto>
   placeholder?: string
@@ -45,8 +42,7 @@ interface TagInputProps {
 export function TagInput({
   value = [],
   onChange,
-  entityType: _entityType,
-  entityId: _entityId,
+  tagType,
   onCreateTag,
   placeholder = 'Add tag...',
   disabled = false,
@@ -55,15 +51,17 @@ export function TagInput({
   const [open, setOpen] = useState(false)
   const [inputValue, setInputValue] = useState('')
 
-  // Fetch all available tags
+  // Fetch all available tags (both types — we group them in the dropdown)
   const { data: allTags = [], isLoading } = useTags({
-    sortBy: 'usageCount',
-    sortOrder: 'desc',
+    ...(tagType ? { type: tagType } : {}),
+    sortBy: 'name',
+    sortOrder: 'asc',
+    limit: 200,
   })
 
   // Normalize value to array of tag IDs
   const selectedTagIds = Array.isArray(value)
-    ? typeof value[0] === 'string'
+    ? value.length > 0 && typeof value[0] === 'string'
       ? (value as string[])
       : (value as TagResponseDto[]).map((t) => t.id)
     : []
@@ -77,6 +75,10 @@ export function TagInput({
       !selectedTagIds.includes(tag.id) &&
       tag.name.toLowerCase().includes(inputValue.toLowerCase())
   )
+
+  // Group available tags by type for the dropdown
+  const systemTags = availableTags.filter((t) => t.type === 'system')
+  const agentTags = availableTags.filter((t) => t.type === 'agent')
 
   // Check if input matches an existing tag exactly
   const exactMatch = allTags.find(
@@ -111,10 +113,33 @@ export function TagInput({
       setOpen(false)
       setInputValue('')
     } else if (e.key === 'Backspace' && !inputValue && selectedTagIds.length > 0) {
-      // Remove last tag when backspace is pressed on empty input
       onChange(selectedTagIds.slice(0, -1))
     }
   }
+
+  const renderTagItem = (tag: TagWithUsageDto) => (
+    <CommandItem
+      key={tag.id}
+      value={tag.id}
+      onSelect={() => handleSelectTag(tag.id)}
+    >
+      <div className="flex items-center gap-2 flex-1">
+        <div
+          className="w-3 h-3 rounded-full shrink-0"
+          style={{ backgroundColor: tag.color || '#e5e7eb' }}
+        />
+        <span>{tag.name}</span>
+        {tag.category && (
+          <span className="text-xs text-muted-foreground">
+            ({tag.category})
+          </span>
+        )}
+      </div>
+      <span className="text-xs text-muted-foreground">
+        {tag.usageCount} uses
+      </span>
+    </CommandItem>
+  )
 
   return (
     <div className={cn('relative', className)}>
@@ -179,31 +204,23 @@ export function TagInput({
                 </div>
               ) : (
                 <>
-                  {availableTags.length > 0 && (
+                  {/* Show grouped when no tagType filter */}
+                  {!tagType && systemTags.length > 0 && (
+                    <CommandGroup heading="System Tags">
+                      {systemTags.map(renderTagItem)}
+                    </CommandGroup>
+                  )}
+
+                  {!tagType && agentTags.length > 0 && (
+                    <CommandGroup heading="My Tags">
+                      {agentTags.map(renderTagItem)}
+                    </CommandGroup>
+                  )}
+
+                  {/* Show flat list when tagType is filtered */}
+                  {tagType && availableTags.length > 0 && (
                     <CommandGroup heading="Select tag">
-                      {availableTags.map((tag) => (
-                        <CommandItem
-                          key={tag.id}
-                          value={tag.id}
-                          onSelect={() => handleSelectTag(tag.id)}
-                        >
-                          <div className="flex items-center gap-2 flex-1">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: tag.color || '#e5e7eb' }}
-                            />
-                            <span>{tag.name}</span>
-                            {tag.category && (
-                              <span className="text-xs text-muted-foreground">
-                                ({tag.category})
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {tag.tripCount + tag.contactCount} uses
-                          </span>
-                        </CommandItem>
-                      ))}
+                      {availableTags.map(renderTagItem)}
                     </CommandGroup>
                   )}
 
@@ -242,21 +259,11 @@ export function TagInput({
   )
 }
 
-/**
- * Calculate contrast color (black or white) for a given background color
- */
 function getContrastColor(hexColor: string): string {
-  // Remove # if present
   const hex = hexColor.replace('#', '')
-
-  // Convert to RGB
   const r = parseInt(hex.substr(0, 2), 16)
   const g = parseInt(hex.substr(2, 2), 16)
   const b = parseInt(hex.substr(4, 2), 16)
-
-  // Calculate relative luminance
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-
-  // Return black for light backgrounds, white for dark backgrounds
   return luminance > 0.5 ? '#000000' : '#FFFFFF'
 }

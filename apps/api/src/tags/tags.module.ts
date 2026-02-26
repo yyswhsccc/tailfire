@@ -1,18 +1,31 @@
 /**
  * Tags Module
  *
- * Provides tag management and entity tag assignment functionality.
+ * Provides multi-tenant tag management and entity tag assignment functionality.
+ * Imports access services for entity-level permission checks on tag endpoints.
  */
 
 import { Module } from '@nestjs/common'
 import { DatabaseModule } from '../db/database.module'
 import { TagsService } from './tags.service'
-import { TagsController, TripTagsController, ContactTagsController } from './tags.controller'
+import {
+  TagsController,
+  TripTagsController,
+  ContactTagsController,
+  CalendarEventTagsController,
+} from './tags.controller'
+import { TripAccessService } from '../trips/trip-access.service'
+import { ContactAccessService } from '../contacts/contact-access.service'
 
 @Module({
   imports: [DatabaseModule],
-  controllers: [TagsController, TripTagsController, ContactTagsController],
-  providers: [TagsService],
+  controllers: [
+    TagsController,
+    TripTagsController,
+    ContactTagsController,
+    CalendarEventTagsController,
+  ],
+  providers: [TagsService, TripAccessService, ContactAccessService],
   exports: [TagsService],
 })
 export class TagsModule {}

@@ -37,8 +37,10 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DateRangeInput } from '@/components/ui/date-range-input'
 import { useCreateTrip, useUpdateTrip, tripKeys } from '@/hooks/use-trips'
+import { useTripTags, useUpdateTripTags, useCreateTag } from '@/hooks/use-tags'
 import { useToast } from '@/hooks/use-toast'
 import { ApiError, api } from '@/lib/api'
+import { TagInput } from '@/components/ui/tag-input'
 import { UnsplashPicker } from '@/components/unsplash-picker'
 import {
   tripFormSchema,
@@ -78,6 +80,12 @@ export function TripFormDialog({
   const [coverPhoto, setCoverPhoto] = useState<SelectedCoverPhoto | null>(null)
   const [showUnsplashPicker, setShowUnsplashPicker] = useState(false)
   const [savingCover, setSavingCover] = useState(false)
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+
+  // Tag hooks for junction-based tag management
+  const { data: existingTripTags } = useTripTags(mode === 'edit' && trip ? trip.id : null)
+  const updateTripTags = useUpdateTripTags()
+  const createTag = useCreateTag()
   const { startLoading, stopLoading, isLoading } = useLoading()
   const isNavigating = isLoading('trip-navigation')
 
@@ -102,9 +110,17 @@ export function TripFormDialog({
         form.reset(toTripDefaults(trip))
       } else if (mode === 'create') {
         form.reset(toTripDefaults())
+        setSelectedTagIds([])
       }
     }
   }, [trip, mode, form, open, stopLoading])
+
+  // Sync tag IDs from junction data when it loads (handles async fetch)
+  useEffect(() => {
+    if (open && mode === 'edit' && existingTripTags) {
+      setSelectedTagIds(existingTripTags.map(t => t.id))
+    }
+  }, [open, mode, existingTripTags])
 
   // Scroll to first error on validation failure
   useEffect(() => {
@@ -147,6 +163,15 @@ export function TripFormDialog({
           }
         }
 
+        // Save tags via junction endpoint
+        if (selectedTagIds.length > 0) {
+          try {
+            await updateTripTags.mutateAsync({ tripId: newTrip.id, tagIds: selectedTagIds })
+          } catch (tagError) {
+            console.warn('Failed to save tags:', tagError)
+          }
+        }
+
         startLoading('trip-navigation', 'Opening your new trip...')
         toast({
           title: 'Trip created',
@@ -155,6 +180,7 @@ export function TripFormDialog({
         onOpenChange(false)
         form.reset(toTripDefaults())
         setCoverPhoto(null)
+        setSelectedTagIds([])
         // Navigate to the new trip's detail page
         router.push(`/trips/${newTrip.id}`)
       } else if (trip) {
@@ -169,6 +195,9 @@ export function TripFormDialog({
           id: trip.id,
           data: payload,
         })
+
+        // Save tags via junction endpoint
+        await updateTripTags.mutateAsync({ tripId: trip.id, tagIds: selectedTagIds })
 
         // Auto-extend itinerary days if trip dates were added or extended
         // Need to fetch full trip details since list view doesn't include itineraries
@@ -470,24 +499,18 @@ export function TripFormDialog({
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="tags"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tags</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Search tags"
-                        data-field="tags"
-                        value={field.value?.join(', ') || ''}
-                        onChange={(e) => field.onChange(e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <FormItem>
+                <FormLabel>Tags</FormLabel>
+                <TagInput
+                  value={selectedTagIds}
+                  onChange={setSelectedTagIds}
+                  onCreateTag={async (name) => {
+                    const tag = await createTag.mutateAsync({ name })
+                    return tag
+                  }}
+                  placeholder="Add tag..."
+                />
+              </FormItem>
             </div>
 
             {/* Row 3: Travel Dates */}

@@ -155,7 +155,6 @@ export class TripsService {
         externalReference: dto.externalReference,
         currency: dto.currency || 'CAD',
         estimatedTotalCost: dto.estimatedTotalCost?.toString(),
-        tags: dto.tags,
         customFields: dto.customFields,
         timezone: dto.timezone,
       })
@@ -292,9 +291,16 @@ export class TripsService {
       conditions.push(lte(this.db.schema.trips.endDate, filters.endDateTo))
     }
 
-    // Tags filter (array overlap)
-    if (filters.tags && filters.tags.length > 0) {
-      conditions.push(sql`${this.db.schema.trips.tags} && ${filters.tags}`)
+    // Tags filter (via junction table, visibility-scoped)
+    if (filters.tags && filters.tags.length > 0 && auth) {
+      conditions.push(sql`EXISTS (
+        SELECT 1 FROM trip_tags
+        JOIN tags ON tags.id = trip_tags.tag_id
+        WHERE trip_tags.trip_id = trips.id
+        AND tags.name = ANY(${filters.tags})
+        AND tags.agency_id = ${auth.agencyId}
+        AND (tags.type = 'system' OR (tags.type = 'agent' AND tags.created_by = ${auth.userId}))
+      )`)
     }
 
     // Trip group filter
@@ -504,10 +510,13 @@ export class TripsService {
     const isStatusChange = dto.status && dto.status !== existingTrip.status
     const now = new Date()
 
+    // Strip legacy tags field — tags are managed via junction table endpoints
+    const { tags: _legacyTags, ...dtoWithoutTags } = dto as any
+
     const [trip] = await this.db.client
       .update(this.db.schema.trips)
       .set({
-        ...dto,
+        ...dtoWithoutTags,
         bookingDate,
         estimatedTotalCost: dto.estimatedTotalCost?.toString(),
         updatedAt: now,
@@ -1069,11 +1078,20 @@ export class TripsService {
     tags: string[]
     groups: { id: string; name: string }[]
   }> {
-    // Get distinct tags from user's trips
+    // Get distinct tag names from junction table (visibility-scoped: system + own agent tags)
     const tagsResult = await this.db.client
-      .selectDistinct({ tag: sql<string>`unnest(${this.db.schema.trips.tags})` })
-      .from(this.db.schema.trips)
-      .where(eq(this.db.schema.trips.ownerId, ownerId))
+      .selectDistinct({ tag: this.db.schema.tags.name })
+      .from(this.db.schema.tags)
+      .innerJoin(this.db.schema.tripTags, eq(this.db.schema.tags.id, this.db.schema.tripTags.tagId))
+      .innerJoin(this.db.schema.trips, eq(this.db.schema.trips.id, this.db.schema.tripTags.tripId))
+      .where(and(
+        eq(this.db.schema.trips.ownerId, ownerId),
+        eq(this.db.schema.tags.agencyId, agencyId),
+        or(
+          eq(this.db.schema.tags.type, 'system'),
+          and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, ownerId)),
+        ),
+      ))
 
     const tags = tagsResult
       .map(r => r.tag)
@@ -3039,7 +3057,6 @@ export class TripsService {
           primaryContactId: original.primaryContactId,
           currency: original.currency,
           estimatedTotalCost: original.estimatedTotalCost,
-          tags: original.tags,
           customFields: original.customFields,
           timezone: original.timezone,
           pricingVisibility: original.pricingVisibility,
@@ -3050,7 +3067,26 @@ export class TripsService {
         })
         .returning()
 
-      // 3. Copy itineraries
+      // 3. Copy trip tags (junction table) — only system tags + duplicator's own agent tags
+      const originalTripTags = await tx
+        .select({ tagId: this.db.schema.tripTags.tagId })
+        .from(this.db.schema.tripTags)
+        .innerJoin(this.db.schema.tags, eq(this.db.schema.tags.id, this.db.schema.tripTags.tagId))
+        .where(and(
+          eq(this.db.schema.tripTags.tripId, tripId),
+          or(
+            eq(this.db.schema.tags.type, 'system'),
+            and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, actorId)),
+          ),
+        ))
+
+      if (originalTripTags.length > 0) {
+        await tx
+          .insert(this.db.schema.tripTags)
+          .values(originalTripTags.map(t => ({ tripId: newTrip!.id, tagId: t.tagId })))
+      }
+
+      // 4. Copy itineraries
       const originalItineraries = await tx
         .select()
         .from(this.db.schema.itineraries)

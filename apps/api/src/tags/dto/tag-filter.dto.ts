@@ -15,6 +15,10 @@ export class TagFilterDto {
   category?: string
 
   @IsOptional()
+  @IsIn(['system', 'agent'])
+  type?: 'system' | 'agent'
+
+  @IsOptional()
   @IsIn(['name', 'usageCount', 'createdAt'])
   sortBy?: 'name' | 'usageCount' | 'createdAt'
 

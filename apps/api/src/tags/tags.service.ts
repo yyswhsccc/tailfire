@@ -1,11 +1,18 @@
 /**
  * Tags Service
  *
- * Business logic for managing tags and tag assignments.
+ * Multi-tenant, type-aware tag management.
+ *
+ * Tag visibility rules:
+ * - System tags: visible to all agents in the agency (admin-only CRUD)
+ * - Agent tags: visible only to the creating agent
+ *
+ * Private tag safety: replace operations only touch tags the caller can see,
+ * preserving other agents' private tags on the entity.
  */
 
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common'
-import { eq, ilike, desc, asc, sql, and, inArray } from 'drizzle-orm'
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common'
+import { eq, ilike, desc, asc, sql, and, inArray, or } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import type {
   TagResponseDto,
@@ -16,39 +23,93 @@ import type {
   CreateAndAssignTagDto,
 } from '@tailfire/shared-types'
 
+interface TagAuthContext {
+  agencyId: string
+  userId: string
+  role: 'admin' | 'user'
+}
+
 @Injectable()
 export class TagsService {
   constructor(private readonly db: DatabaseService) {}
 
   /**
+   * Build visibility condition: system tags for agency + own agent tags
+   */
+  private visibilityCondition(agencyId: string, userId: string) {
+    return and(
+      eq(this.db.schema.tags.agencyId, agencyId),
+      or(
+        eq(this.db.schema.tags.type, 'system'),
+        and(
+          eq(this.db.schema.tags.type, 'agent'),
+          eq(this.db.schema.tags.createdBy, userId),
+        ),
+      ),
+    )
+  }
+
+  /**
+   * Format a tag row into a response DTO
+   */
+  private formatTag(tag: {
+    id: string
+    name: string
+    category: string | null
+    color: string | null
+    type: string
+    createdBy: string | null
+    createdAt: Date
+    updatedAt: Date
+  }): TagResponseDto {
+    return {
+      id: tag.id,
+      name: tag.name,
+      category: tag.category,
+      color: tag.color,
+      type: tag.type as 'system' | 'agent',
+      createdBy: tag.createdBy,
+      createdAt: tag.createdAt.toISOString(),
+      updatedAt: tag.updatedAt.toISOString(),
+    }
+  }
+
+  /**
    * Get all tags with optional filtering and usage counts
    */
-  async findAll(filters: TagFilterDto = {}): Promise<TagWithUsageDto[]> {
+  async findAll(filters: TagFilterDto, auth: TagAuthContext): Promise<TagWithUsageDto[]> {
     const {
       search,
       category,
+      type,
       sortBy = 'name',
       sortOrder = 'asc',
       limit = 100,
       offset = 0,
     } = filters
 
-    // Build where conditions
-    const conditions = []
+    // Build where conditions with visibility
+    const conditions = [this.visibilityCondition(auth.agencyId, auth.userId)!]
+
     if (search) {
       conditions.push(ilike(this.db.schema.tags.name, `%${search}%`))
     }
     if (category) {
       conditions.push(eq(this.db.schema.tags.category, category))
     }
+    if (type) {
+      conditions.push(eq(this.db.schema.tags.type, type))
+    }
 
-    // Query tags with usage counts
+    // Query tags with usage counts across all entity types
     const tags = await this.db.client
       .select({
         id: this.db.schema.tags.id,
         name: this.db.schema.tags.name,
         category: this.db.schema.tags.category,
         color: this.db.schema.tags.color,
+        type: this.db.schema.tags.type,
+        createdBy: this.db.schema.tags.createdBy,
         createdAt: this.db.schema.tags.createdAt,
         updatedAt: this.db.schema.tags.updatedAt,
         tripCount: sql<number>`(
@@ -61,56 +122,98 @@ export class TagsService {
           FROM ${this.db.schema.contactTags}
           WHERE ${this.db.schema.contactTags.tagId} = ${this.db.schema.tags.id}
         )`,
+        taskCount: sql<number>`(
+          SELECT COUNT(*)::int
+          FROM task_tags
+          WHERE task_tags.tag_id = ${this.db.schema.tags.id}
+        )`,
+        eventCount: sql<number>`(
+          SELECT COUNT(*)::int
+          FROM ${this.db.schema.calendarEventTags}
+          WHERE ${this.db.schema.calendarEventTags.tagId} = ${this.db.schema.tags.id}
+        )`,
       })
       .from(this.db.schema.tags)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(
-        sortOrder === 'asc'
-          ? asc(this.db.schema.tags[sortBy === 'usageCount' ? 'id' : sortBy])
-          : desc(this.db.schema.tags[sortBy === 'usageCount' ? 'id' : sortBy])
+        sortBy === 'usageCount'
+          ? (sortOrder === 'asc'
+            ? sql`(
+                (SELECT COUNT(*) FROM ${this.db.schema.tripTags} WHERE ${this.db.schema.tripTags.tagId} = ${this.db.schema.tags.id}) +
+                (SELECT COUNT(*) FROM ${this.db.schema.contactTags} WHERE ${this.db.schema.contactTags.tagId} = ${this.db.schema.tags.id}) +
+                (SELECT COUNT(*) FROM task_tags WHERE task_tags.tag_id = ${this.db.schema.tags.id}) +
+                (SELECT COUNT(*) FROM ${this.db.schema.calendarEventTags} WHERE ${this.db.schema.calendarEventTags.tagId} = ${this.db.schema.tags.id})
+              ) ASC`
+            : sql`(
+                (SELECT COUNT(*) FROM ${this.db.schema.tripTags} WHERE ${this.db.schema.tripTags.tagId} = ${this.db.schema.tags.id}) +
+                (SELECT COUNT(*) FROM ${this.db.schema.contactTags} WHERE ${this.db.schema.contactTags.tagId} = ${this.db.schema.tags.id}) +
+                (SELECT COUNT(*) FROM task_tags WHERE task_tags.tag_id = ${this.db.schema.tags.id}) +
+                (SELECT COUNT(*) FROM ${this.db.schema.calendarEventTags} WHERE ${this.db.schema.calendarEventTags.tagId} = ${this.db.schema.tags.id})
+              ) DESC`)
+          : (sortOrder === 'asc'
+            ? asc(this.db.schema.tags[sortBy])
+            : desc(this.db.schema.tags[sortBy]))
       )
       .limit(limit)
       .offset(offset)
 
-    // Format response with usage counts
     return tags.map((tag) => ({
-      ...tag,
-      createdAt: tag.createdAt.toISOString(),
-      updatedAt: tag.updatedAt.toISOString(),
-      usageCount: tag.tripCount + tag.contactCount,
+      ...this.formatTag(tag),
+      tripCount: tag.tripCount,
+      contactCount: tag.contactCount,
+      taskCount: tag.taskCount,
+      eventCount: tag.eventCount,
+      usageCount: tag.tripCount + tag.contactCount + tag.taskCount + tag.eventCount,
     }))
   }
 
   /**
-   * Get a single tag by ID
+   * Get a single tag by ID (with visibility check)
    */
-  async findOne(id: string): Promise<TagResponseDto> {
+  async findOne(id: string, auth: TagAuthContext): Promise<TagResponseDto> {
     const [tag] = await this.db.client
       .select()
       .from(this.db.schema.tags)
-      .where(eq(this.db.schema.tags.id, id))
+      .where(and(
+        eq(this.db.schema.tags.id, id),
+        this.visibilityCondition(auth.agencyId, auth.userId),
+      ))
       .limit(1)
 
     if (!tag) {
       throw new NotFoundException(`Tag with ID ${id} not found`)
     }
 
-    return {
-      ...tag,
-      createdAt: tag.createdAt.toISOString(),
-      updatedAt: tag.updatedAt.toISOString(),
-    }
+    return this.formatTag(tag)
   }
 
   /**
    * Create a new tag
+   * - System tags: admin only
+   * - Agent tags: any authenticated user (defaults to agent type for non-admins)
    */
-  async create(dto: CreateTagDto): Promise<TagResponseDto> {
-    // Check if tag name already exists (case-insensitive)
+  async create(dto: CreateTagDto, auth: TagAuthContext): Promise<TagResponseDto> {
+    const tagType = dto.type || (auth.role === 'admin' ? 'system' : 'agent')
+
+    // Only admins can create system tags
+    if (tagType === 'system' && auth.role !== 'admin') {
+      throw new ForbiddenException('Only admins can create system tags')
+    }
+
+    // Check for name collision within scope
+    const scopeConditions = [
+      eq(this.db.schema.tags.agencyId, auth.agencyId),
+      eq(this.db.schema.tags.type, tagType),
+      ilike(this.db.schema.tags.name, dto.name.trim()),
+    ]
+    if (tagType === 'agent') {
+      scopeConditions.push(eq(this.db.schema.tags.createdBy, auth.userId))
+    }
+
     const existing = await this.db.client
       .select()
       .from(this.db.schema.tags)
-      .where(ilike(this.db.schema.tags.name, dto.name))
+      .where(and(...scopeConditions))
       .limit(1)
 
     if (existing.length > 0) {
@@ -123,37 +226,50 @@ export class TagsService {
         name: dto.name.trim(),
         category: dto.category?.trim() || null,
         color: dto.color?.trim() || null,
+        agencyId: auth.agencyId,
+        type: tagType,
+        createdBy: tagType === 'agent' ? auth.userId : null,
       })
       .returning()
 
-    return {
-      ...tag!,
-      createdAt: tag!.createdAt.toISOString(),
-      updatedAt: tag!.updatedAt.toISOString(),
-    }
+    return this.formatTag(tag!)
   }
 
   /**
    * Update a tag
+   * - System tags: admin only
+   * - Agent tags: owner only
    */
-  async update(id: string, dto: UpdateTagDto): Promise<TagResponseDto> {
-    // Check if tag exists
-    await this.findOne(id)
+  async update(id: string, dto: UpdateTagDto, auth: TagAuthContext): Promise<TagResponseDto> {
+    const existing = await this.findOne(id, auth)
 
-    // If updating name, check for conflicts
+    // Auth check
+    if (existing.type === 'system' && auth.role !== 'admin') {
+      throw new ForbiddenException('Only admins can edit system tags')
+    }
+    if (existing.type === 'agent' && existing.createdBy !== auth.userId) {
+      throw new ForbiddenException('You can only edit your own tags')
+    }
+
+    // If updating name, check for conflicts within scope
     if (dto.name) {
-      const existing = await this.db.client
+      const scopeConditions = [
+        eq(this.db.schema.tags.agencyId, auth.agencyId),
+        eq(this.db.schema.tags.type, existing.type),
+        ilike(this.db.schema.tags.name, dto.name),
+        sql`${this.db.schema.tags.id} != ${id}`,
+      ]
+      if (existing.type === 'agent') {
+        scopeConditions.push(eq(this.db.schema.tags.createdBy, auth.userId))
+      }
+
+      const conflict = await this.db.client
         .select()
         .from(this.db.schema.tags)
-        .where(
-          and(
-            ilike(this.db.schema.tags.name, dto.name),
-            sql`${this.db.schema.tags.id} != ${id}`
-          )
-        )
+        .where(and(...scopeConditions))
         .limit(1)
 
-      if (existing.length > 0) {
+      if (conflict.length > 0) {
         throw new ConflictException(`Tag with name "${dto.name}" already exists`)
       }
     }
@@ -169,37 +285,40 @@ export class TagsService {
       .where(eq(this.db.schema.tags.id, id))
       .returning()
 
-    return {
-      ...tag!,
-      createdAt: tag!.createdAt.toISOString(),
-      updatedAt: tag!.updatedAt.toISOString(),
-    }
+    return this.formatTag(tag!)
   }
 
   /**
-   * Delete a tag
-   * Also removes all associations with trips and contacts
+   * Delete a tag (cascade removes all junction entries)
    */
-  async remove(id: string): Promise<void> {
-    // Check if tag exists
-    await this.findOne(id)
+  async remove(id: string, auth: TagAuthContext): Promise<void> {
+    const existing = await this.findOne(id, auth)
 
-    // Delete tag (cascade will handle junction table cleanup)
+    if (existing.type === 'system' && auth.role !== 'admin') {
+      throw new ForbiddenException('Only admins can delete system tags')
+    }
+    if (existing.type === 'agent' && existing.createdBy !== auth.userId) {
+      throw new ForbiddenException('You can only delete your own tags')
+    }
+
     await this.db.client
       .delete(this.db.schema.tags)
       .where(eq(this.db.schema.tags.id, id))
   }
 
-  /**
-   * Get all tags for a trip
-   */
-  async getTagsForTrip(tripId: string): Promise<TagResponseDto[]> {
+  // ===========================================================================
+  // Trip Tag Operations
+  // ===========================================================================
+
+  async getTagsForTrip(tripId: string, auth: TagAuthContext): Promise<TagResponseDto[]> {
     const tags = await this.db.client
       .select({
         id: this.db.schema.tags.id,
         name: this.db.schema.tags.name,
         category: this.db.schema.tags.category,
         color: this.db.schema.tags.color,
+        type: this.db.schema.tags.type,
+        createdBy: this.db.schema.tags.createdBy,
         createdAt: this.db.schema.tags.createdAt,
         updatedAt: this.db.schema.tags.updatedAt,
       })
@@ -208,26 +327,85 @@ export class TagsService {
         this.db.schema.tripTags,
         eq(this.db.schema.tags.id, this.db.schema.tripTags.tagId)
       )
-      .where(eq(this.db.schema.tripTags.tripId, tripId))
+      .where(and(
+        eq(this.db.schema.tripTags.tripId, tripId),
+        this.visibilityCondition(auth.agencyId, auth.userId),
+      ))
       .orderBy(asc(this.db.schema.tags.name))
 
-    return tags.map((tag) => ({
-      ...tag,
-      createdAt: tag.createdAt.toISOString(),
-      updatedAt: tag.updatedAt.toISOString(),
-    }))
+    return tags.map((tag) => this.formatTag(tag))
   }
 
   /**
-   * Get all tags for a contact
+   * Replace tags for a trip.
+   * CRITICAL: Only replaces tags the caller can see (system + own agent).
+   * Preserves other agents' private tags.
    */
-  async getTagsForContact(contactId: string): Promise<TagResponseDto[]> {
+  async updateTripTags(tripId: string, tagIds: string[], auth: TagAuthContext): Promise<TagResponseDto[]> {
+    // Verify all provided tag IDs exist and are visible to this user
+    if (tagIds.length > 0) {
+      const validTags = await this.db.client
+        .select({ id: this.db.schema.tags.id })
+        .from(this.db.schema.tags)
+        .where(and(
+          inArray(this.db.schema.tags.id, tagIds),
+          this.visibilityCondition(auth.agencyId, auth.userId),
+        ))
+
+      if (validTags.length !== tagIds.length) {
+        throw new BadRequestException('One or more tag IDs are invalid')
+      }
+    }
+
+    // Delete only junctions for tags the caller can see (preserve other agents' private tags)
+    await this.db.client.execute(sql`
+      DELETE FROM trip_tags
+      WHERE trip_id = ${tripId}
+      AND tag_id IN (
+        SELECT id FROM tags
+        WHERE agency_id = ${auth.agencyId}
+        AND (type = 'system' OR (type = 'agent' AND created_by = ${auth.userId}))
+      )
+    `)
+
+    // Insert new associations
+    if (tagIds.length > 0) {
+      await this.db.client
+        .insert(this.db.schema.tripTags)
+        .values(tagIds.map((tagId) => ({ tripId, tagId })))
+        .onConflictDoNothing()
+    }
+
+    return this.getTagsForTrip(tripId, auth)
+  }
+
+  async createAndAssignToTrip(
+    tripId: string,
+    dto: CreateAndAssignTagDto,
+    auth: TagAuthContext,
+  ): Promise<TagResponseDto> {
+    const tag = await this.create(dto, auth)
+
+    await this.db.client
+      .insert(this.db.schema.tripTags)
+      .values({ tripId, tagId: tag.id })
+
+    return tag
+  }
+
+  // ===========================================================================
+  // Contact Tag Operations
+  // ===========================================================================
+
+  async getTagsForContact(contactId: string, auth: TagAuthContext): Promise<TagResponseDto[]> {
     const tags = await this.db.client
       .select({
         id: this.db.schema.tags.id,
         name: this.db.schema.tags.name,
         category: this.db.schema.tags.category,
         color: this.db.schema.tags.color,
+        type: this.db.schema.tags.type,
+        createdBy: this.db.schema.tags.createdBy,
         createdAt: this.db.schema.tags.createdAt,
         updatedAt: this.db.schema.tags.updatedAt,
       })
@@ -236,129 +414,127 @@ export class TagsService {
         this.db.schema.contactTags,
         eq(this.db.schema.tags.id, this.db.schema.contactTags.tagId)
       )
-      .where(eq(this.db.schema.contactTags.contactId, contactId))
+      .where(and(
+        eq(this.db.schema.contactTags.contactId, contactId),
+        this.visibilityCondition(auth.agencyId, auth.userId),
+      ))
       .orderBy(asc(this.db.schema.tags.name))
 
-    return tags.map((tag) => ({
-      ...tag,
-      createdAt: tag.createdAt.toISOString(),
-      updatedAt: tag.updatedAt.toISOString(),
-    }))
+    return tags.map((tag) => this.formatTag(tag))
   }
 
-  /**
-   * Update tags for a trip (replaces all existing tags)
-   */
-  async updateTripTags(tripId: string, tagIds: string[]): Promise<TagResponseDto[]> {
-    // Verify all tag IDs exist
+  async updateContactTags(contactId: string, tagIds: string[], auth: TagAuthContext): Promise<TagResponseDto[]> {
     if (tagIds.length > 0) {
-      const tags = await this.db.client
+      const validTags = await this.db.client
         .select({ id: this.db.schema.tags.id })
         .from(this.db.schema.tags)
-        .where(inArray(this.db.schema.tags.id, tagIds))
+        .where(and(
+          inArray(this.db.schema.tags.id, tagIds),
+          this.visibilityCondition(auth.agencyId, auth.userId),
+        ))
 
-      if (tags.length !== tagIds.length) {
+      if (validTags.length !== tagIds.length) {
         throw new BadRequestException('One or more tag IDs are invalid')
       }
     }
 
-    // Delete existing associations
-    await this.db.client
-      .delete(this.db.schema.tripTags)
-      .where(eq(this.db.schema.tripTags.tripId, tripId))
+    // Delete only visible tags (preserve other agents' private tags)
+    await this.db.client.execute(sql`
+      DELETE FROM contact_tags
+      WHERE contact_id = ${contactId}
+      AND tag_id IN (
+        SELECT id FROM tags
+        WHERE agency_id = ${auth.agencyId}
+        AND (type = 'system' OR (type = 'agent' AND created_by = ${auth.userId}))
+      )
+    `)
 
-    // Create new associations
-    if (tagIds.length > 0) {
-      await this.db.client
-        .insert(this.db.schema.tripTags)
-        .values(
-          tagIds.map((tagId) => ({
-            tripId,
-            tagId,
-          }))
-        )
-    }
-
-    // Return updated tags
-    return this.getTagsForTrip(tripId)
-  }
-
-  /**
-   * Update tags for a contact (replaces all existing tags)
-   */
-  async updateContactTags(contactId: string, tagIds: string[]): Promise<TagResponseDto[]> {
-    // Verify all tag IDs exist
-    if (tagIds.length > 0) {
-      const tags = await this.db.client
-        .select({ id: this.db.schema.tags.id })
-        .from(this.db.schema.tags)
-        .where(inArray(this.db.schema.tags.id, tagIds))
-
-      if (tags.length !== tagIds.length) {
-        throw new BadRequestException('One or more tag IDs are invalid')
-      }
-    }
-
-    // Delete existing associations
-    await this.db.client
-      .delete(this.db.schema.contactTags)
-      .where(eq(this.db.schema.contactTags.contactId, contactId))
-
-    // Create new associations
     if (tagIds.length > 0) {
       await this.db.client
         .insert(this.db.schema.contactTags)
-        .values(
-          tagIds.map((tagId) => ({
-            contactId,
-            tagId,
-          }))
-        )
+        .values(tagIds.map((tagId) => ({ contactId, tagId })))
+        .onConflictDoNothing()
     }
 
-    // Return updated tags
-    return this.getTagsForContact(contactId)
+    return this.getTagsForContact(contactId, auth)
   }
 
-  /**
-   * Create a new tag and assign it to a trip in one atomic operation
-   */
-  async createAndAssignToTrip(
-    tripId: string,
-    dto: CreateAndAssignTagDto
-  ): Promise<TagResponseDto> {
-    // Create the tag
-    const tag = await this.create(dto)
-
-    // Assign to trip
-    await this.db.client
-      .insert(this.db.schema.tripTags)
-      .values({
-        tripId,
-        tagId: tag.id,
-      })
-
-    return tag
-  }
-
-  /**
-   * Create a new tag and assign it to a contact in one atomic operation
-   */
   async createAndAssignToContact(
     contactId: string,
-    dto: CreateAndAssignTagDto
+    dto: CreateAndAssignTagDto,
+    auth: TagAuthContext,
   ): Promise<TagResponseDto> {
-    // Create the tag
-    const tag = await this.create(dto)
+    const tag = await this.create(dto, auth)
 
-    // Assign to contact
     await this.db.client
       .insert(this.db.schema.contactTags)
-      .values({
-        contactId,
-        tagId: tag.id,
-      })
+      .values({ contactId, tagId: tag.id })
 
     return tag
+  }
+
+  // ===========================================================================
+  // Calendar Event Tag Operations
+  // ===========================================================================
+
+  async getTagsForCalendarEvent(calendarEventId: string, auth: TagAuthContext): Promise<TagResponseDto[]> {
+    const tags = await this.db.client
+      .select({
+        id: this.db.schema.tags.id,
+        name: this.db.schema.tags.name,
+        category: this.db.schema.tags.category,
+        color: this.db.schema.tags.color,
+        type: this.db.schema.tags.type,
+        createdBy: this.db.schema.tags.createdBy,
+        createdAt: this.db.schema.tags.createdAt,
+        updatedAt: this.db.schema.tags.updatedAt,
+      })
+      .from(this.db.schema.tags)
+      .innerJoin(
+        this.db.schema.calendarEventTags,
+        eq(this.db.schema.tags.id, this.db.schema.calendarEventTags.tagId)
+      )
+      .where(and(
+        eq(this.db.schema.calendarEventTags.calendarEventId, calendarEventId),
+        this.visibilityCondition(auth.agencyId, auth.userId),
+      ))
+      .orderBy(asc(this.db.schema.tags.name))
+
+    return tags.map((tag) => this.formatTag(tag))
+  }
+
+  async updateCalendarEventTags(calendarEventId: string, tagIds: string[], auth: TagAuthContext): Promise<TagResponseDto[]> {
+    if (tagIds.length > 0) {
+      const validTags = await this.db.client
+        .select({ id: this.db.schema.tags.id })
+        .from(this.db.schema.tags)
+        .where(and(
+          inArray(this.db.schema.tags.id, tagIds),
+          this.visibilityCondition(auth.agencyId, auth.userId),
+        ))
+
+      if (validTags.length !== tagIds.length) {
+        throw new BadRequestException('One or more tag IDs are invalid')
+      }
+    }
+
+    await this.db.client.execute(sql`
+      DELETE FROM calendar_event_tags
+      WHERE calendar_event_id = ${calendarEventId}
+      AND tag_id IN (
+        SELECT id FROM tags
+        WHERE agency_id = ${auth.agencyId}
+        AND (type = 'system' OR (type = 'agent' AND created_by = ${auth.userId}))
+      )
+    `)
+
+    if (tagIds.length > 0) {
+      await this.db.client
+        .insert(this.db.schema.calendarEventTags)
+        .values(tagIds.map((tagId) => ({ calendarEventId, tagId })))
+        .onConflictDoNothing()
+    }
+
+    return this.getTagsForCalendarEvent(calendarEventId, auth)
   }
 }
