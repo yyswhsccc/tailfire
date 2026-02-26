@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { TripStatusBadge } from '@/components/shared'
+import { Badge } from '@/components/ui/badge'
 import { formatDate, cn } from '@/lib/utils'
 import { canDeleteTrip, type TripStatus } from '@/lib/trip-status-constants'
 import type { TripResponseDto } from '@tailfire/shared-types/api'
@@ -85,6 +86,7 @@ export function TripsDataTable({
             <TableHead>Reference</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Type</TableHead>
+            <TableHead>Tags</TableHead>
             <TableHead>Dates</TableHead>
             <TableHead className="w-[60px]"></TableHead>
           </TableRow>
@@ -92,7 +94,7 @@ export function TripsDataTable({
         <TableBody>
           {trips.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                 No trips found
               </TableCell>
             </TableRow>
@@ -135,6 +137,24 @@ export function TripsDataTable({
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {trip.tripType ? TRIP_TYPE_LABELS[trip.tripType] || trip.tripType : '-'}
+                </TableCell>
+                <TableCell>
+                  {trip.tags && trip.tags.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {trip.tags.slice(0, 3).map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {trip.tags.length > 3 && (
+                        <Badge variant="secondary" className="text-xs">
+                          +{trip.tags.length - 3}
+                        </Badge>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   {trip.startDate || trip.endDate ? (

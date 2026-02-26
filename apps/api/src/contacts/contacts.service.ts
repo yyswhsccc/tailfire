@@ -229,8 +229,37 @@ export class ContactsService {
       .where(conditions.length > 0 ? and(...conditions) : undefined)
     const count = countResult[0]?.count ?? 0
 
+    // Load junction-table tags for all returned contacts
+    const contactIds = contacts.map((c) => c.id)
+    const tagsByContact = new Map<string, Set<string>>()
+    if (contactIds.length > 0 && userId) {
+      const tagRows = await this.db.client
+        .select({
+          contactId: this.db.schema.contactTags.contactId,
+          tagName: this.db.schema.tags.name,
+        })
+        .from(this.db.schema.contactTags)
+        .innerJoin(this.db.schema.tags, eq(this.db.schema.tags.id, this.db.schema.contactTags.tagId))
+        .where(and(
+          inArray(this.db.schema.contactTags.contactId, contactIds),
+          eq(this.db.schema.tags.agencyId, agencyId),
+          or(
+            eq(this.db.schema.tags.type, 'system'),
+            and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, userId)),
+          ),
+        ))
+        .orderBy(asc(this.db.schema.tags.name))
+      tagRows.forEach((r) => {
+        if (!tagsByContact.has(r.contactId)) tagsByContact.set(r.contactId, new Set())
+        tagsByContact.get(r.contactId)!.add(r.tagName)
+      })
+    }
+
     return {
-      data: contacts.map((c) => this.mapToResponseDto(c)),
+      data: contacts.map((c) => ({
+        ...this.mapToResponseDto(c),
+        tags: [...(tagsByContact.get(c.id) || [])],
+      })),
       pagination: {
         page,
         limit,

@@ -42,6 +42,7 @@ export function useTrips(filters: TripFilterDto = {}) {
         status: filters.status,
         tripType: filters.tripType,
         tripGroupId: filters.tripGroupId,
+        tags: filters.tags,
         startDateFrom: filters.startDateFrom,
         startDateTo: filters.startDateTo,
         endDateFrom: filters.endDateFrom,

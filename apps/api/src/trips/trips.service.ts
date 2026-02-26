@@ -369,8 +369,37 @@ export class TripsService {
 
     const totalPages = Math.ceil(Number(count) / limit)
 
+    // Load junction-table tags for all returned trips
+    const tripIds = trips.map((t) => t.id)
+    const tagsByTrip = new Map<string, Set<string>>()
+    if (tripIds.length > 0 && auth) {
+      const tagRows = await this.db.client
+        .select({
+          tripId: this.db.schema.tripTags.tripId,
+          tagName: this.db.schema.tags.name,
+        })
+        .from(this.db.schema.tripTags)
+        .innerJoin(this.db.schema.tags, eq(this.db.schema.tags.id, this.db.schema.tripTags.tagId))
+        .where(and(
+          inArray(this.db.schema.tripTags.tripId, tripIds),
+          eq(this.db.schema.tags.agencyId, auth.agencyId),
+          or(
+            eq(this.db.schema.tags.type, 'system'),
+            and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, auth.userId)),
+          ),
+        ))
+        .orderBy(asc(this.db.schema.tags.name))
+      tagRows.forEach((r) => {
+        if (!tagsByTrip.has(r.tripId)) tagsByTrip.set(r.tripId, new Set())
+        tagsByTrip.get(r.tripId)!.add(r.tagName)
+      })
+    }
+
     return {
-      data: trips.map((trip) => this.mapToResponseDto(trip)),
+      data: trips.map((trip) => ({
+        ...this.mapToResponseDto(trip),
+        tags: [...(tagsByTrip.get(trip.id) || [])],
+      })),
       pagination: {
         page,
         limit,

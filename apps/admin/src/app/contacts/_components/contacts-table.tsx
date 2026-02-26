@@ -79,9 +79,18 @@ export function ContactsTable({
                 <TableCell className="h-12 px-4 py-2 text-sm text-ash-700">-</TableCell>
                 <TableCell className="h-12 px-4 py-2 text-sm text-ash-700">-</TableCell>
                 <TableCell className="h-12 px-4 py-2">
-                  {contact.contactType === 'lead' ? (
-                    <Badge variant="inbound">VIP</Badge>
-                  ) : null}
+                  <div className="flex flex-wrap gap-1">
+                    {contact.tags?.slice(0, 3).map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                    {(contact.tags?.length ?? 0) > 3 && (
+                      <Badge variant="secondary" className="text-xs">
+                        +{contact.tags!.length - 3}
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

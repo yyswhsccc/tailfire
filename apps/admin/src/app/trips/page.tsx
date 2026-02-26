@@ -88,7 +88,7 @@ export default function TernTripsPage() {
   const trips = useMemo(() => data?.data || [], [data?.data])
 
   // Check if we have active filters
-  const hasActiveFilters = filters.status || filters.tripType || filters.search
+  const hasActiveFilters = filters.status || filters.tripType || filters.search || filters.tripGroupId || (filters.tags && filters.tags.length > 0)
 
   // Bulk operations handlers
   const handleBulkDelete = async () => {
