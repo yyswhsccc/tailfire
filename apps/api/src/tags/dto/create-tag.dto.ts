@@ -5,6 +5,7 @@
 import {
   IsString,
   IsOptional,
+  IsIn,
   MinLength,
   MaxLength,
   Matches,
@@ -29,4 +30,8 @@ export class CreateTagDto {
     message: 'Color must be a valid hex color (e.g., #8B5CF6)',
   })
   color?: string
+
+  @IsOptional()
+  @IsIn(['system', 'agent'])
+  type?: 'system' | 'agent'
 }

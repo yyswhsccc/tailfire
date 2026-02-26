@@ -18,6 +18,8 @@ export type TagResponseDto = {
   name: string
   category: string | null
   color: string | null
+  type: 'system' | 'agent'
+  createdBy: string | null
   createdAt: string
   updatedAt: string
 }
@@ -27,9 +29,11 @@ export type TagResponseDto = {
  * Used in tag listing to show how many entities use each tag
  */
 export type TagWithUsageDto = TagResponseDto & {
-  usageCount: number // Total number of trips + contacts using this tag
-  tripCount: number  // Number of trips using this tag
-  contactCount: number // Number of contacts using this tag
+  usageCount: number  // Total across all entity types
+  tripCount: number
+  contactCount: number
+  taskCount: number
+  eventCount: number
 }
 
 // =============================================================================
@@ -44,6 +48,7 @@ export type CreateTagDto = {
   name: string
   category?: string | null
   color?: string | null
+  type?: 'system' | 'agent'
 }
 
 /**
@@ -63,6 +68,7 @@ export type UpdateTagDto = {
 export type TagFilterDto = {
   search?: string  // Search by name (case-insensitive partial match)
   category?: string  // Filter by category
+  type?: 'system' | 'agent'  // Filter by tag type
   sortBy?: 'name' | 'usageCount' | 'createdAt'  // Sort field
   sortOrder?: 'asc' | 'desc'  // Sort direction
   limit?: number  // Max results (default: 100)
@@ -85,4 +91,5 @@ export type CreateAndAssignTagDto = {
   name: string
   category?: string | null
   color?: string | null
+  type?: 'system' | 'agent'
 }

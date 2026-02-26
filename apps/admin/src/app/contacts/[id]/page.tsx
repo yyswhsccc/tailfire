@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useContact, useUpdateContact, useContactTrips, useContactBookings, useSendPortalInvite } from '@/hooks/use-contacts'
+import { useContactTags, useUpdateContactTags, useCreateAndAssignContactTag } from '@/hooks/use-tags'
+import { TagInput } from '@/components/ui/tag-input'
 import { useTasks } from '@/hooks/use-tasks'
 import { TaskList } from '@/app/tasks/_components/task-list'
 import { TaskFormDialog } from '@/app/tasks/_components/task-form-dialog'
@@ -179,6 +181,9 @@ export default function ContactDetailPage() {
   const { data: contactTrips = [], isLoading: tripsLoading } = useContactTrips(contactId)
   const { data: contactBookings = [], isLoading: bookingsLoading } = useContactBookings(contactId)
   const updateContact = useUpdateContact()
+  const { data: contactTags = [] } = useContactTags(contactId)
+  const updateContactTags = useUpdateContactTags()
+  const createAndAssignContactTag = useCreateAndAssignContactTag()
 
   const [editingSection, setEditingSection] = useState<EditSection>(null)
   const [formData, setFormData] = useState<Partial<UpdateContactDto>>({})
@@ -536,6 +541,25 @@ export default function ContactDetailPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Tags */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-ash-900">Tags</Label>
+              <TagInput
+                value={contactTags.map(t => t.id)}
+                onChange={(tagIds) => {
+                  updateContactTags.mutate({ contactId, tagIds })
+                }}
+                onCreateTag={async (name) => {
+                  const result = await createAndAssignContactTag.mutateAsync({
+                    contactId,
+                    data: { name },
+                  })
+                  return result
+                }}
+                placeholder="Add tag..."
+              />
+            </div>
 
             {/* Identity Section */}
             <Card className="border-ash-200">

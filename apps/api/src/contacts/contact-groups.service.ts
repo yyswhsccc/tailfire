@@ -34,7 +34,6 @@ export class ContactGroupsService {
         groupType: dto.groupType,
         description: dto.description,
         primaryContactId: dto.primaryContactId,
-        tags: dto.tags,
       })
       .returning()
 
@@ -291,10 +290,12 @@ export class ContactGroupsService {
   ): Promise<ContactGroupResponseDto> {
     const conditions = [eq(this.db.schema.contactGroups.id, id)]
     conditions.push(eq(this.db.schema.contactGroups.agencyId, agencyId))
+    // Strip legacy tags field — tags are managed via junction table
+    const { tags: _legacyTags, ...dtoWithoutTags } = dto as any
     const [group] = await this.db.client
       .update(this.db.schema.contactGroups)
       .set({
-        ...dto,
+        ...dtoWithoutTags,
         updatedAt: new Date(),
       })
       .where(and(...conditions))

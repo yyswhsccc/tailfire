@@ -38,6 +38,8 @@ import {
 } from '@/hooks/use-calendar-events'
 import { useUser } from '@/hooks/use-user'
 import { useMyProfile } from '@/hooks/use-user-profile'
+import { useCalendarEventTags, useUpdateCalendarEventTags } from '@/hooks/use-tags'
+import { TagInput } from '@/components/ui/tag-input'
 import { useToast } from '@/hooks/use-toast'
 import type { CalendarEvent, CalendarEventSubType } from '@tailfire/shared-types/api'
 
@@ -67,6 +69,11 @@ export function ContactCalendarSection({ contactId }: ContactCalendarSectionProp
 
   const { data: contactEventsData, isLoading } = useContactEvents(contactId, today, futureEnd)
   const events = contactEventsData?.events ?? []
+
+  // Calendar event tags
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const { data: eventTags = [] } = useCalendarEventTags(editingEventId)
+  const updateEventTags = useUpdateCalendarEventTags()
 
   // Create/Edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -100,6 +107,7 @@ export function ContactCalendarSection({ contactId }: ContactCalendarSectionProp
 
   function openCreateDialog() {
     setEditingEvent(null)
+    setEditingEventId(null)
     setFormTitle('')
     setFormEventType('meeting')
     setFormStartDate(today)
@@ -113,6 +121,7 @@ export function ContactCalendarSection({ contactId }: ContactCalendarSectionProp
 
   function openEditDialog(event: CalendarEvent) {
     setEditingEvent(event)
+    setEditingEventId(event.sourceId)
     const startDate = event.start.split('T')[0] || ''
     const startTime = event.allDay ? '09:00' : format(parseISO(event.start), 'HH:mm')
     setFormTitle(event.title)
@@ -406,6 +415,19 @@ export function ContactCalendarSection({ contactId }: ContactCalendarSectionProp
                 rows={3}
               />
             </div>
+
+            {editingEvent && editingEventId && (
+              <div className="space-y-2">
+                <Label>Tags</Label>
+                <TagInput
+                  value={eventTags.map(t => t.id)}
+                  onChange={(tagIds) => {
+                    updateEventTags.mutate({ eventId: editingEventId, tagIds })
+                  }}
+                  placeholder="Add tag..."
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>

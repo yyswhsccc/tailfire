@@ -397,8 +397,6 @@ export function TripOverview({ trip }: TripOverviewProps) {
                   })
                   return result
                 }}
-                entityType="trip"
-                entityId={trip.id}
                 placeholder="Add tag..."
               />
             </div>

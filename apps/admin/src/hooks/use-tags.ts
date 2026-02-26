@@ -18,6 +18,7 @@ export const tagKeys = {
   ...baseKeys,
   tripTags: (tripId: string) => [...baseKeys.all, 'trip', tripId] as const,
   contactTags: (contactId: string) => [...baseKeys.all, 'contact', contactId] as const,
+  calendarEventTags: (eventId: string) => [...baseKeys.all, 'calendar-event', eventId] as const,
 }
 
 // ============================================================================
@@ -31,6 +32,7 @@ export function useTags(filters: TagFilterDto = {}) {
   const query = buildQueryString({
     search: filters.search,
     category: filters.category,
+    type: filters.type,
     sortBy: filters.sortBy,
     sortOrder: filters.sortOrder,
     limit: filters.limit,
@@ -59,7 +61,7 @@ export function useTag(id: string | null) {
 // ============================================================================
 
 /**
- * Create new global tag
+ * Create new tag
  */
 export function useCreateTag() {
   const queryClient = useQueryClient()
@@ -68,7 +70,6 @@ export function useCreateTag() {
     mutationFn: (data: CreateTagDto) =>
       api.post<TagResponseDto>('/tags', data),
     onSuccess: () => {
-      // Invalidate all tag lists to show the new tag
       queryClient.invalidateQueries({ queryKey: tagKeys.lists() })
     },
   })
@@ -84,7 +85,6 @@ export function useUpdateTag() {
     mutationFn: ({ id, data }: { id: string; data: UpdateTagDto }) =>
       api.patch<TagResponseDto>(`/tags/${id}`, data),
     onSuccess: (_, variables) => {
-      // Invalidate the specific tag and all lists
       queryClient.invalidateQueries({ queryKey: tagKeys.detail(variables.id) })
       queryClient.invalidateQueries({ queryKey: tagKeys.lists() })
     },
@@ -109,9 +109,6 @@ export function useDeleteTag() {
 // TRIP TAG QUERIES & MUTATIONS
 // ============================================================================
 
-/**
- * Fetch tags for a specific trip
- */
 export function useTripTags(tripId: string | null) {
   return useQuery({
     queryKey: tagKeys.tripTags(tripId || ''),
@@ -120,9 +117,6 @@ export function useTripTags(tripId: string | null) {
   })
 }
 
-/**
- * Update tags for a trip with optimistic updates
- */
 export function useUpdateTripTags() {
   const queryClient = useQueryClient()
 
@@ -130,23 +124,15 @@ export function useUpdateTripTags() {
     mutationFn: ({ tripId, tagIds }: { tripId: string; tagIds: string[] }) =>
       api.put<TagResponseDto[]>(`/trips/${tripId}/tags`, { tagIds } as UpdateEntityTagsDto),
 
-    // Optimistic update
     onMutate: async (variables) => {
       const { tripId } = variables
-
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: tagKeys.tripTags(tripId) })
-
-      // Snapshot previous value
       const previousTags = queryClient.getQueryData<TagResponseDto[]>(
         tagKeys.tripTags(tripId)
       )
-
-      // Return context for rollback
       return { previousTags, tripId }
     },
 
-    // Rollback on error
     onError: (_error, _variables, context) => {
       if (context?.previousTags) {
         queryClient.setQueryData(
@@ -156,12 +142,8 @@ export function useUpdateTripTags() {
       }
     },
 
-    // Refetch to ensure consistency
     onSettled: (_, __, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: tagKeys.tripTags(variables.tripId),
-      })
-      // Also invalidate tag lists to update usage counts
+      queryClient.invalidateQueries({ queryKey: tagKeys.tripTags(variables.tripId) })
       queryClient.invalidateQueries({ queryKey: tagKeys.lists() })
     },
 
@@ -169,9 +151,6 @@ export function useUpdateTripTags() {
   })
 }
 
-/**
- * Create new tag and assign it to a trip in one operation
- */
 export function useCreateAndAssignTripTag() {
   const queryClient = useQueryClient()
 
@@ -180,10 +159,7 @@ export function useCreateAndAssignTripTag() {
       api.post<TagResponseDto>(`/trips/${tripId}/tags`, data),
 
     onSuccess: (_, variables) => {
-      // Invalidate trip tags and global tag lists
-      queryClient.invalidateQueries({
-        queryKey: tagKeys.tripTags(variables.tripId),
-      })
+      queryClient.invalidateQueries({ queryKey: tagKeys.tripTags(variables.tripId) })
       queryClient.invalidateQueries({ queryKey: tagKeys.lists() })
     },
   })
@@ -193,9 +169,6 @@ export function useCreateAndAssignTripTag() {
 // CONTACT TAG QUERIES & MUTATIONS
 // ============================================================================
 
-/**
- * Fetch tags for a specific contact
- */
 export function useContactTags(contactId: string | null) {
   return useQuery({
     queryKey: tagKeys.contactTags(contactId || ''),
@@ -204,9 +177,6 @@ export function useContactTags(contactId: string | null) {
   })
 }
 
-/**
- * Update tags for a contact with optimistic updates
- */
 export function useUpdateContactTags() {
   const queryClient = useQueryClient()
 
@@ -214,23 +184,15 @@ export function useUpdateContactTags() {
     mutationFn: ({ contactId, tagIds }: { contactId: string; tagIds: string[] }) =>
       api.put<TagResponseDto[]>(`/contacts/${contactId}/tags`, { tagIds } as UpdateEntityTagsDto),
 
-    // Optimistic update
     onMutate: async (variables) => {
       const { contactId } = variables
-
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: tagKeys.contactTags(contactId) })
-
-      // Snapshot previous value
       const previousTags = queryClient.getQueryData<TagResponseDto[]>(
         tagKeys.contactTags(contactId)
       )
-
-      // Return context for rollback
       return { previousTags, contactId }
     },
 
-    // Rollback on error
     onError: (_error, _variables, context) => {
       if (context?.previousTags) {
         queryClient.setQueryData(
@@ -240,12 +202,8 @@ export function useUpdateContactTags() {
       }
     },
 
-    // Refetch to ensure consistency
     onSettled: (_, __, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: tagKeys.contactTags(variables.contactId),
-      })
-      // Also invalidate tag lists to update usage counts
+      queryClient.invalidateQueries({ queryKey: tagKeys.contactTags(variables.contactId) })
       queryClient.invalidateQueries({ queryKey: tagKeys.lists() })
     },
 
@@ -253,9 +211,6 @@ export function useUpdateContactTags() {
   })
 }
 
-/**
- * Create new tag and assign it to a contact in one operation
- */
 export function useCreateAndAssignContactTag() {
   const queryClient = useQueryClient()
 
@@ -264,11 +219,54 @@ export function useCreateAndAssignContactTag() {
       api.post<TagResponseDto>(`/contacts/${contactId}/tags`, data),
 
     onSuccess: (_, variables) => {
-      // Invalidate contact tags and global tag lists
-      queryClient.invalidateQueries({
-        queryKey: tagKeys.contactTags(variables.contactId),
-      })
+      queryClient.invalidateQueries({ queryKey: tagKeys.contactTags(variables.contactId) })
       queryClient.invalidateQueries({ queryKey: tagKeys.lists() })
     },
+  })
+}
+
+// ============================================================================
+// CALENDAR EVENT TAG QUERIES & MUTATIONS
+// ============================================================================
+
+export function useCalendarEventTags(eventId: string | null) {
+  return useQuery({
+    queryKey: tagKeys.calendarEventTags(eventId || ''),
+    queryFn: () => api.get<TagResponseDto[]>(`/calendar-events/${eventId}/tags`),
+    enabled: !!eventId,
+  })
+}
+
+export function useUpdateCalendarEventTags() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ eventId, tagIds }: { eventId: string; tagIds: string[] }) =>
+      api.put<TagResponseDto[]>(`/calendar-events/${eventId}/tags`, { tagIds } as UpdateEntityTagsDto),
+
+    onMutate: async (variables) => {
+      const { eventId } = variables
+      await queryClient.cancelQueries({ queryKey: tagKeys.calendarEventTags(eventId) })
+      const previousTags = queryClient.getQueryData<TagResponseDto[]>(
+        tagKeys.calendarEventTags(eventId)
+      )
+      return { previousTags, eventId }
+    },
+
+    onError: (_error, _variables, context) => {
+      if (context?.previousTags) {
+        queryClient.setQueryData(
+          tagKeys.calendarEventTags(context.eventId),
+          context.previousTags
+        )
+      }
+    },
+
+    onSettled: (_, __, variables) => {
+      queryClient.invalidateQueries({ queryKey: tagKeys.calendarEventTags(variables.eventId) })
+      queryClient.invalidateQueries({ queryKey: tagKeys.lists() })
+    },
+
+    retry: 2,
   })
 }
