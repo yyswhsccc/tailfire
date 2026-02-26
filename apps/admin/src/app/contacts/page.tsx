@@ -1,39 +1,45 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, SlidersHorizontal } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, Search } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { PageHeader } from '@/components/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useContacts, useDeleteContact } from '@/hooks/use-contacts'
 import { ContactsTable } from './_components/contacts-table'
+import { ContactsFilterPanel } from './_components/contacts-filter-panel'
 import { QuickContactDialog } from './_components/quick-contact-dialog'
 import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { useToast } from '@/hooks/use-toast'
+import type { ContactFilterDto } from '@tailfire/shared-types/api'
 
 export default function ContactsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const limit = 10
+  const [filters, setFilters] = useState<ContactFilterDto>({
+    page: 1,
+    limit: 10,
+  })
 
   // Debounce search input (500ms delay)
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchInput)
-      setPage(1) // Reset to page 1 when search changes
+      setFilters((prev) => ({
+        ...prev,
+        search: searchInput || undefined,
+        page: 1,
+      }))
     }, 500)
 
     return () => clearTimeout(timer)
   }, [searchInput])
 
-  const { data, isLoading, error } = useContacts({
-    page,
-    limit,
-    search: debouncedSearch || undefined
-  })
+  const handleFiltersChange = useCallback((newFilters: ContactFilterDto) => {
+    setFilters(newFilters)
+  }, [])
+
+  const { data, isLoading, error } = useContacts(filters)
   const deleteContact = useDeleteContact()
   const { toast } = useToast()
 
@@ -60,17 +66,20 @@ export default function ContactsPage() {
         title="Contacts"
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <SlidersHorizontal className="mr-2 h-4 w-4" />
-              Filter
-            </Button>
-            <Input
-              type="search"
-              placeholder="Search"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="w-64"
+            <ContactsFilterPanel
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
             />
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search contacts..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="w-64 pl-9"
+              />
+            </div>
             <Button onClick={() => setIsCreateOpen(true)} size="sm">
               <Plus className="mr-2 h-4 w-4" />
               New Contact
@@ -89,13 +98,15 @@ export default function ContactsPage() {
             <Button variant="outline">Retry</Button>
           </div>
         ) : isLoading ? (
-          <TableSkeleton rows={limit} />
+          <TableSkeleton rows={filters.limit || 10} />
         ) : !data?.data || data.data.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-ash-500">
-              {debouncedSearch ? `No contacts found matching "${debouncedSearch}"` : 'No contacts found'}
+              {(filters.search || (filters.tags?.length ?? 0) > 0)
+                ? 'No contacts found matching your filters'
+                : 'No contacts found'}
             </p>
-            {!debouncedSearch && (
+            {!filters.search && !(filters.tags?.length) && (
               <Button
                 className="mt-4 bg-phoenix-gold-500 hover:bg-phoenix-gold-600 text-white"
                 onClick={() => setIsCreateOpen(true)}
@@ -120,8 +131,8 @@ export default function ContactsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
+                    onClick={() => setFilters((prev) => ({ ...prev, page: Math.max(1, (prev.page || 1) - 1) }))}
+                    disabled={(filters.page || 1) === 1}
                   >
                     ←
                   </Button>
@@ -131,8 +142,8 @@ export default function ContactsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setPage((p) => p + 1)}
-                    disabled={page >= data.pagination.totalPages}
+                    onClick={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) + 1 }))}
+                    disabled={(filters.page || 1) >= data.pagination.totalPages}
                   >
                     →
                   </Button>

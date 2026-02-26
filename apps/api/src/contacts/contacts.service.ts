@@ -229,8 +229,39 @@ export class ContactsService {
       .where(conditions.length > 0 ? and(...conditions) : undefined)
     const count = countResult[0]?.count ?? 0
 
+    // Load junction-table tags for all returned contacts
+    const contactIds = contacts.map((c) => c.id)
+    const tagsByContact = new Map<string, Set<string>>()
+    if (contactIds.length > 0 && userId) {
+      const tagRows = await this.db.client
+        .select({
+          contactId: this.db.schema.contactTags.contactId,
+          tagName: this.db.schema.tags.name,
+        })
+        .from(this.db.schema.contactTags)
+        .innerJoin(this.db.schema.tags, eq(this.db.schema.tags.id, this.db.schema.contactTags.tagId))
+        .where(and(
+          inArray(this.db.schema.contactTags.contactId, contactIds),
+          eq(this.db.schema.tags.agencyId, agencyId),
+          or(
+            eq(this.db.schema.tags.type, 'system'),
+            and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, userId)),
+          ),
+        ))
+        .orderBy(asc(this.db.schema.tags.name))
+      tagRows.forEach((r) => {
+        if (!tagsByContact.has(r.contactId)) tagsByContact.set(r.contactId, new Set())
+        tagsByContact.get(r.contactId)!.add(r.tagName)
+      })
+    } else if (contactIds.length > 0 && !userId) {
+      this.logger.warn('findAll: userId absent, returning empty tags for contact list')
+    }
+
     return {
-      data: contacts.map((c) => this.mapToResponseDto(c)),
+      data: contacts.map((c) => ({
+        ...this.mapToResponseDto(c),
+        tags: [...(tagsByContact.get(c.id) || [])],
+      })),
       pagination: {
         page,
         limit,
@@ -902,6 +933,35 @@ export class ContactsService {
       email: contact.email,
       inviteSent: true,
     }
+  }
+
+  /**
+   * Get filter options for contacts
+   *
+   * Returns tag names actually in use on contacts (visibility-scoped).
+   */
+  async getContactFilterOptions(agencyId: string, userId: string): Promise<{ tags: string[] }> {
+    const tagsResult = await this.db.client
+      .selectDistinct({ tag: this.db.schema.tags.name })
+      .from(this.db.schema.tags)
+      .innerJoin(this.db.schema.contactTags, eq(this.db.schema.tags.id, this.db.schema.contactTags.tagId))
+      .innerJoin(this.db.schema.contacts, eq(this.db.schema.contacts.id, this.db.schema.contactTags.contactId))
+      .where(and(
+        eq(this.db.schema.contacts.agencyId, agencyId),
+        eq(this.db.schema.contacts.isActive, true),
+        eq(this.db.schema.tags.agencyId, agencyId),
+        or(
+          eq(this.db.schema.tags.type, 'system'),
+          and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, userId)),
+        ),
+      ))
+
+    const tags = tagsResult
+      .map(r => r.tag)
+      .filter((tag): tag is string => tag !== null)
+      .sort()
+
+    return { tags }
   }
 
   /**

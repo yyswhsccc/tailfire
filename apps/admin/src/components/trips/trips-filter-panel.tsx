@@ -40,6 +40,7 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
   const [statusOpen, setStatusOpen] = useState(false)
   const [tripTypeOpen, setTripTypeOpen] = useState(false)
   const [groupOpen, setGroupOpen] = useState(false)
+  const [tagsOpen, setTagsOpen] = useState(false)
   const { data: filterOptions } = useTripFilterOptions()
 
   const activeFilterCount = [
@@ -47,6 +48,7 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
     filters.tripType,
     filters.tripGroupId,
     filters.isArchived !== undefined,
+    (filters.tags?.length ?? 0) > 0,
   ].filter(Boolean).length
 
   const handleStatusSelect = (status: string) => {
@@ -74,6 +76,14 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
       page: 1,
     })
     setGroupOpen(false)
+  }
+
+  const handleTagToggle = (tagName: string) => {
+    const current = filters.tags || []
+    const updated = current.includes(tagName)
+      ? current.filter((t) => t !== tagName)
+      : [...current, tagName]
+    onFiltersChange({ ...filters, tags: updated.length > 0 ? updated : undefined, page: 1 })
   }
 
   const handleClearFilters = () => {
@@ -210,6 +220,51 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
                         )}
                       />
                       {group.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      )}
+
+      {/* Tags Filter (multi-select) */}
+      {(filterOptions?.tags?.length ?? 0) > 0 && (
+        <Popover open={tagsOpen} onOpenChange={setTagsOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn((filters.tags?.length ?? 0) > 0 && 'border-phoenix-gold-500 bg-phoenix-gold-50')}
+            >
+              Tags
+              {(filters.tags?.length ?? 0) > 0 && (
+                <Badge variant="secondary" className="ml-2 px-1.5">
+                  {filters.tags!.length}
+                </Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[200px] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Search tags..." />
+              <CommandList>
+                <CommandEmpty>No tags found.</CommandEmpty>
+                <CommandGroup>
+                  {(filterOptions?.tags || []).map((tag) => (
+                    <CommandItem
+                      key={tag}
+                      value={tag}
+                      onSelect={() => handleTagToggle(tag)}
+                    >
+                      <Check
+                        className={cn(
+                          'mr-2 h-4 w-4',
+                          filters.tags?.includes(tag) ? 'opacity-100' : 'opacity-0'
+                        )}
+                      />
+                      {tag}
                     </CommandItem>
                   ))}
                 </CommandGroup>

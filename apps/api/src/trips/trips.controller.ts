@@ -107,7 +107,7 @@ export class TripsController {
    */
   @Get('filter-options')
   async getFilterOptions(@GetAuthContext() auth: AuthContext): Promise<TripFilterOptionsResponseDto> {
-    return this.tripsService.getFilterOptions(auth.userId, auth.agencyId)
+    return this.tripsService.getFilterOptions(auth, this.tripAccessService)
   }
 
   /**
