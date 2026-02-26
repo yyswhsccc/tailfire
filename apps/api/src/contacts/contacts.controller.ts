@@ -83,7 +83,7 @@ export class ContactsController {
     @GetAuthContext() auth: AuthContext,
     @Query() filters: ContactFilterDto
   ): Promise<PaginatedContactsResponseDto> {
-    const result = await this.contactsService.findAll(filters, auth.agencyId)
+    const result = await this.contactsService.findAll(filters, auth.agencyId, auth.userId)
     // Apply access control filtering using ContactAccessService (includes shares)
     const filteredData = await this.contactAccessService.applyAccessControlToMany(result.data, auth)
     return {

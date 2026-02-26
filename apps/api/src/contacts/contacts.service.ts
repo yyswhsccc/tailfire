@@ -148,6 +148,7 @@ export class ContactsService {
   async findAll(
     filters: ContactFilterDto,
     agencyId: string,
+    userId?: string,
   ): Promise<PaginatedContactsResponseDto> {
     const page = filters.page || 1
     const limit = filters.limit || 20
@@ -180,13 +181,15 @@ export class ContactsService {
     }
 
     if (filters.tags && filters.tags.length > 0) {
-      // Match any of the provided tags (via junction table)
+      // Match any of the provided tags (via junction table, visibility-scoped)
       conditions.push(
         sql`EXISTS (
           SELECT 1 FROM contact_tags
           JOIN tags ON tags.id = contact_tags.tag_id
           WHERE contact_tags.contact_id = contacts.id
           AND tags.name = ANY(${filters.tags})
+          AND tags.agency_id = ${agencyId}
+          AND (tags.type = 'system' OR (tags.type = 'agent' AND tags.created_by = ${userId}))
         )`,
       )
     }

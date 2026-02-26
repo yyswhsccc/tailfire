@@ -291,13 +291,15 @@ export class TripsService {
       conditions.push(lte(this.db.schema.trips.endDate, filters.endDateTo))
     }
 
-    // Tags filter (via junction table)
-    if (filters.tags && filters.tags.length > 0) {
+    // Tags filter (via junction table, visibility-scoped)
+    if (filters.tags && filters.tags.length > 0 && auth) {
       conditions.push(sql`EXISTS (
         SELECT 1 FROM trip_tags
         JOIN tags ON tags.id = trip_tags.tag_id
         WHERE trip_tags.trip_id = trips.id
         AND tags.name = ANY(${filters.tags})
+        AND tags.agency_id = ${auth.agencyId}
+        AND (tags.type = 'system' OR (tags.type = 'agent' AND tags.created_by = ${auth.userId}))
       )`)
     }
 
@@ -1076,13 +1078,20 @@ export class TripsService {
     tags: string[]
     groups: { id: string; name: string }[]
   }> {
-    // Get distinct tag names from junction table (for trips owned by this user)
+    // Get distinct tag names from junction table (visibility-scoped: system + own agent tags)
     const tagsResult = await this.db.client
       .selectDistinct({ tag: this.db.schema.tags.name })
       .from(this.db.schema.tags)
       .innerJoin(this.db.schema.tripTags, eq(this.db.schema.tags.id, this.db.schema.tripTags.tagId))
       .innerJoin(this.db.schema.trips, eq(this.db.schema.trips.id, this.db.schema.tripTags.tripId))
-      .where(eq(this.db.schema.trips.ownerId, ownerId))
+      .where(and(
+        eq(this.db.schema.trips.ownerId, ownerId),
+        eq(this.db.schema.tags.agencyId, agencyId),
+        or(
+          eq(this.db.schema.tags.type, 'system'),
+          and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, ownerId)),
+        ),
+      ))
 
     const tags = tagsResult
       .map(r => r.tag)
