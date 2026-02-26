@@ -55,47 +55,49 @@ export function ContactsFilterPanel({ filters, onFiltersChange }: ContactsFilter
   return (
     <div className="flex items-center gap-2">
       {/* Tags Filter (multi-select) */}
-      <Popover open={tagsOpen} onOpenChange={setTagsOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn((filters.tags?.length ?? 0) > 0 && 'border-phoenix-gold-500 bg-phoenix-gold-50')}
-          >
-            Tags
-            {(filters.tags?.length ?? 0) > 0 && (
-              <Badge variant="secondary" className="ml-2 px-1.5">
-                {filters.tags!.length}
-              </Badge>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[220px] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search tags..." />
-            <CommandList>
-              <CommandEmpty>No tags found.</CommandEmpty>
-              <CommandGroup>
-                {(filterOptions?.tags || []).map((tagName) => (
-                  <CommandItem
-                    key={tagName}
-                    value={tagName}
-                    onSelect={() => handleTagToggle(tagName)}
-                  >
-                    <Check
-                      className={cn(
-                        'mr-2 h-4 w-4',
-                        filters.tags?.includes(tagName) ? 'opacity-100' : 'opacity-0'
-                      )}
-                    />
-                    {tagName}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+      {(filterOptions?.tags?.length ?? 0) > 0 && (
+        <Popover open={tagsOpen} onOpenChange={setTagsOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn((filters.tags?.length ?? 0) > 0 && 'border-phoenix-gold-500 bg-phoenix-gold-50')}
+            >
+              Tags
+              {(filters.tags?.length ?? 0) > 0 && (
+                <Badge variant="secondary" className="ml-2 px-1.5">
+                  {filters.tags!.length}
+                </Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[220px] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Search tags..." />
+              <CommandList>
+                <CommandEmpty>No tags found.</CommandEmpty>
+                <CommandGroup>
+                  {(filterOptions?.tags || []).map((tagName) => (
+                    <CommandItem
+                      key={tagName}
+                      value={tagName}
+                      onSelect={() => handleTagToggle(tagName)}
+                    >
+                      <Check
+                        className={cn(
+                          'mr-2 h-4 w-4',
+                          filters.tags?.includes(tagName) ? 'opacity-100' : 'opacity-0'
+                        )}
+                      />
+                      {tagName}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      )}
 
       {/* Clear Filters */}
       {activeFilterCount > 0 && (
