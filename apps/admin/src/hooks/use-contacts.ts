@@ -126,6 +126,17 @@ export function useContactBookings(contactId: string | null) {
   })
 }
 
+/**
+ * Fetch filter options for contacts (tags in use)
+ */
+export function useContactFilterOptions() {
+  return useQuery({
+    queryKey: [...contactKeys.all, 'filterOptions'],
+    queryFn: () => api.get<{ tags: string[] }>('/contacts/filter-options'),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 // ============================================================================
 // MUTATIONS
 // ============================================================================

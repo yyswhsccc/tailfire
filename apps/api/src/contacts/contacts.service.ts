@@ -253,6 +253,8 @@ export class ContactsService {
         if (!tagsByContact.has(r.contactId)) tagsByContact.set(r.contactId, new Set())
         tagsByContact.get(r.contactId)!.add(r.tagName)
       })
+    } else if (contactIds.length > 0 && !userId) {
+      this.logger.warn('findAll: userId absent, returning empty tags for contact list')
     }
 
     return {
@@ -931,6 +933,35 @@ export class ContactsService {
       email: contact.email,
       inviteSent: true,
     }
+  }
+
+  /**
+   * Get filter options for contacts
+   *
+   * Returns tag names actually in use on contacts (visibility-scoped).
+   */
+  async getContactFilterOptions(agencyId: string, userId: string): Promise<{ tags: string[] }> {
+    const tagsResult = await this.db.client
+      .selectDistinct({ tag: this.db.schema.tags.name })
+      .from(this.db.schema.tags)
+      .innerJoin(this.db.schema.contactTags, eq(this.db.schema.tags.id, this.db.schema.contactTags.tagId))
+      .innerJoin(this.db.schema.contacts, eq(this.db.schema.contacts.id, this.db.schema.contactTags.contactId))
+      .where(and(
+        eq(this.db.schema.contacts.agencyId, agencyId),
+        eq(this.db.schema.contacts.isActive, true),
+        eq(this.db.schema.tags.agencyId, agencyId),
+        or(
+          eq(this.db.schema.tags.type, 'system'),
+          and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, userId)),
+        ),
+      ))
+
+    const tags = tagsResult
+      .map(r => r.tag)
+      .filter((tag): tag is string => tag !== null)
+      .sort()
+
+    return { tags }
   }
 
   /**

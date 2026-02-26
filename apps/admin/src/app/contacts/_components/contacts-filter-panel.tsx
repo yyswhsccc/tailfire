@@ -17,7 +17,7 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Badge } from '@/components/ui/badge'
-import { useTags } from '@/hooks/use-tags'
+import { useContactFilterOptions } from '@/hooks/use-contacts'
 import { cn } from '@/lib/utils'
 import type { ContactFilterDto } from '@tailfire/shared-types/api'
 
@@ -28,7 +28,7 @@ interface ContactsFilterPanelProps {
 
 export function ContactsFilterPanel({ filters, onFiltersChange }: ContactsFilterPanelProps) {
   const [tagsOpen, setTagsOpen] = useState(false)
-  const { data: allTags } = useTags({ sortBy: 'name', sortOrder: 'asc', limit: 200 })
+  const { data: filterOptions } = useContactFilterOptions()
 
   const activeFilterCount = [
     (filters.tags?.length ?? 0) > 0,
@@ -76,25 +76,19 @@ export function ContactsFilterPanel({ filters, onFiltersChange }: ContactsFilter
             <CommandList>
               <CommandEmpty>No tags found.</CommandEmpty>
               <CommandGroup>
-                {(allTags || []).map((tag) => (
+                {(filterOptions?.tags || []).map((tagName) => (
                   <CommandItem
-                    key={tag.id}
-                    value={tag.name}
-                    onSelect={() => handleTagToggle(tag.name)}
+                    key={tagName}
+                    value={tagName}
+                    onSelect={() => handleTagToggle(tagName)}
                   >
                     <Check
                       className={cn(
                         'mr-2 h-4 w-4',
-                        filters.tags?.includes(tag.name) ? 'opacity-100' : 'opacity-0'
+                        filters.tags?.includes(tagName) ? 'opacity-100' : 'opacity-0'
                       )}
                     />
-                    {tag.color && (
-                      <span
-                        className="mr-2 h-2.5 w-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: tag.color }}
-                      />
-                    )}
-                    {tag.name}
+                    {tagName}
                   </CommandItem>
                 ))}
               </CommandGroup>

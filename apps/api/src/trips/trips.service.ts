@@ -393,6 +393,8 @@ export class TripsService {
         if (!tagsByTrip.has(r.tripId)) tagsByTrip.set(r.tripId, new Set())
         tagsByTrip.get(r.tripId)!.add(r.tagName)
       })
+    } else if (tripIds.length > 0 && !auth) {
+      this.logger.warn('findAll: auth context absent, returning empty tags for trip list')
     }
 
     return {
@@ -1097,28 +1099,46 @@ export class TripsService {
   /**
    * Get filter options for trips
    *
-   * Returns available options for filter dropdowns, scoped by ownership.
-   *
-   * @param ownerId - Owner ID for scoping
+   * Returns available options for filter dropdowns, scoped by accessible trips
+   * (owned + shared + inbound) to match findAll scope.
    */
-  async getFilterOptions(ownerId: string, agencyId: string): Promise<{
+  async getFilterOptions(auth: AuthContext, tripAccessService: TripAccessService): Promise<{
     statuses: TripStatus[]
     tripTypes: string[]
     tags: string[]
     groups: { id: string; name: string }[]
   }> {
+    const accessibleTripIds = await tripAccessService.getAccessibleTripIds(auth)
+
+    // Early return if non-admin has no accessible trips
+    if (accessibleTripIds !== 'all' && accessibleTripIds.length === 0) {
+      const groupsResult = await this.db.client
+        .select({ id: this.db.schema.tripGroups.id, name: this.db.schema.tripGroups.name })
+        .from(this.db.schema.tripGroups)
+        .where(eq(this.db.schema.tripGroups.agencyId, auth.agencyId))
+      return {
+        statuses: ['draft', 'quoted', 'booked', 'in_progress', 'completed', 'cancelled', 'inbound'] as TripStatus[],
+        tripTypes: ['leisure', 'business', 'group', 'honeymoon', 'corporate', 'custom'],
+        tags: [],
+        groups: groupsResult,
+      }
+    }
+
     // Get distinct tag names from junction table (visibility-scoped: system + own agent tags)
+    const tripScopeCondition = accessibleTripIds === 'all'
+      ? eq(this.db.schema.tags.agencyId, auth.agencyId)
+      : inArray(this.db.schema.tripTags.tripId, accessibleTripIds)
+
     const tagsResult = await this.db.client
       .selectDistinct({ tag: this.db.schema.tags.name })
       .from(this.db.schema.tags)
       .innerJoin(this.db.schema.tripTags, eq(this.db.schema.tags.id, this.db.schema.tripTags.tagId))
-      .innerJoin(this.db.schema.trips, eq(this.db.schema.trips.id, this.db.schema.tripTags.tripId))
       .where(and(
-        eq(this.db.schema.trips.ownerId, ownerId),
-        eq(this.db.schema.tags.agencyId, agencyId),
+        tripScopeCondition,
+        eq(this.db.schema.tags.agencyId, auth.agencyId),
         or(
           eq(this.db.schema.tags.type, 'system'),
-          and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, ownerId)),
+          and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, auth.userId)),
         ),
       ))
 
@@ -1134,7 +1154,7 @@ export class TripsService {
         name: this.db.schema.tripGroups.name,
       })
       .from(this.db.schema.tripGroups)
-      .where(eq(this.db.schema.tripGroups.agencyId, agencyId))
+      .where(eq(this.db.schema.tripGroups.agencyId, auth.agencyId))
 
     // Return static options + dynamic tags + groups
     return {

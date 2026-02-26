@@ -93,6 +93,17 @@ export class ContactsController {
   }
 
   /**
+   * Get filter options for contacts
+   * GET /contacts/filter-options
+   *
+   * Returns tag names actually in use on contacts (visibility-scoped).
+   */
+  @Get('filter-options')
+  async getFilterOptions(@GetAuthContext() auth: AuthContext): Promise<{ tags: string[] }> {
+    return this.contactsService.getContactFilterOptions(auth.agencyId, auth.userId)
+  }
+
+  /**
    * Get trips associated with a contact
    * GET /contacts/:id/trips
    */
