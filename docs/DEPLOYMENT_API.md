@@ -480,15 +480,27 @@ Doppler's native Railway integration provides:
 
 ### Managing Secrets
 
-```bash
+**Via Doppler MCP (Claude Code — preferred):**
+```
 # View secrets for an environment
-doppler secrets -p tailfire -c prd
+mcp__doppler__secrets_list(project: "tailfire", config: "prd")
 
-# Update a secret
-doppler secrets set VARIABLE_NAME=value -p tailfire -c prd
+# Get a single secret
+mcp__doppler__secrets_get(project: "tailfire", config: "prd", name: "DATABASE_URL")
 
-# Set multiple secrets
-doppler secrets set KEY1=value1 KEY2=value2 -p tailfire -c prd
+# Update a secret (confirm with user before writing to prd)
+mcp__doppler__secrets_update(project: "tailfire", config: "prd", secrets: {"KEY": "value"})
+
+# Compare environments
+mcp__doppler__secrets_download(project: "tailfire", config: "stg", format: "json")
+mcp__doppler__secrets_download(project: "tailfire", config: "prd", format: "json")
+```
+
+**Via Doppler CLI (human developers):**
+```bash
+doppler secrets -p tailfire -c prd                                  # View secrets
+doppler secrets set VARIABLE_NAME=value -p tailfire -c prd          # Update
+doppler secrets set KEY1=value1 KEY2=value2 -p tailfire -c prd      # Set multiple
 ```
 
 > **Important:** Do not set secrets directly in Railway. Always use Doppler as the source of truth. Changes in Doppler sync to Railway automatically.
