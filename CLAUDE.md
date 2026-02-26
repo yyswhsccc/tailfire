@@ -140,34 +140,53 @@ git checkout preview && git merge feature/your-feature && git push
 | `list_migrations` | Always allowed | - |
 | `get_logs` | Always allowed | - |
 
-## Doppler CLI
+## Doppler MCP
 
-Environment secrets are managed via Doppler. The CLI is available for managing secrets.
+Environment secrets are managed via Doppler. **Always use the Doppler MCP tools** (not the CLI) for reading and managing secrets.
 
 ### Project and Configs
 - **Project**: `tailfire`
-- **Configs**: `dev`, `stg` (staging/preview), `prd` (production)
+- **Configs**: `dev` (local), `stg` (staging/preview), `prd` (production)
 
-### Common Commands
-```bash
-# List all projects
-doppler projects
+### MCP Usage Policy
 
-# List configs for tailfire
-doppler configs -p tailfire
+| MCP Tool | Allowed Usage | Notes |
+|----------|---------------|-------|
+| `secrets_list` | View all secrets for a config | Returns values — use for debugging |
+| `secrets_get` | Retrieve a single secret | Use for targeted lookups |
+| `secrets_names` | List secret names only (no values) | Safe for quick inventory checks |
+| `secrets_update` | Set/update secrets | **Confirm with user before writing to `prd`** |
+| `secrets_delete` | Remove a secret | **Confirm with user before any delete** |
+| `secrets_download` | Export secrets in various formats | Useful for comparing environments |
+| `projects_list` | List all Doppler projects | Always allowed |
+| `configs_list` | List configs for a project | Always allowed |
+| `environments_list` | List environments for a project | Always allowed |
+| `activity_logs_list` | View recent activity/audit log | Useful for debugging secret changes |
 
-# View secrets (masked)
-doppler secrets -p tailfire -c dev
+### Common MCP Patterns
 
-# Set a secret
-doppler secrets set KEY="value" -p tailfire -c dev
+```
+# List secrets for an environment
+mcp__doppler__secrets_list(project: "tailfire", config: "dev")
 
-# Set multiple secrets
-doppler secrets set KEY1="value1" KEY2="value2" -p tailfire -c prd
+# Get a single secret value
+mcp__doppler__secrets_get(project: "tailfire", config: "stg", name: "DATABASE_URL")
+
+# List just secret names (no values)
+mcp__doppler__secrets_names(project: "tailfire", config: "prd")
+
+# Update a secret
+mcp__doppler__secrets_update(project: "tailfire", config: "dev", secrets: {"KEY": "value"})
 
 # Delete a secret
-doppler secrets delete KEY -p tailfire -c dev
+mcp__doppler__secrets_delete(project: "tailfire", config: "dev", name: "OLD_KEY")
+
+# Compare environments (download both as JSON)
+mcp__doppler__secrets_download(project: "tailfire", config: "stg", format: "json")
+mcp__doppler__secrets_download(project: "tailfire", config: "prd", format: "json")
 ```
+
+> **Important:** Before using any `mcp__doppler__*` tool, you must first load it via `ToolSearch` (e.g., `ToolSearch(query: "+doppler secrets")`). MCP tools are deferred and must be loaded before invocation.
 
 ### Key Secrets
 | Secret | Description |
@@ -259,22 +278,21 @@ This has caused multiple production issues where:
 | `SUPABASE_SERVICE_ROLE_KEY` | Tailfire-Preview service key | From Supabase Dashboard |
 
 **Verification Workflow (Run After Any Doppler Changes):**
-```bash
-# 1. Switch to correct Railway environment
-railway environment preview
-railway service api-dev
 
-# 2. Compare Doppler vs Railway
-echo "=== Doppler stg ===" && doppler secrets -p tailfire -c stg | grep -E "DATABASE_URL|SUPABASE_URL"
-echo "=== Railway preview ===" && railway variables --kv | grep -E "DATABASE_URL|SUPABASE_URL"
+Use Doppler MCP to read secrets, then compare with Railway CLI:
+```
+# 1. Read Doppler secrets via MCP
+mcp__doppler__secrets_get(project: "tailfire", config: "stg", name: "DATABASE_URL")
+mcp__doppler__secrets_get(project: "tailfire", config: "stg", name: "SUPABASE_URL")
 
-# 3. If mismatch, sync from Doppler to Railway
-railway variables --set "DATABASE_URL=$(doppler secrets get DATABASE_URL -p tailfire -c stg --plain)"
-railway variables --set "SUPABASE_URL=$(doppler secrets get SUPABASE_URL -p tailfire -c stg --plain)"
-railway variables --set "SUPABASE_JWT_SECRET=$(doppler secrets get SUPABASE_JWT_SECRET -p tailfire -c stg --plain)"
+# 2. Compare with Railway (CLI — no MCP available for Railway)
+railway environment preview && railway service api-dev
+railway variables --kv | grep -E "DATABASE_URL|SUPABASE_URL"
 
-# 4. Verify service redeployed with new variables
-railway service status
+# 3. If mismatch, use Doppler MCP value to sync to Railway
+#    Get the value from MCP, then set in Railway:
+railway variables --set "DATABASE_URL=<value-from-mcp>"
+railway variables --set "SUPABASE_URL=<value-from-mcp>"
 ```
 
 **Future Fix:** Set up native Doppler-Railway integration (see `docs/DEPLOYMENT_API.md` for instructions).
@@ -295,28 +313,31 @@ Each Supabase project has unique secrets that MUST match in the corresponding Do
 - JWT tokens signed by one Supabase project cannot be verified by another project's secret
 
 **Verification Commands:**
-```bash
-# Check Railway environment and service
-railway environment preview
-railway service api-dev
+
+Use Doppler MCP for secret lookups:
+```
+# Check Doppler config for Supabase secrets
+mcp__doppler__secrets_get(project: "tailfire", config: "stg", name: "SUPABASE_URL")
+mcp__doppler__secrets_get(project: "tailfire", config: "stg", name: "SUPABASE_JWT_SECRET")
+mcp__doppler__secrets_get(project: "tailfire", config: "stg", name: "SUPABASE_SERVICE_ROLE_KEY")
+
+# Check Railway (CLI)
+railway environment preview && railway service api-dev
 railway variables | grep SUPABASE
 
-# Check Doppler config
-doppler secrets -p tailfire -c stg | grep SUPABASE
-
-# Get correct JWT secret from Supabase
-ACCESS_TOKEN=$(doppler secrets get SUPABASE_ACCESS_TOKEN -p tailfire -c stg --plain)
-PROJECT_REF="gaqacfstpnmwphekjzae"  # Preview project
-curl -s "https://api.supabase.com/v1/projects/${PROJECT_REF}/postgrest" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq '.jwt_secret'
+# Get correct JWT secret from Supabase Management API
+# First get the access token from Doppler MCP:
+mcp__doppler__secrets_get(project: "tailfire", config: "stg", name: "SUPABASE_ACCESS_TOKEN")
+# Then use it:
+curl -s "https://api.supabase.com/v1/projects/gaqacfstpnmwphekjzae/postgrest" \
+  -H "Authorization: Bearer <token-from-mcp>" | jq '.jwt_secret'
 ```
 
 ### Running Migrations
 
 ```bash
-# Local development (tailfire-Dev) - EITHER method works:
-cd apps/api && pnpm db:migrate                    # Uses local .env
-doppler run -p tailfire -c dev -- pnpm db:migrate # Uses Doppler dev
+# Local development (tailfire-Dev):
+cd apps/api && pnpm db:migrate  # Uses local .env
 
 # Preview environment (via CI/CD only)
 # Triggered by pushing to preview branch → deploy-preview.yml
@@ -324,6 +345,9 @@ doppler run -p tailfire -c dev -- pnpm db:migrate # Uses Doppler dev
 # Production (via CI/CD only)
 # Triggered by merging to main → deploy-prod.yml
 ```
+
+> **Note:** To check migration status or DATABASE_URL for an environment, use the Doppler MCP:
+> `mcp__doppler__secrets_get(project: "tailfire", config: "stg", name: "DATABASE_URL")`
 
 ## Storage System (Multi-Provider)
 

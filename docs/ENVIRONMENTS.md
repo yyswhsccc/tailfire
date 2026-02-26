@@ -313,8 +313,17 @@ Doppler is used for centralized secrets management across all environments.
 | `stg` | Cloud Preview | Staging/QA secrets |
 | `prd` | Production | Production secrets |
 
-### Doppler Setup
+### Doppler Access Methods
 
+**Claude Code (MCP — preferred):**
+Claude Code has Doppler MCP tools for direct API access to secrets. No CLI setup needed.
+```
+mcp__doppler__secrets_list(project: "tailfire", config: "dev")
+mcp__doppler__secrets_get(project: "tailfire", config: "stg", name: "DATABASE_URL")
+```
+See `CLAUDE.md` > "Doppler MCP" for full tool reference.
+
+**Human developers (CLI):**
 1. Install the Doppler CLI: `brew install dopplerhq/cli/doppler`
 2. Login: `doppler login`
 3. Setup for local dev: `doppler setup --project tailfire --config dev`

@@ -335,7 +335,18 @@ If you see storage provider initialization errors:
 
 Doppler is used for centralized secrets management. See [ENVIRONMENTS.md](./ENVIRONMENTS.md#doppler-configuration) for full details.
 
-### Common Doppler Commands
+### Claude Code (MCP — preferred for AI-assisted workflows)
+
+Claude Code has direct Doppler MCP access for reading and managing secrets without the CLI:
+```
+mcp__doppler__secrets_list(project: "tailfire", config: "dev")      # View all secrets
+mcp__doppler__secrets_get(project: "tailfire", config: "dev", name: "DATABASE_URL")  # Get one
+mcp__doppler__secrets_names(project: "tailfire", config: "dev")     # List names only
+```
+
+See `CLAUDE.md` > "Doppler MCP" for the full tool reference and usage policy.
+
+### Human Developers (CLI)
 
 ```bash
 # Check current config
