@@ -11,7 +11,7 @@ Local Dev → preview branch → main branch
 
 | Step | Branch | Environment | CI Workflow |
 |------|--------|-------------|-------------|
-| Preview | `preview` | Dev (api-dev.tailfire.ca) | `deploy-dev.yml` |
+| Preview | `preview` | Dev (api-dev.tailfire.ca) | `deploy-preview.yml` |
 | Production | `main` | Prod (api.tailfire.ca) | `deploy-prod.yml` |
 
 > **Note:** This project uses a shared Dev/Preview database. Treat it as a shared environment: avoid destructive changes, announce migrations, and coordinate with the team before applying them.

@@ -6,27 +6,29 @@ This document describes the testing strategy, frameworks, and conventions used a
 
 | Test Type | Framework | Purpose |
 |-----------|-----------|---------|
-| **Unit Tests** | Jest | Isolated function/component testing |
-| **Integration Tests** | Jest | Database and service integration |
+| **Unit Tests (API)** | Jest | Isolated service/controller testing |
+| **Unit Tests (Admin)** | Vitest | Component and hook testing |
+| **Unit Tests (Packages)** | Jest | Utility and type testing |
 | **E2E Tests** | Playwright | Full user workflow testing |
 
 ---
 
 ## Test Frameworks by App
 
-| App/Package | Unit/Integration | E2E |
-|-------------|------------------|-----|
-| `apps/api` | Jest | Jest (e2e config) |
-| `apps/admin` | Jest + React Testing Library | Playwright |
-| `apps/ota` | Jest + React Testing Library | Playwright |
-| `apps/client` | Jest + React Testing Library | Playwright |
-| `packages/*` | Jest | N/A |
+| App/Package | Unit/Integration | E2E | Notes |
+|-------------|------------------|-----|-------|
+| `apps/api` | Jest | Jest (e2e config) | Full test suite |
+| `apps/admin` | Vitest | Playwright | `vitest.config.ts` at app root |
+| `apps/ota` | - | - | No test scripts configured |
+| `apps/client` | - | - | No test scripts configured |
+| `packages/shared-types` | Jest | N/A | Date utilities, schema tests |
+| `packages/database` | - | N/A | Schema-only, no tests |
 
 ---
 
 ## Running Tests
 
-### API (NestJS)
+### API (NestJS + Jest)
 
 ```bash
 cd apps/api
@@ -36,16 +38,37 @@ pnpm test:watch        # Watch mode
 pnpm test:cov          # Coverage report
 pnpm test:ci           # CI mode (--runInBand)
 pnpm test:e2e          # E2E tests
+pnpm test:debug        # Debug mode
 ```
 
-### Frontend Apps
+### Admin (Next.js + Vitest)
 
 ```bash
-cd apps/admin  # or apps/ota, apps/client
+cd apps/admin
+
+pnpm test              # Run all Vitest tests (vitest run)
+pnpm test:watch        # Watch mode
+pnpm test:coverage     # Coverage report
+```
+
+### Admin E2E (Playwright)
+
+```bash
+cd apps/admin
+
+pnpm test:e2e          # Run Playwright tests
+pnpm test:e2e:ui       # Playwright UI mode (recommended for debugging)
+pnpm test:e2e:headed   # Headed browser mode
+```
+
+### Shared Types (Jest)
+
+```bash
+cd packages/shared-types
 
 pnpm test              # Run all Jest tests
 pnpm test:watch        # Watch mode
-pnpm test:coverage     # Coverage report
+pnpm test:cov          # Coverage report
 ```
 
 ### Monorepo-Wide
@@ -54,17 +77,8 @@ pnpm test:coverage     # Coverage report
 # From root
 pnpm test              # Run tests in all apps via Turborepo
 pnpm --filter @tailfire/api test        # Specific app
-pnpm --filter @tailfire/database test   # Specific package
-```
-
-### Playwright E2E
-
-```bash
-cd apps/admin  # or apps/ota, apps/client
-
-pnpm test:e2e          # Run Playwright tests
-pnpm test:e2e:ui       # Playwright UI mode
-pnpm test:e2e:headed   # Headed browser mode
+pnpm --filter @tailfire/admin test      # Admin tests
+pnpm --filter @tailfire/shared-types test   # Package tests
 ```
 
 ---
@@ -75,13 +89,13 @@ pnpm test:e2e:headed   # Headed browser mode
 
 | Type | Pattern | Location |
 |------|---------|----------|
-| Unit tests | `*.test.ts` | `tests/unit/` or co-located |
+| Unit tests | `*.test.ts` / `*.test.tsx` | `tests/unit/` or co-located |
 | Integration tests | `*.test.ts` | `tests/integration/` |
 | E2E tests | `*.spec.ts` | `tests/e2e/` |
 | Test helpers | `*-helper.ts` | `tests/helpers/` |
 | Test factories | `*-factories.ts` | `tests/helpers/` |
 
-### Directory Structure (Frontend App)
+### Directory Structure (Admin App)
 
 ```
 apps/admin/
@@ -89,7 +103,7 @@ apps/admin/
 │   └── components/
 │       └── Button/
 │           ├── Button.tsx
-│           └── Button.test.tsx     # Co-located unit test
+│           └── Button.test.tsx     # Co-located unit test (Vitest)
 ├── tests/
 │   ├── unit/                       # Unit tests
 │   │   └── payment-processor.test.ts
@@ -101,9 +115,8 @@ apps/admin/
 │   │   └── booking-flow.spec.ts
 │   └── helpers/
 │       └── test-factories.ts
-├── jest.config.js
-├── jest.setup.js
-└── playwright.config.ts
+├── vitest.config.ts                # Vitest configuration
+└── playwright.config.ts            # Playwright configuration
 ```
 
 ### Directory Structure (API)
@@ -113,7 +126,7 @@ apps/api/
 ├── src/
 │   └── trips/
 │       ├── trips.service.ts
-│       └── trips.service.spec.ts   # Co-located unit test
+│       └── trips.service.spec.ts   # Co-located unit test (Jest)
 ├── test/
 │   ├── app.e2e-spec.ts            # E2E tests
 │   └── jest-e2e.json              # E2E Jest config
@@ -124,7 +137,7 @@ apps/api/
 
 ## Writing Unit Tests
 
-### Basic Pattern
+### API Pattern (Jest + NestJS)
 
 ```typescript
 // trips.service.spec.ts
@@ -165,10 +178,33 @@ describe('TripsService', () => {
 })
 ```
 
+### Admin Pattern (Vitest)
+
+```typescript
+// components/Button.test.tsx
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { Button } from './Button'
+
+describe('Button', () => {
+  it('renders with text', () => {
+    render(<Button>Click me</Button>)
+    expect(screen.getByText('Click me')).toBeDefined()
+  })
+
+  it('calls onClick handler', async () => {
+    const onClick = vi.fn()
+    render(<Button onClick={onClick}>Click</Button>)
+    screen.getByText('Click').click()
+    expect(onClick).toHaveBeenCalled()
+  })
+})
+```
+
 ### Mocking Dependencies
 
 ```typescript
-// Mock Supabase client
+// Jest (API)
 const mockSupabase = {
   from: jest.fn().mockReturnThis(),
   select: jest.fn().mockReturnThis(),
@@ -176,9 +212,10 @@ const mockSupabase = {
   single: jest.fn().mockResolvedValue({ data: mockData, error: null }),
 }
 
-// Mock external service
-jest.mock('@/lib/external-api', () => ({
-  fetchData: jest.fn().mockResolvedValue({ items: [] }),
+// Vitest (Admin)
+import { vi } from 'vitest'
+vi.mock('@/lib/external-api', () => ({
+  fetchData: vi.fn().mockResolvedValue({ items: [] }),
 }))
 ```
 
@@ -364,62 +401,6 @@ export class TestHelpers {
 | Functions | 70% |
 | Statements | 70% |
 
-### Configuration
-
-```javascript
-// jest.config.js
-module.exports = {
-  coverageThreshold: {
-    global: {
-      branches: 70,
-      functions: 70,
-      lines: 70,
-      statements: 70,
-    },
-  },
-  collectCoverageFrom: [
-    'src/**/*.{ts,tsx}',
-    '!src/**/*.d.ts',
-    '!src/types/**',
-  ],
-}
-```
-
----
-
-## CI/CD Integration
-
-### GitHub Actions Test Job
-
-Tests run as part of the CI pipeline:
-
-```yaml
-# .github/workflows/deploy-dev.yml
-jobs:
-  # Tests run before deployment
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test
-```
-
-### Quality Gates
-
-| Check | Blocks Deploy? |
-|-------|----------------|
-| ESLint | Yes |
-| TypeScript | Yes |
-| Jest Tests | Configurable |
-| Coverage | Configurable |
-
 ---
 
 ## Best Practices
@@ -431,6 +412,7 @@ jobs:
 - Clean up test data in `afterEach` hooks
 - Mock external services (APIs, email, etc.)
 - Test error paths, not just happy paths
+- Use `vi.fn()` for Vitest mocks, `jest.fn()` for Jest mocks
 
 ### Don't
 
@@ -439,6 +421,7 @@ jobs:
 - Hard-code IDs or timestamps
 - Leave test data in the database
 - Skip tests without a comment explaining why
+- Mix Jest and Vitest APIs in the same test file
 
 ### Test Isolation
 

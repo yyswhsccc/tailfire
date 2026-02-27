@@ -10,11 +10,11 @@ Tailfire uses PostgreSQL with two schemas:
 
 | Environment | Total Tables | Notes |
 |-------------|--------------|-------|
-| Local Dev (tailfire-Dev) | 75+ tables | Full schema including catalog |
-| Cloud Preview (Tailfire-Preview) | 75+ tables | Full schema (catalog via FDW or local) |
-| Production (Tailfire-Prod) | 75+ tables | Full schema including catalog |
+| Local Dev (tailfire-Dev) | 90+ tables | Full schema including catalog (FDW) |
+| Cloud Preview (Tailfire-Preview) | 90+ tables | Full schema (catalog via FDW) |
+| Production (Tailfire-Prod) | 90+ tables | Full schema including local catalog |
 
-> **Note:** Table counts include ~61 public schema tables (including cruise booking session tables) and 16 catalog schema tables (cruise data).
+> **Note:** Table counts include ~75+ public schema tables and 16 catalog schema tables (cruise data).
 
 ---
 
@@ -151,6 +151,40 @@ The public schema contains all application data:
 | `tags` | Central tag repository |
 | `trip_tags` | Trip-to-tag mapping |
 | `contact_tags` | Contact-to-tag mapping |
+
+### Tour Catalog
+
+| Table | Purpose |
+|-------|---------|
+| `tour_operators` | Tour operator companies (e.g., Globus) |
+| `tour_departures` | Available tour departure dates/prices |
+| `tour_hotels` | Hotel accommodations within tours |
+| `tour_inclusions` | What's included in tour packages |
+| `tour_media` | Tour images and media assets |
+| `tour_day_details` | Day-by-day tour itinerary details |
+| `tour_sync_history` | Tour data sync tracking |
+
+### Sharing & Collaboration
+
+| Table | Purpose |
+|-------|---------|
+| `contact_shares` | Contact sharing between agents |
+| `trip_shares` | Trip sharing between agents |
+| `traveler_groups` | Group travelers across trips |
+
+### Tasks & Workflow
+
+| Table | Purpose |
+|-------|---------|
+| `tasks` | Task management items |
+| `task_templates` | Reusable task templates |
+
+### OCR & Document Import
+
+| Table | Purpose |
+|-------|---------|
+| `ocr_import_jobs` | OCR document processing jobs |
+| `ocr_supplier_runbooks` | Supplier-specific OCR parsing rules |
 
 ### Email & Communication
 
@@ -333,9 +367,9 @@ export default defineConfig({
 
 All schemas are exported from a single entry point:
 - Catalog schema definition (16 cruise tables)
-- Public schema tables (~59 tables)
+- Public schema tables (~75+ tables)
 - Relations and enums
-- Total: 75+ tables across both schemas
+- Total: 90+ tables across both schemas
 
 ---
 
@@ -414,7 +448,7 @@ Tailfire uses **Drizzle-only** migrations:
 
 - **Location**: `packages/database/src/migrations/`
 - **Tracking**: `migrations/meta/_journal.json`
-- **Total**: 110+ SQL migration files
+- **Total**: 190+ SQL migration files
 
 ### Migration Types
 
@@ -524,7 +558,8 @@ export const activities = pgTable('activities', {
 })
 
 // Component types: flight, cruise, lodging, transportation, dining,
-//                  entertainment, excursion, insurance, custom, port_info
+//                  entertainment, excursion, insurance, custom, port_info,
+//                  package, tour, custom_tour, tour_day
 ```
 
 ---

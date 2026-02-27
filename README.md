@@ -91,7 +91,7 @@ Feature Branch → preview branch → main branch
 
 | Environment | Git Branch | CI Workflow | Platforms |
 |-------------|------------|-------------|-----------|
-| **Development** | `preview` | `deploy-dev.yml` | Railway (`api-dev`), Vercel Preview |
+| **Development** | `preview` | `deploy-preview.yml` | Railway (`api-dev`), Vercel Preview |
 | **Production** | `main` | `deploy-prod.yml` | Railway (`api-prod`), Vercel Production |
 
 ### Production Domains
