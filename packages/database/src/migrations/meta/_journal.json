@@ -946,6 +946,13 @@
       "when": 1772078400000,
       "tag": "20260225120000_tagging_system_overhaul",
       "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1772161200000,
+      "tag": "20260227200000_migrate_feedback_fk_to_contacts",
+      "breakpoints": true
     }
   ]
 }

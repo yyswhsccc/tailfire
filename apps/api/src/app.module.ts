@@ -42,6 +42,7 @@ import { NotesModule } from './notes/notes.module'
 import { CalendarEventsModule } from './calendar-events/calendar-events.module'
 import { OcrImportModule } from './ocr-import/ocr-import.module'
 import { PortalModule } from './portal/portal.module'
+import { ClientPortalModule } from './client-portal/client-portal.module'
 import { LoyaltyProgramsModule } from './loyalty-programs/loyalty-programs.module'
 
 @Module({
@@ -156,6 +157,9 @@ import { LoyaltyProgramsModule } from './loyalty-programs/loyalty-programs.modul
 
     // Client Portal (portal user endpoints)
     PortalModule,
+
+    // Client Portal (contact-scoped trip/itinerary endpoints)
+    ClientPortalModule,
   ],
   controllers: [AppController],
   providers: [
