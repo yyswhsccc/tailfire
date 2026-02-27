@@ -23,51 +23,74 @@ Tailfire uses a two-branch deployment model:
 
 | Workflow | Trigger | Target | Purpose |
 |----------|---------|--------|---------|
-| `deploy-dev.yml` | Push to `preview` | Dev/Preview environments | Development testing |
+| `deploy-preview.yml` | Push to `preview` | Dev/Preview environments | Development testing |
 | `deploy-prod.yml` | Push to `main` | Production environments | Production release |
 
 ---
 
 ## Deployment Flow
 
+### `deploy-preview.yml` (push to `preview`)
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        deploy-dev.yml                           │
-│                     (push to preview)                           │
+│                      deploy-preview.yml                          │
+│                     (push to preview)                             │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. Deploy API Migrations (Drizzle → Dev Supabase)              │
-│     └─ Builds database package, runs pnpm db:migrate            │
-│  2. Deploy OTA Migrations (Supabase CLI → Dev project)          │
-│     └─ Pushes FDW schema, verifies catalog access               │
-│  3. Deploy Admin to Vercel Preview (after migrations)           │
-│  4. Deploy OTA to Vercel Preview (after migrations)             │
-│  5. Deploy Client to Vercel Preview (after migrations)          │
-│  6. Smoke Test API (after Vercel deploys)                       │
-│     └─ Health check with retry logic                            │
-│                                                                 │
-│  Note: API deploys separately via Railway auto-deploy           │
-│                                                                 │
+│                                                                   │
+│  1. Deploy API Migrations (Drizzle → Preview Supabase)            │
+│     ├─ Fetch secrets from Doppler (DOPPLER_TOKEN_PREVIEW)         │
+│     ├─ Verify DB connection mode (reject port 6543)               │
+│     ├─ Guard: block any Supabase CLI migrations                   │
+│     ├─ Build database package                                     │
+│     ├─ Inject FDW password into catalog FDW migration             │
+│     └─ Run pnpm db:migrate                                       │
+│                                                                   │
+│  2. Deploy API to Railway (after migrations)                      │
+│     ├─ Fetch secrets from Doppler                                 │
+│     ├─ Install Railway CLI                                        │
+│     ├─ railway up --service api-dev --detach                      │
+│     └─ Wait for health check (20 retries, 15s intervals)         │
+│                                                                   │
+│  3. Deploy Admin to Vercel Preview (after migrations)             │
+│     └─ Alias to tf-demo.phoenixvoyages.ca                        │
+│  4. Deploy OTA to Vercel Preview (after migrations)               │
+│  5. Deploy Client to Vercel Preview (after migrations)            │
+│                                                                   │
+│  6. Smoke Test (after all deploys)                                │
+│     └─ Health check API endpoint                                  │
+│                                                                   │
 └─────────────────────────────────────────────────────────────────┘
+```
 
+### `deploy-prod.yml` (push to `main`)
+
+```
 ┌─────────────────────────────────────────────────────────────────┐
-│                       deploy-prod.yml                           │
-│                       (push to main)                            │
+│                       deploy-prod.yml                             │
+│                       (push to main)                              │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. Deploy API Migrations (Drizzle → Prod Supabase)             │
-│     └─ Builds database package, runs pnpm db:migrate            │
-│  2. Deploy OTA Migrations (Supabase CLI → Prod project)         │
-│     └─ FDW guard logic no-ops in Prod (local catalog exists)    │
-│     └─ Verifies catalog access                                  │
-│  3. Deploy Admin to Vercel Production (after migrations)        │
-│  4. Deploy OTA to Vercel Production (after migrations)          │
-│  5. Deploy Client to Vercel Production (after migrations)       │
-│  6. Smoke Test API (after Vercel deploys)                       │
-│     └─ Health check with retry logic                            │
-│                                                                 │
-│  Note: API deploys separately via Railway auto-deploy           │
-│                                                                 │
+│                                                                   │
+│  1. Deploy API Migrations (Drizzle → Prod Supabase)               │
+│     ├─ Fetch secrets from Doppler (DOPPLER_TOKEN_PRD)             │
+│     ├─ Verify DB connection mode (reject port 6543)               │
+│     ├─ Guard: block any Supabase CLI migrations                   │
+│     ├─ Build database package                                     │
+│     └─ Run pnpm db:migrate                                       │
+│                                                                   │
+│  2. Deploy API to Railway (after migrations)                      │
+│     ├─ Fetch secrets from Doppler                                 │
+│     ├─ Install Railway CLI                                        │
+│     ├─ railway up --service api-prod --detach                     │
+│     └─ Wait for health check (20 retries, 15s intervals)         │
+│                                                                   │
+│  3. Deploy Admin to Vercel Production (after migrations)          │
+│  4. Deploy OTA to Vercel Production (after migrations)            │
+│  5. Deploy Client to Vercel Production (after migrations)         │
+│                                                                   │
+│  6. Smoke Test (after all deploys)                                │
+│     └─ Health check API endpoint                                  │
+│                                                                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -75,52 +98,31 @@ Tailfire uses a two-branch deployment model:
 
 ## Migration Strategy
 
-### Two Migration Systems
+### Single Migration System (Drizzle Only)
 
-Tailfire uses two separate migration systems for different purposes:
-
-| System | Tool | Database | Purpose |
-|--------|------|----------|---------|
-| **API Migrations** | Drizzle ORM | Supabase PostgreSQL | Core application schema |
-| **OTA Migrations** | Supabase CLI | Supabase PostgreSQL | FDW for catalog data access |
-
-### API Migrations (Drizzle)
-
-Drizzle migrations handle the core application schema:
+All database migrations use Drizzle ORM. Supabase CLI migrations are **explicitly blocked** by a guard step in both workflows:
 
 ```yaml
-# CI migration step
-- name: Run Drizzle migrations
-  working-directory: apps/api
-  env:
-    DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
-  run: pnpm db:migrate
+- name: Guard against Supabase migrations
+  run: |
+    if find apps/ota/supabase/migrations -maxdepth 1 -name "*.sql" -not -path "*/_archive/*" 2>/dev/null | grep -q .; then
+      echo "All migrations must be in packages/database/src/migrations/ (Drizzle)"
+      exit 1
+    fi
 ```
 
-### OTA Migrations (Supabase CLI)
+### DB Connection Mode Verification
 
-Supabase CLI migrations handle the Foreign Data Wrapper setup for catalog access:
+Both workflows verify the `DATABASE_URL` uses session pooler (port 5432) which supports DDL. Transaction pooler (port 6543) is rejected:
 
 ```yaml
-# CI migration step
-- name: Push OTA migrations
-  working-directory: apps/ota
-  env:
-    SUPABASE_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
-  run: supabase db push --linked
-
-- name: Verify catalog access
-  run: supabase db query "SELECT 1 FROM catalog.cruise_lines LIMIT 1"
+- name: Verify DB connection mode
+  run: |
+    if echo "$DATABASE_URL" | grep -q ":6543"; then
+      echo "DATABASE_URL uses transaction pooler (port 6543). Migrations require session mode (port 5432)."
+      exit 1
+    fi
 ```
-
-### FDW Guard Logic
-
-The OTA migrations include guard logic for environment-specific behavior:
-
-- **Development**: FDW migration activates (connects to Prod catalog)
-- **Production**: FDW migration no-ops (local catalog schema exists)
-
-This allows the same migration files to work across environments while keeping `supabase_migrations` table in sync.
 
 ### Migration Guard Behavior (API Runtime)
 
@@ -142,54 +144,73 @@ if (shouldRunMigrations) {
 
 ## Railway API Deployment
 
-The API is deployed via Railway's automatic deployment feature, not through GitHub Actions.
+The API is deployed via **Railway CLI in GitHub Actions**, not via Railway's auto-deploy feature.
 
 ### How It Works
 
-1. Railway monitors the repository for pushes to configured branches
-2. When a push occurs, Railway:
-   - Pulls the latest code
-   - Builds using Railpack/Docker
-   - Deploys the new version
-3. Railway can be configured to "Wait for CI" - blocking deployment until GitHub Actions pass
+1. GitHub Actions fetches secrets from Doppler
+2. Installs Railway CLI (`npm install -g @railway/cli`)
+3. Deploys using `railway up --service <service-name> --detach`
+   - Preview: `railway up --service api-dev --detach`
+   - Production: `railway up --service api-prod --detach`
+4. Waits for health check (up to 5 minutes with 20 retries at 15s intervals)
 
-### "Wait for CI" Configuration
+### Why GitHub Actions (Not Auto-Deploy)
 
-In Railway project settings:
-- **Enable GitHub CI check**: Link the repository
-- **Wait for CI**: Enable "Wait for GitHub Actions to pass before deploying"
+- Migrations run **before** the API deploy (job dependency)
+- Secrets are centralized in Doppler and injected at deploy time
+- Full control over deployment order and health verification
 
-### Why This Matters
+---
 
-- Migrations run in CI **before** Railway deployment starts
-- Railway waits for CI to pass, ensuring schema is updated first
-- Prevents deploying API code that expects new schema before migrations complete
+## Secrets Management
+
+All secrets are managed via **Doppler** and fetched at workflow runtime using the `dopplerhq/secrets-fetch-action`:
+
+```yaml
+- name: Fetch secrets from Doppler
+  uses: dopplerhq/secrets-fetch-action@v1.3.1
+  with:
+    doppler-token: ${{ secrets.DOPPLER_TOKEN_PREVIEW }}  # or DOPPLER_TOKEN_PRD
+    inject-env-vars: true
+```
+
+### GitHub Secrets Required
+
+Only Doppler tokens and Vercel credentials are stored as GitHub secrets:
+
+| Secret | Used For |
+|--------|----------|
+| `DOPPLER_TOKEN_PREVIEW` | Doppler access for preview environment |
+| `DOPPLER_TOKEN_PRD` | Doppler access for production environment |
+
+All other secrets (DATABASE_URL, SUPABASE_*, RAILWAY_TOKEN, VERCEL_*, etc.) are managed in Doppler and injected automatically.
 
 ---
 
 ## Workflow Jobs Summary
 
-### `deploy-dev.yml`
+### `deploy-preview.yml`
 
 | Job | Purpose | Dependencies |
 |-----|---------|--------------|
-| `deploy-api-migrations` | Run Drizzle migrations to Dev Supabase | - |
-| `deploy-ota-migrations` | Run Supabase CLI migrations for FDW | - |
-| `deploy-admin` | Deploy Admin to Vercel Preview | `deploy-api-migrations`, `deploy-ota-migrations` |
-| `deploy-ota` | Deploy OTA to Vercel Preview | `deploy-api-migrations`, `deploy-ota-migrations` |
-| `deploy-client` | Deploy Client to Vercel Preview | `deploy-api-migrations`, `deploy-ota-migrations` |
-| `smoke-test` | Health check API with retry logic | `deploy-admin`, `deploy-ota`, `deploy-client` |
+| `deploy-api-migrations` | Run Drizzle migrations to Preview Supabase | - |
+| `deploy-api` | Deploy API to Railway (api-dev) | `deploy-api-migrations` |
+| `deploy-admin` | Deploy Admin to Vercel Preview | `deploy-api-migrations` |
+| `deploy-ota` | Deploy OTA to Vercel Preview | `deploy-api-migrations` |
+| `deploy-client` | Deploy Client to Vercel Preview | `deploy-api-migrations` |
+| `smoke-test` | Health check all services | `deploy-api`, `deploy-admin`, `deploy-ota`, `deploy-client` |
 
 ### `deploy-prod.yml`
 
 | Job | Purpose | Dependencies |
 |-----|---------|--------------|
 | `deploy-api-migrations` | Run Drizzle migrations to Prod Supabase | - |
-| `deploy-ota-migrations` | Run Supabase CLI migrations (FDW no-op) | - |
-| `deploy-admin` | Deploy Admin to Vercel Production | `deploy-api-migrations`, `deploy-ota-migrations` |
-| `deploy-ota` | Deploy OTA to Vercel Production | `deploy-api-migrations`, `deploy-ota-migrations` |
-| `deploy-client` | Deploy Client to Vercel Production | `deploy-api-migrations`, `deploy-ota-migrations` |
-| `smoke-test` | Health check API with retry logic | `deploy-admin`, `deploy-ota`, `deploy-client` |
+| `deploy-api` | Deploy API to Railway (api-prod) | `deploy-api-migrations` |
+| `deploy-admin` | Deploy Admin to Vercel Production | `deploy-api-migrations` |
+| `deploy-ota` | Deploy OTA to Vercel Production | `deploy-api-migrations` |
+| `deploy-client` | Deploy Client to Vercel Production | `deploy-api-migrations` |
+| `smoke-test` | Health check all services | `deploy-api`, `deploy-admin`, `deploy-ota`, `deploy-client` |
 
 ---
 
@@ -200,47 +221,21 @@ Use these exact check names when configuring branch protection rules in GitHub:
 | Check Name | Purpose |
 |------------|---------|
 | `Deploy API Migrations (Drizzle)` | Drizzle migrations |
-| `Deploy OTA Migrations (Supabase)` | FDW/Supabase migrations |
+| `Deploy API to Railway` | API deployment |
 | `Deploy Admin to Vercel` | Admin app deployment |
 | `Deploy OTA to Vercel` | OTA app deployment |
 | `Deploy Client to Vercel` | Client app deployment |
-| `Smoke Test API` | API health check |
+| `Smoke Test All Services` | Health check |
 
 ### Configuring Branch Protection
 
 To require these checks before merging:
 
-1. Go to GitHub repository **Settings** → **Branches**
+1. Go to GitHub repository **Settings** > **Branches**
 2. Add or edit branch protection rule for `main` (and/or `preview`)
 3. Enable **Require status checks to pass before merging**
 4. Search for and select the check names above
 5. Enable **Require branches to be up to date before merging** (recommended)
-
----
-
-## GitHub Secrets Required
-
-### Supabase
-
-| Secret | Used For |
-|--------|----------|
-| `SUPABASE_ACCESS_TOKEN` | Supabase CLI authentication |
-| `DEV_SUPABASE_PROJECT_REF` | Development project reference |
-| `PROD_SUPABASE_PROJECT_REF` | Production project reference |
-| `DEV_DATABASE_URL` | Dev Supabase direct connection (Drizzle migrations) |
-| `PROD_DATABASE_URL` | Prod Supabase direct connection (Drizzle migrations) |
-| `DEV_DB_PASSWORD` | Dev database password (Supabase CLI) |
-| `PROD_DB_PASSWORD` | Prod database password (Supabase CLI) |
-
-### Vercel
-
-| Secret | Used For |
-|--------|----------|
-| `VERCEL_TOKEN` | Vercel API authentication |
-| `VERCEL_ORG_ID` | Vercel organization identifier |
-| `VERCEL_ADMIN_PROJECT_ID` | Vercel project ID for Admin app |
-| `VERCEL_OTA_PROJECT_ID` | Vercel project ID for OTA app |
-| `VERCEL_CLIENT_PROJECT_ID` | Vercel project ID for Client app |
 
 ---
 
@@ -249,7 +244,7 @@ To require these checks before merging:
 | App | Platform | Dev Environment | Prod Environment |
 |-----|----------|-----------------|------------------|
 | **API** | Railway | `api-dev.tailfire.ca` | `api.tailfire.ca` |
-| **Admin** | Vercel | Preview URLs | `tailfire.phoenixvoyages.ca` |
+| **Admin** | Vercel | `tf-demo.phoenixvoyages.ca` | `tailfire.phoenixvoyages.ca` |
 | **OTA** | Vercel | Preview URLs | `ota.phoenixvoyages.ca` |
 | **Client** | Vercel | Preview URLs | `client.phoenixvoyages.ca` |
 

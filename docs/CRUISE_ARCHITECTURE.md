@@ -601,8 +601,11 @@ For catalog data sharing across environments:
 | Environment | Cruise Data Source |
 |-------------|-------------------|
 | Production | Local `catalog` schema (source of truth) |
-| Preview/Dev | FDW → Production's `catalog` schema |
-| Local Dev | Local `catalog` schema (may drift) |
+| Preview | FDW → Production's `catalog` schema |
+| Local Dev | FDW → Production's `catalog` schema |
+
+> **Note:** Local Dev uses FDW (foreign tables pointing to Production), not a local copy.
+> If catalog queries fail on local dev, restore FDW with `./scripts/setup-local-fdw.sh`.
 
 See `CLAUDE.md` for FDW details and sync commands.
 

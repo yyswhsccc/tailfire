@@ -235,7 +235,7 @@ Start all services: `turbo dev` from project root
 | Context | Database | Config Source |
 |---------|----------|---------------|
 | `turbo dev` (localhost) | tailfire-Dev | Local `.env` files |
-| `deploy-dev.yml` (tf-demo) | Tailfire-Preview | Doppler `dev` config |
+| `deploy-preview.yml` (tf-demo) | Tailfire-Preview | Doppler `stg` config |
 | `deploy-prod.yml` (production) | Tailfire-Prod | Doppler `prd` config |
 
 ### Doppler Configs
