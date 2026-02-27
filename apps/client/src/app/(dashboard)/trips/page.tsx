@@ -129,9 +129,9 @@ export default function TripsPage() {
           ) : filteredTrips.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredTrips.map((trip) => (
+                <Link key={trip.id} href={`/trips/${trip.id}`}>
                 <Card
-                  key={trip.id}
-                  className="bg-phoenix-charcoal/50 border-phoenix-gold/30 overflow-hidden hover:border-phoenix-gold/50 transition-all"
+                  className="bg-phoenix-charcoal/50 border-phoenix-gold/30 overflow-hidden hover:border-phoenix-gold/50 transition-all cursor-pointer"
                 >
                   {trip.coverImageUrl ? (
                     <div
@@ -183,6 +183,7 @@ export default function TripsPage() {
                     )}
                   </CardContent>
                 </Card>
+                </Link>
               ))}
             </div>
           ) : (
