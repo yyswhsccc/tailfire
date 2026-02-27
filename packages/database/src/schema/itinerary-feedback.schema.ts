@@ -8,7 +8,7 @@
 import { pgTable, uuid, text, timestamp, pgEnum, jsonb } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { itineraries } from './trips.schema'
-import { clientPortalUsers } from './client-portal-users.schema'
+import { contacts } from './contacts.schema'
 
 // ============================================================================
 // ENUMS
@@ -34,7 +34,7 @@ export const itineraryFeedback = pgTable('itinerary_feedback', {
 
   // Foreign keys
   itineraryId: uuid('itinerary_id').notNull().references(() => itineraries.id, { onDelete: 'cascade' }),
-  clientPortalUserId: uuid('client_portal_user_id').notNull().references(() => clientPortalUsers.id, { onDelete: 'cascade' }),
+  contactId: uuid('contact_id').notNull().references(() => contacts.id, { onDelete: 'cascade' }),
 
   // Agency scoping (for RLS)
   agencyId: uuid('agency_id').notNull(),
@@ -62,8 +62,8 @@ export const itineraryFeedbackRelations = relations(itineraryFeedback, ({ one })
     fields: [itineraryFeedback.itineraryId],
     references: [itineraries.id],
   }),
-  clientPortalUser: one(clientPortalUsers, {
-    fields: [itineraryFeedback.clientPortalUserId],
-    references: [clientPortalUsers.id],
+  contact: one(contacts, {
+    fields: [itineraryFeedback.contactId],
+    references: [contacts.id],
   }),
 }))
