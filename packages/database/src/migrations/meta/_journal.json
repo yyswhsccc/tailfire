@@ -953,6 +953,13 @@
       "when": 1772161200000,
       "tag": "20260227200000_migrate_feedback_fk_to_contacts",
       "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1772236800000,
+      "tag": "20260228100000_create_document_templates",
+      "breakpoints": true
     }
   ]
 }
