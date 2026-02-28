@@ -967,6 +967,13 @@
       "when": 1772240400000,
       "tag": "20260228110000_migrate_email_templates_to_document_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "7",
+      "when": 1772244000000,
+      "tag": "20260228120000_add_template_pinning_to_trip_orders",
+      "breakpoints": true
     }
   ]
 }
