@@ -242,7 +242,8 @@ interface TemplateContext {
   contact: { first_name, last_name, email, phone, ... }
   trip: { name, reference, start_date, end_date, destination, services: [...], ... }
   agent: { first_name, last_name, full_name, email, phone, ... }
-  agency: { name, phone, email, logo_url, ... }  // renamed from 'business'
+  agency: { name, phone, email, logo_url, ... }
+  business: { ... }  // alias for agency — preserves backward compatibility with seeded templates
   payment: { name, amount, paid_amount, remaining, due_date, status, ... }
   activity: { name, description, ... }
 }
@@ -250,13 +251,15 @@ interface TemplateContext {
 
 Key difference: the current service resolves each variable individually with per-variable DB queries. The new `TemplateContextBuilder` does batch queries upfront (one for contact, one for trip, etc.) and passes the full object to Handlebars. More efficient, especially for templates with many variables.
 
+**Backward compatibility:** `business.*` is kept as an alias for `agency.*` in the context object (seeded templates use `{{business.name}}`, `{{business.phone}}`, etc.). Both `{{agency.name}}` and `{{business.name}}` resolve to the same data. Custom top-level variables like `inviter_name` are passed through `additionalVariables` just as they are today.
+
 ---
 
 ## PDF Generation (Puppeteer + BullMQ)
 
 ### Architecture
 
-PDF rendering runs in a **BullMQ worker** (same container, separate process) — not in the API request path. This isolates Chromium memory usage from API request handling.
+PDF rendering runs as a **BullMQ processor** in the same NestJS process (consistent with how `trip-automation`, `client-care`, `notifications`, `ocr-processing`, and `enrichment` queues all work today). This avoids needing a separate worker startup script or Railway service. The queue is registered in the `DocumentRenderModule` (same pattern as `OcrImportModule` registering `ocr-processing`).
 
 ```
 API Request: POST /documents/render-pdf
@@ -288,10 +291,14 @@ JOB_TYPES.DOCUMENT_RENDER_PDF = 'document.render_pdf'
 
 ### Dockerfile Changes
 
-The `node:20-slim` base image needs Chromium dependencies:
+Use `puppeteer-core` (not full `puppeteer`) to avoid bundled Chromium download during `pnpm install`. Install system Chromium in the Docker base stage:
 
 ```dockerfile
-# Add Chromium deps for Puppeteer
+# In base stage (before deps install):
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# In runner stage (after deps):
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
@@ -305,18 +312,19 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
-
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ```
+
+**Package:** Use `puppeteer-core` in `apps/api/package.json` (not `puppeteer`). This avoids downloading ~300MB Chromium during CI/CD builds.
 
 ### Trip Order Snapshot Integration
 
-Trip Orders use immutable versioned snapshots (`trip_orders` table with `snapshot` JSONB). When rendering a Trip Order PDF:
-1. Load the trip order snapshot (not live trip data)
+Trip Orders use immutable versioned snapshots (`trip_orders` table with `order_data`, `payment_summary`, `booking_details`, `business_config` JSONB columns). When rendering a Trip Order PDF:
+1. Load the trip order snapshot columns (not live trip data)
 2. Load the `trip_order` template at the version pinned to the trip order
 3. Render snapshot data through the pinned template
 4. This preserves the exact document that was sent to the client
+
+**Schema addition needed:** Add `template_id UUID` and `template_version INTEGER` columns to `trip_orders` table to pin which template version was used for each trip order.
 
 ---
 
@@ -446,6 +454,8 @@ User clicks Save
 | POST | `/document-templates/:slug/test-email` | JWT | Send test email to current user |
 | GET | `/document-templates/variables` | JWT | List available template variables |
 
+**Route ordering:** Static routes (`/variables`, `/:slug/preview`, `/:slug/test-email`) must be declared before the dynamic `/:idOrSlug` route in the controller to avoid NestJS matching `variables` as an ID. This matches the existing pattern in `email-templates.controller.ts` (static routes at lines 89-99 before dynamic routes).
+
 ### DocumentRenderModule (`apps/api/src/document-render/`)
 
 | Method | Endpoint | Auth | Description |
@@ -469,17 +479,30 @@ User clicks Save
 
 ### Phase 2: Migrate Existing Email Templates
 
-1. Write migration that copies `email_templates` rows → `document_templates`
-   - `body_html` → `email_html`
+1. Write migration that copies `email_templates` rows → `document_templates` with full field mapping:
+   - `id` → `id`
+   - `agency_id` → `agency_id`
+   - `slug` → `slug`
+   - `name` → `name`
+   - `description` → `description`
    - `subject` → `subject_template`
+   - `body_html` → `email_html`
    - `body_text` → `text_template`
-   - `blocks_json` = auto-generated single-block wrapper
-   - Transform `{{var::fallback}}` → `{{fallback var "fallback"}}` in all content fields
-   - `output_types` = `['email']`
-   - Preserve slugs
+   - `variables` → `variables`
+   - `category` → `category` (map `emailCategoryEnum` values to string)
+   - `is_system` → derive from `agency_id IS NULL`
+   - `is_active` → `is_active`
+   - `created_by` → `created_by`
+   - `created_at` → `created_at`
+   - `updated_at` → `updated_at`
+   - `blocks_json` = auto-generated single-block wrapper from `body_html`
+   - `output_types` = `'{email}'`
+   - `status` = `'published'` (all existing templates are active/published)
+   - Transform `{{var::fallback}}` → `{{fallback var "fallback"}}` in `email_html`, `subject_template`, and `text_template`
 2. Update `EmailTemplatesService.renderTemplate()` to use `HandlebarsRendererService`
-3. Update all callers (notification.service, client-care.processor, etc.) to use new renderer
-4. Keep old `email_templates` table temporarily for rollback safety
+3. Update all callers (notification.service, client-care.processor, notifications.processor, trips.service) to use new renderer
+4. **Keep old `email_templates` table AND `/email-templates` API surface** — existing admin frontend hooks (`use-email-templates.ts`) and controllers continue to work. Migrate admin UI in Phase 4.
+5. Add `template_id` and `template_version` columns to `trip_orders` table
 
 ### Phase 3: Puppeteer PDF Generation
 
@@ -500,12 +523,21 @@ User clicks Save
 5. Create template list page at `/library/templates`
 6. Add fork-on-edit flow for system templates
 
-### Phase 5: Cleanup
+### Phase 5: Cleanup (only after all callers migrated)
 
+**Prerequisites:** All of these must be true before cleanup:
+- Admin UI uses `/document-templates` API (not `/email-templates`)
+- `notification.service.ts`, `client-care.processor.ts`, `notifications.processor.ts` all use `HandlebarsRendererService`
+- `trips.service.ts` booking confirmation uses new template system
+- `trip-order.service.ts` uses Puppeteer rendering (not React-PDF)
+- `use-email-templates.ts` hooks migrated to `use-document-templates.ts`
+
+Then:
 1. Remove `VariableResolverService` (replaced by `HandlebarsRendererService`)
-2. Remove `@react-pdf/renderer` and `trip-order-pdf.ts` (replaced by Puppeteer)
-3. Drop `email_templates` table (after confirming no references remain)
-4. Update all seed migrations to target `document_templates`
+2. Remove `EmailTemplatesController` and `EmailTemplatesService` (replaced by `DocumentTemplatesController`)
+3. Remove `@react-pdf/renderer` and `trip-order-pdf.ts` (replaced by Puppeteer)
+4. Drop `email_templates` table via migration
+5. Update all seed migrations to target `document_templates`
 
 ---
 
@@ -538,11 +570,12 @@ User clicks Save
 |------|--------|
 | `apps/api/src/automation/automation.types.ts` | Add `DOCUMENT_RENDER` queue + job types |
 | `apps/api/src/automation/automation.module.ts` | Register new queue |
+| `apps/api/src/automation/admin/bull-board.setup.ts` | Add `document-render` queue to Bull Board dashboard |
 | `apps/api/src/app.module.ts` | Import `DocumentTemplatesModule`, `DocumentRenderModule` |
 | `apps/api/src/email/email-templates.service.ts` | Delegate rendering to `HandlebarsRendererService` |
 | `apps/api/src/financials/trip-order.service.ts` | Use new template system for PDF generation |
 | `Dockerfile` | Add Chromium dependencies |
-| `apps/api/package.json` | Add `handlebars`, `puppeteer` |
+| `apps/api/package.json` | Add `handlebars`, `puppeteer-core` |
 | `apps/admin/package.json` | Add `grapesjs`, `grapesjs-preset-newsletter` |
 | `packages/database/src/schema/index.ts` | Export new schema |
 
