@@ -45,6 +45,7 @@ import { PortalModule } from './portal/portal.module'
 import { ClientPortalModule } from './client-portal/client-portal.module'
 import { LoyaltyProgramsModule } from './loyalty-programs/loyalty-programs.module'
 import { DocumentTemplatesModule } from './document-templates/document-templates.module'
+import { DocumentRenderModule } from './document-render/document-render.module'
 
 @Module({
   imports: [
@@ -164,6 +165,9 @@ import { DocumentTemplatesModule } from './document-templates/document-templates
 
     // Document Templates (block-based Handlebars rendering for email/PDF)
     DocumentTemplatesModule,
+
+    // Document Render (PDF generation via BullMQ + Puppeteer)
+    DocumentRenderModule,
   ],
   controllers: [AppController],
   providers: [
