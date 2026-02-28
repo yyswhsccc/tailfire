@@ -7,6 +7,8 @@
 FROM node:20-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 RUN corepack enable
 WORKDIR /app
 
@@ -51,6 +53,21 @@ RUN pnpm --filter @tailfire/api build
 FROM base AS runner
 
 ENV NODE_ENV=production
+
+# Install Chromium and dependencies for puppeteer-core PDF rendering
+RUN apt-get update && apt-get install -y \
+    chromium \
+    fonts-liberation \
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    --no-install-recommends \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy package files for pnpm workspace resolution
 COPY --from=builder /app/package.json ./
