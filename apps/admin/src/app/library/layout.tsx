@@ -1,6 +1,6 @@
 'use client'
 
-import { Ship, CalendarClock, Map, Package, MapPin, Building2, Mail, Award, Tag } from 'lucide-react'
+import { Ship, CalendarClock, Map, Package, MapPin, Building2, Mail, Award, Tag, FileText } from 'lucide-react'
 import { DetailLayout } from '@/components/layout/detail-layout'
 import type { SidebarSection } from '@/components/layout/detail-sidebar'
 
@@ -67,6 +67,11 @@ const librarySections: SidebarSection[] = [
         name: 'Email Templates',
         href: '/library/notifications',
         icon: Mail,
+      },
+      {
+        name: 'Document Templates',
+        href: '/library/templates',
+        icon: FileText,
       },
     ],
   },
