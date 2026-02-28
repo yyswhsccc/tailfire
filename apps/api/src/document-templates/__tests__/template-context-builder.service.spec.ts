@@ -130,16 +130,20 @@ describe('TemplateContextBuilderService', () => {
     it('should add first_name, last_name, full_name, and name to the agent object', async () => {
       const agentRow = { id: 'u-1', firstName: 'John', lastName: 'Smith' }
 
-      // With only agencyId + agentId, only two DB calls happen:
-      //   1. loadAgency (agency-1)
-      //   2. loadAgent  (u-1) — no tripId so no preliminary trip query
-      // Contact, trip, activity, payment all short-circuit to null.
-      let callCount = 0
-      mockDb.db.limit.mockImplementation(() => {
-        callCount++
-        // call 1 = agency, call 2 = agent
-        if (callCount === 2) return Promise.resolve([agentRow])
-        return Promise.resolve([])
+      // Mock .from() to return the agent row when querying userProfiles
+      mockDb.db.from.mockImplementation((table: unknown) => {
+        const chain = {
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockImplementation(() => {
+              // Return agent row when the table is userProfiles
+              if (table === mockDb.schema.userProfiles) {
+                return Promise.resolve([agentRow])
+              }
+              return Promise.resolve([])
+            }),
+          }),
+        }
+        return chain
       })
 
       const ctx = await service.buildContext({
