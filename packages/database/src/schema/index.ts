@@ -170,3 +170,6 @@ export * from './client-activity-responses.schema'
 // Client Portal
 export * from './client-portal-users.schema'
 export * from './itinerary-feedback.schema'
+
+// Document template system (block-based Handlebars templates)
+export * from './document-templates.schema'
