@@ -30,10 +30,10 @@ export class HandlebarsRendererService implements OnModuleInit {
       return `${formatted} ${curr}`
     })
 
-    // {{formatDate date "MMM D, YYYY"}}
+    // {{formatDate date "MMM D, YYYY"}} — also supports "now" as dateStr
     this.handlebars.registerHelper('formatDate', (dateStr: string, _format?: string) => {
       if (!dateStr) return ''
-      const date = new Date(dateStr)
+      const date = dateStr === 'now' ? new Date() : new Date(dateStr)
       if (isNaN(date.getTime())) return dateStr
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -46,6 +46,11 @@ export class HandlebarsRendererService implements OnModuleInit {
     // {{uppercase text}}
     this.handlebars.registerHelper('uppercase', (text: string) => {
       return typeof text === 'string' ? text.toUpperCase() : ''
+    })
+
+    // {{index_plus_one @index}} — 1-based index in {{#each}} loops
+    this.handlebars.registerHelper('index_plus_one', (index: number) => {
+      return (index ?? 0) + 1
     })
   }
 

@@ -106,6 +106,16 @@ export interface RenderPdfStatusResponse {
   }
 }
 
+export interface RenderedTemplateResponse {
+  subject: string | null
+  html: string | null
+  pdfHtml: string | null
+  text: string | null
+  templateId: string
+  templateSlug: string
+  templateVersion: number
+}
+
 export interface TemplateVariablesResponse {
   variables: Record<string, string[]>
   helpers: Array<{ name: string; usage: string; description: string }>
@@ -184,6 +194,24 @@ export function useTemplateVariables(
       return api.get<TemplateVariablesResponse>('/document-templates/variables')
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
+    ...options,
+  })
+}
+
+/**
+ * Preview a template rendered with sample/empty context.
+ */
+export function useTemplatePreview(
+  slug: string | null,
+  options?: Omit<UseQueryOptions<RenderedTemplateResponse>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: [...documentTemplateKeys.all, 'preview', slug] as const,
+    queryFn: async () => {
+      return api.get<RenderedTemplateResponse>(`/document-templates/${slug}/preview`)
+    },
+    enabled: !!slug,
+    staleTime: 0, // Always fetch fresh preview
     ...options,
   })
 }

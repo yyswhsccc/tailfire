@@ -164,6 +164,23 @@ export class DocumentTemplatesController {
   }
 
   // -----------------------------------------------------------------------
+  // GET /:slug/preview — preview with empty/sample context
+  // (MUST be declared before :idOrSlug to avoid route shadowing)
+  // -----------------------------------------------------------------------
+
+  @Get(':slug/preview')
+  @ApiOperation({ summary: 'Preview template with sample context' })
+  @ApiParam({ name: 'slug', description: 'Template slug' })
+  @ApiResponse({ status: 200, description: 'Rendered preview' })
+  @ApiResponse({ status: 404, description: 'Template not found' })
+  async preview(
+    @GetAuthContext() auth: AuthContext,
+    @Param('slug') slug: string,
+  ) {
+    return this.templatesService.renderTemplatePreview(slug, auth.agencyId)
+  }
+
+  // -----------------------------------------------------------------------
   // GET /:idOrSlug — get by UUID or slug
   // -----------------------------------------------------------------------
 
@@ -188,24 +205,6 @@ export class DocumentTemplatesController {
       throw new NotFoundException(`Template "${idOrSlug}" not found`)
     }
     return template
-  }
-
-  // -----------------------------------------------------------------------
-  // GET /:slug/preview — preview with empty/sample context
-  // -----------------------------------------------------------------------
-
-  @Get(':slug/preview')
-  @ApiOperation({ summary: 'Preview template with sample context' })
-  @ApiParam({ name: 'slug', description: 'Template slug' })
-  @ApiResponse({ status: 200, description: 'Rendered preview' })
-  @ApiResponse({ status: 404, description: 'Template not found' })
-  async preview(
-    @GetAuthContext() auth: AuthContext,
-    @Param('slug') slug: string,
-  ) {
-    return this.templatesService.renderTemplate(slug, {
-      agencyId: auth.agencyId,
-    })
   }
 
   // -----------------------------------------------------------------------

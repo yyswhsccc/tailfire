@@ -12,6 +12,7 @@ import { DocumentTemplatesModule } from '../document-templates/document-template
 import { DocumentRenderController } from './document-render.controller'
 import { DocumentRenderService } from './document-render.service'
 import { DocumentRenderProcessor } from './document-render.processor'
+import { PuppeteerPdfService } from './puppeteer-pdf.service'
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { DocumentRenderProcessor } from './document-render.processor'
     DocumentTemplatesModule,
   ],
   controllers: [DocumentRenderController],
-  providers: [DocumentRenderService, DocumentRenderProcessor],
-  exports: [DocumentRenderService],
+  providers: [DocumentRenderService, DocumentRenderProcessor, PuppeteerPdfService],
+  exports: [DocumentRenderService, PuppeteerPdfService],
 })
 export class DocumentRenderModule {}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   FileText,
@@ -11,6 +11,7 @@ import {
   GitFork,
   Upload,
   Lock,
+  Eye,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -35,10 +36,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { confirmDialog } from '@/components/ui/confirmation-dialog'
 import {
   useDocumentTemplates,
+  useTemplatePreview,
   useForkDocumentTemplate,
   usePublishDocumentTemplate,
   useDeleteDocumentTemplate,
@@ -96,6 +104,8 @@ function groupByCategory(templates: DocumentTemplate[]): Record<TemplateCategory
 
 export default function TemplatesLibraryPage() {
   const [categoryFilter, setCategoryFilter] = useState<TemplateCategory | 'all'>('all')
+  const [previewSlug, setPreviewSlug] = useState<string | null>(null)
+  const [previewMode, setPreviewMode] = useState<'pdf' | 'email'>('pdf')
   const { toast } = useToast()
 
   // Build filters
@@ -109,6 +119,17 @@ export default function TemplatesLibraryPage() {
   const forkMutation = useForkDocumentTemplate()
   const publishMutation = usePublishDocumentTemplate()
   const deleteMutation = useDeleteDocumentTemplate()
+
+  // Preview
+  const { data: previewData, isLoading: isPreviewLoading } = useTemplatePreview(previewSlug)
+
+  // Auto-select best available preview mode when data loads
+  useEffect(() => {
+    if (previewData) {
+      if (previewData.pdfHtml) setPreviewMode('pdf')
+      else if (previewData.html) setPreviewMode('email')
+    }
+  }, [previewData])
 
   const handleFork = async (template: DocumentTemplate) => {
     try {
@@ -266,6 +287,7 @@ export default function TemplatesLibraryPage() {
                         <TemplateRow
                           key={template.id}
                           template={template}
+                          onPreview={(t) => setPreviewSlug(t.slug)}
                           onFork={handleFork}
                           onPublish={handlePublish}
                           onDelete={handleDelete}
@@ -282,6 +304,61 @@ export default function TemplatesLibraryPage() {
           })}
         </div>
       )}
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewSlug} onOpenChange={(open) => { if (!open) setPreviewSlug(null) }}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Template Preview</DialogTitle>
+              {previewData && (previewData.pdfHtml || previewData.html) && (
+                <div className="flex gap-1 rounded-lg bg-ash-100 p-1">
+                  <button
+                    onClick={() => setPreviewMode('pdf')}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      previewMode === 'pdf'
+                        ? 'bg-white text-ash-900 shadow-sm'
+                        : 'text-ash-500 hover:text-ash-700'
+                    }`}
+                    disabled={!previewData.pdfHtml}
+                  >
+                    PDF
+                  </button>
+                  <button
+                    onClick={() => setPreviewMode('email')}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      previewMode === 'email'
+                        ? 'bg-white text-ash-900 shadow-sm'
+                        : 'text-ash-500 hover:text-ash-700'
+                    }`}
+                    disabled={!previewData.html}
+                  >
+                    Email
+                  </button>
+                </div>
+              )}
+            </div>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {isPreviewLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-ash-400" />
+              </div>
+            ) : (previewMode === 'pdf' ? previewData?.pdfHtml : previewData?.html) ? (
+              <iframe
+                srcDoc={previewMode === 'pdf' ? previewData!.pdfHtml! : previewData!.html!}
+                className="w-full h-[60vh] border border-ash-200 rounded"
+                title="Template Preview"
+                sandbox=""
+              />
+            ) : (
+              <div className="text-center py-12 text-ash-500">
+                No {previewMode === 'pdf' ? 'PDF' : 'email'} HTML content to preview.
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -292,6 +369,7 @@ export default function TemplatesLibraryPage() {
 
 interface TemplateRowProps {
   template: DocumentTemplate
+  onPreview: (template: DocumentTemplate) => void
   onFork: (template: DocumentTemplate) => void
   onPublish: (template: DocumentTemplate) => void
   onDelete: (template: DocumentTemplate) => void
@@ -302,6 +380,7 @@ interface TemplateRowProps {
 
 function TemplateRow({
   template,
+  onPreview,
   onFork,
   onPublish,
   onDelete,
@@ -385,25 +464,59 @@ function TemplateRow({
       {/* Actions */}
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
+          {/* Preview — available for all templates */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onPreview(template)}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Preview template</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           {system ? (
-            /* System template: Customize (fork) button */
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onFork(template)}
-                    disabled={isForking}
-                  >
-                    <GitFork className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Customize template</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            /* System template: Edit + Customize (fork) buttons */
+            <>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/library/templates/${template.id}/edit`}>
+                        <Pencil className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Edit template</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onFork(template)}
+                      disabled={isForking}
+                    >
+                      <GitFork className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Customize template</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </>
           ) : (
             /* Agency template: Edit, Publish, Delete */
             <>

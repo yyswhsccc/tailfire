@@ -34,6 +34,7 @@ export interface ListTemplatesFilters {
 export interface RenderedDocumentTemplate {
   subject: string | null
   html: string | null
+  pdfHtml: string | null
   text: string | null
   templateId: string
   templateSlug: string
@@ -61,7 +62,7 @@ export class DocumentTemplatesService {
   /**
    * Resolve a template by slug with agency-override logic.
    * Agency-specific templates (non-null agency_id) take priority over system templates.
-   * Returns the matching row or null.
+   * Includes draft agency templates — use for authoring, preview, and editing flows.
    */
   async resolveTemplate(slug: string, agencyId: string) {
     const { documentTemplates } = this.db.schema
@@ -75,6 +76,35 @@ export class DocumentTemplatesService {
           eq(documentTemplates.isActive, true),
           or(
             eq(documentTemplates.agencyId, agencyId),
+            isNull(documentTemplates.agencyId),
+          ),
+        ),
+      )
+      .orderBy(sql`${documentTemplates.agencyId} DESC NULLS LAST`)
+      .limit(1)
+
+    return results[0] ?? null
+  }
+
+  /**
+   * Resolve a template for production rendering (Trip Orders, queue jobs).
+   * Agency overrides must be published; system templates are always eligible.
+   */
+  async resolvePublishedTemplate(slug: string, agencyId: string) {
+    const { documentTemplates } = this.db.schema
+
+    const results = await this.db.client
+      .select()
+      .from(documentTemplates)
+      .where(
+        and(
+          eq(documentTemplates.slug, slug),
+          eq(documentTemplates.isActive, true),
+          or(
+            and(
+              eq(documentTemplates.agencyId, agencyId),
+              eq(documentTemplates.status, 'published'),
+            ),
             isNull(documentTemplates.agencyId),
           ),
         ),
@@ -198,11 +228,9 @@ export class DocumentTemplatesService {
       throw new NotFoundException(`Template ${id} not found`)
     }
 
-    if (!existing.agencyId) {
-      throw new ForbiddenException('Cannot modify system templates directly. Fork the template first.')
-    }
-
-    if (existing.agencyId !== agencyId) {
+    // System templates can be edited by any authenticated admin
+    // Agency templates must belong to the caller's agency
+    if (existing.agencyId && existing.agencyId !== agencyId) {
       throw new NotFoundException(`Template ${id} not found`)
     }
 
@@ -296,7 +324,7 @@ export class DocumentTemplatesService {
       throw new NotFoundException(`Template ${templateId} not found`)
     }
 
-    // Check if agency already has a fork of that slug
+    // Check if agency already has a fork of that slug (active or inactive)
     const [existingFork] = await this.db.client
       .select()
       .from(documentTemplates)
@@ -304,18 +332,51 @@ export class DocumentTemplatesService {
         and(
           eq(documentTemplates.slug, source.slug),
           eq(documentTemplates.agencyId, agencyId),
-          eq(documentTemplates.isActive, true),
         ),
       )
       .limit(1)
 
-    if (existingFork) {
+    if (existingFork && existingFork.isActive) {
       throw new ConflictException(
         `Agency already has a template with slug "${source.slug}". Edit the existing template instead.`,
       )
     }
 
-    // Deep-copy the template
+    // If an inactive fork exists, reactivate and update it from the source
+    if (existingFork && !existingFork.isActive) {
+      const [reactivated] = await this.db.client
+        .update(documentTemplates)
+        .set({
+          parentId: source.id,
+          parentVersion: source.version,
+          name: source.name,
+          description: source.description,
+          category: source.category,
+          blocksJson: source.blocksJson,
+          emailHtml: source.emailHtml,
+          emailCss: source.emailCss,
+          pdfHtml: source.pdfHtml,
+          pdfCss: source.pdfCss,
+          subjectTemplate: source.subjectTemplate,
+          textTemplate: source.textTemplate,
+          variables: source.variables,
+          outputTypes: source.outputTypes,
+          status: 'draft',
+          version: existingFork.version + 1,
+          isActive: true,
+          updatedBy: userId,
+          updatedAt: new Date(),
+        })
+        .where(eq(documentTemplates.id, existingFork.id))
+        .returning()
+
+      this.logger.log(
+        `Reactivated fork: ${reactivated!.slug} (${reactivated!.id}) from parent ${source.id} v${source.version}`,
+      )
+      return reactivated!
+    }
+
+    // Deep-copy the template (no existing fork)
     const [forked] = await this.db.client
       .insert(documentTemplates)
       .values({
@@ -376,6 +437,23 @@ export class DocumentTemplatesService {
       ? this.handlebars.render(template.emailHtml, context)
       : null
 
+    // Render PDF HTML for preview (mirrors PuppeteerPdfService.wrapHtml logic)
+    let pdfHtml: string | null = null
+    if (template.pdfHtml) {
+      const renderedPdf = this.handlebars.render(template.pdfHtml, context)
+      const css = template.pdfCss || ''
+      const trimmed = renderedPdf.trimStart().toLowerCase()
+      if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')) {
+        // Full document — inject CSS into existing <head> if provided
+        pdfHtml = css
+          ? renderedPdf.replace(/(<head[^>]*>)/i, `$1<style>${css}</style>`)
+          : renderedPdf
+      } else {
+        // Fragment — wrap in a full document
+        pdfHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${renderedPdf}</body></html>`
+      }
+    }
+
     const text = template.textTemplate
       ? this.handlebars.render(template.textTemplate, context)
       : null
@@ -383,6 +461,132 @@ export class DocumentTemplatesService {
     return {
       subject,
       html,
+      pdfHtml,
+      text,
+      templateId: template.id,
+      templateSlug: template.slug,
+      templateVersion: template.version,
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // renderTemplatePreview — render with sample data for Library preview
+  // -------------------------------------------------------------------------
+
+  async renderTemplatePreview(
+    slug: string,
+    agencyId: string,
+  ): Promise<RenderedDocumentTemplate> {
+    // Load real agency + businessConfig, then merge sample data for preview
+    const context = await this.contextBuilder.buildContext({ agencyId })
+
+    // Inject logo from businessConfig into agency so {{agency.logo}} works
+    const agency = (context.agency ?? {}) as Record<string, unknown>
+    const bc = (context.businessConfig ?? {}) as Record<string, unknown>
+    if (bc.logo_url && !agency.logo) {
+      agency.logo = bc.logo_url
+    }
+
+    // Sample data so the template renders with meaningful content
+    const sampleData: Record<string, unknown> = {
+      agency,
+      business: agency,
+      businessConfig: bc,
+      contact: {
+        full_name: 'Jane & John Smith',
+        first_name: 'Jane',
+        last_name: 'Smith',
+        email: 'jane.smith@example.com',
+        phone: '(416) 555-0123',
+        addressLine1: '123 Main Street',
+        city: 'Toronto',
+        province: 'ON',
+        postalCode: 'M5V 2T6',
+        country: 'Canada',
+      },
+      trip: {
+        name: 'Mediterranean Cruise Getaway',
+        reference: 'PV-2026-0042',
+        referenceNumber: 'PV-2026-0042',
+        startDate: '2026-06-15',
+        endDate: '2026-06-29',
+        destination: 'Mediterranean',
+        currency: 'CAD',
+        totalCost: 12450.00,
+        status: 'booked',
+      },
+      agent: {
+        full_name: 'Sarah Johnson',
+        first_name: 'Sarah',
+        last_name: 'Johnson',
+        email: 'sarah@phoenixvoyages.ca',
+        phone: '(416) 555-0199',
+      },
+      payment: {
+        amountPaid: 5000.00,
+        balanceDue: 7450.00,
+      },
+      passengers: [
+        { full_name: 'Jane Smith', type: 'Adult', dateOfBirth: '1985-03-15', email: 'jane.smith@example.com' },
+        { full_name: 'John Smith', type: 'Adult', dateOfBirth: '1983-07-22', email: 'john.smith@example.com' },
+        { full_name: 'Emma Smith', type: 'Child', dateOfBirth: '2016-11-08', email: null },
+      ],
+      bookings: [
+        { title: 'MSC Grandiosa - Balcony Cabin B412', booking_type: 'Cruise', vendor_confirmation: 'MSC-78234', start_date: '2026-06-15', end_date: '2026-06-29', amount: 8950.00, currency: 'CAD' },
+        { title: 'Airport Transfer - Toronto Pearson', booking_type: 'Transfer', vendor_confirmation: 'TRF-1122', start_date: '2026-06-15', end_date: null, amount: 350.00, currency: 'CAD' },
+        { title: 'Comprehensive Travel Insurance', booking_type: 'Insurance', vendor_confirmation: 'INS-44567', start_date: '2026-06-15', end_date: '2026-06-29', amount: 1150.00, currency: 'CAD' },
+        { title: 'Barcelona City Tour - Private Guide', booking_type: 'Excursion', vendor_confirmation: 'EXC-8899', start_date: '2026-06-18', end_date: null, amount: 2000.00, currency: 'CAD' },
+      ],
+    }
+
+    return this.renderTemplateWithContext(slug, agencyId, sampleData)
+  }
+
+  // -------------------------------------------------------------------------
+  // renderTemplateWithContext — render using a pre-built context
+  // -------------------------------------------------------------------------
+
+  private async renderTemplateWithContext(
+    slug: string,
+    agencyId: string,
+    context: Record<string, unknown>,
+  ): Promise<RenderedDocumentTemplate> {
+    const template = await this.resolveTemplate(slug, agencyId)
+    if (!template) {
+      throw new NotFoundException(`Template "${slug}" not found`)
+    }
+
+    const subject = template.subjectTemplate
+      ? this.handlebars.render(template.subjectTemplate, context)
+      : null
+
+    const html = template.emailHtml
+      ? this.handlebars.render(template.emailHtml, context)
+      : null
+
+    // Render PDF HTML for preview (mirrors PuppeteerPdfService.wrapHtml logic)
+    let pdfHtml: string | null = null
+    if (template.pdfHtml) {
+      const renderedPdf = this.handlebars.render(template.pdfHtml, context)
+      const css = template.pdfCss || ''
+      const trimmed = renderedPdf.trimStart().toLowerCase()
+      if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')) {
+        pdfHtml = css
+          ? renderedPdf.replace(/(<head[^>]*>)/i, `$1<style>${css}</style>`)
+          : renderedPdf
+      } else {
+        pdfHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${renderedPdf}</body></html>`
+      }
+    }
+
+    const text = template.textTemplate
+      ? this.handlebars.render(template.textTemplate, context)
+      : null
+
+    return {
+      subject,
+      html,
+      pdfHtml,
       text,
       templateId: template.id,
       templateSlug: template.slug,

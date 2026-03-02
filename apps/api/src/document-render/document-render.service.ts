@@ -8,6 +8,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
+import type { JobProgress } from 'bullmq'
 import { QUEUES, JOB_TYPES } from '../automation/automation.types'
 import type { DocumentRenderJobData } from '../automation/automation.types'
 
@@ -55,7 +56,7 @@ export class DocumentRenderService {
   async getJobStatus(jobId: string): Promise<{
     id: string
     state: string
-    progress: number | object
+    progress: JobProgress
     result: unknown
     failedReason: string | undefined
   } | null> {

@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Loader2 } from 'lucide-react'
 
-// Dynamically import the editor component to avoid SSR issues with GrapesJS
+// Dynamically import the editor component to avoid SSR issues with Monaco
 const TemplateEditorContent = dynamic(
   () => import('./_editor-content'),
   {

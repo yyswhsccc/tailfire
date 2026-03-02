@@ -32,6 +32,9 @@ export interface TemplateContext {
   agent: Record<string, unknown> | null
   activity: Record<string, unknown> | null
   payment: Record<string, unknown> | null
+  passengers: Record<string, unknown>[]
+  bookings: Record<string, unknown>[]
+  businessConfig: Record<string, unknown> | null
   [key: string]: unknown
 }
 
@@ -56,14 +59,25 @@ export class TemplateContextBuilderService {
     params: ContextParams,
     additionalVariables?: Record<string, unknown>,
   ): Promise<TemplateContext> {
-    const [agency, contact, trip, agent, activity, payment] = await Promise.all([
+    const [agency, contact, trip, agent, activity, payment, passengers, bookings, businessConfig] = await Promise.all([
       this.loadAgency(params.agencyId),
       this.loadContact(params.contactId, params.tripId),
       this.loadTrip(params.tripId),
       this.loadAgent(params.agentId, params.tripId),
       this.loadActivity(params.activityId),
       this.loadPaymentItem(params.paymentItemId),
+      this.loadPassengers(params.tripId),
+      this.loadBookings(params.tripId),
+      this.loadBusinessConfig(params.agencyId),
     ])
+
+    // Enrich agency with logo from businessConfig so {{agency.logo}} works in templates
+    if (agency && businessConfig) {
+      const bc = businessConfig as Record<string, unknown>
+      if (bc.logo_url && !(agency as Record<string, unknown>).logo) {
+        ;(agency as Record<string, unknown>).logo = bc.logo_url
+      }
+    }
 
     return {
       agency,
@@ -73,6 +87,9 @@ export class TemplateContextBuilderService {
       agent,
       activity,
       payment,
+      passengers,
+      bookings,
+      businessConfig,
       ...additionalVariables,
     }
   }
@@ -242,6 +259,121 @@ export class TemplateContextBuilderService {
       return (row as Record<string, unknown>) ?? null
     } catch (error) {
       this.logger.warn(`Failed to load payment item ${paymentItemId}: ${error}`)
+      return null
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Trip-specific loaders (passengers, bookings, business config)
+  // -----------------------------------------------------------------------
+
+  private async loadPassengers(tripId?: string): Promise<Record<string, unknown>[]> {
+    if (!tripId) return []
+    try {
+      const { tripTravelers, contacts } = this.db.schema
+      const travelers = await this.db.client
+        .select({
+          id: tripTravelers.id,
+          travelerType: tripTravelers.travelerType,
+          contactId: tripTravelers.contactId,
+          contactSnapshot: tripTravelers.contactSnapshot,
+          contactFirstName: contacts.firstName,
+          contactLastName: contacts.lastName,
+          contactEmail: contacts.email,
+          contactDateOfBirth: contacts.dateOfBirth,
+        })
+        .from(tripTravelers)
+        .leftJoin(contacts, eq(contacts.id, tripTravelers.contactId))
+        .where(eq(tripTravelers.tripId, tripId))
+
+      return travelers.map((t) => {
+        const snapshot = t.contactSnapshot as { firstName?: string; lastName?: string; email?: string; dateOfBirth?: string } | null
+        const firstName = t.contactFirstName || snapshot?.firstName || ''
+        const lastName = t.contactLastName || snapshot?.lastName || ''
+        return {
+          id: t.id,
+          firstName,
+          lastName,
+          full_name: [firstName, lastName].filter(Boolean).join(' '),
+          type: t.travelerType || 'adult',
+          dateOfBirth: t.contactDateOfBirth || snapshot?.dateOfBirth || null,
+          email: t.contactEmail || snapshot?.email || null,
+        }
+      })
+    } catch (error) {
+      this.logger.warn(`Failed to load passengers for trip ${tripId}: ${error}`)
+      return []
+    }
+  }
+
+  private async loadBookings(tripId?: string): Promise<Record<string, unknown>[]> {
+    if (!tripId) return []
+    try {
+      const { itineraryActivities, itineraryDays, itineraries, activityPricing } = this.db.schema
+      const activities = await this.db.client
+        .select({
+          id: itineraryActivities.id,
+          name: itineraryActivities.name,
+          activityType: itineraryActivities.activityType,
+          confirmationNumber: itineraryActivities.confirmationNumber,
+          startDatetime: itineraryActivities.startDatetime,
+          endDatetime: itineraryActivities.endDatetime,
+          totalPriceCents: activityPricing.totalPriceCents,
+          currency: activityPricing.currency,
+        })
+        .from(itineraryActivities)
+        .innerJoin(itineraryDays, eq(itineraryActivities.itineraryDayId, itineraryDays.id))
+        .innerJoin(itineraries, eq(itineraryDays.itineraryId, itineraries.id))
+        .leftJoin(activityPricing, eq(activityPricing.activityId, itineraryActivities.id))
+        .where(eq(itineraries.tripId, tripId))
+
+      return activities.map((a) => ({
+        id: a.id,
+        title: a.name,
+        booking_type: a.activityType || 'other',
+        vendor_confirmation: a.confirmationNumber || null,
+        start_date: a.startDatetime ? new Date(a.startDatetime).toISOString().split('T')[0] : null,
+        end_date: a.endDatetime ? new Date(a.endDatetime).toISOString().split('T')[0] : null,
+        amount: a.totalPriceCents ? a.totalPriceCents / 100 : 0,
+        currency: a.currency || 'CAD',
+      }))
+    } catch (error) {
+      this.logger.warn(`Failed to load bookings for trip ${tripId}: ${error}`)
+      return []
+    }
+  }
+
+  private async loadBusinessConfig(agencyId?: string): Promise<Record<string, unknown> | null> {
+    if (!agencyId) return null
+    try {
+      const { agencySettings, agencies } = this.db.schema
+
+      const [settings] = await this.db.client
+        .select({
+          logoUrl: agencySettings.logoUrl,
+          primaryColor: agencySettings.primaryColor,
+        })
+        .from(agencySettings)
+        .where(eq(agencySettings.agencyId, agencyId))
+        .limit(1)
+
+      const [agency] = await this.db.client
+        .select({ name: agencies.name })
+        .from(agencies)
+        .where(eq(agencies.id, agencyId))
+        .limit(1)
+
+      return {
+        company_name: agency?.name || 'Phoenix Voyages',
+        company_tagline: 'Discover, Soar, Repeat',
+        logo_url: settings?.logoUrl || null,
+        primary_color: settings?.primaryColor || '#c59746',
+        secondary_color: '#e89e4a',
+        tico_registration: '',
+        hst_number: '',
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to load business config for agency ${agencyId}: ${error}`)
       return null
     }
   }

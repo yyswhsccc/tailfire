@@ -1,30 +1,30 @@
 /**
  * Document Render Processor
  *
- * BullMQ worker that renders PDFs from document templates via Puppeteer.
- * The browser instance is lazy-initialized and cached for the lifetime of the process.
+ * BullMQ worker that renders PDFs from document templates.
+ * Delegates PDF generation to PuppeteerPdfService (shared browser instance).
  */
 
 import { Processor, WorkerHost } from '@nestjs/bullmq'
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { Job } from 'bullmq'
-import * as puppeteer from 'puppeteer-core'
 import { QUEUES } from '../automation/automation.types'
 import type { DocumentRenderJobData } from '../automation/automation.types'
 import { DocumentTemplatesService } from '../document-templates/document-templates.service'
 import { HandlebarsRendererService } from '../document-templates/handlebars-renderer.service'
 import { TemplateContextBuilderService } from '../document-templates/template-context-builder.service'
+import { PuppeteerPdfService } from './puppeteer-pdf.service'
 
 @Processor(QUEUES.DOCUMENT_RENDER)
 @Injectable()
-export class DocumentRenderProcessor extends WorkerHost implements OnModuleDestroy {
+export class DocumentRenderProcessor extends WorkerHost {
   private readonly logger = new Logger(DocumentRenderProcessor.name)
-  private browser: puppeteer.Browser | null = null
 
   constructor(
     private readonly templatesService: DocumentTemplatesService,
     private readonly handlebars: HandlebarsRendererService,
     private readonly contextBuilder: TemplateContextBuilderService,
+    private readonly puppeteerPdf: PuppeteerPdfService,
   ) {
     super()
   }
@@ -45,8 +45,8 @@ export class DocumentRenderProcessor extends WorkerHost implements OnModuleDestr
       contextParams,
     })
 
-    // 1. Resolve the template (agency-override aware)
-    const template = await this.templatesService.resolveTemplate(
+    // 1. Resolve the template (agency-override aware, published only)
+    const template = await this.templatesService.resolvePublishedTemplate(
       templateSlug,
       contextParams.agencyId,
     )
@@ -71,83 +71,20 @@ export class DocumentRenderProcessor extends WorkerHost implements OnModuleDestr
     // 3. Render the Handlebars template
     const renderedHtml = this.handlebars.render(template.pdfHtml, context)
 
-    // Wrap with CSS if present
-    const fullHtml = template.pdfCss
-      ? `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${template.pdfCss}</style></head><body>${renderedHtml}</body></html>`
-      : `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${renderedHtml}</body></html>`
-
     job.updateProgress(60)
 
-    // 4. Launch/reuse browser and generate PDF
-    const browser = await this.getBrowser()
-    const page = await browser.newPage()
+    // 4. Generate PDF via shared PuppeteerPdfService
+    const buffer = await this.puppeteerPdf.renderHtmlToPdf(renderedHtml, template.pdfCss ?? undefined)
 
-    try {
-      await page.setContent(fullHtml, { waitUntil: 'networkidle0' })
-
-      job.updateProgress(80)
-
-      const pdfBuffer = await page.pdf({
-        format: 'letter',
-        printBackground: true,
-        margin: {
-          top: '0.5in',
-          right: '0.5in',
-          bottom: '0.5in',
-          left: '0.5in',
-        },
-      })
-
-      const buffer = Buffer.from(pdfBuffer)
-
-      this.logger.log({
-        message: 'PDF render complete',
-        jobId: job.id,
-        templateSlug,
-        size: buffer.length,
-      })
-
-      job.updateProgress(100)
-
-      return { buffer, size: buffer.length }
-    } finally {
-      await page.close()
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Browser management
-  // ---------------------------------------------------------------------------
-
-  private async getBrowser(): Promise<puppeteer.Browser> {
-    if (this.browser && this.browser.connected) {
-      return this.browser
-    }
-
-    const executablePath =
-      process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
-
-    this.logger.log(`Launching Puppeteer browser from ${executablePath}`)
-
-    this.browser = await puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
+    this.logger.log({
+      message: 'PDF render complete',
+      jobId: job.id,
+      templateSlug,
+      size: buffer.length,
     })
 
-    return this.browser
-  }
+    job.updateProgress(100)
 
-  async onModuleDestroy() {
-    if (this.browser) {
-      this.logger.log('Closing Puppeteer browser')
-      await this.browser.close()
-      this.browser = null
-    }
+    return { buffer, size: buffer.length }
   }
 }
