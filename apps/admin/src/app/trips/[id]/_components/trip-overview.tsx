@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Calendar, MapPin, User, Users, Plus, ChevronDown, ChevronUp, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Calendar, MapPin, User, Users, Plus, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react'
 import type { TripResponseDto, ItineraryResponseDto } from '@tailfire/shared-types/api'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -83,6 +83,16 @@ export function TripOverview({ trip }: TripOverviewProps) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Traveler Warning Banner */}
+      {!loadingTravelers && travelers.length === 0 && ['inbound', 'draft', 'quoted'].includes(trip.status) && (
+        <div className="lg:col-span-3 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>This trip has no travelers. Add travelers before publishing or booking.</span>
+          <Button variant="link" size="sm" className="ml-auto text-amber-800 underline p-0 h-auto" onClick={handleAddTravelers}>
+            Add Travelers
+          </Button>
+        </div>
+      )}
       {/* Main Content - Left Side (2 columns) */}
       <div className="lg:col-span-2 space-y-6">
         {/* Get Started Section - Hidden when trip has itineraries */}
