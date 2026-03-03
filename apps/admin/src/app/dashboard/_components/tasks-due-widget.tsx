@@ -45,7 +45,7 @@ export function TasksDueWidget({ tasks }: TasksDueWidgetProps) {
                 <Checkbox
                   className="mt-0.5"
                   onCheckedChange={() => {
-                    completeTask.mutate(task.id)
+                    completeTask.mutate({ id: task.id })
                   }}
                 />
                 <div className="flex-1 min-w-0">

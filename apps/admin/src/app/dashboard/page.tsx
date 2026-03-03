@@ -1,110 +1,204 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useState, useCallback, useEffect } from 'react'
 import { DashboardLayout } from '@/components/layout'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { api } from '@/lib/api'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { PanelRight, AlertCircle, RefreshCw } from 'lucide-react'
+import { useUser } from '@/hooks/use-user'
+import { useMyProfile } from '@/hooks/use-user-profile'
+import { useDashboardOverview } from '@/hooks/use-dashboard'
+import { KpiCards } from './_components/kpi-cards'
+import { TripCardRow } from './_components/trip-card-row'
+import { TasksDueWidget } from './_components/tasks-due-widget'
+import { PaymentsDueWidget } from './_components/payments-due-widget'
+import { SalesChart } from './_components/sales-chart'
+import { CommissionChart } from './_components/commission-chart'
+import { DashboardSidebar } from './_components/dashboard-sidebar'
 
-interface DashboardStats {
-  totalTrips: number
-  activeTrips: number
-  totalContacts: number
-  totalRevenue: number
+const SIDEBAR_KEY = 'dashboard-sidebar-open'
+
+function useSidebarState() {
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    const stored = localStorage.getItem(SIDEBAR_KEY)
+    if (stored !== null) {
+      setIsOpen(stored === 'true')
+    }
+  }, [])
+
+  const toggle = useCallback(() => {
+    setIsOpen((prev) => {
+      const next = !prev
+      localStorage.setItem(SIDEBAR_KEY, String(next))
+      return next
+    })
+  }, [])
+
+  return { isOpen, toggle }
 }
 
 export default function DashboardPage() {
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ['dashboard-stats'],
-    queryFn: () => api.get<DashboardStats>('/dashboard/stats'),
+  const { isAdmin } = useUser()
+  const { data: profile } = useMyProfile()
+  const firstName = profile?.firstName || 'there'
+
+  // Dashboard controls
+  const [period, setPeriod] = useState<'mtd' | 'ytd'>('mtd')
+  const [chartYear, setChartYear] = useState(new Date().getFullYear())
+  const [includeYoy, setIncludeYoy] = useState(false)
+  const [showProjection, setShowProjection] = useState(false)
+  const sidebar = useSidebarState()
+
+  const { data, isLoading, isError, refetch } = useDashboardOverview({
+    period,
+    chartYear,
+    includeYoy,
   })
+
+  const periodLabel = period === 'mtd' ? 'Month to Date' : 'Year to Date'
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+          </div>
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Skeleton className="h-48" />
+            <Skeleton className="h-48" />
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  // Error state
+  if (isError || !data) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center py-20">
+          <AlertCircle className="h-10 w-10 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold">Unable to load dashboard</h3>
+          <p className="text-sm text-muted-foreground mb-4">Something went wrong fetching your data.</p>
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-muted-foreground">
-            Welcome back! Here&apos;s an overview of your business.
-          </p>
+      <div className="flex gap-6">
+        {/* Main content */}
+        <div className="flex-1 min-w-0 space-y-6">
+          {/* Header */}
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Welcome back, {firstName}</h2>
+              <p className="text-sm text-muted-foreground">
+                Here&apos;s how your business is doing
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Period Toggle */}
+              <div className="flex rounded-md border">
+                <button
+                  className={`px-3 py-1.5 text-xs font-medium rounded-l-md transition-colors ${
+                    period === 'mtd' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                  }`}
+                  onClick={() => setPeriod('mtd')}
+                >
+                  MTD
+                </button>
+                <button
+                  className={`px-3 py-1.5 text-xs font-medium rounded-r-md transition-colors ${
+                    period === 'ytd' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                  }`}
+                  onClick={() => setPeriod('ytd')}
+                >
+                  YTD
+                </button>
+              </div>
+              {/* Sidebar Toggle */}
+              <Button variant="ghost" size="sm" onClick={sidebar.toggle}>
+                <PanelRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Personal KPI Cards */}
+          <KpiCards metrics={data.personal} periodLabel={periodLabel} />
+
+          {/* Agency KPI Row (admin only) */}
+          {isAdmin && data.agency && (
+            <KpiCards metrics={data.agency} periodLabel={periodLabel} variant="agency" />
+          )}
+
+          {/* Jump Back In */}
+          <TripCardRow title="Jump Back In" trips={data.recentTrips} viewAllHref="/trips" />
+
+          {/* Leaving Soon */}
+          <TripCardRow
+            title="Leaving Soon"
+            trips={data.leavingSoon}
+            viewAllHref="/trips"
+            showCreateCard
+          />
+
+          {/* Tasks + Payments (two-column grid) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <TasksDueWidget tasks={data.tasksDue} />
+            <PaymentsDueWidget payments={data.paymentsDue} />
+          </div>
+
+          {/* Charts (two-column grid) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <SalesChart
+              data={data.monthlySales}
+              projection={data.currentMonthProjection}
+              year={chartYear}
+              onYearChange={setChartYear}
+              includeYoy={includeYoy}
+              onYoyToggle={() => setIncludeYoy((v) => !v)}
+              showProjection={showProjection}
+              onProjectionToggle={() => setShowProjection((v) => !v)}
+            />
+            <CommissionChart
+              data={data.monthlyCommission}
+              projection={data.currentMonthProjection}
+              year={chartYear}
+              onYearChange={setChartYear}
+              includeYoy={includeYoy}
+              onYoyToggle={() => setIncludeYoy((v) => !v)}
+              showProjection={showProjection}
+              onProjectionToggle={() => setShowProjection((v) => !v)}
+            />
+          </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {isLoading ? '...' : stats?.totalTrips || 0}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                All time bookings
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Trips</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {isLoading ? '...' : stats?.activeTrips || 0}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Currently in progress
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Contacts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {isLoading ? '...' : stats?.totalContacts || 0}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Total client base
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {isLoading ? '...' : `$${stats?.totalRevenue?.toLocaleString() || 0}`}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Total earnings
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>
-              Your latest bookings and updates
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              No recent activity to display. Start by creating a new trip or adding a contact.
-            </p>
-          </CardContent>
-        </Card>
+        {/* Sidebar */}
+        <DashboardSidebar
+          isOpen={sidebar.isOpen}
+          onToggle={sidebar.toggle}
+          isAdmin={isAdmin}
+          tasks={data.tasksDue}
+          leaderboard={data.agentLeaderboard}
+        />
       </div>
     </DashboardLayout>
   )

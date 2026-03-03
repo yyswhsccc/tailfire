@@ -31,7 +31,7 @@ export function SidebarTodayTasks({ tasks }: SidebarTodayTasksProps) {
             <div key={task.id} className="flex items-start gap-2">
               <Checkbox
                 className="mt-0.5"
-                onCheckedChange={() => completeTask.mutate(task.id)}
+                onCheckedChange={() => completeTask.mutate({ id: task.id })}
               />
               <span className="text-xs">{task.title}</span>
             </div>
