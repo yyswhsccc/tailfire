@@ -13,6 +13,8 @@
 import { Module, forwardRef } from '@nestjs/common'
 import { DatabaseModule } from '../db/database.module'
 import { EmailModule } from '../email/email.module'
+import { DocumentTemplatesModule } from '../document-templates/document-templates.module'
+import { DocumentRenderModule } from '../document-render/document-render.module'
 
 // Services
 import { ExchangeRatesService } from './exchange-rates.service'
@@ -35,7 +37,7 @@ import { StripeConnectController } from './stripe-connect.controller'
 import { StripeInvoiceController } from './stripe-invoice.controller'
 
 @Module({
-  imports: [DatabaseModule, forwardRef(() => EmailModule)],
+  imports: [DatabaseModule, forwardRef(() => EmailModule), DocumentTemplatesModule, DocumentRenderModule],
   controllers: [
     ExchangeRatesController,
     TravellerSplitsController,

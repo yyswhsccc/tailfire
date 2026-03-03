@@ -36,6 +36,7 @@ export interface TripOrderBookingDetail {
   base_price?: number
   taxes?: number
   amount?: number
+  currency?: string
 }
 
 /**
@@ -183,6 +184,7 @@ export interface TICOTripOrder {
     description: string
     travel_dates?: TravelDates
     destination?: string
+    currency?: string
     passengers?: Passenger[]
   }
   cost_breakdown: CostBreakdown

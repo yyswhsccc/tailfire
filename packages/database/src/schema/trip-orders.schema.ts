@@ -9,6 +9,7 @@ import { pgTable, uuid, integer, timestamp, pgEnum, jsonb, index, unique } from 
 import { relations } from 'drizzle-orm'
 import { trips } from './trips.schema'
 import { emailLogs } from './email.schema'
+import { documentTemplates } from './document-templates.schema'
 
 // ============================================================================
 // ENUMS
@@ -60,6 +61,10 @@ export const tripOrders = pgTable('trip_orders', {
 
   // Link to email log when sent
   emailLogId: uuid('email_log_id').references(() => emailLogs.id, { onDelete: 'set null' }),
+
+  // Template pinning (snapshot which template version was used)
+  templateId: uuid('template_id'),
+  templateVersion: integer('template_version'),
 }, (table) => ({
   // Indexes
   tripIdIdx: index('idx_trip_orders_trip_id').on(table.tripId),
@@ -82,5 +87,9 @@ export const tripOrdersRelations = relations(tripOrders, ({ one }) => ({
   emailLog: one(emailLogs, {
     fields: [tripOrders.emailLogId],
     references: [emailLogs.id]
+  }),
+  documentTemplate: one(documentTemplates, {
+    fields: [tripOrders.templateId],
+    references: [documentTemplates.id]
   }),
 }))

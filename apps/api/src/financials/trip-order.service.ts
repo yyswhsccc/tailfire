@@ -1,7 +1,8 @@
 /**
  * Trip-Order PDF Generation Service
  *
- * Generates professional Trip-Order documents using @react-pdf/renderer:
+ * Generates professional Trip-Order documents using the document template system
+ * (Handlebars HTML rendering + Puppeteer PDF conversion):
  * - Phoenix Voyages branding (Cinzel/Lato fonts, gold colors)
  * - Trip header with agency branding
  * - Trip summary and dates
@@ -14,15 +15,14 @@
 
 import { Injectable, NotFoundException, BadRequestException, Logger, Inject, forwardRef } from '@nestjs/common'
 import { eq, and, desc, sql } from 'drizzle-orm'
-import { renderToBuffer } from '@react-pdf/renderer'
-import React from 'react'
 import { DatabaseService } from '../db/database.service'
 import { FinancialSummaryService } from './financial-summary.service'
 import { EmailService } from '../email/email.service'
 import { EmailTemplatesService } from '../email/email-templates.service'
-import { TripOrderPDF } from './pdf/trip-order-pdf'
+import { DocumentTemplatesService } from '../document-templates/document-templates.service'
+import { HandlebarsRendererService } from '../document-templates/handlebars-renderer.service'
+import { PuppeteerPdfService } from '../document-render/puppeteer-pdf.service'
 import type {
-  TripOrderPDFProps,
   TICOTripOrder,
   BusinessConfiguration,
   TripOrderPaymentSummary,
@@ -81,11 +81,15 @@ export class TripOrderService {
     @Inject(forwardRef(() => EmailService))
     private readonly emailService: EmailService,
     @Inject(forwardRef(() => EmailTemplatesService))
-    private readonly emailTemplatesService: EmailTemplatesService
+    private readonly emailTemplatesService: EmailTemplatesService,
+    private readonly templatesService: DocumentTemplatesService,
+    private readonly handlebars: HandlebarsRendererService,
+    private readonly puppeteerPdf: PuppeteerPdfService,
   ) {}
 
   /**
-   * Generate a Trip-Order PDF document using React-PDF
+   * Generate a Trip-Order PDF document using the document template system
+   * (Handlebars HTML + Puppeteer PDF)
    */
   async generateTripOrder(tripId: string, agencyId: string, _dto: GenerateTripOrderDto = {}): Promise<Buffer> {
     // Get trip details
@@ -115,8 +119,11 @@ export class TripOrderService {
     // Get payments
     const payments = await this.getTripPayments(tripId)
 
-    // Build Trip Order data structure
-    const tripOrderData = this.buildTripOrderData({
+    // Build payment summary
+    const paymentSummary = this.buildPaymentSummary(payments, financialSummary.grandTotal.totalCostCents / 100)
+
+    // Build Handlebars template context
+    const context = this.buildTemplateContext({
       trip,
       businessConfig,
       financialSummary,
@@ -124,29 +131,11 @@ export class TripOrderService {
       primaryContact,
       agent,
       bookings,
+      paymentSummary,
     })
 
-    // Build payment summary
-    const paymentSummary = this.buildPaymentSummary(payments, financialSummary.grandTotal.totalCostCents / 100)
-
-    // Build booking details for PDF
-    const bookingDetails = this.buildBookingDetails(bookings)
-
-    // Build PDF props
-    const pdfProps: TripOrderPDFProps = {
-      tripOrder: tripOrderData,
-      businessConfig,
-      paymentSummary,
-      bookingDetails,
-      version: 1,
-    }
-
-    // Render React PDF to buffer
-    // Type assertion needed because TripOrderPDF returns Document but TS doesn't infer it
-    const pdfBuffer = await renderToBuffer(
-      React.createElement(TripOrderPDF, pdfProps) as React.ReactElement
-    )
-    return Buffer.from(pdfBuffer)
+    // Render via document template system
+    return this.renderTripOrderPdf(agencyId, context)
   }
 
   /**
@@ -530,19 +519,20 @@ export class TripOrderService {
    */
   async generatePdfFromSnapshot(id: string, agencyId: string): Promise<Buffer> {
     const tripOrder = await this.getTripOrderById(id, agencyId)
+    const orderData = tripOrder.orderData as TICOTripOrder
+    const businessConfig = tripOrder.businessConfig as BusinessConfiguration
+    const paymentSummary = tripOrder.paymentSummary as TripOrderPaymentSummary
+    const bookingDetails = tripOrder.bookingDetails as TripOrderBookingDetail[]
 
-    const pdfProps: TripOrderPDFProps = {
-      tripOrder: tripOrder.orderData as TICOTripOrder,
-      businessConfig: tripOrder.businessConfig as BusinessConfiguration,
-      paymentSummary: tripOrder.paymentSummary as TripOrderPaymentSummary,
-      bookingDetails: tripOrder.bookingDetails as TripOrderBookingDetail[],
-      version: tripOrder.versionNumber,
-    }
-
-    const pdfBuffer = await renderToBuffer(
-      React.createElement(TripOrderPDF, pdfProps) as React.ReactElement
+    // Build a Handlebars-compatible context from the stored snapshot data
+    const context = this.buildSnapshotTemplateContext(
+      orderData,
+      businessConfig,
+      paymentSummary,
+      bookingDetails,
     )
-    return Buffer.from(pdfBuffer)
+
+    return this.renderTripOrderPdf(agencyId, context)
   }
 
   /**
@@ -689,6 +679,226 @@ export class TripOrderService {
       finalizedBy: tripOrder.finalizedBy,
       sentBy: tripOrder.sentBy,
       emailLogId: tripOrder.emailLogId,
+    }
+  }
+
+  // ============================================================================
+  // PRIVATE METHODS - Template Rendering
+  // ============================================================================
+
+  /**
+   * Resolve the trip-order template, render Handlebars, and convert to PDF.
+   */
+  private async renderTripOrderPdf(
+    agencyId: string,
+    context: Record<string, unknown>,
+  ): Promise<Buffer> {
+    // Resolve the trip-order template (agency override or system default)
+    const template = await this.templatesService.resolvePublishedTemplate('trip-order', agencyId)
+    if (!template || !template.pdfHtml) {
+      throw new NotFoundException('Trip order PDF template not found')
+    }
+
+    // Embed logo as base64 data URI so it renders reliably in Puppeteer
+    await this.embedLogoAsBase64(context)
+
+    // Render the Handlebars HTML
+    const renderedHtml = this.handlebars.render(template.pdfHtml, context)
+
+    // Convert to PDF via Puppeteer
+    return this.puppeteerPdf.renderHtmlToPdf(renderedHtml, template.pdfCss ?? undefined)
+  }
+
+  /**
+   * Fetch the agency logo URL and replace it with a base64 data URI
+   * so Puppeteer doesn't depend on external network access during PDF rendering.
+   */
+  private async embedLogoAsBase64(context: Record<string, unknown>): Promise<void> {
+    const agency = context.agency as Record<string, unknown> | undefined
+    const logoUrl = agency?.logo as string | undefined
+    if (!logoUrl) return
+
+    try {
+      const response = await fetch(logoUrl)
+      if (!response.ok) {
+        this.logger.warn(`Failed to fetch logo for PDF embedding: ${response.status} ${logoUrl}`)
+        return
+      }
+      const buffer = Buffer.from(await response.arrayBuffer())
+      const contentType = response.headers.get('content-type') || 'image/png'
+      const base64 = `data:${contentType};base64,${buffer.toString('base64')}`
+      agency!.logo = base64
+    } catch (err) {
+      this.logger.warn(`Failed to embed logo as base64: ${err}`)
+      // Leave original URL as fallback — Puppeteer may still fetch it
+    }
+  }
+
+  /**
+   * Build a Handlebars-compatible context from live database data.
+   * Variable names match the trip-order template expectations.
+   */
+  private buildTemplateContext(params: {
+    trip: any
+    businessConfig: BusinessConfiguration
+    financialSummary: TripFinancialSummaryResponseDto
+    passengers: any[]
+    primaryContact: any
+    agent: any
+    bookings: any[]
+    paymentSummary: TripOrderPaymentSummary
+  }): Record<string, unknown> {
+    const { trip, businessConfig, financialSummary, passengers, primaryContact, agent, bookings, paymentSummary } = params
+
+    const totalCost = financialSummary.grandTotal.totalCostCents / 100
+
+    return {
+      trip: {
+        name: trip.name,
+        referenceNumber: trip.reference,
+        reference: trip.reference,
+        startDate: trip.startDate,
+        endDate: trip.endDate,
+        currency: trip.currency || 'CAD',
+        totalCost,
+        destination: trip.destination ?? null,
+      },
+      contact: primaryContact
+        ? {
+            full_name: [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(' ') || 'Customer',
+            first_name: primaryContact.firstName || '',
+            last_name: primaryContact.lastName || '',
+            email: primaryContact.email,
+            phone: primaryContact.phone,
+            addressLine1: primaryContact.address1 || primaryContact.addressLine1,
+            city: primaryContact.city,
+            province: primaryContact.stateProvince || primaryContact.province,
+            postalCode: primaryContact.postalCode,
+            country: primaryContact.country,
+          }
+        : { full_name: 'Customer' },
+      agent: agent
+        ? {
+            full_name: [agent.firstName, agent.lastName].filter(Boolean).join(' '),
+            email: agent.email,
+            phone: agent.phone,
+          }
+        : null,
+      agency: {
+        name: businessConfig.company_name,
+        logo: businessConfig.logo_url,
+        address: businessConfig.full_address,
+        phone: businessConfig.phone || businessConfig.toll_free,
+        email: businessConfig.email,
+      },
+      businessConfig: {
+        company_name: businessConfig.company_name,
+        company_tagline: businessConfig.company_tagline || 'Discover, Soar, Repeat',
+        tico_registration: businessConfig.tico_registration,
+        hst_number: businessConfig.hst_number,
+        logo_url: businessConfig.logo_url,
+        primary_color: businessConfig.primary_color || '#c59746',
+      },
+      payment: {
+        amountPaid: paymentSummary.processed_payments,
+        balanceDue: paymentSummary.balance_due,
+      },
+      passengers: passengers.map((p) => ({
+        full_name: [p.firstName, p.lastName].filter(Boolean).join(' '),
+        firstName: p.firstName,
+        lastName: p.lastName,
+        type: p.passengerType || 'adult',
+        dateOfBirth: p.dateOfBirth,
+        email: p.email,
+      })),
+      bookings: bookings.map((b) => ({
+        title: b.title || 'Booking',
+        booking_type: b.bookingType || 'other',
+        vendor_confirmation: b.vendorConfirmation || null,
+        start_date: b.startDate,
+        end_date: b.endDate,
+        amount: Number(b.totalPrice || 0),
+        currency: b.currency || 'CAD',
+      })),
+    }
+  }
+
+  /**
+   * Build a Handlebars-compatible context from a stored trip order snapshot.
+   * Maps the TICOTripOrder structure to the same variable names the template expects.
+   */
+  private buildSnapshotTemplateContext(
+    orderData: TICOTripOrder,
+    businessConfig: BusinessConfiguration,
+    paymentSummary: TripOrderPaymentSummary,
+    bookingDetails: TripOrderBookingDetail[],
+  ): Record<string, unknown> {
+    const header = orderData.order_header
+    const costBreak = orderData.cost_breakdown
+
+    return {
+      trip: {
+        name: orderData.service_details?.description || 'Trip',
+        referenceNumber: header.order_number,
+        reference: header.order_number,
+        startDate: orderData.service_details?.travel_dates?.departure,
+        endDate: orderData.service_details?.travel_dates?.return,
+        currency: orderData.service_details?.currency || 'CAD',
+        totalCost: costBreak.final_total,
+        destination: orderData.service_details?.destination ?? null,
+      },
+      contact: {
+        full_name: header.customer_info?.name || 'Customer',
+        email: header.customer_info?.email,
+        phone: header.customer_info?.phone,
+        addressLine1: header.customer_info?.address?.street1,
+        city: header.customer_info?.address?.city,
+        province: header.customer_info?.address?.state,
+        postalCode: header.customer_info?.address?.postal_code,
+        country: header.customer_info?.address?.country,
+      },
+      agent: header.agent_info
+        ? {
+            full_name: header.agent_info.name,
+            email: header.agent_info.email,
+            phone: header.agent_info.phone,
+          }
+        : null,
+      agency: {
+        name: header.agency_info?.name || businessConfig.company_name,
+        logo: businessConfig.logo_url,
+        address: header.agency_info?.address || businessConfig.full_address,
+        phone: header.agency_info?.phone || businessConfig.phone,
+        email: header.agency_info?.email || businessConfig.email,
+      },
+      businessConfig: {
+        company_name: businessConfig.company_name,
+        company_tagline: businessConfig.company_tagline || 'Discover, Soar, Repeat',
+        tico_registration: businessConfig.tico_registration,
+        hst_number: businessConfig.hst_number,
+        logo_url: businessConfig.logo_url,
+        primary_color: businessConfig.primary_color || '#c59746',
+      },
+      payment: {
+        amountPaid: paymentSummary?.processed_payments ?? 0,
+        balanceDue: paymentSummary?.balance_due ?? costBreak.final_total,
+      },
+      passengers: (orderData.service_details?.passengers || []).map((p) => ({
+        full_name: [p.firstName, p.lastName].filter(Boolean).join(' '),
+        firstName: p.firstName,
+        lastName: p.lastName,
+        type: p.type || 'adult',
+        dateOfBirth: p.dateOfBirth,
+      })),
+      bookings: (bookingDetails || []).map((b) => ({
+        title: b.title || 'Booking',
+        booking_type: b.booking_type || 'other',
+        vendor_confirmation: b.vendor_confirmation || null,
+        start_date: b.start_date,
+        end_date: b.end_date,
+        amount: Number(b.amount || b.base_price || 0),
+        currency: b.currency || orderData.service_details?.currency || 'CAD',
+      })),
     }
   }
 
@@ -937,7 +1147,7 @@ export class TripOrderService {
     return {
       order_header: {
         title: 'Trip Order',
-        order_number: trip.referenceNumber || `TRIP-${trip.id.slice(0, 8).toUpperCase()}`,
+        order_number: trip.reference || `TRIP-${trip.id.slice(0, 8).toUpperCase()}`,
         order_date: orderDate,
         agency_info: {
           name: businessConfig.company_name,
@@ -978,6 +1188,7 @@ export class TripOrderService {
               return: trip.endDate || undefined,
             }
           : undefined,
+        currency: trip.currency || 'CAD',
         passengers: passengers.map((p) => ({
           id: p.id,
           firstName: p.firstName || '',
@@ -1051,6 +1262,7 @@ export class TripOrderService {
       base_price: Number(booking.totalPrice || 0),
       taxes: 0,
       amount: Number(booking.totalPrice || 0),
+      currency: booking.currency || 'CAD',
     }))
   }
 

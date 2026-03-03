@@ -16,6 +16,7 @@ export const QUEUES = {
   NOTIFICATIONS: 'notifications',
   OCR_PROCESSING: 'ocr-processing',
   ENRICHMENT: 'enrichment',
+  DOCUMENT_RENDER: 'document-render',
 } as const
 
 // Alias for backward compatibility
@@ -68,6 +69,9 @@ export const JOB_TYPES = {
   NOTIFICATION_PUSH: 'notification.push',
   NOTIFICATION_EMAIL: 'notification.email',
   NOTIFICATION_SMS: 'notification.sms',
+
+  // Document render jobs
+  DOCUMENT_RENDER_PDF: 'document.render_pdf',
 } as const
 
 export type JobType = (typeof JOB_TYPES)[keyof typeof JOB_TYPES]
@@ -226,6 +230,29 @@ export interface HotelPhotoEnrichmentJobData {
   agencyId: string
   userId: string
   maxPhotos?: number
+}
+
+// ============================================================================
+// Document Render Job Types
+// ============================================================================
+
+/**
+ * Document render job for generating PDFs from templates via puppeteer-core
+ */
+export interface DocumentRenderJobData {
+  templateSlug: string
+  contextParams: {
+    agencyId: string
+    tripId?: string
+    contactId?: string
+    activityId?: string
+    agentId?: string
+    paymentItemId?: string
+  }
+  additionalVariables?: Record<string, unknown>
+  outputFormat: 'pdf'
+  tripOrderId?: string
+  requestedBy?: string
 }
 
 // ============================================================================

@@ -93,6 +93,7 @@ export function setupBullBoard(
     tripAutomationQueue: Queue
     clientCareQueue: Queue
     notificationsQueue: Queue
+    documentRenderQueue: Queue
   },
 ) {
   const enableBullBoard = process.env.ENABLE_BULL_BOARD === 'true'
@@ -119,6 +120,7 @@ export function setupBullBoard(
         new BullMQAdapter(options.tripAutomationQueue, { readOnlyMode: isProduction }),
         new BullMQAdapter(options.clientCareQueue, { readOnlyMode: isProduction }),
         new BullMQAdapter(options.notificationsQueue, { readOnlyMode: isProduction }),
+        new BullMQAdapter(options.documentRenderQueue, { readOnlyMode: isProduction }),
       ],
       serverAdapter,
       options: {
@@ -162,18 +164,21 @@ export async function getQueuesFromApp(app: INestApplication): Promise<{
   tripAutomationQueue: Queue
   clientCareQueue: Queue
   notificationsQueue: Queue
+  documentRenderQueue: Queue
 } | null> {
   try {
     // Use getQueueToken from @nestjs/bullmq for correct token format
     const tripAutomationQueue = app.get<Queue>(getQueueToken(QUEUE_NAMES.TRIP_AUTOMATION))
     const clientCareQueue = app.get<Queue>(getQueueToken(QUEUE_NAMES.CLIENT_CARE))
     const notificationsQueue = app.get<Queue>(getQueueToken(QUEUE_NAMES.NOTIFICATIONS))
+    const documentRenderQueue = app.get<Queue>(getQueueToken(QUEUE_NAMES.DOCUMENT_RENDER))
 
     logger.log('Queue instances retrieved successfully')
     return {
       tripAutomationQueue,
       clientCareQueue,
       notificationsQueue,
+      documentRenderQueue,
     }
   } catch (error) {
     logger.warn(`Could not get queue instances - Bull Board will not be available: ${error}`)

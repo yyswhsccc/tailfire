@@ -953,6 +953,41 @@
       "when": 1772161200000,
       "tag": "20260227200000_migrate_feedback_fk_to_contacts",
       "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1772236800000,
+      "tag": "20260228100000_create_document_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 137,
+      "version": "7",
+      "when": 1772240400000,
+      "tag": "20260228110000_migrate_email_templates_to_document_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "7",
+      "when": 1772244000000,
+      "tag": "20260228120000_add_template_pinning_to_trip_orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 139,
+      "version": "7",
+      "when": 1772247600000,
+      "tag": "20260228130000_seed_trip_order_document_template",
+      "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1772251200000,
+      "tag": "20260228140000_rebrand_document_templates_phoenix_voyages",
+      "breakpoints": true
     }
   ]
 }

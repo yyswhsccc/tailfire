@@ -99,6 +99,15 @@ export class TripsService {
   ): Promise<TripResponseDto> {
     const status = dto.status || 'draft'
 
+    // Validate: trips cannot be created in advanced statuses
+    // They must go through the workflow (draft/quoted → booked via status transition)
+    const ALLOWED_CREATE_STATUSES = ['inbound', 'draft', 'quoted']
+    if (!ALLOWED_CREATE_STATUSES.includes(status)) {
+      throw new BadRequestException(
+        `Trips cannot be created with status "${status}". Use draft, inbound, or quoted, then transition through the workflow.`
+      )
+    }
+
     // Validate: trips must have an owner unless they are inbound leads
     if (!ownerId && status !== 'inbound') {
       throw new BadRequestException('Trips must have an owner unless status is "inbound"')
@@ -504,6 +513,11 @@ export class TripsService {
         if (!newOwnerId) {
           throw new BadRequestException('Cannot change status from "inbound" without assigning an owner')
         }
+      }
+
+      // Validate: transitioning to 'booked' requires at least one traveler
+      if (dto.status === 'booked') {
+        await this.assertHasTravelers(id, 'set trip to Booked')
       }
     }
 
@@ -1026,6 +1040,16 @@ export class TripsService {
         continue
       }
 
+      // Validate: transitioning to 'booked' requires at least one traveler
+      if (newStatus === 'booked') {
+        try {
+          await this.assertHasTravelers(tripId, 'set trip to Booked')
+        } catch (e) {
+          failed.push({ id: tripId, reason: e instanceof BadRequestException ? e.message : 'Cannot set trip to Booked without at least one traveler' })
+          continue
+        }
+      }
+
       // Auto-set booking date if transitioning to 'booked'
       const isTransitioningToBooked = newStatus === 'booked' && trip.status !== 'booked'
       const bookingDate = isTransitioningToBooked
@@ -1443,11 +1467,37 @@ export class TripsService {
   }
 
   // ============================================================================
+  // TRAVELER VALIDATION
+  // ============================================================================
+
+  /**
+   * Assert that a trip has at least one traveler.
+   * Throws BadRequestException if not.
+   */
+  private async assertHasTravelers(tripId: string, action: string): Promise<void> {
+    const result = await this.db.client
+      .select({ count: sql<number>`count(*)` })
+      .from(this.db.schema.tripTravelers)
+      .where(eq(this.db.schema.tripTravelers.tripId, tripId))
+    const count = Number(result[0]?.count ?? 0)
+    if (count === 0) {
+      throw new BadRequestException(
+        `Cannot ${action} without at least one traveler. Add travelers first.`
+      )
+    }
+  }
+
+  // ============================================================================
   // PUBLISH / UNPUBLISH
   // ============================================================================
 
   async publishTrip(id: string, actorId: string): Promise<TripResponseDto> {
     const trip = await this.findOne(id)
+
+    // Require at least one traveler to publish (check even if already published,
+    // so removing all travelers from a published trip is surfaced on re-publish)
+    await this.assertHasTravelers(id, 'publish a trip')
+
     if (trip.isPublished && trip.shareToken) {
       return trip
     }
