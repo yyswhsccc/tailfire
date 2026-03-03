@@ -232,7 +232,6 @@ export class DocumentTemplatesController {
   @ApiOperation({ summary: 'Update document template' })
   @ApiParam({ name: 'id', description: 'Template UUID' })
   @ApiResponse({ status: 200, description: 'Template updated' })
-  @ApiResponse({ status: 403, description: 'Cannot modify system templates' })
   @ApiResponse({ status: 404, description: 'Template not found' })
   async update(
     @GetAuthContext() auth: AuthContext,

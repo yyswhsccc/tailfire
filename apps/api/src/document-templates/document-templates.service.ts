@@ -206,7 +206,7 @@ export class DocumentTemplatesService {
   }
 
   // -------------------------------------------------------------------------
-  // update — update agency template (rejects system templates)
+  // update — update template (system or agency-owned)
   // -------------------------------------------------------------------------
 
   async update(
@@ -217,7 +217,7 @@ export class DocumentTemplatesService {
   ) {
     const { documentTemplates } = this.db.schema
 
-    // Verify template exists and belongs to agency (not a system template)
+    // Verify template exists; system templates (agencyId=null) are editable by any admin
     const [existing] = await this.db.client
       .select()
       .from(documentTemplates)
