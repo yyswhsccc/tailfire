@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Plane, CheckSquare, UserPlus } from 'lucide-react'
 
 const items = [
-  { label: 'New Trip', href: '/trips/new', icon: Plane },
+  { label: 'New Trip', href: '/trips?create=true', icon: Plane },
   { label: 'New Task', href: '/tasks', icon: CheckSquare },
-  { label: 'New Contact', href: '/contacts/new', icon: UserPlus },
+  { label: 'New Contact', href: '/contacts?create=true', icon: UserPlus },
 ]
 
 export function SidebarQuickCreate() {

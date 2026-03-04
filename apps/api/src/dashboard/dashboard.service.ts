@@ -116,6 +116,15 @@ export class DashboardService {
     const tripIds = await this.tripAccessService.getAccessibleTripIds(auth)
     const isAdmin = auth.role === 'admin'
 
+    // For admin personal KPIs, scope to trips they own (not all agency trips)
+    let personalTripIds: string[] | 'all' = tripIds
+    if (isAdmin) {
+      const ownedResult = await this.db.client.execute(sql`
+        SELECT id FROM trips WHERE agency_id = ${auth.agencyId} AND owner_id = ${auth.userId}
+      `)
+      personalTripIds = (ownedResult as any[]).map((r: any) => r.id)
+    }
+
     // Calculate date ranges
     const now = new Date()
     const { startDate, endDate, priorStartDate, priorEndDate } = this.getDateRanges(query.period || 'mtd', now)
@@ -129,10 +138,10 @@ export class DashboardService {
       monthlySales, monthlyCommission,
       projection, leaderboard,
     ] = await Promise.all([
-      // Personal KPIs (scoped to user's accessible trips)
-      this.getKpiMetrics(auth.agencyId, isAdmin ? 'all' : tripIds, startDate, endDate),
-      this.getKpiMetrics(auth.agencyId, isAdmin ? 'all' : tripIds, priorStartDate, priorEndDate),
-      // Agency KPIs (admin only, always all trips)
+      // Personal KPIs (scoped to user's own trips)
+      this.getKpiMetrics(auth.agencyId, personalTripIds, startDate, endDate),
+      this.getKpiMetrics(auth.agencyId, personalTripIds, priorStartDate, priorEndDate),
+      // Agency KPIs (admin only, all agency trips)
       isAdmin ? this.getKpiMetrics(auth.agencyId, 'all', startDate, endDate) : Promise.resolve(null),
       isAdmin ? this.getKpiMetrics(auth.agencyId, 'all', priorStartDate, priorEndDate) : Promise.resolve(null),
       // Widgets
@@ -438,6 +447,7 @@ export class DashboardService {
           accessCondition,
           inArray(this.db.schema.tasks.status, ['pending', 'in_progress']),
           eq(this.db.schema.tasks.isDeleted, false),
+          sql`${this.db.schema.tasks.dueDate} IS NOT NULL`,
         ),
       )
       .orderBy(

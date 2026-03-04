@@ -26,7 +26,7 @@ export function TripCardRow({ title, trips, viewAllHref, showCreateCard }: TripC
         <div className="rounded-lg border border-dashed p-6 text-center">
           <p className="text-sm text-muted-foreground">No trips</p>
           <Link
-            href="/trips/new"
+            href="/trips?create=true"
             className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
           >
             <Plus className="h-3 w-3" />
@@ -50,7 +50,7 @@ export function TripCardRow({ title, trips, viewAllHref, showCreateCard }: TripC
           <TripCard key={trip.id} trip={trip} />
         ))}
         {showCreateCard && (
-          <Link href="/trips/new" className="block min-w-[220px] snap-start">
+          <Link href="/trips?create=true" className="block min-w-[220px] snap-start">
             <Card className="h-full hover:shadow-md transition-shadow cursor-pointer border-dashed">
               <CardContent className="pt-4 pb-4 flex flex-col items-center justify-center h-full min-h-[100px]">
                 <Plus className="h-6 w-6 text-muted-foreground" />
