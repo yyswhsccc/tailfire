@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { DashboardLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PanelRight, AlertCircle, RefreshCw } from 'lucide-react'
+import { PanelRight, AlertCircle, RefreshCw, Loader2 } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { useDashboardOverview } from '@/hooks/use-dashboard'
@@ -51,7 +51,7 @@ export default function DashboardPage() {
   const [showProjection, setShowProjection] = useState(false)
   const sidebar = useSidebarState()
 
-  const { data, isLoading, isError, refetch } = useDashboardOverview({
+  const { data, isPending, isFetching, isError, refetch } = useDashboardOverview({
     period,
     chartYear,
     includeYoy,
@@ -59,8 +59,8 @@ export default function DashboardPage() {
 
   const periodLabel = period === 'mtd' ? 'Month to Date' : 'Year to Date'
 
-  // Loading state
-  if (isLoading) {
+  // Initial loading state (no data yet)
+  if (isPending) {
     return (
       <DashboardLayout>
         <div className="space-y-6">
@@ -115,6 +115,10 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {/* Fetching indicator */}
+              {isFetching && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
               {/* Period Toggle */}
               <div className="flex rounded-md border">
                 <button

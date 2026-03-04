@@ -4,7 +4,7 @@
  * Fetches dashboard overview data with period/chart controls.
  */
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 
 // -- Types (mirror backend response) --
@@ -129,5 +129,6 @@ export function useDashboardOverview(options: UseDashboardOverviewOptions = {}) 
       return api.get<DashboardOverview>(`/dashboard/overview?${params}`)
     },
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   })
 }
