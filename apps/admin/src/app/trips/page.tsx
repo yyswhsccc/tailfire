@@ -36,17 +36,19 @@ import type { TripStatus } from '@tailfire/shared-types'
 export default function TernTripsPage() {
   const router = useRouter()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [viewMode, setViewMode] = useState<TripsViewMode>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('trips-view-mode')
-      if (stored === 'table' || stored === 'kanban') return stored
-    }
-    return 'kanban'
-  })
+  const [viewMode, setViewMode] = useState<TripsViewMode>('kanban')
 
   useEffect(() => {
-    localStorage.setItem('trips-view-mode', viewMode)
-  }, [viewMode])
+    const stored = localStorage.getItem('trips-view-mode')
+    if (stored === 'table' || stored === 'kanban') {
+      setViewMode(stored)
+    }
+  }, [])
+
+  const handleViewChange = useCallback((mode: TripsViewMode) => {
+    setViewMode(mode)
+    localStorage.setItem('trips-view-mode', mode)
+  }, [])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const { toast } = useToast()
 
@@ -181,7 +183,7 @@ export default function TernTripsPage() {
         actions={
           <div className="flex items-center gap-2">
             {/* View Switcher */}
-            <TripsViewSwitcher view={viewMode} onViewChange={setViewMode} />
+            <TripsViewSwitcher view={viewMode} onViewChange={handleViewChange} />
 
             {/* Filter Panel */}
             <TripsFilterPanel
