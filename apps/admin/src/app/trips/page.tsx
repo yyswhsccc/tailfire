@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Search, Download } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
@@ -36,7 +36,17 @@ import type { TripStatus } from '@tailfire/shared-types'
 export default function TernTripsPage() {
   const router = useRouter()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [viewMode, setViewMode] = useState<TripsViewMode>('kanban')
+  const [viewMode, setViewMode] = useState<TripsViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('trips-view-mode')
+      if (stored === 'table' || stored === 'kanban') return stored
+    }
+    return 'kanban'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('trips-view-mode', viewMode)
+  }, [viewMode])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const { toast } = useToast()
 
