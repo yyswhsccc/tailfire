@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { calendarKeys } from './use-calendar'
+import { dashboardKeys } from './use-dashboard'
 import type {
   TaskResponseDto,
   PaginatedTasksResponseDto,
@@ -298,6 +299,7 @@ export function useCompleteTask() {
       queryClient.invalidateQueries({ queryKey: taskKeys.lists() })
       queryClient.invalidateQueries({ queryKey: calendarKeys.events() })
       queryClient.invalidateQueries({ queryKey: calendarKeys.today() })
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all })
     },
   })
 }

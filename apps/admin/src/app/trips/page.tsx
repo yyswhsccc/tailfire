@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Search, Download } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
@@ -37,6 +37,18 @@ export default function TernTripsPage() {
   const router = useRouter()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [viewMode, setViewMode] = useState<TripsViewMode>('kanban')
+
+  useEffect(() => {
+    const stored = localStorage.getItem('trips-view-mode')
+    if (stored === 'table' || stored === 'kanban') {
+      setViewMode(stored)
+    }
+  }, [])
+
+  const handleViewChange = useCallback((mode: TripsViewMode) => {
+    setViewMode(mode)
+    localStorage.setItem('trips-view-mode', mode)
+  }, [])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const { toast } = useToast()
 
@@ -52,7 +64,7 @@ export default function TernTripsPage() {
   const [searchInput, setSearchInput] = useState('')
 
   // Fetch trips with server-side filtering
-  const { data, isLoading, error, refetch } = useTrips(filters)
+  const { data, isPending, error, refetch } = useTrips(filters)
 
   // Bulk operation mutations
   const bulkDelete = useBulkDeleteTrips()
@@ -171,7 +183,7 @@ export default function TernTripsPage() {
         actions={
           <div className="flex items-center gap-2">
             {/* View Switcher */}
-            <TripsViewSwitcher view={viewMode} onViewChange={setViewMode} />
+            <TripsViewSwitcher view={viewMode} onViewChange={handleViewChange} />
 
             {/* Filter Panel */}
             <TripsFilterPanel
@@ -237,7 +249,7 @@ export default function TernTripsPage() {
             Retry
           </Button>
         </div>
-      ) : isLoading ? (
+      ) : isPending ? (
         <TableSkeleton rows={8} />
       ) : trips.length === 0 && !hasActiveFilters ? (
         <EmptyState

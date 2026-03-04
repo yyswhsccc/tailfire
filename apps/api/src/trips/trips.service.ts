@@ -306,7 +306,7 @@ export class TripsService {
         SELECT 1 FROM trip_tags
         JOIN tags ON tags.id = trip_tags.tag_id
         WHERE trip_tags.trip_id = trips.id
-        AND tags.name = ANY(${filters.tags})
+        AND tags.name IN (${sql.join(filters.tags.map(t => sql`${t}`), sql`, `)})
         AND tags.agency_id = ${auth.agencyId}
         AND (tags.type = 'system' OR (tags.type = 'agent' AND tags.created_by = ${auth.userId}))
       )`)
@@ -406,10 +406,30 @@ export class TripsService {
       this.logger.warn('findAll: auth context absent, returning empty tags for trip list')
     }
 
+    // Load owner profiles for all returned trips
+    const ownerIds = [...new Set(trips.map((t) => t.ownerId).filter(Boolean))] as string[]
+    const ownerMap = new Map<string, { id: string; name: string; email: string }>()
+    if (ownerIds.length > 0) {
+      const ownerRows = await this.db.client
+        .select({
+          id: this.db.schema.userProfiles.id,
+          firstName: this.db.schema.userProfiles.firstName,
+          lastName: this.db.schema.userProfiles.lastName,
+          email: this.db.schema.userProfiles.email,
+        })
+        .from(this.db.schema.userProfiles)
+        .where(inArray(this.db.schema.userProfiles.id, ownerIds))
+      ownerRows.forEach((r) => {
+        const name = [r.firstName, r.lastName].filter(Boolean).join(' ') || r.email || ''
+        ownerMap.set(r.id, { id: r.id, name, email: r.email || '' })
+      })
+    }
+
     return {
       data: trips.map((trip) => ({
         ...this.mapToResponseDto(trip),
         tags: [...(tagsByTrip.get(trip.id) || [])],
+        owner: trip.ownerId ? ownerMap.get(trip.ownerId) ?? undefined : undefined,
       })),
       pagination: {
         page,

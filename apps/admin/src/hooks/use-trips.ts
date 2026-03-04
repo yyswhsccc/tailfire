@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { createQueryKeys } from '@/lib/query-keys'
 import { buildQueryString } from '@/lib/query-params'
@@ -53,6 +53,7 @@ export function useTrips(filters: TripFilterDto = {}) {
 
       return api.get<PaginatedTripsResponseDto>(`/trips${query}`)
     },
+    placeholderData: keepPreviousData,
   })
 }
 
