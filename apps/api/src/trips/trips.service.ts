@@ -306,7 +306,7 @@ export class TripsService {
         SELECT 1 FROM trip_tags
         JOIN tags ON tags.id = trip_tags.tag_id
         WHERE trip_tags.trip_id = trips.id
-        AND tags.name = ANY(${filters.tags}::text[])
+        AND tags.name IN (${sql.join(filters.tags.map(t => sql`${t}`), sql`, `)})
         AND tags.agency_id = ${auth.agencyId}
         AND (tags.type = 'system' OR (tags.type = 'agent' AND tags.created_by = ${auth.userId}))
       )`)

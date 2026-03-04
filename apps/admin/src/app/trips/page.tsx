@@ -64,7 +64,7 @@ export default function TernTripsPage() {
   const [searchInput, setSearchInput] = useState('')
 
   // Fetch trips with server-side filtering
-  const { data, isLoading, error, refetch } = useTrips(filters)
+  const { data, isPending, error, refetch } = useTrips(filters)
 
   // Bulk operation mutations
   const bulkDelete = useBulkDeleteTrips()
@@ -249,7 +249,7 @@ export default function TernTripsPage() {
             Retry
           </Button>
         </div>
-      ) : isLoading ? (
+      ) : isPending ? (
         <TableSkeleton rows={8} />
       ) : trips.length === 0 && !hasActiveFilters ? (
         <EmptyState
