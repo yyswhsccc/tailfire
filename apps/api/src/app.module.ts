@@ -46,6 +46,8 @@ import { ClientPortalModule } from './client-portal/client-portal.module'
 import { LoyaltyProgramsModule } from './loyalty-programs/loyalty-programs.module'
 import { DocumentTemplatesModule } from './document-templates/document-templates.module'
 import { DocumentRenderModule } from './document-render/document-render.module'
+import { EnrichmentModule } from './enrichment/enrichment.module'
+import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
 
 @Module({
   imports: [
@@ -168,6 +170,12 @@ import { DocumentRenderModule } from './document-render/document-render.module'
 
     // Document Render (PDF generation via BullMQ + Puppeteer)
     DocumentRenderModule,
+
+    // Cruise catalog matching (shared between OCR import and enrichment)
+    CatalogMatcherModule,
+
+    // Activity enrichment (geocoding, cruise catalog, hotel photos)
+    EnrichmentModule,
   ],
   controllers: [AppController],
   providers: [

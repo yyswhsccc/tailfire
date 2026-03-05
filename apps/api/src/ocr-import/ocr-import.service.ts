@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
-import { eq, and, sql, inArray, ilike, gte, lte, desc, or, asc } from 'drizzle-orm'
+import { eq, and, sql, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { schema } from '@tailfire/database'
 import { OcrService } from '../ocr/ocr.service'
@@ -31,6 +31,7 @@ import { ActivityMediaService } from '../trips/activity-media.service'
 import { SuppliersService } from '../suppliers/suppliers.service'
 import { PaymentSchedulesService } from '../trips/payment-schedules.service'
 import { AutomationService } from '../automation/automation.service'
+import { CatalogMatcherService } from '../catalog-matcher/catalog-matcher.service'
 import type { AuthContext } from '../auth/auth.types'
 import type { OcrPreviewDto, OcrConfirmDto } from './dto/ocr-import.dto'
 import type {
@@ -48,13 +49,11 @@ import type {
   OcrCruiseData,
   PolicyDiff,
   PolicyFieldDiff,
-  CruisePortCall,
 } from '@tailfire/shared-types'
 import type { CreateTripTravelerDto } from '@tailfire/shared-types'
-import { addDays, parseISO, format } from 'date-fns'
 import { QUEUES, JOB_TYPES } from '../automation/automation.types'
 
-const { ocrImportJobs, ocrSupplierRunbooks, cruiseSailings, cruiseShips, cruiseShipImages, cruiseShipDecks, cruiseLines, cruisePorts, cruiseRegions, cruiseSailingRegions, cruiseSailingStops, customCruiseDetails } = schema
+const { ocrImportJobs, ocrSupplierRunbooks, cruiseShips, cruiseLines, customCruiseDetails } = schema
 
 /** Sync extraction timeout before falling back to async */
 const SYNC_TIMEOUT_MS = 90_000
@@ -80,6 +79,7 @@ export class OcrImportService {
     private readonly suppliersService: SuppliersService,
     private readonly paymentSchedulesService: PaymentSchedulesService,
     private readonly automationService: AutomationService,
+    private readonly catalogMatcher: CatalogMatcherService,
     @InjectQueue(QUEUES.OCR_PROCESSING) private readonly ocrQueue: Queue,
   ) {}
 
@@ -707,7 +707,7 @@ export class OcrImportService {
 
     // Enrich from Traveltek catalog (non-blocking)
     try {
-      const match = await this.matchCatalogSailing({
+      const match = await this.catalogMatcher.matchCatalogSailing({
         cruiseLineName: cruise.cruiseLineName,
         shipName: cruise.shipName,
         departureDate: cruise.departureDate,
@@ -725,7 +725,7 @@ export class OcrImportService {
           candidateCount: match.candidateCount,
         })
 
-        const enrichment = await this.enrichCruiseFromCatalog(match)
+        const enrichment = await this.catalogMatcher.enrichCruiseFromSailing(match)
 
         this.logger.log({
           message: 'Enriched cruise from catalog',
@@ -2434,7 +2434,7 @@ export class OcrImportService {
     let cruiseData: OcrCruiseData | null = extraction.cruise ? { ...extraction.cruise } : null
     if (cruiseData && extraction.documentType === 'cruise_confirmation') {
       try {
-        const match = await this.matchCatalogSailing({
+        const match = await this.catalogMatcher.matchCatalogSailing({
           cruiseLineName: cruiseData.cruiseLineName,
           shipName: cruiseData.shipName,
           departureDate: cruiseData.departureDate,
@@ -2655,490 +2655,4 @@ export class OcrImportService {
     return map[type.toLowerCase()] || 'transfer'
   }
 
-  // ============================================================================
-  // Cruise Catalog Matching & Enrichment
-  // ============================================================================
-
-  /**
-   * Normalize a name for fuzzy matching: trim, lowercase, strip punctuation.
-   */
-  private normalizeName(name: string | null | undefined): string {
-    if (!name) return ''
-    return name.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ')
-  }
-
-  /**
-   * Match OCR cruise extraction against catalog sailings using multi-tier strategy.
-   *
-   * Tiers (in order of reliability):
-   * 1. Voyage code + date (±7 days)
-   * 2. Ship + cruise line + date + nights (±1 day)
-   * 3. Ship + date + nights (±1 day)
-   * 4. Cruise line + embark port + date + nights (±1 day)
-   *
-   * Returns match result or null if no confident match.
-   */
-  private async matchCatalogSailing(params: {
-    cruiseLineName?: string | null
-    shipName?: string | null
-    departureDate?: string | null
-    voyageCode?: string | null
-    nights?: number | null
-    departurePort?: string | null
-  }): Promise<{
-    sailingId: string
-    strategy: string
-    score: number
-    candidateCount: number
-    sailDate: string
-    endDate: string
-    providerIdentifier: string
-    cruiseLineId: string
-    shipId: string
-    embarkPortId: string | null
-    disembarkPortId: string | null
-  } | null> {
-    const { cruiseLineName, shipName, departureDate, voyageCode, nights, departurePort } = params
-
-    if (!departureDate) return null
-
-    const sailDateParsed = parseISO(departureDate)
-
-    // Tier 1: Voyage code + date (±7 days)
-    if (voyageCode) {
-      const dateLow = format(addDays(sailDateParsed, -7), 'yyyy-MM-dd')
-      const dateHigh = format(addDays(sailDateParsed, 7), 'yyyy-MM-dd')
-
-      const candidates = await this.db.client
-        .select({
-          id: cruiseSailings.id,
-          sailDate: cruiseSailings.sailDate,
-          endDate: cruiseSailings.endDate,
-          providerIdentifier: cruiseSailings.providerIdentifier,
-          cruiseLineId: cruiseSailings.cruiseLineId,
-          shipId: cruiseSailings.shipId,
-          embarkPortId: cruiseSailings.embarkPortId,
-          disembarkPortId: cruiseSailings.disembarkPortId,
-          nights: cruiseSailings.nights,
-        })
-        .from(cruiseSailings)
-        .where(
-          and(
-            eq(cruiseSailings.voyageCode, voyageCode),
-            gte(cruiseSailings.sailDate, dateLow),
-            lte(cruiseSailings.sailDate, dateHigh),
-            eq(cruiseSailings.isActive, true),
-          ),
-        )
-        .limit(5)
-
-      if (candidates.length === 1) {
-        return {
-          sailingId: candidates[0]!.id,
-          strategy: 'voyage_code+date',
-          score: 5,
-          candidateCount: 1,
-          sailDate: candidates[0]!.sailDate,
-          endDate: candidates[0]!.endDate,
-          providerIdentifier: candidates[0]!.providerIdentifier,
-          cruiseLineId: candidates[0]!.cruiseLineId,
-          shipId: candidates[0]!.shipId,
-          embarkPortId: candidates[0]!.embarkPortId,
-          disembarkPortId: candidates[0]!.disembarkPortId,
-        }
-      }
-    }
-
-    const dateLow1 = format(addDays(sailDateParsed, -1), 'yyyy-MM-dd')
-    const dateHigh1 = format(addDays(sailDateParsed, 1), 'yyyy-MM-dd')
-
-    // Tier 2: Ship + cruise line + date + nights (±1 day)
-    if (shipName && cruiseLineName && nights) {
-      const normalizedShip = this.normalizeName(shipName)
-      const normalizedLine = this.normalizeName(cruiseLineName)
-
-      const candidates = await this.db.client
-        .select({
-          id: cruiseSailings.id,
-          sailDate: cruiseSailings.sailDate,
-          endDate: cruiseSailings.endDate,
-          providerIdentifier: cruiseSailings.providerIdentifier,
-          cruiseLineId: cruiseSailings.cruiseLineId,
-          shipId: cruiseSailings.shipId,
-          embarkPortId: cruiseSailings.embarkPortId,
-          disembarkPortId: cruiseSailings.disembarkPortId,
-          nights: cruiseSailings.nights,
-        })
-        .from(cruiseSailings)
-        .innerJoin(cruiseShips, eq(cruiseSailings.shipId, cruiseShips.id))
-        .innerJoin(cruiseLines, eq(cruiseSailings.cruiseLineId, cruiseLines.id))
-        .where(
-          and(
-            ilike(cruiseShips.name, `%${normalizedShip}%`),
-            ilike(cruiseLines.name, `%${normalizedLine}%`),
-            gte(cruiseSailings.sailDate, dateLow1),
-            lte(cruiseSailings.sailDate, dateHigh1),
-            eq(cruiseSailings.nights, nights),
-            eq(cruiseSailings.isActive, true),
-          ),
-        )
-        .limit(5)
-
-      if (candidates.length === 1) {
-        return {
-          sailingId: candidates[0]!.id,
-          strategy: 'ship+line+date+nights',
-          score: 4,
-          candidateCount: 1,
-          sailDate: candidates[0]!.sailDate,
-          endDate: candidates[0]!.endDate,
-          providerIdentifier: candidates[0]!.providerIdentifier,
-          cruiseLineId: candidates[0]!.cruiseLineId,
-          shipId: candidates[0]!.shipId,
-          embarkPortId: candidates[0]!.embarkPortId,
-          disembarkPortId: candidates[0]!.disembarkPortId,
-        }
-      }
-    }
-
-    // Tier 3: Ship + date + nights (±1 day)
-    if (shipName && nights) {
-      const normalizedShip = this.normalizeName(shipName)
-
-      const candidates = await this.db.client
-        .select({
-          id: cruiseSailings.id,
-          sailDate: cruiseSailings.sailDate,
-          endDate: cruiseSailings.endDate,
-          providerIdentifier: cruiseSailings.providerIdentifier,
-          cruiseLineId: cruiseSailings.cruiseLineId,
-          shipId: cruiseSailings.shipId,
-          embarkPortId: cruiseSailings.embarkPortId,
-          disembarkPortId: cruiseSailings.disembarkPortId,
-          nights: cruiseSailings.nights,
-        })
-        .from(cruiseSailings)
-        .innerJoin(cruiseShips, eq(cruiseSailings.shipId, cruiseShips.id))
-        .where(
-          and(
-            ilike(cruiseShips.name, `%${normalizedShip}%`),
-            gte(cruiseSailings.sailDate, dateLow1),
-            lte(cruiseSailings.sailDate, dateHigh1),
-            eq(cruiseSailings.nights, nights),
-            eq(cruiseSailings.isActive, true),
-          ),
-        )
-        .limit(5)
-
-      if (candidates.length === 1) {
-        return {
-          sailingId: candidates[0]!.id,
-          strategy: 'ship+date+nights',
-          score: 3,
-          candidateCount: 1,
-          sailDate: candidates[0]!.sailDate,
-          endDate: candidates[0]!.endDate,
-          providerIdentifier: candidates[0]!.providerIdentifier,
-          cruiseLineId: candidates[0]!.cruiseLineId,
-          shipId: candidates[0]!.shipId,
-          embarkPortId: candidates[0]!.embarkPortId,
-          disembarkPortId: candidates[0]!.disembarkPortId,
-        }
-      }
-    }
-
-    // Tier 4: Cruise line + embark port + date + nights (±1 day)
-    if (cruiseLineName && departurePort && nights) {
-      const normalizedLine = this.normalizeName(cruiseLineName)
-      const normalizedPort = this.normalizeName(departurePort)
-
-      const candidates = await this.db.client
-        .select({
-          id: cruiseSailings.id,
-          sailDate: cruiseSailings.sailDate,
-          endDate: cruiseSailings.endDate,
-          providerIdentifier: cruiseSailings.providerIdentifier,
-          cruiseLineId: cruiseSailings.cruiseLineId,
-          shipId: cruiseSailings.shipId,
-          embarkPortId: cruiseSailings.embarkPortId,
-          disembarkPortId: cruiseSailings.disembarkPortId,
-          nights: cruiseSailings.nights,
-        })
-        .from(cruiseSailings)
-        .innerJoin(cruiseLines, eq(cruiseSailings.cruiseLineId, cruiseLines.id))
-        .leftJoin(cruisePorts, eq(cruiseSailings.embarkPortId, cruisePorts.id))
-        .where(
-          and(
-            ilike(cruiseLines.name, `%${normalizedLine}%`),
-            or(
-              ilike(cruisePorts.name, `%${normalizedPort}%`),
-              ilike(cruiseSailings.embarkPortName, `%${normalizedPort}%`),
-            ),
-            gte(cruiseSailings.sailDate, dateLow1),
-            lte(cruiseSailings.sailDate, dateHigh1),
-            eq(cruiseSailings.nights, nights),
-            eq(cruiseSailings.isActive, true),
-          ),
-        )
-        .limit(5)
-
-      if (candidates.length === 1) {
-        return {
-          sailingId: candidates[0]!.id,
-          strategy: 'line+port+date+nights',
-          score: 3,
-          candidateCount: 1,
-          sailDate: candidates[0]!.sailDate,
-          endDate: candidates[0]!.endDate,
-          providerIdentifier: candidates[0]!.providerIdentifier,
-          cruiseLineId: candidates[0]!.cruiseLineId,
-          shipId: candidates[0]!.shipId,
-          embarkPortId: candidates[0]!.embarkPortId,
-          disembarkPortId: candidates[0]!.disembarkPortId,
-        }
-      }
-    }
-
-    return null
-  }
-
-  /**
-   * Enrich a cruise activity from the Traveltek catalog.
-   * Replicates the enrichment pattern from import-booking.service.ts:enrichFromCatalog()
-   *
-   * Fetches: sailing stops → port calls, region, ship image/class, port timezones & GPS coordinates.
-   * Synthesizes dates from sailDate + dayNumber for each stop.
-   */
-  private async enrichCruiseFromCatalog(match: {
-    sailingId: string
-    sailDate: string
-    endDate: string
-    providerIdentifier: string
-    cruiseLineId: string
-    shipId: string
-    embarkPortId: string | null
-    disembarkPortId: string | null
-  }): Promise<{
-    portCallsJson: CruisePortCall[]
-    cruiseLineId: string
-    cruiseShipId: string
-    cruiseRegionId: string | null
-    region: string | null
-    shipImageUrl: string | null
-    shipClass: string | null
-    shipGalleryImages: Array<{ url: string; caption?: string; isHero?: boolean }>
-    deckPlanImages: Array<{ url: string; caption: string }>
-    cruiseLineLogo: string | null
-    departurePortId: string | null
-    arrivalPortId: string | null
-    departureTimezone: string | null
-    arrivalTimezone: string | null
-    departurePort: string | null
-    arrivalPort: string | null
-    canonicalSailDate: string
-    canonicalEndDate: string
-  }> {
-    const result = {
-      portCallsJson: [] as CruisePortCall[],
-      cruiseLineId: match.cruiseLineId,
-      cruiseShipId: match.shipId,
-      cruiseRegionId: null as string | null,
-      region: null as string | null,
-      shipImageUrl: null as string | null,
-      shipClass: null as string | null,
-      shipGalleryImages: [] as Array<{ url: string; caption?: string; isHero?: boolean }>,
-      deckPlanImages: [] as Array<{ url: string; caption: string }>,
-      cruiseLineLogo: null as string | null,
-      departurePortId: match.embarkPortId,
-      arrivalPortId: match.disembarkPortId,
-      departureTimezone: null as string | null,
-      arrivalTimezone: null as string | null,
-      departurePort: null as string | null,
-      arrivalPort: null as string | null,
-      canonicalSailDate: match.sailDate,
-      canonicalEndDate: match.endDate,
-    }
-
-    // 1. Fetch sailing stops and synthesize dates from sailDate + dayNumber
-    try {
-      const stops = await this.db.client
-        .select({
-          dayNumber: cruiseSailingStops.dayNumber,
-          portName: cruiseSailingStops.portName,
-          portId: cruiseSailingStops.portId,
-          isSeaDay: cruiseSailingStops.isSeaDay,
-          arrivalTime: cruiseSailingStops.arrivalTime,
-          departureTime: cruiseSailingStops.departureTime,
-          sequenceOrder: cruiseSailingStops.sequenceOrder,
-          // Join port for GPS coordinates
-          portLatitude: cruisePorts.metadata,
-        })
-        .from(cruiseSailingStops)
-        .leftJoin(cruisePorts, eq(cruiseSailingStops.portId, cruisePorts.id))
-        .where(eq(cruiseSailingStops.sailingId, match.sailingId))
-        .orderBy(asc(cruiseSailingStops.dayNumber), asc(cruiseSailingStops.sequenceOrder))
-
-      const sailDateParsed = parseISO(match.sailDate)
-
-      result.portCallsJson = stops.map((stop) => {
-        const stopDate = format(addDays(sailDateParsed, stop.dayNumber - 1), 'yyyy-MM-dd')
-        const portMeta = stop.portLatitude as Record<string, any> | null
-
-        return {
-          day: stop.dayNumber,
-          portName: stop.portName,
-          portId: stop.portId || undefined,
-          arriveDate: stopDate,
-          departDate: stopDate,
-          arriveTime: stop.arrivalTime || '',
-          departTime: stop.departureTime || '',
-          isSeaDay: stop.isSeaDay || false,
-          latitude: portMeta?.latitude ? String(portMeta.latitude) : undefined,
-          longitude: portMeta?.longitude ? String(portMeta.longitude) : undefined,
-        }
-      })
-    } catch (e) {
-      this.logger.warn(`Failed to fetch sailing stops for ${match.sailingId}: ${(e as Error).message}`)
-    }
-
-    // 2. Region lookup from sailing_regions
-    try {
-      const [sailingRegion] = await this.db.client
-        .select({ regionId: cruiseSailingRegions.regionId })
-        .from(cruiseSailingRegions)
-        .where(eq(cruiseSailingRegions.sailingId, match.sailingId))
-        .orderBy(desc(cruiseSailingRegions.isPrimary))
-        .limit(1)
-
-      if (sailingRegion) {
-        result.cruiseRegionId = sailingRegion.regionId
-
-        const [region] = await this.db.client
-          .select({ name: cruiseRegions.name })
-          .from(cruiseRegions)
-          .where(eq(cruiseRegions.id, sailingRegion.regionId))
-          .limit(1)
-
-        if (region) {
-          result.region = region.name
-        }
-      }
-    } catch (e) {
-      this.logger.warn(`Failed to enrich region for sailing ${match.sailingId}: ${(e as Error).message}`)
-    }
-
-    // 3. Ship enrichment (image, class, gallery, deck plans)
-    try {
-      const [ship] = await this.db.client
-        .select({
-          imageUrl: cruiseShips.imageUrl,
-          shipClass: cruiseShips.shipClass,
-        })
-        .from(cruiseShips)
-        .where(eq(cruiseShips.id, match.shipId))
-        .limit(1)
-
-      if (ship) {
-        result.shipImageUrl = ship.imageUrl
-        result.shipClass = ship.shipClass
-      }
-
-      // Ship gallery images from normalized table
-      const galleryImages = await this.db.client
-        .select({
-          imageUrl: cruiseShipImages.imageUrl,
-          altText: cruiseShipImages.altText,
-          isHero: cruiseShipImages.isHero,
-        })
-        .from(cruiseShipImages)
-        .where(and(
-          eq(cruiseShipImages.shipId, match.shipId),
-          eq(cruiseShipImages.isActive, true),
-        ))
-        .orderBy(asc(cruiseShipImages.displayOrder))
-
-      result.shipGalleryImages = galleryImages.map((img) => ({
-        url: img.imageUrl,
-        caption: img.altText || undefined,
-        isHero: img.isHero,
-      }))
-
-      // Deck plan images
-      const decks = await this.db.client
-        .select({
-          deckPlanUrl: cruiseShipDecks.deckPlanUrl,
-          name: cruiseShipDecks.name,
-        })
-        .from(cruiseShipDecks)
-        .where(and(
-          eq(cruiseShipDecks.shipId, match.shipId),
-          eq(cruiseShipDecks.isActive, true),
-        ))
-        .orderBy(asc(cruiseShipDecks.displayOrder))
-
-      result.deckPlanImages = decks
-        .filter((d) => d.deckPlanUrl)
-        .map((d) => ({
-          url: d.deckPlanUrl!,
-          caption: `Deck Plan — ${d.name}`,
-        }))
-    } catch (e) {
-      this.logger.warn(`Failed to enrich ship for sailing ${match.sailingId}: ${(e as Error).message}`)
-    }
-
-    // 3b. Cruise line logo
-    try {
-      const [line] = await this.db.client
-        .select({ metadata: cruiseLines.metadata })
-        .from(cruiseLines)
-        .where(eq(cruiseLines.id, match.cruiseLineId))
-        .limit(1)
-
-      const lineMeta = line?.metadata as Record<string, any> | null
-      if (lineMeta?.logo_url) {
-        result.cruiseLineLogo = lineMeta.logo_url
-      }
-    } catch (e) {
-      this.logger.warn(`Failed to enrich cruise line logo: ${(e as Error).message}`)
-    }
-
-    // 4. Port timezone enrichment + port names
-    try {
-      if (match.embarkPortId) {
-        const [embarkPort] = await this.db.client
-          .select({ metadata: cruisePorts.metadata, name: cruisePorts.name })
-          .from(cruisePorts)
-          .where(eq(cruisePorts.id, match.embarkPortId))
-          .limit(1)
-
-        const embarkMeta = embarkPort?.metadata as Record<string, any> | null
-        if (embarkMeta?.timezone) {
-          result.departureTimezone = embarkMeta.timezone
-        }
-        if (embarkPort?.name) {
-          result.departurePort = embarkPort.name
-        }
-      }
-
-      if (match.disembarkPortId) {
-        const [disembarkPort] = await this.db.client
-          .select({ metadata: cruisePorts.metadata, name: cruisePorts.name })
-          .from(cruisePorts)
-          .where(eq(cruisePorts.id, match.disembarkPortId))
-          .limit(1)
-
-        const disembarkMeta = disembarkPort?.metadata as Record<string, any> | null
-        if (disembarkMeta?.timezone) {
-          result.arrivalTimezone = disembarkMeta.timezone
-        }
-        if (disembarkPort?.name) {
-          result.arrivalPort = disembarkPort.name
-        }
-      }
-    } catch (e) {
-      this.logger.warn(`Failed to enrich port timezones: ${(e as Error).message}`)
-    }
-
-    return result
-  }
 }

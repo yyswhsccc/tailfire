@@ -62,6 +62,8 @@ export const JOB_TYPES = {
 
   // Enrichment jobs
   HOTEL_PHOTO_ENRICHMENT: 'hotel.photo_enrichment',
+  CRUISE_CATALOG_ENRICHMENT: 'cruise.catalog_enrichment',
+  ACTIVITY_GEOCODING: 'activity.geocoding',
 
   // Notification jobs
   NOTIFICATION_SEND: 'notification.send',
@@ -230,6 +232,36 @@ export interface HotelPhotoEnrichmentJobData {
   agencyId: string
   userId: string
   maxPhotos?: number
+}
+
+/**
+ * Cruise catalog enrichment job — matches against Traveltek catalog and enriches with ship photos, port calls, region
+ */
+export interface CruiseCatalogEnrichmentJobData {
+  type: 'cruise.catalog_enrichment'
+  activityId: string
+  cruiseLineName?: string | null
+  shipName?: string | null
+  departureDate?: string | null
+  nights?: number | null
+  departurePort?: string | null
+  voyageCode?: string | null
+  agencyId: string
+}
+
+/**
+ * Activity geocoding job — resolves location to coordinates based on activity type
+ */
+export interface ActivityGeocodingJobData {
+  type: 'activity.geocoding'
+  activityId: string
+  activityType: string
+  propertyName?: string | null
+  address?: string | null
+  departureAirportCode?: string | null
+  locationName?: string | null
+  portName?: string | null
+  agencyId: string
 }
 
 // ============================================================================

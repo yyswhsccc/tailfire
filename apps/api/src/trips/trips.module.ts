@@ -164,6 +164,7 @@ import { TripSharesService } from './trip-shares.service'
     ActivityMediaService,
     StorageService,
     StorageProviderFactory,
+    GeocodingService,
     // Additional exports for TemplatesModule
     ComponentOrchestrationService,
     BaseComponentService,
