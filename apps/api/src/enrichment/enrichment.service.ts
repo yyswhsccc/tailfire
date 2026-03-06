@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { eq, and, isNotNull, inArray } from 'drizzle-orm'
+import { eq, and, or, isNotNull, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { AutomationService } from '../automation/automation.service'
 import { TripsService } from '../trips/trips.service'
@@ -8,7 +8,7 @@ import { schema } from '@tailfire/database'
 import { QUEUES, JOB_TYPES } from '../automation/automation.types'
 import type { AuthContext } from '../auth/auth.types'
 
-const { itineraryActivities, customCruiseDetails, flightDetails, lodgingDetails, itineraries, trips } = schema
+const { itineraryActivities, customCruiseDetails, flightDetails, lodgingDetails, itineraryDays, itineraries, trips } = schema
 
 interface BackfillResult {
   totalTrips: number
@@ -34,6 +34,7 @@ export class EnrichmentService {
       .select({
         id: itineraryActivities.id,
         tripId: itineraryActivities.tripId,
+        itineraryDayId: itineraryActivities.itineraryDayId,
         componentType: itineraryActivities.componentType,
         name: itineraryActivities.name,
         location: itineraryActivities.location,
@@ -49,8 +50,22 @@ export class EnrichmentService {
       throw new NotFoundException(`Activity ${activityId} not found`)
     }
 
+    // Resolve tripId: either direct (floating packages) or through day hierarchy
+    let tripId = activity.tripId
+    if (!tripId && activity.itineraryDayId) {
+      const [dayInfo] = await this.db.client
+        .select({ tripId: itineraries.tripId })
+        .from(itineraryDays)
+        .innerJoin(itineraries, eq(itineraryDays.itineraryId, itineraries.id))
+        .where(eq(itineraryDays.id, activity.itineraryDayId))
+        .limit(1)
+      tripId = dayInfo?.tripId ?? null
+    }
+
     // Verify caller has write access to the trip
-    await this.tripAccessService.verifyWriteAccess(activity.tripId, auth)
+    if (tripId) {
+      await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    }
 
     const jobIds: string[] = []
 
@@ -190,10 +205,24 @@ export class EnrichmentService {
   async enrichTrip(tripId: string, auth: AuthContext): Promise<{ activityCount: number; jobIds: string[] }> {
     await this.tripAccessService.verifyWriteAccess(tripId, auth)
 
-    const activities = await this.db.client
+    // Activities are linked to trips through the day hierarchy:
+    // itinerary_activities → itinerary_days → itineraries → trips
+    // Some floating activities (packages) have trip_id set directly
+    const activitiesViaDays = await this.db.client
+      .selectDistinct({ id: itineraryActivities.id })
+      .from(itineraryActivities)
+      .innerJoin(itineraryDays, eq(itineraryActivities.itineraryDayId, itineraryDays.id))
+      .innerJoin(itineraries, eq(itineraryDays.itineraryId, itineraries.id))
+      .where(and(eq(itineraries.tripId, tripId), eq(itineraryActivities.agencyId, auth.agencyId)))
+
+    const floatingActivities = await this.db.client
       .select({ id: itineraryActivities.id })
       .from(itineraryActivities)
       .where(and(eq(itineraryActivities.tripId, tripId), eq(itineraryActivities.agencyId, auth.agencyId)))
+
+    // Merge and deduplicate
+    const activityIds = new Set([...activitiesViaDays.map(a => a.id), ...floatingActivities.map(a => a.id)])
+    const activities = Array.from(activityIds).map(id => ({ id }))
 
     const allJobIds: string[] = []
     for (const activity of activities) {
