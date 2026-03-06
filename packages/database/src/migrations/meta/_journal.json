@@ -988,6 +988,55 @@
       "when": 1772251200000,
       "tag": "20260228140000_rebrand_document_templates_phoenix_voyages",
       "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "7",
+      "when": 1772755200000,
+      "tag": "20260304100000_add_tour_operators_supplier_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 142,
+      "version": "7",
+      "when": 1772758800000,
+      "tag": "20260304110000_commission_system",
+      "breakpoints": true
+    },
+    {
+      "idx": 143,
+      "version": "7",
+      "when": 1772762400000,
+      "tag": "20260304200000_add_settlement_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 144,
+      "version": "7",
+      "when": 1772841600000,
+      "tag": "20260305120000_calendar_display_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 145,
+      "version": "7",
+      "when": 1772852400000,
+      "tag": "20260305150000_create_traveler_bookings",
+      "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "7",
+      "when": 1772856000000,
+      "tag": "20260305160000_add_traveler_booking_to_payment_schedule",
+      "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "7",
+      "when": 1772942400000,
+      "tag": "20260306120000_add_insurance_activity_type",
+      "breakpoints": true
     }
   ]
 }

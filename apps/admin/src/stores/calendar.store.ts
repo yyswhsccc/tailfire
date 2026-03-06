@@ -26,6 +26,7 @@ const DEFAULT_EVENT_TYPES: CalendarEventType[] = [
   'payment_final',
   'birthday',
   'trip',
+  'activity',
   'event',
   'scheduled_email',
 ]
@@ -63,6 +64,20 @@ export const useCalendarStore = create<CalendarState>()(
     }),
     {
       name: 'calendar-preferences',
+      merge: (persisted, current) => {
+        const merged = { ...current, ...(persisted as Partial<CalendarState>) }
+        // Ensure newly added event types are included for users with persisted state
+        const persistedTypes = (persisted as Partial<CalendarState>)?.enabledEventTypes
+        if (persistedTypes) {
+          const missingTypes = DEFAULT_EVENT_TYPES.filter(
+            (t) => !persistedTypes.includes(t)
+          )
+          if (missingTypes.length > 0) {
+            merged.enabledEventTypes = [...persistedTypes, ...missingTypes]
+          }
+        }
+        return merged
+      },
     }
   )
 )

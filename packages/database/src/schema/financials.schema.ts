@@ -273,6 +273,9 @@ export const agencySettings = pgTable(
     complianceDisclaimerText: text('compliance_disclaimer_text'),
     insuranceWaiverText: text('insurance_waiver_text'),
 
+    // Commission fee (Tailfire technology fee, deducted from net commission before agent split)
+    commissionFeeRate: decimal('commission_fee_rate', { precision: 5, scale: 2 }).notNull().default('5.00'),
+
     // Branding for PDFs
     logoUrl: text('logo_url'),
     primaryColor: varchar('primary_color', { length: 7 }), // Hex color

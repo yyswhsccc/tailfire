@@ -46,6 +46,7 @@ export type TripInsurancePackageDto = {
   termsUrl: string | null
   isFromCatalog: boolean
   displayOrder: number
+  activityId: string | null
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -66,6 +67,7 @@ export type CreateTripInsurancePackageDto = {
   coverageEndDate?: string | null
   coverageDetails?: Record<string, unknown> | null
   termsUrl?: string | null
+  activityId?: string | null
   isFromCatalog?: boolean
   displayOrder?: number
   isActive?: boolean
@@ -86,6 +88,7 @@ export type UpdateTripInsurancePackageDto = {
   coverageEndDate?: string | null
   coverageDetails?: Record<string, unknown> | null
   termsUrl?: string | null
+  activityId?: string | null
   isFromCatalog?: boolean
   displayOrder?: number
   isActive?: boolean

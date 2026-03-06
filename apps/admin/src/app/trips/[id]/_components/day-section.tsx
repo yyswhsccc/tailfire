@@ -35,9 +35,10 @@ interface DaySectionProps {
   day: ItineraryDayWithActivitiesDto
   itineraryId: string
   cruiseColorMap?: Map<string, CruiseColorSet>
+  calendarDisplayMode?: 'trip' | 'activities'
 }
 
-export function DaySection({ day, itineraryId, cruiseColorMap }: DaySectionProps) {
+export function DaySection({ day, itineraryId, cruiseColorMap, calendarDisplayMode }: DaySectionProps) {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const { toast } = useToast()
@@ -178,6 +179,7 @@ export function DaySection({ day, itineraryId, cruiseColorMap }: DaySectionProps
                       dayId={day.id}
                       dayDate={day.date}
                       cruiseColor={cruiseColorMap?.get(activity.id)}
+                      calendarDisplayMode={calendarDisplayMode}
                     />
                   ))}
                 </div>

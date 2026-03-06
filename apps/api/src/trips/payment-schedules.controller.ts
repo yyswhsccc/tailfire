@@ -117,6 +117,44 @@ export class PaymentSchedulesController {
   }
 
   /**
+   * Get payment schedule config by traveler booking ID
+   * GET /payment-schedules/traveler-booking/:travelerBookingId
+   *
+   * Access check: User must have read access to the trip.
+   */
+  @Get('traveler-booking/:travelerBookingId')
+  async getByTravelerBookingId(
+    @GetAuthContext() auth: AuthContext,
+    @Param('travelerBookingId') travelerBookingId: string,
+  ): Promise<PaymentScheduleConfigDto | null> {
+    const tripId = await this.paymentSchedulesService.getTripIdFromTravelerBookingId(travelerBookingId)
+    if (!tripId) {
+      throw new NotFoundException(`Traveler booking with ID ${travelerBookingId} not found`)
+    }
+    await this.tripAccessService.verifyReadAccess(tripId, auth)
+    return this.paymentSchedulesService.findByTravelerBookingId(travelerBookingId)
+  }
+
+  /**
+   * Get all payment schedule configs for an activity pricing (global + per-traveler)
+   * GET /payment-schedules/activity-pricing/:activityPricingId/all
+   *
+   * Access check: User must have read access to the trip.
+   */
+  @Get('activity-pricing/:activityPricingId/all')
+  async getAllByActivityPricingId(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityPricingId') activityPricingId: string,
+  ): Promise<PaymentScheduleConfigDto[]> {
+    const tripId = await this.paymentSchedulesService.getTripIdFromActivityPricingId(activityPricingId)
+    if (!tripId) {
+      throw new NotFoundException(`Activity pricing with ID ${activityPricingId} not found`)
+    }
+    await this.tripAccessService.verifyReadAccess(tripId, auth)
+    return this.paymentSchedulesService.findAllByActivityPricingId(activityPricingId)
+  }
+
+  /**
    * Delete payment schedule configuration (cascades to expected payment items)
    * DELETE /payment-schedules/activity-pricing/:activityPricingId
    *

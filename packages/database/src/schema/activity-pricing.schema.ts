@@ -8,6 +8,7 @@ import { pgTable, pgEnum, uuid, varchar, decimal, text, date, timestamp, integer
 import { relations } from 'drizzle-orm'
 import { itineraryActivities } from './activities.schema'
 import { contacts } from './contacts.schema'
+import { travelerBookings } from './traveler-bookings.schema'
 
 // Reuse pricing type enum from activities
 import { pricingTypeEnum } from './activities.schema'
@@ -102,24 +103,43 @@ export const commissionTracking = pgTable('commission_tracking', {
     .notNull()
     .references(() => activityPricing.id, { onDelete: 'cascade' }),
 
+  // Legacy fields (kept for backwards compatibility with financial-summary.service.ts)
   commissionRate: decimal('commission_rate', { precision: 5, scale: 2 }), // Percentage (e.g., 10.00 for 10%)
   commissionAmount: decimal('commission_amount', { precision: 10, scale: 2 }).notNull(),
   commissionStatus: commissionStatusEnum('commission_status').notNull().default('pending'),
   notes: text('notes'),
+
+  // Enhanced commission fields (cents-based, tax-aware)
+  grossCommissionCents: integer('gross_commission_cents'),
+  taxAmountCents: integer('tax_amount_cents').default(0),
+  taxType: varchar('tax_type', { length: 50 }),
+  netCommissionCents: integer('net_commission_cents'),
+  receivedCents: integer('received_cents').default(0),
+  paidCents: integer('paid_cents').default(0),
+  adjustmentCents: integer('adjustment_cents').default(0),
+  receivedParentCents: integer('received_parent_cents').default(0),
+  platformFeeCents: integer('platform_fee_cents').default(0),
+  source: varchar('source', { length: 100 }).default('manual'),
+  sourceBookingRef: varchar('source_booking_ref', { length: 255 }),
 
   // Audit fields
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-// Payment Schedule Config (1:1 with activity_pricing)
+// Payment Schedule Config (1:many with activity_pricing, keyed by traveler_booking_id)
 // NOTE: Uses component_pricing_id in DB (legacy name), mapped to activityPricingId in code
+// When traveler_booking_id IS NULL → global schedule (one per activity pricing)
+// When traveler_booking_id IS NOT NULL → per-traveler schedule (one per traveler booking)
 export const paymentScheduleConfig = pgTable('payment_schedule_config', {
   id: uuid('id').primaryKey().defaultRandom(),
   activityPricingId: uuid('component_pricing_id')
     .notNull()
-    .unique()
     .references(() => activityPricing.id, { onDelete: 'cascade' }),
+
+  // Per-traveler booking reference (nullable: NULL = global schedule)
+  travelerBookingId: uuid('traveler_booking_id')
+    .references(() => travelerBookings.id, { onDelete: 'cascade' }),
 
   // Schedule configuration
   scheduleType: scheduleTypeEnum('schedule_type').notNull().default('full'),
@@ -225,10 +245,7 @@ export const activityPricingRelations = relations(activityPricing, ({ one, many 
   }),
   paymentSchedule: many(paymentSchedule),
   commissionTracking: many(commissionTracking),
-  paymentScheduleConfig: one(paymentScheduleConfig, {
-    fields: [activityPricing.id],
-    references: [paymentScheduleConfig.activityPricingId],
-  }),
+  paymentScheduleConfigs: many(paymentScheduleConfig),
 }))
 
 export const paymentScheduleRelations = relations(paymentSchedule, ({ one }) => ({
@@ -249,6 +266,10 @@ export const paymentScheduleConfigRelations = relations(paymentScheduleConfig, (
   activityPricing: one(activityPricing, {
     fields: [paymentScheduleConfig.activityPricingId],
     references: [activityPricing.id],
+  }),
+  travelerBooking: one(travelerBookings, {
+    fields: [paymentScheduleConfig.travelerBookingId],
+    references: [travelerBookings.id],
   }),
   expectedPaymentItems: many(expectedPaymentItems),
   creditCardGuarantee: one(creditCardGuarantee, {

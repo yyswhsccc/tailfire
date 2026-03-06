@@ -164,6 +164,7 @@ export class TripsService {
         externalReference: dto.externalReference,
         currency: dto.currency || 'CAD',
         estimatedTotalCost: dto.estimatedTotalCost?.toString(),
+        commissionFeeRateOverride: dto.commissionFeeRateOverride?.toString(),
         customFields: dto.customFields,
         timezone: dto.timezone,
       })
@@ -350,6 +351,7 @@ export class TripsService {
         externalReference: this.db.schema.trips.externalReference,
         currency: this.db.schema.trips.currency,
         estimatedTotalCost: this.db.schema.trips.estimatedTotalCost,
+        commissionFeeRateOverride: this.db.schema.trips.commissionFeeRateOverride,
         tags: this.db.schema.trips.tags,
         customFields: this.db.schema.trips.customFields,
         isArchived: this.db.schema.trips.isArchived,
@@ -358,6 +360,7 @@ export class TripsService {
         pricingVisibility: this.db.schema.trips.pricingVisibility,
         allowPdfDownloads: this.db.schema.trips.allowPdfDownloads,
         itineraryStyle: this.db.schema.trips.itineraryStyle,
+        calendarDisplayMode: this.db.schema.trips.calendarDisplayMode,
         createdAt: this.db.schema.trips.createdAt,
         updatedAt: this.db.schema.trips.updatedAt,
         coverPhotoUrl: coverPhotoSubquery,
@@ -471,6 +474,7 @@ export class TripsService {
         externalReference: this.db.schema.trips.externalReference,
         currency: this.db.schema.trips.currency,
         estimatedTotalCost: this.db.schema.trips.estimatedTotalCost,
+        commissionFeeRateOverride: this.db.schema.trips.commissionFeeRateOverride,
         tags: this.db.schema.trips.tags,
         customFields: this.db.schema.trips.customFields,
         isArchived: this.db.schema.trips.isArchived,
@@ -479,6 +483,7 @@ export class TripsService {
         pricingVisibility: this.db.schema.trips.pricingVisibility,
         allowPdfDownloads: this.db.schema.trips.allowPdfDownloads,
         itineraryStyle: this.db.schema.trips.itineraryStyle,
+        calendarDisplayMode: this.db.schema.trips.calendarDisplayMode,
         createdAt: this.db.schema.trips.createdAt,
         updatedAt: this.db.schema.trips.updatedAt,
         coverPhotoUrl: coverPhotoSubquery,
@@ -1319,7 +1324,10 @@ export class TripsService {
       ? await this.db.client
           .select()
           .from(this.db.schema.paymentScheduleConfig)
-          .where(inArray(this.db.schema.paymentScheduleConfig.activityPricingId, pricingIds))
+          .where(and(
+            inArray(this.db.schema.paymentScheduleConfig.activityPricingId, pricingIds),
+            isNull(this.db.schema.paymentScheduleConfig.travelerBookingId)
+          ))
       : []
 
     // Create a map of activityPricingId -> scheduleConfig
@@ -1477,10 +1485,12 @@ export class TripsService {
       pricingVisibility: trip.pricingVisibility,
       allowPdfDownloads: trip.allowPdfDownloads,
       itineraryStyle: trip.itineraryStyle,
+      calendarDisplayMode: trip.calendarDisplayMode || 'trip',
       coverPhotoUrl: trip.coverPhotoUrl || null,
       shareToken: trip.shareToken || null,
       tripGroupId: trip.tripGroupId || null,
       clientSelectedItineraryId: trip.clientSelectedItineraryId || null,
+      commissionFeeRateOverride: trip.commissionFeeRateOverride ?? null,
       createdAt: trip.createdAt.toISOString(),
       updatedAt: trip.updatedAt.toISOString(),
     }

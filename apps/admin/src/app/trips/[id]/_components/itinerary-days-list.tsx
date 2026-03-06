@@ -174,6 +174,7 @@ export function ItineraryDaysList({ trip, itinerary, responseMap, commentCounts 
                         cruiseColorMap={cruiseColorMap}
                         responseMap={responseMap}
                         commentCounts={commentCounts}
+                        calendarDisplayMode={trip.calendarDisplayMode}
                       />
                     ))}
                   </div>

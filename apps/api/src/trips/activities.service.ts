@@ -13,6 +13,7 @@ import { StorageService } from './storage.service'
 import { TravellerSplitsService } from '../financials/traveller-splits.service'
 import { ActivityTotalsService } from './activity-totals.service'
 import { ActivityTravelersService } from './activity-travelers.service'
+import { TravelerBookingsService } from './traveler-bookings.service'
 import { AuditEvent } from '../activity-logs/events/audit.event'
 import { sanitizeForAudit, computeAuditDiff } from '../activity-logs/audit-sanitizer'
 import type {
@@ -45,6 +46,7 @@ export class ActivitiesService {
     private readonly eventEmitter: EventEmitter2,
     private readonly activityTotalsService: ActivityTotalsService,
     private readonly activityTravelersService: ActivityTravelersService,
+    private readonly travelerBookingsService: TravelerBookingsService,
     private readonly tripAccessService: TripAccessService,
   ) {}
 
@@ -343,10 +345,11 @@ export class ActivitiesService {
     const activityId = activity.id
 
     // Fetch all package-related data in parallel
-    const [packageDetails, children, travelers, totals, tripId] = await Promise.all([
+    const [packageDetails, children, travelers, travelerBookings, totals, tripId] = await Promise.all([
       this.getPackageDetails(activityId),
       this.getLinkedActivitiesWithDayInfo(activityId),
       this.activityTravelersService.findByActivityId(activityId),
+      this.travelerBookingsService.findByActivityId(activityId),
       this.activityTotalsService.calculatePackageTotal(activityId),
       this.getTripIdForActivity(activityId),
     ])
@@ -402,6 +405,7 @@ export class ActivitiesService {
         travelerName: t.travelerName,
         createdAt: t.createdAt,
       })),
+      travelerBookings,
       totalPriceCents: totals.totalCost,
       totalPaidCents: totals.totalPaid,
       totalUnpaidCents: totals.totalUnpaid,
@@ -795,6 +799,7 @@ export class ActivitiesService {
         ...(dto.confirmationNumber !== undefined && { confirmationNumber: dto.confirmationNumber }),
         ...(dto.status && { status: dto.status }),
         ...(dto.isBooked !== undefined && { isBooked: dto.isBooked }),
+        ...(dto.isVisibleInCalendar !== undefined && { isVisibleInCalendar: dto.isVisibleInCalendar }),
         ...(dto.bookingDate !== undefined && {
           bookingDate: dto.bookingDate ? new Date(dto.bookingDate) : null
         }),
@@ -1170,6 +1175,7 @@ export class ActivitiesService {
       confirmationNumber: activity.confirmationNumber || null,
       // Booking tracking
       isBooked: activity.isBooked ?? false,
+      isVisibleInCalendar: activity.isVisibleInCalendar ?? true,
       bookingDate: activity.bookingDate?.toISOString() || null,
       bookingId: activity.bookingId || null,
       pricing: null, // Pricing comes from activity_pricing table, fetched separately
@@ -2325,6 +2331,7 @@ export class ActivitiesService {
         } : null,
         activities: [], // Not fetched for list view - use children endpoint
         travelers: [], // Not fetched for list view
+        travelerBookings: [], // Not fetched for list view
         pricing: pricing ? {
           totalPriceCents: pricing.totalPriceCents ?? 0,
           currency: pricing.currency ?? 'CAD',
@@ -2480,7 +2487,7 @@ export class ActivitiesService {
         // Note: agencyId not stored in paymentScheduleConfig - it's on activityPricing
         scheduleType: 'full', // Use 'full' as default (pay entire balance upfront)
       })
-      .onConflictDoNothing({ target: this.db.schema.paymentScheduleConfig.activityPricingId })
+      .onConflictDoNothing()
   }
 
   /**

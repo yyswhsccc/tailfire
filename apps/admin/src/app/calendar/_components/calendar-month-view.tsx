@@ -36,6 +36,7 @@ import {
   Plane,
   Mail,
   CalendarCheck,
+  CalendarDays,
 } from 'lucide-react'
 import type { CalendarEventType } from '@tailfire/shared-types/api'
 
@@ -47,6 +48,7 @@ const EVENT_ICONS: Record<CalendarEventType, typeof CheckSquare> = {
   trip: Plane,
   scheduled_email: Mail,
   event: CalendarCheck,
+  activity: CalendarDays,
 }
 
 // Layout constants
