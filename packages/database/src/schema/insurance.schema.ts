@@ -8,6 +8,7 @@
 import { pgTable, pgEnum, uuid, varchar, text, date, timestamp, integer, boolean, jsonb, unique } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { trips, tripTravelers } from './trips.schema'
+import { itineraryActivities } from './activities.schema'
 
 // ============================================================================
 // ENUMS
@@ -61,6 +62,9 @@ export const tripInsurancePackages = pgTable('trip_insurance_packages', {
   // Extended details (flexible JSON for medical limits, evacuation coverage, etc.)
   coverageDetails: jsonb('coverage_details'),
   termsUrl: text('terms_url'),
+
+  // Link to itinerary activity (for pricing, commission, payment schedules)
+  activityId: uuid('activity_id').references(() => itineraryActivities.id, { onDelete: 'set null' }),
 
   // Source tracking
   isFromCatalog: boolean('is_from_catalog').default(false),
@@ -135,6 +139,10 @@ export const tripInsurancePackagesRelations = relations(tripInsurancePackages, (
   trip: one(trips, {
     fields: [tripInsurancePackages.tripId],
     references: [trips.id],
+  }),
+  activity: one(itineraryActivities, {
+    fields: [tripInsurancePackages.activityId],
+    references: [itineraryActivities.id],
   }),
   travelerSelections: many(tripTravelerInsurance),
 }))

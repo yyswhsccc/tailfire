@@ -15,7 +15,7 @@
  */
 
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, sql, isNull } from 'drizzle-orm'
 import { addDays, subDays, isAfter } from 'date-fns'
 import { DatabaseService } from '../db/database.service'
 import { PaymentAuditService } from './payment-audit.service'
@@ -78,11 +78,21 @@ export class PaymentSchedulesService {
    */
   async findByActivityPricingId(
     activityPricingId: string,
+    travelerBookingId?: string | null,
   ): Promise<PaymentScheduleConfigDto | null> {
+    const conditions = [
+      eq(this.db.schema.paymentScheduleConfig.activityPricingId, activityPricingId),
+    ]
+    if (travelerBookingId) {
+      conditions.push(eq(this.db.schema.paymentScheduleConfig.travelerBookingId, travelerBookingId))
+    } else {
+      conditions.push(isNull(this.db.schema.paymentScheduleConfig.travelerBookingId))
+    }
+
     const [config] = await this.db.client
       .select()
       .from(this.db.schema.paymentScheduleConfig)
-      .where(eq(this.db.schema.paymentScheduleConfig.activityPricingId, activityPricingId))
+      .where(and(...conditions))
       .limit(1)
 
     if (!config) {
@@ -96,6 +106,47 @@ export class PaymentSchedulesService {
     const creditCardGuarantee = await this.findCreditCardGuarantee(config.id)
 
     return this.formatPaymentScheduleConfig(config, expectedPaymentItems, creditCardGuarantee)
+  }
+
+  /**
+   * Get payment schedule config by traveler booking ID
+   */
+  async findByTravelerBookingId(
+    travelerBookingId: string,
+  ): Promise<PaymentScheduleConfigDto | null> {
+    const [config] = await this.db.client
+      .select()
+      .from(this.db.schema.paymentScheduleConfig)
+      .where(eq(this.db.schema.paymentScheduleConfig.travelerBookingId, travelerBookingId))
+      .limit(1)
+
+    if (!config) {
+      return null
+    }
+
+    const expectedPaymentItems = await this.findExpectedPaymentItems(config.id)
+    const creditCardGuarantee = await this.findCreditCardGuarantee(config.id)
+    return this.formatPaymentScheduleConfig(config, expectedPaymentItems, creditCardGuarantee)
+  }
+
+  /**
+   * Get all payment schedule configs for an activity pricing (global + per-traveler)
+   */
+  async findAllByActivityPricingId(
+    activityPricingId: string,
+  ): Promise<PaymentScheduleConfigDto[]> {
+    const configs = await this.db.client
+      .select()
+      .from(this.db.schema.paymentScheduleConfig)
+      .where(eq(this.db.schema.paymentScheduleConfig.activityPricingId, activityPricingId))
+
+    const results: PaymentScheduleConfigDto[] = []
+    for (const config of configs) {
+      const expectedPaymentItems = await this.findExpectedPaymentItems(config.id)
+      const creditCardGuarantee = await this.findCreditCardGuarantee(config.id)
+      results.push(this.formatPaymentScheduleConfig(config, expectedPaymentItems, creditCardGuarantee))
+    }
+    return results
   }
 
   /**
@@ -128,11 +179,60 @@ export class PaymentSchedulesService {
       )
     }
 
-    // Check for existing schedule (idempotency)
-    const existingSchedule = await this.findByActivityPricingId(pricingId)
+    // Traveler booking validation and exclusivity
+    let totalForValidation = activityPricing.totalPriceCents
+    if (data.travelerBookingId) {
+      // Validate traveler booking exists and belongs to same activity
+      const [travelerBooking] = await this.db.client
+        .select()
+        .from(this.db.schema.travelerBookings)
+        .where(eq(this.db.schema.travelerBookings.id, data.travelerBookingId))
+        .limit(1)
+
+      if (!travelerBooking) {
+        throw new NotFoundException(`Traveler booking with ID ${data.travelerBookingId} not found`)
+      }
+
+      // Verify it belongs to the same activity
+      const [pricing] = await this.db.client
+        .select({ activityId: this.db.schema.activityPricing.activityId })
+        .from(this.db.schema.activityPricing)
+        .where(eq(this.db.schema.activityPricing.id, pricingId))
+        .limit(1)
+
+      if (pricing && travelerBooking.activityId !== pricing.activityId) {
+        throw new BadRequestException('Traveler booking does not belong to the same activity as the pricing')
+      }
+
+      if (!travelerBooking.priceCents) {
+        throw new BadRequestException('Traveler booking must have priceCents set before creating a payment schedule')
+      }
+
+      totalForValidation = travelerBooking.priceCents
+
+      // Exclusivity: reject if a global (NULL) schedule already exists
+      const globalSchedule = await this.findByActivityPricingId(pricingId, null)
+      if (globalSchedule) {
+        throw new BadRequestException(
+          'Cannot create per-traveler schedule: a global schedule already exists. Delete it first.'
+        )
+      }
+    } else {
+      // Creating a global schedule: reject if any per-traveler schedules already exist
+      const allConfigs = await this.findAllByActivityPricingId(pricingId)
+      const perTravelerConfigs = allConfigs.filter(c => c.travelerBookingId !== null)
+      if (perTravelerConfigs.length > 0) {
+        throw new BadRequestException(
+          'Cannot create global schedule: per-traveler schedules already exist. Delete them first.'
+        )
+      }
+    }
+
+    // Check for existing schedule with same scope (idempotency)
+    const existingSchedule = await this.findByActivityPricingId(pricingId, data.travelerBookingId)
     if (existingSchedule) {
       throw new BadRequestException(
-        `Payment schedule already exists for activity pricing ID ${pricingId}. Use update instead.`
+        `Payment schedule already exists for this scope. Use update instead.`
       )
     }
 
@@ -175,9 +275,9 @@ export class PaymentSchedulesService {
     // Validate expected payment items sum to total (if provided)
     if (data.expectedPaymentItems && data.expectedPaymentItems.length > 0) {
       const sum = data.expectedPaymentItems.reduce((acc, item) => acc + item.expectedAmountCents, 0)
-      if (sum !== activityPricing.totalPriceCents) {
+      if (sum !== totalForValidation) {
         throw new BadRequestException(
-          `Expected payment items must sum to total_price_cents. Expected: ${activityPricing.totalPriceCents}, Got: ${sum}`
+          `Expected payment items must sum to total. Expected: ${totalForValidation}, Got: ${sum}`
         )
       }
       // Validate all amounts are non-negative
@@ -194,6 +294,7 @@ export class PaymentSchedulesService {
       .insert(this.db.schema.paymentScheduleConfig)
       .values({
         activityPricingId: pricingId,
+        travelerBookingId: data.travelerBookingId || null,
         scheduleType: data.scheduleType,
         allowPartialPayments: data.allowPartialPayments ?? false,
         depositType: data.depositType || null,
@@ -252,6 +353,19 @@ export class PaymentSchedulesService {
       throw new BadRequestException('Component pricing must have a total_price_cents')
     }
 
+    // Use traveler booking price when config has travelerBookingId
+    let totalForValidation = activityPricing.totalPriceCents
+    if (existingConfig.travelerBookingId) {
+      const [travelerBooking] = await this.db.client
+        .select()
+        .from(this.db.schema.travelerBookings)
+        .where(eq(this.db.schema.travelerBookings.id, existingConfig.travelerBookingId))
+        .limit(1)
+      if (travelerBooking?.priceCents) {
+        totalForValidation = travelerBooking.priceCents
+      }
+    }
+
     // Validate deposit settings if schedule type is being changed to 'deposit'
     const newScheduleType = data.scheduleType || existingConfig.scheduleType
     if (newScheduleType === 'deposit') {
@@ -276,7 +390,7 @@ export class PaymentSchedulesService {
           throw new BadRequestException('depositAmountCents is required when depositType is "fixed_amount"')
         }
         // Validate deposit doesn't exceed total
-        if (newDepositAmountCents > activityPricing.totalPriceCents) {
+        if (newDepositAmountCents > totalForValidation) {
           throw new BadRequestException('depositAmountCents cannot exceed total_price_cents')
         }
         // Validate non-negative
@@ -297,9 +411,9 @@ export class PaymentSchedulesService {
     // Validate expected payment items sum to total (if provided)
     if (data.expectedPaymentItems && data.expectedPaymentItems.length > 0) {
       const sum = data.expectedPaymentItems.reduce((acc, item) => acc + item.expectedAmountCents, 0)
-      if (sum !== activityPricing.totalPriceCents) {
+      if (sum !== totalForValidation) {
         throw new BadRequestException(
-          `Expected payment items must sum to total_price_cents. Expected: ${activityPricing.totalPriceCents}, Got: ${sum}`
+          `Expected payment items must sum to total_price_cents. Expected: ${totalForValidation}, Got: ${sum}`
         )
       }
       // Validate all amounts are non-negative
@@ -1036,6 +1150,8 @@ export class PaymentSchedulesService {
       is_locked: boolean
       contact_id: string | null
       contact_name: string | null
+      traveler_booking_id: string | null
+      traveler_name: string | null
     }
 
     const rows = await this.db.client.execute(sql`
@@ -1057,7 +1173,9 @@ export class PaymentSchedulesService {
         ia.name AS activity_name,
         ia.activity_type,
         ap.currency,
-        CASE WHEN c.id IS NOT NULL THEN TRIM(CONCAT(c.first_name, ' ', c.last_name)) ELSE NULL END AS contact_name
+        CASE WHEN c.id IS NOT NULL THEN TRIM(CONCAT(c.first_name, ' ', c.last_name)) ELSE NULL END AS contact_name,
+        psc.traveler_booking_id,
+        CASE WHEN tb.id IS NOT NULL THEN TRIM(CONCAT(c2.first_name, ' ', c2.last_name)) ELSE NULL END AS traveler_name
       FROM expected_payment_items epi
       JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
       JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
@@ -1065,6 +1183,9 @@ export class PaymentSchedulesService {
       LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
       LEFT JOIN itineraries it ON it.id = iday.itinerary_id
       LEFT JOIN contacts c ON c.id = epi.contact_id
+      LEFT JOIN traveler_bookings tb ON tb.id = psc.traveler_booking_id
+      LEFT JOIN trip_travelers tt2 ON tt2.id = tb.trip_traveler_id
+      LEFT JOIN contacts c2 ON c2.id = tt2.contact_id
       WHERE (it.trip_id = ${tripId} OR ia.trip_id = ${tripId})
         AND ap.agency_id = ${agencyId}
         AND ia.agency_id = ${agencyId}
@@ -1102,6 +1223,8 @@ export class PaymentSchedulesService {
         remainingCents,
         isLocked: row.is_locked ?? false,
         contactName: row.contact_name || null,
+        travelerName: row.traveler_name || null,
+        travelerBookingId: row.traveler_booking_id || null,
       }
     })
   }
@@ -1132,6 +1255,7 @@ export class PaymentSchedulesService {
       activity_name: string
       contact_id: string | null
       contact_name: string | null
+      traveler_name: string | null
     }
 
     // NOTE: payment_schedule_config uses component_pricing_id (legacy name), not activity_pricing_id
@@ -1152,7 +1276,8 @@ export class PaymentSchedulesService {
         pt.contact_id,
         ia.id AS activity_id,
         ia.name AS activity_name,
-        CASE WHEN c.id IS NOT NULL THEN TRIM(CONCAT(c.first_name, ' ', c.last_name)) ELSE NULL END AS contact_name
+        CASE WHEN c.id IS NOT NULL THEN TRIM(CONCAT(c.first_name, ' ', c.last_name)) ELSE NULL END AS contact_name,
+        CASE WHEN tb.id IS NOT NULL THEN TRIM(CONCAT(c2.first_name, ' ', c2.last_name)) ELSE NULL END AS traveler_name
       FROM payment_transactions pt
       JOIN expected_payment_items epi ON epi.id = pt.expected_payment_item_id
       JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
@@ -1161,6 +1286,9 @@ export class PaymentSchedulesService {
       LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
       LEFT JOIN itineraries it ON it.id = iday.itinerary_id
       LEFT JOIN contacts c ON c.id = pt.contact_id
+      LEFT JOIN traveler_bookings tb ON tb.id = psc.traveler_booking_id
+      LEFT JOIN trip_travelers tt2 ON tt2.id = tb.trip_traveler_id
+      LEFT JOIN contacts c2 ON c2.id = tt2.contact_id
       WHERE (it.trip_id = ${tripId} OR ia.trip_id = ${tripId})
         AND pt.agency_id = ${agencyId}
         AND ap.agency_id = ${agencyId}
@@ -1191,6 +1319,7 @@ export class PaymentSchedulesService {
         activityName: row.activity_name,
         paymentName: row.payment_name,
         contactName: row.contact_name || null,
+        travelerName: row.traveler_name || null,
       }
     })
   }
@@ -1222,6 +1351,7 @@ export class PaymentSchedulesService {
       trip_name: string
       contact_id: string | null
       contact_name: string | null
+      traveler_name: string | null
     }
 
     const rows = await this.db.client.execute(sql`
@@ -1243,7 +1373,8 @@ export class PaymentSchedulesService {
         ia.name AS activity_name,
         t.id AS trip_id,
         t.name AS trip_name,
-        CASE WHEN c.id IS NOT NULL THEN TRIM(CONCAT(c.first_name, ' ', c.last_name)) ELSE NULL END AS contact_name
+        CASE WHEN c.id IS NOT NULL THEN TRIM(CONCAT(c.first_name, ' ', c.last_name)) ELSE NULL END AS contact_name,
+        CASE WHEN tb.id IS NOT NULL THEN TRIM(CONCAT(c2.first_name, ' ', c2.last_name)) ELSE NULL END AS traveler_name
       FROM payment_transactions pt
       JOIN expected_payment_items epi ON epi.id = pt.expected_payment_item_id
       JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
@@ -1253,6 +1384,9 @@ export class PaymentSchedulesService {
       LEFT JOIN itineraries it ON it.id = iday.itinerary_id
       JOIN trips t ON t.id = COALESCE(it.trip_id, ia.trip_id)
       LEFT JOIN contacts c ON c.id = pt.contact_id
+      LEFT JOIN traveler_bookings tb ON tb.id = psc.traveler_booking_id
+      LEFT JOIN trip_travelers tt2 ON tt2.id = tb.trip_traveler_id
+      LEFT JOIN contacts c2 ON c2.id = tt2.contact_id
       WHERE (
         -- Explicitly paid by this contact
         pt.contact_id = ${contactId}
@@ -1299,6 +1433,7 @@ export class PaymentSchedulesService {
         tripId: row.trip_id,
         tripName: row.trip_name,
         contactName: row.contact_name || null,
+        travelerName: row.traveler_name || null,
       }
     })
   }
@@ -1717,11 +1852,14 @@ export class PaymentSchedulesService {
 
     // 6. Create or update payment schedule config with template items
     return this.db.client.transaction(async (tx) => {
-      // Check for existing config
+      // Find global config only (templates don't apply to per-traveler schedules via this path)
       const [existingConfig] = await tx
         .select()
         .from(this.db.schema.paymentScheduleConfig)
-        .where(eq(this.db.schema.paymentScheduleConfig.activityPricingId, activityPricingId))
+        .where(and(
+          eq(this.db.schema.paymentScheduleConfig.activityPricingId, activityPricingId),
+          isNull(this.db.schema.paymentScheduleConfig.travelerBookingId)
+        ))
         .limit(1)
 
       let configId: string
@@ -2112,6 +2250,7 @@ export class PaymentSchedulesService {
     return {
       id: config.id,
       activityPricingId: config.activityPricingId,
+      travelerBookingId: config.travelerBookingId || null,
       scheduleType: config.scheduleType,
       allowPartialPayments: config.allowPartialPayments,
       depositType: config.depositType,
@@ -2333,7 +2472,7 @@ export class PaymentSchedulesService {
 
   /**
    * Get tripId from activityPricingId
-   * Path: activityPricing → activity → trip
+   * Path: activityPricing → activity → trip (via tripId or day → itinerary → trip)
    */
   async getTripIdFromActivityPricingId(activityPricingId: string): Promise<string | null> {
     const [pricing] = await this.db.client
@@ -2347,12 +2486,78 @@ export class PaymentSchedulesService {
     }
 
     const [activity] = await this.db.client
-      .select({ tripId: this.db.schema.itineraryActivities.tripId })
+      .select({
+        tripId: this.db.schema.itineraryActivities.tripId,
+        itineraryDayId: this.db.schema.itineraryActivities.itineraryDayId,
+      })
       .from(this.db.schema.itineraryActivities)
       .where(eq(this.db.schema.itineraryActivities.id, pricing.activityId))
       .limit(1)
 
-    return activity?.tripId || null
+    // Floating packages have tripId set directly
+    if (activity?.tripId) {
+      return activity.tripId
+    }
+
+    // Non-package activities: traverse day → itinerary → trip
+    if (activity?.itineraryDayId) {
+      const [result] = await this.db.client
+        .select({ tripId: this.db.schema.itineraries.tripId })
+        .from(this.db.schema.itineraryDays)
+        .innerJoin(
+          this.db.schema.itineraries,
+          eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id),
+        )
+        .where(eq(this.db.schema.itineraryDays.id, activity.itineraryDayId))
+        .limit(1)
+      return result?.tripId || null
+    }
+
+    return null
+  }
+
+  /**
+   * Get tripId from travelerBookingId
+   * Path: travelerBooking → activity → trip
+   */
+  async getTripIdFromTravelerBookingId(travelerBookingId: string): Promise<string | null> {
+    const [booking] = await this.db.client
+      .select({ activityId: this.db.schema.travelerBookings.activityId })
+      .from(this.db.schema.travelerBookings)
+      .where(eq(this.db.schema.travelerBookings.id, travelerBookingId))
+      .limit(1)
+
+    if (!booking?.activityId) {
+      return null
+    }
+
+    const [activity] = await this.db.client
+      .select({
+        tripId: this.db.schema.itineraryActivities.tripId,
+        itineraryDayId: this.db.schema.itineraryActivities.itineraryDayId,
+      })
+      .from(this.db.schema.itineraryActivities)
+      .where(eq(this.db.schema.itineraryActivities.id, booking.activityId))
+      .limit(1)
+
+    if (activity?.tripId) {
+      return activity.tripId
+    }
+
+    if (activity?.itineraryDayId) {
+      const [result] = await this.db.client
+        .select({ tripId: this.db.schema.itineraries.tripId })
+        .from(this.db.schema.itineraryDays)
+        .innerJoin(
+          this.db.schema.itineraries,
+          eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id),
+        )
+        .where(eq(this.db.schema.itineraryDays.id, activity.itineraryDayId))
+        .limit(1)
+      return result?.tripId || null
+    }
+
+    return null
   }
 
   /**

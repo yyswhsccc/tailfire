@@ -10,3 +10,5 @@ coverage
 *.tsbuildinfo
 apps/ota/supabase/.temp/
 .vercel
+data/migration/
+.worktrees/

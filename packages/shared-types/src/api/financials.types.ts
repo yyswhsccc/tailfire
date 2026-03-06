@@ -259,6 +259,8 @@ export interface UpdateAgencySettingsDto {
   // Branding
   logoUrl?: string
   primaryColor?: string // Hex color (e.g., '#FF5733')
+  // Commission fee (Tailfire technology fee, % deducted from net commission before agent split)
+  commissionFeeRate?: number // 0-100, default 5.00
 }
 
 export interface AgencySettingsResponseDto {
@@ -272,6 +274,7 @@ export interface AgencySettingsResponseDto {
   jurisdictionCode: string | null
   complianceDisclaimerText: string | null
   insuranceWaiverText: string | null
+  commissionFeeRate: string // Decimal as string (e.g., "5.00")
   logoUrl: string | null
   primaryColor: string | null
   createdAt: string

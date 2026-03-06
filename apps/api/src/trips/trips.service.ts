@@ -164,6 +164,7 @@ export class TripsService {
         externalReference: dto.externalReference,
         currency: dto.currency || 'CAD',
         estimatedTotalCost: dto.estimatedTotalCost?.toString(),
+        commissionFeeRateOverride: dto.commissionFeeRateOverride?.toString(),
         customFields: dto.customFields,
         timezone: dto.timezone,
       })
@@ -306,7 +307,7 @@ export class TripsService {
         SELECT 1 FROM trip_tags
         JOIN tags ON tags.id = trip_tags.tag_id
         WHERE trip_tags.trip_id = trips.id
-        AND tags.name = ANY(${filters.tags})
+        AND tags.name IN (${sql.join(filters.tags.map(t => sql`${t}`), sql`, `)})
         AND tags.agency_id = ${auth.agencyId}
         AND (tags.type = 'system' OR (tags.type = 'agent' AND tags.created_by = ${auth.userId}))
       )`)
@@ -350,6 +351,7 @@ export class TripsService {
         externalReference: this.db.schema.trips.externalReference,
         currency: this.db.schema.trips.currency,
         estimatedTotalCost: this.db.schema.trips.estimatedTotalCost,
+        commissionFeeRateOverride: this.db.schema.trips.commissionFeeRateOverride,
         tags: this.db.schema.trips.tags,
         customFields: this.db.schema.trips.customFields,
         isArchived: this.db.schema.trips.isArchived,
@@ -358,6 +360,7 @@ export class TripsService {
         pricingVisibility: this.db.schema.trips.pricingVisibility,
         allowPdfDownloads: this.db.schema.trips.allowPdfDownloads,
         itineraryStyle: this.db.schema.trips.itineraryStyle,
+        calendarDisplayMode: this.db.schema.trips.calendarDisplayMode,
         createdAt: this.db.schema.trips.createdAt,
         updatedAt: this.db.schema.trips.updatedAt,
         coverPhotoUrl: coverPhotoSubquery,
@@ -406,10 +409,30 @@ export class TripsService {
       this.logger.warn('findAll: auth context absent, returning empty tags for trip list')
     }
 
+    // Load owner profiles for all returned trips
+    const ownerIds = [...new Set(trips.map((t) => t.ownerId).filter(Boolean))] as string[]
+    const ownerMap = new Map<string, { id: string; name: string; email: string }>()
+    if (ownerIds.length > 0) {
+      const ownerRows = await this.db.client
+        .select({
+          id: this.db.schema.userProfiles.id,
+          firstName: this.db.schema.userProfiles.firstName,
+          lastName: this.db.schema.userProfiles.lastName,
+          email: this.db.schema.userProfiles.email,
+        })
+        .from(this.db.schema.userProfiles)
+        .where(inArray(this.db.schema.userProfiles.id, ownerIds))
+      ownerRows.forEach((r) => {
+        const name = [r.firstName, r.lastName].filter(Boolean).join(' ') || r.email || ''
+        ownerMap.set(r.id, { id: r.id, name, email: r.email || '' })
+      })
+    }
+
     return {
       data: trips.map((trip) => ({
         ...this.mapToResponseDto(trip),
         tags: [...(tagsByTrip.get(trip.id) || [])],
+        owner: trip.ownerId ? ownerMap.get(trip.ownerId) ?? undefined : undefined,
       })),
       pagination: {
         page,
@@ -451,6 +474,7 @@ export class TripsService {
         externalReference: this.db.schema.trips.externalReference,
         currency: this.db.schema.trips.currency,
         estimatedTotalCost: this.db.schema.trips.estimatedTotalCost,
+        commissionFeeRateOverride: this.db.schema.trips.commissionFeeRateOverride,
         tags: this.db.schema.trips.tags,
         customFields: this.db.schema.trips.customFields,
         isArchived: this.db.schema.trips.isArchived,
@@ -459,6 +483,7 @@ export class TripsService {
         pricingVisibility: this.db.schema.trips.pricingVisibility,
         allowPdfDownloads: this.db.schema.trips.allowPdfDownloads,
         itineraryStyle: this.db.schema.trips.itineraryStyle,
+        calendarDisplayMode: this.db.schema.trips.calendarDisplayMode,
         createdAt: this.db.schema.trips.createdAt,
         updatedAt: this.db.schema.trips.updatedAt,
         coverPhotoUrl: coverPhotoSubquery,
@@ -1299,7 +1324,10 @@ export class TripsService {
       ? await this.db.client
           .select()
           .from(this.db.schema.paymentScheduleConfig)
-          .where(inArray(this.db.schema.paymentScheduleConfig.activityPricingId, pricingIds))
+          .where(and(
+            inArray(this.db.schema.paymentScheduleConfig.activityPricingId, pricingIds),
+            isNull(this.db.schema.paymentScheduleConfig.travelerBookingId)
+          ))
       : []
 
     // Create a map of activityPricingId -> scheduleConfig
@@ -1457,10 +1485,12 @@ export class TripsService {
       pricingVisibility: trip.pricingVisibility,
       allowPdfDownloads: trip.allowPdfDownloads,
       itineraryStyle: trip.itineraryStyle,
+      calendarDisplayMode: trip.calendarDisplayMode || 'trip',
       coverPhotoUrl: trip.coverPhotoUrl || null,
       shareToken: trip.shareToken || null,
       tripGroupId: trip.tripGroupId || null,
       clientSelectedItineraryId: trip.clientSelectedItineraryId || null,
+      commissionFeeRateOverride: trip.commissionFeeRateOverride ?? null,
       createdAt: trip.createdAt.toISOString(),
       updatedAt: trip.updatedAt.toISOString(),
     }

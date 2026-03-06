@@ -75,6 +75,11 @@ export class InsuranceService {
   async createPackage(tripId: string, dto: CreateTripInsurancePackageDto): Promise<TripInsurancePackageDto> {
     await this.verifyTripExists(tripId)
 
+    // Validate activityId if provided
+    if (dto.activityId) {
+      await this.verifyActivityForInsurance(dto.activityId, tripId)
+    }
+
     const [pkg] = await this.db.client
       .insert(this.db.schema.tripInsurancePackages)
       .values({
@@ -90,6 +95,7 @@ export class InsuranceService {
         coverageEndDate: dto.coverageEndDate ?? null,
         coverageDetails: dto.coverageDetails ?? null,
         termsUrl: dto.termsUrl ?? null,
+        activityId: dto.activityId ?? null,
         isFromCatalog: dto.isFromCatalog ?? false,
         displayOrder: dto.displayOrder ?? 0,
         isActive: dto.isActive ?? true,
@@ -108,6 +114,11 @@ export class InsuranceService {
     dto: UpdateTripInsurancePackageDto
   ): Promise<TripInsurancePackageDto> {
     await this.getPackage(tripId, packageId) // Verify exists
+
+    // Validate activityId if provided
+    if (dto.activityId) {
+      await this.verifyActivityForInsurance(dto.activityId, tripId)
+    }
 
     const [pkg] = await this.db.client
       .update(this.db.schema.tripInsurancePackages)
@@ -374,6 +385,48 @@ export class InsuranceService {
     }
   }
 
+  /**
+   * Verify that an activity exists, belongs to the same trip, and is of type 'insurance'
+   */
+  private async verifyActivityForInsurance(activityId: string, tripId: string): Promise<void> {
+    const [activity] = await this.db.client
+      .select({
+        id: this.db.schema.itineraryActivities.id,
+        activityType: this.db.schema.itineraryActivities.activityType,
+        floatingTripId: this.db.schema.itineraryActivities.tripId,
+        itineraryTripId: this.db.schema.itineraries.tripId,
+      })
+      .from(this.db.schema.itineraryActivities)
+      .leftJoin(
+        this.db.schema.itineraryDays,
+        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id)
+      )
+      .leftJoin(
+        this.db.schema.itineraries,
+        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
+      )
+      .where(eq(this.db.schema.itineraryActivities.id, activityId))
+      .limit(1)
+
+    if (!activity) {
+      throw new BadRequestException(`Activity ${activityId} not found`)
+    }
+
+    // Check trip ownership — activity may have tripId directly (floating) or via day→itinerary
+    const activityTripId = activity.floatingTripId || activity.itineraryTripId
+    if (activityTripId !== tripId) {
+      throw new BadRequestException(
+        `Activity ${activityId} does not belong to trip ${tripId}`
+      )
+    }
+
+    if (activity.activityType !== 'insurance') {
+      throw new BadRequestException(
+        `Activity ${activityId} has type '${activity.activityType}', expected 'insurance'`
+      )
+    }
+  }
+
   private formatPackage(pkg: any): TripInsurancePackageDto {
     return {
       id: pkg.id,
@@ -389,6 +442,7 @@ export class InsuranceService {
       coverageEndDate: pkg.coverageEndDate,
       coverageDetails: pkg.coverageDetails,
       termsUrl: pkg.termsUrl,
+      activityId: pkg.activityId ?? null,
       isFromCatalog: pkg.isFromCatalog,
       displayOrder: pkg.displayOrder,
       isActive: pkg.isActive,

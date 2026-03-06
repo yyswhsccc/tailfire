@@ -123,6 +123,7 @@ export type ActivityResponseDto = {
 
   // Booking tracking
   isBooked: boolean
+  isVisibleInCalendar: boolean
   bookingDate: string | null // ISO 8601 date when booking was confirmed
 
   // Package reference (for linking activities to packages)
@@ -228,6 +229,54 @@ export type TripBookingStatusResponseDto = {
 }
 
 // =============================================================================
+// Per-Traveler Booking Types
+// =============================================================================
+
+/**
+ * Traveler Booking DTO
+ * Individual booking record for a traveler on an activity
+ * (e.g., separate cabin/confirmation for each passenger on a cruise)
+ */
+export type TravelerBookingDto = {
+  id: string
+  activityId: string
+  tripTravelerId: string
+  travelerName: string // resolved from trip_travelers → contacts
+  confirmationNumber: string | null
+  bookingReference: string | null
+  bookingStatus: string | null
+  supplier: string | null
+  priceCents: number | null
+  currency: string
+  commissionCents: number | null
+  bookingDetailsJson: Record<string, unknown>
+  externalBookingId: string | null
+  externalSystem: string | null
+}
+
+/**
+ * Create Traveler Booking DTO
+ */
+export type CreateTravelerBookingDto = {
+  tripTravelerId: string
+  confirmationNumber?: string | null
+  bookingReference?: string | null
+  bookingStatus?: string
+  supplier?: string | null
+  priceCents?: number | null
+  currency?: string
+  commissionCents?: number | null
+  bookingDetailsJson?: Record<string, unknown>
+  externalBookingId?: string | null
+  externalSystem?: string | null
+}
+
+/**
+ * Update Traveler Booking DTO
+ */
+export type UpdateTravelerBookingDto = Partial<Omit<CreateTravelerBookingDto, 'tripTravelerId'>>
+
+// =============================================================================
 // Package Activity Types (packages are now activities with activityType='package')
 // =============================================================================
 
@@ -263,6 +312,8 @@ export type PackageResponseDto = ActivityResponseDto & {
   activities: PackageLinkedActivityDto[]
   // Travelers linked to this package
   travelers: PackageTravelerDto[]
+  // Per-traveler booking records (confirmation #, pricing per traveler)
+  travelerBookings: TravelerBookingDto[]
   // Financial totals
   totalPriceCents: number
   totalPaidCents: number
@@ -389,6 +440,7 @@ export type UnlinkedActivityDto = {
   paidCents: number | null
   currency: string | null
   commissionTotalCents: number | null
+  travelerBookings?: TravelerBookingDto[]
 }
 
 /**

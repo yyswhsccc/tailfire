@@ -20,6 +20,7 @@ import type {
   PackageLinkedActivityDto,
   ActivityTravelerDto,
   TravelerLinkItemDto,
+  TravelerBookingDto,
 } from '@tailfire/shared-types'
 
 // Query Keys
@@ -41,6 +42,13 @@ export const activityTravelerKeys = {
   list: (activityId: string) => [...activityTravelerKeys.lists(), activityId] as const,
 }
 
+export const travelerBookingKeys = {
+  all: ['traveler-bookings'] as const,
+  lists: () => [...travelerBookingKeys.all, 'list'] as const,
+  list: (activityId: string) => [...travelerBookingKeys.lists(), activityId] as const,
+  tripList: (tripId: string) => [...travelerBookingKeys.all, 'trip', tripId] as const,
+}
+
 // ============================================================================
 // QUERIES
 // ============================================================================
@@ -54,6 +62,32 @@ export function useActivityTravelers(activityId: string | null | undefined) {
     queryKey: activityTravelerKeys.list(activityId || ''),
     queryFn: () => api.get<ActivityTravelerDto[]>(`/activities/${activityId}/travelers`),
     enabled: !!activityId,
+  })
+}
+
+/**
+ * Fetch per-traveler bookings for a specific activity
+ * Uses endpoint: GET /activities/:id/traveler-bookings
+ */
+export function useTravelerBookings(activityId: string | null | undefined) {
+  return useQuery({
+    queryKey: travelerBookingKeys.list(activityId || ''),
+    queryFn: () => api.get<TravelerBookingDto[]>(`/activities/${activityId}/traveler-bookings`),
+    enabled: !!activityId,
+    staleTime: 30_000,
+  })
+}
+
+/**
+ * Fetch all traveler bookings for a trip (batch fetch for bookings tab)
+ * Uses endpoint: GET /trips/:tripId/traveler-bookings
+ */
+export function useTripTravelerBookings(tripId: string | null | undefined) {
+  return useQuery({
+    queryKey: travelerBookingKeys.tripList(tripId || ''),
+    queryFn: () => api.get<TravelerBookingDto[]>(`/trips/${tripId}/traveler-bookings`),
+    enabled: !!tripId,
+    staleTime: 30_000,
   })
 }
 

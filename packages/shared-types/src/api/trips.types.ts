@@ -69,6 +69,10 @@ export interface CreateTripDto {
   pricingVisibility?: 'show_all' | 'hide_all' | 'travelers_only'
   allowPdfDownloads?: boolean
   itineraryStyle?: 'side_by_side' | 'stacked' | 'compact'
+  calendarDisplayMode?: 'trip' | 'activities'
+
+  // Commission fee rate override (nullable — when absent/null, uses agency default)
+  commissionFeeRateOverride?: number | null // 0-100
 }
 
 export interface CreateTripCollaboratorDto {
@@ -189,6 +193,8 @@ export interface UpdateTripDto {
   isPublished?: boolean
   timezone?: string // IANA timezone identifier (e.g., 'America/Toronto')
   tripGroupId?: string | null
+  commissionFeeRateOverride?: number | null
+  calendarDisplayMode?: 'trip' | 'activities'
 }
 
 export interface UpdateTripCollaboratorDto {
@@ -331,10 +337,12 @@ export interface TripResponseDto {
   pricingVisibility: 'show_all' | 'hide_all' | 'travelers_only'
   allowPdfDownloads: boolean
   itineraryStyle: 'side_by_side' | 'stacked' | 'compact'
+  calendarDisplayMode: 'trip' | 'activities'
   coverPhotoUrl: string | null // URL of the trip's cover photo
   shareToken: string | null
   tripGroupId: string | null
   clientSelectedItineraryId: string | null
+  commissionFeeRateOverride: string | null // Decimal as string, null = use agency default
   createdAt: string
   updatedAt: string
 }

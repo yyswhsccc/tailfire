@@ -423,6 +423,25 @@ export function TripOverview({ trip }: TripOverviewProps) {
               />
             </div>
 
+            {/* Calendar Display Mode */}
+            <div className="space-y-2">
+              <Label htmlFor="calendar-display" className="text-sm font-medium text-ash-900">
+                Calendar Display
+              </Label>
+              <Select
+                value={trip.calendarDisplayMode || 'trip'}
+                onValueChange={(value) => handleUpdateSetting('calendarDisplayMode', value as 'trip' | 'activities')}
+              >
+                <SelectTrigger id="calendar-display">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="trip">Trip Span</SelectItem>
+                  <SelectItem value="activities">Individual Activities</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Itinerary Style - Hidden (will be controlled via buttons in Itinerary page) */}
             {/* Database field preserved for future use */}
 

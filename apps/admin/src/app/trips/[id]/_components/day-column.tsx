@@ -39,9 +39,10 @@ interface DayColumnProps {
   cruiseColorMap?: Map<string, CruiseColorSet>
   responseMap?: Record<string, ClientActivityResponseType>
   commentCounts?: Record<string, number>
+  calendarDisplayMode?: 'trip' | 'activities'
 }
 
-export function DayColumn({ day, itineraryId, filteredActivities, hideHeader, cruiseColorMap, responseMap, commentCounts }: DayColumnProps) {
+export function DayColumn({ day, itineraryId, filteredActivities, hideHeader, cruiseColorMap, responseMap, commentCounts, calendarDisplayMode }: DayColumnProps) {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const [showEditModal, setShowEditModal] = useState(false)
@@ -161,6 +162,7 @@ export function DayColumn({ day, itineraryId, filteredActivities, hideHeader, cr
                 cruiseColor={cruiseColorMap?.get(activity.id)}
                 clientResponse={responseMap?.[activity.id] ?? null}
                 commentCount={commentCounts?.[activity.id]}
+                calendarDisplayMode={calendarDisplayMode}
               />
             ))}
           </div>

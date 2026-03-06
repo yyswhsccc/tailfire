@@ -102,6 +102,7 @@ export const updateActivityDtoSchema = z.object({
 
   // Update-only fields
   isBooked: z.boolean().optional(),
+  isVisibleInCalendar: z.boolean().optional(),
   bookingDate: z.string().nullable().optional(),
 
   // Pricing

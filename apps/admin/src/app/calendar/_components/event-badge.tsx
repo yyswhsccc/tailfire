@@ -8,6 +8,7 @@ import {
   Plane,
   Mail,
   CalendarCheck,
+  CalendarDays,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -26,6 +27,7 @@ const EVENT_ICONS: Record<CalendarEventType, typeof CheckSquare> = {
   trip: Plane,
   scheduled_email: Mail,
   event: CalendarCheck,
+  activity: CalendarDays,
 }
 
 interface EventBadgeProps {

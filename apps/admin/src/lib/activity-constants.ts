@@ -10,6 +10,7 @@ import {
   Package,
   MapPin,
   CalendarDays,
+  Shield,
   type LucideIcon,
 } from 'lucide-react'
 import type { ActivityType as DatabaseActivityType } from '@tailfire/shared-types/api'
@@ -216,6 +217,18 @@ export const ACTIVITY_TYPE_METADATA: Record<UIActivityType, ActivityTypeMetadata
     hasDocs: false,
     allowedFields: ['dayNumber', 'overnightCity', 'isLocked'],
   },
+  insurance: {
+    type: 'insurance',
+    label: 'Insurance',
+    icon: Shield,
+    colorClass: 'text-emerald-600 bg-emerald-50',
+    defaultName: 'Insurance',
+    hasSupplier: true,
+    hasPricing: true,
+    hasMedia: false,
+    hasDocs: true,
+    allowedFields: ['name', 'description', 'status', 'startDate', 'endDate'],
+  },
 } as const
 
 /**
@@ -286,6 +299,7 @@ export const COMPONENT_DEFAULTS: Record<UIActivityType, { name: string; status: 
   package: { name: 'Package', status: 'proposed' },
   custom_tour: { name: 'Custom Tour', status: 'proposed' },
   tour_day: { name: 'Tour Day', status: 'proposed' },
+  insurance: { name: 'Insurance', status: 'proposed' },
 } as const
 
 /**
@@ -317,6 +331,16 @@ export function isPackageActivity<T extends { componentType?: string | null }>(
 }
 
 /**
+ * Check if an activity is an insurance activity
+ * Insurance activities belong in the Insurance tab, not on the itinerary
+ */
+export function isInsuranceActivity<T extends { componentType?: string | null }>(
+  activity: T
+): boolean {
+  return activity.componentType === 'insurance'
+}
+
+/**
  * Filter out package activities from a list
  * Use this for itinerary views - packages should only appear in Bookings tab
  */
@@ -324,5 +348,5 @@ export function filterItineraryActivities<T extends { componentType?: string | n
   activities: T[] | undefined | null
 ): T[] {
   if (!activities) return []
-  return activities.filter((a) => !isPackageActivity(a))
+  return activities.filter((a) => !isPackageActivity(a) && !isInsuranceActivity(a))
 }

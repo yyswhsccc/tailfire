@@ -27,12 +27,14 @@ import type {
   PackageResponseDto,
   TripPackageTotalsDto,
   PackageLinkedActivityDto,
+  TravelerBookingDto,
 } from '@tailfire/shared-types'
 import {
   useBookings,
   useTripBookingTotals,
   useUnlinkedActivities,
   useBookingLinkedActivities,
+  useTripTravelerBookings,
   useCreateBooking,
   useDeleteBooking,
   useLinkActivities,
@@ -80,6 +82,7 @@ import {
   Car,
   MapPin,
   Ship,
+  User,
 } from 'lucide-react'
 import { ActivityIconBadge } from '@/components/ui/activity-icon-badge'
 import { TripOrderGeneratorButton } from '@/components/trips/trip-order-generator'
@@ -121,6 +124,7 @@ type UnifiedBookingRow =
       dateBooked: string | null
       activityCount: number
       commissionTotalCents: number | null
+      travelerBookings: TravelerBookingDto[]
     }
   | {
       kind: 'activity'
@@ -138,6 +142,7 @@ type UnifiedBookingRow =
       currency: string | null
       commissionTotalCents: number | null
       children: UnlinkedActivity[]
+      travelerBookings: TravelerBookingDto[]
     }
 
 // ============================================================================
@@ -816,6 +821,20 @@ export function PackagesTable({
   const { data: totals, isLoading: totalsLoading } = useTripBookingTotals(tripId)
   // Filter unlinked activities by the selected itinerary
   const { data: unlinkedData, isLoading: unlinkedLoading } = useUnlinkedActivities(tripId, itineraryId)
+  // Batch-fetch all per-traveler bookings for the trip
+  const { data: tripTravelerBookings } = useTripTravelerBookings(tripId)
+
+  // Build activityId → traveler bookings map
+  const travelerBookingsByActivity = useMemo(() => {
+    const map = new Map<string, TravelerBookingDto[]>()
+    if (!tripTravelerBookings) return map
+    for (const tb of tripTravelerBookings) {
+      const existing = map.get(tb.activityId) || []
+      existing.push(tb)
+      map.set(tb.activityId, existing)
+    }
+    return map
+  }, [tripTravelerBookings])
 
   // Derived data
   // Type assertion for runtime fields that may exist but aren't in the type definition
@@ -890,6 +909,7 @@ export function PackagesTable({
         dateBooked: pkg.dateBooked || null,
         activityCount: pkg.activityCount ?? 0,
         commissionTotalCents: pkg.pricing?.commissionTotalCents ?? null,
+        travelerBookings: travelerBookingsByActivity.get(pkg.id) || [],
       })
     }
 
@@ -911,11 +931,12 @@ export function PackagesTable({
         currency: activity.currency ?? null,
         commissionTotalCents: activity.commissionTotalCents ?? null,
         children,
+        travelerBookings: travelerBookingsByActivity.get(activity.id) || [],
       })
     }
 
     return sortUnifiedRows(rows, firstDay, lastDay)
-  }, [packages, groupedUnlinkedActivities, firstDay, lastDay])
+  }, [packages, groupedUnlinkedActivities, travelerBookingsByActivity, firstDay, lastDay])
 
   // Toggle package expansion
   const togglePackageExpand = useCallback((packageId: string, e: React.MouseEvent) => {
@@ -1255,6 +1276,46 @@ export function PackagesTable({
                             onActivityClick={navigateToActivity}
                           />
                         )}
+                        {/* Per-traveler booking sub-rows for packages */}
+                        {row.travelerBookings.length > 0 && row.travelerBookings.map((tb, idx) => {
+                          const isLast = idx === row.travelerBookings.length - 1
+                          return (
+                            <tr
+                              key={`tb-${tb.id}`}
+                              className="bg-blue-50/30 border-t border-gray-100"
+                            >
+                              <td className="px-4 py-2">
+                                <div className="pl-6" />
+                              </td>
+                              <td className="px-4 py-2">
+                                <div className="flex items-center gap-2 pl-4">
+                                  <span className="text-gray-300">{isLast ? '└' : '├'}</span>
+                                  <User className="h-3.5 w-3.5 text-gray-400" />
+                                  <span className="text-xs text-gray-700">{tb.travelerName}</span>
+                                  <Badge variant="outline" className="text-xs">Booking</Badge>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 text-xs text-gray-500">
+                                {tb.priceCents != null ? formatCurrency(tb.priceCents, tb.currency || currency) : '–'}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-gray-500">{tb.supplier || '–'}</td>
+                              <td className="px-4 py-2 text-xs text-gray-500">{tb.confirmationNumber || '–'}</td>
+                              <td className="px-4 py-2">
+                                {tb.bookingStatus ? (
+                                  <Badge variant="secondary" className="text-xs">{tb.bookingStatus}</Badge>
+                                ) : (
+                                  <span className="text-xs text-gray-400">–</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-gray-500">
+                                {tb.commissionCents
+                                  ? formatCurrency(tb.commissionCents, tb.currency || currency)
+                                  : '–'}
+                              </td>
+                              <td className="px-4 py-2"></td>
+                            </tr>
+                          )
+                        })}
                       </React.Fragment>
                     )
                   } else {
@@ -1415,6 +1476,46 @@ export function PackagesTable({
                               <td className="px-4 py-2 text-xs text-gray-500">
                                 {child.commissionTotalCents
                                   ? formatCurrency(child.commissionTotalCents, child.currency || 'CAD')
+                                  : '–'}
+                              </td>
+                              <td className="px-4 py-2"></td>
+                            </tr>
+                          )
+                        })}
+                        {/* Per-traveler booking sub-rows */}
+                        {row.travelerBookings.length > 0 && row.travelerBookings.map((tb, idx) => {
+                          const isLast = idx === row.travelerBookings.length - 1
+                          return (
+                            <tr
+                              key={`tb-${tb.id}`}
+                              className="bg-blue-50/30 border-t border-gray-100"
+                            >
+                              <td className="px-4 py-2">
+                                <div className="pl-6" />
+                              </td>
+                              <td className="px-4 py-2">
+                                <div className="flex items-center gap-2 pl-4">
+                                  <span className="text-gray-300">{isLast ? '└' : '├'}</span>
+                                  <User className="h-3.5 w-3.5 text-gray-400" />
+                                  <span className="text-xs text-gray-700">{tb.travelerName}</span>
+                                  <Badge variant="outline" className="text-xs">Booking</Badge>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 text-xs text-gray-500">
+                                {tb.priceCents != null ? formatCurrency(tb.priceCents, tb.currency || currency) : '–'}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-gray-500">{tb.supplier || '–'}</td>
+                              <td className="px-4 py-2 text-xs text-gray-500">{tb.confirmationNumber || '–'}</td>
+                              <td className="px-4 py-2">
+                                {tb.bookingStatus ? (
+                                  <Badge variant="secondary" className="text-xs">{tb.bookingStatus}</Badge>
+                                ) : (
+                                  <span className="text-xs text-gray-400">–</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-gray-500">
+                                {tb.commissionCents
+                                  ? formatCurrency(tb.commissionCents, tb.currency || currency)
                                   : '–'}
                               </td>
                               <td className="px-4 py-2"></td>

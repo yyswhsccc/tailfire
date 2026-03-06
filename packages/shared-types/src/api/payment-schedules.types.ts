@@ -77,6 +77,8 @@ export type PaymentScheduleConfigDto = {
   id: string
   /** Activity pricing ID. References component_pricing.id (DB column: component_pricing_id). */
   activityPricingId: string
+  /** Traveler booking ID. When set, this schedule is for a specific traveler booking. */
+  travelerBookingId: string | null
   scheduleType: ScheduleType
   allowPartialPayments: boolean
   depositType: DepositType | null
@@ -98,6 +100,8 @@ export type PaymentScheduleConfigDto = {
 export type CreatePaymentScheduleConfigDto = {
   /** Activity pricing ID. References component_pricing.id (DB column: component_pricing_id). */
   activityPricingId: string
+  /** Traveler booking ID. When set, creates a per-traveler schedule. */
+  travelerBookingId?: string | null
   scheduleType: ScheduleType
   allowPartialPayments?: boolean
 
@@ -268,6 +272,10 @@ export type TripExpectedPaymentDto = ExpectedPaymentItemDto & {
   remainingCents: number
   isLocked: boolean
   contactName: string | null
+  /** Traveler name (booking holder) — distinct from contactName (payer) */
+  travelerName: string | null
+  /** Traveler booking ID, if this payment belongs to a per-traveler schedule */
+  travelerBookingId: string | null
 }
 
 /**
@@ -278,6 +286,8 @@ export type TripPaymentTransactionDto = PaymentTransactionDto & {
   activityName: string
   paymentName: string
   contactName: string | null
+  /** Traveler name (booking holder) — distinct from contactName (payer) */
+  travelerName: string | null
 }
 
 /**

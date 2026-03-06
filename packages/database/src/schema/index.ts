@@ -48,6 +48,9 @@ export * from './activity-suppliers.schema'
 // Financial system schema
 export * from './financials.schema'
 
+// Commission system (check-based commission tracking)
+export * from './commission-checks.schema'
+
 // Payment schedule templates (agency-scoped reusable patterns)
 export * from './payment-templates.schema'
 
@@ -110,6 +113,8 @@ export * from './cruise-sync-history.schema'
 export * from './package-details.schema'
 // Activity travelers links travelers to activities (especially packages)
 export * from './activity-travelers.schema'
+// Per-traveler booking records (confirmation #, pricing per traveler)
+export * from './traveler-bookings.schema'
 
 // Auth & Multi-tenancy (Phase 1 Auth Implementation)
 export * from './agencies.schema'

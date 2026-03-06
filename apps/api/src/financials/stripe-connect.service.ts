@@ -264,17 +264,31 @@ export class StripeConnectService {
       insuranceWaiverText?: string
       logoUrl?: string
       primaryColor?: string
+      commissionFeeRate?: number
     }
   ): Promise<AgencySettingsResponseDto> {
+    // Validate commission fee rate range
+    if (updates.commissionFeeRate !== undefined) {
+      if (updates.commissionFeeRate < 0 || updates.commissionFeeRate > 100) {
+        throw new BadRequestException('commissionFeeRate must be between 0 and 100')
+      }
+    }
     // Ensure settings exist
     await this.getAgencySettings(agencyId)
 
+    // Build update payload, converting numeric commissionFeeRate to string for decimal column
+    const { commissionFeeRate, ...restUpdates } = updates
+    const updatePayload: Record<string, unknown> = {
+      ...restUpdates,
+      updatedAt: new Date(),
+    }
+    if (commissionFeeRate !== undefined) {
+      updatePayload.commissionFeeRate = commissionFeeRate.toString()
+    }
+
     const [updated] = await this.db.client
       .update(this.db.schema.agencySettings)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-      })
+      .set(updatePayload)
       .where(eq(this.db.schema.agencySettings.agencyId, agencyId))
       .returning()
 
@@ -296,6 +310,7 @@ export class StripeConnectService {
     jurisdictionCode: string | null
     complianceDisclaimerText: string | null
     insuranceWaiverText: string | null
+    commissionFeeRate: string
     logoUrl: string | null
     primaryColor: string | null
     createdAt: Date
@@ -312,6 +327,7 @@ export class StripeConnectService {
       jurisdictionCode: settings.jurisdictionCode,
       complianceDisclaimerText: settings.complianceDisclaimerText,
       insuranceWaiverText: settings.insuranceWaiverText,
+      commissionFeeRate: settings.commissionFeeRate,
       logoUrl: settings.logoUrl,
       primaryColor: settings.primaryColor,
       createdAt: settings.createdAt.toISOString(),

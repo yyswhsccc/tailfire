@@ -167,6 +167,7 @@ export function useCreateActivity(itineraryId: string, dayId: string) {
             confirmationNumber: newActivity.confirmationNumber || null,
             status: newActivity.status || 'proposed',
             isBooked: false,
+            isVisibleInCalendar: true,
             bookingDate: null,
             packageId: null,
             pricingType: newActivity.pricingType || 'per_person',
@@ -233,6 +234,27 @@ export function useUpdateActivity(itineraryId: string, dayId: string) {
         queryKey: activityKeys.detail(dayId, variables.id),
       })
       queryClient.invalidateQueries({ queryKey: activityKeys.byDay(dayId) })
+      queryClient.invalidateQueries({ queryKey: activityKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: itineraryDayKeys.list(itineraryId) })
+      queryClient.invalidateQueries({ queryKey: itineraryDayKeys.withActivities(itineraryId) })
+    },
+  })
+}
+
+/**
+ * Patch an activity when dayId varies per call (e.g., table view toggles)
+ */
+export function usePatchActivity(itineraryId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ activityId, dayId, data }: { activityId: string; dayId: string; data: UpdateActivityDto }) =>
+      api.patch<ActivityResponseDto>(`/days/${dayId}/activities/${activityId}`, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: activityKeys.detail(variables.dayId, variables.activityId),
+      })
+      queryClient.invalidateQueries({ queryKey: activityKeys.byDay(variables.dayId) })
       queryClient.invalidateQueries({ queryKey: activityKeys.lists() })
       queryClient.invalidateQueries({ queryKey: itineraryDayKeys.list(itineraryId) })
       queryClient.invalidateQueries({ queryKey: itineraryDayKeys.withActivities(itineraryId) })
