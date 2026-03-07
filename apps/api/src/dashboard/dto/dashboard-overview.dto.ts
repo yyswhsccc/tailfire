@@ -9,10 +9,10 @@ import { Transform, Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 
 export class DashboardOverviewQueryDto {
-  @ApiPropertyOptional({ enum: ['mtd', 'ytd'], default: 'mtd' })
+  @ApiPropertyOptional({ enum: ['mtd', 'ytd', 'lifetime'], default: 'mtd' })
   @IsOptional()
-  @IsEnum(['mtd', 'ytd'])
-  period?: 'mtd' | 'ytd' = 'mtd'
+  @IsEnum(['mtd', 'ytd', 'lifetime'])
+  period?: 'mtd' | 'ytd' | 'lifetime' = 'mtd'
 
   @ApiPropertyOptional({ default: new Date().getFullYear() })
   @IsOptional()
