@@ -45,7 +45,7 @@ export default function DashboardPage() {
   const firstName = profile?.firstName || 'there'
 
   // Dashboard controls
-  const [period, setPeriod] = useState<'mtd' | 'ytd'>('mtd')
+  const [period, setPeriod] = useState<'mtd' | 'ytd' | 'lifetime'>('mtd')
   const [chartYear, setChartYear] = useState(new Date().getFullYear())
   const [includeYoy, setIncludeYoy] = useState(false)
   const [showProjection, setShowProjection] = useState(false)
@@ -57,7 +57,7 @@ export default function DashboardPage() {
     includeYoy,
   })
 
-  const periodLabel = period === 'mtd' ? 'Month to Date' : 'Year to Date'
+  const periodLabel = period === 'mtd' ? 'Month to Date' : period === 'ytd' ? 'Year to Date' : 'Lifetime'
 
   // Initial loading state (no data yet)
   if (isPending) {
@@ -130,12 +130,20 @@ export default function DashboardPage() {
                   MTD
                 </button>
                 <button
-                  className={`px-3 py-1.5 text-xs font-medium rounded-r-md transition-colors ${
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                     period === 'ytd' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
                   }`}
                   onClick={() => setPeriod('ytd')}
                 >
                   YTD
+                </button>
+                <button
+                  className={`px-3 py-1.5 text-xs font-medium rounded-r-md transition-colors ${
+                    period === 'lifetime' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                  }`}
+                  onClick={() => setPeriod('lifetime')}
+                >
+                  All
                 </button>
               </div>
               {/* Sidebar Toggle */}

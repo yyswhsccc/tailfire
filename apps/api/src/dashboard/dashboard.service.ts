@@ -175,7 +175,16 @@ export class DashboardService {
   // Date range helpers
   // ===================================================================
 
-  private getDateRanges(period: 'mtd' | 'ytd', now: Date): DateRange {
+  private getDateRanges(period: 'mtd' | 'ytd' | 'lifetime', now: Date): DateRange {
+    if (period === 'lifetime') {
+      const startDate = new Date(2000, 0, 1) // Far enough back to capture all data
+      const endDate = now
+
+      // No meaningful prior period — use empty range so trends return null
+      const emptyDate = new Date(1999, 0, 1)
+      return { startDate, endDate, priorStartDate: emptyDate, priorEndDate: emptyDate }
+    }
+
     if (period === 'ytd') {
       const startDate = new Date(now.getFullYear(), 0, 1) // Jan 1 of current year
       const endDate = now
@@ -223,14 +232,14 @@ export class DashboardService {
         ? sql`false`
         : sql`t.agency_id = ${agencyId} AND t.id IN ${sql.raw(`('${tripIds.join("','")}')`)}`
 
-    // Bookings count
+    // Bookings count — uses booking_date (actual booking date) with created_at fallback
     const bookingsResult = await this.db.client.execute(sql`
       SELECT count(*)::int AS bookings
       FROM trips t
       WHERE ${tripFilter}
         AND t.status IN ('booked', 'in_progress', 'completed')
-        AND t.created_at >= ${startIso}::timestamptz
-        AND t.created_at <= ${endIso}::timestamptz
+        AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
+        AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
     `)
     const bookings = (bookingsResult as any)[0]?.bookings ?? 0
 
@@ -277,33 +286,37 @@ export class DashboardService {
       netSalesCents = Number((salesResult as any)[0]?.net_sales ?? 0)
     }
 
-    // Commission received
+    // Commission received — uses check_date (actual date received) not created_at
     let commissionDollars = 0
     if (tripIds === 'all') {
       const commResult = await this.db.client.execute(sql`
-        SELECT coalesce(sum(ct.commission_amount::numeric), 0)::float AS commission
-        FROM commission_tracking ct
-        JOIN activity_pricing ap ON ap.id = ct.component_pricing_id
+        SELECT coalesce(sum(cci.received_cents) / 100.0, 0)::float AS commission
+        FROM commission_check_items cci
+        JOIN commission_checks cc ON cc.id = cci.check_id
+        JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
         WHERE ap.agency_id = ${agencyId}
-          AND ct.commission_status = 'received'
-          AND ct.created_at >= ${startIso}::timestamptz
-          AND ct.created_at <= ${endIso}::timestamptz
+          AND cc.check_type = 'received'
+          AND cc.status = 'accepted'
+          AND cc.check_date >= ${startIso}::date
+          AND cc.check_date <= ${endIso}::date
       `)
       commissionDollars = Number((commResult as any)[0]?.commission ?? 0)
     } else if (tripIds.length > 0) {
       const tripIdList = sql.raw(`('${tripIds.join("','")}')`)
       const commResult = await this.db.client.execute(sql`
-        SELECT coalesce(sum(ct.commission_amount::numeric), 0)::float AS commission
-        FROM commission_tracking ct
-        JOIN activity_pricing ap ON ap.id = ct.component_pricing_id
+        SELECT coalesce(sum(cci.received_cents) / 100.0, 0)::float AS commission
+        FROM commission_check_items cci
+        JOIN commission_checks cc ON cc.id = cci.check_id
+        JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
         JOIN itinerary_activities ia ON ia.id = ap.activity_id
         JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
         JOIN itineraries itin ON itin.id = iday.itinerary_id
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
-          AND ct.commission_status = 'received'
-          AND ct.created_at >= ${startIso}::timestamptz
-          AND ct.created_at <= ${endIso}::timestamptz
+          AND cc.check_type = 'received'
+          AND cc.status = 'accepted'
+          AND cc.check_date >= ${startIso}::date
+          AND cc.check_date <= ${endIso}::date
           AND t.id IN ${tripIdList}
       `)
       commissionDollars = Number((commResult as any)[0]?.commission ?? 0)
@@ -640,14 +653,16 @@ export class DashboardService {
     if (tripIds === 'all') {
       result = await this.db.client.execute(sql`
         SELECT
-          extract(month FROM ct.created_at)::int AS month,
-          coalesce(sum(ct.commission_amount::numeric), 0)::float AS commission
-        FROM commission_tracking ct
-        JOIN activity_pricing ap ON ap.id = ct.component_pricing_id
+          extract(month FROM cc.check_date)::int AS month,
+          coalesce(sum(cci.received_cents) / 100.0, 0)::float AS commission
+        FROM commission_check_items cci
+        JOIN commission_checks cc ON cc.id = cci.check_id
+        JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
         WHERE ap.agency_id = ${agencyId}
-          AND ct.commission_status = 'received'
-          AND extract(year FROM ct.created_at) = ${year}
-        GROUP BY extract(month FROM ct.created_at)
+          AND cc.check_type = 'received'
+          AND cc.status = 'accepted'
+          AND extract(year FROM cc.check_date) = ${year}
+        GROUP BY extract(month FROM cc.check_date)
       `) as any[]
     } else if (tripIds.length === 0) {
       return new Map()
@@ -655,19 +670,21 @@ export class DashboardService {
       const tripIdList = sql.raw(`('${tripIds.join("','")}')`)
       result = await this.db.client.execute(sql`
         SELECT
-          extract(month FROM ct.created_at)::int AS month,
-          coalesce(sum(ct.commission_amount::numeric), 0)::float AS commission
-        FROM commission_tracking ct
-        JOIN activity_pricing ap ON ap.id = ct.component_pricing_id
+          extract(month FROM cc.check_date)::int AS month,
+          coalesce(sum(cci.received_cents) / 100.0, 0)::float AS commission
+        FROM commission_check_items cci
+        JOIN commission_checks cc ON cc.id = cci.check_id
+        JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
         JOIN itinerary_activities ia ON ia.id = ap.activity_id
         JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
         JOIN itineraries itin ON itin.id = iday.itinerary_id
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
-          AND ct.commission_status = 'received'
-          AND extract(year FROM ct.created_at) = ${year}
+          AND cc.check_type = 'received'
+          AND cc.status = 'accepted'
+          AND extract(year FROM cc.check_date) = ${year}
           AND t.id IN ${tripIdList}
-        GROUP BY extract(month FROM ct.created_at)
+        GROUP BY extract(month FROM cc.check_date)
       `) as any[]
     }
 
