@@ -244,7 +244,7 @@ export class DashboardService {
     const bookings = (bookingsResult as any)[0]?.bookings ?? 0
 
     // Net sales (payments - refunds) from payment_transactions
-    // For agents with specific trip IDs, use subquery through the join chain
+    // Filtered by trip booking_date so sales align with when trips were booked, not when payments were collected
     let netSalesCents = 0
     if (tripIds === 'all') {
       const salesResult = await this.db.client.execute(sql`
@@ -254,9 +254,16 @@ export class DashboardService {
           0
         )::bigint AS net_sales
         FROM payment_transactions pt
+        JOIN expected_payment_items epi ON epi.id = pt.expected_payment_item_id
+        JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
+        JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
+        JOIN itinerary_activities ia ON ia.id = ap.activity_id
+        JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+        JOIN itineraries itin ON itin.id = iday.itinerary_id
+        JOIN trips t ON t.id = itin.trip_id
         WHERE pt.agency_id = ${agencyId}
-          AND pt.transaction_date >= ${startIso}::timestamptz
-          AND pt.transaction_date <= ${endIso}::timestamptz
+          AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
+          AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
       `)
       netSalesCents = Number((salesResult as any)[0]?.net_sales ?? 0)
     } else if (tripIds.length > 0) {
@@ -269,19 +276,17 @@ export class DashboardService {
           0
         )::bigint AS net_sales
         FROM payment_transactions pt
+        JOIN expected_payment_items epi ON epi.id = pt.expected_payment_item_id
+        JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
+        JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
+        JOIN itinerary_activities ia ON ia.id = ap.activity_id
+        JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+        JOIN itineraries itin ON itin.id = iday.itinerary_id
+        JOIN trips t ON t.id = itin.trip_id
         WHERE pt.agency_id = ${agencyId}
-          AND pt.transaction_date >= ${startIso}::timestamptz
-          AND pt.transaction_date <= ${endIso}::timestamptz
-          AND pt.expected_payment_item_id IN (
-            SELECT epi.id FROM expected_payment_items epi
-            JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
-            JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
-            JOIN itinerary_activities ia ON ia.id = ap.activity_id
-            JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
-            JOIN itineraries itin ON itin.id = iday.itinerary_id
-            JOIN trips t ON t.id = itin.trip_id
-            WHERE t.id IN ${tripIdList}
-          )
+          AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
+          AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
+          AND t.id IN ${tripIdList}
       `)
       netSalesCents = Number((salesResult as any)[0]?.net_sales ?? 0)
     }
@@ -570,17 +575,23 @@ export class DashboardService {
     if (tripIds === 'all') {
       result = await this.db.client.execute(sql`
         SELECT
-          extract(month FROM pt.transaction_date)::int AS month,
+          extract(month FROM coalesce(t.booking_date::timestamptz, t.created_at))::int AS month,
           coalesce(
             sum(CASE WHEN pt.transaction_type = 'payment' THEN pt.amount_cents ELSE 0 END) -
             sum(CASE WHEN pt.transaction_type = 'refund' THEN pt.amount_cents ELSE 0 END),
             0
           )::bigint AS net_sales
         FROM payment_transactions pt
+        JOIN expected_payment_items epi ON epi.id = pt.expected_payment_item_id
+        JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
+        JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
+        JOIN itinerary_activities ia ON ia.id = ap.activity_id
+        JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+        JOIN itineraries itin ON itin.id = iday.itinerary_id
+        JOIN trips t ON t.id = itin.trip_id
         WHERE pt.agency_id = ${agencyId}
-          AND pt.transaction_date >= ${startDate}::date
-          AND pt.transaction_date < ${`${year + 1}-01-01`}::date
-        GROUP BY extract(month FROM pt.transaction_date)
+          AND extract(year FROM coalesce(t.booking_date::timestamptz, t.created_at)) = ${year}
+        GROUP BY extract(month FROM coalesce(t.booking_date::timestamptz, t.created_at))
       `) as any[]
     } else if (tripIds.length === 0) {
       return new Map()
@@ -588,27 +599,24 @@ export class DashboardService {
       const tripIdList = sql.raw(`('${tripIds.join("','")}')`)
       result = await this.db.client.execute(sql`
         SELECT
-          extract(month FROM pt.transaction_date)::int AS month,
+          extract(month FROM coalesce(t.booking_date::timestamptz, t.created_at))::int AS month,
           coalesce(
             sum(CASE WHEN pt.transaction_type = 'payment' THEN pt.amount_cents ELSE 0 END) -
             sum(CASE WHEN pt.transaction_type = 'refund' THEN pt.amount_cents ELSE 0 END),
             0
           )::bigint AS net_sales
         FROM payment_transactions pt
+        JOIN expected_payment_items epi ON epi.id = pt.expected_payment_item_id
+        JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
+        JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
+        JOIN itinerary_activities ia ON ia.id = ap.activity_id
+        JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+        JOIN itineraries itin ON itin.id = iday.itinerary_id
+        JOIN trips t ON t.id = itin.trip_id
         WHERE pt.agency_id = ${agencyId}
-          AND pt.transaction_date >= ${startDate}::date
-          AND pt.transaction_date < ${`${year + 1}-01-01`}::date
-          AND pt.expected_payment_item_id IN (
-            SELECT epi.id FROM expected_payment_items epi
-            JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
-            JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
-            JOIN itinerary_activities ia ON ia.id = ap.activity_id
-            JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
-            JOIN itineraries itin ON itin.id = iday.itinerary_id
-            JOIN trips t ON t.id = itin.trip_id
-            WHERE t.id IN ${tripIdList}
-          )
-        GROUP BY extract(month FROM pt.transaction_date)
+          AND extract(year FROM coalesce(t.booking_date::timestamptz, t.created_at)) = ${year}
+          AND t.id IN ${tripIdList}
+        GROUP BY extract(month FROM coalesce(t.booking_date::timestamptz, t.created_at))
       `) as any[]
     }
 
