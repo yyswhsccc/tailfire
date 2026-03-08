@@ -257,8 +257,8 @@ export class DashboardService {
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
           AND t.status IN ('booked', 'in_progress', 'completed')
-          AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
-          AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
+          AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
+          AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
       `)
       netSalesCents = Number((salesResult as any)[0]?.net_sales ?? 0)
     } else if (tripIds.length > 0) {
@@ -272,8 +272,8 @@ export class DashboardService {
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
           AND t.status IN ('booked', 'in_progress', 'completed')
-          AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
-          AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
+          AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
+          AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
           AND t.id IN ${tripIdList}
       `)
       netSalesCents = Number((salesResult as any)[0]?.net_sales ?? 0)
@@ -563,7 +563,7 @@ export class DashboardService {
     if (tripIds === 'all') {
       result = await this.db.client.execute(sql`
         SELECT
-          extract(month FROM coalesce(t.booking_date::timestamptz, t.created_at))::int AS month,
+          extract(month FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at))::int AS month,
           coalesce(sum(ap.total_price_cents), 0)::bigint AS net_sales
         FROM activity_pricing ap
         JOIN itinerary_activities ia ON ia.id = ap.activity_id
@@ -572,8 +572,8 @@ export class DashboardService {
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
           AND t.status IN ('booked', 'in_progress', 'completed')
-          AND extract(year FROM coalesce(t.booking_date::timestamptz, t.created_at)) = ${year}
-        GROUP BY extract(month FROM coalesce(t.booking_date::timestamptz, t.created_at))
+          AND extract(year FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at)) = ${year}
+        GROUP BY extract(month FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at))
       `) as any[]
     } else if (tripIds.length === 0) {
       return new Map()
@@ -581,7 +581,7 @@ export class DashboardService {
       const tripIdList = sql.raw(`('${tripIds.join("','")}')`)
       result = await this.db.client.execute(sql`
         SELECT
-          extract(month FROM coalesce(t.booking_date::timestamptz, t.created_at))::int AS month,
+          extract(month FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at))::int AS month,
           coalesce(sum(ap.total_price_cents), 0)::bigint AS net_sales
         FROM activity_pricing ap
         JOIN itinerary_activities ia ON ia.id = ap.activity_id
@@ -590,9 +590,9 @@ export class DashboardService {
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
           AND t.status IN ('booked', 'in_progress', 'completed')
-          AND extract(year FROM coalesce(t.booking_date::timestamptz, t.created_at)) = ${year}
+          AND extract(year FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at)) = ${year}
           AND t.id IN ${tripIdList}
-        GROUP BY extract(month FROM coalesce(t.booking_date::timestamptz, t.created_at))
+        GROUP BY extract(month FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at))
       `) as any[]
     }
 
