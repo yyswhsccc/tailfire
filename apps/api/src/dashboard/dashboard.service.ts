@@ -283,11 +283,9 @@ export class DashboardService {
     let commissionDollars = 0
     if (tripIds === 'all') {
       const commResult = await this.db.client.execute(sql`
-        SELECT coalesce(sum(cci.received_cents) / 100.0, 0)::float AS commission
-        FROM commission_check_items cci
-        JOIN commission_checks cc ON cc.id = cci.check_id
-        JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
-        WHERE ap.agency_id = ${agencyId}
+        SELECT coalesce(sum(cc.check_amount_cents) / 100.0, 0)::float AS commission
+        FROM commission_checks cc
+        WHERE cc.agency_id = ${agencyId}
           AND cc.check_type = 'received'
           AND cc.status = 'accepted'
           AND cc.check_date >= ${startIso}::date
@@ -638,11 +636,9 @@ export class DashboardService {
       result = await this.db.client.execute(sql`
         SELECT
           extract(month FROM cc.check_date)::int AS month,
-          coalesce(sum(cci.received_cents) / 100.0, 0)::float AS commission
-        FROM commission_check_items cci
-        JOIN commission_checks cc ON cc.id = cci.check_id
-        JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
-        WHERE ap.agency_id = ${agencyId}
+          coalesce(sum(cc.check_amount_cents) / 100.0, 0)::float AS commission
+        FROM commission_checks cc
+        WHERE cc.agency_id = ${agencyId}
           AND cc.check_type = 'received'
           AND cc.status = 'accepted'
           AND extract(year FROM cc.check_date) = ${year}
