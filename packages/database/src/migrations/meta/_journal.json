@@ -1037,6 +1037,13 @@
       "when": 1772942400000,
       "tag": "20260306120000_add_insurance_activity_type",
       "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "7",
+      "when": 1773028800000,
+      "tag": "20260308120000_group_bookings",
+      "breakpoints": true
     }
   ]
 }
