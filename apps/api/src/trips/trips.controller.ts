@@ -564,12 +564,16 @@ export class TripsController {
     @Param('groupId') groupId: string,
     @Param('mediaId') mediaId: string,
   ) {
-    await this.tripsService.deleteGroupMedia(
+    const media = await this.tripsService.deleteGroupMedia(
       groupId,
       mediaId,
       auth.agencyId,
       auth.userId,
     )
+    // Clean up storage
+    if (media?.fileUrl) {
+      await this.storageService.deleteDocument(media.fileUrl).catch(() => {})
+    }
   }
 
   /**

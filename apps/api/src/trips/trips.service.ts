@@ -3657,13 +3657,14 @@ export class TripsService {
         t.name as trip_name,
         t.status,
         COALESCE(SUM(ap.total_price_cents), 0)::int as package_price_cents,
-        COALESCE(SUM(ap.commission_amount_cents), 0)::int as commission_projected_cents,
-        COALESCE(SUM(ap.commission_received_cents), 0)::int as commission_received_cents
+        COALESCE(SUM(ap.commission_total_cents), 0)::int as commission_projected_cents,
+        COALESCE(SUM(ct.received_cents), 0)::int as commission_received_cents
       FROM trips t
       LEFT JOIN itineraries i ON i.trip_id = t.id
       LEFT JOIN itinerary_days id ON id.itinerary_id = i.id
       LEFT JOIN itinerary_activities ia ON ia.itinerary_day_id = id.id
       LEFT JOIN activity_pricing ap ON ap.activity_id = ia.id
+      LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
       WHERE t.trip_group_id = ${groupId}
         AND t.agency_id = ${agencyId}
       GROUP BY t.id, t.name, t.status
