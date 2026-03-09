@@ -555,8 +555,6 @@ export class DashboardService {
     tripIds: string[] | 'all',
     year: number,
   ): Promise<Map<number, number>> {
-    const startDate = `${year}-01-01`
-
     let result: any[]
     if (tripIds === 'all') {
       result = await this.db.client.execute(sql`

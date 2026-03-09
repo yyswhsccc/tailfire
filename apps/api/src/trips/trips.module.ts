@@ -83,6 +83,9 @@ import { ActivityBookingsController } from './activity-bookings.controller'
 import { TravelerBookingsController } from './traveler-bookings.controller'
 import { TripSharesController } from './trip-shares.controller'
 import { TripSharesService } from './trip-shares.service'
+import { TripGroupAccessService } from './trip-group-access.service'
+import { TripGroupSharesService } from './trip-group-shares.service'
+import { TripGroupSharesController } from './trip-group-shares.controller'
 
 @Module({
   imports: [
@@ -100,6 +103,7 @@ import { TripSharesService } from './trip-shares.service'
     TripsController,
     TripTravelersController,
     TripSharesController,
+    TripGroupSharesController,
     ItinerariesController,
     TravelerGroupsController,
     ItineraryDaysController,
@@ -124,8 +128,10 @@ import { TripSharesService } from './trip-shares.service'
     GeolocationCascadeService,
     TripsService,
     TripAccessService,
+    TripGroupAccessService,
     TripTravelersService,
     TripSharesService,
+    TripGroupSharesService,
     ItinerariesService,
     ItineraryVersionsService,
     TravelerGroupsService,
@@ -159,6 +165,7 @@ import { TripSharesService } from './trip-shares.service'
   exports: [
     TripsService,
     TripAccessService,
+    TripGroupAccessService,
     TripTravelersService,
     ItinerariesService,
     ItineraryVersionsService,

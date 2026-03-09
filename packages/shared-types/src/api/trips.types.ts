@@ -563,21 +563,36 @@ export interface TripShareDto {
   }>
 }
 
-/** Trip group (collection/folder) */
+export type TripGroupType = 'folder' | 'group_booking'
+export type TripGroupStatus = 'planning' | 'confirmed' | 'completed' | 'cancelled'
+
 export interface TripGroupDto {
   id: string
   agencyId: string
   name: string
   description: string | null
+  type: TripGroupType
+  groupNumber: string | null
+  primarySupplierId: string | null
+  destination: string | null
+  startDate: string | null
+  endDate: string | null
+  status: TripGroupStatus | null
   tripCount?: number
   createdAt: string
   updatedAt: string
 }
 
-/** Update trip group */
 export interface UpdateTripGroupApiDto {
   name?: string
   description?: string
+  type?: TripGroupType
+  groupNumber?: string
+  primarySupplierId?: string | null
+  destination?: string
+  startDate?: string | null
+  endDate?: string | null
+  status?: TripGroupStatus
 }
 
 /** Minimal trip data for group member listing */
@@ -586,6 +601,65 @@ export interface TripGroupTripDto {
   name: string
   status: string
   startDate: string | null
+  endDate: string | null
+  primaryContactId: string | null
+  primaryContactFirstName: string | null
+  primaryContactLastName: string | null
+}
+
+export interface GroupTravelerDto {
+  travelerId: string
+  contactId: string | null
+  role: string
+  tripId: string
+  tripName: string
+  firstName: string | null
+  lastName: string | null
+  email: string | null
+  phone: string | null
+}
+
+export interface TripGroupSummaryDto {
+  groupId: string
+  totalPackagePriceCents: number
+  totalCommissionProjectedCents: number
+  totalCommissionReceivedCents: number
+  totalBalanceCents: number
+  currency: string
+  tripSummaries: TripGroupTripSummaryDto[]
+}
+
+export interface TripGroupTripSummaryDto {
+  tripId: string
+  tripName: string
+  status: string
+  packagePriceCents: number
+  commissionProjectedCents: number
+  commissionReceivedCents: number
+  balanceCents: number
+  paymentStatus: 'paid' | 'partial' | 'outstanding' | 'none'
+}
+
+export interface TripGroupDocumentDto {
+  id: string
+  tripGroupId: string
+  documentType: string | null
+  fileUrl: string
+  fileName: string
+  fileSize: number | null
+  uploadedAt: string
+}
+
+export interface TripGroupMediaDto {
+  id: string
+  tripGroupId: string
+  mediaType: string
+  fileUrl: string
+  fileName: string
+  fileSize: number | null
+  caption: string | null
+  orderIndex: number
+  uploadedAt: string
 }
 
 // ============================================================================
@@ -1010,4 +1084,53 @@ export interface ItineraryVersionSummaryDto {
 /** Request body for publishing an itinerary version */
 export interface PublishItineraryDto {
   changeSummary?: string
+}
+
+// ============================================================================
+// TRIP GROUP SHARING DTOs
+// ============================================================================
+
+/**
+ * Access level for trip group sharing
+ */
+export type TripGroupShareAccessLevel = 'read' | 'write'
+
+/**
+ * Source of a trip group share
+ * - manual: User-created share
+ * - auto_trip_owner: System-created when a trip owner's trip is added to the group
+ */
+export type TripGroupShareSource = 'manual' | 'auto_trip_owner'
+
+/**
+ * Create a trip group share
+ */
+export interface CreateTripGroupShareDto {
+  sharedWithUserId: string
+  accessLevel?: TripGroupShareAccessLevel
+  notes?: string
+}
+
+/**
+ * Update a trip group share
+ */
+export interface UpdateTripGroupShareDto {
+  accessLevel?: TripGroupShareAccessLevel
+  notes?: string
+}
+
+/**
+ * Response DTO for trip group share
+ */
+export interface TripGroupShareResponseDto {
+  id: string
+  tripGroupId: string
+  sharedWithUserId: string
+  accessLevel: TripGroupShareAccessLevel
+  sharedBy: string
+  sharedAt: string
+  notes: string | null
+  source: TripGroupShareSource
+  createdAt: string
+  updatedAt: string
 }

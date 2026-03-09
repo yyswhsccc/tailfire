@@ -35,7 +35,7 @@ import { useRouter } from 'next/navigation'
 import { DetailLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useTrip, useDeleteTrip, usePublishTrip, usePublishTripSnapshot, useUnpublishTrip, useDuplicateTrip } from '@/hooks/use-trips'
+import { useTrip, useDeleteTrip, usePublishTrip, usePublishTripSnapshot, useUnpublishTrip, useDuplicateTrip, useTripGroups } from '@/hooks/use-trips'
 import { MoveToGroupDialog } from '@/components/trips/MoveToGroupDialog'
 import { TripOverview } from './_components/trip-overview'
 import { TripItinerary } from './_components/trip-itinerary'
@@ -405,6 +405,7 @@ export default function TripDetailPage() {
 
   // Disable queries when deletion is in progress to prevent 404s
   const { data: trip, isLoading, error } = useTrip(tripId, { enabled: !isDeleting })
+  const { data: tripGroups } = useTripGroups()
 
   const isDeletable = trip ? canDeleteTrip(trip.status) : false
 
@@ -543,6 +544,12 @@ export default function TripDetailPage() {
   const validation = currentContact ? validateContactForTravel(currentContact, trip?.startDate) : undefined
   const hasTravelerChanges = (diff?.hasChanges || validation?.hasIssues) || false
 
+  // Build group back link if trip belongs to a group
+  const tripGroup = trip?.tripGroupId ? tripGroups?.find((g) => g.id === trip.tripGroupId) : null
+  const additionalBackLinks = tripGroup
+    ? [{ href: `/trips/groups/${tripGroup.id}`, label: tripGroup.name }]
+    : undefined
+
   if (isLoading) {
     return (
       <DetailLayout
@@ -637,6 +644,7 @@ export default function TripDetailPage() {
     <DetailLayout
       backHref="/trips"
       backLabel="Trips"
+      additionalBackLinks={additionalBackLinks}
       sidebarSections={getSidebarNav(activeTab, handleTabChange, hasTravelerChanges)}
     >
       <div className="p-6">
