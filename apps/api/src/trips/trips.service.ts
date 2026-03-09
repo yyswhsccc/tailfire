@@ -3462,13 +3462,25 @@ export class TripsService {
   // TRIP GROUPS
   // ============================================================================
 
-  async listTripGroups(agencyId: string) {
+  async listTripGroups(agencyId: string, type?: string) {
+    const conditions: any[] = [eq(this.db.schema.tripGroups.agencyId, agencyId)]
+    if (type) {
+      conditions.push(eq(this.db.schema.tripGroups.type, type as any))
+    }
+
     const groups = await this.db.client
       .select({
         id: this.db.schema.tripGroups.id,
         agencyId: this.db.schema.tripGroups.agencyId,
         name: this.db.schema.tripGroups.name,
         description: this.db.schema.tripGroups.description,
+        type: this.db.schema.tripGroups.type,
+        groupNumber: this.db.schema.tripGroups.groupNumber,
+        primarySupplierId: this.db.schema.tripGroups.primarySupplierId,
+        destination: this.db.schema.tripGroups.destination,
+        startDate: this.db.schema.tripGroups.startDate,
+        endDate: this.db.schema.tripGroups.endDate,
+        status: this.db.schema.tripGroups.status,
         createdAt: this.db.schema.tripGroups.createdAt,
         updatedAt: this.db.schema.tripGroups.updatedAt,
         tripCount: sql<number>`(
@@ -3477,18 +3489,40 @@ export class TripsService {
         )`,
       })
       .from(this.db.schema.tripGroups)
-      .where(eq(this.db.schema.tripGroups.agencyId, agencyId))
+      .where(and(...conditions))
 
     return groups
   }
 
-  async createTripGroup(name: string, agencyId: string, actorId: string) {
+  async createTripGroup(
+    data: {
+      name: string
+      type?: string
+      groupNumber?: string
+      primarySupplierId?: string
+      destination?: string
+      startDate?: string
+      endDate?: string
+      status?: string
+      description?: string
+    },
+    agencyId: string,
+    actorId: string,
+  ) {
     const [group] = await this.db.client
       .insert(this.db.schema.tripGroups)
       .values({
-        name,
+        name: data.name,
         agencyId,
         createdBy: actorId,
+        type: (data.type as any) || 'folder',
+        groupNumber: data.groupNumber,
+        primarySupplierId: data.primarySupplierId,
+        destination: data.destination,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        status: data.status as any ?? (data.type === 'group_booking' ? 'planning' : undefined),
+        description: data.description,
       })
       .returning()
 
@@ -3497,14 +3531,24 @@ export class TripsService {
 
   async updateTripGroup(
     groupId: string,
-    data: { name?: string; description?: string },
+    data: {
+      name?: string
+      description?: string
+      type?: string
+      groupNumber?: string
+      primarySupplierId?: string | null
+      destination?: string
+      startDate?: string | null
+      endDate?: string | null
+      status?: string
+    },
     agencyId: string,
     actorId: string,
   ) {
     try {
       const [group] = await this.db.client
         .update(this.db.schema.tripGroups)
-        .set({ ...data, updatedAt: new Date() })
+        .set({ ...data, updatedAt: new Date() } as any)
         .where(
           and(
             eq(this.db.schema.tripGroups.id, groupId),
@@ -3584,6 +3628,221 @@ export class TripsService {
           eq(this.db.schema.trips.agencyId, agencyId),
         ),
       )
+  }
+
+  /**
+   * Get financial summary for a trip group
+   */
+  async getGroupSummary(groupId: string, agencyId: string) {
+    // Verify group exists and belongs to agency
+    const [group] = await this.db.client
+      .select()
+      .from(this.db.schema.tripGroups)
+      .where(
+        and(
+          eq(this.db.schema.tripGroups.id, groupId),
+          eq(this.db.schema.tripGroups.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!group) {
+      throw new NotFoundException(`Trip group with ID ${groupId} not found`)
+    }
+
+    // Aggregate pricing across all trips in one query
+    const rows = await this.db.client.execute(sql`
+      SELECT
+        t.id as trip_id,
+        t.name as trip_name,
+        t.status,
+        COALESCE(SUM(ap.total_price_cents), 0)::int as package_price_cents,
+        COALESCE(SUM(ap.commission_amount_cents), 0)::int as commission_projected_cents,
+        COALESCE(SUM(ap.commission_received_cents), 0)::int as commission_received_cents
+      FROM trips t
+      LEFT JOIN itineraries i ON i.trip_id = t.id
+      LEFT JOIN itinerary_days id ON id.itinerary_id = i.id
+      LEFT JOIN itinerary_activities ia ON ia.itinerary_day_id = id.id
+      LEFT JOIN activity_pricing ap ON ap.activity_id = ia.id
+      WHERE t.trip_group_id = ${groupId}
+        AND t.agency_id = ${agencyId}
+      GROUP BY t.id, t.name, t.status
+    `)
+
+    const tripSummaries = (rows as any[]).map((row) => {
+      const balance = row.package_price_cents - row.commission_received_cents
+      return {
+        tripId: row.trip_id,
+        tripName: row.trip_name,
+        status: row.status,
+        packagePriceCents: row.package_price_cents,
+        commissionProjectedCents: row.commission_projected_cents,
+        commissionReceivedCents: row.commission_received_cents,
+        balanceCents: balance,
+        paymentStatus: balance <= 0 ? 'paid' as const : row.commission_received_cents > 0 ? 'partial' as const : row.package_price_cents > 0 ? 'outstanding' as const : 'none' as const,
+      }
+    })
+
+    return {
+      groupId,
+      totalPackagePriceCents: tripSummaries.reduce((sum, t) => sum + t.packagePriceCents, 0),
+      totalCommissionProjectedCents: tripSummaries.reduce((sum, t) => sum + t.commissionProjectedCents, 0),
+      totalCommissionReceivedCents: tripSummaries.reduce((sum, t) => sum + t.commissionReceivedCents, 0),
+      totalBalanceCents: tripSummaries.reduce((sum, t) => sum + t.balanceCents, 0),
+      currency: 'CAD',
+      tripSummaries,
+    }
+  }
+
+  /**
+   * Cancel all trips in a group via existing cancelTrip() method
+   */
+  async cancelGroupTrips(
+    groupId: string,
+    reason: string,
+    agencyId: string,
+    actorId: string,
+  ) {
+    const [group] = await this.db.client
+      .select()
+      .from(this.db.schema.tripGroups)
+      .where(
+        and(
+          eq(this.db.schema.tripGroups.id, groupId),
+          eq(this.db.schema.tripGroups.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!group) {
+      throw new NotFoundException(`Trip group with ID ${groupId} not found`)
+    }
+
+    const trips = await this.db.client
+      .select({ id: this.db.schema.trips.id, status: this.db.schema.trips.status })
+      .from(this.db.schema.trips)
+      .where(
+        and(
+          eq(this.db.schema.trips.tripGroupId, groupId),
+          eq(this.db.schema.trips.agencyId, agencyId),
+        ),
+      )
+
+    const cancelled: string[] = []
+    const skipped: { tripId: string; reason: string }[] = []
+
+    for (const trip of trips) {
+      if (!canTransitionTripStatus(trip.status as TripStatus, 'cancelled')) {
+        skipped.push({
+          tripId: trip.id,
+          reason: getTransitionErrorMessage(trip.status as TripStatus, 'cancelled'),
+        })
+        continue
+      }
+      try {
+        await this.cancelTrip(trip.id, { reason: `Group cancellation: ${reason}` }, actorId)
+        cancelled.push(trip.id)
+      } catch (e: any) {
+        skipped.push({ tripId: trip.id, reason: e.message })
+      }
+    }
+
+    // Update group status
+    await this.db.client
+      .update(this.db.schema.tripGroups)
+      .set({ status: 'cancelled' as any, updatedAt: new Date() })
+      .where(eq(this.db.schema.tripGroups.id, groupId))
+
+    this.eventEmitter.emit(
+      'audit.updated',
+      new AuditEvent('trip_group', group.id, 'updated', group.id, actorId, group.name),
+    )
+
+    return { cancelled, skipped }
+  }
+
+  /**
+   * Add trips to a group
+   */
+  async addTripsToGroup(
+    groupId: string,
+    tripIds: string[],
+    agencyId: string,
+    actorId: string,
+  ) {
+    const [group] = await this.db.client
+      .select()
+      .from(this.db.schema.tripGroups)
+      .where(
+        and(
+          eq(this.db.schema.tripGroups.id, groupId),
+          eq(this.db.schema.tripGroups.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!group) {
+      throw new NotFoundException(`Trip group with ID ${groupId} not found`)
+    }
+
+    for (const tripId of tripIds) {
+      await this.db.client
+        .update(this.db.schema.trips)
+        .set({ tripGroupId: groupId, updatedAt: new Date() })
+        .where(
+          and(
+            eq(this.db.schema.trips.id, tripId),
+            eq(this.db.schema.trips.agencyId, agencyId),
+          ),
+        )
+
+      this.eventEmitter.emit(
+        'audit.status_changed',
+        new AuditEvent('trip', tripId, 'moved_to_group', tripId, actorId, group.name),
+      )
+    }
+
+    return { added: tripIds.length }
+  }
+
+  /**
+   * Remove a trip from a group
+   */
+  async removeTripFromGroup(
+    groupId: string,
+    tripId: string,
+    agencyId: string,
+    actorId: string,
+  ) {
+    const [group] = await this.db.client
+      .select()
+      .from(this.db.schema.tripGroups)
+      .where(
+        and(
+          eq(this.db.schema.tripGroups.id, groupId),
+          eq(this.db.schema.tripGroups.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!group) {
+      throw new NotFoundException(`Trip group with ID ${groupId} not found`)
+    }
+
+    await this.db.client
+      .update(this.db.schema.trips)
+      .set({ tripGroupId: null, updatedAt: new Date() })
+      .where(
+        and(
+          eq(this.db.schema.trips.id, tripId),
+          eq(this.db.schema.trips.tripGroupId, groupId),
+        ),
+      )
+
+    this.eventEmitter.emit(
+      'audit.status_changed',
+      new AuditEvent('trip', tripId, 'removed_from_group', tripId, actorId, group.name),
+    )
   }
 
   // ============================================================================

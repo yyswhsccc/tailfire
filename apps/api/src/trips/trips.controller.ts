@@ -284,8 +284,11 @@ export class TripsController {
    * GET /trips/groups
    */
   @Get('groups')
-  async listTripGroups(@GetAuthContext() auth: AuthContext) {
-    return this.tripsService.listTripGroups(auth.agencyId)
+  async listTripGroups(
+    @GetAuthContext() auth: AuthContext,
+    @Query('type') type?: string,
+  ) {
+    return this.tripsService.listTripGroups(auth.agencyId, type)
   }
 
   /**
@@ -295,9 +298,19 @@ export class TripsController {
   @Post('groups')
   async createTripGroup(
     @GetAuthContext() auth: AuthContext,
-    @Body() body: { name: string },
+    @Body() body: {
+      name: string
+      type?: string
+      groupNumber?: string
+      primarySupplierId?: string
+      destination?: string
+      startDate?: string
+      endDate?: string
+      status?: string
+      description?: string
+    },
   ) {
-    return this.tripsService.createTripGroup(body.name, auth.agencyId, auth.userId)
+    return this.tripsService.createTripGroup(body, auth.agencyId, auth.userId)
   }
 
   /**
@@ -308,7 +321,17 @@ export class TripsController {
   async updateTripGroup(
     @GetAuthContext() auth: AuthContext,
     @Param('groupId') groupId: string,
-    @Body() body: { name?: string; description?: string },
+    @Body() body: {
+      name?: string
+      description?: string
+      type?: string
+      groupNumber?: string
+      primarySupplierId?: string | null
+      destination?: string
+      startDate?: string | null
+      endDate?: string | null
+      status?: string
+    },
   ) {
     return this.tripsService.updateTripGroup(groupId, body, auth.agencyId, auth.userId)
   }
@@ -336,6 +359,81 @@ export class TripsController {
     @Param('groupId') groupId: string,
   ) {
     return this.tripsService.getTripsByGroup(groupId, auth.agencyId)
+  }
+
+  /**
+   * Get financial summary for a trip group
+   * GET /trips/groups/:groupId/summary
+   */
+  @Get('groups/:groupId/summary')
+  async getGroupSummary(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+  ) {
+    return this.tripsService.getGroupSummary(groupId, auth.agencyId)
+  }
+
+  /**
+   * Update group status (with cascade for cancellation)
+   * PATCH /trips/groups/:groupId/status
+   */
+  @Patch('groups/:groupId/status')
+  async updateGroupStatus(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Body() body: { status: string; reason?: string },
+  ) {
+    if (body.status === 'cancelled') {
+      return this.tripsService.cancelGroupTrips(
+        groupId,
+        body.reason || '',
+        auth.agencyId,
+        auth.userId,
+      )
+    }
+    return this.tripsService.updateTripGroup(
+      groupId,
+      { status: body.status },
+      auth.agencyId,
+      auth.userId,
+    )
+  }
+
+  /**
+   * Add trip(s) to a group
+   * POST /trips/groups/:groupId/trips
+   */
+  @Post('groups/:groupId/trips')
+  async addTripsToGroup(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Body() body: { tripIds: string[] },
+  ) {
+    return this.tripsService.addTripsToGroup(
+      groupId,
+      body.tripIds,
+      auth.agencyId,
+      auth.userId,
+    )
+  }
+
+  /**
+   * Remove a trip from a group
+   * DELETE /trips/groups/:groupId/trips/:tripId
+   */
+  @Delete('groups/:groupId/trips/:tripId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeTripFromGroup(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Param('tripId') tripId: string,
+  ) {
+    return this.tripsService.removeTripFromGroup(
+      groupId,
+      tripId,
+      auth.agencyId,
+      auth.userId,
+    )
   }
 
   /**
