@@ -29,6 +29,7 @@ import type {
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
 import { TripAccessService } from '../trips/trip-access.service'
+import { TripsService } from '../trips/trips.service'
 import { ContactsService } from '../contacts/contacts.service'
 
 @ApiTags('Notes')
@@ -37,6 +38,7 @@ export class NotesController {
   constructor(
     private readonly notesService: NotesService,
     private readonly tripAccessService: TripAccessService,
+    private readonly tripsService: TripsService,
     private readonly contactsService: ContactsService
   ) {}
 
@@ -51,7 +53,7 @@ export class NotesController {
     @Body() dto: CreateNoteDto
   ): Promise<NoteResponseDto> {
     // Verify entity access before creating
-    await this.verifyEntityAccess(dto.tripId, dto.contactId, auth)
+    await this.verifyEntityAccess(dto.tripId, dto.contactId, dto.tripGroupId, auth)
     return this.notesService.create(dto, auth.agencyId, auth.userId)
   }
 
@@ -70,6 +72,9 @@ export class NotesController {
     }
     if (filters.contactId) {
       await this.contactsService.findOne(filters.contactId, auth.agencyId)
+    }
+    if (filters.tripGroupId) {
+      await this.verifyTripGroupAccess(filters.tripGroupId, auth.agencyId)
     }
     return this.notesService.findAll(filters, auth.agencyId)
   }
@@ -152,11 +157,12 @@ export class NotesController {
   private async verifyEntityAccess(
     tripId: string | undefined,
     contactId: string | undefined,
+    tripGroupId: string | undefined,
     auth: AuthContext
   ): Promise<void> {
-    if (!tripId && !contactId) {
+    if (!tripId && !contactId && !tripGroupId) {
       throw new BadRequestException(
-        'Either tripId or contactId must be provided'
+        'Either tripId, contactId, or tripGroupId must be provided'
       )
     }
     if (tripId) {
@@ -165,6 +171,25 @@ export class NotesController {
     if (contactId) {
       // findOne throws NotFoundException if not found or not in agency
       await this.contactsService.findOne(contactId, auth.agencyId)
+    }
+    if (tripGroupId) {
+      await this.verifyTripGroupAccess(tripGroupId, auth.agencyId)
+    }
+  }
+
+  /**
+   * Verify the trip group belongs to the user's agency
+   */
+  private async verifyTripGroupAccess(
+    tripGroupId: string,
+    agencyId: string
+  ): Promise<void> {
+    const groups = await this.tripsService.listTripGroups(agencyId)
+    const group = groups.find((g: any) => g.id === tripGroupId)
+    if (!group) {
+      throw new BadRequestException(
+        `Trip group ${tripGroupId} not found or not accessible`
+      )
     }
   }
 }

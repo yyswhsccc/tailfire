@@ -570,9 +570,13 @@ export class TripsController {
       auth.agencyId,
       auth.userId,
     )
-    // Clean up storage
+    // Clean up media storage (extract path from public URL)
     if (media?.fileUrl) {
-      await this.storageService.deleteDocument(media.fileUrl).catch(() => {})
+      const urlParts = media.fileUrl.split('.r2.dev/')
+      const storagePath = urlParts.length > 1 ? urlParts[1] : null
+      if (storagePath) {
+        await this.storageService.deleteMedia(storagePath).catch(() => {})
+      }
     }
   }
 

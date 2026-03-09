@@ -62,7 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_trip_group_documents_group ON trip_group_document
 CREATE TABLE IF NOT EXISTS trip_group_media (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_group_id UUID NOT NULL REFERENCES trip_groups(id) ON DELETE CASCADE,
-  media_type VARCHAR(50) NOT NULL DEFAULT 'image',
+  media_type media_type NOT NULL DEFAULT 'image',
   file_url TEXT NOT NULL,
   file_name VARCHAR(255) NOT NULL,
   file_size INTEGER,

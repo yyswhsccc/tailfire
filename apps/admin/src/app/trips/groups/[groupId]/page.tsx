@@ -107,14 +107,20 @@ export default function GroupDetailPage() {
 
   const handleCancelGroup = async () => {
     try {
-      await updateGroupStatus.mutateAsync({
+      const result = await updateGroupStatus.mutateAsync({
         groupId,
         status: 'cancelled',
         reason: cancelReason,
       })
+      const data = result?.data || result
+      const cancelledCount = data?.cancelled?.length || 0
+      const skippedCount = data?.skipped?.length || 0
       toast({
-        title: 'Group Cancelled',
-        description: 'The group booking and its trips have been cancelled.',
+        title: cancelledCount > 0 ? 'Group Cancelled' : 'No Trips Cancelled',
+        description: cancelledCount > 0
+          ? `${cancelledCount} trip(s) cancelled${skippedCount > 0 ? `, ${skippedCount} skipped` : ''}.`
+          : `All ${skippedCount} trip(s) could not be cancelled.`,
+        variant: cancelledCount === 0 ? 'destructive' : undefined,
       })
       setShowCancelDialog(false)
       setCancelReason('')

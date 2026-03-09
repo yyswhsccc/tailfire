@@ -3651,6 +3651,7 @@ export class TripsService {
     }
 
     // Aggregate pricing across all trips in one query
+    // Only aggregate from selected itineraries to avoid overcounting
     const rows = await this.db.client.execute(sql`
       SELECT
         t.id as trip_id,
@@ -3660,7 +3661,7 @@ export class TripsService {
         COALESCE(SUM(ap.commission_total_cents), 0)::int as commission_projected_cents,
         COALESCE(SUM(ct.received_cents), 0)::int as commission_received_cents
       FROM trips t
-      LEFT JOIN itineraries i ON i.trip_id = t.id
+      LEFT JOIN itineraries i ON i.trip_id = t.id AND i.is_selected = true
       LEFT JOIN itinerary_days id ON id.itinerary_id = i.id
       LEFT JOIN itinerary_activities ia ON ia.itinerary_day_id = id.id
       LEFT JOIN activity_pricing ap ON ap.activity_id = ia.id
@@ -3671,7 +3672,8 @@ export class TripsService {
     `)
 
     const tripSummaries = (rows as any[]).map((row) => {
-      const balance = row.package_price_cents - row.commission_received_cents
+      // Balance = commission still owed (projected minus received)
+      const commissionBalance = row.commission_projected_cents - row.commission_received_cents
       return {
         tripId: row.trip_id,
         tripName: row.trip_name,
@@ -3679,8 +3681,8 @@ export class TripsService {
         packagePriceCents: row.package_price_cents,
         commissionProjectedCents: row.commission_projected_cents,
         commissionReceivedCents: row.commission_received_cents,
-        balanceCents: balance,
-        paymentStatus: balance <= 0 ? 'paid' as const : row.commission_received_cents > 0 ? 'partial' as const : row.package_price_cents > 0 ? 'outstanding' as const : 'none' as const,
+        balanceCents: commissionBalance,
+        paymentStatus: commissionBalance <= 0 ? 'paid' as const : row.commission_received_cents > 0 ? 'partial' as const : row.commission_projected_cents > 0 ? 'outstanding' as const : 'none' as const,
       }
     })
 
@@ -3748,16 +3750,18 @@ export class TripsService {
       }
     }
 
-    // Update group status
-    await this.db.client
-      .update(this.db.schema.tripGroups)
-      .set({ status: 'cancelled' as any, updatedAt: new Date() })
-      .where(eq(this.db.schema.tripGroups.id, groupId))
+    // Only update group status to cancelled if at least one trip was cancelled
+    if (cancelled.length > 0) {
+      await this.db.client
+        .update(this.db.schema.tripGroups)
+        .set({ status: 'cancelled' as any, updatedAt: new Date() })
+        .where(eq(this.db.schema.tripGroups.id, groupId))
 
-    this.eventEmitter.emit(
-      'audit.updated',
-      new AuditEvent('trip_group', group.id, 'updated', group.id, actorId, group.name),
-    )
+      this.eventEmitter.emit(
+        'audit.updated',
+        new AuditEvent('trip_group', group.id, 'updated', group.id, actorId, group.name),
+      )
+    }
 
     return { cancelled, skipped }
   }
