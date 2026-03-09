@@ -14,6 +14,9 @@ import type {
   TripGroupDto,
   UpdateTripGroupApiDto,
   TripGroupTripDto,
+  TripGroupSummaryDto,
+  TripGroupDocumentDto,
+  TripGroupMediaDto,
 } from '@tailfire/shared-types/api'
 import type { TripStatus } from '@tailfire/shared-types'
 
@@ -363,8 +366,17 @@ export function useTripGroups() {
 export function useCreateTripGroup() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (name: string) =>
-      api.post<TripGroupDto>('/trips/groups', { name }),
+    mutationFn: (data: {
+      name: string
+      type?: string
+      groupNumber?: string
+      primarySupplierId?: string
+      destination?: string
+      startDate?: string
+      endDate?: string
+      status?: string
+      description?: string
+    }) => api.post<TripGroupDto>('/trips/groups', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: tripGroupKeys.all })
     },
@@ -399,5 +411,117 @@ export function useTripsByGroup(groupId: string | null) {
     queryKey: [...tripGroupKeys.all, 'trips', groupId] as const,
     queryFn: () => api.get<TripGroupTripDto[]>(`/trips/groups/${groupId}/trips`),
     enabled: !!groupId,
+  })
+}
+
+export function useGroupSummary(groupId: string | null) {
+  return useQuery({
+    queryKey: [...tripGroupKeys.all, 'summary', groupId],
+    queryFn: () => api.get<TripGroupSummaryDto>(`/trips/groups/${groupId}/summary`),
+    enabled: !!groupId,
+  })
+}
+
+export function useUpdateGroupStatus() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ groupId, status, reason }: { groupId: string; status: string; reason?: string }) =>
+      api.patch(`/trips/groups/${groupId}/status`, { status, reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: tripGroupKeys.all })
+      queryClient.invalidateQueries({ queryKey: tripKeys.lists() })
+    },
+  })
+}
+
+export function useAddTripsToGroup() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ groupId, tripIds }: { groupId: string; tripIds: string[] }) =>
+      api.post(`/trips/groups/${groupId}/trips`, { tripIds }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: tripGroupKeys.all })
+      queryClient.invalidateQueries({ queryKey: tripKeys.lists() })
+    },
+  })
+}
+
+export function useRemoveTripFromGroup() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ groupId, tripId }: { groupId: string; tripId: string }) =>
+      api.delete(`/trips/groups/${groupId}/trips/${tripId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: tripGroupKeys.all })
+      queryClient.invalidateQueries({ queryKey: tripKeys.lists() })
+    },
+  })
+}
+
+export function useGroupDocuments(groupId: string | null) {
+  return useQuery({
+    queryKey: [...tripGroupKeys.all, 'documents', groupId],
+    queryFn: () => api.get<TripGroupDocumentDto[]>(`/trips/groups/${groupId}/documents`),
+    enabled: !!groupId,
+  })
+}
+
+export function useUploadGroupDocument() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ groupId, file, documentType }: { groupId: string; file: File; documentType?: string }) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      if (documentType) formData.append('documentType', documentType)
+      return api.post(`/trips/groups/${groupId}/documents`, formData)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: tripGroupKeys.all })
+    },
+  })
+}
+
+export function useDeleteGroupDocument() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ groupId, documentId }: { groupId: string; documentId: string }) =>
+      api.delete(`/trips/groups/${groupId}/documents/${documentId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: tripGroupKeys.all })
+    },
+  })
+}
+
+export function useGroupMedia(groupId: string | null) {
+  return useQuery({
+    queryKey: [...tripGroupKeys.all, 'media', groupId],
+    queryFn: () => api.get<TripGroupMediaDto[]>(`/trips/groups/${groupId}/media`),
+    enabled: !!groupId,
+  })
+}
+
+export function useUploadGroupMedia() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ groupId, file, caption }: { groupId: string; file: File; caption?: string }) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      if (caption) formData.append('caption', caption)
+      return api.post(`/trips/groups/${groupId}/media`, formData)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: tripGroupKeys.all })
+    },
+  })
+}
+
+export function useDeleteGroupMedia() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ groupId, mediaId }: { groupId: string; mediaId: string }) =>
+      api.delete(`/trips/groups/${groupId}/media/${mediaId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: tripGroupKeys.all })
+    },
   })
 }
