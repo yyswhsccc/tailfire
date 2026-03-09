@@ -2,7 +2,8 @@
  * Trip Access Service
  *
  * Core access control logic for trips.
- * Determines who can read/write trip data based on ownership and sharing.
+ * Determines who can read/write trip data based on ownership, sharing,
+ * and group membership (for group_booking groups).
  *
  * Access Levels:
  * - Admin: Full read/write access to all trips in agency
@@ -11,13 +12,18 @@
  * - Read Share: Read-only access via explicit share (access_level = 'read')
  * - Agency (no share): No access to other users' trips
  *
+ * Group Gate (group_booking only):
+ * - If a trip is in a group_booking, user must also have group access
+ * - Folders do not gate access
+ *
  * NOTE: Unlike contacts (which have basic agency-wide visibility),
  * trips are private by default and require explicit sharing for access.
  */
 
 import { Injectable } from '@nestjs/common'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray, notInArray, sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
+import { TripGroupAccessService } from './trip-group-access.service'
 import type { AuthContext } from '../auth/auth.types'
 
 export interface TripAccessResult {
@@ -28,7 +34,10 @@ export interface TripAccessResult {
 
 @Injectable()
 export class TripAccessService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly tripGroupAccessService: TripGroupAccessService,
+  ) {}
 
   /**
    * Check what level of access a user has to a trip
@@ -46,11 +55,12 @@ export class TripAccessService {
       }
     }
 
-    // Get the trip to check ownership
+    // Get the trip to check ownership and group membership
     const [trip] = await this.db.client
       .select({
         ownerId: this.db.schema.trips.ownerId,
         agencyId: this.db.schema.trips.agencyId,
+        tripGroupId: this.db.schema.trips.tripGroupId,
       })
       .from(this.db.schema.trips)
       .where(eq(this.db.schema.trips.id, tripId))
@@ -73,57 +83,61 @@ export class TripAccessService {
       }
     }
 
-    // Owner has full access
+    // Determine base access from ownership/sharing
+    let access: TripAccessResult
+
     if (trip.ownerId === auth.userId) {
-      return {
-        canRead: true,
-        canWrite: true,
-        reason: 'User owns this trip',
+      access = { canRead: true, canWrite: true, reason: 'User owns this trip' }
+    } else {
+      // Check for explicit share
+      const [share] = await this.db.client
+        .select({ accessLevel: this.db.schema.tripShares.accessLevel })
+        .from(this.db.schema.tripShares)
+        .where(
+          and(
+            eq(this.db.schema.tripShares.tripId, tripId),
+            eq(this.db.schema.tripShares.sharedWithUserId, auth.userId),
+          ),
+        )
+        .limit(1)
+
+      if (share) {
+        access = share.accessLevel === 'write'
+          ? { canRead: true, canWrite: true, reason: 'Write share granted' }
+          : { canRead: true, canWrite: false, reason: 'Read-only share granted' }
+      } else if (trip.ownerId === null) {
+        // Inbound trips (no owner) - agency users can view but not edit
+        access = { canRead: true, canWrite: false, reason: 'Inbound trip (no owner) - read-only access' }
+      } else {
+        access = { canRead: false, canWrite: false, reason: 'No access to this trip' }
       }
     }
 
-    // Check for explicit share
-    const [share] = await this.db.client
-      .select({ accessLevel: this.db.schema.tripShares.accessLevel })
-      .from(this.db.schema.tripShares)
-      .where(
-        and(
-          eq(this.db.schema.tripShares.tripId, tripId),
-          eq(this.db.schema.tripShares.sharedWithUserId, auth.userId),
-        ),
-      )
-      .limit(1)
+    // If no base read access, no point checking group gate
+    if (!access.canRead) {
+      return access
+    }
 
-    if (share) {
-      if (share.accessLevel === 'write') {
-        return {
-          canRead: true,
-          canWrite: true,
-          reason: 'Write share granted',
+    // Group gate: if trip is in a group_booking, user must also have group access
+    if (trip.tripGroupId) {
+      const [group] = await this.db.client
+        .select({ type: this.db.schema.tripGroups.type })
+        .from(this.db.schema.tripGroups)
+        .where(eq(this.db.schema.tripGroups.id, trip.tripGroupId))
+        .limit(1)
+
+      if (group?.type === 'group_booking') {
+        const groupAccess = await this.tripGroupAccessService.canAccessGroup(trip.tripGroupId, auth)
+        if (!groupAccess.canRead) {
+          return { canRead: false, canWrite: false, reason: 'No access to trip group' }
+        }
+        if (!groupAccess.canWrite && access.canWrite) {
+          return { canRead: true, canWrite: false, reason: 'Read-only group access' }
         }
       }
-      return {
-        canRead: true,
-        canWrite: false,
-        reason: 'Read-only share granted',
-      }
     }
 
-    // Inbound trips (no owner) - agency users can view but not edit
-    if (trip.ownerId === null) {
-      return {
-        canRead: true,
-        canWrite: false,
-        reason: 'Inbound trip (no owner) - read-only access',
-      }
-    }
-
-    // Default: No access to other users' trips
-    return {
-      canRead: false,
-      canWrite: false,
-      reason: 'No access to this trip',
-    }
+    return access
   }
 
   /**
@@ -182,7 +196,7 @@ export class TripAccessService {
 
   /**
    * Get all trips a user can access (for filtering queries)
-   * Returns trip IDs the user can read
+   * Returns trip IDs the user can read, excluding trips in inaccessible group_bookings
    */
   async getAccessibleTripIds(auth: AuthContext): Promise<string[] | 'all'> {
     // Admins can access all trips in agency
@@ -230,6 +244,35 @@ export class TripAccessService {
       tripIds.add(trip.id)
     }
 
-    return Array.from(tripIds)
+    const accessibleTripIds = Array.from(tripIds)
+
+    // Group gate: exclude trips in group_bookings the user can't access
+    if (accessibleTripIds.length > 0) {
+      const accessibleGroupIds = await this.tripGroupAccessService.getAccessibleGroupIds(auth)
+      if (accessibleGroupIds !== 'all') {
+        // Find trips in inaccessible group_bookings
+        const groupedTripsToExclude = await this.db.client
+          .select({ id: this.db.schema.trips.id })
+          .from(this.db.schema.trips)
+          .innerJoin(
+            this.db.schema.tripGroups,
+            eq(this.db.schema.trips.tripGroupId, this.db.schema.tripGroups.id),
+          )
+          .where(
+            and(
+              inArray(this.db.schema.trips.id, accessibleTripIds),
+              eq(this.db.schema.tripGroups.type, 'group_booking'),
+              accessibleGroupIds.length > 0
+                ? notInArray(this.db.schema.tripGroups.id, accessibleGroupIds)
+                : sql`true`,
+            ),
+          )
+
+        const excludeIds = new Set(groupedTripsToExclude.map(t => t.id))
+        return accessibleTripIds.filter(id => !excludeIds.has(id))
+      }
+    }
+
+    return accessibleTripIds
   }
 }
