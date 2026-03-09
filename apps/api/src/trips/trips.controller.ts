@@ -17,12 +17,16 @@ import {
   HttpStatus,
   ForbiddenException,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
 import { Public } from '../auth/decorators/public.decorator'
 import { ApiTags } from '@nestjs/swagger'
 import { TripsService } from './trips.service'
 import { TripAccessService } from './trip-access.service'
+import { StorageService } from './storage.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
 import { ActivitiesService } from './activities.service'
@@ -64,6 +68,7 @@ export class TripsController {
     private readonly activitiesService: ActivitiesService,
     private readonly activityLogsService: ActivityLogsService,
     private readonly paymentSchedulesService: PaymentSchedulesService,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -431,6 +436,137 @@ export class TripsController {
     return this.tripsService.removeTripFromGroup(
       groupId,
       tripId,
+      auth.agencyId,
+      auth.userId,
+    )
+  }
+
+  /**
+   * List documents for a trip group
+   * GET /trips/groups/:groupId/documents
+   */
+  @Get('groups/:groupId/documents')
+  async listGroupDocuments(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+  ) {
+    return this.tripsService.listGroupDocuments(groupId, auth.agencyId)
+  }
+
+  /**
+   * Upload a document to a trip group
+   * POST /trips/groups/:groupId/documents
+   */
+  @Post('groups/:groupId/documents')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadGroupDocument(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { documentType?: string },
+  ) {
+    const storagePath = await this.storageService.uploadDocument(
+      file.buffer,
+      groupId,
+      file.originalname,
+      file.mimetype,
+    )
+
+    return this.tripsService.createGroupDocument(
+      groupId,
+      {
+        fileUrl: storagePath,
+        fileName: file.originalname,
+        fileSize: file.size,
+        documentType: body.documentType,
+      },
+      auth.agencyId,
+      auth.userId,
+    )
+  }
+
+  /**
+   * Delete a document from a trip group
+   * DELETE /trips/groups/:groupId/documents/:documentId
+   */
+  @Delete('groups/:groupId/documents/:documentId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteGroupDocument(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    const doc = await this.tripsService.deleteGroupDocument(
+      groupId,
+      documentId,
+      auth.agencyId,
+      auth.userId,
+    )
+    // Clean up storage
+    if (doc.fileUrl) {
+      await this.storageService.deleteDocument(doc.fileUrl).catch(() => {})
+    }
+  }
+
+  /**
+   * List media for a trip group
+   * GET /trips/groups/:groupId/media
+   */
+  @Get('groups/:groupId/media')
+  async listGroupMedia(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+  ) {
+    return this.tripsService.listGroupMedia(groupId, auth.agencyId)
+  }
+
+  /**
+   * Upload media to a trip group
+   * POST /trips/groups/:groupId/media
+   */
+  @Post('groups/:groupId/media')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadGroupMedia(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { caption?: string },
+  ) {
+    const folder = `trip-groups/${groupId}/media`
+    const result = await this.storageService.uploadMediaFile(
+      file.buffer,
+      folder,
+      file.originalname,
+      file.mimetype,
+    )
+
+    return this.tripsService.createGroupMedia(
+      groupId,
+      {
+        fileUrl: result.url,
+        fileName: file.originalname,
+        fileSize: file.size,
+        caption: body.caption,
+      },
+      auth.agencyId,
+      auth.userId,
+    )
+  }
+
+  /**
+   * Delete media from a trip group
+   * DELETE /trips/groups/:groupId/media/:mediaId
+   */
+  @Delete('groups/:groupId/media/:mediaId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteGroupMedia(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Param('mediaId') mediaId: string,
+  ) {
+    await this.tripsService.deleteGroupMedia(
+      groupId,
+      mediaId,
       auth.agencyId,
       auth.userId,
     )

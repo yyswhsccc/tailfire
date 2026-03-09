@@ -3846,6 +3846,222 @@ export class TripsService {
   }
 
   // ============================================================================
+  // TRIP GROUP DOCUMENTS & MEDIA
+  // ============================================================================
+
+  async listGroupDocuments(groupId: string, agencyId: string) {
+    // Verify group belongs to agency
+    const [group] = await this.db.client
+      .select({ id: this.db.schema.tripGroups.id })
+      .from(this.db.schema.tripGroups)
+      .where(
+        and(
+          eq(this.db.schema.tripGroups.id, groupId),
+          eq(this.db.schema.tripGroups.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!group) {
+      throw new NotFoundException(`Trip group with ID ${groupId} not found`)
+    }
+
+    return this.db.client
+      .select()
+      .from(this.db.schema.tripGroupDocuments)
+      .where(eq(this.db.schema.tripGroupDocuments.tripGroupId, groupId))
+  }
+
+  async createGroupDocument(
+    groupId: string,
+    data: { fileUrl: string; fileName: string; fileSize?: number; documentType?: string },
+    agencyId: string,
+    actorId: string,
+  ) {
+    const [group] = await this.db.client
+      .select({ id: this.db.schema.tripGroups.id, name: this.db.schema.tripGroups.name })
+      .from(this.db.schema.tripGroups)
+      .where(
+        and(
+          eq(this.db.schema.tripGroups.id, groupId),
+          eq(this.db.schema.tripGroups.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!group) {
+      throw new NotFoundException(`Trip group with ID ${groupId} not found`)
+    }
+
+    const [doc] = await this.db.client
+      .insert(this.db.schema.tripGroupDocuments)
+      .values({
+        tripGroupId: groupId,
+        fileUrl: data.fileUrl,
+        fileName: data.fileName,
+        fileSize: data.fileSize,
+        documentType: data.documentType,
+        uploadedBy: actorId,
+      })
+      .returning()
+
+    if (!doc) {
+      throw new Error('Failed to create group document')
+    }
+
+    this.eventEmitter.emit(
+      'audit.created',
+      new AuditEvent('trip_group', groupId, 'created', doc.id, actorId, data.fileName),
+    )
+
+    return doc
+  }
+
+  async deleteGroupDocument(groupId: string, documentId: string, agencyId: string, actorId: string) {
+    const [group] = await this.db.client
+      .select({ id: this.db.schema.tripGroups.id, name: this.db.schema.tripGroups.name })
+      .from(this.db.schema.tripGroups)
+      .where(
+        and(
+          eq(this.db.schema.tripGroups.id, groupId),
+          eq(this.db.schema.tripGroups.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!group) {
+      throw new NotFoundException(`Trip group with ID ${groupId} not found`)
+    }
+
+    const [doc] = await this.db.client
+      .delete(this.db.schema.tripGroupDocuments)
+      .where(
+        and(
+          eq(this.db.schema.tripGroupDocuments.id, documentId),
+          eq(this.db.schema.tripGroupDocuments.tripGroupId, groupId),
+        ),
+      )
+      .returning()
+
+    if (!doc) {
+      throw new NotFoundException(`Document with ID ${documentId} not found`)
+    }
+
+    this.eventEmitter.emit(
+      'audit.deleted',
+      new AuditEvent('trip_group', groupId, 'deleted', documentId, actorId, doc.fileName),
+    )
+
+    return doc
+  }
+
+  async listGroupMedia(groupId: string, agencyId: string) {
+    const [group] = await this.db.client
+      .select({ id: this.db.schema.tripGroups.id })
+      .from(this.db.schema.tripGroups)
+      .where(
+        and(
+          eq(this.db.schema.tripGroups.id, groupId),
+          eq(this.db.schema.tripGroups.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!group) {
+      throw new NotFoundException(`Trip group with ID ${groupId} not found`)
+    }
+
+    return this.db.client
+      .select()
+      .from(this.db.schema.tripGroupMedia)
+      .where(eq(this.db.schema.tripGroupMedia.tripGroupId, groupId))
+  }
+
+  async createGroupMedia(
+    groupId: string,
+    data: { fileUrl: string; fileName: string; fileSize?: number; mediaType?: string; caption?: string },
+    agencyId: string,
+    actorId: string,
+  ) {
+    const [group] = await this.db.client
+      .select({ id: this.db.schema.tripGroups.id, name: this.db.schema.tripGroups.name })
+      .from(this.db.schema.tripGroups)
+      .where(
+        and(
+          eq(this.db.schema.tripGroups.id, groupId),
+          eq(this.db.schema.tripGroups.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!group) {
+      throw new NotFoundException(`Trip group with ID ${groupId} not found`)
+    }
+
+    const [media] = await this.db.client
+      .insert(this.db.schema.tripGroupMedia)
+      .values({
+        tripGroupId: groupId,
+        fileUrl: data.fileUrl,
+        fileName: data.fileName,
+        fileSize: data.fileSize,
+        mediaType: (data.mediaType as any) || 'image',
+        caption: data.caption,
+        uploadedBy: actorId,
+      })
+      .returning()
+
+    if (!media) {
+      throw new Error('Failed to create group media')
+    }
+
+    this.eventEmitter.emit(
+      'audit.created',
+      new AuditEvent('trip_group', groupId, 'created', media.id, actorId, data.fileName),
+    )
+
+    return media
+  }
+
+  async deleteGroupMedia(groupId: string, mediaId: string, agencyId: string, actorId: string) {
+    const [group] = await this.db.client
+      .select({ id: this.db.schema.tripGroups.id })
+      .from(this.db.schema.tripGroups)
+      .where(
+        and(
+          eq(this.db.schema.tripGroups.id, groupId),
+          eq(this.db.schema.tripGroups.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!group) {
+      throw new NotFoundException(`Trip group with ID ${groupId} not found`)
+    }
+
+    const [media] = await this.db.client
+      .delete(this.db.schema.tripGroupMedia)
+      .where(
+        and(
+          eq(this.db.schema.tripGroupMedia.id, mediaId),
+          eq(this.db.schema.tripGroupMedia.tripGroupId, groupId),
+        ),
+      )
+      .returning()
+
+    if (!media) {
+      throw new NotFoundException(`Media with ID ${mediaId} not found`)
+    }
+
+    this.eventEmitter.emit(
+      'audit.deleted',
+      new AuditEvent('trip_group', groupId, 'deleted', mediaId, actorId, media.fileName),
+    )
+
+    return media
+  }
+
+  // ============================================================================
   // TRIP CANCELLATION
   // ============================================================================
 
