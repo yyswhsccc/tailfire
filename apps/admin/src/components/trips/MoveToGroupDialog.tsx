@@ -97,7 +97,7 @@ export function MoveToGroupDialog({ open, onOpenChange, tripId, currentGroupId }
   const handleCreateGroup = async () => {
     if (!newGroupName.trim()) return
     try {
-      const group = await createGroup.mutateAsync(newGroupName.trim())
+      const group = await createGroup.mutateAsync({ name: newGroupName.trim() })
       await handleSelectGroup(group.id)
       setNewGroupName('')
       setShowCreateForm(false)
