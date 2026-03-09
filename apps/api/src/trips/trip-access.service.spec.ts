@@ -5,6 +5,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ForbiddenException } from '@nestjs/common'
 import { TripAccessService } from './trip-access.service'
+import { TripGroupAccessService } from './trip-group-access.service'
 import { DatabaseService } from '../db/database.service'
 import type { AuthContext } from '../auth/auth.types'
 
@@ -44,6 +45,13 @@ describe('TripAccessService', () => {
       providers: [
         TripAccessService,
         {
+          provide: TripGroupAccessService,
+          useValue: {
+            canAccessGroup: jest.fn().mockResolvedValue({ canRead: true, canWrite: true, reason: 'mock' }),
+            getAccessibleGroupIds: jest.fn().mockResolvedValue('all'),
+          },
+        },
+        {
           provide: DatabaseService,
           useValue: {
             client: mockDbClient,
@@ -53,12 +61,17 @@ describe('TripAccessService', () => {
                 ownerId: 'ownerId',
                 agencyId: 'agencyId',
                 status: 'status',
+                tripGroupId: 'tripGroupId',
               },
               tripShares: {
                 id: 'id',
                 tripId: 'tripId',
                 sharedWithUserId: 'sharedWithUserId',
                 accessLevel: 'accessLevel',
+              },
+              tripGroups: {
+                id: 'id',
+                type: 'type',
               },
             },
           },
