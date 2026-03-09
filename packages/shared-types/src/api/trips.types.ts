@@ -563,21 +563,36 @@ export interface TripShareDto {
   }>
 }
 
-/** Trip group (collection/folder) */
+export type TripGroupType = 'folder' | 'group_booking'
+export type TripGroupStatus = 'planning' | 'confirmed' | 'completed' | 'cancelled'
+
 export interface TripGroupDto {
   id: string
   agencyId: string
   name: string
   description: string | null
+  type: TripGroupType
+  groupNumber: string | null
+  primarySupplierId: string | null
+  destination: string | null
+  startDate: string | null
+  endDate: string | null
+  status: TripGroupStatus | null
   tripCount?: number
   createdAt: string
   updatedAt: string
 }
 
-/** Update trip group */
 export interface UpdateTripGroupApiDto {
   name?: string
   description?: string
+  type?: TripGroupType
+  groupNumber?: string
+  primarySupplierId?: string | null
+  destination?: string
+  startDate?: string | null
+  endDate?: string | null
+  status?: TripGroupStatus
 }
 
 /** Minimal trip data for group member listing */
@@ -586,6 +601,49 @@ export interface TripGroupTripDto {
   name: string
   status: string
   startDate: string | null
+}
+
+export interface TripGroupSummaryDto {
+  groupId: string
+  totalPackagePriceCents: number
+  totalCommissionProjectedCents: number
+  totalCommissionReceivedCents: number
+  totalBalanceCents: number
+  currency: string
+  tripSummaries: TripGroupTripSummaryDto[]
+}
+
+export interface TripGroupTripSummaryDto {
+  tripId: string
+  tripName: string
+  status: string
+  packagePriceCents: number
+  commissionProjectedCents: number
+  commissionReceivedCents: number
+  balanceCents: number
+  paymentStatus: 'paid' | 'partial' | 'outstanding' | 'none'
+}
+
+export interface TripGroupDocumentDto {
+  id: string
+  tripGroupId: string
+  documentType: string | null
+  fileUrl: string
+  fileName: string
+  fileSize: number | null
+  uploadedAt: string
+}
+
+export interface TripGroupMediaDto {
+  id: string
+  tripGroupId: string
+  mediaType: string
+  fileUrl: string
+  fileName: string
+  fileSize: number | null
+  caption: string | null
+  orderIndex: number
+  uploadedAt: string
 }
 
 // ============================================================================
