@@ -23,6 +23,7 @@ export const activityTypeEnum = pgEnum('activity_type', [
   'package', // Package grouping for multiple activities
   'custom_tour', // Catalog tour with departure selection
   'tour_day', // Child activity for each tour day
+  'insurance', // Insurance activity (linked to trip_insurance_packages)
 ])
 
 export const activityStatusEnum = pgEnum('activity_status', [
@@ -101,6 +102,7 @@ export const itineraryActivities = pgTable('itinerary_activities', {
 
   // Booking tracking
   isBooked: boolean('is_booked').notNull().default(false),
+  isVisibleInCalendar: boolean('is_visible_in_calendar').default(true).notNull(),
   bookingDate: timestamp('booking_date', { withTimezone: true }),
 
   // Pricing

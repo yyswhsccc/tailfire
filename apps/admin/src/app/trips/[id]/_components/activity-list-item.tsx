@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { GripVertical, Pencil, Trash2, MoreHorizontal, Package, Check, X, MessageSquare } from 'lucide-react'
+import { GripVertical, Pencil, Trash2, MoreHorizontal, Package, Check, X, MessageSquare, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
@@ -32,7 +32,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
-import { useDeleteActivity } from '@/hooks/use-activities'
+import { useDeleteActivity, useUpdateActivity } from '@/hooks/use-activities'
 import { useDeleteFlight } from '@/hooks/use-flights'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -49,9 +49,10 @@ interface ActivityListItemProps {
   cruiseColor?: CruiseColorSet
   clientResponse?: ClientActivityResponseType | null
   commentCount?: number
+  calendarDisplayMode?: 'trip' | 'activities'
 }
 
-export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDate, cruiseColor, clientResponse, commentCount }: ActivityListItemProps) {
+export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDate, cruiseColor, clientResponse, commentCount, calendarDisplayMode }: ActivityListItemProps) {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const { toast } = useToast()
@@ -60,6 +61,7 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
 
   const deleteActivity = useDeleteActivity(itineraryId)
   const deleteFlight = useDeleteFlight(itineraryId, dayId)
+  const updateActivity = useUpdateActivity(itineraryId, dayId)
 
   const isFlight = activity.componentType === 'flight'
 
@@ -226,6 +228,39 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
                 )}
               </div>
             </div>
+
+            {/* Calendar Visibility Toggle (only in activities mode) */}
+            {calendarDisplayMode === 'activities' && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-6 w-6 p-0 flex-shrink-0",
+                        FOCUS_VISIBLE_RING,
+                        activity.isVisibleInCalendar
+                          ? "text-indigo-500 hover:text-indigo-700"
+                          : "text-ash-300 hover:text-ash-500"
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        updateActivity.mutate({
+                          id: activity.id,
+                          data: { isVisibleInCalendar: !activity.isVisibleInCalendar },
+                        })
+                      }}
+                    >
+                      <CalendarDays className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{activity.isVisibleInCalendar ? 'Hide from calendar' : 'Show on calendar'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
 
             {/* Action Buttons - Dropdown Menu */}
             <DropdownMenu>

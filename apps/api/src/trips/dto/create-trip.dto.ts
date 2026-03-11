@@ -14,6 +14,7 @@ import {
   MinLength,
   MaxLength,
   Min,
+  Max,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import { IsTimezone } from '../../common/validators/is-timezone.validator'
@@ -94,4 +95,17 @@ export class CreateTripDto {
   @IsOptional()
   @IsTimezone()
   timezone?: string
+
+  // Commission fee rate override (null = use agency default)
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @Type(() => Number)
+  commissionFeeRateOverride?: number | null
+
+  // Calendar display mode
+  @IsOptional()
+  @IsIn(['trip', 'activities'])
+  calendarDisplayMode?: 'trip' | 'activities'
 }

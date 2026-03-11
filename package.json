@@ -8,6 +8,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
+    "predev": "redis-cli ping > /dev/null 2>&1 || redis-server --daemonize yes",
     "dev": "turbo dev",
     "build": "turbo build",
     "build:api": "pnpm --filter @tailfire/api build",

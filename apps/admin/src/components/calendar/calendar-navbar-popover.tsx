@@ -20,6 +20,7 @@ import {
   Plane,
   Mail,
   CalendarCheck,
+  CalendarDays,
 } from 'lucide-react'
 
 const EVENT_ICONS: Record<CalendarEventType, typeof CheckSquare> = {
@@ -30,6 +31,7 @@ const EVENT_ICONS: Record<CalendarEventType, typeof CheckSquare> = {
   trip: Plane,
   scheduled_email: Mail,
   event: CalendarCheck,
+  activity: CalendarDays,
 }
 
 function EventListItem({ event }: { event: CalendarEvent }) {
@@ -42,6 +44,8 @@ function EventListItem({ event }: { event: CalendarEvent }) {
         return `/tasks?id=${event.sourceId}`
       case 'trip':
         return `/trips/${event.tripId || event.sourceId}`
+      case 'activity':
+        return event.tripId ? `/trips/${event.tripId}` : null
       case 'payment_deposit':
       case 'payment_final':
         return event.tripId ? `/trips/${event.tripId}#financials` : null

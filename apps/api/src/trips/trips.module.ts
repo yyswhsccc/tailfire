@@ -50,6 +50,7 @@ import { PaymentTemplatesService } from './payment-templates.service'
 import { ActivityTotalsService } from './activity-totals.service'
 import { ActivityTravelersService } from './activity-travelers.service'
 import { ActivityBookingsService } from './activity-bookings.service'
+import { TravelerBookingsService } from './traveler-bookings.service'
 import { InsuranceService } from './insurance.service'
 import { StorageService } from './storage.service'
 import { ActivityDocumentsService } from './activity-documents.service'
@@ -79,8 +80,12 @@ import {
 } from './activity-media.controller'
 import { TripMediaController } from './trip-media.controller'
 import { ActivityBookingsController } from './activity-bookings.controller'
+import { TravelerBookingsController } from './traveler-bookings.controller'
 import { TripSharesController } from './trip-shares.controller'
 import { TripSharesService } from './trip-shares.service'
+import { TripGroupAccessService } from './trip-group-access.service'
+import { TripGroupSharesService } from './trip-group-shares.service'
+import { TripGroupSharesController } from './trip-group-shares.controller'
 
 @Module({
   imports: [
@@ -98,6 +103,7 @@ import { TripSharesService } from './trip-shares.service'
     TripsController,
     TripTravelersController,
     TripSharesController,
+    TripGroupSharesController,
     ItinerariesController,
     TravelerGroupsController,
     ItineraryDaysController,
@@ -114,6 +120,7 @@ import { TripSharesService } from './trip-shares.service'
     ComponentMediaController, // Legacy route for backwards compatibility
     TripMediaController,
     ActivityBookingsController, // Booking status management for activities
+    TravelerBookingsController, // Per-traveler booking records
   ],
   providers: [
     StorageProviderFactory,
@@ -121,8 +128,10 @@ import { TripSharesService } from './trip-shares.service'
     GeolocationCascadeService,
     TripsService,
     TripAccessService,
+    TripGroupAccessService,
     TripTravelersService,
     TripSharesService,
+    TripGroupSharesService,
     ItinerariesService,
     ItineraryVersionsService,
     TravelerGroupsService,
@@ -146,6 +155,7 @@ import { TripSharesService } from './trip-shares.service'
     ActivityTotalsService,
     ActivityTravelersService,
     ActivityBookingsService,
+    TravelerBookingsService,
     InsuranceService,
     StorageService,
     ActivityDocumentsService,
@@ -155,6 +165,7 @@ import { TripSharesService } from './trip-shares.service'
   exports: [
     TripsService,
     TripAccessService,
+    TripGroupAccessService,
     TripTravelersService,
     ItinerariesService,
     ItineraryVersionsService,

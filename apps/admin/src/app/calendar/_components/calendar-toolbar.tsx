@@ -30,6 +30,7 @@ const EVENT_TYPE_OPTIONS: { value: CalendarEventType; label: string; color: stri
   { value: 'payment_final', label: 'Final Payments', color: 'bg-red-500' },
   { value: 'birthday', label: 'Birthdays', color: 'bg-pink-500' },
   { value: 'trip', label: 'Trips', color: 'bg-emerald-500' },
+  { value: 'activity', label: 'Activities', color: 'bg-indigo-500' },
   { value: 'event', label: 'Events', color: 'bg-violet-500' },
   { value: 'scheduled_email', label: 'Emails', color: 'bg-slate-500' },
 ]

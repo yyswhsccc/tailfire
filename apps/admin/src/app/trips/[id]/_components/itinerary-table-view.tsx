@@ -3,10 +3,10 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { MoreVertical, MapPin, Clock, Calendar, Pencil, Copy, Trash2, Check, X, MessageSquare } from 'lucide-react'
+import { MoreVertical, MapPin, Clock, Calendar, CalendarDays, Pencil, Copy, Trash2, Check, X, MessageSquare } from 'lucide-react'
 import type { TripResponseDto, ItineraryResponseDto } from '@tailfire/shared-types/api'
 import { useItineraryDaysWithActivities } from '@/hooks/use-itinerary-days'
-import { useDeleteActivity, useDuplicateActivity } from '@/hooks/use-activities'
+import { useDeleteActivity, useDuplicateActivity, usePatchActivity } from '@/hooks/use-activities'
 import { useToast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -35,6 +35,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useDroppable } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
 import {
@@ -152,6 +158,7 @@ export function ItineraryTableView({ trip, itinerary, responseMap, commentCounts
 
   // Delete hook - dayId passed at mutation time
   const deleteActivity = useDeleteActivity(itinerary.id)
+  const updateActivity = usePatchActivity(itinerary.id)
 
   // Handle delete confirmation
   const handleDeleteConfirm = async () => {
@@ -406,6 +413,11 @@ export function ItineraryTableView({ trip, itinerary, responseMap, commentCounts
             <TableHead className="w-32 text-xs font-medium uppercase tracking-wide text-ash-600">Time</TableHead>
             <TableHead className="w-40 text-xs font-medium uppercase tracking-wide text-ash-600">Location</TableHead>
             <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-ash-600">Status</TableHead>
+            {trip.calendarDisplayMode === 'activities' && (
+              <TableHead className="w-10 text-xs font-medium uppercase tracking-wide text-ash-600 text-center">
+                <CalendarDays className="h-3.5 w-3.5 mx-auto text-ash-500" />
+              </TableHead>
+            )}
             <TableHead className="w-24 text-xs font-medium uppercase tracking-wide text-ash-600 text-right">Cost</TableHead>
             <TableHead className="w-10" />
           </TableRow>
@@ -574,6 +586,40 @@ export function ItineraryTableView({ trip, itinerary, responseMap, commentCounts
                     )}
                   </div>
                 </TableCell>
+
+                {/* Calendar Visibility Column */}
+                {trip.calendarDisplayMode === 'activities' && (
+                  <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-6 w-6 p-0",
+                              row.activity.isVisibleInCalendar
+                                ? "text-indigo-500 hover:text-indigo-700"
+                                : "text-ash-300 hover:text-ash-500"
+                            )}
+                            onClick={() => {
+                              updateActivity.mutate({
+                                activityId: row.activity.id,
+                                dayId: row.dayId,
+                                data: { isVisibleInCalendar: !row.activity.isVisibleInCalendar },
+                              })
+                            }}
+                          >
+                            <CalendarDays className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{row.activity.isVisibleInCalendar ? 'Hide from calendar' : 'Show on calendar'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableCell>
+                )}
 
                 {/* Cost Column */}
                 <TableCell className="py-2 text-right">

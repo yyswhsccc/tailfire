@@ -9,6 +9,7 @@ import {
   Plane,
   Mail,
   CalendarCheck,
+  CalendarDays,
   ExternalLink,
   User,
   MapPin,
@@ -33,6 +34,7 @@ const EVENT_ICONS: Record<CalendarEventType, typeof CheckSquare> = {
   trip: Plane,
   scheduled_email: Mail,
   event: CalendarCheck,
+  activity: CalendarDays,
 }
 
 const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
@@ -43,6 +45,7 @@ const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   trip: 'Trip',
   scheduled_email: 'Scheduled Email',
   event: 'Event',
+  activity: 'Activity',
 }
 
 interface EventDetailModalProps {
@@ -74,6 +77,8 @@ export function EventDetailModal({ event, open, onOpenChange }: EventDetailModal
         return `/tasks?id=${event.id}`
       case 'trip':
         return `/trips/${event.metadata?.tripId}`
+      case 'activity':
+        return event.metadata?.tripId ? `/trips/${event.metadata.tripId}` : null
       case 'payment_deposit':
       case 'payment_final':
         return event.metadata?.tripId ? `/trips/${event.metadata.tripId}#financials` : null

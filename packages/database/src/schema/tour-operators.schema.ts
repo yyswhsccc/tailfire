@@ -13,6 +13,7 @@ export const tourOperators = catalogSchema.table('tour_operators', {
   code: varchar('code', { length: 50 }).notNull().unique(),
   name: varchar('name', { length: 255 }).notNull(),
   provider: varchar('provider', { length: 100 }).notNull(),
+  supplierId: uuid('supplier_id'), // Links to suppliers table (no .references() — matches cruise_lines pattern for FDW)
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 })

@@ -156,6 +156,7 @@ export const trips = pgTable('trips', {
   pricingVisibility: pricingVisibilityEnum('pricing_visibility').default('show_all'),
   allowPdfDownloads: boolean('allow_pdf_downloads').default(true).notNull(),
   itineraryStyle: itineraryStyleEnum('itinerary_style').default('side_by_side'),
+  calendarDisplayMode: varchar('calendar_display_mode', { length: 20 }).default('trip').notNull(),
 
   // Settings
   isArchived: boolean('is_archived').default(false).notNull(),
@@ -166,6 +167,9 @@ export const trips = pgTable('trips', {
   // Client's preferred itinerary selection (multi-itinerary proposals)
   // FK constraint defined in migration SQL (not inline — avoids circular type reference with itineraries table)
   clientSelectedItineraryId: uuid('client_selected_itinerary_id'),
+
+  // Commission fee rate override (nullable — when NULL, uses agency_settings.commission_fee_rate)
+  commissionFeeRateOverride: decimal('commission_fee_rate_override', { precision: 5, scale: 2 }),
 
   // Cover Photo (denormalized for quick access - synced from trip_media)
   coverPhotoUrl: text('cover_photo_url'),
@@ -195,6 +199,14 @@ export const tripGroups = pgTable('trip_groups', {
   agencyId: uuid('agency_id').notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
+  type: varchar('type', { length: 20 }).default('folder').notNull(),
+  groupNumber: varchar('group_number', { length: 100 }),
+  primarySupplierId: uuid('primary_supplier_id'),
+  destination: varchar('destination', { length: 255 }),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
+  status: varchar('status', { length: 20 }),
+  ownerId: uuid('owner_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   createdBy: uuid('created_by'),

@@ -31,7 +31,7 @@ export class DashboardController {
    */
   @Get('overview')
   @ApiOperation({ summary: 'Get dashboard overview with KPIs, charts, and widgets' })
-  @ApiQuery({ name: 'period', enum: ['mtd', 'ytd'], required: false })
+  @ApiQuery({ name: 'period', enum: ['mtd', 'ytd', 'lifetime'], required: false })
   @ApiQuery({ name: 'chartYear', type: Number, required: false })
   @ApiQuery({ name: 'includeYoy', type: Boolean, required: false })
   async getOverview(

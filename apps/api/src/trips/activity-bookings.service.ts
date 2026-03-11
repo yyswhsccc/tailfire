@@ -166,7 +166,7 @@ export class ActivityBookingsService {
       FROM itinerary_activities ia
       LEFT JOIN itinerary_activities parent ON parent.id = ia.parent_activity_id
       LEFT JOIN activity_pricing ap ON ap.activity_id = ia.id
-      LEFT JOIN payment_schedule_config psc ON psc.component_pricing_id = ap.id
+      LEFT JOIN payment_schedule_config psc ON psc.component_pricing_id = ap.id AND psc.traveler_booking_id IS NULL
       WHERE ia.itinerary_day_id IN (
         SELECT id FROM itinerary_days WHERE itinerary_id IN (
           SELECT id FROM itineraries WHERE trip_id = ${tripId}
@@ -219,7 +219,7 @@ export class ActivityBookingsService {
     const result = await this.db.client.execute(sql`
       SELECT ap.id, psc.id as schedule_id
       FROM activity_pricing ap
-      LEFT JOIN payment_schedule_config psc ON psc.component_pricing_id = ap.id
+      LEFT JOIN payment_schedule_config psc ON psc.component_pricing_id = ap.id AND psc.traveler_booking_id IS NULL
       WHERE ap.activity_id = ${activityId}
       LIMIT 1
     `) as unknown as PricingScheduleRow[]

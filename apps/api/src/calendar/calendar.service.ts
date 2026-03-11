@@ -10,7 +10,7 @@
  */
 
 import { Injectable } from '@nestjs/common'
-import { and, eq, gte, lte, or, isNotNull, inArray } from 'drizzle-orm'
+import { and, eq, gte, lte, or, ne, isNotNull, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TripAccessService } from '../trips/trip-access.service'
 import { CalendarEventsService } from '../calendar-events/calendar-events.service'
@@ -34,6 +34,7 @@ const EVENT_COLORS: Record<CalendarEventType, { background: string; border: stri
   trip: { background: '#10b981', border: '#059669' },
   scheduled_email: { background: '#64748b', border: '#475569' },
   event: { background: '#8b5cf6', border: '#7c3aed' },
+  activity: { background: '#6366f1', border: '#4f46e5' },
 }
 
 @Injectable()
@@ -59,10 +60,11 @@ export class CalendarService {
       'trip',
       'scheduled_email',
       'event',
+      'activity',
     ]
 
     // Fetch events from all sources in parallel
-    const [tasks, trips, payments, birthdays, scheduledEmails, calendarEvents] = await Promise.all([
+    const [tasks, trips, payments, birthdays, scheduledEmails, calendarEvents, activityEvents] = await Promise.all([
       enabledTypes.includes('task')
         ? this.getTaskEvents(query, auth)
         : [],
@@ -81,10 +83,13 @@ export class CalendarService {
       enabledTypes.includes('event')
         ? this.getCalendarEventEvents(query, auth)
         : [],
+      enabledTypes.includes('activity')
+        ? this.getActivityCalendarEvents(query, auth)
+        : [],
     ])
 
     // Combine and sort events
-    const events = [...tasks, ...trips, ...payments, ...birthdays, ...scheduledEmails, ...calendarEvents].sort(
+    const events = [...tasks, ...trips, ...payments, ...birthdays, ...scheduledEmails, ...calendarEvents, ...activityEvents].sort(
       (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
     )
 
@@ -313,6 +318,8 @@ export class CalendarService {
   ): Promise<CalendarEvent[]> {
     const conditions = [
       eq(this.db.schema.trips.agencyId, auth.agencyId),
+      // Skip trips in 'activities' mode — they show individual activities instead
+      ne(this.db.schema.trips.calendarDisplayMode, 'activities'),
     ]
 
     // Date range filter
@@ -415,6 +422,7 @@ export class CalendarService {
       isNotNull(this.db.schema.expectedPaymentItems.dueDate),
       gte(this.db.schema.expectedPaymentItems.dueDate, query.start),
       lte(this.db.schema.expectedPaymentItems.dueDate, query.end),
+      ne(this.db.schema.trips.status, 'cancelled'),
     ]
 
     // Apply trip access filtering
@@ -702,6 +710,134 @@ export class CalendarService {
           },
         }
       })
+  }
+
+  /**
+   * Get individual activity events for trips in 'activities' calendar display mode
+   */
+  private async getActivityCalendarEvents(
+    query: CalendarQueryDto,
+    auth: AuthContext
+  ): Promise<CalendarEvent[]> {
+    // First find trips in 'activities' mode within the date range
+    const tripConditions = [
+      eq(this.db.schema.trips.agencyId, auth.agencyId),
+      eq(this.db.schema.trips.calendarDisplayMode, 'activities'),
+    ]
+
+    // RBAC: Use TripAccessService to get accessible trips
+    const accessibleTripIds = await this.tripAccessService.getAccessibleTripIds(auth)
+    if (accessibleTripIds !== 'all') {
+      if (accessibleTripIds.length === 0) {
+        return []
+      }
+      tripConditions.push(inArray(this.db.schema.trips.id, accessibleTripIds))
+    }
+
+    // Admin user filter
+    if (query.userId && auth.role === 'admin') {
+      tripConditions.push(eq(this.db.schema.trips.ownerId, query.userId))
+    }
+
+    // Specific trip filter
+    if (query.tripId) {
+      tripConditions.push(eq(this.db.schema.trips.id, query.tripId))
+    }
+
+    // Contact filter
+    if (query.contactId) {
+      const contactTripIds = this.db.client
+        .select({ tripId: this.db.schema.tripTravelers.tripId })
+        .from(this.db.schema.tripTravelers)
+        .where(eq(this.db.schema.tripTravelers.contactId, query.contactId))
+      tripConditions.push(inArray(this.db.schema.trips.id, contactTripIds))
+    }
+
+    // Query activities: trips → itineraries → itinerary_days → itinerary_activities
+    // Filter: isVisibleInCalendar = true, has itineraryDayId (not floating), has dates
+    const queryStart = new Date(query.start)
+    const queryEnd = new Date(query.end)
+    queryEnd.setUTCHours(23, 59, 59, 999)
+
+    const activities = await this.db.client
+      .select({
+        activityId: this.db.schema.itineraryActivities.id,
+        activityName: this.db.schema.itineraryActivities.name,
+        activityType: this.db.schema.itineraryActivities.activityType,
+        startDatetime: this.db.schema.itineraryActivities.startDatetime,
+        endDatetime: this.db.schema.itineraryActivities.endDatetime,
+        location: this.db.schema.itineraryActivities.location,
+        status: this.db.schema.itineraryActivities.status,
+        tripId: this.db.schema.trips.id,
+        tripName: this.db.schema.trips.name,
+      })
+      .from(this.db.schema.itineraryActivities)
+      .innerJoin(
+        this.db.schema.itineraryDays,
+        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id)
+      )
+      .innerJoin(
+        this.db.schema.itineraries,
+        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
+      )
+      .innerJoin(
+        this.db.schema.trips,
+        eq(this.db.schema.itineraries.tripId, this.db.schema.trips.id)
+      )
+      .where(
+        and(
+          ...tripConditions,
+          eq(this.db.schema.itineraryActivities.isVisibleInCalendar, true),
+          isNotNull(this.db.schema.itineraryActivities.itineraryDayId),
+          isNotNull(this.db.schema.itineraryActivities.startDatetime),
+          // Date overlap: activity overlaps with query range
+          or(
+            // Activity starts within range
+            and(
+              gte(this.db.schema.itineraryActivities.startDatetime, queryStart),
+              lte(this.db.schema.itineraryActivities.startDatetime, queryEnd)
+            ),
+            // Activity ends within range
+            and(
+              isNotNull(this.db.schema.itineraryActivities.endDatetime),
+              gte(this.db.schema.itineraryActivities.endDatetime, queryStart),
+              lte(this.db.schema.itineraryActivities.endDatetime, queryEnd)
+            ),
+            // Activity spans entire range
+            and(
+              lte(this.db.schema.itineraryActivities.startDatetime, queryStart),
+              isNotNull(this.db.schema.itineraryActivities.endDatetime),
+              gte(this.db.schema.itineraryActivities.endDatetime, queryEnd)
+            )
+          )
+        )
+      )
+
+    return activities.map((a): CalendarEvent => {
+      const start = a.startDatetime!.toISOString()
+      const end = a.endDatetime?.toISOString()
+
+      return {
+        id: `activity-${a.activityId}`,
+        type: 'activity',
+        title: `${a.activityName} — ${a.tripName}`,
+        description: a.location ?? undefined,
+        start,
+        end,
+        allDay: false,
+        backgroundColor: EVENT_COLORS.activity.background,
+        borderColor: EVENT_COLORS.activity.border,
+        sourceId: a.activityId,
+        sourceType: 'activity',
+        tripId: a.tripId,
+        editable: false,
+        clickable: true,
+        metadata: {
+          activityType: a.activityType,
+          status: a.status,
+        },
+      }
+    })
   }
 
   /**
