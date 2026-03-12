@@ -470,7 +470,9 @@ export function useRemoveTripFromGroup() {
 export function useGroupDocuments(groupId: string | null) {
   return useQuery({
     queryKey: [...tripGroupKeys.all, 'documents', groupId],
-    queryFn: () => api.get<TripGroupDocumentDto[]>(`/trips/groups/${groupId}/documents`),
+    queryFn: () =>
+      api.get<{ documents: TripGroupDocumentDto[] }>(`/trips/groups/${groupId}/documents`)
+        .then((res) => res.documents),
     enabled: !!groupId,
   })
 }
@@ -504,7 +506,9 @@ export function useDeleteGroupDocument() {
 export function useGroupMedia(groupId: string | null) {
   return useQuery({
     queryKey: [...tripGroupKeys.all, 'media', groupId],
-    queryFn: () => api.get<TripGroupMediaDto[]>(`/trips/groups/${groupId}/media`),
+    queryFn: () =>
+      api.get<{ media: TripGroupMediaDto[] }>(`/trips/groups/${groupId}/media`)
+        .then((res) => res.media),
     enabled: !!groupId,
   })
 }

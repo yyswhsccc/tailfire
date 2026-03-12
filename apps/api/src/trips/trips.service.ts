@@ -167,6 +167,7 @@ export class TripsService {
         commissionFeeRateOverride: dto.commissionFeeRateOverride?.toString(),
         customFields: dto.customFields,
         timezone: dto.timezone,
+        tripGroupId: dto.tripGroupId,
       })
       .returning()
 
@@ -3545,7 +3546,7 @@ export class TripsService {
         updatedAt: this.db.schema.tripGroups.updatedAt,
         tripCount: sql<number>`(
           SELECT COUNT(*)::int FROM ${this.db.schema.trips}
-          WHERE ${this.db.schema.trips.tripGroupId} = ${this.db.schema.tripGroups.id}
+          WHERE ${this.db.schema.trips.tripGroupId} = "trip_groups"."id"
         )`,
       })
       .from(this.db.schema.tripGroups)
@@ -4202,6 +4203,32 @@ export class TripsService {
     )
 
     return media
+  }
+
+  async updateGroupMedia(
+    groupId: string,
+    mediaId: string,
+    data: { caption?: string; orderIndex?: number },
+  ) {
+    const [updated] = await this.db.client
+      .update(this.db.schema.tripGroupMedia)
+      .set({
+        ...(data.caption !== undefined && { caption: data.caption }),
+        ...(data.orderIndex !== undefined && { orderIndex: data.orderIndex }),
+      })
+      .where(
+        and(
+          eq(this.db.schema.tripGroupMedia.id, mediaId),
+          eq(this.db.schema.tripGroupMedia.tripGroupId, groupId),
+        ),
+      )
+      .returning()
+
+    if (!updated) {
+      throw new NotFoundException(`Media with ID ${mediaId} not found`)
+    }
+
+    return updated
   }
 
   async deleteGroupMedia(groupId: string, mediaId: string, agencyId: string, actorId: string) {

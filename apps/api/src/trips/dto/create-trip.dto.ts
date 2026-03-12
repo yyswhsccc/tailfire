@@ -108,4 +108,9 @@ export class CreateTripDto {
   @IsOptional()
   @IsIn(['trip', 'activities'])
   calendarDisplayMode?: 'trip' | 'activities'
+
+  // Optional group association
+  @IsOptional()
+  @IsUUID()
+  tripGroupId?: string
 }

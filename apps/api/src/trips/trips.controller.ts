@@ -16,6 +16,7 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  BadRequestException,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -473,7 +474,21 @@ export class TripsController {
     @Param('groupId') groupId: string,
   ) {
     await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
-    return this.tripsService.listGroupDocuments(groupId, auth.agencyId)
+    const documents = await this.tripsService.listGroupDocuments(groupId, auth.agencyId)
+    const documentsWithUrls = await Promise.all(
+      documents.map(async (doc) => {
+        if (this.storageService.isAvailable() && doc.fileUrl) {
+          try {
+            const downloadUrl = await this.storageService.getSignedUrl(doc.fileUrl, 3600)
+            return { ...doc, downloadUrl }
+          } catch {
+            return { ...doc, downloadUrl: null }
+          }
+        }
+        return { ...doc, downloadUrl: null }
+      })
+    )
+    return { documents: documentsWithUrls }
   }
 
   /**
@@ -489,6 +504,15 @@ export class TripsController {
     @Body() body: { documentType?: string },
   ) {
     await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
+    if (!file) {
+      throw new BadRequestException('No file provided')
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('File too large. Maximum size is 10MB')
+    }
+    if (!this.storageService.isAvailable()) {
+      throw new BadRequestException('Storage service not configured')
+    }
     const storagePath = await this.storageService.uploadDocument(
       file.buffer,
       groupId,
@@ -543,7 +567,8 @@ export class TripsController {
     @Param('groupId') groupId: string,
   ) {
     await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
-    return this.tripsService.listGroupMedia(groupId, auth.agencyId)
+    const media = await this.tripsService.listGroupMedia(groupId, auth.agencyId)
+    return { media }
   }
 
   /**
@@ -559,6 +584,19 @@ export class TripsController {
     @Body() body: { caption?: string },
   ) {
     await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
+    if (!file) {
+      throw new BadRequestException('No file provided')
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('File too large. Maximum size is 10MB')
+    }
+    const allowedMediaTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif', 'video/mp4', 'video/webm']
+    if (!allowedMediaTypes.includes(file.mimetype)) {
+      throw new BadRequestException(`Invalid file type: ${file.mimetype}. Allowed types: JPEG, PNG, GIF, WebP, AVIF, MP4, WebM`)
+    }
+    if (!this.storageService.isMediaAvailable()) {
+      throw new BadRequestException('Media storage service not configured')
+    }
     const folder = `trip-groups/${groupId}/media`
     const result = await this.storageService.uploadMediaFile(
       file.buffer,
@@ -578,6 +616,21 @@ export class TripsController {
       auth.agencyId,
       auth.userId,
     )
+  }
+
+  /**
+   * Update media in a trip group (caption, order)
+   * PATCH /trips/groups/:groupId/media/:mediaId
+   */
+  @Patch('groups/:groupId/media/:mediaId')
+  async updateGroupMedia(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Param('mediaId') mediaId: string,
+    @Body() body: { caption?: string; orderIndex?: number },
+  ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
+    return this.tripsService.updateGroupMedia(groupId, mediaId, body)
   }
 
   /**

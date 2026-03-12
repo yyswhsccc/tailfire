@@ -10,7 +10,7 @@ import { relations, sql } from 'drizzle-orm'
 
 import { agencies } from './agencies.schema'
 import { userProfiles } from './user-profiles.schema'
-import { trips } from './trips.schema'
+import { trips, tripGroups } from './trips.schema'
 import { contacts } from './contacts.schema'
 
 // ============================================================================
@@ -33,6 +33,7 @@ export const notes = pgTable(
     contactId: uuid('contact_id').references(() => contacts.id, {
       onDelete: 'cascade',
     }),
+    tripGroupId: uuid('trip_group_id').references(() => tripGroups.id, { onDelete: 'cascade' }),
 
     isPinned: boolean('is_pinned').default(false).notNull(),
 
@@ -58,10 +59,13 @@ export const notes = pgTable(
     index('idx_notes_trip_pinned_created')
       .on(table.tripId, table.isPinned, table.createdAt)
       .where(sql`${table.tripId} IS NOT NULL`),
+    index('idx_notes_trip_group_pinned_created')
+      .on(table.tripGroupId, table.isPinned, table.createdAt)
+      .where(sql`${table.tripGroupId} IS NOT NULL`),
     // CHECK: exactly one entity FK must be set
     check(
       'notes_entity_check',
-      sql`(trip_id IS NOT NULL AND contact_id IS NULL) OR (trip_id IS NULL AND contact_id IS NOT NULL)`
+      sql`num_nonnulls(trip_id, contact_id, trip_group_id) = 1`
     ),
   ]
 )
@@ -82,6 +86,10 @@ export const notesRelations = relations(notes, ({ one }) => ({
   contact: one(contacts, {
     fields: [notes.contactId],
     references: [contacts.id],
+  }),
+  tripGroup: one(tripGroups, {
+    fields: [notes.tripGroupId],
+    references: [tripGroups.id],
   }),
   createdByUser: one(userProfiles, {
     fields: [notes.createdBy],
