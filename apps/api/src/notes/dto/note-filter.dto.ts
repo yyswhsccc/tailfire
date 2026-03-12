@@ -21,4 +21,8 @@ export class NoteFilterDto {
   @IsOptional()
   @IsUUID()
   contactId?: string
+
+  @IsOptional()
+  @IsUUID()
+  tripGroupId?: string
 }

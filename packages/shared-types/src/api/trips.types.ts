@@ -73,6 +73,9 @@ export interface CreateTripDto {
 
   // Commission fee rate override (nullable — when absent/null, uses agency default)
   commissionFeeRateOverride?: number | null // 0-100
+
+  // Optional group association
+  tripGroupId?: string
 }
 
 export interface CreateTripCollaboratorDto {

@@ -16,6 +16,7 @@ import {
   StickyNote,
   FileText,
   Image,
+  Pencil,
 } from 'lucide-react'
 import { DetailLayout } from '@/components/layout'
 import { Card } from '@/components/ui/card'
@@ -33,6 +34,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
+import { DocumentUploader } from '@/components/document-uploader'
+import { GroupMediaTab } from './_components/group-media-tab'
+import { NotesSection } from '@/components/notes/NotesSection'
+import { GroupFormDialog } from '../../_components/group-form-dialog'
 import {
   useTripGroups,
   useTripsByGroup,
@@ -196,6 +201,7 @@ export default function GroupDetailPage() {
   // Dialog state
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
 
   // Tab state with URL sync (matching trip detail pattern)
   const initialTab = searchParams.get('tab') as GroupTab | null
@@ -577,26 +583,21 @@ export default function GroupDetailPage() {
 
       case 'notes':
         return (
-          <EmptyState
-            title="Notes coming soon"
-            description="Group notes will be available in a future update."
-          />
+          <NotesSection tripGroupId={groupId} />
         )
 
       case 'documents':
         return (
-          <EmptyState
-            title="Documents coming soon"
-            description="Group document management will be available in a future update."
+          <DocumentUploader
+            resourceId={groupId}
+            endpointPath="/trips/groups/{id}/documents"
+            queryKey={['group-documents', groupId]}
           />
         )
 
       case 'media':
         return (
-          <EmptyState
-            title="Media coming soon"
-            description="Group media management will be available in a future update."
-          />
+          <GroupMediaTab groupId={groupId} />
         )
 
       default:
@@ -641,16 +642,26 @@ export default function GroupDetailPage() {
               </div>
             </div>
           </div>
-          {isGroupBooking && group.status !== 'cancelled' && (
+          <div className="flex items-center gap-2">
             <Button
-              variant="destructive"
+              variant="outline"
               size="sm"
-              onClick={() => setShowCancelDialog(true)}
+              onClick={() => setEditDialogOpen(true)}
             >
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              Cancel Group
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit
             </Button>
-          )}
+            {isGroupBooking && group.status !== 'cancelled' && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowCancelDialog(true)}
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Cancel Group
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Tab Content */}
@@ -689,6 +700,14 @@ export default function GroupDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Group Dialog */}
+      <GroupFormDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        mode="edit"
+        group={group}
+      />
     </DetailLayout>
   )
 }
