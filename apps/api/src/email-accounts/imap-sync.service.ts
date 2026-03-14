@@ -28,13 +28,12 @@ export class ImapSyncService {
     password: string
   }): Promise<TestConnectionResultDto> {
     try {
-      const { ImapFlow } = await import('imapflow')
-      const client = new ImapFlow({
+      const client = await this.createImapClient({
         host: dto.imapHost,
         port: dto.imapPort,
         secure: dto.imapTls,
-        auth: { user: dto.username, pass: dto.password },
-        logger: false,
+        user: dto.username,
+        pass: dto.password,
       })
 
       await client.connect()
@@ -59,13 +58,12 @@ export class ImapSyncService {
     const errors: string[] = []
 
     try {
-      const { ImapFlow } = await import('imapflow')
-      const client = new ImapFlow({
+      const client = await this.createImapClient({
         host: account.imapHost,
         port: account.imapPort,
         secure: account.imapTls,
-        auth: { user: credentials.username, pass: credentials.password },
-        logger: false,
+        user: credentials.username,
+        pass: credentials.password,
       })
 
       await client.connect()
@@ -79,18 +77,21 @@ export class ImapSyncService {
 
         // Fetch new messages (metadata only — no body)
         const fetchRange = lastUid > 0 ? `${lastUid + 1}:*` : '1:*'
+        this.logger.debug(`Fetching UIDs ${fetchRange} from INBOX (lastUid=${lastUid}, mailbox.exists=${(client.mailbox as any)?.exists})`)
         for await (const msg of client.fetch(fetchRange, {
           envelope: true,
           bodyStructure: true,
           flags: true,
           uid: true,
         })) {
+          this.logger.debug(`Processing UID ${msg.uid} (subject: ${msg.envelope?.subject})`)
           if (Number(msg.uid) <= lastUid) continue
 
           try {
             await this.upsertEmailFromImap(accountId, account.agencyId, 'INBOX', msg)
             newMessages++
           } catch (err: any) {
+            this.logger.error(`Failed to upsert UID ${msg.uid}: ${err.message}`, err.stack)
             errors.push(`UID ${msg.uid}: ${err.message}`)
           }
         }
@@ -154,13 +155,12 @@ export class ImapSyncService {
     }
 
     try {
-      const { ImapFlow } = await import('imapflow')
-      const client = new ImapFlow({
+      const client = await this.createImapClient({
         host: account.imapHost,
         port: account.imapPort,
         secure: account.imapTls,
-        auth: { user: credentials.username, pass: credentials.password },
-        logger: false,
+        user: credentials.username,
+        pass: credentials.password,
       })
 
       await client.connect()
@@ -208,13 +208,12 @@ export class ImapSyncService {
     const credentials = await this.emailAccountsService.getDecryptedCredentials(accountId)
 
     try {
-      const { ImapFlow } = await import('imapflow')
-      const client = new ImapFlow({
+      const client = await this.createImapClient({
         host: account.imapHost,
         port: account.imapPort,
         secure: account.imapTls,
-        auth: { user: credentials.username, pass: credentials.password },
-        logger: false,
+        user: credentials.username,
+        pass: credentials.password,
       })
 
       await client.connect()
@@ -271,13 +270,12 @@ export class ImapSyncService {
       throw new NotFoundException('Email not found')
     }
 
-    const { ImapFlow } = await import('imapflow')
-    const client = new ImapFlow({
+    const client = await this.createImapClient({
       host: account.imapHost,
       port: account.imapPort,
       secure: account.imapTls,
-      auth: { user: credentials.username, pass: credentials.password },
-      logger: false,
+      user: credentials.username,
+      pass: credentials.password,
     })
 
     await client.connect()
@@ -308,6 +306,32 @@ export class ImapSyncService {
   // ============================================================================
   // Private helpers
   // ============================================================================
+
+  /**
+   * Create an ImapFlow client with an error handler to prevent unhandled
+   * 'error' events (e.g. socket timeouts) from crashing the Node process.
+   */
+  private async createImapClient(config: {
+    host: string
+    port: number
+    secure: boolean
+    user: string
+    pass: string
+  }) {
+    const { ImapFlow } = await import('imapflow')
+    const client = new ImapFlow({
+      host: config.host,
+      port: config.port,
+      secure: config.secure,
+      auth: { user: config.user, pass: config.pass },
+      logger: false,
+    })
+    // Prevent unhandled 'error' event from crashing the process
+    client.on('error', (err: Error) => {
+      this.logger.warn(`ImapFlow error (${config.host}): ${err.message}`)
+    })
+    return client
+  }
 
   private async upsertEmailFromImap(
     accountId: string,
