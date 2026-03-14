@@ -1044,6 +1044,13 @@
       "when": 1773201600000,
       "tag": "20260309120000_add_trip_group_ownership",
       "breakpoints": true
+    },
+    {
+      "idx": 149,
+      "version": "7",
+      "when": 1773763200000,
+      "tag": "20260314120000_create_email_accounts",
+      "breakpoints": true
     }
   ]
 }
