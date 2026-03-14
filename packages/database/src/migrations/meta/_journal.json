@@ -1065,6 +1065,20 @@
       "when": 1773763202000,
       "tag": "20260314120200_create_email_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1773763203000,
+      "tag": "20260314120300_add_email_settings_to_agency",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1773763204000,
+      "tag": "20260314120400_add_contact_email_index",
+      "breakpoints": true
     }
   ]
 }
