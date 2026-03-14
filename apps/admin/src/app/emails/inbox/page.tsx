@@ -1,16 +1,20 @@
 'use client'
 
+import { useState, useCallback } from 'react'
+import { DndContext, DragOverlay, type DragStartEvent, type DragEndEvent } from '@dnd-kit/core'
 import { Loader2, Pencil, RefreshCw, Mail, Search } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useEmailAccounts } from '@/hooks/use-email-accounts'
-import { useEmailFolders, useEmails, useSyncEmails } from '@/hooks/use-emails'
+import { useEmailFolders, useEmails, useSyncEmails, useMoveEmail } from '@/hooks/use-emails'
 import { useEmailStore } from '@/stores/email.store'
+import { useDndSensors, dndCollisionDetection, type EmailDragData, type FolderDropData } from '@/lib/dnd-config'
 import { FolderSidebar } from './_components/folder-sidebar'
 import { EmailList } from './_components/email-list'
 import { EmailReader } from './_components/email-reader'
 import { ComposeEmailDialog } from './_components/compose-email-dialog'
+import type { SyncedEmailResponseDto } from '@tailfire/shared-types/api'
 
 export default function EmailInboxPage() {
   const { data: accounts, isLoading: accountsLoading } = useEmailAccounts()
@@ -32,6 +36,41 @@ export default function EmailInboxPage() {
     search: search || undefined,
   })
   const syncEmails = useSyncEmails(accountId)
+  const moveEmail = useMoveEmail(accountId)
+
+  // DnD state
+  const sensors = useDndSensors()
+  const [activeDragEmail, setActiveDragEmail] = useState<SyncedEmailResponseDto | null>(null)
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const data = event.active.data.current as EmailDragData | undefined
+    if (data?.type === 'email') {
+      setActiveDragEmail(data.email)
+    }
+  }, [])
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    setActiveDragEmail(null)
+    const overData = event.over?.data.current as FolderDropData | undefined
+    if (!overData || overData.type !== 'folder') return
+
+    const emailData = event.active.data.current as EmailDragData | undefined
+    if (!emailData || emailData.type !== 'email') return
+
+    const targetFolder = overData.folderPath
+    if (targetFolder === activeFolder) return
+
+    moveEmail.mutate({ emailId: emailData.email.id, folder: targetFolder })
+
+    // Clear selection if the moved email was selected
+    if (emailData.email.id === selectedEmailId) {
+      setSelectedEmailId(null)
+    }
+  }, [activeFolder, moveEmail, selectedEmailId, setSelectedEmailId])
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragEmail(null)
+  }, [])
 
   // No email account configured
   if (!accountsLoading && (!accounts || accounts.length === 0)) {
@@ -66,82 +105,103 @@ export default function EmailInboxPage() {
 
   return (
     <DashboardLayout>
-      <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-lg border">
-        {/* Folder Sidebar */}
-        <div className="w-52 flex-shrink-0 border-r bg-muted/20 p-3">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Folders</h3>
-            <div className="flex gap-0.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => openCompose({ mode: 'new' })}
-                title="Compose"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => syncEmails.mutate()}
-                disabled={syncEmails.isPending}
-                title="Sync emails"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${syncEmails.isPending ? 'animate-spin' : ''}`} />
-              </Button>
-            </div>
-          </div>
-          <FolderSidebar
-            accountId={accountId}
-            folders={folders || []}
-            activeFolder={activeFolder}
-            onSelectFolder={setActiveFolder}
-          />
-        </div>
-
-        {/* Email List */}
-        <div className="flex w-80 flex-shrink-0 flex-col border-r">
-          <div className="border-b p-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search emails..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-9 pl-9"
-              />
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {emailsLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      <DndContext
+        sensors={sensors}
+        collisionDetection={dndCollisionDetection}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-lg border">
+          {/* Folder Sidebar */}
+          <div className="w-52 flex-shrink-0 border-r bg-muted/20 p-3">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Folders</h3>
+              <div className="flex gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => openCompose({ mode: 'new' })}
+                  title="Compose"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => syncEmails.mutate()}
+                  disabled={syncEmails.isPending}
+                  title="Sync emails"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${syncEmails.isPending ? 'animate-spin' : ''}`} />
+                </Button>
               </div>
+            </div>
+            <FolderSidebar
+              accountId={accountId}
+              folders={folders || []}
+              activeFolder={activeFolder}
+              onSelectFolder={setActiveFolder}
+            />
+          </div>
+
+          {/* Email List */}
+          <div className="flex w-80 flex-shrink-0 flex-col border-r">
+            <div className="border-b p-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search emails..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-9 pl-9"
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {emailsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <EmailList
+                  accountId={accountId}
+                  activeFolder={activeFolder}
+                  emails={emailsData?.emails || []}
+                  selectedEmailId={selectedEmailId}
+                  onSelectEmail={setSelectedEmailId}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Email Reader */}
+          <div className="flex-1 overflow-hidden">
+            {selectedEmailId && accountId ? (
+              <EmailReader accountId={accountId} emailId={selectedEmailId} />
             ) : (
-              <EmailList
-                accountId={accountId}
-                activeFolder={activeFolder}
-                emails={emailsData?.emails || []}
-                selectedEmailId={selectedEmailId}
-                onSelectEmail={setSelectedEmailId}
-              />
+              <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+                Select an email to read
+              </div>
             )}
           </div>
         </div>
 
-        {/* Email Reader */}
-        <div className="flex-1 overflow-hidden">
-          {selectedEmailId && accountId ? (
-            <EmailReader accountId={accountId} emailId={selectedEmailId} />
-          ) : (
-            <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
-              Select an email to read
+        <DragOverlay>
+          {activeDragEmail && (
+            <div className="w-72 rounded-md border bg-background p-3 shadow-lg rotate-2">
+              <p className="truncate text-sm font-medium">
+                {activeDragEmail.subject || '(no subject)'}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {activeDragEmail.fromName || activeDragEmail.fromAddress || 'Unknown'}
+              </p>
             </div>
           )}
-        </div>
-      </div>
+        </DragOverlay>
+      </DndContext>
 
       {/* Compose Dialog */}
       {compose && accountId && (

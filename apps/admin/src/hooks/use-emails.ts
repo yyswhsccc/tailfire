@@ -12,6 +12,7 @@ import type {
   SyncedEmailDetailDto,
   EmailFolderDto,
   SyncResultDto,
+  PaginatedEmailLogsResponse,
 } from '@tailfire/shared-types/api'
 import { useToast } from './use-toast'
 import { useEmailAccounts } from './use-email-accounts'
@@ -19,6 +20,12 @@ import { useEmailAccounts } from './use-email-accounts'
 // ============================================================================
 // Query Keys
 // ============================================================================
+
+export const emailLogKeys = {
+  all: ['email-logs'] as const,
+  list: (contactId: string, search?: string) =>
+    [...emailLogKeys.all, contactId, search] as const,
+}
 
 export const emailKeys = {
   all: ['emails'] as const,
@@ -32,6 +39,20 @@ export const emailKeys = {
 // ============================================================================
 // Queries
 // ============================================================================
+
+export function useEmailLogs(contactId: string | null, filters?: { search?: string }) {
+  return useQuery({
+    queryKey: emailLogKeys.list(contactId || '', filters?.search),
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (contactId) params.set('contactId', contactId)
+      if (filters?.search) params.set('search', filters.search)
+      params.set('limit', '100')
+      return api.get<PaginatedEmailLogsResponse>(`/emails/logs?${params.toString()}`)
+    },
+    enabled: !!contactId,
+  })
+}
 
 export function useEmailFolders(accountId: string | null) {
   return useQuery({

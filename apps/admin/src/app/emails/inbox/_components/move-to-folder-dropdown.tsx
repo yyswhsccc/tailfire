@@ -8,11 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { useEmailFolders, useMoveEmail } from '@/hooks/use-emails'
 
 interface MoveToFolderDropdownProps {
@@ -38,21 +33,17 @@ export function MoveToFolderDropdown({
 
   return (
     <DropdownMenu>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={btnSize}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <FolderInput className={iconSize} />
-            </Button>
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">Move to folder</TooltipContent>
-      </Tooltip>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={btnSize}
+          onClick={(e) => e.stopPropagation()}
+          title="Move to folder"
+        >
+          <FolderInput className={iconSize} />
+        </Button>
+      </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
         {(folders || [])
           .filter((f) => f.path !== currentFolder)

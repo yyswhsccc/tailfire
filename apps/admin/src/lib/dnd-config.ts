@@ -66,3 +66,13 @@ export interface DayColumnDropData extends DragData {
 export interface TripSummaryDropData extends DragData {
   type: 'trip-summary'
 }
+
+export interface EmailDragData extends DragData {
+  type: 'email'
+  email: import('@tailfire/shared-types/api').SyncedEmailResponseDto
+}
+
+export interface FolderDropData extends DragData {
+  type: 'folder'
+  folderPath: string
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDroppable } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
 import {
   Inbox,
@@ -31,6 +32,7 @@ import {
 } from '@/components/ui/dialog'
 import { useCreateFolder, useRenameFolder, useDeleteFolder } from '@/hooks/use-emails'
 import type { EmailFolderDto } from '@tailfire/shared-types/api'
+import type { FolderDropData } from '@/lib/dnd-config'
 
 interface FolderSidebarProps {
   accountId: string | null
@@ -103,74 +105,23 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
   return (
     <>
       <nav className="space-y-1">
-        {folders.map((folder) => {
-          const isActive = folder.path === activeFolder
-          const icon = folderIcons[folder.specialUse || ''] || <FolderOpen className="h-4 w-4" />
-          const isProtected = PROTECTED_SPECIAL_USES.includes(folder.specialUse || '')
-
-          return (
-            <div
-              key={folder.path}
-              className={cn(
-                'group flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-              )}
-            >
-              <button
-                onClick={() => onSelectFolder(folder.path)}
-                className="flex flex-1 items-center gap-2 text-left"
-              >
-                {icon}
-                <span className="truncate">{folder.name}</span>
-              </button>
-              <div className="flex items-center gap-1">
-                {folder.unseenMessages > 0 && (
-                  <Badge variant="secondary" className="h-5 min-w-5 px-1 text-xs">
-                    {folder.unseenMessages}
-                  </Badge>
-                )}
-                {!isProtected && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="hidden h-5 w-5 group-hover:flex"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreHorizontal className="h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-36">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setTargetFolder(folder)
-                          setRenameTo(folder.name)
-                          setShowRenameDialog(true)
-                        }}
-                      >
-                        <Pencil className="mr-2 h-3.5 w-3.5" />
-                        Rename
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => {
-                          setTargetFolder(folder)
-                          setShowDeleteConfirm(true)
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-3.5 w-3.5" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            </div>
-          )
-        })}
+        {folders.map((folder) => (
+          <DroppableFolderItem
+            key={folder.path}
+            folder={folder}
+            isActive={folder.path === activeFolder}
+            onSelectFolder={onSelectFolder}
+            onRename={(f) => {
+              setTargetFolder(f)
+              setRenameTo(f.name)
+              setShowRenameDialog(true)
+            }}
+            onDelete={(f) => {
+              setTargetFolder(f)
+              setShowDeleteConfirm(true)
+            }}
+          />
+        ))}
 
         {/* New Folder button */}
         <button
@@ -261,5 +212,82 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+function DroppableFolderItem({
+  folder,
+  isActive,
+  onSelectFolder,
+  onRename,
+  onDelete,
+}: {
+  folder: EmailFolderDto
+  isActive: boolean
+  onSelectFolder: (path: string) => void
+  onRename: (folder: EmailFolderDto) => void
+  onDelete: (folder: EmailFolderDto) => void
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `folder:${folder.path}`,
+    data: { type: 'folder', folderPath: folder.path } satisfies FolderDropData,
+  })
+
+  const icon = folderIcons[folder.specialUse || ''] || <FolderOpen className="h-4 w-4" />
+  const isProtected = PROTECTED_SPECIAL_USES.includes(folder.specialUse || '')
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'group flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors',
+        isActive
+          ? 'bg-accent text-accent-foreground'
+          : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+        isOver && 'ring-2 ring-primary bg-accent',
+      )}
+    >
+      <button
+        onClick={() => onSelectFolder(folder.path)}
+        className="flex flex-1 items-center gap-2 text-left"
+      >
+        {icon}
+        <span className="truncate">{folder.name}</span>
+      </button>
+      <div className="flex items-center gap-1">
+        {folder.unseenMessages > 0 && (
+          <Badge variant="secondary" className="h-5 min-w-5 px-1 text-xs">
+            {folder.unseenMessages}
+          </Badge>
+        )}
+        {!isProtected && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden h-5 w-5 group-hover:flex"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36">
+              <DropdownMenuItem onClick={() => onRename(folder)}>
+                <Pencil className="mr-2 h-3.5 w-3.5" />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => onDelete(folder)}
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    </div>
   )
 }
