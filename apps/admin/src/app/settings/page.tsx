@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Key, Ship, Users, Building2, Info } from 'lucide-react'
+import { Key, Ship, Users, Building2, Info, Mail } from 'lucide-react'
 import { SettingsTabsLayout } from './_components/settings-tabs-layout'
 
 // Build info - set at build time
@@ -40,6 +40,13 @@ const settingsCategories: SettingsCategoryCard[] = [
     description: 'Manage team members and user permissions',
     href: '/settings/users',
     icon: <Users className="h-6 w-6" />,
+    available: true,
+  },
+  {
+    title: 'Email Integration',
+    description: 'Manage allowed email domains and compliance footer',
+    href: '/settings/email',
+    icon: <Mail className="h-6 w-6" />,
     available: true,
   },
   {
