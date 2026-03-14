@@ -75,6 +75,77 @@ export function useEmailDetail(accountId: string | null, emailId: string | null)
 // Mutations
 // ============================================================================
 
+export function useSendEmail(accountId: string | null) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: (dto: {
+      to: { address: string; name?: string }[]
+      cc?: { address: string; name?: string }[]
+      bcc?: { address: string; name?: string }[]
+      subject: string
+      bodyHtml: string
+      inReplyToEmailId?: string
+    }) => {
+      if (!accountId) throw new Error('No account selected')
+      return api.post<SyncedEmailResponseDto>(`/email-accounts/${accountId}/send`, dto)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      toast({ title: 'Email sent' })
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to send email',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+export function useUpdateEmailFlags(accountId: string | null) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: { emailId: string; isSeen?: boolean; isFlagged?: boolean }) => {
+      if (!accountId) throw new Error('No account selected')
+      const { emailId, ...flags } = params
+      return api.patch<SyncedEmailResponseDto>(
+        `/email-accounts/${accountId}/emails/${emailId}/flags`,
+        flags,
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: emailKeys.all })
+    },
+  })
+}
+
+export function useDeleteEmail(accountId: string | null) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: (emailId: string) => {
+      if (!accountId) throw new Error('No account selected')
+      return api.delete(`/email-accounts/${accountId}/emails/${emailId}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      toast({ title: 'Email deleted' })
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to delete email',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
 export function useSyncEmails(accountId: string | null) {
   const queryClient = useQueryClient()
   const { toast } = useToast()

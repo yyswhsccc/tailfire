@@ -1,13 +1,31 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { format } from 'date-fns'
 import DOMPurify from 'dompurify'
-import { Download, FileText, Loader2, Reply, ReplyAll, Forward } from 'lucide-react'
+import {
+  Download,
+  FileText,
+  Forward,
+  Loader2,
+  Mail,
+  MailOpen,
+  Reply,
+  ReplyAll,
+  Star,
+  Trash2,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { useEmailDetail } from '@/hooks/use-emails'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { useEmailDetail, useUpdateEmailFlags, useDeleteEmail } from '@/hooks/use-emails'
+import { useEmailStore } from '@/stores/email.store'
 import { ContactMatchBanner } from './contact-match-banner'
 import type { EmailAddressDto, EmailAttachmentDto } from '@tailfire/shared-types/api'
 
@@ -29,6 +47,17 @@ function formatFileSize(bytes: number | null): string {
 
 export function EmailReader({ accountId, emailId }: EmailReaderProps) {
   const { data: email, isLoading } = useEmailDetail(accountId, emailId)
+  const updateFlags = useUpdateEmailFlags(accountId)
+  const deleteEmail = useDeleteEmail(accountId)
+  const openCompose = useEmailStore((s) => s.openCompose)
+  const setSelectedEmailId = useEmailStore((s) => s.setSelectedEmailId)
+
+  // Auto-mark as read when email is opened
+  useEffect(() => {
+    if (email && !email.isSeen) {
+      updateFlags.mutate({ emailId: email.id, isSeen: true })
+    }
+  }, [email?.id, email?.isSeen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const sanitizedHtml = useMemo(() => {
     if (!email?.bodyHtml) return null
@@ -65,6 +94,61 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
     )
   }
 
+  function handleReply() {
+    if (!email) return
+    const replyTo = email.fromAddress
+      ? [{ address: email.fromAddress, name: email.fromName || undefined }]
+      : []
+    openCompose({
+      mode: 'reply',
+      replyToEmailId: email.id,
+      prefillTo: replyTo,
+      prefillSubject: email.subject?.startsWith('Re:') ? email.subject : `Re: ${email.subject || ''}`,
+      prefillBody: `\n\n---\nOn ${email.date ? format(new Date(email.date), 'PPpp') : ''}, ${email.fromName || email.fromAddress || 'Unknown'} wrote:\n> ${(email.bodyText || '').replace(/\n/g, '\n> ')}`,
+    })
+  }
+
+  function handleReplyAll() {
+    if (!email) return
+    const replyTo = email.fromAddress
+      ? [{ address: email.fromAddress, name: email.fromName || undefined }]
+      : []
+    // Include all original To/CC except our own account
+    const otherTo = email.toAddresses.filter((a: EmailAddressDto) => a.address !== email.fromAddress)
+    const allCc = [...(email.ccAddresses || [])]
+    openCompose({
+      mode: 'replyAll',
+      replyToEmailId: email.id,
+      prefillTo: replyTo,
+      prefillCc: [...otherTo, ...allCc],
+      prefillSubject: email.subject?.startsWith('Re:') ? email.subject : `Re: ${email.subject || ''}`,
+      prefillBody: `\n\n---\nOn ${email.date ? format(new Date(email.date), 'PPpp') : ''}, ${email.fromName || email.fromAddress || 'Unknown'} wrote:\n> ${(email.bodyText || '').replace(/\n/g, '\n> ')}`,
+    })
+  }
+
+  function handleForward() {
+    if (!email) return
+    openCompose({
+      mode: 'forward',
+      prefillSubject: email.subject?.startsWith('Fwd:') ? email.subject : `Fwd: ${email.subject || ''}`,
+      prefillBody: `\n\n---\nForwarded message from ${email.fromName || email.fromAddress || 'Unknown'}:\n\n${email.bodyText || ''}`,
+    })
+  }
+
+  function handleToggleRead() {
+    updateFlags.mutate({ emailId: email!.id, isSeen: !email!.isSeen })
+  }
+
+  function handleToggleStar() {
+    updateFlags.mutate({ emailId: email!.id, isFlagged: !email!.isFlagged })
+  }
+
+  function handleDelete() {
+    deleteEmail.mutate(email!.id, {
+      onSuccess: () => setSelectedEmailId(null),
+    })
+  }
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -73,17 +157,71 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
           <h2 className="text-lg font-semibold leading-tight">
             {email.subject || '(no subject)'}
           </h2>
-          <div className="flex flex-shrink-0 gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" title="Reply" disabled>
-              <Reply className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title="Reply All" disabled>
-              <ReplyAll className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title="Forward" disabled>
-              <Forward className="h-4 w-4" />
-            </Button>
-          </div>
+          <TooltipProvider delayDuration={300}>
+            <div className="flex flex-shrink-0 gap-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleReply}>
+                    <Reply className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Reply</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleReplyAll}>
+                    <ReplyAll className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Reply All</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleForward}>
+                    <Forward className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Forward</TooltipContent>
+              </Tooltip>
+
+              <div className="mx-1 h-8 w-px bg-border" />
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleToggleRead}>
+                    {email.isSeen ? (
+                      <Mail className="h-4 w-4" />
+                    ) : (
+                      <MailOpen className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{email.isSeen ? 'Mark as unread' : 'Mark as read'}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleToggleStar}>
+                    <Star className={`h-4 w-4 ${email.isFlagged ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{email.isFlagged ? 'Unstar' : 'Star'}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                    onClick={handleDelete}
+                    disabled={deleteEmail.isPending}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete</TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
 
         <div className="space-y-1 text-sm">
@@ -117,7 +255,12 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
         </div>
 
         {/* Contact match */}
-        <ContactMatchBanner matchedContactIds={email.matchedContactIds} contacts={[]} />
+        <ContactMatchBanner
+          matchedContactIds={email.matchedContactIds}
+          contacts={[]}
+          fromAddress={email.fromAddress}
+          fromName={email.fromName}
+        />
       </div>
 
       {/* Body */}

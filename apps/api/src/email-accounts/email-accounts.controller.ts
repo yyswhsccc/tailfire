@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -153,6 +154,22 @@ export class EmailAccountsController {
   }
 
   /**
+   * Batch update email flags
+   * PATCH /email-accounts/:id/emails/batch-flags
+   */
+  @Patch(':id/emails/batch-flags')
+  async batchUpdateFlags(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() body: { emailIds: string[]; isSeen?: boolean; isFlagged?: boolean },
+  ): Promise<void> {
+    return this.emailAccountsService.batchUpdateFlags(id, auth.userId, body.emailIds, {
+      isSeen: body.isSeen,
+      isFlagged: body.isFlagged,
+    })
+  }
+
+  /**
    * Get full email detail (triggers lazy body fetch if needed)
    * GET /email-accounts/:id/emails/:emailId
    */
@@ -194,6 +211,34 @@ export class EmailAccountsController {
       'Content-Disposition': `attachment; filename="${(filename || 'attachment').replace(/"/g, '\\"')}"`,
     })
     return new StreamableFile(buffer)
+  }
+
+  /**
+   * Update email flags (read/unread, flagged)
+   * PATCH /email-accounts/:id/emails/:emailId/flags
+   */
+  @Patch(':id/emails/:emailId/flags')
+  async updateEmailFlags(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Param('emailId') emailId: string,
+    @Body() flags: { isSeen?: boolean; isFlagged?: boolean },
+  ): Promise<SyncedEmailResponseDto> {
+    return this.emailAccountsService.updateEmailFlags(id, emailId, auth.userId, flags)
+  }
+
+  /**
+   * Delete an email
+   * DELETE /email-accounts/:id/emails/:emailId
+   */
+  @Delete(':id/emails/:emailId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteEmail(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Param('emailId') emailId: string,
+  ): Promise<void> {
+    return this.emailAccountsService.deleteEmail(id, emailId, auth.userId)
   }
 
   /**

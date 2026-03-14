@@ -297,6 +297,80 @@ export class EmailAccountsService {
   }
 
   // ============================================================================
+  // Email actions
+  // ============================================================================
+
+  async updateEmailFlags(
+    accountId: string,
+    emailId: string,
+    userId: string,
+    flags: { isSeen?: boolean; isFlagged?: boolean },
+  ): Promise<SyncedEmailResponseDto> {
+    await this.findOne(accountId, userId)
+
+    const updateData: Record<string, unknown> = { updatedAt: new Date() }
+    if (flags.isSeen !== undefined) updateData.isSeen = flags.isSeen
+    if (flags.isFlagged !== undefined) updateData.isFlagged = flags.isFlagged
+
+    const [updated] = await this.db.client
+      .update(this.db.schema.syncedEmails)
+      .set(updateData)
+      .where(
+        and(
+          eq(this.db.schema.syncedEmails.id, emailId),
+          eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+        ),
+      )
+      .returning()
+
+    if (!updated) throw new NotFoundException('Email not found')
+    return this.formatEmailResponse(updated)
+  }
+
+  async deleteEmail(
+    accountId: string,
+    emailId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.findOne(accountId, userId)
+
+    const result = await this.db.client
+      .delete(this.db.schema.syncedEmails)
+      .where(
+        and(
+          eq(this.db.schema.syncedEmails.id, emailId),
+          eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+        ),
+      )
+      .returning({ id: this.db.schema.syncedEmails.id })
+
+    if (result.length === 0) throw new NotFoundException('Email not found')
+  }
+
+  async batchUpdateFlags(
+    accountId: string,
+    userId: string,
+    emailIds: string[],
+    flags: { isSeen?: boolean; isFlagged?: boolean },
+  ): Promise<void> {
+    await this.findOne(accountId, userId)
+
+    const updateData: Record<string, unknown> = { updatedAt: new Date() }
+    if (flags.isSeen !== undefined) updateData.isSeen = flags.isSeen
+    if (flags.isFlagged !== undefined) updateData.isFlagged = flags.isFlagged
+
+    await this.db.client
+      .update(this.db.schema.syncedEmails)
+      .set(updateData)
+      .where(
+        and(
+          eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+          sql`${this.db.schema.syncedEmails.id} IN (${sql.join(emailIds.map(id => sql`${id}`), sql`, `)})`,
+        ),
+      )
+  }
+
+  // ============================================================================
   // Private helpers
   // ============================================================================
 

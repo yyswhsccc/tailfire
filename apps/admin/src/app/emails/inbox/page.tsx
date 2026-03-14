@@ -1,6 +1,6 @@
 'use client'
 
-import { Loader2, RefreshCw, Mail, Search } from 'lucide-react'
+import { Loader2, Pencil, RefreshCw, Mail, Search } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { useEmailStore } from '@/stores/email.store'
 import { FolderSidebar } from './_components/folder-sidebar'
 import { EmailList } from './_components/email-list'
 import { EmailReader } from './_components/email-reader'
+import { ComposeEmailDialog } from './_components/compose-email-dialog'
 
 export default function EmailInboxPage() {
   const { data: accounts, isLoading: accountsLoading } = useEmailAccounts()
@@ -19,9 +20,11 @@ export default function EmailInboxPage() {
   const activeFolder = useEmailStore((s) => s.activeFolder)
   const selectedEmailId = useEmailStore((s) => s.selectedEmailId)
   const search = useEmailStore((s) => s.search)
+  const compose = useEmailStore((s) => s.compose)
   const setActiveFolder = useEmailStore((s) => s.setActiveFolder)
   const setSelectedEmailId = useEmailStore((s) => s.setSelectedEmailId)
   const setSearch = useEmailStore((s) => s.setSearch)
+  const openCompose = useEmailStore((s) => s.openCompose)
 
   const { data: folders } = useEmailFolders(accountId)
   const { data: emailsData, isLoading: emailsLoading } = useEmails(accountId, {
@@ -68,16 +71,27 @@ export default function EmailInboxPage() {
         <div className="w-52 flex-shrink-0 border-r bg-muted/20 p-3">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold">Folders</h3>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => syncEmails.mutate()}
-              disabled={syncEmails.isPending}
-              title="Sync emails"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${syncEmails.isPending ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => openCompose({ mode: 'new' })}
+                title="Compose"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => syncEmails.mutate()}
+                disabled={syncEmails.isPending}
+                title="Sync emails"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${syncEmails.isPending ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
           <FolderSidebar
             folders={folders || []}
@@ -106,6 +120,7 @@ export default function EmailInboxPage() {
               </div>
             ) : (
               <EmailList
+                accountId={accountId}
                 emails={emailsData?.emails || []}
                 selectedEmailId={selectedEmailId}
                 onSelectEmail={setSelectedEmailId}
@@ -125,6 +140,11 @@ export default function EmailInboxPage() {
           )}
         </div>
       </div>
+
+      {/* Compose Dialog */}
+      {compose && accountId && (
+        <ComposeEmailDialog accountId={accountId} compose={compose} />
+      )}
     </DashboardLayout>
   )
 }
