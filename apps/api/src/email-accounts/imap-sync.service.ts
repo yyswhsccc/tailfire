@@ -85,7 +85,7 @@ export class ImapSyncService {
           flags: true,
           uid: true,
         })) {
-          if (msg.uid <= lastUid) continue
+          if (Number(msg.uid) <= lastUid) continue
 
           try {
             await this.upsertEmailFromImap(accountId, account.agencyId, 'INBOX', msg)
@@ -97,8 +97,9 @@ export class ImapSyncService {
 
         // Update sync state
         const mailbox = client.mailbox
-        const uidValidity = mailbox && typeof mailbox === 'object' ? (mailbox as any).uidValidity : undefined
-        const uidNext = mailbox && typeof mailbox === 'object' ? (mailbox as any).uidNext : undefined
+        // ImapFlow returns BigInt for uidValidity/uidNext — convert to Number for JSON serialization
+        const uidValidity = mailbox && typeof mailbox === 'object' ? Number((mailbox as any).uidValidity) : undefined
+        const uidNext = mailbox && typeof mailbox === 'object' ? Number((mailbox as any).uidNext) : undefined
         await this.emailAccountsService.updateSyncState(accountId, {
           ...syncState,
           folders: {
@@ -348,7 +349,7 @@ export class ImapSyncService {
         emailAccountId: accountId,
         agencyId,
         messageId: envelope?.messageId,
-        imapUid: msg.uid,
+        imapUid: Number(msg.uid),
         folder,
         inReplyTo: envelope?.inReplyTo,
         referencesHeader: Array.isArray(envelope?.references)
@@ -368,7 +369,7 @@ export class ImapSyncService {
         isOutbound,
         matchedContactIds,
         hasAttachments: attachments.length > 0,
-        sizeBytes: msg.size,
+        sizeBytes: msg.size != null ? Number(msg.size) : null,
       })
       .onConflictDoUpdate({
         target: [
