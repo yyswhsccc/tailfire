@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { eq, sql } from 'drizzle-orm'
 import * as nodemailer from 'nodemailer'
@@ -65,6 +65,9 @@ export class SmtpSendService {
     if (filteredTo.length === 0 && filteredCc.length === 0 && filteredBcc.length === 0) {
       this.logger.warn(
         `All recipients filtered out in non-prod for account ${accountId}. No email sent.`,
+      )
+      throw new BadRequestException(
+        'No eligible recipients — in non-production, only @phoenixvoyages.ca addresses are allowed.',
       )
     }
 
@@ -172,7 +175,7 @@ export class SmtpSendService {
 
   private filterRecipientsForNonProd(recipients: string[]): string[] {
     if (this.isProduction()) return recipients
-    const allowedDomains = ['phoenixvoyages.ca']
+    const allowedDomains = ['phoenixvoyages.ca', 'kaponline.com']
     const filtered = recipients.filter((r) =>
       allowedDomains.some((d) => r.toLowerCase().endsWith(`@${d}`)),
     )
