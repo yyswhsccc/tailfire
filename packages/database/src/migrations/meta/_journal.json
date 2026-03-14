@@ -1051,6 +1051,20 @@
       "when": 1773763200000,
       "tag": "20260314120000_create_email_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "7",
+      "when": 1773763201000,
+      "tag": "20260314120100_create_synced_emails",
+      "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "7",
+      "when": 1773763202000,
+      "tag": "20260314120200_create_email_attachments",
+      "breakpoints": true
     }
   ]
 }
