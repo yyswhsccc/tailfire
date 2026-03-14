@@ -27,9 +27,6 @@ export function getPasswordResetTemplate({ resetLink }: PasswordResetTemplatePar
         Your password will remain unchanged.
       </p>
     </div>
-    <p style="margin: 24px 0 0; color: #a1a1aa; font-size: 12px; text-align: center;">
-      Phoenix Voyages
-    </p>
   </div>
 </body>
 </html>

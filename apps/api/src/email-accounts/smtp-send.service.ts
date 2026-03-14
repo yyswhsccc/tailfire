@@ -5,6 +5,7 @@ import * as nodemailer from 'nodemailer'
 import { DatabaseService } from '../db/database.service'
 import { EmailAccountsService } from './email-accounts.service'
 import { SendEmailDto } from './dto/send-email.dto'
+import { buildEmailBody } from '../common/email/build-email-body'
 import type { SyncedEmailResponseDto } from '@tailfire/shared-types'
 
 @Injectable()
@@ -33,10 +34,10 @@ export class SmtpSendService {
       .limit(1)
 
     const signatureConfig = userProfile?.emailSignatureConfig as any
-    const signature =
+    const signatureHtml =
       signatureConfig?.enabled && signatureConfig?.signatureHtml
         ? signatureConfig.signatureHtml
-        : ''
+        : null
 
     // Load compliance footer from agency settings
     const [settings] = await this.db.client
@@ -45,17 +46,10 @@ export class SmtpSendService {
       .where(eq(this.db.schema.agencySettings.agencyId, account.agencyId))
       .limit(1)
 
-    const footer = settings?.emailComplianceFooter || ''
+    const complianceFooter = settings?.emailComplianceFooter || null
 
     // Build HTML body: user content + signature + footer
-    let fullBodyHtml = dto.bodyHtml
-    if (signature) {
-      fullBodyHtml += '<br><div class="email-signature">' + signature + '</div>'
-    }
-    if (footer) {
-      fullBodyHtml += '<hr style="border:none;border-top:1px solid #ccc;margin:20px 0">'
-      fullBodyHtml += '<div class="email-footer" style="font-size:11px;color:#666">' + footer + '</div>'
-    }
+    const fullBodyHtml = buildEmailBody(dto.bodyHtml, { signatureHtml, complianceFooter })
 
     // Filter recipients in non-production
     const filteredTo = this.filterRecipientsForNonProd(dto.to.map((t) => t.address))
@@ -158,6 +152,59 @@ export class SmtpSendService {
       // Never log credentials
       this.logger.error(`SMTP send failed for account ${accountId}: ${error.message}`)
       throw error
+    } finally {
+      transport.close()
+    }
+  }
+
+  /**
+   * Lightweight SMTP send with pre-built content.
+   * Does NOT: build body, filter domains, load signature/footer, log, or save to synced_emails.
+   * All of that is the caller's responsibility (enables double-send prevention).
+   */
+  async sendRaw(options: {
+    accountId: string
+    from: string
+    to: string[]
+    cc?: string[]
+    bcc?: string[]
+    subject: string
+    html: string
+    text?: string
+    replyTo?: string
+    attachments?: { filename: string; content: Buffer | string; contentType?: string }[]
+  }): Promise<{ messageId: string }> {
+    const account = await this.emailAccountsService.getAccountById(options.accountId)
+    const credentials = await this.emailAccountsService.getDecryptedCredentials(options.accountId)
+
+    const transport = nodemailer.createTransport({
+      host: account.smtpHost,
+      port: account.smtpPort,
+      secure: account.smtpTls,
+      auth: {
+        user: credentials.username,
+        pass: credentials.password,
+      },
+    })
+
+    try {
+      const info = await transport.sendMail({
+        from: options.from,
+        to: options.to,
+        cc: options.cc?.length ? options.cc : undefined,
+        bcc: options.bcc?.length ? options.bcc : undefined,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        replyTo: options.replyTo,
+        attachments: options.attachments?.map((att) => ({
+          filename: att.filename,
+          content: att.content,
+          contentType: att.contentType,
+        })),
+      })
+
+      return { messageId: info.messageId }
     } finally {
       transport.close()
     }

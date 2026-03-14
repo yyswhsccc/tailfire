@@ -5,18 +5,22 @@
  * Supports both direct sending and templated emails.
  */
 
-import { Injectable, Logger } from '@nestjs/common'
-import { eq, and, desc, asc, ilike, or, gte, lte, sql } from 'drizzle-orm'
+import { Injectable, Logger, Optional, Inject, forwardRef } from '@nestjs/common'
+import { eq, and, desc, asc, ilike, or, gte, lte, sql, isNull } from 'drizzle-orm'
 import { getResendClient } from './resend.client'
 import { getPasswordResetTemplate, getWelcomeTemplate, getInviteTemplate, getClientPortalInviteTemplate } from './templates'
 import { getEmailDomainFilter } from './email-domain-filter'
+import { buildEmailBody } from '../common/email/build-email-body'
 import { DatabaseService } from '../db/database.service'
+import { SmtpSendService } from '../email-accounts/smtp-send.service'
+import { EmailAccountsService } from '../email-accounts/email-accounts.service'
 import type { EmailLogsFilterDto } from './dto'
 import type {
   EmailResult,
   EmailLogResponse,
   PaginatedEmailLogsResponse,
   EmailStatus,
+  EmailCategory,
 } from '@tailfire/shared-types'
 
 interface EmailAttachment {
@@ -51,34 +55,70 @@ export class EmailService {
   private readonly fromName: string
   private readonly domainFilter = getEmailDomainFilter()
 
-  constructor(private readonly db: DatabaseService) {
+  constructor(
+    private readonly db: DatabaseService,
+    @Optional()
+    @Inject(forwardRef(() => SmtpSendService))
+    private readonly smtpSendService?: SmtpSendService,
+    @Optional()
+    @Inject(forwardRef(() => EmailAccountsService))
+    private readonly emailAccountsService?: EmailAccountsService,
+  ) {
     this.fromAddress = process.env.EMAIL_FROM_ADDRESS || 'noreply@phoenixvoyages.ca'
     this.fromName = process.env.EMAIL_FROM_NAME || 'Phoenix Voyages'
+
+    if (!this.smtpSendService) {
+      this.logger.warn('SmtpSendService not injected — SMTP routing disabled, Resend-only mode')
+    }
   }
 
   /**
-   * Core email sending method with logging
+   * Core email sending method with SMTP-first routing and Resend fallback.
+   *
+   * Flow:
+   * 1. Resolve agent (contactId → tripId → createdBy waterfall)
+   * 2. Build email body with signature + footer
+   * 3. Apply domain filter
+   * 4. Log as pending
+   * 5. Try SMTP if agent has email account
+   * 6. Fall back to Resend on pre-delivery SMTP failure
    */
   async sendEmail(options: SendEmailOptions): Promise<EmailResult> {
     const { emailLogs } = this.db.schema
 
-    // Apply domain filter (dev/preview only)
+    // 1. Resolve agent for SMTP routing
+    const agent = await this.resolveAgent(options.agencyId, {
+      contactId: options.contactId,
+      tripId: options.tripId,
+      createdBy: options.createdBy,
+    })
+
+    // 2. Load signature + footer, build final HTML
+    const { signatureHtml, complianceFooter } =
+      await this.loadSignatureAndFooter(
+        options.agencyId,
+        agent?.userId,
+      )
+    let html = buildEmailBody(options.html, { signatureHtml, complianceFooter })
+
+    // 3. Apply domain filter (dev/preview only)
     const filterResult = this.domainFilter.filterRecipients(
       options.to,
       options.cc,
-      options.bcc
+      options.bcc,
     )
-
-    // Modify subject in non-production
     const subject = this.domainFilter.modifySubject(options.subject)
 
-    // Prepare HTML with filter warning if needed
-    let html = options.html
     if (filterResult.isFiltered) {
       html = this.domainFilter.generateFilterWarningHtml() + html
     }
 
-    // Log email as pending
+    // 4. Determine from address (agent email for SMTP path, noreply for Resend)
+    const fromEmail = agent?.emailAccountId && agent.emailAddress
+      ? agent.emailAddress
+      : this.fromAddress
+
+    // 5. Log email as pending
     const insertResult = await this.db.client
       .insert(emailLogs)
       .values({
@@ -86,7 +126,7 @@ export class EmailService {
         toEmail: filterResult.to,
         ccEmail: filterResult.cc,
         bccEmail: filterResult.bcc,
-        fromEmail: this.fromAddress,
+        fromEmail,
         replyTo: options.replyTo,
         subject,
         bodyHtml: html,
@@ -105,9 +145,10 @@ export class EmailService {
 
     // Check if we have valid recipients after filtering
     if (!filterResult.hasValidRecipients) {
-      this.logger.warn(`No valid recipients after domain filtering for email ${emailLog.id}`)
+      this.logger.warn(
+        `No valid recipients after domain filtering for email ${emailLog.id}`,
+      )
 
-      // Update log to filtered status
       await this.db.client
         .update(emailLogs)
         .set({
@@ -125,6 +166,120 @@ export class EmailService {
       }
     }
 
+    // 6. Try SMTP if agent has email account
+    if (agent?.emailAccountId && this.smtpSendService) {
+      try {
+        const smtpResult = await this.smtpSendService.sendRaw({
+          accountId: agent.emailAccountId,
+          from: agent.displayName
+            ? `"${agent.displayName}" <${agent.emailAddress}>`
+            : agent.emailAddress!,
+          to: filterResult.to,
+          cc: filterResult.cc,
+          bcc: filterResult.bcc,
+          subject,
+          html,
+          text: options.text,
+          replyTo: options.replyTo,
+          attachments: options.attachments?.map((att) => ({
+            filename: att.filename,
+            content: att.content,
+            contentType: att.contentType,
+          })),
+        })
+
+        // SMTP accepted — persist to DB (double-send prevention: if this fails, do NOT resend)
+        try {
+          const allRecipients = [
+            ...filterResult.to,
+            ...(filterResult.cc || []),
+            ...(filterResult.bcc || []),
+          ]
+          const matchedContactIds = await this.matchRecipientContacts(
+            options.agencyId,
+            allRecipients,
+          )
+
+          await this.db.client
+            .insert(this.db.schema.syncedEmails)
+            .values({
+              emailAccountId: agent.emailAccountId,
+              agencyId: options.agencyId,
+              messageId: smtpResult.messageId,
+              imapUid: null,
+              folder: 'Sent',
+              fromAddress: agent.emailAddress,
+              fromName: agent.displayName,
+              toAddresses: filterResult.to.map((addr) => ({ address: addr })),
+              ccAddresses: (filterResult.cc || []).map((addr) => ({
+                address: addr,
+              })),
+              bccAddresses: (filterResult.bcc || []).map((addr) => ({
+                address: addr,
+              })),
+              subject,
+              date: new Date(),
+              bodyHtml: html,
+              bodyText: options.text,
+              snippet: options.html
+                .replace(/<[^>]+>/g, '')
+                .substring(0, 200)
+                .trim(),
+              isSeen: true,
+              isOutbound: true,
+              matchedContactIds,
+            })
+
+          await this.db.client
+            .update(emailLogs)
+            .set({
+              status: 'sent',
+              provider: 'smtp',
+              providerMessageId: smtpResult.messageId,
+              sentAt: new Date(),
+            })
+            .where(eq(emailLogs.id, emailLog.id))
+        } catch (dbError: any) {
+          // SMTP accepted but DB write failed — email was sent, do NOT resend
+          this.logger.error(
+            `Post-SMTP DB write failed for ${emailLog.id}: ${dbError.message}`,
+          )
+          try {
+            await this.db.client
+              .update(emailLogs)
+              .set({ status: 'sent', provider: 'smtp', sentAt: new Date() })
+              .where(eq(emailLogs.id, emailLog.id))
+          } catch {
+            /* best-effort */
+          }
+        }
+
+        this.logger.log(
+          `Email sent via SMTP: ${emailLog.id}, messageId: ${smtpResult.messageId}`,
+        )
+        return {
+          success: true,
+          emailLogId: emailLog.id,
+          filtered: filterResult.isFiltered,
+          filteredRecipients: filterResult.isFiltered ? filterResult.filtered : undefined,
+        }
+      } catch (smtpError: any) {
+        // SMTP pre-delivery failure — fall through to Resend
+        this.logger.warn(
+          `SMTP send failed for ${emailLog.id}, falling back to Resend: ${smtpError.message}`,
+        )
+        await this.db.client
+          .update(emailLogs)
+          .set({
+            errorMessage: `SMTP failed: ${smtpError.message}`,
+            fromEmail: this.fromAddress,
+            replyTo: agent?.emailAddress || options.replyTo || null,
+          })
+          .where(eq(emailLogs.id, emailLog.id))
+      }
+    }
+
+    // 7. Resend fallback
     try {
       const resend = getResendClient()
       const result = await resend.emails.send({
@@ -132,7 +287,7 @@ export class EmailService {
         to: filterResult.to,
         cc: filterResult.cc,
         bcc: filterResult.bcc,
-        replyTo: options.replyTo,
+        replyTo: (agent?.emailAddress || options.replyTo) ?? undefined,
         subject,
         html,
         text: options.text,
@@ -144,13 +299,15 @@ export class EmailService {
       })
 
       if (result.error) {
-        this.logger.error(`Failed to send email ${emailLog.id}: ${result.error.message}`)
+        this.logger.error(
+          `Failed to send email ${emailLog.id}: ${result.error.message}`,
+        )
 
-        // Update log to failed status
         await this.db.client
           .update(emailLogs)
           .set({
             status: 'failed',
+            provider: 'resend',
             errorMessage: result.error.message,
           })
           .where(eq(emailLogs.id, emailLog.id))
@@ -162,42 +319,47 @@ export class EmailService {
         }
       }
 
-      // Update log to sent status
+      const resendReplyTo = agent?.emailAddress || options.replyTo || null
       await this.db.client
         .update(emailLogs)
         .set({
           status: 'sent',
+          provider: 'resend',
           providerMessageId: result.data?.id,
           sentAt: new Date(),
+          fromEmail: this.fromAddress,
+          replyTo: resendReplyTo,
         })
         .where(eq(emailLogs.id, emailLog.id))
 
-      this.logger.log(`Email sent successfully: ${emailLog.id}, provider_id: ${result.data?.id}`)
+      this.logger.log(
+        `Email sent via Resend: ${emailLog.id}, provider_id: ${result.data?.id}`,
+      )
 
       return {
         success: true,
         emailLogId: emailLog.id,
-        providerMessageId: result.data?.id,
         filtered: filterResult.isFiltered,
         filteredRecipients: filterResult.isFiltered ? filterResult.filtered : undefined,
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      this.logger.error(`Email service error for ${emailLog.id}: ${errorMessage}`)
+    } catch (error: any) {
+      this.logger.error(
+        `Resend send failed for email ${emailLog.id}: ${error.message}`,
+      )
 
-      // Update log to failed status
       await this.db.client
         .update(emailLogs)
         .set({
           status: 'failed',
-          errorMessage,
+          provider: 'resend',
+          errorMessage: error.message,
         })
         .where(eq(emailLogs.id, emailLog.id))
 
       return {
         success: false,
         emailLogId: emailLog.id,
-        error: errorMessage,
+        error: error.message,
       }
     }
   }
@@ -209,7 +371,7 @@ export class EmailService {
     agencyId: string,
     filters: EmailLogsFilterDto
   ): Promise<PaginatedEmailLogsResponse> {
-    const { emailLogs } = this.db.schema
+    const { emailLogs, emailTemplates, contacts } = this.db.schema
     const page = filters.page || 1
     const limit = filters.limit || 20
     const offset = (page - 1) * limit
@@ -226,7 +388,24 @@ export class EmailService {
     }
 
     if (filters.contactId) {
-      conditions.push(eq(emailLogs.contactId, filters.contactId))
+      // Fallback: also match by toEmail containing the contact's email address
+      const [contact] = await this.db.client
+        .select({ email: contacts.email })
+        .from(contacts)
+        .where(and(eq(contacts.id, filters.contactId), eq(contacts.agencyId, agencyId)))
+        .limit(1)
+
+      if (contact?.email) {
+        const contactEmail = contact.email.toLowerCase()
+        conditions.push(
+          or(
+            eq(emailLogs.contactId, filters.contactId),
+            sql`EXISTS (SELECT 1 FROM unnest(${emailLogs.toEmail}) AS e WHERE lower(e) = ${contactEmail})`
+          )!
+        )
+      } else {
+        conditions.push(eq(emailLogs.contactId, filters.contactId))
+      }
     }
 
     if (filters.templateSlug) {
@@ -250,11 +429,13 @@ export class EmailService {
       )
     }
 
+    const whereClause = and(...conditions)
+
     // Get total count
     const countResult = await this.db.client
       .select({ count: sql<number>`count(*)` })
       .from(emailLogs)
-      .where(and(...conditions))
+      .where(whereClause)
     const count = countResult[0]?.count ?? 0
 
     // Determine sort order
@@ -263,17 +444,49 @@ export class EmailService {
                       emailLogs.createdAt
     const sortOrder = filters.sortOrder === 'asc' ? asc(sortField) : desc(sortField)
 
-    // Get paginated results
+    // Get paginated results — exclude bodyHtml/bodyText, join templates for category
     const logs = await this.db.client
-      .select()
+      .select({
+        id: emailLogs.id,
+        agencyId: emailLogs.agencyId,
+        toEmail: emailLogs.toEmail,
+        ccEmail: emailLogs.ccEmail,
+        bccEmail: emailLogs.bccEmail,
+        fromEmail: emailLogs.fromEmail,
+        replyTo: emailLogs.replyTo,
+        subject: emailLogs.subject,
+        templateSlug: emailLogs.templateSlug,
+        variables: emailLogs.variables,
+        status: emailLogs.status,
+        provider: emailLogs.provider,
+        providerMessageId: emailLogs.providerMessageId,
+        errorMessage: emailLogs.errorMessage,
+        tripId: emailLogs.tripId,
+        contactId: emailLogs.contactId,
+        activityId: emailLogs.activityId,
+        sentAt: emailLogs.sentAt,
+        createdAt: emailLogs.createdAt,
+        createdBy: emailLogs.createdBy,
+        category: emailTemplates.category,
+      })
       .from(emailLogs)
-      .where(and(...conditions))
+      .leftJoin(
+        emailTemplates,
+        and(
+          eq(emailLogs.templateSlug, emailTemplates.slug),
+          or(
+            eq(emailTemplates.agencyId, agencyId),
+            isNull(emailTemplates.agencyId)
+          )
+        )
+      )
+      .where(whereClause)
       .orderBy(sortOrder)
       .limit(limit)
       .offset(offset)
 
     return {
-      data: logs.map(this.mapToEmailLogResponse),
+      data: logs.map((log) => this.mapToEmailLogResponseFromJoin(log)),
       pagination: {
         page,
         limit,
@@ -325,6 +538,38 @@ export class EmailService {
       sentAt: log.sentAt?.toISOString() || null,
       createdAt: log.createdAt.toISOString(),
       createdBy: log.createdBy,
+      category: null,
+    }
+  }
+
+  /**
+   * Map joined query row (with template category, no body fields) to response DTO
+   */
+  private mapToEmailLogResponseFromJoin(log: any): EmailLogResponse {
+    return {
+      id: log.id,
+      agencyId: log.agencyId,
+      toEmail: log.toEmail,
+      ccEmail: log.ccEmail,
+      bccEmail: log.bccEmail,
+      fromEmail: log.fromEmail,
+      replyTo: log.replyTo,
+      subject: log.subject,
+      bodyHtml: null,
+      bodyText: null,
+      templateSlug: log.templateSlug,
+      variables: log.variables,
+      status: log.status as EmailStatus,
+      provider: log.provider,
+      providerMessageId: log.providerMessageId,
+      errorMessage: log.errorMessage,
+      tripId: log.tripId,
+      contactId: log.contactId,
+      activityId: log.activityId,
+      sentAt: log.sentAt?.toISOString() || null,
+      createdAt: log.createdAt.toISOString(),
+      createdBy: log.createdBy,
+      category: (log.category as EmailCategory) || null,
     }
   }
 
@@ -394,6 +639,138 @@ export class EmailService {
       variables: options.variables,
       createdBy: options.createdBy,
     })
+  }
+
+  // ==========================================================================
+  // SMTP routing helpers
+  // ==========================================================================
+
+  /**
+   * Resolve the agent for SMTP routing via waterfall:
+   * 1. contactId → contacts.ownerId
+   * 2. tripId → trips.ownerId
+   * 3. createdBy
+   *
+   * Then look up their active email account.
+   */
+  private async resolveAgent(
+    agencyId: string,
+    options: { contactId?: string; tripId?: string; createdBy?: string },
+  ): Promise<{
+    userId: string
+    emailAccountId: string | null
+    emailAddress: string | null
+    displayName: string | null
+  } | null> {
+    if (!this.emailAccountsService) return null
+
+    let agentUserId: string | null = null
+
+    if (options.contactId) {
+      const [contact] = await this.db.client
+        .select({ ownerId: this.db.schema.contacts.ownerId })
+        .from(this.db.schema.contacts)
+        .where(eq(this.db.schema.contacts.id, options.contactId))
+        .limit(1)
+      agentUserId = contact?.ownerId ?? null
+    }
+
+    if (!agentUserId && options.tripId) {
+      const [trip] = await this.db.client
+        .select({ ownerId: this.db.schema.trips.ownerId })
+        .from(this.db.schema.trips)
+        .where(eq(this.db.schema.trips.id, options.tripId))
+        .limit(1)
+      agentUserId = trip?.ownerId ?? null
+    }
+
+    if (!agentUserId && options.createdBy) {
+      agentUserId = options.createdBy
+    }
+
+    if (!agentUserId) return null
+
+    // Look up agent's profile email (for replyTo when no SMTP account)
+    const [profile] = await this.db.client
+      .select({ email: this.db.schema.userProfiles.email })
+      .from(this.db.schema.userProfiles)
+      .where(eq(this.db.schema.userProfiles.id, agentUserId))
+      .limit(1)
+
+    const account = await this.emailAccountsService.findActiveAccountForUser(
+      agentUserId,
+      agencyId,
+    )
+
+    return {
+      userId: agentUserId,
+      emailAccountId: account?.id ?? null,
+      emailAddress: account?.emailAddress ?? profile?.email ?? null,
+      displayName: account?.displayName ?? null,
+    }
+  }
+
+  /**
+   * Load agent signature and agency compliance footer for buildEmailBody.
+   */
+  private async loadSignatureAndFooter(
+    agencyId: string,
+    agentUserId?: string,
+  ): Promise<{ signatureHtml: string | null; complianceFooter: string | null }> {
+    let signatureHtml: string | null = null
+
+    if (agentUserId) {
+      const [userProfile] = await this.db.client
+        .select({
+          emailSignatureConfig: this.db.schema.userProfiles.emailSignatureConfig,
+        })
+        .from(this.db.schema.userProfiles)
+        .where(eq(this.db.schema.userProfiles.id, agentUserId))
+        .limit(1)
+
+      const sigConfig = userProfile?.emailSignatureConfig as any
+      signatureHtml =
+        sigConfig?.enabled && sigConfig?.signatureHtml
+          ? sigConfig.signatureHtml
+          : null
+    }
+
+    const [settings] = await this.db.client
+      .select({
+        emailComplianceFooter:
+          this.db.schema.agencySettings.emailComplianceFooter,
+      })
+      .from(this.db.schema.agencySettings)
+      .where(eq(this.db.schema.agencySettings.agencyId, agencyId))
+      .limit(1)
+
+    return {
+      signatureHtml,
+      complianceFooter: settings?.emailComplianceFooter || null,
+    }
+  }
+
+  /**
+   * Match recipient email addresses to contacts in the agency.
+   */
+  private async matchRecipientContacts(
+    agencyId: string,
+    addresses: string[],
+  ): Promise<string[]> {
+    if (addresses.length === 0) return []
+
+    const lowered = addresses.map((a) => a.toLowerCase())
+    const results = await this.db.client
+      .select({ id: this.db.schema.contacts.id })
+      .from(this.db.schema.contacts)
+      .where(
+        sql`${this.db.schema.contacts.agencyId} = ${agencyId} AND lower(${this.db.schema.contacts.email}) IN (${sql.join(
+          lowered.map((a) => sql`${a}`),
+          sql`, `,
+        )})`,
+      )
+
+    return results.map((r) => r.id)
   }
 
   // ==========================================================================

@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq'
 import { QUEUES } from '../automation/automation.types'
 import { DatabaseModule } from '../db/database.module'
 import { EncryptionModule } from '../common/encryption/encryption.module'
+import { NotificationModule } from '../notifications/notification.module'
 import { EmailAccountsController } from './email-accounts.controller'
 import { EmailAccountsService } from './email-accounts.service'
 import { ImapSyncService } from './imap-sync.service'
@@ -13,8 +14,9 @@ import { EmailSyncSchedulerService } from './email-sync-scheduler.service'
 /**
  * EmailAccountsModule — Agent personal email (IMAP/SMTP)
  *
- * IMPORTANT: This module is completely separate from EmailModule (Resend transactional emails).
- * Do NOT import from apps/api/src/email/ in any file here.
+ * IMPORTANT: EmailModule now imports this module (via forwardRef) for SMTP-first sending.
+ * However, this module must NOT import from apps/api/src/email/ to avoid circular dependencies.
+ * Shared utilities live in apps/api/src/common/email/ instead.
  *
  * Self-registers its own BullMQ queue (email-sync) following DocumentRenderModule pattern.
  * Do NOT modify AutomationModule to register this queue.
@@ -23,6 +25,7 @@ import { EmailSyncSchedulerService } from './email-sync-scheduler.service'
   imports: [
     DatabaseModule,
     EncryptionModule,
+    NotificationModule,
     BullModule.registerQueue({
       name: QUEUES.EMAIL_SYNC,
       defaultJobOptions: {
@@ -39,6 +42,6 @@ import { EmailSyncSchedulerService } from './email-sync-scheduler.service'
     EmailSyncProcessor,
     EmailSyncSchedulerService,
   ],
-  exports: [EmailAccountsService, ImapSyncService],
+  exports: [EmailAccountsService, ImapSyncService, SmtpSendService],
 })
 export class EmailAccountsModule {}

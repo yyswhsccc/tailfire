@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
-import { eq, and, sql, desc, ilike, or } from 'drizzle-orm'
+import { eq, and, sql, desc, asc, ilike, or } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { EncryptionService } from '../common/encryption/encryption.service'
 import { CreateEmailAccountDto } from './dto/create-email-account.dto'
@@ -170,6 +170,31 @@ export class EmailAccountsService {
     return account
   }
 
+  /**
+   * Find the primary active email account for a user within an agency.
+   * Returns the oldest active account (deterministic selection by createdAt ASC).
+   * Returns null if no active account exists.
+   */
+  async findActiveAccountForUser(
+    userId: string,
+    agencyId: string,
+  ) {
+    const [account] = await this.db.client
+      .select()
+      .from(this.db.schema.emailAccounts)
+      .where(
+        and(
+          eq(this.db.schema.emailAccounts.userId, userId),
+          eq(this.db.schema.emailAccounts.agencyId, agencyId),
+          eq(this.db.schema.emailAccounts.isActive, true),
+        ),
+      )
+      .orderBy(asc(this.db.schema.emailAccounts.createdAt))
+      .limit(1)
+
+    return account || null
+  }
+
   async findAllActive(): Promise<{ id: string; userId: string; agencyId: string }[]> {
     return this.db.client
       .select({
@@ -209,15 +234,20 @@ export class EmailAccountsService {
     // Verify ownership
     await this.findOne(accountId, userId)
 
-    const folder = filters.folder || 'INBOX'
     const page = filters.page ?? 1
     const limit = filters.limit ?? 50
     const offset = (page - 1) * limit
 
     const conditions = [
       eq(this.db.schema.syncedEmails.emailAccountId, accountId),
-      eq(this.db.schema.syncedEmails.folder, folder),
     ]
+
+    // When filtering by contactId, search across all folders;
+    // otherwise scope to a specific folder (default INBOX)
+    if (!filters.contactId) {
+      const folder = filters.folder || 'INBOX'
+      conditions.push(eq(this.db.schema.syncedEmails.folder, folder))
+    }
 
     if (filters.search) {
       conditions.push(
@@ -230,9 +260,31 @@ export class EmailAccountsService {
     }
 
     if (filters.contactId) {
-      conditions.push(
-        sql`${this.db.schema.syncedEmails.matchedContactIds} @> ${JSON.stringify([filters.contactId])}::jsonb`,
-      )
+      // Look up the contact's email address for a fallback match
+      const [contact] = await this.db.client
+        .select({ email: this.db.schema.contacts.email })
+        .from(this.db.schema.contacts)
+        .where(eq(this.db.schema.contacts.id, filters.contactId))
+
+      const contactEmail = contact?.email?.toLowerCase()
+
+      if (contactEmail) {
+        // Match by either matchedContactIds OR email address (from/to/cc)
+        conditions.push(
+          or(
+            sql`${this.db.schema.syncedEmails.matchedContactIds} @> ${JSON.stringify([filters.contactId])}::jsonb`,
+            ilike(this.db.schema.syncedEmails.fromAddress, contactEmail),
+            sql`EXISTS (
+              SELECT 1 FROM jsonb_array_elements(${this.db.schema.syncedEmails.toAddresses}) AS addr
+              WHERE lower(addr->>'address') = ${contactEmail}
+            )`,
+          )!,
+        )
+      } else {
+        conditions.push(
+          sql`${this.db.schema.syncedEmails.matchedContactIds} @> ${JSON.stringify([filters.contactId])}::jsonb`,
+        )
+      }
     }
 
     const whereClause = and(...conditions)

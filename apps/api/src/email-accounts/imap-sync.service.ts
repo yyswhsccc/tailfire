@@ -1,7 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, and, sql, count, isNull } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { EmailAccountsService } from './email-accounts.service'
+import { NotificationService } from '../notifications/notification.service'
 import type {
   TestConnectionResultDto,
   EmailFolderDto,
@@ -15,6 +16,7 @@ export class ImapSyncService {
   constructor(
     private readonly db: DatabaseService,
     private readonly emailAccountsService: EmailAccountsService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -56,6 +58,7 @@ export class ImapSyncService {
 
     let newMessages = 0
     const errors: string[] = []
+    const newSenders: string[] = []
 
     try {
       const client = await this.createImapClient({
@@ -81,7 +84,7 @@ export class ImapSyncService {
           ? Number((mailboxStatus as any).uidNext)
           : undefined
 
-        if (uidNext && uidNext <= lastUid) {
+        if (uidNext && uidNext <= lastUid + 1) {
           this.logger.debug(`No new messages in INBOX (uidNext=${uidNext}, lastUid=${lastUid})`)
         } else {
           // Fetch new messages (metadata only — no body)
@@ -98,6 +101,10 @@ export class ImapSyncService {
             try {
               await this.upsertEmailFromImap(accountId, account.agencyId, 'INBOX', msg)
               newMessages++
+              const from = msg.envelope?.from?.[0]
+              if (from) {
+                newSenders.push(from.name || from.address || 'Unknown')
+              }
             } catch (err: any) {
               this.logger.error(`Failed to upsert UID ${msg.uid}: ${err.message}`, err.stack)
               errors.push(`UID ${msg.uid}: ${err.message}`)
@@ -132,6 +139,33 @@ export class ImapSyncService {
         error.message,
       )
       errors.push(error.message)
+    }
+
+    // Notify account owner of new emails
+    if (newMessages > 0) {
+      try {
+        const title = newMessages === 1
+          ? `New email from ${newSenders[0] || 'Unknown'}`
+          : `${newMessages} new emails`
+        const body = newMessages === 1
+          ? `You received a new email from ${newSenders[0] || 'Unknown'}`
+          : `You received ${newMessages} new emails from ${[...new Set(newSenders)].slice(0, 3).join(', ')}${newSenders.length > 3 ? ` and ${newSenders.length - 3} more` : ''}`
+
+        await this.notificationService.send({
+          userId: account.userId,
+          category: 'client_care',
+          title,
+          body,
+          actionUrl: '/emails/inbox',
+          data: {
+            notificationType: 'email.received',
+            emailAccountId: accountId,
+            newMessageCount: newMessages,
+          },
+        })
+      } catch (err: any) {
+        this.logger.warn(`Failed to send new email notification: ${err.message}`)
+      }
     }
 
     return { newMessages, errors }
@@ -228,12 +262,29 @@ export class ImapSyncService {
       const mailboxes = await client.list()
       await client.logout()
 
+      // Use local DB for unseen counts (flag updates are local-only)
+      const localCounts = await this.db.client
+        .select({
+          folder: this.db.schema.syncedEmails.folder,
+          total: count(),
+          unseen: count(
+            sql`CASE WHEN ${this.db.schema.syncedEmails.isSeen} = false THEN 1 END`,
+          ),
+        })
+        .from(this.db.schema.syncedEmails)
+        .where(eq(this.db.schema.syncedEmails.emailAccountId, accountId))
+        .groupBy(this.db.schema.syncedEmails.folder)
+
+      const countsByFolder = new Map(
+        localCounts.map((r) => [r.folder, { total: r.total, unseen: r.unseen }]),
+      )
+
       return mailboxes.map((mb) => ({
         name: mb.name,
         path: mb.path,
         specialUse: mb.specialUse || undefined,
-        totalMessages: mb.status?.messages ?? 0,
-        unseenMessages: mb.status?.unseen ?? 0,
+        totalMessages: countsByFolder.get(mb.path)?.total ?? 0,
+        unseenMessages: countsByFolder.get(mb.path)?.unseen ?? 0,
       }))
     } catch (error: any) {
       this.logger.error(`List folders failed for account ${accountId}: ${error.message}`)
@@ -509,6 +560,59 @@ export class ImapSyncService {
     // Determine outbound direction
     const account = await this.emailAccountsService.getAccountById(accountId)
     const isOutbound = from?.address?.toLowerCase() === account.emailAddress.toLowerCase()
+
+    // Dedup: Check if this outbound message was already saved by sendRaw (imapUid=null)
+    if (envelope?.messageId) {
+      const [existing] = await this.db.client
+        .select({ id: this.db.schema.syncedEmails.id })
+        .from(this.db.schema.syncedEmails)
+        .where(
+          and(
+            eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+            eq(this.db.schema.syncedEmails.messageId, envelope.messageId),
+            isNull(this.db.schema.syncedEmails.imapUid),
+          ),
+        )
+        .limit(1)
+
+      if (existing) {
+        // Update the provisional row with the real IMAP UID and flags
+        await this.db.client
+          .update(this.db.schema.syncedEmails)
+          .set({
+            imapUid: Number(msg.uid),
+            folder,
+            isSeen: flags.has('\\Seen'),
+            isFlagged: flags.has('\\Flagged'),
+            isAnswered: flags.has('\\Answered'),
+            isDraft: flags.has('\\Draft'),
+            hasAttachments: attachments.length > 0,
+            sizeBytes: msg.size != null ? Number(msg.size) : null,
+            updatedAt: new Date(),
+          })
+          .where(eq(this.db.schema.syncedEmails.id, existing.id))
+
+        // Still insert attachments if any
+        if (attachments.length > 0) {
+          await this.db.client
+            .insert(this.db.schema.emailAttachments)
+            .values(
+              attachments.map((att: any) => ({
+                emailId: existing.id,
+                filename: att.filename,
+                contentType: att.contentType,
+                sizeBytes: att.size,
+                contentId: att.contentId,
+                isInline: att.isInline ?? false,
+                imapPartId: att.partId,
+              })),
+            )
+            .onConflictDoNothing()
+        }
+
+        return // Early exit — deduped with existing row
+      }
+    }
 
     // Upsert (idempotent — ON CONFLICT updates flags)
     const [upserted] = await this.db.client
