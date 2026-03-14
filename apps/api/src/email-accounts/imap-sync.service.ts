@@ -75,32 +75,40 @@ export class ImapSyncService {
         const folderState = syncState?.folders?.INBOX ?? {}
         const lastUid = folderState.lastUid ?? 0
 
-        // Fetch new messages (metadata only — no body)
-        const fetchRange = lastUid > 0 ? `${lastUid + 1}:*` : '1:*'
-        this.logger.debug(`Fetching UIDs ${fetchRange} from INBOX (lastUid=${lastUid}, mailbox.exists=${(client.mailbox as any)?.exists})`)
-        for await (const msg of client.fetch(fetchRange, {
-          envelope: true,
-          bodyStructure: true,
-          flags: true,
-          uid: true,
-        })) {
-          this.logger.debug(`Processing UID ${msg.uid} (subject: ${msg.envelope?.subject})`)
-          if (Number(msg.uid) <= lastUid) continue
+        // Check if there are potentially new messages before fetching
+        const mailboxStatus = client.mailbox
+        const uidNext = mailboxStatus && typeof mailboxStatus === 'object'
+          ? Number((mailboxStatus as any).uidNext)
+          : undefined
 
-          try {
-            await this.upsertEmailFromImap(accountId, account.agencyId, 'INBOX', msg)
-            newMessages++
-          } catch (err: any) {
-            this.logger.error(`Failed to upsert UID ${msg.uid}: ${err.message}`, err.stack)
-            errors.push(`UID ${msg.uid}: ${err.message}`)
+        if (uidNext && uidNext <= lastUid) {
+          this.logger.debug(`No new messages in INBOX (uidNext=${uidNext}, lastUid=${lastUid})`)
+        } else {
+          // Fetch new messages (metadata only — no body)
+          const fetchRange = lastUid > 0 ? `${lastUid + 1}:*` : '1:*'
+          this.logger.debug(`Fetching UIDs ${fetchRange} from INBOX (lastUid=${lastUid}, uidNext=${uidNext})`)
+          for await (const msg of client.fetch(fetchRange, {
+            envelope: true,
+            bodyStructure: true,
+            flags: true,
+            uid: true,
+          })) {
+            if (Number(msg.uid) <= lastUid) continue
+
+            try {
+              await this.upsertEmailFromImap(accountId, account.agencyId, 'INBOX', msg)
+              newMessages++
+            } catch (err: any) {
+              this.logger.error(`Failed to upsert UID ${msg.uid}: ${err.message}`, err.stack)
+              errors.push(`UID ${msg.uid}: ${err.message}`)
+            }
           }
         }
 
         // Update sync state
-        const mailbox = client.mailbox
-        // ImapFlow returns BigInt for uidValidity/uidNext — convert to Number for JSON serialization
-        const uidValidity = mailbox && typeof mailbox === 'object' ? Number((mailbox as any).uidValidity) : undefined
-        const uidNext = mailbox && typeof mailbox === 'object' ? Number((mailbox as any).uidNext) : undefined
+        const uidValidity = mailboxStatus && typeof mailboxStatus === 'object'
+          ? Number((mailboxStatus as any).uidValidity)
+          : undefined
         await this.emailAccountsService.updateSyncState(accountId, {
           ...syncState,
           folders: {
