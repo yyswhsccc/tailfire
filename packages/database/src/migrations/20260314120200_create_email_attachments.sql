@@ -25,5 +25,9 @@ CREATE TABLE IF NOT EXISTS email_attachments (
 -- Indexes
 CREATE INDEX idx_email_attachments_email_id ON email_attachments(email_id);
 
+-- Dedupe attachment metadata on re-sync
+CREATE UNIQUE INDEX idx_email_attachments_unique ON email_attachments(email_id, imap_part_id)
+  WHERE imap_part_id IS NOT NULL;
+
 -- RLS
 ALTER TABLE email_attachments ENABLE ROW LEVEL SECURITY;

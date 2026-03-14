@@ -1,9 +1,9 @@
-import { IsArray, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator'
+import { IsArray, IsEmail, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 
 class EmailAddressInput {
-  @IsString()
-  address: string
+  @IsEmail()
+  address!: string
 
   @IsOptional()
   @IsString()
@@ -14,7 +14,7 @@ export class SendEmailDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => EmailAddressInput)
-  to: EmailAddressInput[]
+  to!: EmailAddressInput[]
 
   @IsOptional()
   @IsArray()
@@ -29,10 +29,10 @@ export class SendEmailDto {
   bcc?: EmailAddressInput[]
 
   @IsString()
-  subject: string
+  subject!: string
 
   @IsString()
-  bodyHtml: string
+  bodyHtml!: string
 
   @IsOptional()
   @IsUUID()

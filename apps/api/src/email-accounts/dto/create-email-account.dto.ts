@@ -2,14 +2,14 @@ import { IsEmail, IsString, IsOptional, IsInt, IsBoolean, Min, Max } from 'class
 
 export class CreateEmailAccountDto {
   @IsEmail()
-  emailAddress: string
+  emailAddress!: string
 
   @IsOptional()
   @IsString()
   displayName?: string
 
   @IsString()
-  imapHost: string
+  imapHost!: string
 
   @IsOptional()
   @IsInt()
@@ -22,7 +22,7 @@ export class CreateEmailAccountDto {
   imapTls?: boolean
 
   @IsString()
-  smtpHost: string
+  smtpHost!: string
 
   @IsOptional()
   @IsInt()
@@ -35,8 +35,8 @@ export class CreateEmailAccountDto {
   smtpTls?: boolean
 
   @IsString()
-  username: string
+  username!: string
 
   @IsString()
-  password: string
+  password!: string
 }

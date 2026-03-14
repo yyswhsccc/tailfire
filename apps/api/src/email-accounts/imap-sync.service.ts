@@ -1,7 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { eq, and, sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
-import { EncryptionService } from '../common/encryption/encryption.service'
 import { EmailAccountsService } from './email-accounts.service'
 import type {
   TestConnectionResultDto,
@@ -15,7 +14,6 @@ export class ImapSyncService {
 
   constructor(
     private readonly db: DatabaseService,
-    private readonly encryptionService: EncryptionService,
     private readonly emailAccountsService: EmailAccountsService,
   ) {}
 
@@ -99,13 +97,15 @@ export class ImapSyncService {
 
         // Update sync state
         const mailbox = client.mailbox
+        const uidValidity = mailbox && typeof mailbox === 'object' ? (mailbox as any).uidValidity : undefined
+        const uidNext = mailbox && typeof mailbox === 'object' ? (mailbox as any).uidNext : undefined
         await this.emailAccountsService.updateSyncState(accountId, {
           ...syncState,
           folders: {
             ...syncState.folders,
             INBOX: {
-              uidValidity: mailbox?.uidValidity,
-              lastUid: mailbox?.uidNext ? mailbox.uidNext - 1 : lastUid,
+              uidValidity,
+              lastUid: uidNext ? uidNext - 1 : lastUid,
             },
           },
         })
@@ -166,7 +166,7 @@ export class ImapSyncService {
       const lock = await client.getMailboxLock(email.folder)
 
       try {
-        const downloadResult = await client.download(email.imapUid.toString(), undefined, { uid: true })
+        const downloadResult = await client.download(String(email.imapUid), undefined, { uid: true })
         const chunks: Buffer[] = []
         for await (const chunk of downloadResult.content) {
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
@@ -284,7 +284,7 @@ export class ImapSyncService {
 
     try {
       const downloadResult = await client.download(
-        email.imapUid.toString(),
+        String(email.imapUid),
         attachment.imapPartId || undefined,
         { uid: true },
       )
@@ -452,7 +452,7 @@ export class ImapSyncService {
 
   private async computeThreadId(
     accountId: string,
-    messageId?: string,
+    _messageId?: string,
     inReplyTo?: string,
   ): Promise<string | null> {
     if (!inReplyTo) return null

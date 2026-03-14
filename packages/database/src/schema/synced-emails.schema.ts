@@ -8,7 +8,7 @@
  * ensures upsert-safe re-sync without duplicates.
  */
 
-import { pgTable, uuid, varchar, text, boolean, timestamp, jsonb, integer, index, uniqueIndex } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, text, boolean, timestamp, jsonb, integer, index } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { emailAccounts } from './email-accounts.schema'
 
@@ -19,7 +19,7 @@ export const syncedEmails = pgTable('synced_emails', {
 
   // IMAP identifiers
   messageId: varchar('message_id', { length: 512 }), // RFC Message-ID header
-  imapUid: integer('imap_uid').notNull(), // required for sync idempotency (unique index)
+  imapUid: integer('imap_uid'), // null for outbound emails; NOT NULL for IMAP-synced (unique partial index)
   folder: varchar('folder', { length: 255 }).notNull().default('INBOX'),
 
   // Threading
@@ -64,8 +64,9 @@ export const syncedEmails = pgTable('synced_emails', {
   syncedAt: timestamp('synced_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
-  // UNIQUE constraint for IMAP idempotency — prevents duplicate inserts on re-sync
-  idxUniqueImapIdentity: uniqueIndex('idx_synced_emails_unique_imap').on(table.emailAccountId, table.folder, table.imapUid),
+  // UNIQUE partial index for IMAP idempotency — defined in migration SQL as partial WHERE imap_uid IS NOT NULL
+  // Drizzle's uniqueIndex doesn't support partial indexes, so this is a regular index for ORM awareness
+  idxUniqueImapIdentity: index('idx_synced_emails_unique_imap').on(table.emailAccountId, table.folder, table.imapUid),
   idxAccountFolder: index('idx_synced_emails_account_folder').on(table.emailAccountId, table.folder),
   idxMessageId: index('idx_synced_emails_message_id').on(table.messageId),
   idxDate: index('idx_synced_emails_date').on(table.date),

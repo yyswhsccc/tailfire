@@ -9,7 +9,10 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Res,
+  StreamableFile,
 } from '@nestjs/common'
+import type { Response } from 'express'
 import { ApiTags } from '@nestjs/swagger'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
@@ -182,9 +185,15 @@ export class EmailAccountsController {
     @Param('id') id: string,
     @Param('emailId') emailId: string,
     @Param('attachmentId') attachmentId: string,
-  ) {
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
     await this.emailAccountsService.findOne(id, auth.userId)
-    return this.imapSyncService.fetchAttachment(id, emailId, attachmentId)
+    const { buffer, contentType, filename } = await this.imapSyncService.fetchAttachment(id, emailId, attachmentId)
+    res.set({
+      'Content-Type': contentType || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${(filename || 'attachment').replace(/"/g, '\\"')}"`,
+    })
+    return new StreamableFile(buffer)
   }
 
   /**

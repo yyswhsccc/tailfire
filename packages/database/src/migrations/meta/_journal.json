@@ -1079,6 +1079,13 @@
       "when": 1773763204000,
       "tag": "20260314120400_add_contact_email_index",
       "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "7",
+      "when": 1773763205000,
+      "tag": "20260314120500_fix_email_schema_codex_review",
+      "breakpoints": true
     }
   ]
 }

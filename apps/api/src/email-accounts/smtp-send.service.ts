@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config'
 import { eq, sql } from 'drizzle-orm'
 import * as nodemailer from 'nodemailer'
 import { DatabaseService } from '../db/database.service'
-import { EncryptionService } from '../common/encryption/encryption.service'
 import { EmailAccountsService } from './email-accounts.service'
 import { SendEmailDto } from './dto/send-email.dto'
 import type { SyncedEmailResponseDto } from '@tailfire/shared-types'
@@ -14,7 +13,6 @@ export class SmtpSendService {
 
   constructor(
     private readonly db: DatabaseService,
-    private readonly encryptionService: EncryptionService,
     private readonly emailAccountsService: EmailAccountsService,
     private readonly configService: ConfigService,
   ) {}
@@ -132,7 +130,7 @@ export class SmtpSendService {
           emailAccountId: accountId,
           agencyId: account.agencyId,
           messageId: info.messageId,
-          imapUid: 0, // Outbound — no IMAP UID
+          imapUid: null, // Outbound — no IMAP UID (excluded from unique partial index)
           folder: 'Sent',
           inReplyTo: inReplyTo ?? null,
           referencesHeader: references ?? null,

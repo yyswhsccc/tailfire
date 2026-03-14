@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common'
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
 import { eq, and, sql, desc, ilike, or } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { EncryptionService } from '../common/encryption/encryption.service'
@@ -10,12 +10,10 @@ import type {
   SyncedEmailResponseDto,
   SyncedEmailDetailDto,
   EmailAttachmentDto,
-  TestConnectionResultDto,
 } from '@tailfire/shared-types'
 
 @Injectable()
 export class EmailAccountsService {
-  private readonly logger = new Logger(EmailAccountsService.name)
 
   constructor(
     private readonly db: DatabaseService,
@@ -311,8 +309,8 @@ export class EmailAccountsService {
 
     const allowedDomains = (settings?.emailAllowedDomains as string[]) ?? []
     if (allowedDomains.length > 0) {
-      const domain = emailAddress.split('@')[1]?.toLowerCase()
-      if (!allowedDomains.includes(domain)) {
+      const domain = emailAddress.split('@')[1]?.toLowerCase() ?? ''
+      if (!domain || !allowedDomains.includes(domain)) {
         throw new BadRequestException(
           `Only emails from allowed domains can be added: ${allowedDomains.join(', ')}`,
         )

@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS synced_emails (
 
   -- IMAP identifiers
   message_id VARCHAR(512),
-  imap_uid INTEGER NOT NULL,
+  imap_uid INTEGER, -- null for outbound (SMTP-sent), NOT NULL for IMAP-synced
   folder VARCHAR(255) NOT NULL DEFAULT 'INBOX',
 
   -- Threading
@@ -54,8 +54,10 @@ CREATE TABLE IF NOT EXISTS synced_emails (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- UNIQUE constraint for IMAP sync idempotency (upsert on re-sync)
-CREATE UNIQUE INDEX idx_synced_emails_unique_imap ON synced_emails(email_account_id, folder, imap_uid);
+-- UNIQUE partial index for IMAP sync idempotency (upsert on re-sync)
+-- Only applies to IMAP-synced emails (imap_uid IS NOT NULL), not outbound SMTP-sent emails
+CREATE UNIQUE INDEX idx_synced_emails_unique_imap ON synced_emails(email_account_id, folder, imap_uid)
+  WHERE imap_uid IS NOT NULL;
 
 -- Query indexes
 CREATE INDEX idx_synced_emails_account_folder ON synced_emails(email_account_id, folder);

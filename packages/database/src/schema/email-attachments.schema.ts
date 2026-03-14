@@ -5,7 +5,7 @@
  * Actual file content is fetched on-demand from IMAP and cached in storage.
  */
 
-import { pgTable, uuid, varchar, text, integer, boolean, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, text, integer, boolean, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { syncedEmails } from './synced-emails.schema'
 
@@ -29,7 +29,11 @@ export const emailAttachments = pgTable('email_attachments', {
   isCached: boolean('is_cached').notNull().default(false),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-})
+}, (table) => ({
+  // Dedupe attachment metadata on re-sync
+  idxUniqueAttachment: uniqueIndex('idx_email_attachments_unique')
+    .on(table.emailId, table.imapPartId),
+}))
 
 export const emailAttachmentsRelations = relations(emailAttachments, ({ one }) => ({
   email: one(syncedEmails, {
