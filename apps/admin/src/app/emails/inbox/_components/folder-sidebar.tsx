@@ -1,11 +1,39 @@
 'use client'
 
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { Inbox, Send, FileText, Trash2, FolderOpen, AlertCircle } from 'lucide-react'
+import {
+  Inbox,
+  Send,
+  FileText,
+  Trash2,
+  FolderOpen,
+  AlertCircle,
+  MoreHorizontal,
+  Pencil,
+  FolderPlus,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { useCreateFolder, useRenameFolder, useDeleteFolder } from '@/hooks/use-emails'
 import type { EmailFolderDto } from '@tailfire/shared-types/api'
 
 interface FolderSidebarProps {
+  accountId: string | null
   folders: EmailFolderDto[]
   activeFolder: string
   onSelectFolder: (path: string) => void
@@ -19,36 +47,219 @@ const folderIcons: Record<string, React.ReactNode> = {
   '\\Junk': <AlertCircle className="h-4 w-4" />,
 }
 
-export function FolderSidebar({ folders, activeFolder, onSelectFolder }: FolderSidebarProps) {
-  return (
-    <nav className="space-y-1">
-      {folders.map((folder) => {
-        const isActive = folder.path === activeFolder
-        const icon = folderIcons[folder.specialUse || ''] || <FolderOpen className="h-4 w-4" />
+// System folders that cannot be renamed or deleted
+const PROTECTED_SPECIAL_USES = ['\\Inbox', '\\Sent', '\\Drafts', '\\Trash', '\\Junk']
 
-        return (
-          <button
-            key={folder.path}
-            onClick={() => onSelectFolder(folder.path)}
-            className={cn(
-              'flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors',
-              isActive
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-            )}
-          >
-            <span className="flex items-center gap-2">
-              {icon}
-              {folder.name}
-            </span>
-            {folder.unseenMessages > 0 && (
-              <Badge variant="secondary" className="h-5 min-w-5 px-1 text-xs">
-                {folder.unseenMessages}
-              </Badge>
-            )}
-          </button>
-        )
-      })}
-    </nav>
+export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder }: FolderSidebarProps) {
+  const createFolder = useCreateFolder(accountId)
+  const renameFolder = useRenameFolder(accountId)
+  const deleteFolder = useDeleteFolder(accountId)
+
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showRenameDialog, setShowRenameDialog] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [targetFolder, setTargetFolder] = useState<EmailFolderDto | null>(null)
+  const [renameTo, setRenameTo] = useState('')
+
+  function handleCreate() {
+    if (!newFolderName.trim()) return
+    createFolder.mutate(newFolderName.trim(), {
+      onSuccess: () => {
+        setShowCreateDialog(false)
+        setNewFolderName('')
+      },
+    })
+  }
+
+  function handleRename() {
+    if (!targetFolder || !renameTo.trim()) return
+    renameFolder.mutate(
+      { path: targetFolder.path, newPath: renameTo.trim() },
+      {
+        onSuccess: () => {
+          setShowRenameDialog(false)
+          setTargetFolder(null)
+          setRenameTo('')
+        },
+      },
+    )
+  }
+
+  function handleDelete() {
+    if (!targetFolder) return
+    deleteFolder.mutate(targetFolder.path, {
+      onSuccess: () => {
+        setShowDeleteConfirm(false)
+        setTargetFolder(null)
+        // Switch to INBOX if deleted folder was active
+        if (activeFolder === targetFolder.path) {
+          onSelectFolder('INBOX')
+        }
+      },
+    })
+  }
+
+  return (
+    <>
+      <nav className="space-y-1">
+        {folders.map((folder) => {
+          const isActive = folder.path === activeFolder
+          const icon = folderIcons[folder.specialUse || ''] || <FolderOpen className="h-4 w-4" />
+          const isProtected = PROTECTED_SPECIAL_USES.includes(folder.specialUse || '')
+
+          return (
+            <div
+              key={folder.path}
+              className={cn(
+                'group flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+              )}
+            >
+              <button
+                onClick={() => onSelectFolder(folder.path)}
+                className="flex flex-1 items-center gap-2 text-left"
+              >
+                {icon}
+                <span className="truncate">{folder.name}</span>
+              </button>
+              <div className="flex items-center gap-1">
+                {folder.unseenMessages > 0 && (
+                  <Badge variant="secondary" className="h-5 min-w-5 px-1 text-xs">
+                    {folder.unseenMessages}
+                  </Badge>
+                )}
+                {!isProtected && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hidden h-5 w-5 group-hover:flex"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-36">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setTargetFolder(folder)
+                          setRenameTo(folder.name)
+                          setShowRenameDialog(true)
+                        }}
+                      >
+                        <Pencil className="mr-2 h-3.5 w-3.5" />
+                        Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => {
+                          setTargetFolder(folder)
+                          setShowDeleteConfirm(true)
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-3.5 w-3.5" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* New Folder button */}
+        <button
+          onClick={() => setShowCreateDialog(true)}
+          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+        >
+          <FolderPlus className="h-4 w-4" />
+          New Folder
+        </button>
+      </nav>
+
+      {/* Create Folder Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Create Folder</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            placeholder="Folder name"
+            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreate}
+              disabled={!newFolderName.trim() || createFolder.isPending}
+            >
+              {createFolder.isPending ? 'Creating...' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Folder Dialog */}
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rename Folder</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={renameTo}
+            onChange={(e) => setRenameTo(e.target.value)}
+            placeholder="New folder name"
+            onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRename}
+              disabled={!renameTo.trim() || renameFolder.isPending}
+            >
+              {renameFolder.isPending ? 'Renaming...' : 'Rename'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Folder Confirm Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Folder</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete &ldquo;{targetFolder?.name}&rdquo;? All emails in this
+            folder will be permanently removed.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteFolder.isPending}
+            >
+              {deleteFolder.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

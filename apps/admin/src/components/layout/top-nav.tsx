@@ -20,6 +20,7 @@ import {
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { NotificationBell } from '@/components/notifications'
 import { CalendarNavbarPopover } from '@/components/calendar'
+import { useUnreadEmailCount } from '@/hooks/use-emails'
 
 const navigation = [
   { name: 'Trips', href: '/trips' },
@@ -38,6 +39,7 @@ export function TopNav() {
   const { signOut, claims } = useAuth()
   const { data: profile } = useMyProfile()
   const isAdmin = claims?.role === 'admin'
+  const unreadEmailCount = useUnreadEmailCount()
 
   const handleSignOut = async () => {
     try {
@@ -68,6 +70,7 @@ export function TopNav() {
         <nav className="flex items-center space-x-1">
           {navigation.map((item) => {
             const isActive = pathname?.startsWith(item.href)
+            const badge = item.name === 'Emails' && unreadEmailCount > 0 ? unreadEmailCount : 0
             return (
               <Link
                 key={item.name}
@@ -80,6 +83,11 @@ export function TopNav() {
                 )}
               >
                 {item.name}
+                {badge > 0 && (
+                  <span className="ml-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
+                    {badge > 99 ? '99+' : badge}
+                  </span>
+                )}
                 {isActive && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-phoenix-gold-600" />
                 )}

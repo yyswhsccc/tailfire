@@ -4,6 +4,7 @@
  * Hooks for reading synced emails, folders, and triggering sync.
  */
 
+import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type {
@@ -13,6 +14,7 @@ import type {
   SyncResultDto,
 } from '@tailfire/shared-types/api'
 import { useToast } from './use-toast'
+import { useEmailAccounts } from './use-email-accounts'
 
 // ============================================================================
 // Query Keys
@@ -69,6 +71,31 @@ export function useEmailDetail(accountId: string | null, emailId: string | null)
       api.get<SyncedEmailDetailDto>(`/email-accounts/${accountId}/emails/${emailId}`),
     enabled: !!accountId && !!emailId,
   })
+}
+
+/**
+ * Lightweight hook for top nav unread badge.
+ * Fetches accounts + INBOX folder unseen count with 60s stale time.
+ */
+export function useUnreadEmailCount() {
+  const { data: accounts } = useEmailAccounts()
+  const accountId = accounts?.[0]?.id ?? null
+
+  const { data: folders } = useQuery({
+    queryKey: emailKeys.folders(accountId || ''),
+    queryFn: () => api.get<EmailFolderDto[]>(`/email-accounts/${accountId}/folders`),
+    enabled: !!accountId,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  })
+
+  return useMemo(() => {
+    if (!folders) return 0
+    const inbox = folders.find(
+      (f) => f.specialUse === '\\Inbox' || f.path === 'INBOX',
+    )
+    return inbox?.unseenMessages ?? 0
+  }, [folders])
 }
 
 // ============================================================================
@@ -142,6 +169,84 @@ export function useDeleteEmail(accountId: string | null) {
         description: error.message,
         variant: 'destructive',
       })
+    },
+  })
+}
+
+export function useCreateFolder(accountId: string | null) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: (path: string) => {
+      if (!accountId) throw new Error('No account selected')
+      return api.post(`/email-accounts/${accountId}/folders`, { path })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: emailKeys.folders(accountId || '') })
+      toast({ title: 'Folder created' })
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to create folder', description: error.message, variant: 'destructive' })
+    },
+  })
+}
+
+export function useRenameFolder(accountId: string | null) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: (params: { path: string; newPath: string }) => {
+      if (!accountId) throw new Error('No account selected')
+      return api.patch(`/email-accounts/${accountId}/folders/rename`, params)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      toast({ title: 'Folder renamed' })
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to rename folder', description: error.message, variant: 'destructive' })
+    },
+  })
+}
+
+export function useDeleteFolder(accountId: string | null) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: (path: string) => {
+      if (!accountId) throw new Error('No account selected')
+      return api.delete(`/email-accounts/${accountId}/folders?path=${encodeURIComponent(path)}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      toast({ title: 'Folder deleted' })
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to delete folder', description: error.message, variant: 'destructive' })
+    },
+  })
+}
+
+export function useMoveEmail(accountId: string | null) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: (params: { emailId: string; folder: string }) => {
+      if (!accountId) throw new Error('No account selected')
+      return api.post(`/email-accounts/${accountId}/emails/${params.emailId}/move`, {
+        folder: params.folder,
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      toast({ title: 'Email moved' })
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to move email', description: error.message, variant: 'destructive' })
     },
   })
 }

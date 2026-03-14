@@ -27,6 +27,7 @@ import {
 import { useEmailDetail, useUpdateEmailFlags, useDeleteEmail } from '@/hooks/use-emails'
 import { useEmailStore } from '@/stores/email.store'
 import { ContactMatchBanner } from './contact-match-banner'
+import { MoveToFolderDropdown } from './move-to-folder-dropdown'
 import type { EmailAddressDto, EmailAttachmentDto } from '@tailfire/shared-types/api'
 
 interface EmailReaderProps {
@@ -206,6 +207,13 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
                 </TooltipTrigger>
                 <TooltipContent>{email.isFlagged ? 'Unstar' : 'Star'}</TooltipContent>
               </Tooltip>
+              <MoveToFolderDropdown
+                accountId={accountId}
+                emailId={emailId}
+                currentFolder={email.folder}
+                size="default"
+                onMoved={() => setSelectedEmailId(null)}
+              />
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

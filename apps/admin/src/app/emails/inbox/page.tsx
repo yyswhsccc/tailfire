@@ -94,6 +94,7 @@ export default function EmailInboxPage() {
             </div>
           </div>
           <FolderSidebar
+            accountId={accountId}
             folders={folders || []}
             activeFolder={activeFolder}
             onSelectFolder={setActiveFolder}
@@ -121,6 +122,7 @@ export default function EmailInboxPage() {
             ) : (
               <EmailList
                 accountId={accountId}
+                activeFolder={activeFolder}
                 emails={emailsData?.emails || []}
                 selectedEmailId={selectedEmailId}
                 onSelectEmail={setSelectedEmailId}

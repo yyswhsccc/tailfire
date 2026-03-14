@@ -11,16 +11,18 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useUpdateEmailFlags, useDeleteEmail } from '@/hooks/use-emails'
+import { MoveToFolderDropdown } from './move-to-folder-dropdown'
 import type { SyncedEmailResponseDto } from '@tailfire/shared-types/api'
 
 interface EmailListProps {
   accountId: string | null
+  activeFolder?: string
   emails: SyncedEmailResponseDto[]
   selectedEmailId: string | null
   onSelectEmail: (emailId: string) => void
 }
 
-export function EmailList({ accountId, emails, selectedEmailId, onSelectEmail }: EmailListProps) {
+export function EmailList({ accountId, activeFolder, emails, selectedEmailId, onSelectEmail }: EmailListProps) {
   const updateFlags = useUpdateEmailFlags(accountId)
   const deleteEmail = useDeleteEmail(accountId)
 
@@ -119,6 +121,12 @@ export function EmailList({ accountId, emails, selectedEmailId, onSelectEmail }:
                         {email.isFlagged ? 'Unstar' : 'Star'}
                       </TooltipContent>
                     </Tooltip>
+                    <MoveToFolderDropdown
+                      accountId={accountId}
+                      emailId={email.id}
+                      currentFolder={activeFolder}
+                      size="sm"
+                    />
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button

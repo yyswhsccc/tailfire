@@ -141,6 +141,63 @@ export class EmailAccountsController {
   }
 
   /**
+   * Create an IMAP folder
+   * POST /email-accounts/:id/folders
+   */
+  @Post(':id/folders')
+  async createFolder(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() body: { path: string },
+  ): Promise<void> {
+    await this.emailAccountsService.findOne(id, auth.userId)
+    return this.imapSyncService.createFolder(id, body.path)
+  }
+
+  /**
+   * Rename an IMAP folder
+   * PATCH /email-accounts/:id/folders/rename
+   */
+  @Patch(':id/folders/rename')
+  async renameFolder(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() body: { path: string; newPath: string },
+  ): Promise<void> {
+    await this.emailAccountsService.findOne(id, auth.userId)
+    return this.imapSyncService.renameFolder(id, body.path, body.newPath)
+  }
+
+  /**
+   * Delete an IMAP folder
+   * DELETE /email-accounts/:id/folders?path=FolderName
+   */
+  @Delete(':id/folders')
+  async deleteFolder(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Query('path') path: string,
+  ): Promise<void> {
+    await this.emailAccountsService.findOne(id, auth.userId)
+    return this.imapSyncService.deleteFolder(id, path)
+  }
+
+  /**
+   * Move an email to a different folder
+   * POST /email-accounts/:id/emails/:emailId/move
+   */
+  @Post(':id/emails/:emailId/move')
+  async moveEmail(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Param('emailId') emailId: string,
+    @Body() body: { folder: string },
+  ): Promise<void> {
+    await this.emailAccountsService.findOne(id, auth.userId)
+    return this.imapSyncService.moveEmail(id, emailId, body.folder)
+  }
+
+  /**
    * List synced emails (filtered)
    * GET /email-accounts/:id/emails
    */

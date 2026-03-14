@@ -234,6 +234,142 @@ export class ImapSyncService {
   }
 
   /**
+   * Create an IMAP folder
+   */
+  async createFolder(accountId: string, path: string): Promise<void> {
+    const account = await this.emailAccountsService.getAccountById(accountId)
+    const credentials = await this.emailAccountsService.getDecryptedCredentials(accountId)
+
+    const client = await this.createImapClient({
+      host: account.imapHost,
+      port: account.imapPort,
+      secure: account.imapTls,
+      user: credentials.username,
+      pass: credentials.password,
+    })
+
+    await client.connect()
+    try {
+      await client.mailboxCreate(path)
+    } finally {
+      await client.logout()
+    }
+  }
+
+  /**
+   * Rename an IMAP folder
+   */
+  async renameFolder(accountId: string, path: string, newPath: string): Promise<void> {
+    const account = await this.emailAccountsService.getAccountById(accountId)
+    const credentials = await this.emailAccountsService.getDecryptedCredentials(accountId)
+
+    const client = await this.createImapClient({
+      host: account.imapHost,
+      port: account.imapPort,
+      secure: account.imapTls,
+      user: credentials.username,
+      pass: credentials.password,
+    })
+
+    await client.connect()
+    try {
+      await client.mailboxRename(path, newPath)
+      // Update folder references in synced_emails
+      await this.db.client
+        .update(this.db.schema.syncedEmails)
+        .set({ folder: newPath, updatedAt: new Date() })
+        .where(
+          and(
+            eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+            eq(this.db.schema.syncedEmails.folder, path),
+          ),
+        )
+    } finally {
+      await client.logout()
+    }
+  }
+
+  /**
+   * Delete an IMAP folder
+   */
+  async deleteFolder(accountId: string, path: string): Promise<void> {
+    const account = await this.emailAccountsService.getAccountById(accountId)
+    const credentials = await this.emailAccountsService.getDecryptedCredentials(accountId)
+
+    const client = await this.createImapClient({
+      host: account.imapHost,
+      port: account.imapPort,
+      secure: account.imapTls,
+      user: credentials.username,
+      pass: credentials.password,
+    })
+
+    await client.connect()
+    try {
+      await client.mailboxDelete(path)
+      // Remove synced emails from deleted folder
+      await this.db.client
+        .delete(this.db.schema.syncedEmails)
+        .where(
+          and(
+            eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+            eq(this.db.schema.syncedEmails.folder, path),
+          ),
+        )
+    } finally {
+      await client.logout()
+    }
+  }
+
+  /**
+   * Move an email to a different IMAP folder
+   */
+  async moveEmail(
+    accountId: string,
+    emailId: string,
+    destinationFolder: string,
+  ): Promise<void> {
+    const account = await this.emailAccountsService.getAccountById(accountId)
+    const credentials = await this.emailAccountsService.getDecryptedCredentials(accountId)
+
+    const [email] = await this.db.client
+      .select()
+      .from(this.db.schema.syncedEmails)
+      .where(
+        and(
+          eq(this.db.schema.syncedEmails.id, emailId),
+          eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+        ),
+      )
+      .limit(1)
+
+    if (!email) throw new NotFoundException('Email not found')
+    if (!email.imapUid) throw new NotFoundException('Email has no IMAP UID (outbound email)')
+
+    const client = await this.createImapClient({
+      host: account.imapHost,
+      port: account.imapPort,
+      secure: account.imapTls,
+      user: credentials.username,
+      pass: credentials.password,
+    })
+
+    await client.connect()
+    const lock = await client.getMailboxLock(email.folder)
+    try {
+      await client.messageMove(String(email.imapUid), destinationFolder, { uid: true })
+      // Update the local DB record
+      await this.db.client
+        .update(this.db.schema.syncedEmails)
+        .set({ folder: destinationFolder, updatedAt: new Date() })
+        .where(eq(this.db.schema.syncedEmails.id, emailId))
+    } finally {
+      lock.release()
+      await client.logout()
+    }
+  }
+
+  /**
    * Fetch attachment content from IMAP (cache on first access)
    */
   async fetchAttachment(
