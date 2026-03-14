@@ -261,6 +261,9 @@ export interface UpdateAgencySettingsDto {
   primaryColor?: string // Hex color (e.g., '#FF5733')
   // Commission fee (Tailfire technology fee, % deducted from net commission before agent split)
   commissionFeeRate?: number // 0-100, default 5.00
+  // Email Integration
+  emailAllowedDomains?: string[] // empty = no restriction
+  emailComplianceFooter?: string | null // HTML footer for all outbound emails
 }
 
 export interface AgencySettingsResponseDto {
@@ -277,6 +280,9 @@ export interface AgencySettingsResponseDto {
   commissionFeeRate: string // Decimal as string (e.g., "5.00")
   logoUrl: string | null
   primaryColor: string | null
+  // Email Integration
+  emailAllowedDomains: string[]
+  emailComplianceFooter: string | null
   createdAt: string
   updatedAt: string
 }
