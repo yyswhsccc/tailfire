@@ -40,7 +40,7 @@ interface ProfileFormProviderProps {
   defaultTab?: string
 }
 
-const VALID_TABS = ['public', 'agent', 'preferences', 'notifications', 'templates', 'tags', 'marketing', 'security']
+const VALID_TABS = ['public', 'agent', 'preferences', 'notifications', 'email', 'templates', 'tags', 'marketing', 'security']
 
 export function ProfileFormProvider({ children, defaultTab = 'public' }: ProfileFormProviderProps) {
   const searchParams = useSearchParams()
