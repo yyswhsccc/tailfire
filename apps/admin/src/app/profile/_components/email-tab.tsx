@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Loader2, Mail, Plug, AlertCircle, CheckCircle2, Info } from 'lucide-react'
+import { Loader2, Mail, Plug, CheckCircle2, Info } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,9 +54,6 @@ export function EmailTab() {
     },
   })
 
-  const editingAccount = editingAccountId
-    ? accounts?.find((a) => a.id === editingAccountId)
-    : null
   const updateAccount = useUpdateEmailAccount(editingAccountId || '')
 
   const onSubmit = async (data: EmailFormValues) => {
