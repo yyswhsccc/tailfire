@@ -1330,7 +1330,9 @@ export default function ContactDetailPage() {
                 <NotesSection contactId={contactId} />
               )}
               {activeSection === 'emails' && (
-                <ContactEmailsSection contactId={contactId} />
+                <div className="p-6">
+                  <ContactEmailsSection contactId={contactId} />
+                </div>
               )}
               {activeSection === 'sms' && (
                 <ComingSoonSection

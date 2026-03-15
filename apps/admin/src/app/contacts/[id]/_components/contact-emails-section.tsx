@@ -160,13 +160,26 @@ export function ContactEmailsSection({ contactId }: ContactEmailsSectionProps) {
 
   // Merge and filter
   const emails = useMemo(() => {
-    const agentEmails = (agentData?.emails || []).map(mapAgentEmail)
+    const rawAgentEmails = agentData?.emails || []
+    const agentEmails = rawAgentEmails.map(mapAgentEmail)
     const systemEmails = (systemData?.data || []).map(mapSystemEmail)
 
     let merged: UnifiedEmail[] = []
-    if (typeFilter === 'agent') merged = agentEmails
-    else if (typeFilter === 'system') merged = systemEmails
-    else merged = [...agentEmails, ...systemEmails]
+    if (typeFilter === 'agent') {
+      merged = agentEmails
+    } else if (typeFilter === 'system') {
+      merged = systemEmails
+    } else {
+      // Deduplicate: if a system email's providerMessageId matches an agent email's messageId,
+      // keep only the agent version (richer data: snippet, read status, etc.)
+      const agentMessageIds = new Set(
+        rawAgentEmails.map((e) => e.messageId).filter(Boolean),
+      )
+      const dedupedSystemEmails = (systemData?.data || [])
+        .filter((log) => !log.providerMessageId || !agentMessageIds.has(log.providerMessageId))
+        .map(mapSystemEmail)
+      merged = [...agentEmails, ...dedupedSystemEmails]
+    }
 
     // Client-side search by subject
     if (debouncedSearch) {
@@ -180,7 +193,8 @@ export function ContactEmailsSection({ contactId }: ContactEmailsSectionProps) {
     return merged
   }, [agentData, systemData, typeFilter, debouncedSearch])
 
-  const totalCount = (agentData?.total || agentData?.emails?.length || 0) + (systemData?.pagination?.total || systemData?.data?.length || 0)
+  // When searching, show filtered vs total; otherwise just show total
+  const totalCount = emails.length
 
   if (isLoading) {
     return (
@@ -225,9 +239,7 @@ export function ContactEmailsSection({ contactId }: ContactEmailsSectionProps) {
 
       {/* Count */}
       <p className="text-xs text-muted-foreground">
-        {emails.length === totalCount
-          ? `${totalCount} email${totalCount !== 1 ? 's' : ''}`
-          : `${emails.length} of ${totalCount} emails`}
+        {`${totalCount} email${totalCount !== 1 ? 's' : ''}`}
       </p>
 
       {/* Email list */}
