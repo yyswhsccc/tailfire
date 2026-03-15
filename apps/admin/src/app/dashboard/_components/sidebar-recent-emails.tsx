@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import {
@@ -17,6 +17,13 @@ import { Button } from '@/components/ui/button'
 import { useEmailAccounts } from '@/hooks/use-email-accounts'
 import { useEmails, useSyncEmails, useUnreadEmailCount } from '@/hooks/use-emails'
 import { useEmailStore } from '@/stores/email.store'
+import { EmailPreviewDialog } from '@/app/contacts/[id]/_components/email-preview-dialog'
+
+type PreviewState = {
+  emailId: string
+  subject: string
+  folder: string
+} | null
 
 export function SidebarRecentEmails() {
   const router = useRouter()
@@ -30,16 +37,9 @@ export function SidebarRecentEmails() {
   const syncEmails = useSyncEmails(accountId)
   const unreadCount = useUnreadEmailCount()
 
-  const emails = useMemo(() => emailsData?.emails || [], [emailsData])
+  const [preview, setPreview] = useState<PreviewState>(null)
 
-  function handleClickEmail(emailId: string) {
-    useEmailStore.setState({
-      activeFolder: 'INBOX',
-      selectedEmailId: emailId,
-      search: '',
-    })
-    router.push('/emails/inbox')
-  }
+  const emails = useMemo(() => emailsData?.emails || [], [emailsData])
 
   function handleCompose() {
     useEmailStore.setState({ compose: { mode: 'new' } })
@@ -109,7 +109,13 @@ export function SidebarRecentEmails() {
           {emails.slice(0, 5).map((email) => (
             <button
               key={email.id}
-              onClick={() => handleClickEmail(email.id)}
+              onClick={() =>
+                setPreview({
+                  emailId: email.id,
+                  subject: email.subject || '(no subject)',
+                  folder: email.folder,
+                })
+              }
               className={cn(
                 'w-full text-left rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50',
                 !email.isSeen && 'font-semibold',
@@ -134,6 +140,18 @@ export function SidebarRecentEmails() {
             </button>
           ))}
         </div>
+      )}
+
+      {preview && (
+        <EmailPreviewDialog
+          open={!!preview}
+          onOpenChange={(open) => { if (!open) setPreview(null) }}
+          source="agent"
+          rawId={preview.emailId}
+          accountId={accountId}
+          folder={preview.folder}
+          subject={preview.subject}
+        />
       )}
     </div>
   )
