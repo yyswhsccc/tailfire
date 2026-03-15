@@ -67,6 +67,9 @@ export * from './users.types.js'
 // Email System (Send, Log, Templates)
 export * from './email.types.js'
 
+// Email Accounts (Agent personal IMAP/SMTP — separate from EmailModule)
+export * from './email-accounts.types.js'
+
 // Geolocation (Cascade System)
 export * from './geolocation.types.js'
 

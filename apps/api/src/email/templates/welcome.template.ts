@@ -29,9 +29,6 @@ export function getWelcomeTemplate({ firstName, loginUrl }: WelcomeTemplateParam
         If you have any questions, please don't hesitate to reach out to our support team.
       </p>
     </div>
-    <p style="margin: 24px 0 0; color: #a1a1aa; font-size: 12px; text-align: center;">
-      Phoenix Voyages
-    </p>
   </div>
 </body>
 </html>

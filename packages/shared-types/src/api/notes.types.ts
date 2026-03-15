@@ -14,6 +14,7 @@ export interface CreateNoteDto {
   content: string
   tripId?: string
   contactId?: string
+  tripGroupId?: string
   isPinned?: boolean
 }
 
@@ -29,6 +30,7 @@ export interface UpdateNoteDto {
 export interface NoteFilterDto extends BaseFilterDto {
   tripId?: string
   contactId?: string
+  tripGroupId?: string
 }
 
 // ============================================================================
@@ -48,6 +50,7 @@ export interface NoteResponseDto {
   content: string
   tripId?: string
   contactId?: string
+  tripGroupId?: string
   isPinned: boolean
   createdBy: string
   createdByUser: NoteUserDto

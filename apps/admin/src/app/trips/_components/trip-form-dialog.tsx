@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { useQueryClient } from '@tanstack/react-query'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Search, Trash2 } from 'lucide-react'
+import { Search, Trash2, Check, ChevronsUpDown, Plus } from 'lucide-react'
 import type { TripResponseDto, ItineraryResponseDto, ItineraryDayResponseDto } from '@tailfire/shared-types/api'
 import { useLoading } from '@/context/loading-context'
 import { itineraryDayKeys } from '@/hooks/use-itinerary-days'
@@ -36,12 +36,28 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DateRangeInput } from '@/components/ui/date-range-input'
-import { useCreateTrip, useUpdateTrip, tripKeys } from '@/hooks/use-trips'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command'
+import { useCreateTrip, useUpdateTrip, tripKeys, useTripGroups } from '@/hooks/use-trips'
 import { useTripTags, useUpdateTripTags, useCreateTag } from '@/hooks/use-tags'
 import { useToast } from '@/hooks/use-toast'
 import { ApiError, api } from '@/lib/api'
 import { TagInput } from '@/components/ui/tag-input'
 import { UnsplashPicker } from '@/components/unsplash-picker'
+import { GroupFormDialog } from './group-form-dialog'
+import { cn } from '@/lib/utils'
 import {
   tripFormSchema,
   toTripDefaults,
@@ -81,6 +97,17 @@ export function TripFormDialog({
   const [showUnsplashPicker, setShowUnsplashPicker] = useState(false)
   const [savingCover, setSavingCover] = useState(false)
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [groupOpen, setGroupOpen] = useState(false)
+  const [inlineGroupDialogOpen, setInlineGroupDialogOpen] = useState(false)
+
+  // Fetch groups for the combobox
+  const { data: groups = [] } = useTripGroups()
+
+  // When a group is created inline, auto-select it
+  const handleInlineGroupCreated = (groupId: string) => {
+    form.setValue('tripGroupId', groupId)
+    setInlineGroupDialogOpen(false)
+  }
 
   // Tag hooks for junction-based tag management
   const { data: existingTripTags } = useTripTags(mode === 'edit' && trip ? trip.id : null)
@@ -105,6 +132,7 @@ export function TripFormDialog({
       setCoverPhoto(null)
       setShowUnsplashPicker(false)
       setSavingCover(false)
+      setGroupOpen(false)
       stopLoading('trip-navigation')
       if (trip && mode === 'edit') {
         form.reset(toTripDefaults(trip))
@@ -448,7 +476,12 @@ export function TripFormDialog({
                   <FormItem>
                     <FormLabel>Trip Type</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
+                      onValueChange={(val) => {
+                        field.onChange(val)
+                        if (val !== 'group') {
+                          form.setValue('tripGroupId', '')
+                        }
+                      }}
                       value={field.value}
                     >
                       <FormControl>
@@ -468,6 +501,84 @@ export function TripFormDialog({
                 )}
               />
             </div>
+
+            {/* Group Selector — shown when trip type is "group" */}
+            {form.watch('tripType') === 'group' && (
+              <FormField
+                control={form.control}
+                name="tripGroupId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Group</FormLabel>
+                    <Popover open={groupOpen} onOpenChange={setGroupOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={groupOpen}
+                            className={cn(
+                              'w-full justify-between font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                            data-field="tripGroupId"
+                          >
+                            {field.value
+                              ? groups.find((g: any) => g.id === field.value)?.name || 'Selected group'
+                              : 'Select a group...'}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search groups..." />
+                          <CommandList>
+                            <CommandEmpty>No groups found.</CommandEmpty>
+                            <CommandGroup>
+                              {groups.map((group: any) => (
+                                <CommandItem
+                                  key={group.id}
+                                  value={group.name}
+                                  onSelect={() => {
+                                    field.onChange(field.value === group.id ? '' : group.id)
+                                    setGroupOpen(false)
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      'mr-2 h-4 w-4',
+                                      field.value === group.id ? 'opacity-100' : 'opacity-0'
+                                    )}
+                                  />
+                                  {group.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                            <CommandSeparator />
+                            <CommandGroup>
+                              <CommandItem
+                                onSelect={() => {
+                                  setGroupOpen(false)
+                                  setInlineGroupDialogOpen(true)
+                                }}
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Create New Group
+                              </CommandItem>
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormDescription>
+                      Assign this trip to an existing group
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Row 2: Status & Tags */}
             <div className="grid grid-cols-2 gap-4">
@@ -681,6 +792,14 @@ export function TripFormDialog({
         />
       </DialogContent>
     </Dialog>
+
+    {/* Inline Group Creation Dialog */}
+    <GroupFormDialog
+      open={inlineGroupDialogOpen}
+      onOpenChange={setInlineGroupDialogOpen}
+      mode="create"
+      onCreated={handleInlineGroupCreated}
+    />
   </>
   )
 }

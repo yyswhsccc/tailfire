@@ -38,11 +38,15 @@ type QuickContactFormValues = z.infer<typeof quickContactSchema>
 interface QuickContactDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  defaultValues?: Partial<QuickContactFormValues>
+  onSuccess?: (contactId: string) => void
 }
 
 export function QuickContactDialog({
   open,
   onOpenChange,
+  defaultValues: prefill,
+  onSuccess,
 }: QuickContactDialogProps) {
   const router = useRouter()
   const form = useForm<QuickContactFormValues>({
@@ -61,9 +65,12 @@ export function QuickContactDialog({
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
-      form.reset()
+      form.reset({
+        firstName: '', lastName: '', email: '', phone: '',
+        ...prefill,
+      })
     }
-  }, [open, form])
+  }, [open, form, prefill])
 
   const onSubmit = async (data: QuickContactFormValues) => {
     try {
@@ -82,8 +89,9 @@ export function QuickContactDialog({
       onOpenChange(false)
       form.reset()
 
-      // Navigate to the new contact detail page
-      if (newContact?.id) {
+      if (onSuccess && newContact?.id) {
+        onSuccess(newContact.id)
+      } else if (newContact?.id) {
         router.push(`/contacts/${newContact.id}`)
       }
     } catch (error) {

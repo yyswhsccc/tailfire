@@ -34,6 +34,8 @@ export * from './loyalty-programs.schema'
 export * from './trips.schema'
 export * from './trip-shares.schema'
 export * from './trip-group-shares.schema'
+export * from './trip-group-documents.schema'
+export * from './trip-group-media.schema'
 export * from './trip-media.schema'
 export * from './tags.schema'
 export * from './itinerary-days.schema'
@@ -123,6 +125,11 @@ export * from './user-profiles.schema'
 
 // Email system (logs and templates)
 export * from './email.schema'
+
+// Email accounts (agent personal IMAP/SMTP — separate from EmailModule)
+export * from './email-accounts.schema'
+export * from './synced-emails.schema'
+export * from './email-attachments.schema'
 
 // Trip Orders (invoice snapshots with versioning)
 export * from './trip-orders.schema'

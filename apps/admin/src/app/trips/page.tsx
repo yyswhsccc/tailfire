@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Download } from 'lucide-react'
+import { Plus, Search, Download, FolderPlus } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { PageHeader } from '@/components/shared'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,8 @@ import {
   type TripsViewMode,
 } from '@/components/trips'
 import { TripFormDialog } from './_components/trip-form-dialog'
+import { GroupsTable } from './_components/groups-table'
+import { GroupFormDialog } from './_components/group-form-dialog'
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/shared'
 import { TableSkeleton } from '@/components/shared/loading-skeleton'
@@ -36,11 +38,12 @@ import type { TripStatus } from '@tailfire/shared-types'
 export default function TernTripsPage() {
   const router = useRouter()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [viewMode, setViewMode] = useState<TripsViewMode>('kanban')
 
   useEffect(() => {
     const stored = localStorage.getItem('trips-view-mode')
-    if (stored === 'table' || stored === 'kanban') {
+    if (stored === 'table' || stored === 'kanban' || stored === 'groups') {
       setViewMode(stored)
     }
   }, [])
@@ -177,30 +180,35 @@ export default function TernTripsPage() {
 
   return (
     <DashboardLayout>
-      {/* Page Header */}
+      {/* Page Header — identical across all views */}
       <PageHeader
         title="Trips"
         actions={
           <div className="flex items-center gap-2">
-            {/* View Switcher */}
             <TripsViewSwitcher view={viewMode} onViewChange={handleViewChange} />
 
-            {/* Filter Panel */}
             <TripsFilterPanel
               filters={filters}
               onFiltersChange={handleFiltersChange}
             />
 
-            {/* Search Input */}
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search trips..."
+                placeholder={viewMode === 'groups' ? 'Search groups...' : 'Search trips...'}
                 value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
-                onBlur={handleSearchSubmit}
+                onChange={(e) => {
+                  setSearchInput(e.target.value)
+                  // Groups view filters client-side so update immediately
+                  if (viewMode === 'groups') return
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && viewMode !== 'groups') handleSearchSubmit()
+                }}
+                onBlur={() => {
+                  if (viewMode !== 'groups') handleSearchSubmit()
+                }}
                 className="w-64 pl-9"
               />
             </div>
@@ -214,6 +222,11 @@ export default function TernTripsPage() {
               Import Booking
             </Button>
 
+            <Button variant="outline" size="sm" onClick={() => setGroupDialogOpen(true)}>
+              <FolderPlus className="mr-2 h-4 w-4" />
+              New Group
+            </Button>
+
             <Button onClick={() => setIsCreateOpen(true)} size="sm">
               <Plus className="mr-2 h-4 w-4" />
               New Trip
@@ -222,74 +235,84 @@ export default function TernTripsPage() {
         }
       />
 
-      {/* Bulk Actions Toolbar - shows when items selected in table view */}
-      {viewMode === 'table' && selectedIds.size > 0 && (
-        <div className="mb-4">
-          <TripsBulkActions
-            selectedCount={selectedIds.size}
-            onDelete={handleBulkDelete}
-            onArchive={handleBulkArchive}
-            onUnarchive={handleBulkUnarchive}
-            onChangeStatus={handleBulkChangeStatus}
-            onClearSelection={() => setSelectedIds(new Set())}
-            isDeleting={bulkDelete.isPending}
-            isArchiving={bulkArchive.isPending}
-            isChangingStatus={bulkChangeStatus.isPending}
-          />
-        </div>
+      {/* Groups View */}
+      {viewMode === 'groups' && (
+        <GroupsTable search={searchInput} />
       )}
 
-      {/* Content */}
-      {error ? (
-        <div className="text-center py-12">
-          <p className="text-destructive mb-4">
-            Failed to load trips. Please try again.
-          </p>
-          <Button variant="outline" onClick={() => refetch()}>
-            Retry
-          </Button>
-        </div>
-      ) : isPending ? (
-        <TableSkeleton rows={8} />
-      ) : trips.length === 0 && !hasActiveFilters ? (
-        <EmptyState
-          title="No trips yet"
-          description="Get started by creating your first trip"
-          action={{
-            label: 'Create Trip',
-            onClick: () => setIsCreateOpen(true),
-          }}
-        />
-      ) : trips.length === 0 && hasActiveFilters ? (
-        <EmptyState
-          title="No matching trips"
-          description="Try adjusting your filters or search query"
-          action={{
-            label: 'Clear Filters',
-            onClick: () => {
-              setFilters({ page: 1, limit: 25, sortBy: 'createdAt', sortOrder: 'desc' })
-              setSearchInput('')
-            },
-          }}
-        />
-      ) : viewMode === 'kanban' ? (
-        <TripsKanban trips={trips} />
-      ) : (
+      {/* Trip Views (Kanban / Table) */}
+      {viewMode !== 'groups' && (
         <>
-          <TripsDataTable
-            trips={trips}
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-          />
-          {data?.pagination && data.pagination.totalPages > 1 && (
-            <TripsPagination
-              page={data.pagination.page}
-              totalPages={data.pagination.totalPages}
-              total={data.pagination.total}
-              limit={data.pagination.limit}
-              onPageChange={handlePageChange}
-              onLimitChange={handleLimitChange}
+          {/* Bulk Actions Toolbar - shows when items selected in table view */}
+          {viewMode === 'table' && selectedIds.size > 0 && (
+            <div className="mb-4">
+              <TripsBulkActions
+                selectedCount={selectedIds.size}
+                onDelete={handleBulkDelete}
+                onArchive={handleBulkArchive}
+                onUnarchive={handleBulkUnarchive}
+                onChangeStatus={handleBulkChangeStatus}
+                onClearSelection={() => setSelectedIds(new Set())}
+                isDeleting={bulkDelete.isPending}
+                isArchiving={bulkArchive.isPending}
+                isChangingStatus={bulkChangeStatus.isPending}
+              />
+            </div>
+          )}
+
+          {/* Content */}
+          {error ? (
+            <div className="text-center py-12">
+              <p className="text-destructive mb-4">
+                Failed to load trips. Please try again.
+              </p>
+              <Button variant="outline" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          ) : isPending ? (
+            <TableSkeleton rows={8} />
+          ) : trips.length === 0 && !hasActiveFilters ? (
+            <EmptyState
+              title="No trips yet"
+              description="Get started by creating your first trip"
+              action={{
+                label: 'Create Trip',
+                onClick: () => setIsCreateOpen(true),
+              }}
             />
+          ) : trips.length === 0 && hasActiveFilters ? (
+            <EmptyState
+              title="No matching trips"
+              description="Try adjusting your filters or search query"
+              action={{
+                label: 'Clear Filters',
+                onClick: () => {
+                  setFilters({ page: 1, limit: 25, sortBy: 'createdAt', sortOrder: 'desc' })
+                  setSearchInput('')
+                },
+              }}
+            />
+          ) : viewMode === 'kanban' ? (
+            <TripsKanban trips={trips} />
+          ) : (
+            <>
+              <TripsDataTable
+                trips={trips}
+                selectedIds={selectedIds}
+                onSelectionChange={setSelectedIds}
+              />
+              {data?.pagination && data.pagination.totalPages > 1 && (
+                <TripsPagination
+                  page={data.pagination.page}
+                  totalPages={data.pagination.totalPages}
+                  total={data.pagination.total}
+                  limit={data.pagination.limit}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
+                />
+              )}
+            </>
           )}
         </>
       )}
@@ -298,6 +321,13 @@ export default function TernTripsPage() {
       <TripFormDialog
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
+        mode="create"
+      />
+
+      {/* Create Group Dialog */}
+      <GroupFormDialog
+        open={groupDialogOpen}
+        onOpenChange={setGroupDialogOpen}
         mode="create"
       />
     </DashboardLayout>
