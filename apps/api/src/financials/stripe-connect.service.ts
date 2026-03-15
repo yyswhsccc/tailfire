@@ -265,6 +265,8 @@ export class StripeConnectService {
       logoUrl?: string
       primaryColor?: string
       commissionFeeRate?: number
+      emailAllowedDomains?: string[]
+      emailComplianceFooter?: string | null
     }
   ): Promise<AgencySettingsResponseDto> {
     // Validate commission fee rate range
@@ -313,6 +315,8 @@ export class StripeConnectService {
     commissionFeeRate: string
     logoUrl: string | null
     primaryColor: string | null
+    emailAllowedDomains: unknown
+    emailComplianceFooter: string | null
     createdAt: Date
     updatedAt: Date
   }): AgencySettingsResponseDto {
@@ -330,6 +334,8 @@ export class StripeConnectService {
       commissionFeeRate: settings.commissionFeeRate,
       logoUrl: settings.logoUrl,
       primaryColor: settings.primaryColor,
+      emailAllowedDomains: (settings.emailAllowedDomains as string[]) ?? [],
+      emailComplianceFooter: settings.emailComplianceFooter,
       createdAt: settings.createdAt.toISOString(),
       updatedAt: settings.updatedAt.toISOString(),
     }

@@ -184,6 +184,7 @@ export type EmailLogResponse = {
   sentAt: string | null
   createdAt: string
   createdBy: string | null
+  category: EmailCategory | null
 }
 
 /**

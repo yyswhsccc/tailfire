@@ -17,6 +17,7 @@ export const QUEUES = {
   OCR_PROCESSING: 'ocr-processing',
   ENRICHMENT: 'enrichment',
   DOCUMENT_RENDER: 'document-render',
+  EMAIL_SYNC: 'email-sync',
 } as const
 
 // Alias for backward compatibility
@@ -72,6 +73,10 @@ export const JOB_TYPES = {
 
   // Document render jobs
   DOCUMENT_RENDER_PDF: 'document.render_pdf',
+
+  // Email sync jobs (queue registered in EmailAccountsModule, NOT here)
+  EMAIL_SYNC: 'email.sync',
+  EMAIL_DISPATCH_SYNC: 'email.dispatch_sync',
 } as const
 
 export type JobType = (typeof JOB_TYPES)[keyof typeof JOB_TYPES]
@@ -253,6 +258,15 @@ export interface DocumentRenderJobData {
   outputFormat: 'pdf'
   tripOrderId?: string
   requestedBy?: string
+}
+
+// ============================================================================
+// Email Sync Job Types (queue registered in EmailAccountsModule, NOT AutomationModule)
+// ============================================================================
+
+export interface EmailSyncJobData {
+  type: 'email.sync' | 'email.dispatch_sync'
+  emailAccountId?: string // required for 'email.sync'
 }
 
 // ============================================================================

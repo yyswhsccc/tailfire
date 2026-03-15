@@ -126,6 +126,11 @@ export * from './user-profiles.schema'
 // Email system (logs and templates)
 export * from './email.schema'
 
+// Email accounts (agent personal IMAP/SMTP — separate from EmailModule)
+export * from './email-accounts.schema'
+export * from './synced-emails.schema'
+export * from './email-attachments.schema'
+
 // Trip Orders (invoice snapshots with versioning)
 export * from './trip-orders.schema'
 

@@ -280,6 +280,10 @@ export const agencySettings = pgTable(
     logoUrl: text('logo_url'),
     primaryColor: varchar('primary_color', { length: 7 }), // Hex color
 
+    // Email Integration Settings
+    emailAllowedDomains: jsonb('email_allowed_domains').default([]), // string[] — empty = no restriction
+    emailComplianceFooter: text('email_compliance_footer'), // HTML footer for all outbound emails
+
     // Audit fields
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

@@ -36,9 +36,6 @@ export function getInviteTemplate({
         This invitation link will expire in 24 hours. If you didn't expect this invitation, you can safely ignore this email.
       </p>
     </div>
-    <p style="margin: 24px 0 0; color: #a1a1aa; font-size: 12px; text-align: center;">
-      Phoenix Voyages
-    </p>
   </div>
 </body>
 </html>

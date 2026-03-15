@@ -55,11 +55,11 @@ import { RelationshipsSection } from './_components/relationships-section'
 import { LoyaltyProgramsSection } from './_components/loyalty-programs-section'
 import { LoyaltyProgramDialog } from './_components/loyalty-program-dialog'
 import { ContactDocumentsSection } from './_components/contact-documents-section'
+import { ContactEmailsSection } from './_components/contact-emails-section'
 import { NotesSection } from '@/components/notes/NotesSection'
 import { ContactCalendarSection } from '@/components/calendar/ContactCalendarSection'
 import {
   CheckSquare,
-  Mail,
   MessageCircle,
   Plane,
   MapPin,
@@ -1330,11 +1330,9 @@ export default function ContactDetailPage() {
                 <NotesSection contactId={contactId} />
               )}
               {activeSection === 'emails' && (
-                <ComingSoonSection
-                  title="Emails"
-                  description="Email communication history with this contact."
-                  icon={Mail}
-                />
+                <div className="p-6">
+                  <ContactEmailsSection contactId={contactId} />
+                </div>
               )}
               {activeSection === 'sms' && (
                 <ComingSoonSection

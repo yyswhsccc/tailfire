@@ -46,6 +46,7 @@ import { ClientPortalModule } from './client-portal/client-portal.module'
 import { LoyaltyProgramsModule } from './loyalty-programs/loyalty-programs.module'
 import { DocumentTemplatesModule } from './document-templates/document-templates.module'
 import { DocumentRenderModule } from './document-render/document-render.module'
+import { EmailAccountsModule } from './email-accounts/email-accounts.module'
 
 @Module({
   imports: [
@@ -168,6 +169,9 @@ import { DocumentRenderModule } from './document-render/document-render.module'
 
     // Document Render (PDF generation via BullMQ + Puppeteer)
     DocumentRenderModule,
+
+    // Email Accounts (Agent IMAP/SMTP — separate from EmailModule)
+    EmailAccountsModule,
   ],
   controllers: [AppController],
   providers: [

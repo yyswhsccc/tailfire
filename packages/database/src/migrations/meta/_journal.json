@@ -1051,6 +1051,48 @@
       "when": 1773504000000,
       "tag": "20260311120000_add_group_docs_media",
       "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "7",
+      "when": 1773763200000,
+      "tag": "20260314120000_create_email_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "7",
+      "when": 1773763201000,
+      "tag": "20260314120100_create_synced_emails",
+      "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1773763202000,
+      "tag": "20260314120200_create_email_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1773763203000,
+      "tag": "20260314120300_add_email_settings_to_agency",
+      "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "7",
+      "when": 1773763204000,
+      "tag": "20260314120400_add_contact_email_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "7",
+      "when": 1773763205000,
+      "tag": "20260314120500_fix_email_schema_codex_review",
+      "breakpoints": true
     }
   ]
 }

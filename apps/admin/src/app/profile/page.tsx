@@ -15,6 +15,7 @@ import { AgentInfoTab } from './_components/agent-info-tab'
 import { PreferencesTab } from './_components/preferences-tab'
 import { NotificationsTab } from './_components/notifications-tab'
 import { SecurityTab } from './_components/security-tab'
+import { EmailTab } from './_components/email-tab'
 
 function ProfilePageHeader() {
   const { data: profile, isLoading } = useMyProfile()
@@ -66,7 +67,7 @@ function ComingSoonTab({ title }: { title: string }) {
 }
 
 // Tabs that have form registration (show Save button)
-const SAVEABLE_TABS = ['public', 'agent', 'preferences', 'notifications']
+const SAVEABLE_TABS = ['public', 'agent', 'preferences', 'notifications', 'email']
 
 function ProfileContent() {
   const { activeTab, setActiveTab, submitActiveForm, isSubmitting } = useProfileForm()
@@ -97,11 +98,12 @@ function ProfileContent() {
 
       {/* Controlled Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="public">Public Profile</TabsTrigger>
           <TabsTrigger value="agent">Agent Info</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="email">Email</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="tags">Tags</TabsTrigger>
           <TabsTrigger value="marketing">Marketing</TabsTrigger>
@@ -122,6 +124,10 @@ function ProfileContent() {
 
         <TabsContent value="notifications">
           <NotificationsTab />
+        </TabsContent>
+
+        <TabsContent value="email">
+          <EmailTab />
         </TabsContent>
 
         <TabsContent value="templates">
