@@ -12,6 +12,7 @@ import {
 import { SidebarQuickCreate } from './sidebar-quick-create'
 import { SidebarMiniCalendar } from './sidebar-mini-calendar'
 import { SidebarTodayTasks } from './sidebar-today-tasks'
+import { SidebarRecentEmails } from './sidebar-recent-emails'
 import { SidebarAgentLeaderboard } from './sidebar-agent-leaderboard'
 import type { TaskDueSummary, AgentLeaderboardEntry } from '@/hooks/use-dashboard'
 
@@ -27,6 +28,7 @@ function SidebarContent({ isAdmin, tasks, leaderboard }: Pick<DashboardSidebarPr
   return (
     <div className="space-y-6">
       <SidebarQuickCreate />
+      <SidebarRecentEmails />
       <SidebarMiniCalendar />
       <SidebarTodayTasks tasks={tasks} />
       {isAdmin && leaderboard && leaderboard.length > 0 && (
