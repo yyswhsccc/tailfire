@@ -56,6 +56,7 @@ import { LoyaltyProgramsSection } from './_components/loyalty-programs-section'
 import { LoyaltyProgramDialog } from './_components/loyalty-program-dialog'
 import { ContactDocumentsSection } from './_components/contact-documents-section'
 import { ContactEmailsSection } from './_components/contact-emails-section'
+import { RecentEmailsCard } from './_components/recent-emails-card'
 import { NotesSection } from '@/components/notes/NotesSection'
 import { ContactCalendarSection } from '@/components/calendar/ContactCalendarSection'
 import {
@@ -1241,6 +1242,12 @@ export default function ContactDetailPage() {
               onAddRelationship={handleAddRelationship}
               onEditRelationship={handleEditRelationship}
               onViewAll={handleViewAllRelationships}
+            />
+
+            {/* Recent Emails Widget */}
+            <RecentEmailsCard
+              contactId={contactId}
+              onViewAll={() => setActiveSection('emails')}
             />
           </div>
 

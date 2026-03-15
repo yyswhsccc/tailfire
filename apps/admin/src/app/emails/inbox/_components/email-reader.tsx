@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo } from 'react'
 import { format } from 'date-fns'
-import DOMPurify from 'dompurify'
 import {
   Download,
   FileText,
@@ -24,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { sanitizeEmailHtml } from '@/lib/sanitize-email-html'
 import { useEmailDetail, useUpdateEmailFlags, useDeleteEmail } from '@/hooks/use-emails'
 import { useEmailStore } from '@/stores/email.store'
 import { ContactMatchBanner } from './contact-match-banner'
@@ -62,21 +62,7 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
 
   const sanitizedHtml = useMemo(() => {
     if (!email?.bodyHtml) return null
-    return DOMPurify.sanitize(email.bodyHtml, {
-      ALLOWED_TAGS: [
-        'a', 'b', 'i', 'u', 'em', 'strong', 'p', 'br', 'div', 'span',
-        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
-        'table', 'thead', 'tbody', 'tr', 'td', 'th', 'img', 'blockquote',
-        'pre', 'code', 'hr', 'dl', 'dt', 'dd', 'sup', 'sub', 'font',
-      ],
-      ALLOWED_ATTR: [
-        'href', 'src', 'alt', 'title', 'class', 'style', 'width', 'height',
-        'border', 'cellpadding', 'cellspacing', 'align', 'valign', 'bgcolor',
-        'color', 'size', 'face', 'target', 'rel',
-      ],
-      ALLOW_DATA_ATTR: false,
-      ADD_ATTR: ['target'],
-    })
+    return sanitizeEmailHtml(email.bodyHtml)
   }, [email?.bodyHtml])
 
   if (isLoading) {

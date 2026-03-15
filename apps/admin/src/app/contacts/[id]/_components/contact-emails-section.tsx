@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import {
   ArrowDownLeft,
@@ -26,6 +26,7 @@ import {
 import { useEmailAccounts } from '@/hooks/use-email-accounts'
 import { useEmails, useEmailLogs } from '@/hooks/use-emails'
 import type { SyncedEmailResponseDto, EmailLogResponse } from '@tailfire/shared-types/api'
+import { EmailPreviewDialog } from './email-preview-dialog'
 
 // =============================================================================
 // Types
@@ -33,6 +34,7 @@ import type { SyncedEmailResponseDto, EmailLogResponse } from '@tailfire/shared-
 
 type UnifiedEmail = {
   id: string
+  rawId: string
   source: 'agent' | 'system'
   direction: 'inbound' | 'outbound'
   subject: string
@@ -46,6 +48,7 @@ type UnifiedEmail = {
   status: string | null
   category: string | null
   templateSlug: string | null
+  folder?: string
 }
 
 type TypeFilter = 'all' | 'agent' | 'system'
@@ -66,6 +69,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 function mapAgentEmail(email: SyncedEmailResponseDto): UnifiedEmail {
   return {
     id: `agent-${email.id}`,
+    rawId: email.id,
     source: 'agent',
     direction: email.isOutbound ? 'outbound' : 'inbound',
     subject: email.subject || '(no subject)',
@@ -79,12 +83,14 @@ function mapAgentEmail(email: SyncedEmailResponseDto): UnifiedEmail {
     status: null,
     category: null,
     templateSlug: null,
+    folder: email.folder,
   }
 }
 
 function mapSystemEmail(log: EmailLogResponse): UnifiedEmail {
   return {
     id: `system-${log.id}`,
+    rawId: log.id,
     source: 'system',
     direction: 'outbound',
     subject: log.subject || '(no subject)',
@@ -129,6 +135,7 @@ export function ContactEmailsSection({ contactId }: ContactEmailsSectionProps) {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [previewEmail, setPreviewEmail] = useState<UnifiedEmail | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
 
   // Debounce search with cleanup
@@ -253,8 +260,17 @@ export function ContactEmailsSection({ contactId }: ContactEmailsSectionProps) {
           {emails.map((email) => (
             <div
               key={email.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setPreviewEmail(email)}
+              onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setPreviewEmail(email)
+                }
+              }}
               className={cn(
-                'flex flex-col gap-1.5 px-4 py-3',
+                'flex flex-col gap-1.5 px-4 py-3 cursor-pointer transition-colors hover:bg-muted/50',
                 !email.isSeen && 'font-semibold',
               )}
             >
@@ -322,6 +338,18 @@ export function ContactEmailsSection({ contactId }: ContactEmailsSectionProps) {
             </div>
           ))}
         </div>
+      )}
+
+      {previewEmail && (
+        <EmailPreviewDialog
+          open={!!previewEmail}
+          onOpenChange={(open) => { if (!open) setPreviewEmail(null) }}
+          source={previewEmail.source}
+          rawId={previewEmail.rawId}
+          accountId={accountId}
+          folder={previewEmail.folder}
+          subject={previewEmail.subject}
+        />
       )}
     </div>
   )

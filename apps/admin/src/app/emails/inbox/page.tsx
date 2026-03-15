@@ -1,14 +1,21 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { DndContext, DragOverlay, type DragStartEvent, type DragEndEvent } from '@dnd-kit/core'
 import { Loader2, Pencil, RefreshCw, Mail, Search } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useEmailAccounts } from '@/hooks/use-email-accounts'
 import { useEmailFolders, useEmails, useSyncEmails, useMoveEmail } from '@/hooks/use-emails'
-import { useEmailStore } from '@/stores/email.store'
+import { useEmailStore, type EmailSortBy } from '@/stores/email.store'
 import { useDndSensors, dndCollisionDetection, type EmailDragData, type FolderDropData } from '@/lib/dnd-config'
 import { FolderSidebar } from './_components/folder-sidebar'
 import { EmailList } from './_components/email-list'
@@ -24,10 +31,12 @@ export default function EmailInboxPage() {
   const activeFolder = useEmailStore((s) => s.activeFolder)
   const selectedEmailId = useEmailStore((s) => s.selectedEmailId)
   const search = useEmailStore((s) => s.search)
+  const sortBy = useEmailStore((s) => s.sortBy)
   const compose = useEmailStore((s) => s.compose)
   const setActiveFolder = useEmailStore((s) => s.setActiveFolder)
   const setSelectedEmailId = useEmailStore((s) => s.setSelectedEmailId)
   const setSearch = useEmailStore((s) => s.setSearch)
+  const setSortBy = useEmailStore((s) => s.setSortBy)
   const openCompose = useEmailStore((s) => s.openCompose)
 
   const { data: folders } = useEmailFolders(accountId)
@@ -37,6 +46,33 @@ export default function EmailInboxPage() {
   })
   const syncEmails = useSyncEmails(accountId)
   const moveEmail = useMoveEmail(accountId)
+
+  // Client-side sorting
+  const sortedEmails = useMemo(() => {
+    const emails = [...(emailsData?.emails || [])]
+    switch (sortBy) {
+      case 'date-desc':
+        return emails.sort((a, b) =>
+          new Date(b.date || b.syncedAt).getTime() - new Date(a.date || a.syncedAt).getTime()
+        )
+      case 'date-asc':
+        return emails.sort((a, b) =>
+          new Date(a.date || a.syncedAt).getTime() - new Date(b.date || b.syncedAt).getTime()
+        )
+      case 'unread':
+        return emails.sort((a, b) => {
+          if (a.isSeen !== b.isSeen) return a.isSeen ? 1 : -1
+          return new Date(b.date || b.syncedAt).getTime() - new Date(a.date || a.syncedAt).getTime()
+        })
+      case 'starred':
+        return emails.sort((a, b) => {
+          if (a.isFlagged !== b.isFlagged) return a.isFlagged ? -1 : 1
+          return new Date(b.date || b.syncedAt).getTime() - new Date(a.date || a.syncedAt).getTime()
+        })
+      default:
+        return emails
+    }
+  }, [emailsData?.emails, sortBy])
 
   // DnD state
   const sensors = useDndSensors()
@@ -149,7 +185,7 @@ export default function EmailInboxPage() {
 
           {/* Email List */}
           <div className="flex w-80 flex-shrink-0 flex-col border-r">
-            <div className="border-b p-2">
+            <div className="space-y-2 border-b p-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -158,6 +194,22 @@ export default function EmailInboxPage() {
                   onChange={(e) => setSearch(e.target.value)}
                   className="h-9 pl-9"
                 />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {emailsData?.total ?? sortedEmails.length} email{(emailsData?.total ?? sortedEmails.length) !== 1 ? 's' : ''}
+                </span>
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as EmailSortBy)}>
+                  <SelectTrigger className="h-7 w-[140px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date-desc">Newest first</SelectItem>
+                    <SelectItem value="date-asc">Oldest first</SelectItem>
+                    <SelectItem value="unread">Unread first</SelectItem>
+                    <SelectItem value="starred">Starred first</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -169,7 +221,7 @@ export default function EmailInboxPage() {
                 <EmailList
                   accountId={accountId}
                   activeFolder={activeFolder}
-                  emails={emailsData?.emails || []}
+                  emails={sortedEmails}
                   selectedEmailId={selectedEmailId}
                   onSelectEmail={setSelectedEmailId}
                 />

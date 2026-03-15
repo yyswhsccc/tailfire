@@ -12,6 +12,7 @@ import type {
   SyncedEmailDetailDto,
   EmailFolderDto,
   SyncResultDto,
+  EmailLogResponse,
   PaginatedEmailLogsResponse,
 } from '@tailfire/shared-types/api'
 import { useToast } from './use-toast'
@@ -25,6 +26,7 @@ export const emailLogKeys = {
   all: ['email-logs'] as const,
   list: (contactId: string, search?: string) =>
     [...emailLogKeys.all, contactId, search] as const,
+  detail: (logId: string) => [...emailLogKeys.all, 'detail', logId] as const,
 }
 
 export const emailKeys = {
@@ -91,6 +93,14 @@ export function useEmailDetail(accountId: string | null, emailId: string | null)
     queryFn: () =>
       api.get<SyncedEmailDetailDto>(`/email-accounts/${accountId}/emails/${emailId}`),
     enabled: !!accountId && !!emailId,
+  })
+}
+
+export function useEmailLogDetail(logId: string | null) {
+  return useQuery({
+    queryKey: emailLogKeys.detail(logId || ''),
+    queryFn: () => api.get<EmailLogResponse>(`/emails/logs/${logId}`),
+    enabled: !!logId,
   })
 }
 
@@ -180,16 +190,38 @@ export function useDeleteEmail(accountId: string | null) {
       if (!accountId) throw new Error('No account selected')
       return api.delete(`/email-accounts/${accountId}/emails/${emailId}`)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: emailKeys.all })
-      toast({ title: 'Email deleted' })
+    onMutate: async (emailId) => {
+      await queryClient.cancelQueries({ queryKey: emailKeys.all })
+
+      const cache = queryClient.getQueriesData<{ emails: SyncedEmailResponseDto[]; total: number }>({
+        queryKey: [...emailKeys.all, accountId || ''],
+      })
+
+      for (const [key, data] of cache) {
+        if (!data?.emails) continue
+        const filtered = data.emails.filter((e) => e.id !== emailId)
+        if (filtered.length !== data.emails.length) {
+          queryClient.setQueryData(key, { emails: filtered, total: Math.max(0, data.total - 1) })
+        }
+      }
+
+      return { cache }
     },
-    onError: (error: Error) => {
+    onError: (_error, _vars, context) => {
+      if (context?.cache) {
+        for (const [key, data] of context.cache) {
+          queryClient.setQueryData(key, data)
+        }
+      }
       toast({
         title: 'Failed to delete email',
-        description: error.message,
+        description: _error.message,
         variant: 'destructive',
       })
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      toast({ title: 'Email deleted' })
     },
   })
 }
@@ -262,12 +294,38 @@ export function useMoveEmail(accountId: string | null) {
         folder: params.folder,
       })
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: emailKeys.all })
-      toast({ title: 'Email moved' })
+    onMutate: async ({ emailId }) => {
+      // Cancel in-flight queries so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: emailKeys.all })
+
+      // Snapshot all email list caches that contain this email
+      const cache = queryClient.getQueriesData<{ emails: SyncedEmailResponseDto[]; total: number }>({
+        queryKey: [...emailKeys.all, accountId || ''],
+      })
+
+      // Optimistically remove the email from every cached list
+      for (const [key, data] of cache) {
+        if (!data?.emails) continue
+        const filtered = data.emails.filter((e) => e.id !== emailId)
+        if (filtered.length !== data.emails.length) {
+          queryClient.setQueryData(key, { emails: filtered, total: Math.max(0, data.total - 1) })
+        }
+      }
+
+      return { cache }
     },
-    onError: (error: Error) => {
-      toast({ title: 'Failed to move email', description: error.message, variant: 'destructive' })
+    onError: (_error, _vars, context) => {
+      // Rollback: restore all cached lists
+      if (context?.cache) {
+        for (const [key, data] of context.cache) {
+          queryClient.setQueryData(key, data)
+        }
+      }
+      toast({ title: 'Failed to move email', description: _error.message, variant: 'destructive' })
+    },
+    onSettled: () => {
+      // Refetch to reconcile with server state
+      queryClient.invalidateQueries({ queryKey: emailKeys.all })
     },
   })
 }

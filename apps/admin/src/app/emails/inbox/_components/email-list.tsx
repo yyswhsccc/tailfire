@@ -1,6 +1,6 @@
 'use client'
 
-import { formatDistanceToNow } from 'date-fns'
+import { format, isToday, isYesterday, isThisYear } from 'date-fns'
 import { useDraggable } from '@dnd-kit/core'
 import { Mail, MailOpen, Paperclip, Star, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -22,6 +22,20 @@ interface EmailListProps {
   emails: SyncedEmailResponseDto[]
   selectedEmailId: string | null
   onSelectEmail: (emailId: string) => void
+}
+
+function formatEmailDate(dateStr: string | null): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isToday(d)) return format(d, 'h:mm a')
+  if (isYesterday(d)) return 'Yesterday'
+  if (isThisYear(d)) return format(d, 'MMM d')
+  return format(d, 'MMM d, yyyy')
+}
+
+function formatEmailDateFull(dateStr: string | null): string {
+  if (!dateStr) return ''
+  return format(new Date(dateStr), 'MMM d, yyyy h:mm a')
 }
 
 export function EmailList({ accountId, activeFolder, emails, selectedEmailId, onSelectEmail }: EmailListProps) {
@@ -188,11 +202,16 @@ function DraggableEmailItem({
           </div>
 
           {/* Date (hidden on hover to make room for actions) */}
-          <span className="text-xs text-muted-foreground group-hover:hidden">
-            {email.date
-              ? formatDistanceToNow(new Date(email.date), { addSuffix: true })
-              : ''}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-xs text-muted-foreground group-hover:hidden">
+                {formatEmailDate(email.date)}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              {formatEmailDateFull(email.date)}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

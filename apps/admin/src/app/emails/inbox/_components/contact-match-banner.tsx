@@ -1,10 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { ExternalLink, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useContacts } from '@/hooks/use-contacts'
+import { QuickContactDialog } from '@/app/contacts/_components/quick-contact-dialog'
 
 interface ContactMatchBannerProps {
   matchedContactIds: string[]
@@ -19,7 +20,7 @@ export function ContactMatchBanner({
   fromAddress,
   fromName,
 }: ContactMatchBannerProps) {
-  const router = useRouter()
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   // Real-time fallback: search contacts by fromAddress when matchedContactIds is empty
   const { data: searchResults } = useContacts(
@@ -80,33 +81,43 @@ export function ContactMatchBanner({
     )
   }
 
+  // Parse sender name into first/last
+  const parsedName = (() => {
+    if (!fromName) return {}
+    const parts = fromName.split(' ')
+    if (parts.length > 1) {
+      return {
+        firstName: parts.slice(0, -1).join(' '),
+        lastName: parts[parts.length - 1]!,
+      }
+    }
+    return { firstName: fromName }
+  })()
+
   // No match found at all — show create button
   return (
-    <div className="flex items-center justify-between rounded-md border border-dashed border-muted-foreground/30 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-      <span>No matching contact found</span>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-6 gap-1 text-xs"
-        onClick={() => {
-          const params = new URLSearchParams()
-          if (fromAddress) params.set('email', fromAddress)
-          if (fromName) {
-            const parts = fromName.split(' ')
-            if (parts.length > 1) {
-              params.set('firstName', parts.slice(0, -1).join(' '))
-              params.set('lastName', parts[parts.length - 1]!)
-            } else {
-              params.set('firstName', fromName)
-            }
-          }
-          params.set('create', 'true')
-          router.push(`/contacts?${params.toString()}`)
+    <>
+      <div className="flex items-center justify-between rounded-md border border-dashed border-muted-foreground/30 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <span>No matching contact found</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 gap-1 text-xs"
+          onClick={() => setDialogOpen(true)}
+        >
+          <UserPlus className="h-3 w-3" />
+          Create Contact
+        </Button>
+      </div>
+      <QuickContactDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        defaultValues={{
+          ...parsedName,
+          ...(fromAddress ? { email: fromAddress } : {}),
         }}
-      >
-        <UserPlus className="h-3 w-3" />
-        Create Contact
-      </Button>
-    </div>
+        onSuccess={() => setDialogOpen(false)}
+      />
+    </>
   )
 }
