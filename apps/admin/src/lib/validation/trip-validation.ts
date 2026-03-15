@@ -29,6 +29,7 @@ export const tripFormSchema = z.object({
   endDate: z.string().optional().or(z.literal('')),
   addDatesLater: z.boolean().default(false),
   timezone: z.string().optional().or(z.literal('')),
+  tripGroupId: z.string().optional().or(z.literal('')),
 }).superRefine((data, ctx) => {
   // Cross-field validation: require both dates when addDatesLater is false
   if (!data.addDatesLater) {
@@ -79,6 +80,7 @@ export const TRIP_FORM_FIELDS = [
   'endDate',
   'addDatesLater',
   'timezone',
+  'tripGroupId',
 ] as const
 
 // ============================================================================
@@ -100,6 +102,7 @@ export function toTripDefaults(trip?: TripResponseDto | null): TripFormValues {
       endDate: '',
       addDatesLater: false,
       timezone: '',
+      tripGroupId: '',
     }
   }
 
@@ -112,6 +115,7 @@ export function toTripDefaults(trip?: TripResponseDto | null): TripFormValues {
     endDate: trip.endDate ?? '',
     addDatesLater: !trip.startDate && !trip.endDate,
     timezone: trip.timezone ?? '',
+    tripGroupId: (trip as any).tripGroupId ?? '',
   }
 }
 
@@ -139,5 +143,6 @@ export function toTripApiPayload(
     startDate: data.addDatesLater ? undefined : (data.startDate || undefined),
     endDate: data.addDatesLater ? undefined : (data.endDate || undefined),
     timezone: data.timezone || undefined,
+    tripGroupId: data.tripGroupId || undefined,
   }
 }

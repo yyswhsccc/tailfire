@@ -20,9 +20,10 @@ import { useToast } from '@/hooks/use-toast'
 interface NotesSectionProps {
   tripId?: string
   contactId?: string
+  tripGroupId?: string
 }
 
-export function NotesSection({ tripId, contactId }: NotesSectionProps) {
+export function NotesSection({ tripId, contactId, tripGroupId }: NotesSectionProps) {
   const [newContent, setNewContent] = useState('')
   const [page, setPage] = useState(1)
   const limit = 20
@@ -34,6 +35,7 @@ export function NotesSection({ tripId, contactId }: NotesSectionProps) {
   const { data, isLoading } = useNotes({
     tripId,
     contactId,
+    tripGroupId,
     page,
     limit,
   })
@@ -59,6 +61,7 @@ export function NotesSection({ tripId, contactId }: NotesSectionProps) {
         content: trimmed,
         tripId,
         contactId,
+        tripGroupId,
         _optimistic: {
           userId,
           firstName: profile?.firstName ?? undefined,

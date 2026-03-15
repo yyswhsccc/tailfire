@@ -38,10 +38,11 @@ export function useNotes(filters: NoteFilterDto = {}) {
       if (filters.search) params.append('search', filters.search)
       if (filters.tripId) params.append('tripId', filters.tripId)
       if (filters.contactId) params.append('contactId', filters.contactId)
+      if (filters.tripGroupId) params.append('tripGroupId', filters.tripGroupId)
 
       return api.get<PaginatedNotesResponseDto>(`/notes?${params.toString()}`)
     },
-    enabled: !!(filters.tripId || filters.contactId),
+    enabled: !!(filters.tripId || filters.contactId || filters.tripGroupId),
   })
 }
 
@@ -77,6 +78,7 @@ export function useCreateNote() {
           content: data.content,
           tripId: data.tripId,
           contactId: data.contactId,
+          tripGroupId: data.tripGroupId,
           isPinned: data.isPinned ?? false,
           createdBy: data._optimistic.userId,
           createdByUser: {

@@ -31,14 +31,15 @@ export class NotesService {
     userId: string
   ): Promise<NoteResponseDto> {
     // Validate exactly one entity reference
-    if (!dto.tripId && !dto.contactId) {
+    const entityCount = [dto.tripId, dto.contactId, dto.tripGroupId].filter(Boolean).length
+    if (entityCount === 0) {
       throw new BadRequestException(
-        'Either tripId or contactId must be provided'
+        'One of tripId, contactId, or tripGroupId must be provided'
       )
     }
-    if (dto.tripId && dto.contactId) {
+    if (entityCount > 1) {
       throw new BadRequestException(
-        'Only one of tripId or contactId can be provided'
+        'Only one of tripId, contactId, or tripGroupId can be provided'
       )
     }
 
@@ -49,6 +50,7 @@ export class NotesService {
         content: dto.content,
         tripId: dto.tripId,
         contactId: dto.contactId,
+        tripGroupId: dto.tripGroupId,
         isPinned: dto.isPinned ?? false,
         createdBy: userId,
         updatedBy: userId,
@@ -80,6 +82,9 @@ export class NotesService {
     }
     if (filters.contactId) {
       conditions.push(eq(this.db.schema.notes.contactId, filters.contactId))
+    }
+    if (filters.tripGroupId) {
+      conditions.push(eq(this.db.schema.notes.tripGroupId, filters.tripGroupId))
     }
     if (filters.search) {
       conditions.push(
@@ -302,6 +307,7 @@ export class NotesService {
       content: note.content,
       tripId: note.tripId ?? undefined,
       contactId: note.contactId ?? undefined,
+      tripGroupId: note.tripGroupId ?? undefined,
       isPinned: note.isPinned,
       createdBy: note.createdBy,
       createdByUser: {

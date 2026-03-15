@@ -1,10 +1,10 @@
 'use client'
 
-import { LayoutGrid, List } from 'lucide-react'
+import { LayoutGrid, List, Users } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 
-export type TripsViewMode = 'kanban' | 'table'
+export type TripsViewMode = 'kanban' | 'table' | 'groups'
 
 interface TripsViewSwitcherProps {
   view: TripsViewMode
@@ -33,11 +33,21 @@ export function TripsViewSwitcher({ view, onViewChange }: TripsViewSwitcherProps
         value="table"
         aria-label="Table view"
         className={cn(
-          'rounded-l-none border',
+          'rounded-none border border-r-0',
           view === 'table' && 'bg-muted'
         )}
       >
         <List className="h-4 w-4" />
+      </ToggleGroupItem>
+      <ToggleGroupItem
+        value="groups"
+        aria-label="Groups view"
+        className={cn(
+          'rounded-l-none border',
+          view === 'groups' && 'bg-muted'
+        )}
+      >
+        <Users className="h-4 w-4" />
       </ToggleGroupItem>
     </ToggleGroup>
   )

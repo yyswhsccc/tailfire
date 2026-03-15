@@ -19,8 +19,13 @@ export class CreateNoteDto {
 
   @IsOptional()
   @IsUUID()
-  @ValidateIf((o) => !o.tripId)
+  @ValidateIf((o) => !o.tripId && !o.tripGroupId)
   contactId?: string
+
+  @IsOptional()
+  @IsUUID()
+  @ValidateIf((o) => !o.tripId && !o.contactId)
+  tripGroupId?: string
 
   @IsOptional()
   @IsBoolean()
