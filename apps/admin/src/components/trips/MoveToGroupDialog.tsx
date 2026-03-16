@@ -31,7 +31,9 @@ import {
   ArrowLeft,
   X,
   Loader2,
+  ExternalLink,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface MoveToGroupDialogProps {
   open: boolean
@@ -42,6 +44,7 @@ interface MoveToGroupDialogProps {
 
 export function MoveToGroupDialog({ open, onOpenChange, tripId, currentGroupId }: MoveToGroupDialogProps) {
   const { toast } = useToast()
+  const router = useRouter()
   const { data: groups = [], isLoading } = useTripGroups()
   const createGroup = useCreateTripGroup()
   const updateGroup = useUpdateTripGroup()
@@ -288,6 +291,21 @@ export function MoveToGroupDialog({ open, onOpenChange, tripId, currentGroupId }
 
                   {/* Hover actions */}
                   <div className="hidden group-hover/row:flex items-center shrink-0">
+                    {group.type === 'group_booking' && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onOpenChange(false)
+                          router.push(`/trips/groups/${group.id}`)
+                        }}
+                        title="Open group detail"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     <Button
                       size="icon"
                       variant="ghost"
