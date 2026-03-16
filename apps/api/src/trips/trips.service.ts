@@ -521,6 +521,12 @@ export class TripsService {
 
     // Validate status transition if status is being changed
     if (dto.status && dto.status !== existingTrip.status) {
+      if (dto.status === 'cancelled') {
+        throw new BadRequestException(
+          'Cannot set status to cancelled via update. Use POST /trips/:id/cancel instead.'
+        )
+      }
+
       const isValid = canTransitionTripStatus(
         existingTrip.status as TripStatus,
         dto.status as TripStatus
@@ -1032,6 +1038,12 @@ export class TripsService {
     auth?: AuthContext,
     tripAccessService?: TripAccessService,
   ): Promise<{ success: string[]; failed: Array<{ id: string; reason: string }> }> {
+    if (newStatus === ('cancelled' as any)) {
+      throw new BadRequestException(
+        'Cannot set status to cancelled via bulk update. Cancel trips individually via POST /trips/:id/cancel.'
+      )
+    }
+
     const success: string[] = []
     const failed: Array<{ id: string; reason: string }> = []
 
@@ -4293,6 +4305,10 @@ export class TripsService {
 
     if (!existingTrip) {
       throw new NotFoundException(`Trip with ID ${id} not found`)
+    }
+
+    if (!dto.reason?.trim()) {
+      throw new BadRequestException('Cancellation reason is required')
     }
 
     // Validate transition to cancelled is allowed

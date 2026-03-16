@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { Calendar, MoreVertical, Trash2, Archive, XCircle, User } from 'lucide-react'
 import {
@@ -22,7 +23,9 @@ import { TripStatusBadge } from '@/components/shared'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, cn } from '@/lib/utils'
 import { canDeleteTrip, type TripStatus } from '@/lib/trip-status-constants'
+import { canTransitionTripStatus } from '@tailfire/shared-types/api'
 import type { TripResponseDto } from '@tailfire/shared-types/api'
+import { CancelTripDialog } from './cancel-trip-dialog'
 
 interface TripsDataTableProps {
   trips: TripResponseDto[]
@@ -48,6 +51,7 @@ export function TripsDataTable({
   onDelete,
   onArchive,
 }: TripsDataTableProps) {
+  const [cancelTrip, setCancelTrip] = useState<{ id: string; name: string } | null>(null)
   const allSelected = trips.length > 0 && selectedIds.size === trips.length
   const someSelected = selectedIds.size > 0 && selectedIds.size < trips.length
 
@@ -192,10 +196,11 @@ export function TripsDataTable({
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
                         </DropdownMenuItem>
-                      ) : (
+                      ) : null}
+                      {canTransitionTripStatus(trip.status as any, 'cancelled') && (
                         <DropdownMenuItem
-                          disabled
-                          className="text-muted-foreground"
+                          onClick={() => setCancelTrip({ id: trip.id, name: trip.name })}
+                          className="text-destructive focus:text-destructive"
                         >
                           <XCircle className="mr-2 h-4 w-4" />
                           Cancel Trip
@@ -209,6 +214,15 @@ export function TripsDataTable({
           )}
         </TableBody>
       </Table>
+
+      {cancelTrip && (
+        <CancelTripDialog
+          open={!!cancelTrip}
+          onOpenChange={(open) => { if (!open) setCancelTrip(null) }}
+          tripId={cancelTrip.id}
+          tripName={cancelTrip.name}
+        />
+      )}
     </div>
   )
 }

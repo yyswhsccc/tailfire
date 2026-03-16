@@ -359,12 +359,18 @@ export class ClientCareProcessor extends WorkerHost {
       return
     }
 
-    // Get trip name for context
+    // Get trip name and status for context
     const [trip] = await this.db.client
-      .select({ name: trips.name })
+      .select({ name: trips.name, status: trips.status })
       .from(trips)
       .where(eq(trips.id, tripId))
       .limit(1)
+
+    // Skip reminders for cancelled trips
+    if (trip?.status === 'cancelled') {
+      this.logger.log(`Skipping payment reminder for cancelled trip ${tripId}`)
+      return
+    }
 
     // Map reminder type to template slug (must match seeded templates)
     const templateSlugMap: Record<string, string> = {

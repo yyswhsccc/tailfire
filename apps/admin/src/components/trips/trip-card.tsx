@@ -26,6 +26,8 @@ import { Button } from '@/components/ui/button'
 import { useDeleteTrip } from '@/hooks/use-trips'
 import { useToast } from '@/hooks/use-toast'
 import { canDeleteTrip } from '@/lib/trip-status-constants'
+import { canTransitionTripStatus } from '@tailfire/shared-types/api'
+import { CancelTripDialog } from './cancel-trip-dialog'
 
 interface TripCardProps {
   trip: TripResponseDto
@@ -38,6 +40,7 @@ interface TripCardProps {
  */
 export function TripCard({ trip, isUpdating = false }: TripCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
   const deleteTrip = useDeleteTrip()
   const { toast } = useToast()
 
@@ -136,10 +139,14 @@ export function TripCard({ trip, isUpdating = false }: TripCardProps) {
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
                 </DropdownMenuItem>
-              ) : (
+              ) : null}
+              {canTransitionTripStatus(trip.status as any, 'cancelled') && (
                 <DropdownMenuItem
-                  disabled
-                  className="text-muted-foreground"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setShowCancelDialog(true)
+                  }}
+                  className="text-destructive focus:text-destructive"
                 >
                   <XCircle className="mr-2 h-4 w-4" />
                   Cancel Trip
@@ -149,6 +156,14 @@ export function TripCard({ trip, isUpdating = false }: TripCardProps) {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Cancel Trip Dialog */}
+      <CancelTripDialog
+        open={showCancelDialog}
+        onOpenChange={setShowCancelDialog}
+        tripId={trip.id}
+        tripName={trip.name}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

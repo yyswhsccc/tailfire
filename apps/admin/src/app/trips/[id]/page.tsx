@@ -45,6 +45,7 @@ import { TripPayments } from './_components/trip-payments'
 import { TripInsurance } from './_components/trip-insurance'
 import { TripFormDialog } from '@/app/trips/_components/trip-form-dialog'
 import { ActivityFeed } from '@/components/trips/ActivityFeed'
+import { CancelTripDialog } from '@/components/trips/cancel-trip-dialog'
 import { ServiceFeesPanel } from '@/components/financials/service-fees-panel'
 import { Card } from '@/components/ui/card'
 import { TripDetailSkeleton } from '@/components/shared/loading-skeleton'
@@ -364,6 +365,7 @@ export default function TripDetailPage() {
     initialTab && validTabs.includes(initialTab) ? initialTab : 'overview'
   )
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [showEditTripDialog, setShowEditTripDialog] = useState(false)
   const [isHeaderHovered, setIsHeaderHovered] = useState(false)
 
@@ -427,11 +429,7 @@ export default function TripDetailPage() {
   }
 
   const handleCancelTrip = () => {
-    // TODO: Implement Cancel functionality for booked/in_progress/completed trips
-    toast({
-      title: 'In Development',
-      description: 'Cancel functionality is being built and will be available soon.',
-    })
+    setShowCancelDialog(true)
   }
 
   const handlePublish = async () => {
@@ -817,6 +815,16 @@ export default function TripDetailPage() {
         mode="edit"
         trip={trip}
       />
+
+      {/* Cancel Trip Dialog */}
+      {trip && (
+        <CancelTripDialog
+          open={showCancelDialog}
+          onOpenChange={setShowCancelDialog}
+          tripId={trip.id}
+          tripName={trip.name}
+        />
+      )}
 
       {/* Move to Group Dialog */}
       {trip && (

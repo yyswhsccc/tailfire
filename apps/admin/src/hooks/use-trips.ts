@@ -181,6 +181,23 @@ export function useUpdateTrip() {
 }
 
 /**
+ * Cancel a trip (sets status to cancelled with a reason)
+ */
+export function useCancelTrip() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ tripId, reason }: { tripId: string; reason: string }) =>
+      api.post(`/trips/${tripId}/cancel`, { reason }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: tripKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: tripKeys.detail(variables.tripId) })
+      queryClient.invalidateQueries({ queryKey: ['activity-logs'] })
+    },
+  })
+}
+
+/**
  * Delete trip
  * Note: Only trips with status 'draft' or 'quoted' can be deleted
  */
