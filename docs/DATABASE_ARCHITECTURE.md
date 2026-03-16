@@ -170,7 +170,16 @@ The public schema contains all application data:
 |-------|---------|
 | `contact_shares` | Contact sharing between agents |
 | `trip_shares` | Trip sharing between agents |
+| `trip_group_shares` | Trip group sharing between agents (with access levels) |
 | `traveler_groups` | Group travelers across trips |
+
+### Trip Groups (Group Bookings)
+
+| Table | Purpose |
+|-------|---------|
+| `trip_groups` | Group definitions (folders and group bookings with status, dates, supplier) |
+| `trip_group_documents` | Group-level documents (receipts, confirmations, contracts) |
+| `trip_group_media` | Group-level media (shared photos, marketing assets) |
 
 ### Tasks & Workflow
 
@@ -178,6 +187,7 @@ The public schema contains all application data:
 |-------|---------|
 | `tasks` | Task management items |
 | `task_templates` | Reusable task templates |
+| `notes` | Internal agent notes (scoped to trip, contact, or trip group via `trip_group_id`) |
 
 ### OCR & Document Import
 
@@ -190,7 +200,10 @@ The public schema contains all application data:
 
 | Table | Purpose |
 |-------|---------|
-| `email_logs` | Email sending records with status |
+| `email_accounts` | Agent IMAP/SMTP email account connections (encrypted credentials) |
+| `synced_emails` | Synced IMAP email messages with metadata (subject, from, to, body, folder) |
+| `email_attachments` | Email attachment metadata and storage references |
+| `email_logs` | System email sending records with status |
 | `email_templates` | Reusable email templates |
 
 ### Insurance

@@ -270,6 +270,29 @@ It is **NEVER** used for:
 
 ---
 
+## Email Account Credentials
+
+**Location**: `apps/api/src/email-accounts/email-accounts.service.ts`
+
+Agent email accounts (IMAP/SMTP) store credentials encrypted at rest using AES-256-GCM (same as API credentials). The `ENCRYPTION_KEY` environment variable is used for both.
+
+- IMAP host, port, username, and password are encrypted before database storage
+- SMTP credentials are stored alongside IMAP in the same `email_accounts` record
+- Decrypted only at sync time (IMAP fetch) or send time (SMTP relay)
+- Non-production environments block email sends to domains outside the allowed list (`agency_settings.email_allowed_domains`)
+
+## Trip Group Access Control
+
+**Location**: `apps/api/src/trips/trip-group-access.service.ts`
+
+Trip groups use a sharing model similar to trips:
+- `trip_group_shares` table grants read or write access to specific users
+- Group owners (the user who created the group) have implicit full access
+- Admin users have access to all groups in their agency
+- RLS policy on `trip_group_shares` enforces agency isolation
+
+---
+
 ## Additional Security Controls
 
 ### Password Reset

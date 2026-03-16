@@ -56,6 +56,10 @@ The Automation System uses **BullMQ + Redis** to handle:
 | Queue | Purpose | Priority |
 |-------|---------|----------|
 | `trip-automation` | Status transitions, reminders | High |
+| `email-sync` | IMAP email sync for agent email accounts | Normal |
+| `enrichment` | Activity enrichment (geocoding, catalog match, hotel photos) | Normal |
+| `document-render` | PDF generation via Puppeteer | Normal |
+| `ocr-processing` | OCR document import processing | Normal |
 | `client-care` | Emails, follow-ups | Normal |
 | `notifications` | Push, email, SMS delivery | Normal |
 

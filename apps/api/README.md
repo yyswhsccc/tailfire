@@ -40,11 +40,13 @@ apps/api/
 │   │   ├── database.module.ts
 │   │   ├── database.service.ts
 │   │   └── migrate.ts       # Migration runner
-│   ├── modules/             # Feature modules
-│   │   ├── trips/           # Trip management
-│   │   ├── bookings/        # Booking management
-│   │   ├── contacts/        # Contact/CRM
-│   │   └── ...              # Other features
+│   ├── trips/               # Trip management (incl. group bookings, shares)
+│   ├── contacts/            # Contact/CRM
+│   ├── email-accounts/      # Agent IMAP/SMTP email (sync, send, folders)
+│   ├── email/               # System email (templates, delivery)
+│   ├── enrichment/          # Activity enrichment (geocoding, catalog match)
+│   ├── catalog-matcher/     # Cruise catalog matching service
+│   ├── ...                  # Other feature modules
 │   ├── app.module.ts        # Root module
 │   ├── app.controller.ts    # Root controller
 │   ├── app.service.ts       # Root service
@@ -401,4 +403,4 @@ CMD ["pnpm", "start"]
 
 ---
 
-**Last Updated:** November 21, 2025
+**Last Updated:** March 16, 2026

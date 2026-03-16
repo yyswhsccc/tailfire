@@ -20,11 +20,18 @@ B2B admin dashboard for the Tailfire travel agency management system, built with
 apps/admin/
 ├── src/
 │   ├── app/                    # Next.js App Router pages
-│   │   ├── dashboard/         # Dashboard page
-│   │   ├── trips/             # Trips management
-│   │   ├── contacts/          # Contacts management
-│   │   ├── destinations/      # Destinations (placeholder)
-│   │   ├── settings/          # Settings (placeholder)
+│   │   ├── dashboard/         # Dashboard with KPI cards, sidebar, calendar
+│   │   ├── trips/             # Trips management (incl. group booking detail)
+│   │   ├── contacts/          # Contacts (CRM, emails tab, recent emails card)
+│   │   ├── emails/            # Email inbox (3-column layout, compose, folders)
+│   │   ├── tasks/             # Task management
+│   │   ├── library/           # Supplier library, notifications
+│   │   ├── calendar/          # Calendar view
+│   │   ├── profile/           # User profile (incl. email account setup)
+│   │   ├── settings/          # Settings (email config, agency)
+│   │   ├── commission/        # Commission tracking (in development)
+│   │   ├── reporting/         # Reporting (in development)
+│   │   ├── destinations/      # Destinations (in development)
 │   │   ├── layout.tsx         # Root layout with providers
 │   │   ├── page.tsx           # Landing page
 │   │   └── globals.css        # Global styles & theme
@@ -200,12 +207,21 @@ Located in `src/components/layout/`:
 
 Next.js App Router with file-based routing:
 
-- `/` - Landing page
-- `/dashboard` - Main dashboard with stats
-- `/trips` - Trip management
-- `/contacts` - Contact management
-- `/destinations` - Destination browser (placeholder)
-- `/settings` - User settings (placeholder)
+- `/` - Landing page (redirects to dashboard)
+- `/dashboard` - Main dashboard with KPI cards, sidebar (quick create, recent emails, calendar)
+- `/trips` - Trip management (list, detail, itinerary builder)
+- `/trips/groups/[groupId]` - Group booking detail (notes, documents, media tabs)
+- `/contacts` - Contact management (CRM)
+- `/contacts/[id]` - Contact detail (activity timeline, emails tab, recent emails card)
+- `/emails/inbox` - Email inbox (3-column layout: folders, email list, reader + compose)
+- `/tasks` - Task management
+- `/calendar` - Calendar view (trips, activities, tasks, birthdays)
+- `/library` - Supplier library, notification templates
+- `/profile` - User profile (email account IMAP/SMTP setup)
+- `/settings` - Settings (email allowed domains, agency settings)
+- `/commission` - Commission tracking (in development)
+- `/reporting` - Reporting & analytics (in development)
+- `/destinations` - Destination browser (in development)
 
 ## Adding New Features
 

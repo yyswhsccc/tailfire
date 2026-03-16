@@ -91,11 +91,16 @@ SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 | `contacts.schema.ts` | contacts, relationships, groups | Contact management |
 | `trips.schema.ts` | trips, travelers, itineraries | Trip management |
 | `activities.schema.ts` | activities, activity_* | Trip activities (tours, dining, packages, etc.) |
-| `bookings.schema.ts` | bookings, booking_* | All 7 booking types |
 | `financials.schema.ts` | payments, commissions, trust ledger | Financial management |
 | `tasks.schema.ts` | tasks | Task management |
-| `cruise.schema.ts` | cruise_catalogue, ships, ports | Cruise catalogue |
-| `lookups.schema.ts` | countries, currencies, etc. | Lookup tables |
+| `email-accounts.schema.ts` | email_accounts | Agent IMAP/SMTP email connections |
+| `synced-emails.schema.ts` | synced_emails | Synced IMAP email messages |
+| `email-attachments.schema.ts` | email_attachments | Email attachment metadata |
+| `notes.schema.ts` | notes | Internal agent notes (trip, contact, group scoped) |
+| `trip-group-shares.schema.ts` | trip_group_shares | Group sharing between agents |
+| `trip-group-documents.schema.ts` | trip_group_documents | Group-level documents |
+| `trip-group-media.schema.ts` | trip_group_media | Group-level media assets |
+| `cruise-*.schema.ts` | cruise catalog tables (16 tables) | Cruise catalogue (catalog schema) |
 
 ## Schema Notes
 
