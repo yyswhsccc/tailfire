@@ -7,7 +7,7 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger, Inject, forwardRef } from '@nestjs/common'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import * as crypto from 'crypto'
-import { eq, and, or, gte, lte, ilike, sql, desc, asc, inArray, isNull } from 'drizzle-orm'
+import { eq, and, or, gte, lte, ilike, sql, desc, asc, inArray, isNull, isNotNull } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TripBookedEvent } from './events/trip-booked.event'
 import { TripCancelledEvent } from './events/trip-cancelled.event'
@@ -484,6 +484,7 @@ export class TripsService {
         allowPdfDownloads: this.db.schema.trips.allowPdfDownloads,
         itineraryStyle: this.db.schema.trips.itineraryStyle,
         calendarDisplayMode: this.db.schema.trips.calendarDisplayMode,
+        tripGroupId: this.db.schema.trips.tripGroupId,
         createdAt: this.db.schema.trips.createdAt,
         updatedAt: this.db.schema.trips.updatedAt,
         coverPhotoUrl: coverPhotoSubquery,
@@ -613,12 +614,16 @@ export class TripsService {
       )
     }
 
-    // Emit audit events for group changes
+    // Emit audit events for group changes + auto-share
     if (isGroupChange) {
       if (dto.tripGroupId) {
-        // Trip moved to a group — resolve group name
+        // Trip moved to a group — resolve group info
         const [group] = await this.db.client
-          .select({ name: this.db.schema.tripGroups.name })
+          .select({
+            name: this.db.schema.tripGroups.name,
+            ownerId: this.db.schema.tripGroups.ownerId,
+            type: this.db.schema.tripGroups.type,
+          })
           .from(this.db.schema.tripGroups)
           .where(eq(this.db.schema.tripGroups.id, dto.tripGroupId))
           .limit(1)
@@ -630,6 +635,27 @@ export class TripsService {
             groupName,
           }),
         )
+
+        // Auto-share: give trip owner read access to group (group_bookings only)
+        if (
+          group &&
+          group.type === 'group_booking' &&
+          existingTrip.ownerId &&
+          existingTrip.ownerId !== group.ownerId
+        ) {
+          await this.db.client
+            .insert(this.db.schema.tripGroupShares)
+            .values({
+              tripGroupId: dto.tripGroupId,
+              sharedWithUserId: existingTrip.ownerId,
+              agencyId: existingTrip.agencyId,
+              accessLevel: 'read',
+              sharedBy: existingTrip.ownerId, // self-triggered via update
+              source: 'auto_trip_owner',
+              notes: 'Auto-shared: trip owner added to group',
+            })
+            .onConflictDoNothing()
+        }
       } else {
         // Trip removed from a group — resolve old group name
         let oldGroupName = 'Unknown group'
@@ -1151,7 +1177,7 @@ export class TripsService {
    * Returns available options for filter dropdowns, scoped by accessible trips
    * (owned + shared + inbound) to match findAll scope.
    */
-  async getFilterOptions(auth: AuthContext, tripAccessService: TripAccessService): Promise<{
+  async getFilterOptions(auth: AuthContext, tripAccessService: TripAccessService, tripGroupAccessService?: { getAccessibleGroupIds: (auth: AuthContext) => Promise<string[] | 'all'> }): Promise<{
     statuses: TripStatus[]
     tripTypes: string[]
     tags: string[]
@@ -1161,10 +1187,20 @@ export class TripsService {
 
     // Early return if non-admin has no accessible trips
     if (accessibleTripIds !== 'all' && accessibleTripIds.length === 0) {
+      // Still filter groups by access
+      const groupConditions: any[] = [eq(this.db.schema.tripGroups.agencyId, auth.agencyId)]
+      if (tripGroupAccessService && auth.role !== 'admin') {
+        const accessibleGroupIds = await tripGroupAccessService.getAccessibleGroupIds(auth)
+        if (accessibleGroupIds !== 'all' && accessibleGroupIds.length > 0) {
+          groupConditions.push(inArray(this.db.schema.tripGroups.id, accessibleGroupIds))
+        } else if (accessibleGroupIds !== 'all') {
+          groupConditions.push(sql`false`)
+        }
+      }
       const groupsResult = await this.db.client
         .select({ id: this.db.schema.tripGroups.id, name: this.db.schema.tripGroups.name })
         .from(this.db.schema.tripGroups)
-        .where(eq(this.db.schema.tripGroups.agencyId, auth.agencyId))
+        .where(and(...groupConditions))
       return {
         statuses: ['draft', 'quoted', 'booked', 'in_progress', 'completed', 'cancelled', 'inbound'] as TripStatus[],
         tripTypes: ['leisure', 'business', 'group', 'honeymoon', 'corporate', 'custom'],
@@ -1196,14 +1232,23 @@ export class TripsService {
       .filter((tag): tag is string => tag !== null)
       .sort()
 
-    // Get trip groups for the agency
+    // Get trip groups for the agency (filtered by access for non-admins)
+    const groupConditions: any[] = [eq(this.db.schema.tripGroups.agencyId, auth.agencyId)]
+    if (tripGroupAccessService && auth.role !== 'admin') {
+      const accessibleGroupIds = await tripGroupAccessService.getAccessibleGroupIds(auth)
+      if (accessibleGroupIds !== 'all' && accessibleGroupIds.length > 0) {
+        groupConditions.push(inArray(this.db.schema.tripGroups.id, accessibleGroupIds))
+      } else if (accessibleGroupIds !== 'all') {
+        groupConditions.push(sql`false`)
+      }
+    }
     const groupsResult = await this.db.client
       .select({
         id: this.db.schema.tripGroups.id,
         name: this.db.schema.tripGroups.name,
       })
       .from(this.db.schema.tripGroups)
-      .where(eq(this.db.schema.tripGroups.agencyId, auth.agencyId))
+      .where(and(...groupConditions))
 
     // Return static options + dynamic tags + groups
     return {
@@ -3462,10 +3507,24 @@ export class TripsService {
   // TRIP GROUPS
   // ============================================================================
 
-  async listTripGroups(agencyId: string, type?: string) {
+  async listTripGroups(agencyId: string, type?: string, auth?: AuthContext) {
     const conditions: any[] = [eq(this.db.schema.tripGroups.agencyId, agencyId)]
     if (type) {
       conditions.push(eq(this.db.schema.tripGroups.type, type as any))
+    }
+
+    // Non-admin users can only see groups they own, are shared with, or that are folders
+    if (auth && auth.role !== 'admin') {
+      conditions.push(
+        or(
+          eq(this.db.schema.tripGroups.type, 'folder'),
+          eq(this.db.schema.tripGroups.ownerId, auth.userId),
+          sql`${this.db.schema.tripGroups.id} IN (
+            SELECT trip_group_id FROM trip_group_shares
+            WHERE shared_with_user_id = ${auth.userId}
+          )`,
+        )!,
+      )
     }
 
     const groups = await this.db.client
@@ -3481,6 +3540,7 @@ export class TripsService {
         startDate: this.db.schema.tripGroups.startDate,
         endDate: this.db.schema.tripGroups.endDate,
         status: this.db.schema.tripGroups.status,
+        ownerId: this.db.schema.tripGroups.ownerId,
         createdAt: this.db.schema.tripGroups.createdAt,
         updatedAt: this.db.schema.tripGroups.updatedAt,
         tripCount: sql<number>`(
@@ -3515,6 +3575,7 @@ export class TripsService {
         name: data.name,
         agencyId,
         createdBy: actorId,
+        ownerId: actorId,
         type: (data.type as any) || 'folder',
         groupNumber: data.groupNumber,
         primarySupplierId: data.primarySupplierId,
@@ -3620,14 +3681,94 @@ export class TripsService {
         name: this.db.schema.trips.name,
         status: this.db.schema.trips.status,
         startDate: this.db.schema.trips.startDate,
+        endDate: this.db.schema.trips.endDate,
+        primaryContactId: this.db.schema.trips.primaryContactId,
+        primaryContactFirstName: this.db.schema.contacts.firstName,
+        primaryContactLastName: this.db.schema.contacts.lastName,
       })
       .from(this.db.schema.trips)
+      .leftJoin(
+        this.db.schema.contacts,
+        eq(this.db.schema.trips.primaryContactId, this.db.schema.contacts.id),
+      )
       .where(
         and(
           eq(this.db.schema.trips.tripGroupId, groupId),
           eq(this.db.schema.trips.agencyId, agencyId),
         ),
       )
+      .orderBy(asc(this.db.schema.trips.startDate), asc(this.db.schema.trips.name))
+  }
+
+  async getGroupTravelers(groupId: string, agencyId: string) {
+    // 1. Get travelers from trip_travelers table
+    const tripTravelerRows = await this.db.client
+      .selectDistinct({
+        travelerId: this.db.schema.tripTravelers.id,
+        contactId: this.db.schema.tripTravelers.contactId,
+        role: this.db.schema.tripTravelers.role,
+        tripId: this.db.schema.trips.id,
+        tripName: this.db.schema.trips.name,
+        firstName: this.db.schema.contacts.firstName,
+        lastName: this.db.schema.contacts.lastName,
+        email: this.db.schema.contacts.email,
+        phone: this.db.schema.contacts.phone,
+      })
+      .from(this.db.schema.tripTravelers)
+      .innerJoin(
+        this.db.schema.trips,
+        eq(this.db.schema.tripTravelers.tripId, this.db.schema.trips.id),
+      )
+      .leftJoin(
+        this.db.schema.contacts,
+        eq(this.db.schema.tripTravelers.contactId, this.db.schema.contacts.id),
+      )
+      .where(
+        and(
+          eq(this.db.schema.trips.tripGroupId, groupId),
+          eq(this.db.schema.trips.agencyId, agencyId),
+        ),
+      )
+      .orderBy(asc(this.db.schema.contacts.lastName), asc(this.db.schema.contacts.firstName))
+
+    if (tripTravelerRows.length > 0) {
+      return tripTravelerRows
+    }
+
+    // 2. Fallback: get primary contacts from trips (for imported trips without trip_travelers)
+    const primaryContactRows = await this.db.client
+      .select({
+        travelerId: this.db.schema.trips.primaryContactId,
+        contactId: this.db.schema.trips.primaryContactId,
+        role: sql<string>`'primary_contact'`,
+        tripId: this.db.schema.trips.id,
+        tripName: this.db.schema.trips.name,
+        firstName: this.db.schema.contacts.firstName,
+        lastName: this.db.schema.contacts.lastName,
+        email: this.db.schema.contacts.email,
+        phone: this.db.schema.contacts.phone,
+      })
+      .from(this.db.schema.trips)
+      .leftJoin(
+        this.db.schema.contacts,
+        eq(this.db.schema.trips.primaryContactId, this.db.schema.contacts.id),
+      )
+      .where(
+        and(
+          eq(this.db.schema.trips.tripGroupId, groupId),
+          eq(this.db.schema.trips.agencyId, agencyId),
+          isNotNull(this.db.schema.trips.primaryContactId),
+        ),
+      )
+      .orderBy(asc(this.db.schema.contacts.lastName), asc(this.db.schema.contacts.firstName))
+
+    // Deduplicate by contactId
+    const seen = new Set<string>()
+    return primaryContactRows.filter((row) => {
+      if (!row.contactId || seen.has(row.contactId)) return false
+      seen.add(row.contactId)
+      return true
+    })
   }
 
   /**
@@ -3767,7 +3908,7 @@ export class TripsService {
   }
 
   /**
-   * Add trips to a group
+   * Add trips to a group (transactional with auto-share)
    */
   async addTripsToGroup(
     groupId: string,
@@ -3775,39 +3916,74 @@ export class TripsService {
     agencyId: string,
     actorId: string,
   ) {
-    const [group] = await this.db.client
-      .select()
-      .from(this.db.schema.tripGroups)
-      .where(
-        and(
-          eq(this.db.schema.tripGroups.id, groupId),
-          eq(this.db.schema.tripGroups.agencyId, agencyId),
-        ),
-      )
-      .limit(1)
-
-    if (!group) {
-      throw new NotFoundException(`Trip group with ID ${groupId} not found`)
-    }
-
-    for (const tripId of tripIds) {
-      await this.db.client
-        .update(this.db.schema.trips)
-        .set({ tripGroupId: groupId, updatedAt: new Date() })
+    return await this.db.client.transaction(async (tx) => {
+      const [group] = await tx
+        .select({
+          id: this.db.schema.tripGroups.id,
+          name: this.db.schema.tripGroups.name,
+          ownerId: this.db.schema.tripGroups.ownerId,
+          type: this.db.schema.tripGroups.type,
+          agencyId: this.db.schema.tripGroups.agencyId,
+        })
+        .from(this.db.schema.tripGroups)
         .where(
           and(
-            eq(this.db.schema.trips.id, tripId),
-            eq(this.db.schema.trips.agencyId, agencyId),
+            eq(this.db.schema.tripGroups.id, groupId),
+            eq(this.db.schema.tripGroups.agencyId, agencyId),
           ),
         )
+        .limit(1)
 
-      this.eventEmitter.emit(
-        'audit.status_changed',
-        new AuditEvent('trip', tripId, 'moved_to_group', tripId, actorId, group.name),
-      )
-    }
+      if (!group) {
+        throw new NotFoundException(`Trip group with ID ${groupId} not found`)
+      }
 
-    return { added: tripIds.length }
+      let added = 0
+      for (const tripId of tripIds) {
+        const result = await tx
+          .update(this.db.schema.trips)
+          .set({ tripGroupId: groupId, updatedAt: new Date() })
+          .where(
+            and(
+              eq(this.db.schema.trips.id, tripId),
+              eq(this.db.schema.trips.agencyId, agencyId),
+            ),
+          )
+          .returning({ id: this.db.schema.trips.id, ownerId: this.db.schema.trips.ownerId })
+
+        if (result.length === 0) continue
+        added++
+
+        const tripResult = result[0]!
+
+        // Auto-share: give trip owner read access to group (group_bookings only)
+        if (
+          tripResult.ownerId &&
+          tripResult.ownerId !== group.ownerId &&
+          group.type === 'group_booking'
+        ) {
+          await tx
+            .insert(this.db.schema.tripGroupShares)
+            .values({
+              tripGroupId: groupId,
+              sharedWithUserId: tripResult.ownerId,
+              agencyId,
+              accessLevel: 'read',
+              sharedBy: actorId,
+              source: 'auto_trip_owner',
+              notes: 'Auto-shared: trip owner added to group',
+            })
+            .onConflictDoNothing()
+        }
+
+        this.eventEmitter.emit(
+          'audit.status_changed',
+          new AuditEvent('trip', tripId, 'moved_to_group', tripId, actorId, group.name),
+        )
+      }
+
+      return { added }
+    })
   }
 
   /**

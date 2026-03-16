@@ -15,6 +15,7 @@ import {
   CalendarEventTagsController,
 } from './tags.controller'
 import { TripAccessService } from '../trips/trip-access.service'
+import { TripGroupAccessService } from '../trips/trip-group-access.service'
 import { ContactAccessService } from '../contacts/contact-access.service'
 
 @Module({
@@ -25,7 +26,7 @@ import { ContactAccessService } from '../contacts/contact-access.service'
     ContactTagsController,
     CalendarEventTagsController,
   ],
-  providers: [TagsService, TripAccessService, ContactAccessService],
+  providers: [TagsService, TripAccessService, TripGroupAccessService, ContactAccessService],
   exports: [TagsService],
 })
 export class TagsModule {}

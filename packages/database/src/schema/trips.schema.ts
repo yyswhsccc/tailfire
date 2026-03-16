@@ -11,7 +11,6 @@ import { contacts } from './contacts.schema'
 import { itineraryDays } from './itinerary-days.schema'
 import { agencies } from './agencies.schema'
 import { userProfiles } from './user-profiles.schema'
-import { suppliers } from './suppliers.schema'
 
 // ============================================================================
 // ENUMS
@@ -191,9 +190,6 @@ export const trips = pgTable('trips', {
   updatedBy: uuid('updated_by'), // FK to users
 })
 
-export const tripGroupTypeEnum = pgEnum('trip_group_type', ['folder', 'group_booking'])
-export const tripGroupStatusEnum = pgEnum('trip_group_status', ['planning', 'confirmed', 'completed', 'cancelled'])
-
 // ============================================================================
 // TABLE: trip_groups (trip collections/folders)
 // ============================================================================
@@ -203,16 +199,17 @@ export const tripGroups = pgTable('trip_groups', {
   agencyId: uuid('agency_id').notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
+  type: varchar('type', { length: 20 }).default('folder').notNull(),
+  groupNumber: varchar('group_number', { length: 100 }),
+  primarySupplierId: uuid('primary_supplier_id'),
+  destination: varchar('destination', { length: 255 }),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
+  status: varchar('status', { length: 20 }),
+  ownerId: uuid('owner_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   createdBy: uuid('created_by'),
-  type: tripGroupTypeEnum('type').notNull().default('folder'),
-  groupNumber: varchar('group_number', { length: 100 }),
-  primarySupplierId: uuid('primary_supplier_id').references(() => suppliers.id),
-  destination: varchar('destination', { length: 500 }),
-  startDate: date('start_date', { mode: 'string' }),
-  endDate: date('end_date', { mode: 'string' }),
-  status: tripGroupStatusEnum('status'),
 })
 
 // ============================================================================
@@ -472,12 +469,8 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   // Media relation defined in trip-media.schema.ts to avoid circular imports
 }))
 
-export const tripGroupsRelations = relations(tripGroups, ({ many, one }) => ({
+export const tripGroupsRelations = relations(tripGroups, ({ many }) => ({
   trips: many(trips),
-  primarySupplier: one(suppliers, {
-    fields: [tripGroups.primarySupplierId],
-    references: [suppliers.id],
-  }),
 }))
 
 export const tripCollaboratorsRelations = relations(tripCollaborators, ({ one }) => ({

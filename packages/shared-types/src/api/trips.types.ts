@@ -601,6 +601,22 @@ export interface TripGroupTripDto {
   name: string
   status: string
   startDate: string | null
+  endDate: string | null
+  primaryContactId: string | null
+  primaryContactFirstName: string | null
+  primaryContactLastName: string | null
+}
+
+export interface GroupTravelerDto {
+  travelerId: string
+  contactId: string | null
+  role: string
+  tripId: string
+  tripName: string
+  firstName: string | null
+  lastName: string | null
+  email: string | null
+  phone: string | null
 }
 
 export interface TripGroupSummaryDto {
@@ -1068,4 +1084,53 @@ export interface ItineraryVersionSummaryDto {
 /** Request body for publishing an itinerary version */
 export interface PublishItineraryDto {
   changeSummary?: string
+}
+
+// ============================================================================
+// TRIP GROUP SHARING DTOs
+// ============================================================================
+
+/**
+ * Access level for trip group sharing
+ */
+export type TripGroupShareAccessLevel = 'read' | 'write'
+
+/**
+ * Source of a trip group share
+ * - manual: User-created share
+ * - auto_trip_owner: System-created when a trip owner's trip is added to the group
+ */
+export type TripGroupShareSource = 'manual' | 'auto_trip_owner'
+
+/**
+ * Create a trip group share
+ */
+export interface CreateTripGroupShareDto {
+  sharedWithUserId: string
+  accessLevel?: TripGroupShareAccessLevel
+  notes?: string
+}
+
+/**
+ * Update a trip group share
+ */
+export interface UpdateTripGroupShareDto {
+  accessLevel?: TripGroupShareAccessLevel
+  notes?: string
+}
+
+/**
+ * Response DTO for trip group share
+ */
+export interface TripGroupShareResponseDto {
+  id: string
+  tripGroupId: string
+  sharedWithUserId: string
+  accessLevel: TripGroupShareAccessLevel
+  sharedBy: string
+  sharedAt: string
+  notes: string | null
+  source: TripGroupShareSource
+  createdAt: string
+  updatedAt: string
 }

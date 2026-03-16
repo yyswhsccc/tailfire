@@ -26,6 +26,7 @@ import { Public } from '../auth/decorators/public.decorator'
 import { ApiTags } from '@nestjs/swagger'
 import { TripsService } from './trips.service'
 import { TripAccessService } from './trip-access.service'
+import { TripGroupAccessService } from './trip-group-access.service'
 import { StorageService } from './storage.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
@@ -65,6 +66,7 @@ export class TripsController {
   constructor(
     private readonly tripsService: TripsService,
     private readonly tripAccessService: TripAccessService,
+    private readonly tripGroupAccessService: TripGroupAccessService,
     private readonly activitiesService: ActivitiesService,
     private readonly activityLogsService: ActivityLogsService,
     private readonly paymentSchedulesService: PaymentSchedulesService,
@@ -112,7 +114,7 @@ export class TripsController {
    */
   @Get('filter-options')
   async getFilterOptions(@GetAuthContext() auth: AuthContext): Promise<TripFilterOptionsResponseDto> {
-    return this.tripsService.getFilterOptions(auth, this.tripAccessService)
+    return this.tripsService.getFilterOptions(auth, this.tripAccessService, this.tripGroupAccessService)
   }
 
   /**
@@ -293,7 +295,7 @@ export class TripsController {
     @GetAuthContext() auth: AuthContext,
     @Query('type') type?: string,
   ) {
-    return this.tripsService.listTripGroups(auth.agencyId, type)
+    return this.tripsService.listTripGroups(auth.agencyId, type, auth)
   }
 
   /**
@@ -338,6 +340,7 @@ export class TripsController {
       status?: string
     },
   ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
     return this.tripsService.updateTripGroup(groupId, body, auth.agencyId, auth.userId)
   }
 
@@ -351,6 +354,7 @@ export class TripsController {
     @GetAuthContext() auth: AuthContext,
     @Param('groupId') groupId: string,
   ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
     return this.tripsService.deleteTripGroup(groupId, auth.agencyId, auth.userId)
   }
 
@@ -363,7 +367,21 @@ export class TripsController {
     @GetAuthContext() auth: AuthContext,
     @Param('groupId') groupId: string,
   ) {
+    await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
     return this.tripsService.getTripsByGroup(groupId, auth.agencyId)
+  }
+
+  /**
+   * Get all travelers across trips in a group (deduplicated by contact)
+   * GET /trips/groups/:groupId/travelers
+   */
+  @Get('groups/:groupId/travelers')
+  async getGroupTravelers(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+  ) {
+    await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
+    return this.tripsService.getGroupTravelers(groupId, auth.agencyId)
   }
 
   /**
@@ -375,6 +393,7 @@ export class TripsController {
     @GetAuthContext() auth: AuthContext,
     @Param('groupId') groupId: string,
   ) {
+    await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
     return this.tripsService.getGroupSummary(groupId, auth.agencyId)
   }
 
@@ -388,6 +407,7 @@ export class TripsController {
     @Param('groupId') groupId: string,
     @Body() body: { status: string; reason?: string },
   ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
     if (body.status === 'cancelled') {
       return this.tripsService.cancelGroupTrips(
         groupId,
@@ -414,6 +434,7 @@ export class TripsController {
     @Param('groupId') groupId: string,
     @Body() body: { tripIds: string[] },
   ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
     return this.tripsService.addTripsToGroup(
       groupId,
       body.tripIds,
@@ -433,6 +454,7 @@ export class TripsController {
     @Param('groupId') groupId: string,
     @Param('tripId') tripId: string,
   ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
     return this.tripsService.removeTripFromGroup(
       groupId,
       tripId,
@@ -450,6 +472,7 @@ export class TripsController {
     @GetAuthContext() auth: AuthContext,
     @Param('groupId') groupId: string,
   ) {
+    await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
     return this.tripsService.listGroupDocuments(groupId, auth.agencyId)
   }
 
@@ -465,6 +488,7 @@ export class TripsController {
     @UploadedFile() file: Express.Multer.File,
     @Body() body: { documentType?: string },
   ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
     const storagePath = await this.storageService.uploadDocument(
       file.buffer,
       groupId,
@@ -496,6 +520,7 @@ export class TripsController {
     @Param('groupId') groupId: string,
     @Param('documentId') documentId: string,
   ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
     const doc = await this.tripsService.deleteGroupDocument(
       groupId,
       documentId,
@@ -517,6 +542,7 @@ export class TripsController {
     @GetAuthContext() auth: AuthContext,
     @Param('groupId') groupId: string,
   ) {
+    await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
     return this.tripsService.listGroupMedia(groupId, auth.agencyId)
   }
 
@@ -532,6 +558,7 @@ export class TripsController {
     @UploadedFile() file: Express.Multer.File,
     @Body() body: { caption?: string },
   ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
     const folder = `trip-groups/${groupId}/media`
     const result = await this.storageService.uploadMediaFile(
       file.buffer,
@@ -564,6 +591,7 @@ export class TripsController {
     @Param('groupId') groupId: string,
     @Param('mediaId') mediaId: string,
   ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
     const media = await this.tripsService.deleteGroupMedia(
       groupId,
       mediaId,

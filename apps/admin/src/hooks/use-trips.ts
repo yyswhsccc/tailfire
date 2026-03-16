@@ -17,6 +17,7 @@ import type {
   TripGroupSummaryDto,
   TripGroupDocumentDto,
   TripGroupMediaDto,
+  GroupTravelerDto,
 } from '@tailfire/shared-types/api'
 import type { TripStatus } from '@tailfire/shared-types'
 
@@ -410,6 +411,14 @@ export function useTripsByGroup(groupId: string | null) {
   return useQuery({
     queryKey: [...tripGroupKeys.all, 'trips', groupId] as const,
     queryFn: () => api.get<TripGroupTripDto[]>(`/trips/groups/${groupId}/trips`),
+    enabled: !!groupId,
+  })
+}
+
+export function useGroupTravelers(groupId: string | null) {
+  return useQuery({
+    queryKey: [...tripGroupKeys.all, 'travelers', groupId] as const,
+    queryFn: () => api.get<GroupTravelerDto[]>(`/trips/groups/${groupId}/travelers`),
     enabled: !!groupId,
   })
 }
