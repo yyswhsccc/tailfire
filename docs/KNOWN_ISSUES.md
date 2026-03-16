@@ -6,11 +6,8 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 
 ## Beta Blockers
 
-### Trip Cancellation Flow Not Implemented
-- **Location:** `apps/admin/src/app/trips/[id]/page.tsx:430`
-- **Status:** Cancel button exists but shows "In Development" toast — no actual cancellation logic
-- **Impact:** Users cannot cancel booked/in-progress trips. This is a core workflow for travel agents.
-- **Required:** API endpoint for trip cancellation with status transition, refund/payment handling, traveler notification, and confirmation dialog in admin UI.
+~~### Trip Cancellation Flow Not Implemented~~ **RESOLVED 2026-03-16**
+- Confirmation dialog with reason presets, server-side enforcement, bypass protection, payment reminder guard.
 
 ---
 
