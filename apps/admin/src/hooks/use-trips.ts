@@ -187,8 +187,8 @@ export function useCancelTrip() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ tripId, reason }: { tripId: string; reason: string }) =>
-      api.post(`/trips/${tripId}/cancel`, { reason }),
+    mutationFn: ({ tripId, reason, notifyTravelers }: { tripId: string; reason: string; notifyTravelers?: boolean }) =>
+      api.post(`/trips/${tripId}/cancel`, { reason, notifyTravelers }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: tripKeys.lists() })
       queryClient.invalidateQueries({ queryKey: tripKeys.detail(variables.tripId) })

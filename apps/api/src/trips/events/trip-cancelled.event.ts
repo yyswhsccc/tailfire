@@ -16,5 +16,7 @@ export class TripCancelledEvent {
     public readonly cancellationReason: string | null,
     /** The trip's previous status before cancellation */
     public readonly previousStatus: string,
+    /** Whether to send cancellation email to travelers */
+    public readonly notifyTravelers: boolean = false,
   ) {}
 }

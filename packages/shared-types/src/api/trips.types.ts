@@ -738,6 +738,7 @@ export interface UpdateTripOwnerDto {
  */
 export interface CancelTripDto {
   reason?: string // Optional cancellation reason
+  notifyTravelers?: boolean // Optional: send cancellation email to trip travelers
 }
 
 // ============================================================================

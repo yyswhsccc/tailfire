@@ -9,6 +9,8 @@ import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { eq } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
+import { EmailService } from '../../email/email.service'
+import { getTripCancellationTemplate } from '../../email/templates/trip-cancellation.template'
 import { NotificationService } from '../notification.service'
 // NotificationCategory type available from '../notification.types' if needed
 
@@ -51,6 +53,7 @@ export class NotificationEventsListener {
   constructor(
     private readonly db: DatabaseService,
     private readonly notificationService: NotificationService,
+    private readonly emailService: EmailService,
   ) {}
 
   // =========================================================================
@@ -242,32 +245,83 @@ export class NotificationEventsListener {
     const { tripId, tripName, cancelledBy, cancellationReason } = event
 
     const trip = await this.getTrip(tripId)
-    if (!trip || !trip.ownerId) return
+    if (!trip) return
 
-    // Don't notify if the owner cancelled it themselves
-    if (cancelledBy === trip.ownerId) {
-      this.logger.debug(`Trip ${tripId} owner cancelled it - skipping notification`)
-      return
+    // Send in-app notification to owner (unless they cancelled it themselves)
+    if (trip.ownerId && cancelledBy !== trip.ownerId) {
+      await this.notificationService.send({
+        userId: trip.ownerId,
+        category: 'trip_updates',
+        title: 'Trip Cancelled',
+        body: cancellationReason
+          ? `Trip "${tripName}" has been cancelled: ${cancellationReason}`
+          : `Trip "${tripName}" has been cancelled`,
+        actionUrl: `/trips/${tripId}`,
+        data: {
+          tripId,
+          tripName,
+          reason: cancellationReason,
+          cancelledBy,
+          notificationType: 'trip.cancelled',
+        },
+      })
+
+      this.logger.debug(`Sent trip.cancelled notification to user ${trip.ownerId} for trip ${tripId}`)
     }
 
-    await this.notificationService.send({
-      userId: trip.ownerId,
-      category: 'trip_updates',
-      title: 'Trip Cancelled',
-      body: cancellationReason
-        ? `Trip "${tripName}" has been cancelled: ${cancellationReason}`
-        : `Trip "${tripName}" has been cancelled`,
-      actionUrl: `/trips/${tripId}`,
-      data: {
-        tripId,
-        tripName,
-        reason: cancellationReason,
-        cancelledBy,
-        notificationType: 'trip.cancelled',
-      },
-    })
+    // Send cancellation email to travelers if requested
+    if (event.notifyTravelers && event.primaryContactId) {
+      try {
+        // Fetch primary contact email
+        const [contact] = await this.db.client
+          .select({
+            email: this.db.schema.contacts.email,
+            firstName: this.db.schema.contacts.firstName,
+            lastName: this.db.schema.contacts.lastName,
+          })
+          .from(this.db.schema.contacts)
+          .where(eq(this.db.schema.contacts.id, event.primaryContactId))
+          .limit(1)
 
-    this.logger.debug(`Sent trip.cancelled notification to user ${trip.ownerId} for trip ${tripId}`)
+        if (contact?.email) {
+          // Fetch agency info for the email
+          const [agency] = await this.db.client
+            .select({
+              name: this.db.schema.agencies.name,
+              id: this.db.schema.agencies.id,
+            })
+            .from(this.db.schema.agencies)
+            .innerJoin(
+              this.db.schema.trips,
+              eq(this.db.schema.trips.agencyId, this.db.schema.agencies.id),
+            )
+            .where(eq(this.db.schema.trips.id, event.tripId))
+            .limit(1)
+
+          const html = getTripCancellationTemplate({
+            travelerName: contact.firstName || 'Traveler',
+            tripName: event.tripName,
+            cancellationReason: event.cancellationReason,
+            agencyName: agency?.name || 'Your Travel Agency',
+          })
+
+          await this.emailService.sendEmail({
+            to: [contact.email],
+            subject: `Trip Cancellation: ${event.tripName}`,
+            html,
+            agencyId: agency?.id || '',
+            tripId: event.tripId,
+            contactId: event.primaryContactId,
+            templateSlug: 'trip-cancellation',
+          })
+
+          this.logger.log(`Sent cancellation email to ${contact.email} for trip ${event.tripId}`)
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
+        this.logger.error(`Failed to send cancellation email for trip ${event.tripId}: ${message}`)
+      }
+    }
   }
 
   // =========================================================================

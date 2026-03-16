@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { useCancelTrip } from '@/hooks/use-trips'
@@ -37,6 +38,7 @@ export function CancelTripDialog({
   tripName,
 }: CancelTripDialogProps) {
   const [reason, setReason] = useState('')
+  const [notifyTravelers, setNotifyTravelers] = useState(false)
   const cancelTrip = useCancelTrip()
   const { toast } = useToast()
 
@@ -44,13 +46,14 @@ export function CancelTripDialog({
     if (!reason.trim()) return
 
     try {
-      await cancelTrip.mutateAsync({ tripId, reason: reason.trim() })
+      await cancelTrip.mutateAsync({ tripId, reason: reason.trim(), notifyTravelers })
       toast({
         title: 'Trip cancelled',
         description: `"${tripName}" has been cancelled.`,
       })
       onOpenChange(false)
       setReason('')
+      setNotifyTravelers(false)
     } catch (error: any) {
       toast({
         title: 'Failed to cancel trip',
@@ -97,8 +100,19 @@ export function CancelTripDialog({
           />
         </div>
 
+        <div className="flex items-center space-x-2 pt-1">
+          <Checkbox
+            id="notify-travelers"
+            checked={notifyTravelers}
+            onCheckedChange={(checked) => setNotifyTravelers(checked === true)}
+          />
+          <Label htmlFor="notify-travelers" className="text-sm font-normal cursor-pointer">
+            Send cancellation notice to travelers
+          </Label>
+        </div>
+
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setReason('')}>
+          <AlertDialogCancel onClick={() => { setReason(''); setNotifyTravelers(false) }}>
             Keep Trip
           </AlertDialogCancel>
           <AlertDialogAction

@@ -4352,6 +4352,7 @@ export class TripsService {
         actorId,
         dto.reason || null,
         existingTrip.status,
+        dto.notifyTravelers || false,
       ),
     )
 
