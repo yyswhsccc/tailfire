@@ -75,7 +75,7 @@ export interface CreateTripDto {
   commissionFeeRateOverride?: number | null // 0-100
 
   // Optional group association
-  tripGroupId?: string
+  tripGroupId?: string | null
 }
 
 export interface CreateTripCollaboratorDto {

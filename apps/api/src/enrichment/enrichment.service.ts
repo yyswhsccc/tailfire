@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { eq, and, or, isNotNull, inArray } from 'drizzle-orm'
+import { eq, and, isNotNull, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { AutomationService } from '../automation/automation.service'
 import { TripsService } from '../trips/trips.service'

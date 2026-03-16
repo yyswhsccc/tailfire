@@ -15,6 +15,7 @@ import {
   MaxLength,
   Min,
   Max,
+  ValidateIf,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import { IsTimezone } from '../../common/validators/is-timezone.validator'
@@ -111,6 +112,7 @@ export class CreateTripDto {
 
   // Optional group association
   @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsUUID()
-  tripGroupId?: string
+  tripGroupId?: string | null
 }
