@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Query } from '@nestjs/common'
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common'
+import { AdminGuard } from '../common/guards/admin.guard'
 import { ApiTags } from '@nestjs/swagger'
 import {
   ReferenceDataService,
@@ -60,12 +61,10 @@ export class ReferenceDataController {
   }
 
   /**
-   * Refresh the reference data cache
+   * Refresh the reference data cache (admin only)
    * POST /reference-data/refresh
-   *
-   * TODO: Add admin guard when auth is implemented (Phase 4)
-   * This endpoint should be protected to prevent unauthorized cache invalidation
    */
+  @UseGuards(AdminGuard)
   @Post('refresh')
   async refreshCache(): Promise<{ message: string }> {
     await this.referenceDataService.refreshCache()

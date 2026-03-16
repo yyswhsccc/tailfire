@@ -1,44 +1,22 @@
-import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/common'
-import { Observable } from 'rxjs'
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common'
 
 /**
  * AdminGuard
  *
- * Placeholder guard for admin-only endpoints.
- * Currently allows all requests with a warning log.
+ * Restricts access to admin-only endpoints.
+ * Checks auth.role from JWT context (set by JwtAuthGuard).
  *
- * TODO: Replace with actual RolesGuard when user auth system is ready
- *
- * @example
- * ```typescript
- * @UseGuards(AdminGuard)
- * @Post('api-credentials')
- * async createCredential() {
- *   // Only admins should access this endpoint
- * }
- * ```
+ * Must be used AFTER JwtAuthGuard (which is registered globally).
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
-  private readonly logger = new Logger(AdminGuard.name)
-  private hasLoggedWarning = false
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest()
+    const user = request.user
 
-  canActivate(
-    _context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
-    // Log warning only once to avoid spam
-    if (!this.hasLoggedWarning) {
-      this.logger.warn(
-        '⚠️  AdminGuard is a placeholder - all requests are currently allowed. ' +
-        'This guard must be replaced with actual RolesGuard when user authentication system is ready.'
-      )
-      this.hasLoggedWarning = true
+    if (!user || user.role !== 'admin') {
+      throw new ForbiddenException('Admin access required')
     }
-
-    // TODO: Implement actual admin role checking
-    // const request = context.switchToHttp().getRequest()
-    // const user = request.user
-    // return user && user.roles && user.roles.includes('admin')
 
     return true
   }
