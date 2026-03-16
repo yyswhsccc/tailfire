@@ -13,6 +13,7 @@ import { ContactsModule } from '../contacts/contacts.module'
 import { TripsModule } from '../trips/trips.module'
 import { SuppliersModule } from '../suppliers/suppliers.module'
 import { AutomationModule } from '../automation/automation.module'
+import { CatalogMatcherModule } from '../catalog-matcher/catalog-matcher.module'
 import { OcrImportController } from './ocr-import.controller'
 import { OcrImportService } from './ocr-import.service'
 import { QUEUES } from '../automation/automation.types'
@@ -25,6 +26,7 @@ import { QUEUES } from '../automation/automation.types'
     forwardRef(() => TripsModule),
     SuppliersModule,
     forwardRef(() => AutomationModule),
+    CatalogMatcherModule,
     BullModule.registerQueue({
       name: QUEUES.OCR_PROCESSING,
       defaultJobOptions: {

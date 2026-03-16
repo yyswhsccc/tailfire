@@ -175,6 +175,7 @@ import { TripGroupSharesController } from './trip-group-shares.controller'
     ActivityMediaService,
     StorageService,
     StorageProviderFactory,
+    GeocodingService,
     // Additional exports for TemplatesModule
     ComponentOrchestrationService,
     BaseComponentService,

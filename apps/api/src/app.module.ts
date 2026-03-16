@@ -47,6 +47,8 @@ import { LoyaltyProgramsModule } from './loyalty-programs/loyalty-programs.modul
 import { DocumentTemplatesModule } from './document-templates/document-templates.module'
 import { DocumentRenderModule } from './document-render/document-render.module'
 import { EmailAccountsModule } from './email-accounts/email-accounts.module'
+import { EnrichmentModule } from './enrichment/enrichment.module'
+import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
 
 @Module({
   imports: [
@@ -172,6 +174,12 @@ import { EmailAccountsModule } from './email-accounts/email-accounts.module'
 
     // Email Accounts (Agent IMAP/SMTP — separate from EmailModule)
     EmailAccountsModule,
+
+    // Cruise catalog matching (shared between OCR import and enrichment)
+    CatalogMatcherModule,
+
+    // Activity enrichment (geocoding, cruise catalog, hotel photos)
+    EnrichmentModule,
   ],
   controllers: [AppController],
   providers: [

@@ -32,6 +32,7 @@ import { EnrichmentProcessor } from './processors/enrichment.processor'
 import { AutomationController } from './admin/automation.controller'
 import { GooglePlacesModule } from '../external-apis/providers/google-places/google-places.module'
 import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
+import { CatalogMatcherModule } from '../catalog-matcher/catalog-matcher.module'
 import { QUEUES } from './automation.types'
 
 @Module({
@@ -128,6 +129,7 @@ import { QUEUES } from './automation.types'
     HttpModule,
     GooglePlacesModule,
     ApiCredentialsModule,
+    CatalogMatcherModule,
   ],
   controllers: [AutomationController],
   providers: [

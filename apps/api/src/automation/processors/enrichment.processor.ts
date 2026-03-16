@@ -2,7 +2,7 @@
  * Enrichment Processor
  *
  * BullMQ processor for background data enrichment jobs.
- * Currently handles hotel photo enrichment via Google Places API.
+ * Handles hotel photo enrichment, cruise catalog enrichment, and activity geocoding.
  */
 
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq'
@@ -10,15 +10,26 @@ import { Injectable, Logger } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { Job } from 'bullmq'
 import { createHash } from 'crypto'
+import { eq, and } from 'drizzle-orm'
 import { firstValueFrom } from 'rxjs'
 import { ApiProvider } from '@tailfire/shared-types'
+import { schema } from '@tailfire/database'
 import type { MediaType } from '@tailfire/database'
 import { GooglePlacesHotelsProvider } from '../../external-apis/providers/google-places/google-places-hotels.provider'
 import { CredentialResolverService } from '../../api-credentials/credential-resolver.service'
 import { ActivityMediaService, ExternalUrlAttribution } from '../../trips/activity-media.service'
 import { StorageService } from '../../trips/storage.service'
+import { GeocodingService } from '../../trips/geocoding.service'
+import { CatalogMatcherService } from '../../catalog-matcher/catalog-matcher.service'
+import { DatabaseService } from '../../db/database.service'
 import { QUEUES, JOB_TYPES } from '../automation.types'
-import type { HotelPhotoEnrichmentJobData } from '../automation.types'
+import type {
+  HotelPhotoEnrichmentJobData,
+  CruiseCatalogEnrichmentJobData,
+  ActivityGeocodingJobData,
+} from '../automation.types'
+
+const { customCruiseDetails, itineraryActivities } = schema
 
 const DEFAULT_MAX_PHOTOS = 3
 
@@ -33,6 +44,9 @@ export class EnrichmentProcessor extends WorkerHost {
     private readonly credentialResolver: CredentialResolverService,
     private readonly mediaService: ActivityMediaService,
     private readonly storageService: StorageService,
+    private readonly catalogMatcher: CatalogMatcherService,
+    private readonly geocodingService: GeocodingService,
+    private readonly db: DatabaseService,
   ) {
     super()
   }
@@ -41,6 +55,12 @@ export class EnrichmentProcessor extends WorkerHost {
     switch (job.name) {
       case JOB_TYPES.HOTEL_PHOTO_ENRICHMENT:
         await this.handleHotelPhotoEnrichment(job as Job<HotelPhotoEnrichmentJobData>)
+        break
+      case JOB_TYPES.CRUISE_CATALOG_ENRICHMENT:
+        await this.handleCruiseCatalogEnrichment(job as Job<CruiseCatalogEnrichmentJobData>)
+        break
+      case JOB_TYPES.ACTIVITY_GEOCODING:
+        await this.handleActivityGeocoding(job as Job<ActivityGeocodingJobData>)
         break
       default:
         this.logger.warn(`Unknown enrichment job type: ${job.name}`)
@@ -171,6 +191,169 @@ export class EnrichmentProcessor extends WorkerHost {
       imported,
       failed,
     })
+  }
+
+  private async handleCruiseCatalogEnrichment(job: Job<CruiseCatalogEnrichmentJobData>): Promise<void> {
+    const { activityId, agencyId, cruiseLineName, shipName, departureDate, nights, departurePort, voyageCode } = job.data
+
+    this.logger.log({ message: 'Starting cruise catalog enrichment', activityId, cruiseLineName, shipName })
+
+    // Verify activity belongs to the expected agency
+    const [activity] = await this.db.client
+      .select({ id: itineraryActivities.id })
+      .from(itineraryActivities)
+      .where(and(eq(itineraryActivities.id, activityId), eq(itineraryActivities.agencyId, agencyId)))
+      .limit(1)
+
+    if (!activity) {
+      this.logger.warn({ message: 'Activity not found or agency mismatch — skipping', activityId, agencyId })
+      return
+    }
+
+    const match = await this.catalogMatcher.matchCatalogSailing({
+      cruiseLineName,
+      shipName,
+      departureDate,
+      nights,
+      departurePort,
+      voyageCode,
+    })
+
+    if (!match) {
+      this.logger.log({ message: 'No catalog match found for cruise', activityId, cruiseLineName, shipName })
+      return
+    }
+
+    this.logger.log({
+      message: 'Matched catalog sailing',
+      activityId,
+      strategy: match.strategy,
+      score: match.score,
+      sailingId: match.sailingId,
+    })
+
+    const enrichment = await this.catalogMatcher.enrichCruiseFromSailing(match)
+
+    // Update custom_cruise_details with enrichment data
+    await this.db.client
+      .update(customCruiseDetails)
+      .set({
+        source: 'traveltek',
+        traveltekCruiseId: match.providerIdentifier,
+        cruiseLineId: enrichment.cruiseLineId,
+        cruiseShipId: enrichment.cruiseShipId,
+        cruiseRegionId: enrichment.cruiseRegionId,
+        region: enrichment.region,
+        shipImageUrl: enrichment.shipImageUrl,
+        shipClass: enrichment.shipClass,
+        departurePortId: enrichment.departurePortId,
+        arrivalPortId: enrichment.arrivalPortId,
+        departureTimezone: enrichment.departureTimezone,
+        arrivalTimezone: enrichment.arrivalTimezone,
+        departurePort: enrichment.departurePort || undefined,
+        arrivalPort: enrichment.arrivalPort || undefined,
+        portCallsJson: enrichment.portCallsJson,
+        updatedAt: new Date(),
+      })
+      .where(eq(customCruiseDetails.activityId, activityId))
+
+    // Import ship images to activity media (stores external URLs directly, no storage upload needed)
+    const imagesToImport: Array<{ url: string; caption?: string; attribution?: { source: string; sourceUrl?: string; photographerName?: string } }> = []
+
+    if (enrichment.shipImageUrl) {
+      imagesToImport.push({
+        url: enrichment.shipImageUrl,
+        caption: `${shipName || 'Ship'} - Main Image`,
+        attribution: { source: 'traveltek_catalog' },
+      })
+    }
+
+    for (const img of enrichment.shipGalleryImages.slice(0, 5)) {
+      imagesToImport.push({
+        url: img.url,
+        caption: img.caption || `${shipName || 'Ship'} Gallery`,
+        attribution: { source: 'traveltek_catalog' },
+      })
+    }
+
+    if (imagesToImport.length > 0) {
+      try {
+        const result = await this.mediaService.importExternalImagesBatch(activityId, imagesToImport, 'cruise')
+        this.logger.log({
+          message: 'Ship images imported',
+          activityId,
+          successful: result.successful.length,
+          failed: result.failed.length,
+          skipped: result.skipped,
+        })
+      } catch (err) {
+        this.logger.warn({ message: 'Failed to import ship images batch', activityId, error: (err as Error).message })
+      }
+    }
+
+    this.logger.log({
+      message: 'Cruise catalog enrichment complete',
+      activityId,
+      portCalls: enrichment.portCallsJson.length,
+      hasShipImage: !!enrichment.shipImageUrl,
+      hasRegion: !!enrichment.region,
+    })
+  }
+
+  private async handleActivityGeocoding(job: Job<ActivityGeocodingJobData>): Promise<void> {
+    const { activityId, agencyId, activityType, propertyName, address, departureAirportCode, locationName, portName } = job.data
+
+    this.logger.log({ message: 'Starting activity geocoding', activityId, activityType })
+
+    // Idempotency: skip if coordinates already set; also verify agency ownership
+    const [activity] = await this.db.client
+      .select({ coordinates: itineraryActivities.coordinates })
+      .from(itineraryActivities)
+      .where(and(eq(itineraryActivities.id, activityId), eq(itineraryActivities.agencyId, agencyId)))
+      .limit(1)
+
+    if (!activity) {
+      this.logger.warn({ message: 'Activity not found or agency mismatch — skipping', activityId, agencyId })
+      return
+    }
+
+    if (activity?.coordinates) {
+      this.logger.log({ message: 'Activity already has coordinates — skipping', activityId })
+      return
+    }
+
+    let result: { name: string; lat: number; lng: number } | null = null
+
+    switch (activityType) {
+      case 'flight':
+        if (departureAirportCode) {
+          result = await this.geocodingService.resolveLocation({ iataCode: departureAirportCode })
+        }
+        break
+      case 'lodging':
+        result = await this.geocodingService.resolveLocation({ address: address || undefined, name: propertyName || undefined })
+        break
+      case 'custom_cruise':
+        if (portName) {
+          result = await this.geocodingService.resolveLocation({ portName })
+        }
+        break
+      default:
+        // tour, custom_tour, transportation, dining, etc.
+        result = await this.geocodingService.resolveLocation({ name: locationName || undefined })
+        break
+    }
+
+    if (result) {
+      await this.db.client
+        .update(itineraryActivities)
+        .set({ coordinates: { lat: result.lat, lng: result.lng } })
+        .where(eq(itineraryActivities.id, activityId))
+
+      this.logger.log({ message: 'Activity geocoded', activityId, lat: result.lat, lng: result.lng })
+    } else {
+      this.logger.log({ message: 'Geocoding returned no result — skipping', activityId, activityType })
+    }
   }
 
   @OnWorkerEvent('failed')
