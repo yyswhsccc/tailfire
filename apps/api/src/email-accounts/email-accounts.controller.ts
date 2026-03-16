@@ -12,9 +12,11 @@ import {
   HttpStatus,
   Res,
   StreamableFile,
+  UseGuards,
 } from '@nestjs/common'
 import type { Response } from 'express'
 import { ApiTags } from '@nestjs/swagger'
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
 import { EmailAccountsService } from './email-accounts.service'
@@ -22,6 +24,7 @@ import { ImapSyncService } from './imap-sync.service'
 import { SmtpSendService } from './smtp-send.service'
 import { CreateEmailAccountDto } from './dto/create-email-account.dto'
 import { UpdateEmailAccountDto } from './dto/update-email-account.dto'
+import { TestConnectionDto } from './dto/test-connection.dto'
 import { SendEmailDto } from './dto/send-email.dto'
 import { EmailFilterDto } from './dto/email-filter.dto'
 import type {
@@ -108,8 +111,10 @@ export class EmailAccountsController {
    * POST /email-accounts/test-connection
    */
   @Post('test-connection')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async testConnection(
-    @Body() dto: { imapHost: string; imapPort: number; imapTls: boolean; username: string; password: string },
+    @Body() dto: TestConnectionDto,
   ): Promise<TestConnectionResultDto> {
     return this.imapSyncService.testConnection(dto)
   }
@@ -119,6 +124,8 @@ export class EmailAccountsController {
    * POST /email-accounts/:id/sync
    */
   @Post(':id/sync')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   async triggerSync(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
@@ -303,6 +310,8 @@ export class EmailAccountsController {
    * POST /email-accounts/:id/send
    */
   @Post(':id/send')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async sendEmail(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,

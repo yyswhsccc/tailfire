@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { eq, and, sql, count, isNull } from 'drizzle-orm'
+import { assertPublicHost } from '../common/guards/assert-public-host'
 import { DatabaseService } from '../db/database.service'
 import { EmailAccountsService } from './email-accounts.service'
 import { NotificationService } from '../notifications/notification.service'
@@ -513,6 +514,7 @@ export class ImapSyncService {
     user: string
     pass: string
   }) {
+    await assertPublicHost(config.host)
     const { ImapFlow } = await import('imapflow')
     const client = new ImapFlow({
       host: config.host,

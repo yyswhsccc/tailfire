@@ -17,6 +17,10 @@ import { DocumentTemplatesModule } from '../document-templates/document-template
 import { DocumentRenderModule } from '../document-render/document-render.module'
 import { CommissionModule } from './commission/commission.module'
 
+// Shared access services (added directly — NOT via TripsModule to avoid circular dep)
+import { TripAccessService } from '../trips/trip-access.service'
+import { TripGroupAccessService } from '../trips/trip-group-access.service'
+
 // Services
 import { ExchangeRatesService } from './exchange-rates.service'
 import { TravellerSplitsService } from './traveller-splits.service'
@@ -58,6 +62,8 @@ import { StripeInvoiceController } from './stripe-invoice.controller'
     TripOrderService,
     StripeConnectService,
     StripeInvoiceService,
+    TripAccessService,
+    TripGroupAccessService,
   ],
   exports: [
     ExchangeRatesService,

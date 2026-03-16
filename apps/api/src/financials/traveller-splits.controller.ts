@@ -3,9 +3,6 @@
  *
  * REST API endpoints for activity traveller splits.
  *
- * TODO: Add @UseGuards(AuthGuard) when authentication is implemented
- * TODO: Add tenant scoping to ensure users can only access their own agency's trips
- *
  * Endpoints:
  * - GET /activities/:activityId/splits - Get splits for an activity
  * - PUT /activities/:activityId/splits - Set splits for an activity (replaces all)
@@ -16,6 +13,9 @@
 import { Controller, Get, Put, Delete, Param, Body } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { TravellerSplitsService } from './traveller-splits.service'
+import { TripAccessService } from '../trips/trip-access.service'
+import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
+import type { AuthContext } from '../auth/auth.types'
 import type {
   SetActivitySplitsDto,
   ActivitySplitsSummaryResponseDto,
@@ -25,7 +25,10 @@ import type {
 @ApiTags('Traveller Splits')
 @Controller()
 export class TravellerSplitsController {
-  constructor(private readonly splitsService: TravellerSplitsService) {}
+  constructor(
+    private readonly splitsService: TravellerSplitsService,
+    private readonly tripAccessService: TripAccessService,
+  ) {}
 
   /**
    * Get splits summary for an activity
@@ -33,9 +36,10 @@ export class TravellerSplitsController {
    */
   @Get('activities/:activityId/splits')
   async getActivitySplits(
+    @GetAuthContext() auth: AuthContext,
     @Param('activityId') activityId: string
   ): Promise<ActivitySplitsSummaryResponseDto> {
-    return this.splitsService.getActivitySplits(activityId)
+    return this.splitsService.getActivitySplits(activityId, auth)
   }
 
   /**
@@ -47,11 +51,11 @@ export class TravellerSplitsController {
    */
   @Put('activities/:activityId/splits')
   async setActivitySplits(
+    @GetAuthContext() auth: AuthContext,
     @Param('activityId') activityId: string,
     @Body() dto: SetActivitySplitsDto
   ): Promise<ActivitySplitsSummaryResponseDto> {
-    // TODO: Get userId from auth context
-    return this.splitsService.setActivitySplits(activityId, dto)
+    return this.splitsService.setActivitySplits(activityId, dto, auth.userId, auth)
   }
 
   /**
@@ -59,8 +63,11 @@ export class TravellerSplitsController {
    * DELETE /activities/:activityId/splits
    */
   @Delete('activities/:activityId/splits')
-  async deleteActivitySplits(@Param('activityId') activityId: string): Promise<{ success: boolean }> {
-    await this.splitsService.deleteActivitySplits(activityId)
+  async deleteActivitySplits(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityId') activityId: string,
+  ): Promise<{ success: boolean }> {
+    await this.splitsService.deleteActivitySplits(activityId, auth)
     return { success: true }
   }
 
@@ -70,9 +77,11 @@ export class TravellerSplitsController {
    */
   @Get('trips/:tripId/travellers/:travellerId/splits')
   async getTravellerSplits(
+    @GetAuthContext() auth: AuthContext,
     @Param('tripId') tripId: string,
     @Param('travellerId') travellerId: string
   ): Promise<ActivityTravellerSplitResponseDto[]> {
+    await this.tripAccessService.verifyReadAccess(tripId, auth)
     return this.splitsService.getTravellerSplits(tripId, travellerId)
   }
 }

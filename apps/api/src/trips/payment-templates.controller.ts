@@ -11,9 +11,6 @@
  * - PATCH  /payment-templates/:id                    - Update template (admin only)
  * - DELETE /payment-templates/:id                    - Delete template (admin only)
  *
- * TODO: Add @UseGuards(AuthGuard, AdminGuard) when authentication is implemented
- * TODO: Extract agencyId from JWT context for proper authorization
- *
  * @see beta/docs/design/payment-schedule/PAYMENT_SCHEDULE_TEMPLATES.md
  */
 
@@ -34,6 +31,8 @@ import {
 import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger'
 import { PaymentTemplatesService } from './payment-templates.service'
 import { PaymentAuditService } from './payment-audit.service'
+import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
+import type { AuthContext } from '../auth/auth.types'
 import type {
   PaymentScheduleTemplateDto,
   CreatePaymentScheduleTemplateDto,
@@ -68,11 +67,14 @@ export class PaymentTemplatesController {
     description: 'Include inactive templates',
   })
   async listTemplates(
+    @GetAuthContext() auth: AuthContext,
     @Param('agencyId') agencyId: string,
     @Query('includeInactive') includeInactive?: string
   ): Promise<PaymentScheduleTemplateDto[]> {
-    // TODO: Validate agencyId matches JWT context
-    return this.templatesService.findAllByAgency(agencyId, {
+    if (agencyId !== auth.agencyId) {
+      throw new ForbiddenException('Agency mismatch')
+    }
+    return this.templatesService.findAllByAgency(auth.agencyId, {
       includeInactive: includeInactive === 'true',
     })
   }
@@ -86,15 +88,14 @@ export class PaymentTemplatesController {
   @ApiOperation({ summary: 'Create a payment template (admin only)' })
   @ApiParam({ name: 'agencyId', description: 'Agency UUID' })
   async createTemplate(
+    @GetAuthContext() auth: AuthContext,
     @Param('agencyId') agencyId: string,
     @Body() dto: CreatePaymentScheduleTemplateDto
   ): Promise<PaymentScheduleTemplateDto> {
-    // TODO: Validate agencyId matches JWT context
-    // TODO: Validate role is admin or owner
-    // TODO: Extract userId from JWT
-    const userId = 'system' // Placeholder until auth is implemented
-
-    return this.templatesService.create(agencyId, userId, dto)
+    if (agencyId !== auth.agencyId) {
+      throw new ForbiddenException('Agency mismatch')
+    }
+    return this.templatesService.create(auth.agencyId, auth.userId, dto)
   }
 
   // ============================================================================
@@ -104,28 +105,15 @@ export class PaymentTemplatesController {
   /**
    * Get a payment template by ID
    * GET /payment-templates/:id
-   *
-   * Note: agencyId is passed as query param for validation until
-   * JWT context extraction is implemented
    */
   @Get('payment-templates/:id')
   @ApiOperation({ summary: 'Get a payment template by ID' })
   @ApiParam({ name: 'id', description: 'Template UUID' })
-  @ApiQuery({
-    name: 'agencyId',
-    required: true,
-    description: 'Agency UUID for authorization',
-  })
   async getTemplate(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Query('agencyId') agencyId: string
   ): Promise<PaymentScheduleTemplateDto> {
-    // TODO: Extract agencyId from JWT context instead of query param
-    if (!agencyId) {
-      throw new ForbiddenException('Agency context required')
-    }
-
-    const template = await this.templatesService.findById(id, agencyId)
+    const template = await this.templatesService.findById(id, auth.agencyId)
     if (!template) {
       throw new NotFoundException(`Template ${id} not found`)
     }
@@ -140,26 +128,12 @@ export class PaymentTemplatesController {
   @Patch('payment-templates/:id')
   @ApiOperation({ summary: 'Update a payment template (admin only)' })
   @ApiParam({ name: 'id', description: 'Template UUID' })
-  @ApiQuery({
-    name: 'agencyId',
-    required: true,
-    description: 'Agency UUID for authorization',
-  })
   async updateTemplate(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Query('agencyId') agencyId: string,
     @Body() dto: UpdatePaymentScheduleTemplateDto
   ): Promise<PaymentScheduleTemplateDto> {
-    // TODO: Extract agencyId from JWT context
-    // TODO: Validate role is admin or owner
-    // TODO: Extract userId from JWT
-    if (!agencyId) {
-      throw new ForbiddenException('Agency context required')
-    }
-
-    const userId = 'system' // Placeholder until auth is implemented
-
-    return this.templatesService.update(id, agencyId, userId, dto)
+    return this.templatesService.update(id, auth.agencyId, auth.userId, dto)
   }
 
   /**
@@ -170,25 +144,11 @@ export class PaymentTemplatesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a payment template (admin only)' })
   @ApiParam({ name: 'id', description: 'Template UUID' })
-  @ApiQuery({
-    name: 'agencyId',
-    required: true,
-    description: 'Agency UUID for authorization',
-  })
   async deleteTemplate(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Query('agencyId') agencyId: string
   ): Promise<void> {
-    // TODO: Extract agencyId from JWT context
-    // TODO: Validate role is admin or owner
-    // TODO: Extract userId from JWT
-    if (!agencyId) {
-      throw new ForbiddenException('Agency context required')
-    }
-
-    const userId = 'system' // Placeholder until auth is implemented
-
-    await this.templatesService.delete(id, agencyId, userId)
+    await this.templatesService.delete(id, auth.agencyId, auth.userId)
   }
 
   // ============================================================================
@@ -210,11 +170,14 @@ export class PaymentTemplatesController {
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Max results (default 50)' })
   @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Offset for pagination' })
   async getAuditLog(
+    @GetAuthContext() auth: AuthContext,
     @Param('agencyId') agencyId: string,
     @Query() query: AuditLogQueryDto
   ): Promise<PaymentScheduleAuditLogDto[]> {
-    // TODO: Validate agencyId matches JWT context
-    return this.auditService.getAuditLog(agencyId, query)
+    if (agencyId !== auth.agencyId) {
+      throw new ForbiddenException('Agency mismatch')
+    }
+    return this.auditService.getAuditLog(auth.agencyId, query)
   }
 
   /**
@@ -224,23 +187,13 @@ export class PaymentTemplatesController {
   @Get('payment-templates/:id/audit-log')
   @ApiOperation({ summary: 'Get audit log for a specific template' })
   @ApiParam({ name: 'id', description: 'Template UUID' })
-  @ApiQuery({
-    name: 'agencyId',
-    required: true,
-    description: 'Agency UUID for authorization',
-  })
   async getTemplateAuditLog(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-    @Query('agencyId') agencyId: string
   ): Promise<PaymentScheduleAuditLogDto[]> {
-    // TODO: Extract agencyId from JWT context
-    if (!agencyId) {
-      throw new ForbiddenException('Agency context required')
-    }
-
     // Verify template exists and belongs to agency
-    await this.templatesService.findByIdOrThrow(id, agencyId)
+    await this.templatesService.findByIdOrThrow(id, auth.agencyId)
 
-    return this.auditService.getEntityAuditLog('template', id, agencyId)
+    return this.auditService.getEntityAuditLog('template', id, auth.agencyId)
   }
 }

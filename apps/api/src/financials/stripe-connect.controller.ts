@@ -3,10 +3,6 @@
  *
  * REST API endpoints for Stripe Connect operations.
  *
- * TODO: Add @UseGuards(AuthGuard) when authentication is implemented
- * TODO: Add tenant scoping to ensure users can only manage their own agency
- * TODO: Consider role-based access (admin only for Stripe onboarding)
- *
  * Endpoints:
  * - GET /agencies/:agencyId/settings - Get agency settings
  * - PATCH /agencies/:agencyId/settings - Update agency settings
@@ -15,9 +11,11 @@
  * - POST /agencies/:agencyId/stripe/dashboard - Get dashboard login link
  */
 
-import { Controller, Get, Post, Patch, Param, Body } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Param, Body, ForbiddenException } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { StripeConnectService } from './stripe-connect.service'
+import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
+import type { AuthContext } from '../auth/auth.types'
 import type {
   StripeOnboardingResponseDto,
   StripeAccountStatusResponseDto,
@@ -36,9 +34,13 @@ export class StripeConnectController {
    */
   @Get('agencies/:agencyId/settings')
   async getAgencySettings(
+    @GetAuthContext() auth: AuthContext,
     @Param('agencyId') agencyId: string
   ): Promise<AgencySettingsResponseDto> {
-    return this.stripeConnectService.getAgencySettings(agencyId)
+    if (agencyId !== auth.agencyId) {
+      throw new ForbiddenException('Agency mismatch')
+    }
+    return this.stripeConnectService.getAgencySettings(auth.agencyId)
   }
 
   /**
@@ -47,10 +49,14 @@ export class StripeConnectController {
    */
   @Patch('agencies/:agencyId/settings')
   async updateAgencySettings(
+    @GetAuthContext() auth: AuthContext,
     @Param('agencyId') agencyId: string,
     @Body() dto: UpdateAgencySettingsDto
   ): Promise<AgencySettingsResponseDto> {
-    return this.stripeConnectService.updateAgencySettings(agencyId, dto)
+    if (agencyId !== auth.agencyId) {
+      throw new ForbiddenException('Agency mismatch')
+    }
+    return this.stripeConnectService.updateAgencySettings(auth.agencyId, dto)
   }
 
   /**
@@ -59,10 +65,14 @@ export class StripeConnectController {
    */
   @Post('agencies/:agencyId/stripe/onboard')
   async startOnboarding(
+    @GetAuthContext() auth: AuthContext,
     @Param('agencyId') agencyId: string,
     @Body() dto: { returnUrl: string; refreshUrl: string }
   ): Promise<StripeOnboardingResponseDto> {
-    return this.stripeConnectService.startOnboarding(agencyId, dto.returnUrl, dto.refreshUrl)
+    if (agencyId !== auth.agencyId) {
+      throw new ForbiddenException('Agency mismatch')
+    }
+    return this.stripeConnectService.startOnboarding(auth.agencyId, dto.returnUrl, dto.refreshUrl)
   }
 
   /**
@@ -71,9 +81,13 @@ export class StripeConnectController {
    */
   @Get('agencies/:agencyId/stripe/status')
   async getAccountStatus(
+    @GetAuthContext() auth: AuthContext,
     @Param('agencyId') agencyId: string
   ): Promise<StripeAccountStatusResponseDto> {
-    return this.stripeConnectService.refreshAccountStatus(agencyId)
+    if (agencyId !== auth.agencyId) {
+      throw new ForbiddenException('Agency mismatch')
+    }
+    return this.stripeConnectService.refreshAccountStatus(auth.agencyId)
   }
 
   /**
@@ -81,7 +95,13 @@ export class StripeConnectController {
    * POST /agencies/:agencyId/stripe/dashboard
    */
   @Post('agencies/:agencyId/stripe/dashboard')
-  async getDashboardLink(@Param('agencyId') agencyId: string): Promise<{ url: string }> {
-    return this.stripeConnectService.createDashboardLink(agencyId)
+  async getDashboardLink(
+    @GetAuthContext() auth: AuthContext,
+    @Param('agencyId') agencyId: string,
+  ): Promise<{ url: string }> {
+    if (agencyId !== auth.agencyId) {
+      throw new ForbiddenException('Agency mismatch')
+    }
+    return this.stripeConnectService.createDashboardLink(auth.agencyId)
   }
 }

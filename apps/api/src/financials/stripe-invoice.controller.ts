@@ -3,13 +3,9 @@
  *
  * REST API endpoints for Stripe invoice and webhook operations.
  *
- * TODO: Add @UseGuards(AuthGuard) for invoice/refund endpoints when auth is implemented
- * TODO: Add tenant scoping to ensure users can only access their own agency's service fees
- * Note: The webhook endpoint must remain public (validated by Stripe signature)
- *
  * Endpoints:
- * - POST /service-fees/:id/invoice - Create and send invoice
- * - POST /service-fees/:id/refund - Process refund
+ * - POST /service-fees/:id/invoice - Create and send invoice (auth required)
+ * - POST /service-fees/:id/stripe-refund - Process refund (auth required)
  * - POST /webhooks/stripe - Handle Stripe webhooks (public, signature-verified)
  */
 
@@ -22,10 +18,14 @@ import {
   RawBodyRequest,
   Req,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { Request } from 'express'
 import { StripeInvoiceService } from './stripe-invoice.service'
+import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
+import { Public } from '../auth/decorators/public.decorator'
+import type { AuthContext } from '../auth/auth.types'
 
 @ApiTags('Stripe Invoices')
 @Controller()
@@ -38,12 +38,16 @@ export class StripeInvoiceController {
    */
   @Post('service-fees/:id/invoice')
   async createInvoice(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') serviceFeeId: string,
     @Body() dto: { agencyId: string; recipientEmail: string; recipientName: string }
   ): Promise<{ invoiceId: string; hostedInvoiceUrl: string }> {
+    if (dto.agencyId !== auth.agencyId) {
+      throw new ForbiddenException('Agency mismatch')
+    }
     return this.stripeInvoiceService.createAndSendInvoice(
       serviceFeeId,
-      dto.agencyId,
+      auth.agencyId,
       dto.recipientEmail,
       dto.recipientName
     )
@@ -55,12 +59,16 @@ export class StripeInvoiceController {
    */
   @Post('service-fees/:id/stripe-refund')
   async processRefund(
+    @GetAuthContext() auth: AuthContext,
     @Param('id') serviceFeeId: string,
     @Body() dto: { agencyId: string; amountCents?: number; reason?: string }
   ): Promise<{ refundId: string }> {
+    if (dto.agencyId !== auth.agencyId) {
+      throw new ForbiddenException('Agency mismatch')
+    }
     return this.stripeInvoiceService.processStripeRefund(
       serviceFeeId,
-      dto.agencyId,
+      auth.agencyId,
       dto.amountCents ?? 0,
       dto.reason
     )
@@ -73,6 +81,7 @@ export class StripeInvoiceController {
    * This endpoint requires raw body access for signature verification.
    * Configure NestJS to preserve raw body for this route.
    */
+  @Public()
   @Post('webhooks/stripe')
   async handleWebhook(
     @Req() req: RawBodyRequest<Request>,

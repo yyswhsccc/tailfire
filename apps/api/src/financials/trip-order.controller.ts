@@ -26,6 +26,7 @@ import { TripOrderService, TripOrderSnapshotDto } from './trip-order.service'
 import { SendTripOrderEmailDto } from './dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
+import { TripAccessService } from '../trips/trip-access.service'
 import type { AuthContext } from '../auth/auth.types'
 import type { GenerateTripOrderDto, TripOrderResponseDto } from '@tailfire/shared-types'
 
@@ -51,7 +52,10 @@ interface SendTripOrderEmailResponse {
 @UseGuards(JwtAuthGuard)
 @Controller()
 export class TripOrderController {
-  constructor(private readonly tripOrderService: TripOrderService) {}
+  constructor(
+    private readonly tripOrderService: TripOrderService,
+    private readonly tripAccessService: TripAccessService,
+  ) {}
 
   // ===========================================================================
   // SNAPSHOT MANAGEMENT ENDPOINTS (Canonical Flow)
@@ -70,6 +74,7 @@ export class TripOrderController {
     @GetAuthContext() auth: AuthContext,
     @Param('tripId') tripId: string
   ): Promise<TripOrderSnapshotDto> {
+    await this.tripAccessService.verifyWriteAccess(tripId, auth)
     return this.tripOrderService.generateTripOrderSnapshot(tripId, auth.agencyId, auth.userId)
   }
 
@@ -83,6 +88,7 @@ export class TripOrderController {
     @GetAuthContext() auth: AuthContext,
     @Param('tripId') tripId: string
   ): Promise<TripOrderSnapshotDto[]> {
+    await this.tripAccessService.verifyReadAccess(tripId, auth)
     return this.tripOrderService.listTripOrders(tripId, auth.agencyId)
   }
 
@@ -96,6 +102,7 @@ export class TripOrderController {
     @GetAuthContext() auth: AuthContext,
     @Param('tripId') tripId: string
   ): Promise<TripOrderSnapshotDto | null> {
+    await this.tripAccessService.verifyReadAccess(tripId, auth)
     return this.tripOrderService.getLatestTripOrder(tripId, auth.agencyId)
   }
 
@@ -193,6 +200,7 @@ export class TripOrderController {
     @Param('tripId') tripId: string,
     @Body() dto: GenerateTripOrderDto
   ): Promise<TripOrderResponseDto> {
+    await this.tripAccessService.verifyReadAccess(tripId, auth)
     return this.tripOrderService.generateTripOrderWithUrl(tripId, auth.agencyId, dto)
   }
 
@@ -214,6 +222,7 @@ export class TripOrderController {
     @Body() dto: GenerateTripOrderDto,
     @Res() res: Response
   ): Promise<void> {
+    await this.tripAccessService.verifyReadAccess(tripId, auth)
     const pdfBuffer = await this.tripOrderService.generateTripOrder(tripId, auth.agencyId, dto)
 
     const filename = `trip-order-${tripId.slice(0, 8)}.pdf`
@@ -245,6 +254,7 @@ export class TripOrderController {
     @Param('tripId') tripId: string,
     @Body() dto: SendTripOrderEmailDto
   ): Promise<SendTripOrderEmailResponse> {
+    await this.tripAccessService.verifyWriteAccess(tripId, auth)
     return this.tripOrderService.sendTripOrderEmail(tripId, auth.agencyId, dto)
   }
 }

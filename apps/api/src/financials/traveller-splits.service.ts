@@ -13,6 +13,8 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { eq, and } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { ExchangeRatesService } from './exchange-rates.service'
+import { TripAccessService } from '../trips/trip-access.service'
+import type { AuthContext } from '../auth/auth.types'
 import type {
   SetActivitySplitsDto,
   ActivityTravellerSplitResponseDto,
@@ -26,17 +28,22 @@ export class TravellerSplitsService {
 
   constructor(
     private readonly db: DatabaseService,
-    private readonly exchangeRatesService: ExchangeRatesService
+    private readonly exchangeRatesService: ExchangeRatesService,
+    private readonly tripAccessService: TripAccessService,
   ) {}
 
   /**
    * Get splits summary for an activity
    */
-  async getActivitySplits(activityId: string): Promise<ActivitySplitsSummaryResponseDto> {
+  async getActivitySplits(activityId: string, auth?: AuthContext): Promise<ActivitySplitsSummaryResponseDto> {
     // Get activity with pricing info
     const activity = await this.getActivityWithDetails(activityId)
     if (!activity) {
       throw new NotFoundException(`Activity ${activityId} not found`)
+    }
+
+    if (auth) {
+      await this.tripAccessService.verifyReadAccess(activity.tripId, auth)
     }
 
     // Get existing splits
@@ -98,12 +105,17 @@ export class TravellerSplitsService {
   async setActivitySplits(
     activityId: string,
     dto: SetActivitySplitsDto,
-    userId?: string
+    userId?: string,
+    auth?: AuthContext,
   ): Promise<ActivitySplitsSummaryResponseDto> {
     // Get activity with pricing info
     const activity = await this.getActivityWithDetails(activityId)
     if (!activity) {
       throw new NotFoundException(`Activity ${activityId} not found`)
+    }
+
+    if (auth) {
+      await this.tripAccessService.verifyWriteAccess(activity.tripId, auth)
     }
 
     // Get trip travellers
@@ -231,7 +243,14 @@ export class TravellerSplitsService {
   /**
    * Delete all splits for an activity
    */
-  async deleteActivitySplits(activityId: string): Promise<void> {
+  async deleteActivitySplits(activityId: string, auth?: AuthContext): Promise<void> {
+    if (auth) {
+      const activity = await this.getActivityWithDetails(activityId)
+      if (activity) {
+        await this.tripAccessService.verifyWriteAccess(activity.tripId, auth)
+      }
+    }
+
     await this.db.client
       .delete(this.db.schema.activityTravellerSplits)
       .where(eq(this.db.schema.activityTravellerSplits.activityId, activityId))

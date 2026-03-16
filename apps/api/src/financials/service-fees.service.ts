@@ -3,7 +3,7 @@
  *
  * Manages service fee lifecycle (without Stripe integration):
  * - CRUD operations for service fees
- * - Status transitions: draft → sent → paid → partially_refunded/refunded
+ * - Status transitions: draft -> sent -> paid -> partially_refunded/refunded
  * - Currency conversion with exchange rate snapshots
  */
 
@@ -17,6 +17,8 @@ import { eq, desc } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { ExchangeRatesService } from './exchange-rates.service'
 import { TripNotificationsService } from './trip-notifications.service'
+import { TripAccessService } from '../trips/trip-access.service'
+import type { AuthContext } from '../auth/auth.types'
 import type {
   ServiceFeeResponseDto,
   CreateServiceFeeDto,
@@ -40,13 +42,18 @@ export class ServiceFeesService {
   constructor(
     private readonly db: DatabaseService,
     private readonly exchangeRatesService: ExchangeRatesService,
-    private readonly notificationsService: TripNotificationsService
+    private readonly notificationsService: TripNotificationsService,
+    private readonly tripAccessService: TripAccessService,
   ) {}
 
   /**
    * Get all service fees for a trip
    */
-  async getServiceFees(tripId: string): Promise<ServiceFeeResponseDto[]> {
+  async getServiceFees(tripId: string, auth?: AuthContext): Promise<ServiceFeeResponseDto[]> {
+    if (auth) {
+      await this.tripAccessService.verifyReadAccess(tripId, auth)
+    }
+
     const fees = await this.db.client
       .select()
       .from(this.db.schema.serviceFees)
@@ -59,7 +66,7 @@ export class ServiceFeesService {
   /**
    * Get a single service fee by ID
    */
-  async getServiceFee(serviceFeeId: string): Promise<ServiceFeeResponseDto> {
+  async getServiceFee(serviceFeeId: string, auth?: AuthContext): Promise<ServiceFeeResponseDto> {
     const [fee] = await this.db.client
       .select()
       .from(this.db.schema.serviceFees)
@@ -70,6 +77,10 @@ export class ServiceFeesService {
       throw new NotFoundException(`Service fee ${serviceFeeId} not found`)
     }
 
+    if (auth) {
+      await this.tripAccessService.verifyReadAccess(fee.tripId, auth)
+    }
+
     return this.formatServiceFee(fee)
   }
 
@@ -78,8 +89,13 @@ export class ServiceFeesService {
    */
   async createServiceFee(
     tripId: string,
-    dto: CreateServiceFeeDto
+    dto: CreateServiceFeeDto,
+    auth?: AuthContext,
   ): Promise<ServiceFeeResponseDto> {
+    if (auth) {
+      await this.tripAccessService.verifyWriteAccess(tripId, auth)
+    }
+
     // Verify trip exists and get currency
     const [trip] = await this.db.client
       .select({ id: this.db.schema.trips.id, currency: this.db.schema.trips.currency })
@@ -133,9 +149,14 @@ export class ServiceFeesService {
    */
   async updateServiceFee(
     serviceFeeId: string,
-    dto: UpdateServiceFeeDto
+    dto: UpdateServiceFeeDto,
+    auth?: AuthContext,
   ): Promise<ServiceFeeResponseDto> {
     const existing = await this.getServiceFeeRecord(serviceFeeId)
+
+    if (auth) {
+      await this.tripAccessService.verifyWriteAccess(existing.tripId, auth)
+    }
 
     if (existing.status !== 'draft') {
       throw new BadRequestException('Can only update service fees in draft status')
@@ -192,10 +213,15 @@ export class ServiceFeesService {
   }
 
   /**
-   * Send a service fee (draft → sent)
+   * Send a service fee (draft -> sent)
    */
-  async sendServiceFee(serviceFeeId: string): Promise<ServiceFeeResponseDto> {
+  async sendServiceFee(serviceFeeId: string, auth?: AuthContext): Promise<ServiceFeeResponseDto> {
     const existing = await this.getServiceFeeRecord(serviceFeeId)
+
+    if (auth) {
+      await this.tripAccessService.verifyWriteAccess(existing.tripId, auth)
+    }
+
     this.validateTransition(existing.status, 'sent')
 
     const [updated] = await this.db.client
@@ -212,11 +238,16 @@ export class ServiceFeesService {
   }
 
   /**
-   * Mark a service fee as paid (sent → paid)
+   * Mark a service fee as paid (sent -> paid)
    * In future, this will be called by Stripe webhook
    */
-  async markAsPaid(serviceFeeId: string): Promise<ServiceFeeResponseDto> {
+  async markAsPaid(serviceFeeId: string, auth?: AuthContext): Promise<ServiceFeeResponseDto> {
     const existing = await this.getServiceFeeRecord(serviceFeeId)
+
+    if (auth) {
+      await this.tripAccessService.verifyWriteAccess(existing.tripId, auth)
+    }
+
     this.validateTransition(existing.status, 'paid')
 
     const [updated] = await this.db.client
@@ -241,13 +272,18 @@ export class ServiceFeesService {
   }
 
   /**
-   * Process a refund (paid → partially_refunded or refunded)
+   * Process a refund (paid -> partially_refunded or refunded)
    */
   async processRefund(
     serviceFeeId: string,
-    dto: RefundServiceFeeDto
+    dto: RefundServiceFeeDto,
+    auth?: AuthContext,
   ): Promise<ServiceFeeResponseDto> {
     const existing = await this.getServiceFeeRecord(serviceFeeId)
+
+    if (auth) {
+      await this.tripAccessService.verifyWriteAccess(existing.tripId, auth)
+    }
 
     if (existing.status !== 'paid' && existing.status !== 'partially_refunded') {
       throw new BadRequestException('Can only refund paid or partially refunded service fees')
@@ -292,10 +328,15 @@ export class ServiceFeesService {
   }
 
   /**
-   * Cancel a service fee (draft/sent → cancelled)
+   * Cancel a service fee (draft/sent -> cancelled)
    */
-  async cancelServiceFee(serviceFeeId: string): Promise<ServiceFeeResponseDto> {
+  async cancelServiceFee(serviceFeeId: string, auth?: AuthContext): Promise<ServiceFeeResponseDto> {
     const existing = await this.getServiceFeeRecord(serviceFeeId)
+
+    if (auth) {
+      await this.tripAccessService.verifyWriteAccess(existing.tripId, auth)
+    }
+
     this.validateTransition(existing.status, 'cancelled')
 
     const [updated] = await this.db.client
@@ -314,8 +355,12 @@ export class ServiceFeesService {
   /**
    * Delete a service fee (only in draft status)
    */
-  async deleteServiceFee(serviceFeeId: string): Promise<void> {
+  async deleteServiceFee(serviceFeeId: string, auth?: AuthContext): Promise<void> {
     const existing = await this.getServiceFeeRecord(serviceFeeId)
+
+    if (auth) {
+      await this.tripAccessService.verifyWriteAccess(existing.tripId, auth)
+    }
 
     if (existing.status !== 'draft') {
       throw new BadRequestException('Can only delete service fees in draft status')

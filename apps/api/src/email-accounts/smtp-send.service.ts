@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { eq, sql } from 'drizzle-orm'
 import * as nodemailer from 'nodemailer'
+import { assertPublicHost } from '../common/guards/assert-public-host'
 import { DatabaseService } from '../db/database.service'
 import { EmailAccountsService } from './email-accounts.service'
 import { SendEmailDto } from './dto/send-email.dto'
@@ -85,6 +86,9 @@ export class SmtpSendService {
           : original.messageId
       }
     }
+
+    // Validate SMTP host resolves to a public IP
+    await assertPublicHost(account.smtpHost)
 
     // Create Nodemailer transport
     const transport = nodemailer.createTransport({
@@ -176,6 +180,8 @@ export class SmtpSendService {
   }): Promise<{ messageId: string }> {
     const account = await this.emailAccountsService.getAccountById(options.accountId)
     const credentials = await this.emailAccountsService.getDecryptedCredentials(options.accountId)
+
+    await assertPublicHost(account.smtpHost)
 
     const transport = nodemailer.createTransport({
       host: account.smtpHost,

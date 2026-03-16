@@ -13,6 +13,8 @@ import { Injectable, NotFoundException, Logger } from '@nestjs/common'
 import { eq, sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { ExchangeRatesService } from './exchange-rates.service'
+import { TripAccessService } from '../trips/trip-access.service'
+import type { AuthContext } from '../auth/auth.types'
 import type {
   TripFinancialSummaryResponseDto,
   ActivityCostSummaryDto,
@@ -26,13 +28,18 @@ export class FinancialSummaryService {
 
   constructor(
     private readonly db: DatabaseService,
-    private readonly exchangeRatesService: ExchangeRatesService
+    private readonly exchangeRatesService: ExchangeRatesService,
+    private readonly tripAccessService: TripAccessService,
   ) {}
 
   /**
    * Get comprehensive financial summary for a trip
    */
-  async getTripFinancialSummary(tripId: string): Promise<TripFinancialSummaryResponseDto> {
+  async getTripFinancialSummary(tripId: string, auth?: AuthContext): Promise<TripFinancialSummaryResponseDto> {
+    if (auth) {
+      await this.tripAccessService.verifyReadAccess(tripId, auth)
+    }
+
     // Get trip details
     const [trip] = await this.db.client
       .select({

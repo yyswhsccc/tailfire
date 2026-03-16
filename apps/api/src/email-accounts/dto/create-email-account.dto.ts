@@ -1,4 +1,5 @@
 import { IsEmail, IsString, IsOptional, IsInt, IsBoolean, Min, Max } from 'class-validator'
+import { IsValidEmailHost } from '../../common/validators/is-valid-email-host.validator'
 
 export class CreateEmailAccountDto {
   @IsEmail()
@@ -9,6 +10,7 @@ export class CreateEmailAccountDto {
   displayName?: string
 
   @IsString()
+  @IsValidEmailHost()
   imapHost!: string
 
   @IsOptional()
@@ -22,6 +24,7 @@ export class CreateEmailAccountDto {
   imapTls?: boolean
 
   @IsString()
+  @IsValidEmailHost()
   smtpHost!: string
 
   @IsOptional()

@@ -6,7 +6,7 @@
  */
 
 import { Injectable } from '@nestjs/common'
-import { eq, and, sql, inArray, desc, asc } from 'drizzle-orm'
+import { eq, and, sql, inArray, desc, asc, type SQL } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TripAccessService } from '../trips/trip-access.service'
 import { TaskAccessService } from '../tasks/task-access.service'
@@ -207,6 +207,12 @@ export class DashboardService {
     return { startDate, endDate, priorStartDate, priorEndDate }
   }
 
+  /** Build a parameterized SQL list from an array of IDs — safe from SQL injection */
+  private sqlIdList(ids: string[]): SQL {
+    const params = ids.map((id, i) => i === 0 ? sql`${id}` : sql`, ${id}`)
+    return sql`(${sql.join(params, sql.raw(''))})`
+  }
+
   // ===================================================================
   // KPI Metrics
   // ===================================================================
@@ -230,7 +236,7 @@ export class DashboardService {
       ? sql`t.agency_id = ${agencyId}`
       : tripIds.length === 0
         ? sql`false`
-        : sql`t.agency_id = ${agencyId} AND t.id IN ${sql.raw(`('${tripIds.join("','")}')`)}`
+        : sql`t.agency_id = ${agencyId} AND t.id IN ${this.sqlIdList(tripIds)}`
 
     // Bookings count — uses booking_date (actual booking date) with created_at fallback
     const bookingsResult = await this.db.client.execute(sql`
@@ -262,7 +268,7 @@ export class DashboardService {
       `)
       netSalesCents = Number((salesResult as any)[0]?.net_sales ?? 0)
     } else if (tripIds.length > 0) {
-      const tripIdList = sql.raw(`('${tripIds.join("','")}')`)
+      const tripIdList = this.sqlIdList(tripIds)
       const salesResult = await this.db.client.execute(sql`
         SELECT coalesce(sum(ap.total_price_cents), 0)::bigint AS net_sales
         FROM activity_pricing ap
@@ -293,7 +299,7 @@ export class DashboardService {
       `)
       commissionDollars = Number((commResult as any)[0]?.commission ?? 0)
     } else if (tripIds.length > 0) {
-      const tripIdList = sql.raw(`('${tripIds.join("','")}')`)
+      const tripIdList = this.sqlIdList(tripIds)
       const commResult = await this.db.client.execute(sql`
         SELECT coalesce(sum(cci.received_cents) / 100.0, 0)::float AS commission
         FROM commission_check_items cci
@@ -353,7 +359,7 @@ export class DashboardService {
 
     const tripFilter = isAdmin
       ? sql`t.agency_id = ${auth.agencyId}`
-      : sql`t.agency_id = ${auth.agencyId} AND t.id IN ${sql.raw(`('${(tripIds as string[]).join("','")}')`)}`
+      : sql`t.agency_id = ${auth.agencyId} AND t.id IN ${this.sqlIdList(tripIds as string[])}`
 
     const result = await this.db.client.execute(sql`
       SELECT
@@ -394,7 +400,7 @@ export class DashboardService {
 
     const tripFilter = isAdmin
       ? sql`t.agency_id = ${auth.agencyId}`
-      : sql`t.agency_id = ${auth.agencyId} AND t.id IN ${sql.raw(`('${(tripIds as string[]).join("','")}')`)}`
+      : sql`t.agency_id = ${auth.agencyId} AND t.id IN ${this.sqlIdList(tripIds as string[])}`
 
     const result = await this.db.client.execute(sql`
       SELECT
@@ -485,7 +491,7 @@ export class DashboardService {
 
     const tripFilter = tripIds === 'all'
       ? sql`epi.agency_id = ${agencyId}`
-      : sql`epi.agency_id = ${agencyId} AND t.id IN ${sql.raw(`('${tripIds.join("','")}')`)}`
+      : sql`epi.agency_id = ${agencyId} AND t.id IN ${this.sqlIdList(tripIds)}`
 
     const result = await this.db.client.execute(sql`
       SELECT
@@ -574,7 +580,7 @@ export class DashboardService {
     } else if (tripIds.length === 0) {
       return new Map()
     } else {
-      const tripIdList = sql.raw(`('${tripIds.join("','")}')`)
+      const tripIdList = this.sqlIdList(tripIds)
       result = await this.db.client.execute(sql`
         SELECT
           extract(month FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at))::int AS month,
@@ -645,7 +651,7 @@ export class DashboardService {
     } else if (tripIds.length === 0) {
       return new Map()
     } else {
-      const tripIdList = sql.raw(`('${tripIds.join("','")}')`)
+      const tripIdList = this.sqlIdList(tripIds)
       result = await this.db.client.execute(sql`
         SELECT
           extract(month FROM cc.check_date)::int AS month,
