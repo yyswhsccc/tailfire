@@ -55,11 +55,11 @@ function ComingSoonTab({ title }: { title: string }) {
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>This feature is coming soon</CardDescription>
+        <CardDescription>This feature is in development</CardDescription>
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground">
-          We&apos;re working on bringing you this feature. Check back later!
+          This section is being built and will be available in a future update.
         </p>
       </CardContent>
     </Card>

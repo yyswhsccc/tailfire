@@ -142,7 +142,7 @@ export function TripCard({ trip, isUpdating = false }: TripCardProps) {
                   className="text-muted-foreground"
                 >
                   <XCircle className="mr-2 h-4 w-4" />
-                  Cancel (coming soon)
+                  Cancel Trip
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>

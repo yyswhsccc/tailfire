@@ -8,7 +8,7 @@ export default function ReportingPage() {
       </div>
       <h1 className="text-2xl font-semibold text-ash-900 mb-2">Reporting</h1>
       <p className="text-ash-500 max-w-md">
-        Reporting features are coming soon. You&apos;ll be able to generate business reports and analytics here.
+        Business reports and analytics are in development. This section will include sales reports, booking trends, and performance metrics.
       </p>
     </div>
   )

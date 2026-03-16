@@ -12,3 +12,5 @@ apps/ota/supabase/.temp/
 .vercel
 data/migration/
 .worktrees/
+dump.rdb
+.playwright-mcp/

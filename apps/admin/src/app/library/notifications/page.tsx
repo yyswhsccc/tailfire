@@ -119,7 +119,7 @@ export default function NotificationsLibraryPage() {
             <MessageSquare className="h-4 w-4" />
             SMS Templates
             <Badge variant="outline" className="ml-1 text-xs">
-              Coming Soon
+              Soon
             </Badge>
           </TabsTrigger>
         </TabsList>

@@ -322,8 +322,8 @@ export function TripItinerary({ trip }: TripItineraryProps) {
 
       // Other library items can be handled here in the future
       toast({
-        title: 'Coming soon',
-        description: `${componentLabel || 'This library'} is not yet available.`,
+        title: 'Not yet available',
+        description: `${componentLabel || 'This library'} is in development.`,
       })
       return
     }
@@ -465,8 +465,8 @@ export function TripItinerary({ trip }: TripItineraryProps) {
       }
 
       toast({
-        title: 'Coming soon',
-        description: `${componentLabel || 'This library'} is not yet available.`,
+        title: 'Not yet available',
+        description: `${componentLabel || 'This library'} is in development.`,
       })
       return
     }

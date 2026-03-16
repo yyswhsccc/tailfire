@@ -16,11 +16,11 @@ export default function DestinationsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Coming Soon</CardTitle>
+            <CardTitle>In Development</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Destination management will be available in a future update.
+              Destination management is being built. You&apos;ll be able to browse destinations, manage guides, and link them to trips.
             </p>
           </CardContent>
         </Card>

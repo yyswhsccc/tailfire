@@ -8,7 +8,7 @@ export default function CommissionPage() {
       </div>
       <h1 className="text-2xl font-semibold text-ash-900 mb-2">Commission</h1>
       <p className="text-ash-500 max-w-md">
-        Commission tracking features are coming soon. You&apos;ll be able to view and manage supplier commissions here.
+        Commission tracking is in development. This section will let you view and manage supplier commissions, payment schedules, and settlement reports.
       </p>
     </div>
   )

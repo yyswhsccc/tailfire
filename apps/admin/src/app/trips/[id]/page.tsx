@@ -429,8 +429,8 @@ export default function TripDetailPage() {
   const handleCancelTrip = () => {
     // TODO: Implement Cancel functionality for booked/in_progress/completed trips
     toast({
-      title: 'Coming Soon',
-      description: 'Cancel functionality will be available in a future update.',
+      title: 'In Development',
+      description: 'Cancel functionality is being built and will be available soon.',
     })
   }
 
@@ -631,8 +631,8 @@ export default function TripDetailPage() {
       case 'automations':
         return (
           <EmptyState
-            title={`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace(/-/g, ' ')} coming soon`}
-            description="This feature is currently under development and will be available in a future update."
+            title={`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace(/-/g, ' ')}`}
+            description="This feature is in development and will be available in a future update."
           />
         )
       default:

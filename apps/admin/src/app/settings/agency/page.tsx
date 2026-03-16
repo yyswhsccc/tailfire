@@ -21,8 +21,8 @@ export default function AgencySettingsPage() {
             <Building2 className="h-6 w-6" />
           </div>
           <div>
-            <CardTitle>Coming Soon</CardTitle>
-            <CardDescription>Agency settings is under development</CardDescription>
+            <CardTitle>In Development</CardTitle>
+            <CardDescription>Agency settings are being built</CardDescription>
           </div>
         </CardHeader>
         <CardContent>

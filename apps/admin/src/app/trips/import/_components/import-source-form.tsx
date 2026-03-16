@@ -194,7 +194,7 @@ export function ImportSourceForm({ onPreviewSuccess, onPdfResult, isLoading, for
                 Fuzzy (AI)
               </Label>
               <Badge variant="outline" className="text-xs">
-                Coming Soon
+                Soon
               </Badge>
             </div>
           </RadioGroup>

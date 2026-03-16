@@ -95,7 +95,7 @@ export default function SettingsPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">Coming soon</p>
+                  <p className="text-sm text-muted-foreground">In development</p>
                 </CardContent>
               </>
             )}
