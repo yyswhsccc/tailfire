@@ -18,6 +18,10 @@ import { eq, and, or, lte, gte, sql, inArray, isNotNull, ne } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
 import { AutomationService } from '../automation.service'
 import { NotificationService } from '../../notifications/notification.service'
+import { EmailService } from '../../email/email.service'
+import { getClientWelcomeTemplate } from '../../email/templates/client-welcome.template'
+import { getClientFollowUpTemplate } from '../../email/templates/client-follow-up.template'
+import { getClientPostTripTemplate } from '../../email/templates/client-post-trip.template'
 import {
   QUEUES,
   type ClientCareJobData,
@@ -50,6 +54,7 @@ export class ClientCareProcessor extends WorkerHost {
     private readonly eventEmitter: EventEmitter2,
     private readonly automationService: AutomationService,
     private readonly notificationService: NotificationService,
+    private readonly emailService: EmailService,
   ) {
     super()
   }
@@ -169,17 +174,29 @@ export class ClientCareProcessor extends WorkerHost {
       return
     }
 
-    // TODO: Implement actual email sending when email templates are ready
-    // The 'client-welcome' template needs to be created first
-    this.logger.warn(`Welcome email for contact ${contactId} skipped - template not yet implemented`)
+    // Fetch agency name via contact's agencyId
+    const agencyId = await this.getAgencyIdForContact(contactId)
+    const [agency] = await this.db.client
+      .select({ name: this.db.schema.agencies.name })
+      .from(this.db.schema.agencies)
+      .where(eq(this.db.schema.agencies.id, agencyId))
+      .limit(1)
 
-    // When ready, use:
-    // await this.notificationService.sendToContact({
-    //   contactId,
-    //   agencyId,
-    //   templateSlug: 'client-welcome',
-    //   context: { agencyId, contactId, tripId, customVariables: {} },
-    // })
+    const html = getClientWelcomeTemplate({
+      firstName: contact.firstName || 'Traveler',
+      agencyName: agency?.name || 'Your Travel Agency',
+    })
+
+    await this.emailService.sendEmail({
+      to: [contact.email],
+      subject: `Welcome to ${agency?.name || 'Your Travel Agency'}`,
+      html,
+      agencyId,
+      contactId,
+      templateSlug: 'client-welcome',
+    })
+
+    this.logger.log(`Sent welcome email to ${contact.email}`)
   }
 
   // ============================================================================
@@ -224,16 +241,30 @@ export class ClientCareProcessor extends WorkerHost {
       return
     }
 
-    this.logger.log(`Sending post-trip follow-up to ${contact.email} for trip "${trip.name}"`)
+    const agencyId = await this.getAgencyIdForContact(contactId)
+    const [agency] = await this.db.client
+      .select({ name: this.db.schema.agencies.name })
+      .from(this.db.schema.agencies)
+      .where(eq(this.db.schema.agencies.id, agencyId))
+      .limit(1)
 
-    // Emit event for email service
-    this.eventEmitter.emit('client.post_trip', {
-      contactId,
-      email: contact.email,
-      firstName: contact.firstName,
-      tripId,
+    const html = getClientPostTripTemplate({
+      firstName: contact.firstName || 'Traveler',
       tripName: trip.name,
+      agencyName: agency?.name || 'Your Travel Agency',
     })
+
+    await this.emailService.sendEmail({
+      to: [contact.email],
+      subject: `Welcome back from "${trip.name}"!`,
+      html,
+      agencyId,
+      contactId,
+      tripId,
+      templateSlug: 'client-post-trip',
+    })
+
+    this.logger.log(`Sent post-trip email to ${contact.email} for trip "${trip.name}"`)
   }
 
   // ============================================================================
@@ -308,17 +339,30 @@ export class ClientCareProcessor extends WorkerHost {
       tripName = trip?.name
     }
 
-    // TODO: Implement actual email sending when email templates are ready
-    // The 'client-follow-up' template needs to be created first
-    this.logger.warn(`Follow-up email for contact ${contactId}${tripName ? ` (trip: ${tripName})` : ''} skipped - template not yet implemented`)
+    const agencyId = await this.getAgencyIdForContact(contactId)
+    const [agency] = await this.db.client
+      .select({ name: this.db.schema.agencies.name })
+      .from(this.db.schema.agencies)
+      .where(eq(this.db.schema.agencies.id, agencyId))
+      .limit(1)
 
-    // When ready, use:
-    // await this.notificationService.sendToContact({
-    //   contactId,
-    //   agencyId,
-    //   templateSlug: 'client-follow-up',
-    //   context: { agencyId, contactId, tripId, customVariables: { tripName } },
-    // })
+    const html = getClientFollowUpTemplate({
+      firstName: contact.firstName || 'Traveler',
+      tripName,
+      agencyName: agency?.name || 'Your Travel Agency',
+    })
+
+    await this.emailService.sendEmail({
+      to: [contact.email],
+      subject: tripName ? `Following up on "${tripName}"` : 'Following up on your travel plans',
+      html,
+      agencyId,
+      contactId,
+      tripId,
+      templateSlug: 'client-follow-up',
+    })
+
+    this.logger.log(`Sent follow-up email to ${contact.email}${tripName ? ` for trip "${tripName}"` : ''}`)
   }
 
   // ============================================================================
@@ -849,6 +893,19 @@ ${removedTasks.map((t) => `<tr><td style="font-size:14px;color:#27272a;border-bo
         // Don't mark as sent on failure — will retry next hour
       }
     }
+  }
+
+  // ============================================================================
+  // Helpers
+  // ============================================================================
+
+  private async getAgencyIdForContact(contactId: string): Promise<string> {
+    const [result] = await this.db.client
+      .select({ agencyId: this.db.schema.contacts.agencyId })
+      .from(this.db.schema.contacts)
+      .where(eq(this.db.schema.contacts.id, contactId))
+      .limit(1)
+    return result?.agencyId || ''
   }
 
   // ============================================================================
