@@ -675,7 +675,7 @@ export class CommissionService {
             currency: 'CAD',
             recipientUserId: agent.userId,
             recipientName: agent.userName,
-            status: 'pending',
+            status: 'submitted',
             source: 'system',
             createdBy: userId,
             updatedBy: userId,
@@ -783,11 +783,79 @@ export class CommissionService {
   // DASHBOARD SUMMARY
   // ============================================================================
 
-  async getCommissionSummary(agencyId: string, _scopeUserId?: string): Promise<CommissionSummaryResponseDto> {
+  async getCommissionSummary(agencyId: string, scopeUserId?: string): Promise<CommissionSummaryResponseDto> {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]!
     const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]!
     const today = now.toISOString().split('T')[0]!
+
+    // When scoped to a specific user (non-admin), filter to checks/sales on trips
+    // where the user is an active collaborator
+    if (scopeUserId) {
+      const scopedResult: any[] = await this.db.client.execute(sql`
+        WITH user_trips AS (
+          SELECT tc.trip_id
+          FROM trip_collaborators tc
+          WHERE tc.user_id = ${scopeUserId} AND tc.is_active = true
+        ),
+        user_check_items AS (
+          SELECT cci.check_id, cci.received_cents
+          FROM commission_check_items cci
+          JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
+          JOIN itinerary_activities ia ON ia.id = ap.activity_id
+          JOIN itinerary_days id ON id.id = ia.itinerary_day_id
+          JOIN itineraries i ON i.id = id.itinerary_id
+          WHERE i.trip_id IN (SELECT trip_id FROM user_trips)
+        )
+        SELECT
+          COALESCE((
+            SELECT SUM(cc.check_amount_cents)
+            FROM commission_checks cc
+            WHERE cc.agency_id = ${agencyId}
+              AND cc.check_type = 'received'
+              AND cc.status = 'accepted'
+              AND cc.check_date >= ${monthStart}::date AND cc.check_date <= ${today}::date
+              AND cc.id IN (SELECT check_id FROM user_check_items)
+          ), 0) AS commission_mtd,
+          COALESCE((
+            SELECT SUM(cc.check_amount_cents)
+            FROM commission_checks cc
+            WHERE cc.agency_id = ${agencyId}
+              AND cc.check_type = 'received'
+              AND cc.status = 'accepted'
+              AND cc.check_date >= ${yearStart}::date AND cc.check_date <= ${today}::date
+              AND cc.id IN (SELECT check_id FROM user_check_items)
+          ), 0) AS commission_ytd,
+          COALESCE((
+            SELECT SUM(ap.total_price_cents)
+            FROM activity_pricing ap
+            JOIN itinerary_activities ia ON ia.id = ap.activity_id
+            JOIN itinerary_days id ON id.id = ia.itinerary_day_id
+            JOIN itineraries i ON i.id = id.itinerary_id
+            WHERE ap.agency_id = ${agencyId}
+              AND ap.created_at >= ${monthStart}::date
+              AND i.trip_id IN (SELECT trip_id FROM user_trips)
+          ), 0) AS sales_mtd,
+          COALESCE((
+            SELECT SUM(ap.total_price_cents)
+            FROM activity_pricing ap
+            JOIN itinerary_activities ia ON ia.id = ap.activity_id
+            JOIN itinerary_days id ON id.id = ia.itinerary_day_id
+            JOIN itineraries i ON i.id = id.itinerary_id
+            WHERE ap.agency_id = ${agencyId}
+              AND ap.created_at >= ${yearStart}::date
+              AND i.trip_id IN (SELECT trip_id FROM user_trips)
+          ), 0) AS sales_ytd
+      `)
+
+      const row = scopedResult[0] ?? {}
+      return {
+        salesMtdCents: Number(row.sales_mtd ?? 0),
+        salesYtdCents: Number(row.sales_ytd ?? 0),
+        commissionReceivedMtdCents: Number(row.commission_mtd ?? 0),
+        commissionReceivedYtdCents: Number(row.commission_ytd ?? 0),
+      }
+    }
 
     const mtdResults = await this.db.client
       .select({ total: sql<number>`COALESCE(SUM(check_amount_cents), 0)` })

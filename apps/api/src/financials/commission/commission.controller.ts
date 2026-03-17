@@ -12,9 +12,10 @@
  * RBAC: admin sees all, agent sees only their own data.
  */
 
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { CommissionService } from './commission.service'
+import { AdminGuard } from '../../common/guards/admin.guard'
 import { GetAuthContext } from '../../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../../auth/auth.types'
 import type {
@@ -43,6 +44,7 @@ export class CommissionController {
   // ============================================================================
 
   @Post('commission/checks')
+  @UseGuards(AdminGuard)
   async createCheck(
     @GetAuthContext() auth: AuthContext,
     @Body() dto: CreateCommissionCheckDto
@@ -67,10 +69,16 @@ export class CommissionController {
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string
   ): Promise<CommissionCheckResponseDto> {
-    return this.commissionService.getCheckDetail(auth.agencyId, id)
+    const check = await this.commissionService.getCheckDetail(auth.agencyId, id)
+    // Non-admin users can only see checks where they are the recipient
+    if (auth.role !== 'admin' && check.recipientUserId !== auth.userId) {
+      throw new ForbiddenException('You can only view checks assigned to you')
+    }
+    return check
   }
 
   @Patch('commission/checks/:id')
+  @UseGuards(AdminGuard)
   async updateCheck(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
@@ -84,6 +92,7 @@ export class CommissionController {
   // ============================================================================
 
   @Post('commission/checks/:id/accept')
+  @UseGuards(AdminGuard)
   async acceptCheck(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string
@@ -92,6 +101,7 @@ export class CommissionController {
   }
 
   @Post('commission/checks/:id/recall')
+  @UseGuards(AdminGuard)
   async recallCheck(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string
@@ -104,6 +114,7 @@ export class CommissionController {
   // ============================================================================
 
   @Post('commission/checks/:id/items')
+  @UseGuards(AdminGuard)
   async addCheckItem(
     @GetAuthContext() auth: AuthContext,
     @Param('id') checkId: string,
@@ -113,6 +124,7 @@ export class CommissionController {
   }
 
   @Delete('commission/checks/:id/items/:itemId')
+  @UseGuards(AdminGuard)
   async removeCheckItem(
     @GetAuthContext() auth: AuthContext,
     @Param('id') checkId: string,
@@ -163,6 +175,7 @@ export class CommissionController {
   }
 
   @Post('commission/due/pay')
+  @UseGuards(AdminGuard)
   async payAgents(
     @GetAuthContext() auth: AuthContext,
     @Body() dto: PayAgentDto
