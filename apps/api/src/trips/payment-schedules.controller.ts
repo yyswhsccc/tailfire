@@ -93,7 +93,7 @@ export class PaymentSchedulesController {
       }
       await this.tripAccessService.verifyWriteAccess(tripId, auth)
     }
-    return this.paymentSchedulesService.create(dto)
+    return this.paymentSchedulesService.create(dto, auth.role === 'admin')
   }
 
   /**
@@ -113,7 +113,7 @@ export class PaymentSchedulesController {
       throw new NotFoundException(`Activity pricing with ID ${activityPricingId} not found`)
     }
     await this.tripAccessService.verifyWriteAccess(tripId, auth)
-    return this.paymentSchedulesService.update(activityPricingId, dto)
+    return this.paymentSchedulesService.update(activityPricingId, dto, auth.role === 'admin')
   }
 
   /**
@@ -171,7 +171,7 @@ export class PaymentSchedulesController {
       throw new NotFoundException(`Activity pricing with ID ${activityPricingId} not found`)
     }
     await this.tripAccessService.verifyWriteAccess(tripId, auth)
-    await this.paymentSchedulesService.delete(activityPricingId)
+    await this.paymentSchedulesService.delete(activityPricingId, auth.role === 'admin')
   }
 
   // ============================================================================
@@ -195,7 +195,7 @@ export class PaymentSchedulesController {
       throw new NotFoundException(`Expected payment item with ID ${itemId} not found`)
     }
     await this.tripAccessService.verifyWriteAccess(tripId, auth)
-    return this.paymentSchedulesService.updateExpectedPaymentItem(itemId, dto)
+    return this.paymentSchedulesService.updateExpectedPaymentItem(itemId, dto, auth.role === 'admin')
   }
 
   /**
@@ -216,7 +216,7 @@ export class PaymentSchedulesController {
       throw new NotFoundException(`Payment schedule config with ID ${configId} not found`)
     }
     await this.tripAccessService.verifyWriteAccess(tripId, auth)
-    return this.paymentSchedulesService.addExpectedPaymentItem(configId, auth.agencyId, dto)
+    return this.paymentSchedulesService.addExpectedPaymentItem(configId, auth.agencyId, dto, auth.role === 'admin')
   }
 
   /**
@@ -237,7 +237,7 @@ export class PaymentSchedulesController {
       throw new NotFoundException(`Expected payment item with ID ${itemId} not found`)
     }
     await this.tripAccessService.verifyWriteAccess(tripId, auth)
-    await this.paymentSchedulesService.deleteExpectedPaymentItem(itemId, auth.agencyId)
+    await this.paymentSchedulesService.deleteExpectedPaymentItem(itemId, auth.agencyId, auth.role === 'admin')
   }
 
   // ============================================================================

@@ -153,11 +153,14 @@ export class PaymentSchedulesService {
    * Create payment schedule configuration with expected payment items
    * This is a transactional operation.
    */
-  async create(data: CreatePaymentScheduleConfigDto): Promise<PaymentScheduleConfigDto> {
+  async create(data: CreatePaymentScheduleConfigDto, isAdmin = false): Promise<PaymentScheduleConfigDto> {
     const pricingId = data.activityPricingId
     if (!pricingId) {
       throw new BadRequestException('activityPricingId is required')
     }
+
+    // Block edits after trip departure unless admin
+    await this.ensureTripEditable(pricingId, isAdmin)
 
     // Validate component pricing exists
     const [activityPricing] = await this.db.client
@@ -333,7 +336,11 @@ export class PaymentSchedulesService {
   async update(
     activityPricingId: string,
     data: UpdatePaymentScheduleConfigDto,
+    isAdmin = false,
   ): Promise<PaymentScheduleConfigDto> {
+    // Block edits after trip departure unless admin
+    await this.ensureTripEditable(activityPricingId, isAdmin)
+
     // Find existing config
     const existingConfig = await this.findByActivityPricingId(activityPricingId)
     if (!existingConfig) {
@@ -499,7 +506,10 @@ export class PaymentSchedulesService {
   /**
    * Delete payment schedule configuration (cascades to expected payment items)
    */
-  async delete(activityPricingId: string): Promise<void> {
+  async delete(activityPricingId: string, isAdmin = false): Promise<void> {
+    // Block edits after trip departure unless admin
+    await this.ensureTripEditable(activityPricingId, isAdmin)
+
     const existingConfig = await this.findByActivityPricingId(activityPricingId)
     if (!existingConfig) {
       throw new NotFoundException(
@@ -582,6 +592,64 @@ export class PaymentSchedulesService {
   }
 
   /**
+   * Ensure the trip hasn't departed yet (status is not in_progress/completed/cancelled).
+   * Blocks payment schedule edits after departure unless user is admin.
+   */
+  private async ensureTripEditable(activityPricingId: string, isAdmin = false): Promise<void> {
+    if (isAdmin) return
+
+    const tripContext = await this.getTripContextFromActivityPricingId(activityPricingId)
+    if (!tripContext) return // can't resolve trip — allow (edge case)
+
+    const [trip] = await this.db.client
+      .select({ status: this.db.schema.trips.status })
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.id, tripContext.tripId))
+      .limit(1)
+
+    if (!trip) return
+
+    const lockedStatuses = ['in_progress', 'completed', 'cancelled']
+    if (lockedStatuses.includes(trip.status)) {
+      throw new BadRequestException(
+        'Payment schedule cannot be modified after the trip has departed. Contact an admin for changes.'
+      )
+    }
+  }
+
+  /**
+   * Resolve activityPricingId from an expected payment item ID.
+   * Traverses: expectedPaymentItem → paymentScheduleConfig → activityPricingId
+   */
+  private async getActivityPricingIdFromItem(itemId: string): Promise<string | null> {
+    const [item] = await this.db.client
+      .select({ configId: this.db.schema.expectedPaymentItems.paymentScheduleConfigId })
+      .from(this.db.schema.expectedPaymentItems)
+      .where(eq(this.db.schema.expectedPaymentItems.id, itemId))
+      .limit(1)
+    if (!item?.configId) return null
+
+    const [config] = await this.db.client
+      .select({ activityPricingId: this.db.schema.paymentScheduleConfig.activityPricingId })
+      .from(this.db.schema.paymentScheduleConfig)
+      .where(eq(this.db.schema.paymentScheduleConfig.id, item.configId))
+      .limit(1)
+    return config?.activityPricingId || null
+  }
+
+  /**
+   * Resolve activityPricingId from a payment schedule config ID.
+   */
+  private async getActivityPricingIdFromConfigId(configId: string): Promise<string | null> {
+    const [config] = await this.db.client
+      .select({ activityPricingId: this.db.schema.paymentScheduleConfig.activityPricingId })
+      .from(this.db.schema.paymentScheduleConfig)
+      .where(eq(this.db.schema.paymentScheduleConfig.id, configId))
+      .limit(1)
+    return config?.activityPricingId || null
+  }
+
+  /**
    * Get trip and contact context from activity pricing ID
    */
   private async getTripContextFromActivityPricingId(
@@ -636,7 +704,12 @@ export class PaymentSchedulesService {
   async updateExpectedPaymentItem(
     itemId: string,
     data: UpdateExpectedPaymentItemDto,
+    isAdmin = false,
   ): Promise<ExpectedPaymentItemDto> {
+    // Block edits after trip departure unless admin
+    const pricingIdForGuard = await this.getActivityPricingIdFromItem(itemId)
+    if (pricingIdForGuard) await this.ensureTripEditable(pricingIdForGuard, isAdmin)
+
     // Get existing item to check for due date changes
     const [existing] = await this.db.client
       .select()
@@ -1756,7 +1829,11 @@ export class PaymentSchedulesService {
     agencyId: string,
     userId: string,
     dto: ApplyTemplateDto,
+    isAdmin = false,
   ): Promise<ApplyTemplateResponseDto> {
+    // Block edits after trip departure unless admin
+    await this.ensureTripEditable(activityPricingId, isAdmin)
+
     // 1. Validate activity pricing exists and get total price
     const [activityPricing] = await this.db.client
       .select()
@@ -2074,8 +2151,6 @@ export class PaymentSchedulesService {
    * Locked items cannot be edited without admin unlock.
    *
    * Called automatically when a payment transaction is recorded.
-   *
-   * TODO: Enable when is_locked, locked_at, locked_by columns are added via migration
    */
   async lockItemOnPayment(
     itemId: string,
@@ -2093,16 +2168,13 @@ export class PaymentSchedulesService {
       throw new NotFoundException(`Expected payment item ${itemId} not found`)
     }
 
-    // TODO: Enable locking when columns are added via migration
-    // For now, this is a no-op
+    // Locking disabled — no-op until is_locked column is added via migration
     this.logger.debug(`Locking disabled - expected payment item ${itemId} would be locked after payment`)
   }
 
   /**
    * Unlock an expected payment item (admin only).
    * Requires a reason for audit trail.
-   *
-   * TODO: Enable when is_locked, locked_at, locked_by columns are added via migration
    */
   async unlockItem(
     itemId: string,
@@ -2125,20 +2197,16 @@ export class PaymentSchedulesService {
       throw new NotFoundException(`Expected payment item ${itemId} not found`)
     }
 
-    // TODO: Enable locking when columns are added via migration
-    // For now, return item with isLocked=false
+    // Locking disabled — return item with isLocked=false until column is added
     return this.formatExpectedPaymentItemWithLocking(item)
   }
 
   /**
    * Check if an item can be edited (not locked).
    * Throws ForbiddenException if locked.
-   *
-   * TODO: Enable when is_locked column is added via migration
    */
   async ensureItemNotLocked(_itemId: string): Promise<void> {
-    // TODO: Enable locking when columns are added via migration
-    // For now, all items are considered unlocked
+    // Locking disabled — all items are considered unlocked until column is added
   }
 
   // ============================================================================
@@ -2310,7 +2378,6 @@ export class PaymentSchedulesService {
       contactId: item.contactId || null,
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString(),
-      // TODO: Enable when is_locked, locked_at, locked_by columns are added via migration
       isLocked: false,
       lockedAt: null,
       lockedBy: null,
@@ -2344,7 +2411,12 @@ export class PaymentSchedulesService {
     configId: string,
     agencyId: string,
     data: CreateExpectedPaymentItemDto,
+    isAdmin = false,
   ): Promise<ExpectedPaymentItemDto> {
+    // Block edits after trip departure unless admin
+    const pricingIdForGuard = await this.getActivityPricingIdFromConfigId(configId)
+    if (pricingIdForGuard) await this.ensureTripEditable(pricingIdForGuard, isAdmin)
+
     // Validate config exists and belongs to agency
     const [config] = await this.db.client
       .select({
@@ -2410,7 +2482,12 @@ export class PaymentSchedulesService {
   async deleteExpectedPaymentItem(
     itemId: string,
     agencyId: string,
+    isAdmin = false,
   ): Promise<void> {
+    // Block edits after trip departure unless admin
+    const pricingIdForGuard = await this.getActivityPricingIdFromItem(itemId)
+    if (pricingIdForGuard) await this.ensureTripEditable(pricingIdForGuard, isAdmin)
+
     // Validate item exists and belongs to agency
     const [item] = await this.db.client
       .select()
