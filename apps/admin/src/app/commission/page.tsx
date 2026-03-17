@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DollarSign } from 'lucide-react'
+import { DashboardLayout } from '@/components/layout'
 
 export default function CommissionPage() {
   const { isAdmin } = useUser()
@@ -41,7 +42,8 @@ export default function CommissionPage() {
   const myPayable = due?.find(() => true) // For agents, API returns only their own data
 
   return (
-    <div className="space-y-6 p-6">
+    <DashboardLayout>
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Commission</h1>
@@ -129,5 +131,6 @@ export default function CommissionPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </DashboardLayout>
   )
 }
