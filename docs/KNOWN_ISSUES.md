@@ -19,10 +19,8 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 ~~### Client Care Emails Not Sending~~ **RESOLVED 2026-03-16**
 - Wired welcome, follow-up, and post-trip handlers with TS templates + EmailService.sendEmail().
 
-### Itinerary Enum Migration Undocumented
-- **Status:** `itinerary_status` enum was renamed manually via ALTER TYPE (`presented→proposing`, `selected→approved`, `rejected→archived`) but NO migration file exists in version control
-- **Impact:** Works on all current environments, but a fresh database setup would have the old enum values
-- **Fix:** Create a migration file that matches the current state, add to journal
+~~### Itinerary Enum Migration Undocumented~~ **ALREADY RESOLVED**
+- Migration `20260224000000_rename_itinerary_status_enums.sql` exists and is registered in journal. Idempotent (safe on all envs).
 
 ### IMAP Sync Caching Not Implemented
 - **Location:** `apps/api/src/email-accounts/imap-sync.service.ts:455`
