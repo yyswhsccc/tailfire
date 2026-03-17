@@ -88,6 +88,13 @@ export const commissionChecks = pgTable('commission_checks', {
   source: varchar('source', { length: 100 }).default('manual'),
   sourceRef: varchar('source_ref', { length: 255 }),
 
+  // Reconciliation / accounting
+  reconciliationDate: timestamp('reconciliation_date', { withTimezone: true }),
+  reconciledBy: uuid('reconciled_by'),
+  accountingTransactionId: varchar('accounting_transaction_id', { length: 255 }),
+  fileUrl: text('file_url'),
+  fileName: varchar('file_name', { length: 255 }),
+
   // Audit
   createdBy: uuid('created_by'),
   updatedBy: uuid('updated_by'),
@@ -109,8 +116,10 @@ export const commissionCheckItems = pgTable(
       .references(() => commissionChecks.id, { onDelete: 'cascade' }),
 
     activityPricingId: uuid('activity_pricing_id')
-      .notNull()
       .references(() => activityPricing.id),
+
+    // Description for unreconciled items (no matching booking)
+    description: varchar('description', { length: 500 }),
 
     // Commission amounts
     projectedCents: integer('projected_cents'),

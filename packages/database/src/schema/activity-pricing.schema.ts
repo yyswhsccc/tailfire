@@ -122,6 +122,10 @@ export const commissionTracking = pgTable('commission_tracking', {
   source: varchar('source', { length: 100 }).default('manual'),
   sourceBookingRef: varchar('source_booking_ref', { length: 255 }),
 
+  // Reconciliation audit
+  reconciliationDate: timestamp('reconciliation_date', { withTimezone: true }),
+  reconciledBy: uuid('reconciled_by'),
+
   // Audit fields
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
