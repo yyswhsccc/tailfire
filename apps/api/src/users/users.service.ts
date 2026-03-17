@@ -230,7 +230,7 @@ export class UsersService {
         isActive: true,
         commissionSettings: {
           splitType: 'percentage',
-          splitValue: dto.commissionSplit ?? 0,
+          splitValue: dto.commissionSplit ?? 60,
         },
       })
     } catch (dbError) {
@@ -342,7 +342,7 @@ export class UsersService {
           isActive: true,
           invitedAt: new Date(),
           invitedBy,
-          commissionSettings: { splitType: 'percentage', splitValue: 0 },
+          commissionSettings: { splitType: 'percentage', splitValue: 60 },
         })
         .onConflictDoNothing()
 
@@ -392,7 +392,7 @@ export class UsersService {
         isActive: true,
         invitedAt: new Date(),
         invitedBy,
-        commissionSettings: { splitType: 'percentage', splitValue: 0 },
+        commissionSettings: { splitType: 'percentage', splitValue: 60 },
       })
     } catch (dbError) {
       // Rollback: delete auth user if profile creation fails

@@ -8,11 +8,15 @@
  * - Per-activity commission tracking
  * - Agent payout calculation
  * - Dashboard summary
+ *
+ * RBAC: admin sees all, agent sees only their own data.
  */
 
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { CommissionService } from './commission.service'
+import { GetAuthContext } from '../../auth/decorators/auth-context.decorator'
+import type { AuthContext } from '../../auth/auth.types'
 import type {
   CommissionCheckResponseDto,
   CommissionCheckFilterDto,
@@ -40,41 +44,39 @@ export class CommissionController {
 
   @Post('commission/checks')
   async createCheck(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Body() dto: CreateCommissionCheckDto
   ): Promise<CommissionCheckResponseDto> {
-    const agencyId = req.user?.agencyId
-    const userId = req.user?.userId
-    return this.commissionService.createCheck(agencyId, dto, userId)
+    return this.commissionService.createCheck(auth.agencyId, dto, auth.userId)
   }
 
   @Get('commission/checks')
   async getChecks(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Query() filter: CommissionCheckFilterDto
   ): Promise<PaginatedCommissionChecksResponseDto> {
-    const agencyId = req.user?.agencyId
-    return this.commissionService.getChecks(agencyId, filter)
+    // Non-admin users only see checks where they are the recipient
+    if (auth.role !== 'admin') {
+      filter.recipientUserId = auth.userId
+    }
+    return this.commissionService.getChecks(auth.agencyId, filter)
   }
 
   @Get('commission/checks/:id')
   async getCheckDetail(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string
   ): Promise<CommissionCheckResponseDto> {
-    const agencyId = req.user?.agencyId
-    return this.commissionService.getCheckDetail(agencyId, id)
+    return this.commissionService.getCheckDetail(auth.agencyId, id)
   }
 
   @Patch('commission/checks/:id')
   async updateCheck(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdateCommissionCheckDto
   ): Promise<CommissionCheckResponseDto> {
-    const agencyId = req.user?.agencyId
-    const userId = req.user?.userId
-    return this.commissionService.updateCheck(agencyId, id, dto, userId)
+    return this.commissionService.updateCheck(auth.agencyId, id, dto, auth.userId)
   }
 
   // ============================================================================
@@ -83,22 +85,18 @@ export class CommissionController {
 
   @Post('commission/checks/:id/accept')
   async acceptCheck(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string
   ): Promise<CommissionCheckResponseDto> {
-    const agencyId = req.user?.agencyId
-    const userId = req.user?.userId
-    return this.commissionService.acceptCheck(agencyId, id, userId)
+    return this.commissionService.acceptCheck(auth.agencyId, id, auth.userId)
   }
 
   @Post('commission/checks/:id/recall')
   async recallCheck(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string
   ): Promise<CommissionCheckResponseDto> {
-    const agencyId = req.user?.agencyId
-    const userId = req.user?.userId
-    return this.commissionService.recallCheck(agencyId, id, userId)
+    return this.commissionService.recallCheck(auth.agencyId, id, auth.userId)
   }
 
   // ============================================================================
@@ -107,22 +105,20 @@ export class CommissionController {
 
   @Post('commission/checks/:id/items')
   async addCheckItem(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Param('id') checkId: string,
     @Body() dto: AddCheckItemDto
   ): Promise<CommissionCheckItemResponseDto> {
-    const agencyId = req.user?.agencyId
-    return this.commissionService.addCheckItem(agencyId, checkId, dto)
+    return this.commissionService.addCheckItem(auth.agencyId, checkId, dto)
   }
 
   @Delete('commission/checks/:id/items/:itemId')
   async removeCheckItem(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Param('id') checkId: string,
     @Param('itemId') itemId: string
   ): Promise<{ success: boolean }> {
-    const agencyId = req.user?.agencyId
-    return this.commissionService.removeCheckItem(agencyId, checkId, itemId)
+    return this.commissionService.removeCheckItem(auth.agencyId, checkId, itemId)
   }
 
   // ============================================================================
@@ -131,31 +127,28 @@ export class CommissionController {
 
   @Post('activities/:id/commission')
   async upsertActivityCommission(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Param('id') activityPricingId: string,
     @Body() dto: UpsertActivityCommissionDto
   ): Promise<ActivityCommissionResponseDto> {
-    const agencyId = req.user?.agencyId
-    return this.commissionService.upsertActivityCommission(agencyId, activityPricingId, dto)
+    return this.commissionService.upsertActivityCommission(auth.agencyId, activityPricingId, dto)
   }
 
   @Get('activities/:id/commission')
   async getActivityCommission(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Param('id') activityPricingId: string
   ): Promise<ActivityCommissionResponseDto> {
-    const agencyId = req.user?.agencyId
-    return this.commissionService.getActivityCommission(agencyId, activityPricingId)
+    return this.commissionService.getActivityCommission(auth.agencyId, activityPricingId)
   }
 
   @Patch('activities/:id/commission')
   async updateActivityCommission(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Param('id') activityPricingId: string,
     @Body() dto: UpdateActivityCommissionDto
   ): Promise<ActivityCommissionResponseDto> {
-    const agencyId = req.user?.agencyId
-    return this.commissionService.updateActivityCommission(agencyId, activityPricingId, dto)
+    return this.commissionService.updateActivityCommission(auth.agencyId, activityPricingId, dto)
   }
 
   // ============================================================================
@@ -163,19 +156,30 @@ export class CommissionController {
   // ============================================================================
 
   @Get('commission/due')
-  async getCommissionDue(@Req() req: any): Promise<AgentCommissionDueDto[]> {
-    const agencyId = req.user?.agencyId
-    return this.commissionService.getCommissionDue(agencyId)
+  async getCommissionDue(@GetAuthContext() auth: AuthContext): Promise<AgentCommissionDueDto[]> {
+    // Non-admin users only see their own commission due
+    const scopeUserId = auth.role !== 'admin' ? auth.userId : undefined
+    return this.commissionService.getCommissionDue(auth.agencyId, scopeUserId)
   }
 
   @Post('commission/due/pay')
   async payAgents(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Body() dto: PayAgentDto
   ): Promise<CommissionCheckResponseDto[]> {
-    const agencyId = req.user?.agencyId
-    const userId = req.user?.userId
-    return this.commissionService.payAgents(agencyId, dto, userId)
+    return this.commissionService.payAgents(auth.agencyId, dto, auth.userId)
+  }
+
+  /**
+   * Agent self-claim endpoint — agents can claim their own payable commission
+   */
+  @Post('commission/claims/me')
+  async claimMyCommission(
+    @GetAuthContext() auth: AuthContext,
+  ): Promise<CommissionCheckResponseDto[]> {
+    return this.commissionService.payAgents(auth.agencyId, {
+      userIds: [auth.userId],
+    }, auth.userId)
   }
 
   // ============================================================================
@@ -183,8 +187,9 @@ export class CommissionController {
   // ============================================================================
 
   @Get('commission/summary')
-  async getCommissionSummary(@Req() req: any): Promise<CommissionSummaryResponseDto> {
-    const agencyId = req.user?.agencyId
-    return this.commissionService.getCommissionSummary(agencyId)
+  async getCommissionSummary(@GetAuthContext() auth: AuthContext): Promise<CommissionSummaryResponseDto> {
+    // Non-admin users get their own summary (scoped)
+    const scopeUserId = auth.role !== 'admin' ? auth.userId : undefined
+    return this.commissionService.getCommissionSummary(auth.agencyId, scopeUserId)
   }
 }

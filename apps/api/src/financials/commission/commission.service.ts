@@ -407,6 +407,40 @@ export class CommissionService {
     // Legacy field compatibility
     const commissionAmount = (dto.grossCommissionCents / 100).toFixed(2)
 
+    // Auto-calculate platform fee from agency settings (or trip-level override)
+    // Resolve tripId from activity_pricing → itinerary_activities → itinerary_days → itineraries → trip
+    const tripResult: any[] = await this.db.client.execute(sql`
+      SELECT i.trip_id
+      FROM activity_pricing ap
+      JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      JOIN itinerary_days id ON id.id = ia.itinerary_day_id
+      JOIN itineraries i ON i.id = id.itinerary_id
+      WHERE ap.id = ${activityPricingId}
+      LIMIT 1
+    `)
+    const tripId = tripResult[0]?.trip_id ?? null
+
+    // Fetch agency commission fee rate
+    const [agencySettingsRow] = await this.db.client
+      .select({ commissionFeeRate: this.db.schema.agencySettings.commissionFeeRate })
+      .from(this.db.schema.agencySettings)
+      .where(eq(this.db.schema.agencySettings.agencyId, agencyId))
+      .limit(1)
+
+    let feeRate = parseFloat(agencySettingsRow?.commissionFeeRate || '5.00')
+
+    // Check for trip-level override
+    if (tripId) {
+      const [trip] = await this.db.client
+        .select({ override: this.db.schema.trips.commissionFeeRateOverride })
+        .from(this.db.schema.trips)
+        .where(eq(this.db.schema.trips.id, tripId))
+        .limit(1)
+      if (trip?.override) feeRate = parseFloat(trip.override)
+    }
+
+    const platformFeeCents = Math.round(netCommissionCents * feeRate / 100)
+
     const [existing] = await this.db.client
       .select()
       .from(this.db.schema.commissionTracking)
@@ -422,6 +456,7 @@ export class CommissionService {
           taxAmountCents: dto.taxAmountCents ?? 0,
           taxType: dto.taxType,
           netCommissionCents,
+          platformFeeCents,
           commissionRate: dto.commissionRate?.toString(),
           commissionAmount,
           source: dto.source ?? 'manual',
@@ -443,6 +478,7 @@ export class CommissionService {
         taxAmountCents: dto.taxAmountCents ?? 0,
         taxType: dto.taxType,
         netCommissionCents,
+        platformFeeCents,
         commissionRate: dto.commissionRate?.toString(),
         commissionAmount,
         commissionStatus: 'pending',
@@ -546,16 +582,25 @@ export class CommissionService {
   // AGENT PAYOUTS
   // ============================================================================
 
-  async getCommissionDue(agencyId: string): Promise<AgentCommissionDueDto[]> {
+  async getCommissionDue(agencyId: string, scopeUserId?: string): Promise<AgentCommissionDueDto[]> {
     // Calculate commissions due per agent from accepted received checks
     // using settlement-based anti-join instead of heuristic NOT EXISTS
+    //
+    // Formula (two-stage split):
+    //   distributable = received_cents - tax - platform_fee
+    //   agent_portion = distributable * agent_split_rate / 100  (default 60%)
+    //   individual_payout = agent_portion * collaborator_percentage / 100
     const result: any[] = await this.db.client.execute(sql`
       SELECT
         up.id AS user_id,
         COALESCE(up.first_name || ' ' || up.last_name, up.email) AS user_name,
         COUNT(DISTINCT cci.activity_pricing_id) AS booking_count,
         COALESCE(SUM(
-          ROUND(cci.received_cents * tc.commission_percentage / 100)
+          ROUND(
+            (cci.received_cents - COALESCE(ct.tax_amount_cents, 0) - COALESCE(ct.platform_fee_cents, 0))
+            * COALESCE((up.commission_settings->>'splitValue')::numeric, 60) / 100
+            * tc.commission_percentage / 100
+          )
         ), 0) AS commission_due_cents,
         COALESCE(
           (SELECT SUM(ca.amount_cents)
@@ -568,6 +613,7 @@ export class CommissionService {
       FROM commission_checks cc
       JOIN commission_check_items cci ON cci.check_id = cc.id
       JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
+      LEFT JOIN commission_tracking ct ON ct.component_pricing_id = cci.activity_pricing_id
       JOIN itinerary_activities ia ON ia.id = ap.activity_id
       JOIN itinerary_days id ON id.id = ia.itinerary_day_id
       JOIN itineraries i ON i.id = id.itinerary_id
@@ -580,18 +626,9 @@ export class CommissionService {
         AND cc.check_type = 'received'
         AND cc.status = 'accepted'
         AND cis.id IS NULL
-      GROUP BY up.id, up.first_name, up.last_name, up.email
-      HAVING COALESCE(SUM(
-        ROUND(cci.received_cents * tc.commission_percentage / 100)
-      ), 0) +
-             COALESCE(
-               (SELECT SUM(ca.amount_cents)
-                FROM commission_adjustments ca
-                WHERE ca.agent_user_id = up.id
-                  AND ca.agency_id = ${agencyId}
-                  AND ca.status = 'pending'),
-               0
-             ) >= 5000
+        AND t.status IN ('in_progress', 'completed')
+        ${scopeUserId ? sql`AND up.id = ${scopeUserId}` : sql``}
+      GROUP BY up.id, up.first_name, up.last_name, up.email, up.commission_settings
     `)
 
     return result.map((row: any) => ({
@@ -650,6 +687,7 @@ export class CommissionService {
         }
 
         // Step 2: Atomically claim unsettled items via INSERT ... ON CONFLICT DO NOTHING RETURNING
+        // Uses corrected formula: distributable * agent_split_rate * collaborator_percentage
         const claimedRows: { settled_amount_cents: number }[] = await tx.execute(sql`
           INSERT INTO commission_item_settlements
             (check_item_id, recipient_user_id, paid_check_id, settled_amount_cents, created_by)
@@ -657,18 +695,25 @@ export class CommissionService {
             cci.id,
             ${agent.userId},
             ${check.id},
-            ROUND(cci.received_cents * tc.commission_percentage / 100),
+            ROUND(
+              (cci.received_cents - COALESCE(ct.tax_amount_cents, 0) - COALESCE(ct.platform_fee_cents, 0))
+              * COALESCE((up.commission_settings->>'splitValue')::numeric, 60) / 100
+              * tc.commission_percentage / 100
+            ),
             ${userId}
           FROM commission_check_items cci
           JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
+          LEFT JOIN commission_tracking ct ON ct.component_pricing_id = cci.activity_pricing_id
           JOIN itinerary_activities ia ON ia.id = ap.activity_id
           JOIN itinerary_days id ON id.id = ia.itinerary_day_id
           JOIN itineraries i ON i.id = id.itinerary_id
           JOIN trips t ON t.id = i.trip_id
           JOIN trip_collaborators tc ON tc.trip_id = t.id AND tc.user_id = ${agent.userId} AND tc.is_active = true
+          JOIN user_profiles up ON up.id = tc.user_id
           LEFT JOIN commission_item_settlements existing
             ON existing.check_item_id = cci.id AND existing.recipient_user_id = ${agent.userId}
           WHERE existing.id IS NULL
+            AND t.status IN ('in_progress', 'completed')
             AND cci.check_id IN (
               SELECT cc.id FROM commission_checks cc
               WHERE cc.agency_id = ${agencyId} AND cc.check_type = 'received' AND cc.status = 'accepted'
@@ -738,7 +783,7 @@ export class CommissionService {
   // DASHBOARD SUMMARY
   // ============================================================================
 
-  async getCommissionSummary(agencyId: string): Promise<CommissionSummaryResponseDto> {
+  async getCommissionSummary(agencyId: string, _scopeUserId?: string): Promise<CommissionSummaryResponseDto> {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]!
     const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]!

@@ -100,5 +100,8 @@ export * from './ocr-import.types.js'
 // Loyalty Programs Catalog (Library)
 export * from './loyalty-programs.types.js'
 
+// Commission System
+export * from './commission.types.js'
+
 // Future exports:
 // export * from './auth.types'

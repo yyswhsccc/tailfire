@@ -175,6 +175,21 @@ export class TripsService {
       throw new Error('Failed to create trip')
     }
 
+    // Auto-create trip collaborator for owner (100% of agent portion)
+    if (ownerId) {
+      await this.db.client
+        .insert(this.db.schema.tripCollaborators)
+        .values({
+          tripId: trip.id,
+          userId: ownerId,
+          commissionPercentage: '100', // 100% of agent portion (sole collaborator)
+          role: 'lead',
+          isActive: true,
+          createdBy: ownerId,
+        })
+        .onConflictDoNothing()
+    }
+
     // Emit trip created event
     this.eventEmitter.emit(
       'trip.created',
