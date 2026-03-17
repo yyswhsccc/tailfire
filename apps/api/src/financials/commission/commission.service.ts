@@ -37,6 +37,9 @@ import type {
   PendingReceivablesFilterDto,
   PendingReceivablesResponseDto,
   PendingReceivableDto,
+  CreateDepositDto,
+  FinalizeDepositDto,
+  DepositDetailResponseDto,
 } from './commission.types'
 
 @Injectable()
@@ -1082,6 +1085,230 @@ export class CommissionService {
   }
 
   // ============================================================================
+  // DEPOSIT MANAGEMENT (Supplier Commission Deposit Flow)
+  // ============================================================================
+
+  async createDeposit(
+    agencyId: string,
+    dto: CreateDepositDto,
+    userId?: string
+  ): Promise<DepositDetailResponseDto> {
+    const [check] = await this.db.client
+      .insert(this.db.schema.commissionChecks)
+      .values({
+        agencyId,
+        checkNumber: dto.depositNumber,
+        checkType: 'received',
+        checkDate: dto.depositDate,
+        checkAmountCents: dto.totalAmountCents,
+        currency: 'CAD',
+        senderSupplierId: dto.supplierId,
+        status: 'submitted',
+        source: 'deposit',
+        notes: dto.notes,
+        fileUrl: dto.fileUrl,
+        fileName: dto.fileName,
+        createdBy: userId,
+        updatedBy: userId,
+      })
+      .returning()
+
+    return this.formatDepositDetail(check)
+  }
+
+  async finalizeDeposit(
+    agencyId: string,
+    depositId: string,
+    dto: FinalizeDepositDto,
+    actorId?: string
+  ): Promise<DepositDetailResponseDto> {
+    const check = await this.getCheckRecord(agencyId, depositId)
+
+    if (check.source !== 'deposit') {
+      throw new BadRequestException('Only deposit-type checks can be finalized via this endpoint')
+    }
+
+    if (check.status === 'accepted') {
+      throw new BadRequestException('Deposit is already finalized')
+    }
+
+    const result = await this.db.client.transaction(async (tx) => {
+      // Insert reconciled items
+      for (const item of dto.items) {
+        // Insert commission_check_item
+        await tx
+          .insert(this.db.schema.commissionCheckItems)
+          .values({
+            checkId: depositId,
+            activityPricingId: item.activityPricingId,
+            receivedCents: item.receivedCents,
+            receivedParentCents: 0,
+          })
+
+        // Upsert commission_tracking: SELECT + INSERT/UPDATE
+        // (no unique constraint on component_pricing_id, so ON CONFLICT not available)
+        const commissionAmount = (item.receivedCents / 100).toFixed(2)
+        const [existing] = await tx
+          .select({ id: this.db.schema.commissionTracking.id })
+          .from(this.db.schema.commissionTracking)
+          .where(eq(this.db.schema.commissionTracking.activityPricingId, item.activityPricingId))
+          .limit(1)
+
+        if (existing) {
+          await tx
+            .update(this.db.schema.commissionTracking)
+            .set({
+              commissionStatus: 'received',
+              commissionAmount,
+              receivedCents: item.receivedCents,
+              taxAmountCents: item.taxCents ?? 0,
+              reconciliationDate: new Date(),
+              reconciledBy: actorId,
+              updatedAt: new Date(),
+            })
+            .where(eq(this.db.schema.commissionTracking.id, existing.id))
+        } else {
+          await tx
+            .insert(this.db.schema.commissionTracking)
+            .values({
+              activityPricingId: item.activityPricingId,
+              commissionAmount,
+              commissionStatus: 'received',
+              receivedCents: item.receivedCents,
+              taxAmountCents: item.taxCents ?? 0,
+              reconciliationDate: new Date(),
+              reconciledBy: actorId,
+            })
+        }
+      }
+
+      // Insert unreconciled items (no matching booking)
+      if (dto.unreconciled?.length) {
+        for (const unrec of dto.unreconciled) {
+          await tx
+            .insert(this.db.schema.commissionCheckItems)
+            .values({
+              checkId: depositId,
+              activityPricingId: null,
+              description: unrec.description,
+              receivedCents: unrec.amountCents,
+              receivedParentCents: 0,
+            })
+        }
+      }
+
+      // Accept the deposit and mark reconciliation
+      const [updated] = await tx
+        .update(this.db.schema.commissionChecks)
+        .set({
+          status: 'accepted',
+          reconciliationDate: new Date(),
+          reconciledBy: actorId,
+          updatedBy: actorId,
+          updatedAt: new Date(),
+        })
+        .where(eq(this.db.schema.commissionChecks.id, depositId))
+        .returning()
+
+      return updated
+    })
+
+    return this.formatDepositDetail(result)
+  }
+
+  async getDepositDetail(
+    agencyId: string,
+    depositId: string
+  ): Promise<DepositDetailResponseDto> {
+    const check = await this.getCheckRecord(agencyId, depositId)
+
+    // Fetch items with activity details via raw SQL for richer info
+    const items: any[] = await this.db.client.execute(sql`
+      SELECT
+        cci.id,
+        cci.check_id,
+        cci.activity_pricing_id,
+        cci.description,
+        cci.projected_cents,
+        cci.received_parent_cents,
+        cci.received_cents,
+        cci.created_at,
+        cci.updated_at,
+        ia.title AS activity_name,
+        ap.confirmation_number,
+        ap.booking_reference,
+        t.name AS trip_name
+      FROM commission_check_items cci
+      LEFT JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
+      LEFT JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      LEFT JOIN itinerary_days id_day ON id_day.id = ia.itinerary_day_id
+      LEFT JOIN itineraries i ON i.id = id_day.itinerary_id
+      LEFT JOIN trips t ON t.id = COALESCE(ia.trip_id, i.trip_id)
+      WHERE cci.check_id = ${depositId}
+      ORDER BY cci.created_at ASC
+    `)
+
+    const formattedItems = items.map((i: any) => ({
+      id: i.id,
+      checkId: i.check_id,
+      activityPricingId: i.activity_pricing_id,
+      description: i.description ?? null,
+      projectedCents: i.projected_cents,
+      receivedParentCents: i.received_parent_cents ?? 0,
+      receivedCents: i.received_cents ?? 0,
+      activityName: i.activity_name ?? null,
+      confirmationNumber: i.confirmation_number ?? null,
+      bookingReference: i.booking_reference ?? null,
+      tripName: i.trip_name ?? null,
+      createdAt: new Date(i.created_at).toISOString(),
+      updatedAt: new Date(i.updated_at).toISOString(),
+    }))
+
+    const totalItemsCents = items.reduce((sum: number, i: any) => sum + (i.received_cents ?? 0), 0)
+
+    // Fetch adjustments for summary
+    const adjustments = await this.db.client
+      .select()
+      .from(this.db.schema.commissionAdjustments)
+      .where(eq(this.db.schema.commissionAdjustments.checkId, depositId))
+      .orderBy(desc(this.db.schema.commissionAdjustments.createdAt))
+
+    const totalAdjustmentsCents = adjustments.reduce((sum, a) => sum + a.amountCents, 0)
+    const reconciledTotal = totalItemsCents + totalAdjustmentsCents
+
+    const summary: CommissionCheckSummaryDto = {
+      totalItemsCents,
+      totalAdjustmentsCents,
+      reconciledTotal,
+      unreconciledCents: check.checkAmountCents - reconciledTotal,
+    }
+
+    return {
+      ...this.formatDepositDetail(check),
+      items: formattedItems,
+      adjustments: adjustments.map((a) => ({
+        id: a.id,
+        checkId: a.checkId,
+        agencyId: a.agencyId,
+        description: a.description,
+        amountCents: a.amountCents,
+        adjustmentType: a.adjustmentType,
+        taxType: a.taxType,
+        taxRate: a.taxRate,
+        agentUserId: a.agentUserId,
+        companyName: a.companyName,
+        status: a.status,
+        source: a.source,
+        sourceRef: a.sourceRef,
+        createdBy: a.createdBy,
+        createdAt: a.createdAt.toISOString(),
+        updatedAt: a.updatedAt.toISOString(),
+      })),
+      summary,
+    }
+  }
+
+  // ============================================================================
   // PRIVATE HELPERS
   // ============================================================================
 
@@ -1173,6 +1400,19 @@ export class CommissionService {
       sourceBookingRef: tracking.sourceBookingRef,
       createdAt: tracking.createdAt.toISOString(),
       updatedAt: tracking.updatedAt.toISOString(),
+    }
+  }
+
+  private formatDepositDetail(check: any): DepositDetailResponseDto {
+    return {
+      ...this.formatCheck(check),
+      reconciliationDate: check.reconciliationDate
+        ? check.reconciliationDate.toISOString()
+        : null,
+      reconciledBy: check.reconciledBy ?? null,
+      accountingTransactionId: check.accountingTransactionId ?? null,
+      fileUrl: check.fileUrl ?? null,
+      fileName: check.fileName ?? null,
     }
   }
 }

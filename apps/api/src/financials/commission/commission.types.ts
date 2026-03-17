@@ -329,3 +329,36 @@ export interface PendingReceivablesResponseDto {
     totalPages: number
   }
 }
+
+// ============================================================================
+// DEPOSIT DTOs (Supplier Commission Deposit Flow)
+// ============================================================================
+
+export interface CreateDepositDto {
+  depositNumber: string
+  depositDate: string
+  totalAmountCents: number
+  supplierId?: string
+  notes?: string
+  fileUrl?: string
+  fileName?: string
+}
+
+export interface AddDepositItemDto {
+  activityPricingId: string
+  receivedCents: number
+  taxCents?: number
+}
+
+export interface FinalizeDepositDto {
+  items: AddDepositItemDto[]
+  unreconciled?: { description: string; amountCents: number }[]
+}
+
+export interface DepositDetailResponseDto extends CommissionCheckResponseDto {
+  reconciliationDate: string | null
+  reconciledBy: string | null
+  accountingTransactionId: string | null
+  fileUrl: string | null
+  fileName: string | null
+}

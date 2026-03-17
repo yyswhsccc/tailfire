@@ -32,6 +32,11 @@ import type {
   AgentCommissionDueDto,
   PayAgentDto,
   CommissionSummaryResponseDto,
+  CreateDepositDto,
+  FinalizeDepositDto,
+  DepositDetailResponseDto,
+  PendingReceivablesFilterDto,
+  PendingReceivablesResponseDto,
 } from './commission.types'
 
 @ApiTags('Commission')
@@ -193,6 +198,47 @@ export class CommissionController {
     return this.commissionService.payAgents(auth.agencyId, {
       userIds: [auth.userId],
     }, auth.userId)
+  }
+
+  // ============================================================================
+  // DEPOSITS (Supplier Commission Deposit Flow)
+  // ============================================================================
+
+  @Get('commission/receivables')
+  @UseGuards(AdminGuard)
+  async getPendingReceivables(
+    @GetAuthContext() auth: AuthContext,
+    @Query() filter: PendingReceivablesFilterDto
+  ): Promise<PendingReceivablesResponseDto> {
+    return this.commissionService.getPendingReceivables(auth.agencyId, filter)
+  }
+
+  @Post('commission/deposits')
+  @UseGuards(AdminGuard)
+  async createDeposit(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: CreateDepositDto
+  ): Promise<DepositDetailResponseDto> {
+    return this.commissionService.createDeposit(auth.agencyId, dto, auth.userId)
+  }
+
+  @Post('commission/deposits/:id/finalize')
+  @UseGuards(AdminGuard)
+  async finalizeDeposit(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: FinalizeDepositDto
+  ): Promise<DepositDetailResponseDto> {
+    return this.commissionService.finalizeDeposit(auth.agencyId, id, dto, auth.userId)
+  }
+
+  @Get('commission/deposits/:id')
+  @UseGuards(AdminGuard)
+  async getDepositDetail(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string
+  ): Promise<DepositDetailResponseDto> {
+    return this.commissionService.getDepositDetail(auth.agencyId, id)
   }
 
   // ============================================================================
