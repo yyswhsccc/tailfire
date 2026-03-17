@@ -83,6 +83,12 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 | Payment schedule locking disabled | Trip-status-based lock (blocked after departure, admin override) |
 | Soft-delete was hard delete | Converted to soft-delete with admin restore |
 | No un-cancel for trips | Admin-only un-cancel restoring to previous status |
+| Client care emails not sending | Wired welcome, follow-up, post-trip with TS templates |
+| IMAP body re-downloaded every open | Added cache check — skip IMAP if body in DB |
+| Hardcoded agency ID in 3 files | Replaced with auth-derived agencyId via useUser() |
+| Day insertion ordering collision | Fixed Day 0 sequenceOrder in backend start-insert |
+| DB trigger broke INSERT on uncancel | Added TG_OP='INSERT' guard |
+| findOne/trip-access exposed soft-deleted | Added isNull(deletedAt) filter |
 
 ---
 

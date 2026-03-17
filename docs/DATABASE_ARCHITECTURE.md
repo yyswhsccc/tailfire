@@ -110,7 +110,7 @@ The public schema contains all application data:
 
 | Table | Purpose |
 |-------|---------|
-| `trips` | Trip records with travelers |
+| `trips` | Trip records with travelers (soft-delete via `deleted_at`/`deleted_by`, cancel tracking via `status_before_cancel`) |
 | `itineraries` | Trip itineraries |
 | `itinerary_days` | Day-by-day breakdown |
 | `itinerary_templates` | Reusable itinerary templates |

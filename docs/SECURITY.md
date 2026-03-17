@@ -304,6 +304,8 @@ Admin-only endpoints are protected by `AdminGuard`, which checks `auth.role === 
 - `users` — user profile administration
 - `aerodatabox` — flight data provider management
 - `reference-data/refresh` — cache invalidation
+- `trips/:id/restore` — restore soft-deleted trips
+- `trips/:id/uncancel` — reverse trip cancellation
 
 ### Financial Endpoint Authorization
 
@@ -331,6 +333,24 @@ Sensitive email endpoints are rate-limited via `@UseGuards(ThrottlerGuard)` + `@
 - `test-connection`: 5 requests/minute
 - `sync`: 3 requests/minute
 - `send`: 10 requests/minute
+
+### Soft-Delete Protection
+
+Trip deletion is a soft-delete (`deletedAt`/`deletedBy` flags). Soft-deleted trips are filtered from:
+- `findAll()` — excluded by default (unless `includeDeleted=true`)
+- `findOne()` — excluded via `isNull(deletedAt)`
+- Trip access checks (`canAccessTrip`, `getAccessibleTripIds`)
+- Share token lookups (`findByShareToken`, `resolveShareToken`)
+
+Only admins can restore soft-deleted trips via `POST /trips/:id/restore`.
+
+### Payment Schedule Locking
+
+Payment schedules are locked based on trip status:
+- **Editable:** `draft`, `quoted`, `booked` — agents can freely modify
+- **Locked:** `in_progress`, `completed`, `cancelled` — blocked with error message
+- **Admin override:** admins can edit regardless of status
+- **Transaction recording:** always allowed (payments should always be recordable)
 
 ### Trip Cancellation Bypass Prevention
 
