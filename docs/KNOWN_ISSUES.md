@@ -44,13 +44,8 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 - **Status:** Still functional, new controllers coexist
 - **Fix:** Remove after confirming no frontend references to old endpoints
 
-### Hardcoded Agency Context in Frontend
-- **Files:**
-  - `apps/admin/src/app/trips/[id]/_components/save-as-template-dialog.tsx:25`
-  - `apps/admin/src/app/library/itineraries/page.tsx:42`
-  - `apps/admin/src/app/library/packages/page.tsx:42`
-- **Status:** Uses placeholder agency ID instead of auth context
-- **Impact:** Low — single-agency platform, but should use proper context
+~~### Hardcoded Agency Context in Frontend~~ **RESOLVED 2026-03-16**
+- Replaced TEMP_AGENCY_ID with auth-derived agencyId via useUser() in 3 files.
 
 ### Static Airline Data
 - **File:** `apps/admin/src/lib/airlines-data.ts:7`
@@ -62,9 +57,8 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 - **Impact:** Accessibility gap — itinerary builder requires mouse for drag-and-drop
 - **Fix:** Add keyboard-based reordering as an alternative
 
-### Add Days Dialog Insert Logic
-- **File:** `apps/admin/src/app/trips/[id]/_components/add-days-dialog.tsx:114`
-- **Status:** "Insert after Day 0" logic has a workaround, needs proper backend support
+~~### Add Days Dialog Insert Logic~~ **RESOLVED 2026-03-16**
+- Fixed Day 0 sequenceOrder collision in backend start-insert path.
 
 ---
 
