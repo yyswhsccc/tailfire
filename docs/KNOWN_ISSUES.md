@@ -22,11 +22,8 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 ~~### Itinerary Enum Migration Undocumented~~ **ALREADY RESOLVED**
 - Migration `20260224000000_rename_itinerary_status_enums.sql` exists and is registered in journal. Idempotent (safe on all envs).
 
-### IMAP Sync Caching Not Implemented
-- **Location:** `apps/api/src/email-accounts/imap-sync.service.ts:455`
-- **Status:** Every sync re-fetches all message bodies from email server
-- **Impact:** Inefficient syncing, slower than necessary, higher bandwidth usage
-- **Fix:** Cache email bodies in storage, return from cache on subsequent syncs
+~~### IMAP Sync Caching Not Implemented~~ **RESOLVED 2026-03-16**
+- Sync was already UID-incremental. Added body cache check — skip IMAP if body already in DB.
 
 ---
 
