@@ -197,6 +197,15 @@ export class ImapSyncService {
       throw new NotFoundException('Email not found')
     }
 
+    // Return cached body if already fetched (avoid redundant IMAP connection)
+    if (email.bodyHtml || email.bodyText) {
+      return {
+        bodyHtml: email.bodyHtml,
+        bodyText: email.bodyText,
+        snippet: email.snippet,
+      }
+    }
+
     try {
       const client = await this.createImapClient({
         host: account.imapHost,
@@ -452,8 +461,7 @@ export class ImapSyncService {
       throw new NotFoundException('Attachment not found')
     }
 
-    // TODO: In Phase 2, cache in storage and return from cache if available
-    // For now, always fetch from IMAP
+    // Attachments are fetched from IMAP on demand (not cached in storage yet)
     const account = await this.emailAccountsService.getAccountById(accountId)
     const credentials = await this.emailAccountsService.getDecryptedCredentials(accountId)
     const [email] = await this.db.client
