@@ -1100,6 +1100,13 @@
       "when": 1773936000000,
       "tag": "20260316120000_soft_delete_and_uncancel",
       "breakpoints": true
+    },
+    {
+      "idx": 157,
+      "version": "7",
+      "when": 1774022400000,
+      "tag": "20260317120000_backfill_trip_collaborators",
+      "breakpoints": true
     }
   ]
 }

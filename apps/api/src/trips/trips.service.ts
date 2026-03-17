@@ -3284,6 +3284,19 @@ export class TripsService {
         })
         .returning()
 
+      // 2b. Auto-create trip collaborator for the duplicator
+      await tx
+        .insert(this.db.schema.tripCollaborators)
+        .values({
+          tripId: newTrip!.id,
+          userId: actorId,
+          commissionPercentage: '100',
+          role: 'lead',
+          isActive: true,
+          createdBy: actorId,
+        })
+        .onConflictDoNothing()
+
       // 3. Copy trip tags (junction table) — only system tags + duplicator's own agent tags
       const originalTripTags = await tx
         .select({ tagId: this.db.schema.tripTags.tagId })
