@@ -285,3 +285,47 @@ export interface CommissionSummaryResponseDto {
   commissionReceivedMtdCents: number
   commissionReceivedYtdCents: number
 }
+
+// ============================================================================
+// PENDING RECEIVABLES DTOs (Commission Receive Deposit UI)
+// ============================================================================
+
+export interface PendingReceivableDto {
+  activityPricingId: string
+  confirmationNumber: string | null
+  bookingReference: string | null
+  supplierName: string | null
+  supplierId: string | null
+  tripName: string
+  tripId: string
+  tripStartDate: string | null
+  activityStartDate: string | null
+  activityName: string
+  passengerNames: string[]
+  expectedCommissionCents: number
+  commissionStatus: 'pending' | 'received' | 'cancelled' | null
+  reconciliationDate: string | null
+  reconciledBy: string | null
+  agentName: string | null
+}
+
+export interface PendingReceivablesFilterDto {
+  supplierId?: string
+  search?: string
+  departureDateFrom?: string
+  departureDateTo?: string
+  status?: 'pending' | 'all'
+  page?: number
+  limit?: number
+}
+
+export interface PendingReceivablesResponseDto {
+  data: PendingReceivableDto[]
+  filteredTotalCents: number
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}

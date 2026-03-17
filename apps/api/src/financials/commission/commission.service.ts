@@ -34,6 +34,9 @@ import type {
   PayAgentDto,
   CommissionSummaryResponseDto,
   CommissionCheckStatus,
+  PendingReceivablesFilterDto,
+  PendingReceivablesResponseDto,
+  PendingReceivableDto,
 } from './commission.types'
 
 @Injectable()
@@ -907,6 +910,174 @@ export class CommissionService {
       salesYtdCents: Number(salesYtdResults[0]?.total ?? 0),
       commissionReceivedMtdCents: Number(mtdResults[0]?.total ?? 0),
       commissionReceivedYtdCents: Number(ytdResults[0]?.total ?? 0),
+    }
+  }
+
+  // ============================================================================
+  // PENDING RECEIVABLES (Commission Receive Deposit UI)
+  // ============================================================================
+
+  async getPendingReceivables(
+    agencyId: string,
+    filters: PendingReceivablesFilterDto = {}
+  ): Promise<PendingReceivablesResponseDto> {
+    const page = filters.page ?? 1
+    const limit = filters.limit ?? 50
+    const offset = (page - 1) * limit
+    const statusFilter = filters.status ?? 'pending'
+
+    // Build WHERE conditions
+    const conditions: string[] = [
+      `ap.agency_id = '${agencyId}'`,
+      `ap.commission_total_cents > 0`,
+    ]
+
+    // Status filter: "pending" = no tracking row OR status = 'pending'
+    // "all" = include received items too
+    if (statusFilter === 'pending') {
+      conditions.push(`(ct.id IS NULL OR ct.commission_status = 'pending')`)
+    }
+    // When 'all', no status filter needed (show everything with commission > 0)
+
+    if (filters.supplierId) {
+      conditions.push(`asup.supplier_id = '${filters.supplierId}'`)
+    }
+
+    if (filters.departureDateFrom) {
+      conditions.push(`t.start_date >= '${filters.departureDateFrom}'`)
+    }
+
+    if (filters.departureDateTo) {
+      conditions.push(`t.start_date <= '${filters.departureDateTo}'`)
+    }
+
+    // Search filter: confirmationNumber, bookingReference, passenger name, trip name
+    let searchJoin = ''
+    if (filters.search) {
+      const searchTerm = filters.search.replace(/'/g, "''")
+      searchJoin = `
+        LEFT JOIN trip_travelers tt_search ON tt_search.trip_id = t.id
+        LEFT JOIN contacts c_search ON c_search.id = tt_search.contact_id
+      `
+      conditions.push(`(
+        ap.confirmation_number ILIKE '%${searchTerm}%'
+        OR ap.booking_reference ILIKE '%${searchTerm}%'
+        OR t.name ILIKE '%${searchTerm}%'
+        OR (c_search.first_name || ' ' || c_search.last_name) ILIKE '%${searchTerm}%'
+      )`)
+    }
+
+    const whereClause = conditions.join(' AND ')
+
+    // Main query with all joins
+    // Uses COALESCE(ia.trip_id, i.trip_id) to handle both floating and day-assigned activities
+    const dataQuery = sql`
+      WITH receivables AS (
+        SELECT DISTINCT ON (ap.id)
+          ap.id AS activity_pricing_id,
+          ap.confirmation_number,
+          ap.booking_reference,
+          ap.supplier AS supplier_name,
+          asup.supplier_id,
+          t.name AS trip_name,
+          t.id AS trip_id,
+          t.start_date AS trip_start_date,
+          COALESCE(ia.start_date::text, id_day.day_date::text) AS activity_start_date,
+          ia.title AS activity_name,
+          ap.commission_total_cents AS expected_commission_cents,
+          ct.commission_status,
+          ct.reconciliation_date,
+          ct.reconciled_by,
+          owner.first_name AS owner_first_name,
+          owner.last_name AS owner_last_name
+        FROM activity_pricing ap
+        JOIN itinerary_activities ia ON ia.id = ap.activity_id
+        LEFT JOIN itinerary_days id_day ON id_day.id = ia.itinerary_day_id
+        LEFT JOIN itineraries i ON i.id = id_day.itinerary_id
+        JOIN trips t ON t.id = COALESCE(ia.trip_id, i.trip_id)
+        LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
+        LEFT JOIN activity_suppliers asup ON asup.activity_id = ia.id AND asup.primary_supplier = true
+        LEFT JOIN user_profiles owner ON owner.id = t.owner_id
+        ${filters.search ? sql.raw(searchJoin) : sql``}
+        WHERE ${sql.raw(whereClause)}
+      )
+      SELECT
+        r.*,
+        COALESCE(
+          array_agg(DISTINCT (c.first_name || ' ' || c.last_name)) FILTER (WHERE c.id IS NOT NULL),
+          ARRAY[]::text[]
+        ) AS passenger_names
+      FROM receivables r
+      LEFT JOIN trip_travelers tt ON tt.trip_id = r.trip_id
+      LEFT JOIN contacts c ON c.id = tt.contact_id
+      GROUP BY
+        r.activity_pricing_id, r.confirmation_number, r.booking_reference,
+        r.supplier_name, r.supplier_id, r.trip_name, r.trip_id,
+        r.trip_start_date, r.activity_start_date, r.activity_name,
+        r.expected_commission_cents, r.commission_status,
+        r.reconciliation_date, r.reconciled_by,
+        r.owner_first_name, r.owner_last_name
+      ORDER BY r.trip_start_date DESC NULLS LAST, r.activity_name ASC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `
+
+    // Count + sum query (all matching rows, not just current page)
+    const countQuery = sql`
+      SELECT
+        COUNT(DISTINCT ap.id)::int AS total,
+        COALESCE(SUM(DISTINCT ap.commission_total_cents), 0)::bigint AS filtered_total_cents
+      FROM activity_pricing ap
+      JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      LEFT JOIN itinerary_days id_day ON id_day.id = ia.itinerary_day_id
+      LEFT JOIN itineraries i ON i.id = id_day.itinerary_id
+      JOIN trips t ON t.id = COALESCE(ia.trip_id, i.trip_id)
+      LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
+      LEFT JOIN activity_suppliers asup ON asup.activity_id = ia.id AND asup.primary_supplier = true
+      ${filters.search ? sql.raw(searchJoin) : sql``}
+      WHERE ${sql.raw(whereClause)}
+    `
+
+    const [dataRows, countRows]: [any[], any[]] = await Promise.all([
+      this.db.client.execute(dataQuery),
+      this.db.client.execute(countQuery),
+    ])
+
+    const total = countRows[0]?.total ?? 0
+    const filteredTotalCents = Number(countRows[0]?.filtered_total_cents ?? 0)
+
+    const data: PendingReceivableDto[] = dataRows.map((row: any) => ({
+      activityPricingId: row.activity_pricing_id,
+      confirmationNumber: row.confirmation_number ?? null,
+      bookingReference: row.booking_reference ?? null,
+      supplierName: row.supplier_name ?? null,
+      supplierId: row.supplier_id ?? null,
+      tripName: row.trip_name,
+      tripId: row.trip_id,
+      tripStartDate: row.trip_start_date ?? null,
+      activityStartDate: row.activity_start_date ?? null,
+      activityName: row.activity_name,
+      passengerNames: row.passenger_names ?? [],
+      expectedCommissionCents: Number(row.expected_commission_cents),
+      commissionStatus: row.commission_status ?? null,
+      reconciliationDate: row.reconciliation_date
+        ? new Date(row.reconciliation_date).toISOString()
+        : null,
+      reconciledBy: row.reconciled_by ?? null,
+      agentName: row.owner_first_name
+        ? `${row.owner_first_name} ${row.owner_last_name ?? ''}`.trim()
+        : null,
+    }))
+
+    return {
+      data,
+      filteredTotalCents,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     }
   }
 
