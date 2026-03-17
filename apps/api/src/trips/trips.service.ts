@@ -629,9 +629,9 @@ export class TripsService {
     }
 
     // Sync lead collaborator when owner changes
-    if (dto.ownerId && dto.ownerId !== existingTrip.ownerId) {
+    if ('ownerId' in dto && dto.ownerId !== existingTrip.ownerId) {
+      // Deactivate old owner's lead collaborator
       if (existingTrip.ownerId) {
-        // Swap lead collaborator: deactivate old owner, upsert new owner
         await this.db.client
           .update(this.db.schema.tripCollaborators)
           .set({ isActive: false })
@@ -643,21 +643,23 @@ export class TripsService {
             ),
           )
       }
-      // Create or reactivate collaborator for new owner
-      await this.db.client
-        .insert(this.db.schema.tripCollaborators)
-        .values({
-          tripId: id,
-          userId: dto.ownerId,
-          commissionPercentage: '100',
-          role: 'lead',
-          isActive: true,
-          createdBy: dto.ownerId,
-        })
-        .onConflictDoUpdate({
-          target: [this.db.schema.tripCollaborators.tripId, this.db.schema.tripCollaborators.userId],
-          set: { isActive: true, role: 'lead', commissionPercentage: '100' },
-        })
+      // Create or reactivate collaborator for new owner (skip if null/inbound)
+      if (dto.ownerId) {
+        await this.db.client
+          .insert(this.db.schema.tripCollaborators)
+          .values({
+            tripId: id,
+            userId: dto.ownerId,
+            commissionPercentage: '100',
+            role: 'lead',
+            isActive: true,
+            createdBy: dto.ownerId,
+          })
+          .onConflictDoUpdate({
+            target: [this.db.schema.tripCollaborators.tripId, this.db.schema.tripCollaborators.userId],
+            set: { isActive: true, role: 'lead', commissionPercentage: '100' },
+          })
+      }
     }
 
     // Check if this is only a group change (no other fields updated)

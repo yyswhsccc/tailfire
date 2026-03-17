@@ -19,4 +19,9 @@ export class UpdateTripDto extends PartialType(CreateTripDto) {
   @ValidateIf((_, value) => value !== null)
   @IsUUID()
   tripGroupId?: string | null
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  ownerId?: string | null
 }
