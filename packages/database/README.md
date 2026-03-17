@@ -47,7 +47,7 @@ See [MIGRATIONS.md](./MIGRATIONS.md) for full conventions and workflow.
 
 - **Run migrations from `apps/api` only** (requires direct TCP connection)
 - **Naming format**: `YYYYMMDDHHMMSS_snake_case_description.sql`
-- **Source of truth**: Supabase migrations table (not Drizzle journal)
+- **Source of truth**: `meta/_journal.json` (Drizzle migration tracking)
 
 ## Directory Structure
 
@@ -55,9 +55,10 @@ See [MIGRATIONS.md](./MIGRATIONS.md) for full conventions and workflow.
 packages/database/
 ├── src/
 │   ├── schema/              # Drizzle schema files
-│   │   ├── auth.schema.ts
 │   │   ├── agencies.schema.ts
 │   │   ├── trips.schema.ts
+│   │   ├── contacts.schema.ts
+│   │   ├── ...              # 30+ schema files
 │   │   └── index.ts
 │   ├── migrations/          # Generated SQL migrations
 │   │   └── YYYYMMDD_*.sql
@@ -86,8 +87,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
 | File | Tables | Description |
 |------|--------|-------------|
-| `auth.schema.ts` | users, sessions, roles | Authentication & RBAC |
-| `agencies.schema.ts` | agencies, branches | Agency structure |
+| `agencies.schema.ts` | agencies | Agency structure |
 | `contacts.schema.ts` | contacts, relationships, groups | Contact management |
 | `trips.schema.ts` | trips, travelers, itineraries | Trip management |
 | `activities.schema.ts` | activities, activity_* | Trip activities (tours, dining, packages, etc.) |

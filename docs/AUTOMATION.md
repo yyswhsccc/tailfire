@@ -7,7 +7,7 @@ This document describes the centralized job queue system for scheduled and delay
 The Automation System uses **BullMQ + Redis** to handle:
 - Trip status auto-transitions (booked → in_progress → completed)
 - Client care automations (welcome emails, follow-ups)
-- Notification delivery (push, email, SMS)
+- Notification delivery (push, email; SMS not yet implemented)
 
 ## Architecture
 
@@ -83,6 +83,11 @@ The Automation System uses **BullMQ + Redis** to handle:
 | `client.post_trip` | Post-trip follow-up |
 | `client.birthday` | Birthday greetings |
 | `client.follow_up` | General follow-ups |
+| `payment.reminder` | Payment due date reminders |
+| `departure.reminder` | Upcoming departure reminders |
+| `post_trip.thank_you` | Post-trip thank you message |
+| `post_trip.feedback` | Post-trip feedback request |
+| `client_care.recurring_scan` | Periodic scan for due client care jobs |
 
 ### Notifications
 

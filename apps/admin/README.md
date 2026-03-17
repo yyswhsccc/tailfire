@@ -12,7 +12,7 @@ B2B admin dashboard for the Tailfire travel agency management system, built with
 - **Styling**: Tailwind CSS with CSS variables theming
 - **Type Safety**: TypeScript with strict mode
 - **Icons**: Lucide React
-- **Deployment**: Cloudflare Pages
+- **Deployment**: Vercel
 
 ## Project Structure
 
@@ -311,36 +311,11 @@ export function useCreateTrip() {
 
 ## Deployment
 
-### Cloudflare Pages
+### Vercel
 
-1. **Connect Repository**: Link your GitHub repo to Cloudflare Pages
-
-2. **Build Settings**:
-   ```
-   Build command: pnpm --filter @tailfire/admin build
-   Build output directory: apps/admin/.next
-   Root directory: /
-   ```
-
-3. **Environment Variables**: Add in Cloudflare dashboard:
-   ```
-   NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api/v1
-   NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   ```
-
-4. **Deploy**: Push to `main` branch for automatic deployment
-
-### Vercel (Alternative)
-
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-cd apps/admin
-vercel
-```
+Deployed automatically via CI/CD:
+- Preview: push to `preview` branch -> `deploy-preview.yml`
+- Production: merge to `main` -> `deploy-prod.yml`
 
 ## Theming
 

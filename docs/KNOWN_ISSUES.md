@@ -30,7 +30,7 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 ## Tech Debt (Can Defer)
 
 ### Excessive `as any` Type Casts
-- **Count:** ~150 instances across API and Admin
+- **Count:** ~227 instances across API and Admin
 - **High-risk locations:**
   - `trips/activities.service.ts:334` — pricing JSON cast
   - `trips/component-orchestration.service.ts` — 18+ pricing casts

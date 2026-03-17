@@ -21,7 +21,7 @@
 
 **ALWAYS:**
 1. Create a feature branch (e.g., `feature/phase-12-storage`)
-2. Push to feature branch to trigger `deploy-dev.yml`
+2. Push to feature branch to trigger `deploy-preview.yml`
 3. Verify changes work on preview environment
 4. Create PR and merge to `main` for production deployment
 

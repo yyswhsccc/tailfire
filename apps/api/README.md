@@ -210,7 +210,8 @@ See `.env.example` for all required environment variables.
 **Required:**
 - `DATABASE_URL` - Supabase PostgreSQL connection string
 - `SUPABASE_SERVICE_ROLE_KEY` - For migrations (bypasses RLS)
-- `JWT_SECRET` - For authentication
+- `SUPABASE_JWT_SECRET` - For authentication
+- `SUPABASE_URL` - Supabase project URL
 
 **Optional:**
 - `PORT` - API port (default: 3101)
