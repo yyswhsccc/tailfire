@@ -628,6 +628,38 @@ export class TripsService {
       throw new NotFoundException(`Trip with ID ${id} not found`)
     }
 
+    // Sync lead collaborator when owner changes
+    if (dto.ownerId && dto.ownerId !== existingTrip.ownerId) {
+      if (existingTrip.ownerId) {
+        // Swap lead collaborator: deactivate old owner, upsert new owner
+        await this.db.client
+          .update(this.db.schema.tripCollaborators)
+          .set({ isActive: false })
+          .where(
+            and(
+              eq(this.db.schema.tripCollaborators.tripId, id),
+              eq(this.db.schema.tripCollaborators.userId, existingTrip.ownerId),
+              eq(this.db.schema.tripCollaborators.role, 'lead'),
+            ),
+          )
+      }
+      // Create or reactivate collaborator for new owner
+      await this.db.client
+        .insert(this.db.schema.tripCollaborators)
+        .values({
+          tripId: id,
+          userId: dto.ownerId,
+          commissionPercentage: '100',
+          role: 'lead',
+          isActive: true,
+          createdBy: dto.ownerId,
+        })
+        .onConflictDoUpdate({
+          target: [this.db.schema.tripCollaborators.tripId, this.db.schema.tripCollaborators.userId],
+          set: { isActive: true, role: 'lead', commissionPercentage: '100' },
+        })
+    }
+
     // Check if this is only a group change (no other fields updated)
     const isGroupChange = 'tripGroupId' in dto && dto.tripGroupId !== existingTrip.tripGroupId
     const dtoKeys = Object.keys(dto).filter((k) => k !== 'tripGroupId')
