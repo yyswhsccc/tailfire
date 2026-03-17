@@ -986,7 +986,12 @@ export class ItineraryDaysService {
     const firstDatedDay = datedDays.length > 0 ? datedDays[0] : null
     const firstDate = firstDatedDay?.date ? new Date(firstDatedDay.date) : null
 
-    // Build days to create (dayNumber 1..count, sequenceOrder 0..count-1)
+    // When Day 0 exists, new days start at sequenceOrder 1 (after Day 0 at 0)
+    // to avoid collisions. Otherwise new days start at sequenceOrder 0.
+    const hasDay0 = existingDays.some((d) => d.dayNumber === 0)
+    const seqOffset = hasDay0 ? 1 : 0
+
+    // Build days to create (dayNumber 1..count, sequenceOrder seqOffset..seqOffset+count-1)
     const daysToCreate: Array<{
       agencyId: string
       itineraryId: string
@@ -1021,7 +1026,7 @@ export class ItineraryDaysService {
         dayNumber: dayNum,
         date: dateStr,
         title: `Day ${dayNum}`,
-        sequenceOrder: i,
+        sequenceOrder: seqOffset + i,
       })
     }
 

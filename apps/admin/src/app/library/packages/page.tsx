@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useLoading } from '@/context/loading-context'
+import { useUser } from '@/hooks/use-user'
 import { api, ApiError } from '@/lib/api'
 import type {
   PackageTemplateResponse,
@@ -39,14 +40,12 @@ import type {
 } from '@tailfire/shared-types'
 import { PackageTemplateModal } from './_components/package-template-modal'
 
-// TODO: Replace with actual agency context
-const TEMP_AGENCY_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
-
 function PackageTemplatesContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
   const { stopLoading } = useLoading()
+  const { agencyId } = useUser()
 
   // Context from trip (when navigated from Package Library drag)
   const itineraryId = searchParams.get('itineraryId')
@@ -78,10 +77,11 @@ function PackageTemplatesContent() {
 
   // Fetch templates
   const fetchTemplates = useCallback(async () => {
+    if (!agencyId) return
     setIsLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ agencyId: TEMP_AGENCY_ID })
+      const params = new URLSearchParams({ agencyId })
       if (searchQuery) params.append('search', searchQuery)
       const response = await api.get<PackageTemplateListResponse>(
         `/templates/packages?${params.toString()}`
@@ -92,7 +92,7 @@ function PackageTemplatesContent() {
     } finally {
       setIsLoading(false)
     }
-  }, [searchQuery])
+  }, [agencyId, searchQuery])
 
   useEffect(() => {
     fetchTemplates()
@@ -141,7 +141,7 @@ function PackageTemplatesContent() {
 
     setApplyingTemplateId(template.id)
     try {
-      await api.post(`/itineraries/${itineraryId}/templates/packages/${template.id}/apply?agencyId=${TEMP_AGENCY_ID}`, {
+      await api.post(`/itineraries/${itineraryId}/templates/packages/${template.id}/apply?agencyId=${agencyId}`, {
         anchorDayId: dayId,
       })
 
@@ -164,7 +164,7 @@ function PackageTemplatesContent() {
     } finally {
       setApplyingTemplateId(null)
     }
-  }, [itineraryId, dayId, returnUrl, router, toast])
+  }, [itineraryId, dayId, agencyId, returnUrl, router, toast])
 
   // Format date for display
   const formatDate = (dateStr: string) => {
@@ -389,7 +389,7 @@ function PackageTemplatesContent() {
           open={isModalOpen}
           onOpenChange={setIsModalOpen}
           onSuccess={handleModalSuccess}
-          agencyId={TEMP_AGENCY_ID}
+          agencyId={agencyId!}
         />
       )}
 

@@ -33,7 +33,7 @@ interface AddDaysDialogProps {
  *
  * Simplified dialog for adding days to an itinerary.
  * - Add X days at the end or start of itinerary
- * - Special handling for Day 0 (Pre-Travel): inserts after Day 0
+ * - Day 0 (Pre-Travel) is preserved when inserting at start
  */
 export function AddDaysDialog({
   itineraryId,
@@ -103,22 +103,9 @@ export function AddDaysDialog({
 
   const handleSubmit = async () => {
     try {
-      // When adding at start with Day 0, we need special handling
-      // The backend will renumber all days including Day 0, so we need to
-      // add at end and the days will naturally follow Day 0
-      if (position === 'start' && hasDay0) {
-        // Add days at 'end' position - they'll be added after all existing days
-        // But we want them after Day 0, before Day 1
-        // For now, use 'start' which will renumber, then Day 0 becomes a higher number
-        // This is not ideal - we should warn the user
-        // TODO: Implement proper "insert after Day 0" logic in backend
-
-        // For now, just add at start - Day 0 will be renumbered
-        // The user should be aware of this limitation
-        await batchCreate.mutateAsync({ count, position: 'start' })
-      } else {
-        await batchCreate.mutateAsync({ count, position })
-      }
+      // Backend handles Day 0 correctly: new days are inserted after Day 0
+      // with proper sequenceOrder offsets, no collisions
+      await batchCreate.mutateAsync({ count, position })
 
       const actionText = position === 'end' ? 'Created' : 'Inserted'
       toast({

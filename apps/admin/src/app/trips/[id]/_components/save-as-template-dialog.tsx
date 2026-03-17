@@ -15,15 +15,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { api, ApiError } from '@/lib/api'
+import { useUser } from '@/hooks/use-user'
 import type {
   ItineraryTemplateResponse,
   PackageTemplateResponse,
   SaveItineraryAsTemplateDto,
   SavePackageAsTemplateDto,
 } from '@tailfire/shared-types'
-
-// TODO: Replace with actual agency context
-const TEMP_AGENCY_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
 
 interface SaveAsTemplateDialogProps {
   /** Type of item being saved as template */
@@ -54,6 +52,8 @@ export function SaveAsTemplateDialog({
   onOpenChange,
   onSuccess,
 }: SaveAsTemplateDialogProps) {
+  const { agencyId } = useUser()
+
   // Form state
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -82,6 +82,11 @@ export function SaveAsTemplateDialog({
       return
     }
 
+    if (!agencyId) {
+      setError('Agency context not available')
+      return
+    }
+
     setIsSubmitting(true)
     setError(null)
 
@@ -90,7 +95,7 @@ export function SaveAsTemplateDialog({
 
       if (type === 'itinerary') {
         const dto: SaveItineraryAsTemplateDto = {
-          agencyId: TEMP_AGENCY_ID,
+          agencyId,
           name: name.trim(),
           description: description.trim() || undefined,
         }
@@ -100,7 +105,7 @@ export function SaveAsTemplateDialog({
         )
       } else {
         const dto: SavePackageAsTemplateDto = {
-          agencyId: TEMP_AGENCY_ID,
+          agencyId,
           name: name.trim(),
           description: description.trim() || undefined,
         }
@@ -121,7 +126,7 @@ export function SaveAsTemplateDialog({
     } finally {
       setIsSubmitting(false)
     }
-  }, [type, itemId, name, description, onOpenChange, onSuccess])
+  }, [type, itemId, name, description, agencyId, onOpenChange, onSuccess])
 
   const typeLabel = type === 'itinerary' ? 'Itinerary' : 'Package'
 
@@ -185,7 +190,7 @@ export function SaveAsTemplateDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
+          <Button onClick={handleSubmit} disabled={isSubmitting || !agencyId}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save to Library
           </Button>
