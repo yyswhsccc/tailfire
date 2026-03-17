@@ -496,7 +496,7 @@ export class TripsService {
         coverPhotoUrl: coverPhotoSubquery,
       })
       .from(this.db.schema.trips)
-      .where(eq(this.db.schema.trips.id, id))
+      .where(and(eq(this.db.schema.trips.id, id), isNull(this.db.schema.trips.deletedAt)))
       .limit(1)
 
     if (!trip) {

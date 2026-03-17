@@ -21,6 +21,11 @@ DECLARE
   is_valid boolean := FALSE;
   i integer;
 BEGIN
+  -- Skip validation on INSERT (OLD is null)
+  IF TG_OP = 'INSERT' THEN
+    RETURN NEW;
+  END IF;
+
   -- Skip validation if status hasn't changed
   IF OLD.status = NEW.status THEN
     RETURN NEW;

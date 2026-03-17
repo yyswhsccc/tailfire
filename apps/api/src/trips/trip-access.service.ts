@@ -21,7 +21,7 @@
  */
 
 import { Injectable } from '@nestjs/common'
-import { eq, and, inArray, notInArray, sql } from 'drizzle-orm'
+import { eq, and, inArray, notInArray, sql, isNull } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TripGroupAccessService } from './trip-group-access.service'
 import type { AuthContext } from '../auth/auth.types'
@@ -63,7 +63,7 @@ export class TripAccessService {
         tripGroupId: this.db.schema.trips.tripGroupId,
       })
       .from(this.db.schema.trips)
-      .where(eq(this.db.schema.trips.id, tripId))
+      .where(and(eq(this.db.schema.trips.id, tripId), isNull(this.db.schema.trips.deletedAt)))
       .limit(1)
 
     if (!trip) {
@@ -204,7 +204,7 @@ export class TripAccessService {
       return 'all'
     }
 
-    // Get owned trips
+    // Get owned trips (exclude soft-deleted)
     const ownedTrips = await this.db.client
       .select({ id: this.db.schema.trips.id })
       .from(this.db.schema.trips)
@@ -212,6 +212,7 @@ export class TripAccessService {
         and(
           eq(this.db.schema.trips.ownerId, auth.userId),
           eq(this.db.schema.trips.agencyId, auth.agencyId),
+          isNull(this.db.schema.trips.deletedAt),
         ),
       )
 
