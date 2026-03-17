@@ -13,12 +13,8 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 
 ## Should Fix (Post-Beta Priority)
 
-### Payment Schedule Locking Disabled
-- **Location:** `apps/api/src/trips/payment-schedules.service.ts:2078-2140`
-- **Status:** `lockItemOnPayment()`, `unlockItem()`, `ensureItemNotLocked()` are all no-ops
-- **Reason:** Requires `is_locked`, `locked_at`, `locked_by` columns via migration
-- **Impact:** Payment items can be edited after payment is received, risking data corruption
-- **Fix:** Create migration to add locking columns, then enable the existing logic
+~~### Payment Schedule Locking Disabled~~ **RESOLVED 2026-03-16**
+- Trip-status-based lock: editable until departure, blocked after (admin can override).
 
 ### Client Care Emails Not Sending
 - **Location:** `apps/api/src/automation/processors/client-care.processor.ts:172, 311`
@@ -98,6 +94,9 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 | Trip cancellation not implemented | Full cancel flow with dialog, reason presets, bypass prevention |
 | Cancellation email to travelers | Optional opt-in email with HTML template |
 | Reference-data refresh unguarded | Added AdminGuard |
+| Payment schedule locking disabled | Trip-status-based lock (blocked after departure, admin override) |
+| Soft-delete was hard delete | Converted to soft-delete with admin restore |
+| No un-cancel for trips | Admin-only un-cancel restoring to previous status |
 
 ---
 
