@@ -16,11 +16,8 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 ~~### Payment Schedule Locking Disabled~~ **RESOLVED 2026-03-16**
 - Trip-status-based lock: editable until departure, blocked after (admin can override).
 
-### Client Care Emails Not Sending
-- **Location:** `apps/api/src/automation/processors/client-care.processor.ts:172, 311`
-- **Status:** Emails are queued and logged but never actually sent
-- **Reason:** Email template integration not wired up
-- **Impact:** Automated follow-ups, reminders, and care emails don't reach clients
+~~### Client Care Emails Not Sending~~ **RESOLVED 2026-03-16**
+- Wired welcome, follow-up, and post-trip handlers with TS templates + EmailService.sendEmail().
 
 ### Itinerary Enum Migration Undocumented
 - **Status:** `itinerary_status` enum was renamed manually via ALTER TYPE (`presented→proposing`, `selected→approved`, `rejected→archived`) but NO migration file exists in version control
