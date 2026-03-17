@@ -433,3 +433,40 @@ commission_check + check_items created (deposit record)
   ↓ Trip departs
 Agent can claim commission
 ```
+
+---
+
+## Codex Review Findings (must address during implementation)
+
+### Critical — schema/flow fixes needed:
+
+1. **Unreconciled items**: `commission_check_items.activity_pricing_id` is currently NOT NULL.
+   Migration must make it nullable + add `description VARCHAR(500)` field for unmatched line items.
+
+2. **commission_tracking insert**: `commission_amount` is NOT NULL.
+   When finalizing, set `commission_amount` from received cents (as decimal) on insert.
+
+3. **Status flow mismatch**: Plan says create as 'pending' then finalize to 'accepted'.
+   Existing flow is pending→submitted→accepted. Solution: create deposit as 'submitted',
+   then use existing `acceptCheck` service method on finalize. Don't create a parallel flow.
+
+### Important — implementation adjustments:
+
+4. **activity_suppliers not reliably populated**: Fall back to `activity_pricing.supplier` (text field)
+   for supplier matching. Use `activity_suppliers` join as secondary/optional enhancement.
+
+5. **Floating activities missed**: Use `itinerary_activities.trip_id` directly for trip resolution,
+   NOT exclusively through itinerary_days→itineraries chain. Activities can have null itinerary_day_id.
+
+6. **Overlap with existing endpoints**: Orchestrate deposit create/finalize on top of existing
+   `createCheck()`, `addCheckItem()`, `acceptCheck()` service methods. Don't create parallel API surface.
+
+7. **StorageService not in CommissionModule**: Either import StorageModule into CommissionModule,
+   or handle file upload via a separate endpoint (e.g., existing trip media upload pattern).
+
+8. **react-resizable-panels**: Must be added to `apps/admin/package.json` as explicit dependency.
+   It exists in lockfile via another package but is not declared.
+
+9. **Auto-match + pagination**: Auto-match must use server-side total of ALL filtered results,
+   not just the visible page. Either disable pagination during auto-match, or have the API return
+   a `filteredTotalCents` alongside paginated results.
