@@ -95,6 +95,9 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 | "Coming Soon" placeholder text | Replaced with "In Development" |
 | Documentation gaps (email, groups, enrichment) | Updated 7 doc files |
 | Branch cleanup (9 stale branches) | Deleted, 2 merged |
+| Trip cancellation not implemented | Full cancel flow with dialog, reason presets, bypass prevention |
+| Cancellation email to travelers | Optional opt-in email with HTML template |
+| Reference-data refresh unguarded | Added AdminGuard |
 
 ---
 

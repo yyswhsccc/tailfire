@@ -293,6 +293,56 @@ Trip groups use a sharing model similar to trips:
 
 ---
 
+## Authorization & Access Control
+
+### Role-Based Access (AdminGuard)
+
+**Location**: `apps/api/src/common/guards/admin.guard.ts`
+
+Admin-only endpoints are protected by `AdminGuard`, which checks `auth.role === 'admin'` from the JWT context. Used by:
+- `api-credentials` — encrypted credential management
+- `users` — user profile administration
+- `aerodatabox` — flight data provider management
+- `reference-data/refresh` — cache invalidation
+
+### Financial Endpoint Authorization
+
+All financial controllers enforce trip access checks via `TripAccessService`:
+- `service-fees` — verifies trip read/write access per endpoint
+- `financial-summary` — verifies trip read access
+- `traveller-splits` — resolves trip from activity chain, verifies access
+- `stripe-connect` — asserts `agencyId` matches JWT context
+- `payment-templates` — asserts agency match, uses `auth.userId` (not hardcoded)
+- `trip-order`, `trip-notifications` — verifies trip access before processing
+
+### SSRF Prevention (Email Hosts)
+
+**Location**: `apps/api/src/common/validators/is-valid-email-host.validator.ts`, `apps/api/src/common/guards/assert-public-host.ts`
+
+IMAP/SMTP host inputs are validated at two levels:
+1. **DTO validation** — blocks raw IPs, localhost, private RFC 1918 ranges, `.internal`/`.local` TLDs
+2. **Runtime DNS resolution** — resolves hostname before connection, rejects if any resolved IP is in a private range
+
+### Rate Limiting
+
+**Location**: `apps/api/src/email-accounts/email-accounts.controller.ts`
+
+Sensitive email endpoints are rate-limited via `@UseGuards(ThrottlerGuard)` + `@Throttle()`:
+- `test-connection`: 5 requests/minute
+- `sync`: 3 requests/minute
+- `send`: 10 requests/minute
+
+### Trip Cancellation Bypass Prevention
+
+Direct status change to `cancelled` via `PATCH /trips/:id` or bulk status update is blocked. Cancellation must go through `POST /trips/:id/cancel`, which enforces:
+- Required cancellation reason (server-side validation)
+- Sets `cancelledAt`, `cancellationReason`, `cancelledBy` metadata
+- Cancels scheduled automation jobs
+- Emits `trip.cancelled` event for audit trail
+- Optionally sends cancellation email to travelers
+
+---
+
 ## Additional Security Controls
 
 ### Password Reset

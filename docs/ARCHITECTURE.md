@@ -297,7 +297,7 @@ The NestJS API is organized into feature modules. Notable modules beyond the cor
 | `commissions` | Commission tracking and reporting for bookings |
 | `activity-logs` | Audit trail via EventEmitter2 wildcard events (`audit.*`) |
 | `email-accounts` | Agent IMAP/SMTP email — account setup, sync scheduler, send via SMTP with Resend fallback |
-| `email` | System email delivery (welcome, invite, password reset) with templates |
+| `email` | System email delivery (welcome, invite, password reset, trip cancellation) with templates |
 | `enrichment` | Activity enrichment — geocoding, cruise catalog matching, hotel photos for imported trips |
 | `catalog-matcher` | Shared cruise catalog matching service (used by OCR import and enrichment) |
 
