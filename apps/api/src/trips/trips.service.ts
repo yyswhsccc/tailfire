@@ -246,6 +246,11 @@ export class TripsService {
       conditions.push(eq(this.db.schema.trips.agencyId, auth.agencyId))
     }
 
+    // Soft-delete filter - exclude deleted trips by default
+    if (!filters.includeDeleted) {
+      conditions.push(isNull(this.db.schema.trips.deletedAt))
+    }
+
     // Search filter
     if (filters.search) {
       const searchCondition = or(
@@ -813,14 +818,9 @@ export class TripsService {
    * 2. Use ownerId in WHERE clause to scope deletion
    * 3. Add agencyId check for agency-level access control
    */
-  async remove(id: string, ownerId?: string): Promise<void> {
+  async remove(id: string, actorId: string): Promise<void> {
     // 1. Resolve trip first to check status and ownership
     const conditions = [eq(this.db.schema.trips.id, id)]
-
-    // Phase 4: Add ownership scope when auth is implemented
-    if (ownerId) {
-      conditions.push(eq(this.db.schema.trips.ownerId, ownerId))
-    }
 
     const [existing] = await this.db.client
       .select()
@@ -837,15 +837,20 @@ export class TripsService {
       throw new BadRequestException(getDeleteErrorMessage(existing.status as TripStatus))
     }
 
-    // 3. Delete the trip (scoped by ID and optional ownerId)
+    // 3. Soft-delete the trip
     await this.db.client
-      .delete(this.db.schema.trips)
+      .update(this.db.schema.trips)
+      .set({
+        deletedAt: new Date(),
+        deletedBy: actorId,
+        updatedAt: new Date(),
+      })
       .where(and(...conditions))
 
     // Emit trip deleted event
     this.eventEmitter.emit(
       'trip.deleted',
-      new TripDeletedEvent(existing.id, existing.name, ownerId || null),
+      new TripDeletedEvent(existing.id, existing.name, actorId),
     )
   }
 
@@ -918,9 +923,14 @@ export class TripsService {
         continue
       }
 
-      // Delete the trip
+      // Soft-delete the trip
       await this.db.client
-        .delete(this.db.schema.trips)
+        .update(this.db.schema.trips)
+        .set({
+          deletedAt: new Date(),
+          deletedBy: ownerId,
+          updatedAt: new Date(),
+        })
         .where(eq(this.db.schema.trips.id, tripId))
 
       // Emit event
@@ -1549,6 +1559,9 @@ export class TripsService {
       tripGroupId: trip.tripGroupId || null,
       clientSelectedItineraryId: trip.clientSelectedItineraryId || null,
       commissionFeeRateOverride: trip.commissionFeeRateOverride ?? null,
+      deletedAt: trip.deletedAt ? trip.deletedAt.toISOString() : null,
+      deletedBy: trip.deletedBy || null,
+      statusBeforeCancel: trip.statusBeforeCancel || null,
       createdAt: trip.createdAt.toISOString(),
       updatedAt: trip.updatedAt.toISOString(),
     }
@@ -1690,6 +1703,7 @@ export class TripsService {
         and(
           eq(this.db.schema.trips.shareToken, token),
           eq(this.db.schema.trips.isPublished, true),
+          isNull(this.db.schema.trips.deletedAt),
         ),
       )
       .limit(1)
@@ -1960,6 +1974,7 @@ export class TripsService {
         and(
           eq(this.db.schema.trips.shareToken, token),
           eq(this.db.schema.trips.isPublished, true),
+          isNull(this.db.schema.trips.deletedAt),
         ),
       )
       .limit(1)
@@ -4329,6 +4344,7 @@ export class TripsService {
         cancelledAt: now,
         cancellationReason: dto.reason,
         cancelledBy: actorId,
+        statusBeforeCancel: existingTrip.status,
         lastStatusChangeAt: now,
         updatedAt: now,
       })
@@ -4357,6 +4373,99 @@ export class TripsService {
     )
 
     return this.mapToResponseDto(trip)
+  }
+
+  /**
+   * Restore a soft-deleted trip
+   *
+   * @param id - Trip ID
+   * @param actorId - User performing the restore
+   */
+  async restoreTrip(id: string, actorId: string): Promise<TripResponseDto> {
+    const [trip] = await this.db.client
+      .select()
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.id, id))
+      .limit(1)
+
+    if (!trip) throw new NotFoundException(`Trip with ID ${id} not found`)
+    if (!trip.deletedAt) throw new BadRequestException('Trip is not deleted')
+
+    const [restored] = await this.db.client
+      .update(this.db.schema.trips)
+      .set({
+        deletedAt: null,
+        deletedBy: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(this.db.schema.trips.id, id))
+      .returning()
+
+    this.eventEmitter.emit('audit.updated', {
+      entityType: 'trip',
+      entityId: id,
+      action: 'restored',
+      actorId,
+      changes: { restored: true },
+    })
+
+    return this.mapToResponseDto(restored)
+  }
+
+  /**
+   * Un-cancel a trip, restoring its previous status
+   *
+   * @param id - Trip ID
+   * @param actorId - User performing the un-cancel
+   */
+  async uncancelTrip(id: string, actorId: string): Promise<TripResponseDto> {
+    const [trip] = await this.db.client
+      .select()
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.id, id))
+      .limit(1)
+
+    if (!trip) throw new NotFoundException(`Trip with ID ${id} not found`)
+    if (trip.status !== 'cancelled') throw new BadRequestException('Trip is not cancelled')
+
+    const restoreStatus = (trip.statusBeforeCancel || 'draft') as 'draft' | 'quoted' | 'booked' | 'in_progress'
+
+    const [restored] = await this.db.client
+      .update(this.db.schema.trips)
+      .set({
+        status: restoreStatus,
+        cancelledAt: null,
+        cancellationReason: null,
+        cancelledBy: null,
+        statusBeforeCancel: null,
+        lastStatusChangeAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(this.db.schema.trips.id, id))
+      .returning()
+
+    if (!restored) throw new NotFoundException(`Trip with ID ${id} not found`)
+
+    // Re-schedule automation jobs only for booked/in_progress
+    if (['booked', 'in_progress'].includes(restoreStatus) && restored.startDate && restored.endDate) {
+      await this.scheduleStatusTransitions(
+        restored.id,
+        restored.startDate,
+        restored.endDate,
+        restored.timezone || 'America/Toronto',
+        restoreStatus,
+      )
+    }
+
+    this.eventEmitter.emit('audit.updated', {
+      entityType: 'trip',
+      entityId: id,
+      action: 'status_changed',
+      actorId,
+      changes: { status: restoreStatus, previousStatus: 'cancelled', uncancelled: true },
+    })
+
+    return this.mapToResponseDto(restored)
   }
 
   // ============================================================================

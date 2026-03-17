@@ -30,12 +30,14 @@ import {
   Calendar,
   User,
   Link as LinkIcon,
+  RotateCcw,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { DetailLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useTrip, useDeleteTrip, usePublishTrip, usePublishTripSnapshot, useUnpublishTrip, useDuplicateTrip, useTripGroups } from '@/hooks/use-trips'
+import { useTrip, useDeleteTrip, useUncancelTrip, usePublishTrip, usePublishTripSnapshot, useUnpublishTrip, useDuplicateTrip, useTripGroups } from '@/hooks/use-trips'
+import { useUser } from '@/hooks/use-user'
 import { MoveToGroupDialog } from '@/components/trips/MoveToGroupDialog'
 import { TripOverview } from './_components/trip-overview'
 import { TripItinerary } from './_components/trip-itinerary'
@@ -398,6 +400,8 @@ export default function TripDetailPage() {
   }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const deleteTrip = useDeleteTrip()
+  const uncancelTrip = useUncancelTrip()
+  const { isAdmin } = useUser()
   const publishTrip = usePublishTrip()
   const publishSnapshot = usePublishTripSnapshot()
   const unpublishTrip = useUnpublishTrip()
@@ -750,6 +754,22 @@ export default function TripDetailPage() {
                   {duplicateTrip.isPending ? 'Duplicating...' : 'Duplicate Trip'}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                {trip.status === 'cancelled' && isAdmin && (
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      try {
+                        await uncancelTrip.mutateAsync(trip.id)
+                        toast({ title: 'Trip restored', description: 'Trip has been un-cancelled.' })
+                      } catch (error: any) {
+                        toast({ title: 'Failed to un-cancel', description: error?.message || 'An error occurred.', variant: 'destructive' })
+                      }
+                    }}
+                    disabled={uncancelTrip.isPending}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    {uncancelTrip.isPending ? 'Restoring...' : 'Un-cancel Trip'}
+                  </DropdownMenuItem>
+                )}
                 {isDeletable ? (
                   <DropdownMenuItem
                     onClick={() => setShowDeleteDialog(true)}
@@ -770,6 +790,23 @@ export default function TripDetailPage() {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+            {trip.status === 'cancelled' && isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await uncancelTrip.mutateAsync(trip.id)
+                    toast({ title: 'Trip restored', description: 'Trip has been un-cancelled.' })
+                  } catch (error: any) {
+                    toast({ title: 'Failed to un-cancel', description: error?.message || 'An error occurred.', variant: 'destructive' })
+                  }
+                }}
+                disabled={uncancelTrip.isPending}
+              >
+                {uncancelTrip.isPending ? 'Restoring...' : 'Un-cancel Trip'}
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="gap-1.5" onClick={handlePreview}>
               <Eye className="h-4 w-4" />
               Preview

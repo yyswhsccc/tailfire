@@ -178,6 +178,9 @@ export const trips = pgTable('trips', {
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   cancellationReason: text('cancellation_reason'),
   cancelledBy: uuid('cancelled_by'),
+  statusBeforeCancel: varchar('status_before_cancel', { length: 20 }),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: uuid('deleted_by'),
 
   // Status Transition Tracking
   statusAutoTransitionedAt: timestamp('status_auto_transitioned_at', { withTimezone: true }),

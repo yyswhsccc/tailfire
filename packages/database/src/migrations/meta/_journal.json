@@ -1093,6 +1093,13 @@
       "when": 1773763205000,
       "tag": "20260314120500_fix_email_schema_codex_review",
       "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "7",
+      "when": 1773936000000,
+      "tag": "20260316120000_soft_delete_and_uncancel",
+      "breakpoints": true
     }
   ]
 }

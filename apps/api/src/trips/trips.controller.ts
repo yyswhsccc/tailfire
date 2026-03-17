@@ -21,6 +21,7 @@ import {
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common'
+import { AdminGuard } from '../common/guards/admin.guard'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
 import { Public } from '../auth/decorators/public.decorator'
@@ -855,7 +856,7 @@ export class TripsController {
   }
 
   /**
-   * Delete a trip
+   * Delete a trip (soft-delete)
    * DELETE /trips/:id
    *
    * Access check: User must have write access (owner, admin, or write share).
@@ -867,7 +868,33 @@ export class TripsController {
     @Param('id') id: string,
   ): Promise<void> {
     await this.tripAccessService.verifyWriteAccess(id, auth)
-    return this.tripsService.remove(id)
+    return this.tripsService.remove(id, auth.userId)
+  }
+
+  /**
+   * Restore a soft-deleted trip (Admin only)
+   * POST /trips/:id/restore
+   */
+  @UseGuards(AdminGuard)
+  @Post(':id/restore')
+  async restoreTrip(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<TripResponseDto> {
+    return this.tripsService.restoreTrip(id, auth.userId)
+  }
+
+  /**
+   * Un-cancel a trip, restoring its previous status (Admin only)
+   * POST /trips/:id/uncancel
+   */
+  @UseGuards(AdminGuard)
+  @Post(':id/uncancel')
+  async uncancelTrip(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<TripResponseDto> {
+    return this.tripsService.uncancelTrip(id, auth.userId)
   }
 
   /**

@@ -268,6 +268,7 @@ export interface TripFilterDto {
   primaryContactId?: string // Filter by primary contact
   isArchived?: boolean
   isPublished?: boolean
+  includeDeleted?: boolean
   tags?: string[] // Match any of these tags
   tripGroupId?: string // Filter by trip group
 
@@ -346,6 +347,9 @@ export interface TripResponseDto {
   tripGroupId: string | null
   clientSelectedItineraryId: string | null
   commissionFeeRateOverride: string | null // Decimal as string, null = use agency default
+  deletedAt: string | null
+  deletedBy: string | null
+  statusBeforeCancel: string | null
   createdAt: string
   updatedAt: string
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Calendar, MoreVertical, Trash2, Archive, XCircle, User } from 'lucide-react'
+import { Calendar, MoreVertical, RotateCcw, Trash2, Archive, XCircle, User } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -25,6 +25,9 @@ import { formatDate, cn } from '@/lib/utils'
 import { canDeleteTrip, type TripStatus } from '@/lib/trip-status-constants'
 import { canTransitionTripStatus } from '@tailfire/shared-types/api'
 import type { TripResponseDto } from '@tailfire/shared-types/api'
+import { useUncancelTrip } from '@/hooks/use-trips'
+import { useUser } from '@/hooks/use-user'
+import { useToast } from '@/hooks/use-toast'
 import { CancelTripDialog } from './cancel-trip-dialog'
 
 interface TripsDataTableProps {
@@ -52,6 +55,9 @@ export function TripsDataTable({
   onArchive,
 }: TripsDataTableProps) {
   const [cancelTrip, setCancelTrip] = useState<{ id: string; name: string } | null>(null)
+  const uncancelTrip = useUncancelTrip()
+  const { isAdmin } = useUser()
+  const { toast } = useToast()
   const allSelected = trips.length > 0 && selectedIds.size === trips.length
   const someSelected = selectedIds.size > 0 && selectedIds.size < trips.length
 
@@ -186,6 +192,18 @@ export function TripsDataTable({
                         <DropdownMenuItem onClick={() => onArchive(trip.id)}>
                           <Archive className="mr-2 h-4 w-4" />
                           {trip.isArchived ? 'Unarchive' : 'Archive'}
+                        </DropdownMenuItem>
+                      )}
+                      {trip.status === 'cancelled' && isAdmin && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            uncancelTrip.mutateAsync(trip.id).then(() => {
+                              toast({ title: 'Trip restored', description: 'Trip has been un-cancelled.' })
+                            })
+                          }}
+                        >
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Un-cancel Trip
                         </DropdownMenuItem>
                       )}
                       {canDeleteTrip(trip.status as TripStatus) ? (

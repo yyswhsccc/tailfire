@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Calendar, Loader2, MoreVertical, Trash2, XCircle } from 'lucide-react'
+import { Calendar, Loader2, MoreVertical, RotateCcw, Trash2, XCircle } from 'lucide-react'
 import type { TripResponseDto } from '@tailfire/shared-types/api'
 import { Card } from '@/components/ui/card'
 import { formatDate, cn } from '@/lib/utils'
@@ -23,7 +23,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { useDeleteTrip } from '@/hooks/use-trips'
+import { useDeleteTrip, useUncancelTrip } from '@/hooks/use-trips'
+import { useUser } from '@/hooks/use-user'
 import { useToast } from '@/hooks/use-toast'
 import { canDeleteTrip } from '@/lib/trip-status-constants'
 import { canTransitionTripStatus } from '@tailfire/shared-types/api'
@@ -42,6 +43,8 @@ export function TripCard({ trip, isUpdating = false }: TripCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const deleteTrip = useDeleteTrip()
+  const uncancelTrip = useUncancelTrip()
+  const { isAdmin } = useUser()
   const { toast } = useToast()
 
   const isDeletable = canDeleteTrip(trip.status)
@@ -128,6 +131,21 @@ export function TripCard({ trip, isUpdating = false }: TripCardProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {trip.status === 'cancelled' && isAdmin && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.preventDefault()
+                    uncancelTrip.mutateAsync(trip.id).then(() => {
+                      toast({ title: 'Trip restored', description: 'Trip has been un-cancelled.' })
+                    }).catch((error: any) => {
+                      toast({ title: 'Failed', description: error?.message || 'Error', variant: 'destructive' })
+                    })
+                  }}
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Un-cancel Trip
+                </DropdownMenuItem>
+              )}
               {isDeletable ? (
                 <DropdownMenuItem
                   onClick={(e) => {

@@ -201,6 +201,39 @@ export function useCancelTrip() {
  * Delete trip
  * Note: Only trips with status 'draft' or 'quoted' can be deleted
  */
+/**
+ * Restore a trip from cancelled status (admin only)
+ */
+export function useRestoreTrip() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (tripId: string) => api.post(`/trips/${tripId}/restore`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: tripKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: ['activity-logs'] })
+    },
+  })
+}
+
+/**
+ * Un-cancel a trip (admin only, returns to previous status)
+ */
+export function useUncancelTrip() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (tripId: string) => api.post(`/trips/${tripId}/uncancel`),
+    onSuccess: (_data, tripId) => {
+      queryClient.invalidateQueries({ queryKey: tripKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: tripKeys.detail(tripId) })
+      queryClient.invalidateQueries({ queryKey: ['activity-logs'] })
+    },
+  })
+}
+
+/**
+ * Delete trip
+ * Note: Only trips with status 'draft' or 'quoted' can be deleted
+ */
 export function useDeleteTrip() {
   const queryClient = useQueryClient()
 
