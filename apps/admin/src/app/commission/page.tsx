@@ -77,6 +77,7 @@ export default function CommissionPage() {
           {isAdmin && <TabsTrigger value="payable">Payable by Agent</TabsTrigger>}
           <TabsTrigger value="received">Received Checks</TabsTrigger>
           <TabsTrigger value="claims">{isAdmin ? 'Agent Claims' : 'My Claims'}</TabsTrigger>
+          {isAdmin && <TabsTrigger value="unreconciled">Unreconciled</TabsTrigger>}
         </TabsList>
 
         {isAdmin && (
@@ -140,6 +141,21 @@ export default function CommissionPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {isAdmin && (
+          <TabsContent value="unreconciled">
+            <Card>
+              <CardHeader>
+                <CardTitle>Unreconciled Items</CardTitle>
+                <CardDescription>Deposit line items that couldn&apos;t be matched to a booking</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Unreconciled items from finalized deposits will appear here.
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
     </DashboardLayout>
