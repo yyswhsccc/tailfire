@@ -955,8 +955,7 @@ export class CommissionService {
     const searchPattern = filters.search ? `%${filters.search}%` : null
     if (searchPattern) {
       conditions.push(sql`(
-        ap.confirmation_number ILIKE ${searchPattern}
-        OR ia.confirmation_number ILIKE ${searchPattern}
+        ia.confirmation_number ILIKE ${searchPattern}
         OR ap.booking_reference ILIKE ${searchPattern}
         OR t.name ILIKE ${searchPattern}
         OR EXISTS (
@@ -978,7 +977,7 @@ export class CommissionService {
       WITH receivables AS (
         SELECT DISTINCT ON (ap.id)
           ap.id AS activity_pricing_id,
-          COALESCE(ap.confirmation_number, ia.confirmation_number) AS confirmation_number,
+          ia.confirmation_number,
           ap.booking_reference,
           ap.supplier AS supplier_name,
           asup.supplier_id,
@@ -1273,7 +1272,7 @@ export class CommissionService {
         cci.created_at,
         cci.updated_at,
         ia.name AS activity_name,
-        ap.confirmation_number,
+        ia.confirmation_number,
         ap.booking_reference,
         t.name AS trip_name
       FROM commission_check_items cci
