@@ -20,4 +20,10 @@ export class AppController {
   getInfo() {
     return this.appService.getInfo()
   }
+
+  @Get('debug-sentry')
+  @ApiOperation({ summary: 'Test Sentry error reporting' })
+  debugSentry() {
+    throw new Error('Sentry test error from Tailfire API')
+  }
 }
