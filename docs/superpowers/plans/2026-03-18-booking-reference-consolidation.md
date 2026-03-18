@@ -102,10 +102,13 @@ COMMENT ON COLUMN itinerary_activities.confirmation_number IS
 
 - [ ] **Step 3: Update Drizzle schema** — remove `confirmationNumber` from `activityPricing` in `packages/database/src/schema/activity-pricing.schema.ts`
 
-- [ ] **Step 4: Fix any TypeScript references** — search codebase for `activityPricing.confirmationNumber` or `activity_pricing.confirmation_number` and update/remove. Expected locations:
-  - `commission.service.ts` — receivables query (already using COALESCE, simplify to ia only)
+- [ ] **Step 4: Fix all TypeScript/SQL references** — search codebase for `activityPricing.confirmationNumber` or `activity_pricing.confirmation_number` and update/remove. **ALL known locations (from Codex audit):**
+  - `commission.service.ts:958` — search filter references `ap.confirmation_number`
+  - `commission.service.ts:981` — COALESCE in receivables data query
+  - `commission.service.ts:1276,1280` — deposit detail query reads `ap.confirmation_number`
+  - `activities.service.ts:2005,2105` — activities list enrichment uses Drizzle schema field
   - `component-orchestration.service.ts` — check if it writes to ap.confirmationNumber
-  - Any DTOs referencing the field
+  - Any DTOs/types referencing the field
 
 - [ ] **Step 5: Run migration locally, typecheck, commit.**
 
@@ -213,7 +216,33 @@ Ensure each one writes `dto.confirmationNumber` → `itinerary_activities.confir
 
 ---
 
-## Chunk 6: TES Import Fix (Future)
+## Chunk 6: Sync Manual Cruise Booking Number
+
+### Task 7: Keep ia.confirmation_number in sync when cruise booking_number changes
+
+**Files:**
+- `apps/api/src/trips/custom-cruise-details.service.ts`
+
+The import flow (Task 3) only handles the import path. Manual cruise create/update also writes `booking_number` to `custom_cruise_details` but doesn't sync to `itinerary_activities.confirmation_number`.
+
+- [ ] **Step 1: In create method** (custom-cruise-details.service.ts:~109) — after inserting custom_cruise_details, if `bookingNumber` is provided, update `itinerary_activities.confirmation_number`:
+
+```typescript
+if (dto.bookingNumber) {
+  await this.db.client
+    .update(this.db.schema.itineraryActivities)
+    .set({ confirmationNumber: dto.bookingNumber })
+    .where(eq(this.db.schema.itineraryActivities.id, activityId))
+}
+```
+
+- [ ] **Step 2: In update method** (~line 196) — same sync when bookingNumber changes.
+
+- [ ] **Step 3: Commit.**
+
+---
+
+## Chunk 7: TES Import Fix (Future)
 
 ### Task 6: Document TES import requirements for booking references
 
@@ -236,22 +265,24 @@ TES field → Tailfire field:
 
 ## Summary
 
-| Task | What | Chunk |
-|------|------|-------|
-| 1 | Migration: backfill + drop ap.confirmation_number | DB |
-| 2 | Simplify commission receivables query | API |
-| 3 | Fix cruise import to sync booking_number → ia | API |
-| 4 | Fix component orchestration writes | API |
-| 5 | Rename UI form label | UI |
-| 6 | Document TES import requirements | Docs |
+| Task | What | Chunk | Order |
+|------|------|-------|-------|
+| 2 | Simplify commission receivables + deposit detail queries | API | 1st |
+| 4 | Fix component orchestration + activities.service writes | API | 2nd |
+| 3 | Fix cruise import to sync booking_number → ia | API | 3rd |
+| 7 | Sync manual cruise create/update booking_number → ia | API | 4th |
+| 5 | Rename UI form label | UI | 5th |
+| 1 | Migration: backfill + drop ap.confirmation_number | DB | LAST |
+| 6 | Document TES import requirements | Docs | anytime |
 
-**Estimated: 6 tasks, ~1.5 hours**
+**Estimated: 7 tasks, ~2 hours**
 
-**Dependencies:**
-- Task 1 (DB) must run first
-- Tasks 2-4 depend on Task 1
+**Dependencies — CRITICAL ORDERING:**
+- Tasks 2-4 (code changes) must run FIRST — remove all references to `ap.confirmation_number`
+- Task 1 (DB migration) runs LAST — drops the column only after no code references it
 - Task 5 is independent
 - Task 6 is documentation only
+- Task 7 is independent (cruise sync for manual flows)
 
 **Key principle:** After this work, any code that needs the supplier's booking reference reads `itinerary_activities.confirmation_number` — one field, one table, one source of truth.
 
