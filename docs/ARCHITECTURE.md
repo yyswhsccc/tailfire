@@ -32,6 +32,7 @@ tailfire/
 | **Database** | Supabase PostgreSQL |
 | **Auth** | Supabase Auth + JWT |
 | **Storage** | Cloudflare R2 (Supabase Storage as fallback) |
+| **Error Monitoring** | Sentry (integrated in API and Admin; org: systemsaholic) |
 
 ---
 
@@ -320,3 +321,4 @@ The NestJS API is organized into feature modules. Notable modules beyond the cor
 - [Automation System](./AUTOMATION.md) - Job queues, trip auto-transitions
 - [Environment Configuration](./ENVIRONMENTS.md) - Domains, CORS, env vars
 - [CI/CD Pipeline](./CI_CD.md) - Deployment workflows
+- [Monitoring Guide](./MONITORING.md) - Sentry setup, troubleshooting, and SOPs

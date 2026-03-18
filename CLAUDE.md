@@ -555,6 +555,17 @@ Import is idempotent — scoped by agency + source + booking reference to preven
 | `TRAVELTEK_PASSWORD` | OAuth client password |
 | `TRAVELTEK_SID` | Agency session ID |
 
+## Monitoring
+
+Sentry is integrated in both the API (NestJS) and Admin (Next.js) apps for runtime error capture across all environments.
+
+- **Dashboard**: https://systemsaholic.sentry.io (org: systemsaholic)
+- **Test endpoint**: `GET /api/v1/debug-sentry` — triggers a deliberate error to verify capture is working (disabled in production)
+- **Projects**: `tailfire-api` (Railway) and `tailfire-admin` (Vercel)
+- **Environments**: errors are tagged `development`, `preview`, or `production` based on `SENTRY_ENVIRONMENT` / `NEXT_PUBLIC_SENTRY_ENVIRONMENT` Doppler secrets
+
+See [docs/MONITORING.md](./docs/MONITORING.md) for full configuration details, Doppler secrets reference, troubleshooting runbooks, and beta monitoring SOPs.
+
 ## Codex Collaboration (tmux)
 
 When collaborating with Codex for plan validation or code review, **USE THE SKILL**:

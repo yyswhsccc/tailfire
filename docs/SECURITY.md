@@ -363,6 +363,42 @@ Direct status change to `cancelled` via `PATCH /trips/:id` or bulk status update
 
 ---
 
+## Error Monitoring (Sentry)
+
+Sentry is integrated for runtime error capture in both the API and Admin apps. All errors flow to the shared organization dashboard at [systemsaholic.sentry.io](https://systemsaholic.sentry.io).
+
+### Sentry Projects
+
+| Project | Platform | App |
+|---------|----------|-----|
+| `tailfire-api` | NestJS | `apps/api` — Railway |
+| `tailfire-admin` | Next.js | `apps/admin` — Vercel |
+
+### Organization
+
+- **Org slug**: `systemsaholic`
+- **Dashboard**: https://systemsaholic.sentry.io
+
+### Environment Tags
+
+Errors are tagged by environment so they can be filtered in the Sentry dashboard:
+
+| Tag | When applied |
+|-----|-------------|
+| `development` | Local dev and preview builds |
+| `preview` | Preview deployments (tf-demo.phoenixvoyages.ca) |
+| `production` | Production deployments |
+
+Environment values are set via `SENTRY_ENVIRONMENT` (API) and `NEXT_PUBLIC_SENTRY_ENVIRONMENT` (Admin) in Doppler per config.
+
+### Test Endpoint
+
+`GET /api/v1/debug-sentry` — triggers a deliberate error to verify Sentry capture is working. This endpoint is disabled in the production environment.
+
+For full configuration details, key files, Doppler secrets, and monitoring SOPs, see [Monitoring Guide](./MONITORING.md).
+
+---
+
 ## Additional Security Controls
 
 ### Password Reset
