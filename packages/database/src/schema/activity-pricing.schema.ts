@@ -61,7 +61,6 @@ export const activityPricing = pgTable('activity_pricing', {
   commissionSplitPercentage: decimal('commission_split_percentage', { precision: 5, scale: 2 }),
   commissionExpectedDate: date('commission_expected_date'),
 
-  confirmationNumber: varchar('confirmation_number', { length: 255 }),
   bookingReference: varchar('booking_reference', { length: 255 }), // Links round-trip flights/activities
   bookingStatus: varchar('booking_status', { length: 100 }),
 
