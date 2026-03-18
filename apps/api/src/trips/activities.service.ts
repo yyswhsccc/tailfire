@@ -1996,13 +1996,12 @@ export class ActivitiesService {
     // Get activity IDs for batch pricing query
     const activityIds = activities.map(a => a.activity.id)
 
-    // Fetch pricing for all activities in a single query (include confirmationNumber)
+    // Fetch pricing for all activities in a single query
     const pricingData = await this.db.client
       .select({
         activityId: this.db.schema.activityPricing.activityId,
         totalPriceCents: this.db.schema.activityPricing.totalPriceCents,
         currency: this.db.schema.activityPricing.currency,
-        confirmationNumber: this.db.schema.activityPricing.confirmationNumber,
       })
       .from(this.db.schema.activityPricing)
       .where(inArray(this.db.schema.activityPricing.activityId, activityIds))
@@ -2102,7 +2101,7 @@ export class ActivitiesService {
       return {
         ...baseResponse,
         supplierName,
-        confirmationNumber: pricing?.confirmationNumber ?? r.activity.confirmationNumber ?? null,
+        confirmationNumber: r.activity.confirmationNumber ?? null,
         isBooked: r.activity.isBooked,
         paymentStatus,
         paidCents: payment?.paidCents ?? null,
