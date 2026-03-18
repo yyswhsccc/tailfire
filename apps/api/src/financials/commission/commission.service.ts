@@ -956,6 +956,7 @@ export class CommissionService {
     if (searchPattern) {
       conditions.push(sql`(
         ap.confirmation_number ILIKE ${searchPattern}
+        OR ia.confirmation_number ILIKE ${searchPattern}
         OR ap.booking_reference ILIKE ${searchPattern}
         OR t.name ILIKE ${searchPattern}
         OR EXISTS (
@@ -977,7 +978,7 @@ export class CommissionService {
       WITH receivables AS (
         SELECT DISTINCT ON (ap.id)
           ap.id AS activity_pricing_id,
-          ap.confirmation_number,
+          COALESCE(ap.confirmation_number, ia.confirmation_number) AS confirmation_number,
           ap.booking_reference,
           ap.supplier AS supplier_name,
           asup.supplier_id,
