@@ -197,11 +197,13 @@ export class ImportBookingService {
     })
 
     // 8b. Mark the imported cruise as booked — it's an existing confirmed booking
+    // Also sync booking_number → confirmation_number (canonical booking ref field)
     await this.db.client
       .update(this.db.schema.itineraryActivities)
       .set({
         isBooked: true,
         bookingDate: new Date(),
+        confirmationNumber: dto.bookingReference,
       })
       .where(eq(this.db.schema.itineraryActivities.id, cruiseActivity.id))
 
