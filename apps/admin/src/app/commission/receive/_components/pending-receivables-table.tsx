@@ -193,7 +193,16 @@ export function PendingReceivablesTable({
                   <TableCell className="max-w-[150px] truncate">
                     {item.passengerNames.length > 0 ? item.passengerNames.join(', ') : '\u2014'}
                   </TableCell>
-                  <TableCell className="max-w-[150px] truncate">{item.tripName}</TableCell>
+                  <TableCell className="max-w-[150px] truncate">
+                    <a
+                      href={`/trips/${item.tripId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      {item.tripName}
+                    </a>
+                  </TableCell>
                   <TableCell>{formatDate(item.tripStartDate)}</TableCell>
                   <TableCell className="text-right font-medium">
                     {formatCurrency(item.expectedCommissionCents)}

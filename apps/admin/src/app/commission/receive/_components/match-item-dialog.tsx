@@ -71,7 +71,14 @@ export function MatchItemDialog({ open, onOpenChange, item, onConfirm }: MatchIt
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Trip</span>
-              <span className="max-w-[200px] truncate text-right">{item.tripName}</span>
+              <a
+                href={`/trips/${item.tripId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="max-w-[200px] truncate text-right text-blue-600 hover:underline"
+              >
+                {item.tripName}
+              </a>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Passengers</span>
