@@ -25,7 +25,7 @@ interface DepositHeaderFormProps {
 export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderFormProps) {
   const { toast } = useToast()
   const createDeposit = useCreateDeposit()
-  const { data: suppliersData } = useSuppliers({ limit: 200 })
+  const { data: suppliersData } = useSuppliers({ limit: 100 })
 
   const [depositNumber, setDepositNumber] = useState('')
   const [depositDate, setDepositDate] = useState('')

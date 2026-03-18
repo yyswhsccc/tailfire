@@ -51,7 +51,7 @@ export function PendingReceivablesTable({
   onSelectItem,
   onAutoMatch,
 }: PendingReceivablesTableProps) {
-  const { data: suppliersData } = useSuppliers({ limit: 200 })
+  const { data: suppliersData } = useSuppliers({ limit: 100 })
   const suppliers = suppliersData?.suppliers ?? []
 
   // Filter state
