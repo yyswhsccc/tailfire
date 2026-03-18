@@ -39,7 +39,8 @@ export interface CommissionCheckResponseDto {
 export interface CommissionCheckItemResponseDto {
   id: string
   checkId: string
-  activityPricingId: string
+  activityPricingId: string | null
+  description: string | null
   projectedCents: number | null
   receivedParentCents: number
   receivedCents: number

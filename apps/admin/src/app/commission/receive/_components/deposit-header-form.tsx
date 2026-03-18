@@ -60,7 +60,7 @@ export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderForm
         depositNumber: depositNumber.trim(),
         depositDate,
         totalAmountCents,
-        supplierId: supplierId || undefined,
+        supplierId: supplierId && supplierId !== '__none__' ? supplierId : undefined,
         notes: notes.trim() || undefined,
         fileUrl: fileUrl.trim() || undefined,
         fileName: fileUrl.trim() ? fileUrl.trim().split('/').pop() : undefined,

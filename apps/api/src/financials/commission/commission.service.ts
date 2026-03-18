@@ -929,51 +929,50 @@ export class CommissionService {
     const offset = (page - 1) * limit
     const statusFilter = filters.status ?? 'pending'
 
-    // Build WHERE conditions
-    const conditions: string[] = [
-      `ap.agency_id = '${agencyId}'`,
-      `ap.commission_total_cents > 0`,
+    // Build parameterized WHERE conditions (no string interpolation)
+    const conditions: ReturnType<typeof sql>[] = [
+      sql`ap.agency_id = ${agencyId}`,
+      sql`ap.commission_total_cents > 0`,
     ]
 
-    // Status filter: "pending" = no tracking row OR status = 'pending'
-    // "all" = include received items too
     if (statusFilter === 'pending') {
-      conditions.push(`(ct.id IS NULL OR ct.commission_status = 'pending')`)
+      conditions.push(sql`(ct.id IS NULL OR ct.commission_status = 'pending')`)
     }
-    // When 'all', no status filter needed (show everything with commission > 0)
 
     if (filters.supplierId) {
-      conditions.push(`asup.supplier_id = '${filters.supplierId}'`)
+      conditions.push(sql`asup.supplier_id = ${filters.supplierId}`)
     }
 
     if (filters.departureDateFrom) {
-      conditions.push(`t.start_date >= '${filters.departureDateFrom}'`)
+      conditions.push(sql`t.start_date >= ${filters.departureDateFrom}::date`)
     }
 
     if (filters.departureDateTo) {
-      conditions.push(`t.start_date <= '${filters.departureDateTo}'`)
+      conditions.push(sql`t.start_date <= ${filters.departureDateTo}::date`)
     }
 
-    // Search filter: confirmationNumber, bookingReference, passenger name, trip name
-    let searchJoin = ''
-    if (filters.search) {
-      const searchTerm = filters.search.replace(/'/g, "''")
-      searchJoin = `
-        LEFT JOIN trip_travelers tt_search ON tt_search.trip_id = t.id
-        LEFT JOIN contacts c_search ON c_search.id = tt_search.contact_id
-      `
-      conditions.push(`(
-        ap.confirmation_number ILIKE '%${searchTerm}%'
-        OR ap.booking_reference ILIKE '%${searchTerm}%'
-        OR t.name ILIKE '%${searchTerm}%'
-        OR (c_search.first_name || ' ' || c_search.last_name) ILIKE '%${searchTerm}%'
+    // Search filter uses parameterized ILIKE
+    const searchPattern = filters.search ? `%${filters.search}%` : null
+    if (searchPattern) {
+      conditions.push(sql`(
+        ap.confirmation_number ILIKE ${searchPattern}
+        OR ap.booking_reference ILIKE ${searchPattern}
+        OR t.name ILIKE ${searchPattern}
+        OR EXISTS (
+          SELECT 1 FROM trip_travelers tt_s
+          JOIN contacts c_s ON c_s.id = tt_s.contact_id
+          WHERE tt_s.trip_id = t.id
+            AND (c_s.first_name || ' ' || c_s.last_name) ILIKE ${searchPattern}
+        )
       )`)
     }
 
-    const whereClause = conditions.join(' AND ')
+    // Combine conditions with AND
+    const whereClause = conditions.reduce((acc, cond, i) =>
+      i === 0 ? cond : sql`${acc} AND ${cond}`
+    )
 
-    // Main query with all joins
-    // Uses COALESCE(ia.trip_id, i.trip_id) to handle both floating and day-assigned activities
+    // Main query — fully parameterized
     const dataQuery = sql`
       WITH receivables AS (
         SELECT DISTINCT ON (ap.id)
@@ -1001,8 +1000,7 @@ export class CommissionService {
         LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
         LEFT JOIN activity_suppliers asup ON asup.activity_id = ia.id AND asup.primary_supplier = true
         LEFT JOIN user_profiles owner ON owner.id = t.owner_id
-        ${filters.search ? sql.raw(searchJoin) : sql``}
-        WHERE ${sql.raw(whereClause)}
+        WHERE ${whereClause}
       )
       SELECT
         r.*,
@@ -1025,20 +1023,23 @@ export class CommissionService {
       OFFSET ${offset}
     `
 
-    // Count + sum query (all matching rows, not just current page)
+    // Count + sum query — uses SUM over subquery to avoid SUM(DISTINCT) bug
     const countQuery = sql`
       SELECT
-        COUNT(DISTINCT ap.id)::int AS total,
-        COALESCE(SUM(DISTINCT ap.commission_total_cents), 0)::bigint AS filtered_total_cents
-      FROM activity_pricing ap
-      JOIN itinerary_activities ia ON ia.id = ap.activity_id
-      LEFT JOIN itinerary_days id_day ON id_day.id = ia.itinerary_day_id
-      LEFT JOIN itineraries i ON i.id = id_day.itinerary_id
-      JOIN trips t ON t.id = COALESCE(ia.trip_id, i.trip_id)
-      LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
-      LEFT JOIN activity_suppliers asup ON asup.activity_id = ia.id AND asup.primary_supplier = true
-      ${filters.search ? sql.raw(searchJoin) : sql``}
-      WHERE ${sql.raw(whereClause)}
+        COUNT(*)::int AS total,
+        COALESCE(SUM(expected_commission_cents), 0)::bigint AS filtered_total_cents
+      FROM (
+        SELECT DISTINCT ON (ap.id)
+          ap.commission_total_cents AS expected_commission_cents
+        FROM activity_pricing ap
+        JOIN itinerary_activities ia ON ia.id = ap.activity_id
+        LEFT JOIN itinerary_days id_day ON id_day.id = ia.itinerary_day_id
+        LEFT JOIN itineraries i ON i.id = id_day.itinerary_id
+        JOIN trips t ON t.id = COALESCE(ia.trip_id, i.trip_id)
+        LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
+        LEFT JOIN activity_suppliers asup ON asup.activity_id = ia.id AND asup.primary_supplier = true
+        WHERE ${whereClause}
+      ) sub
     `
 
     const [dataRows, countRows]: [any[], any[]] = await Promise.all([
@@ -1132,9 +1133,38 @@ export class CommissionService {
       throw new BadRequestException('Deposit is already finalized')
     }
 
+    // Validate matched + unreconciled = deposit total (prevent silent residual deltas)
+    const matchedTotal = dto.items.reduce((sum, i) => sum + i.receivedCents, 0)
+    const unreconciledTotal = (dto.unreconciled ?? []).reduce((sum, u) => sum + u.amountCents, 0)
+    const reconciledTotal = matchedTotal + unreconciledTotal
+    if (reconciledTotal !== check.checkAmountCents) {
+      throw new BadRequestException(
+        `Reconciled total (${reconciledTotal}) does not match deposit amount (${check.checkAmountCents}). ` +
+        `Add unreconciled items for any residual difference.`
+      )
+    }
+
     const result = await this.db.client.transaction(async (tx) => {
       // Insert reconciled items
       for (const item of dto.items) {
+        // Verify activity pricing belongs to same agency (prevent cross-tenant writes)
+        const [pricing] = await tx
+          .select({ id: this.db.schema.activityPricing.id })
+          .from(this.db.schema.activityPricing)
+          .where(
+            and(
+              eq(this.db.schema.activityPricing.id, item.activityPricingId),
+              eq(this.db.schema.activityPricing.agencyId, agencyId)
+            )
+          )
+          .limit(1)
+
+        if (!pricing) {
+          throw new BadRequestException(
+            `Activity pricing ${item.activityPricingId} not found or does not belong to this agency`
+          )
+        }
+
         // Insert commission_check_item
         await tx
           .insert(this.db.schema.commissionCheckItems)
@@ -1371,7 +1401,8 @@ export class CommissionService {
     return {
       id: item.id,
       checkId: item.checkId,
-      activityPricingId: item.activityPricingId,
+      activityPricingId: item.activityPricingId ?? null,
+      description: item.description ?? null,
       projectedCents: item.projectedCents,
       receivedParentCents: item.receivedParentCents ?? 0,
       receivedCents: item.receivedCents ?? 0,
