@@ -1129,8 +1129,10 @@ export class CommissionService {
       throw new BadRequestException('Only deposit-type checks can be finalized via this endpoint')
     }
 
-    if (check.status === 'accepted') {
-      throw new BadRequestException('Deposit is already finalized')
+    if (check.status !== 'submitted') {
+      throw new BadRequestException(
+        `Deposit must be in 'submitted' status to finalize (current: '${check.status}')`
+      )
     }
 
     // Validate matched + unreconciled = deposit total (prevent silent residual deltas)
@@ -1251,6 +1253,10 @@ export class CommissionService {
     depositId: string
   ): Promise<DepositDetailResponseDto> {
     const check = await this.getCheckRecord(agencyId, depositId)
+
+    if (check.source !== 'deposit') {
+      throw new BadRequestException('This endpoint is for deposit-type checks only')
+    }
 
     // Fetch items with activity details via raw SQL for richer info
     const items: any[] = await this.db.client.execute(sql`

@@ -18,10 +18,11 @@ const publicRoutes = ['/auth/callback']
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Skip middleware for static files and API routes
+  // Skip middleware for static files, API routes, and Sentry tunnel
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
+    pathname.startsWith('/monitoring') ||
     pathname.includes('.')
   ) {
     return NextResponse.next()

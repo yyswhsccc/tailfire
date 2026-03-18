@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -8,6 +8,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { DashboardLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
+import { useUser } from '@/hooks/use-user'
 import { useFinalizeDeposit } from '@/hooks/use-commission'
 import { DepositHeaderForm } from './_components/deposit-header-form'
 import { PendingReceivablesTable } from './_components/pending-receivables-table'
@@ -18,6 +19,14 @@ import type { PendingReceivableDto } from '@tailfire/shared-types/api'
 export default function ReceiveDepositPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { isAdmin } = useUser()
+
+  // Redirect non-admin users
+  useEffect(() => {
+    if (isAdmin === false) {
+      router.replace('/commission')
+    }
+  }, [isAdmin, router])
   const finalizeDeposit = useFinalizeDeposit()
 
   // Deposit header state

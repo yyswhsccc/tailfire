@@ -79,7 +79,10 @@ export function DepositBuilder({
     setUnreconciledAmount('')
   }
 
-  const canFinalize = matchedItems.length > 0
+  const totalMatched = matchedItems.reduce((sum, i) => sum + i.receivedCents, 0)
+    + unreconciledItems.reduce((sum, u) => sum + u.amountCents, 0)
+  const canFinalize = (matchedItems.length > 0 || unreconciledItems.length > 0)
+    && totalMatched === totalAmountCents
 
   return (
     <Card className="flex flex-col h-full">

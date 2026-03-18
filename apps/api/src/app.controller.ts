@@ -24,6 +24,9 @@ export class AppController {
   @Get('debug-sentry')
   @ApiOperation({ summary: 'Test Sentry error reporting' })
   debugSentry() {
+    if (process.env.SENTRY_ENVIRONMENT === 'production') {
+      return { message: 'Debug endpoint disabled in production' }
+    }
     throw new Error('Sentry test error from Tailfire API')
   }
 }
