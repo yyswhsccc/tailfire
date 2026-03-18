@@ -19,14 +19,14 @@ import type { PendingReceivableDto } from '@tailfire/shared-types/api'
 export default function ReceiveDepositPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const { isAdmin } = useUser()
+  const { isAdmin, isLoading } = useUser()
 
-  // Redirect non-admin users
+  // Redirect non-admin users (wait for auth to load first)
   useEffect(() => {
-    if (isAdmin === false) {
+    if (!isLoading && !isAdmin) {
       router.replace('/commission')
     }
-  }, [isAdmin, router])
+  }, [isAdmin, isLoading, router])
   const finalizeDeposit = useFinalizeDeposit()
 
   // Deposit header state
