@@ -49,6 +49,7 @@ import { LoyaltyProgramsModule } from './loyalty-programs/loyalty-programs.modul
 import { DocumentTemplatesModule } from './document-templates/document-templates.module'
 import { DocumentRenderModule } from './document-render/document-render.module'
 import { EmailAccountsModule } from './email-accounts/email-accounts.module'
+import { BugReportsModule } from './bug-reports/bug-reports.module'
 import { EnrichmentModule } from './enrichment/enrichment.module'
 import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
 
@@ -182,6 +183,9 @@ import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
 
     // Cruise catalog matching (shared between OCR import and enrichment)
     CatalogMatcherModule,
+
+    // Bug reporter (GitHub issue creation)
+    BugReportsModule,
 
     // Activity enrichment (geocoding, cruise catalog, hotel photos)
     EnrichmentModule,
