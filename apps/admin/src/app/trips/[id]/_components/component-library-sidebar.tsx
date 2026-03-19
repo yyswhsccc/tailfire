@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { FileText, Sparkles, ChevronDown, ChevronUp, Library, Compass, Anchor, MapPin } from 'lucide-react'
-import { useDraggable } from '@dnd-kit/core'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
+import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SIDEBAR_WIDTH, ITINERARY_CARD_STYLES, FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
 import { Button } from '@/components/ui/button'
@@ -56,13 +57,40 @@ function DraggableComponent({ id, componentType, label, icon: Icon }: DraggableC
   )
 }
 
-export function ComponentLibrarySidebar() {
+function CancelDropZone() {
+  const { setNodeRef, isOver } = useDroppable({
+    id: 'cancel-drop-zone',
+    data: { type: 'cancel' },
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed transition-all',
+        isOver
+          ? 'border-red-400 bg-red-50 text-red-700'
+          : 'border-ash-300 bg-ash-50 text-ash-500'
+      )}
+    >
+      <X className="h-4 w-4" />
+      <span className="text-sm font-medium">
+        {isOver ? 'Release to cancel' : 'Drop here to cancel'}
+      </span>
+    </div>
+  )
+}
+
+export function ComponentLibrarySidebar({ isDragging = false }: { isDragging?: boolean }) {
   const [aiAssistExpanded, setAiAssistExpanded] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
 
   return (
     <div className={cn(SIDEBAR_WIDTH, ITINERARY_CARD_STYLES, 'overflow-y-auto')}>
       <div className="p-3 space-y-3">
+        {/* Cancel zone when dragging */}
+        {isDragging && <CancelDropZone />}
+
         {/* Header */}
         <h3 className="text-base font-semibold text-ash-900">Build your trip</h3>
 
