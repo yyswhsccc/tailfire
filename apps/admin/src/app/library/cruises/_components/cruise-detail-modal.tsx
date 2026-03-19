@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { format, parseISO } from 'date-fns'
 import {
@@ -44,7 +45,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useCruiseSailing, useAddCruiseToItinerary } from '@/hooks/use-cruise-library'
 import { PortScheduleList } from './port-schedule-list'
 import { CabinPricingGrid } from './cabin-pricing-grid'
-import { AddToTripDialog } from './add-to-trip-dialog'
+import { AddToTripDialog } from '@/components/library/add-to-trip-dialog'
 
 interface CruiseDetailModalProps {
   sailingId: string | null
@@ -65,6 +66,7 @@ export function CruiseDetailModal({
   tripContext,
   onAddedToItinerary,
 }: CruiseDetailModalProps) {
+  const router = useRouter()
   const { data: sailing, isLoading, error } = useCruiseSailing(sailingId)
   const addCruiseMutation = useAddCruiseToItinerary(tripContext?.itineraryId ?? '')
 
@@ -76,8 +78,16 @@ export function CruiseDetailModal({
   // Add to trip dialog state (when no tripContext)
   const [showAddToTripDialog, setShowAddToTripDialog] = useState(false)
 
-  // Confirmation dialog state for extending itinerary dates
+  // Confirmation dialog state for extending itinerary dates (tripContext flow)
   const [showExtendConfirm, setShowExtendConfirm] = useState(false)
+
+  // Pending params for the Add to Trip flow (extend confirmation)
+  const [pendingAddToTrip, setPendingAddToTrip] = useState<{
+    tripId: string
+    itineraryId: string
+    isNewTrip: boolean
+    isNewItinerary: boolean
+  } | null>(null)
 
   const images = sailing?.ship.images ?? []
   const hasMultipleImages = images.length > 1
@@ -88,6 +98,73 @@ export function CruiseDetailModal({
     setFailedImageIndices(new Set())
     setLogoImageError(false)
   }, [sailingId])
+
+  // Compute a reliable end date for cruise: use catalog endDate if reasonable,
+  // otherwise sailDate + nights. Catalog endDate can be corrupt (Traveltek data quality).
+  const reliableEndDate = (() => {
+    if (!sailing) return undefined
+    const computedEnd = new Date(sailing.sailDate + 'T00:00:00')
+    computedEnd.setDate(computedEnd.getDate() + sailing.nights)
+    const expectedEndDate = computedEnd.toISOString().split('T')[0]!
+    const catalogEndDate = sailing.endDate
+    const maxReasonableGap = 14
+    const catalogEndMs = new Date(catalogEndDate + 'T00:00:00').getTime()
+    const expectedEndMs = new Date(expectedEndDate + 'T00:00:00').getTime()
+    return (catalogEndMs - expectedEndMs) > maxReasonableGap * 86400000 || catalogEndMs < expectedEndMs
+      ? expectedEndDate
+      : catalogEndDate
+  })()
+
+  /**
+   * Callback for the shared AddToTripDialog.
+   * Handles date checking, extend confirmation, and calling the cruise mutation.
+   */
+  const handleTripAndItinerarySelected = useCallback(async (params: {
+    tripId: string
+    itineraryId: string
+    isNewTrip: boolean
+    isNewItinerary: boolean
+  }) => {
+    if (!sailing) return
+
+    // For new itineraries, dates were set from the cruise -- no conflict possible
+    if (params.isNewItinerary) {
+      await addCruiseMutation.mutateAsync({
+        sailing,
+        itineraryId: params.itineraryId,
+        tripId: params.tripId,
+        autoExtendItinerary: false,
+      })
+      setShowAddToTripDialog(false)
+      onAddedToItinerary?.()
+      onClose()
+      router.push(`/trips/${params.tripId}`)
+      return
+    }
+
+    // Existing itinerary -- try without extending first, prompt if needed
+    try {
+      await addCruiseMutation.mutateAsync({
+        sailing,
+        itineraryId: params.itineraryId,
+        tripId: params.tripId,
+        autoExtendItinerary: false,
+      })
+      setShowAddToTripDialog(false)
+      onAddedToItinerary?.()
+      onClose()
+      router.push(`/trips/${params.tripId}`)
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('do not fit within itinerary dates')) {
+        // Store params and show extend confirmation
+        setPendingAddToTrip(params)
+        setShowAddToTripDialog(false)
+        setShowExtendConfirm(true)
+      } else {
+        throw err
+      }
+    }
+  }, [sailing, addCruiseMutation, onAddedToItinerary, onClose, router])
 
   const handleAddToItinerary = async () => {
     if (!sailing || !tripContext) return
@@ -112,9 +189,33 @@ export function CruiseDetailModal({
   }
 
   // Confirm extension and retry with autoExtendItinerary=true
+  // Handles both tripContext flow and add-to-trip flow
   const handleConfirmExtend = async () => {
-    if (!sailing || !tripContext) return
+    if (!sailing) return
 
+    if (pendingAddToTrip) {
+      // Add-to-trip flow: extend and add cruise
+      try {
+        await addCruiseMutation.mutateAsync({
+          sailing,
+          itineraryId: pendingAddToTrip.itineraryId,
+          tripId: pendingAddToTrip.tripId,
+          autoExtendItinerary: true,
+        })
+        setShowExtendConfirm(false)
+        onAddedToItinerary?.()
+        onClose()
+        router.push(`/trips/${pendingAddToTrip.tripId}`)
+      } catch {
+        setShowExtendConfirm(false)
+      } finally {
+        setPendingAddToTrip(null)
+      }
+      return
+    }
+
+    // tripContext flow
+    if (!tripContext) return
     try {
       await addCruiseMutation.mutateAsync({
         sailing,
@@ -124,9 +225,8 @@ export function CruiseDetailModal({
 
       setShowExtendConfirm(false)
       onAddedToItinerary?.()
-    } catch (error) {
+    } catch {
       setShowExtendConfirm(false)
-      throw error
     }
   }
 
@@ -412,14 +512,12 @@ export function CruiseDetailModal({
       {/* Add to Trip Dialog - shown when no tripContext */}
       {sailing && (
         <AddToTripDialog
-          sailing={sailing}
           isOpen={showAddToTripDialog}
           onClose={() => setShowAddToTripDialog(false)}
-          onSuccess={() => {
-            setShowAddToTripDialog(false)
-            onAddedToItinerary?.()
-            onClose()
-          }}
+          activityName={sailing.name}
+          activityDates={{ start: sailing.sailDate, end: reliableEndDate }}
+          onTripAndItinerarySelected={handleTripAndItinerarySelected}
+          isProcessing={addCruiseMutation.isPending}
         />
       )}
 
