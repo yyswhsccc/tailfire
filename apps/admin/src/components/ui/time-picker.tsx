@@ -140,10 +140,31 @@ export function TimePicker({
   const currentHours = parsed?.hours ?? 12
   const currentMinutes = parsed?.minutes ?? 0
 
+  /**
+   * Auto-format time input as user types.
+   * Strips non-digits, auto-inserts colon after 2 digits.
+   * "1" → "1", "11" → "11", "113" → "11:3", "1130" → "11:30"
+   * Also handles if user types colon manually: "11:" → "11:"
+   */
+  const autoFormatTime = (raw: string): string => {
+    // If user typed a colon, let it through as-is
+    if (raw.includes(':')) return raw
+
+    // Strip non-digits
+    const digits = raw.replace(/\D/g, '')
+
+    // Auto-insert colon after first 2 digits
+    if (digits.length <= 2) return digits
+    return `${digits.slice(0, 2)}:${digits.slice(2, 4)}`
+  }
+
   // Handle manual input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     isTypingRef.current = true
-    const newValue = e.target.value
+    const formatted = autoFormatTime(e.target.value)
+
+    // Limit to 5 chars (HH:MM)
+    const newValue = formatted.slice(0, 5)
     setInputValue(newValue)
 
     // Only call onChange for valid values or empty (clear)
@@ -154,16 +175,30 @@ export function TimePicker({
       setIsValid(true)
       onChange?.(newValue)
     } else {
-      // Intermediate typing state (e.g., "1", "11", "11:") — don't call onChange
-      setIsValid(true) // Don't show error while typing
+      // Intermediate typing state — don't call onChange or show error
+      setIsValid(true)
     }
   }
 
   // Handle input blur - normalize format and clear typing flag
   const handleInputBlur = () => {
     isTypingRef.current = false
+
+    // Try to normalize common formats on blur
+    const digits = inputValue.replace(/\D/g, '')
+    if (digits.length === 3 || digits.length === 4) {
+      // "130" → "01:30", "1130" → "11:30"
+      const padded = digits.padStart(4, '0')
+      const normalized = `${padded.slice(0, 2)}:${padded.slice(2, 4)}`
+      if (isValidTimeFormat(normalized)) {
+        setInputValue(normalized)
+        setIsValid(true)
+        onChange?.(normalized)
+        return
+      }
+    }
+
     if (inputValue && isValidTimeFormat(inputValue)) {
-      // Normalize to HH:MM format
       const parsed = parseTime(inputValue)
       if (parsed) {
         const normalized = formatTime(parsed.hours, parsed.minutes)
@@ -171,7 +206,6 @@ export function TimePicker({
         onChange?.(normalized)
       }
     } else if (inputValue && !isValidTimeFormat(inputValue)) {
-      // Invalid on blur — show error
       setIsValid(false)
     }
   }
