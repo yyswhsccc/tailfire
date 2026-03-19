@@ -331,7 +331,7 @@ export class ComponentOrchestrationService {
 
     await this.markItineraryChangedForActivity(activityId)
 
-    // Cascade day location recalculation (non-blocking)
+    // Cascade day location recalculation (non-fatal — failures logged to Sentry)
     if (dto.itineraryDayId) {
       const itineraryId = await this.getItineraryIdFromDayId(dto.itineraryDayId)
       if (itineraryId) {
@@ -554,7 +554,7 @@ export class ComponentOrchestrationService {
     // Mark itinerary as having unpublished changes
     await this.markItineraryChangedForActivity(id)
 
-    // Cascade day location recalculation (non-blocking)
+    // Cascade day location recalculation (non-fatal — failures logged to Sentry)
     await this.cascadeDayLocationsForActivity(id)
 
     // Return the updated flight component
@@ -646,7 +646,9 @@ export class ComponentOrchestrationService {
         .where(eq(this.db.schema.activityPricing.activityId, activityId))
     }
 
-    // Cascade day location recalculation (non-blocking)
+    await this.markItineraryChangedForActivity(activityId)
+
+    // Cascade day location recalculation (non-fatal — failures logged to Sentry)
     if (dto.itineraryDayId) {
       const itineraryId = await this.getItineraryIdFromDayId(dto.itineraryDayId)
       if (itineraryId) {
@@ -815,7 +817,7 @@ export class ComponentOrchestrationService {
 
     await this.markItineraryChangedForActivity(id)
 
-    // Cascade day location recalculation (non-blocking)
+    // Cascade day location recalculation (non-fatal — failures logged to Sentry)
     await this.cascadeDayLocationsForActivity(id)
 
     return this.getLodging(id)
@@ -1423,7 +1425,9 @@ export class ComponentOrchestrationService {
       await this.portInfoDetailsService.create(activityId, dto.portInfoDetails)
     }
 
-    // Cascade day location recalculation (non-blocking)
+    await this.markItineraryChangedForActivity(activityId)
+
+    // Cascade day location recalculation (non-fatal — failures logged to Sentry)
     if (dto.itineraryDayId) {
       const itineraryId = await this.getItineraryIdFromDayId(dto.itineraryDayId)
       if (itineraryId) {
@@ -1519,7 +1523,7 @@ export class ComponentOrchestrationService {
 
     await this.markItineraryChangedForActivity(id)
 
-    // Cascade day location recalculation (non-blocking)
+    // Cascade day location recalculation (non-fatal — failures logged to Sentry)
     await this.cascadeDayLocationsForActivity(id)
 
     return this.getPortInfo(id)
