@@ -11,6 +11,7 @@
 
 import { Injectable, Logger } from '@nestjs/common'
 import { sql } from 'drizzle-orm'
+import * as Sentry from '@sentry/nestjs'
 import { DatabaseService } from '../db/database.service'
 import type { GeoLocation } from '../../../../packages/shared-types/src/api'
 
@@ -50,6 +51,10 @@ export class GeocodingService {
         if (result) return result
       } catch (err) {
         this.logger.warn(`Failed to resolve airport ${input.iataCode}: ${err}`)
+        Sentry.captureException(err, {
+          tags: { service: 'geocoding', source: 'resolve-location' },
+          extra: { iataCode: input.iataCode, step: 'airport' },
+        })
       }
     }
 
@@ -60,16 +65,25 @@ export class GeocodingService {
         if (result) return result
       } catch (err) {
         this.logger.warn(`Failed to resolve cruise port ${input.portName}: ${err}`)
+        Sentry.captureException(err, {
+          tags: { service: 'geocoding', source: 'resolve-location' },
+          extra: { portName: input.portName, step: 'cruise-port' },
+        })
       }
     }
 
     // 4. Google Places Text Search — fallback for addresses/names
     if (input.address || input.name) {
+      const query = input.address || input.name!
       try {
-        const result = await this.resolveViaGooglePlaces(input.address || input.name!)
+        const result = await this.resolveViaGooglePlaces(query)
         if (result) return result
       } catch (err) {
         this.logger.warn(`Failed to resolve via Google Places: ${err}`)
+        Sentry.captureException(err, {
+          tags: { service: 'geocoding', source: 'resolve-location' },
+          extra: { query, step: 'google-places' },
+        })
       }
     }
 
@@ -106,6 +120,10 @@ export class GeocodingService {
         }
       } catch (err) {
         this.logger.debug(`Aerodatabox lookup failed for ${iataCode}: ${err}`)
+        Sentry.captureException(err, {
+          tags: { service: 'geocoding', source: 'airport' },
+          extra: { iataCode },
+        })
       }
     }
 
@@ -132,6 +150,10 @@ export class GeocodingService {
       }
     } catch (err) {
       this.logger.debug(`Cruise port lookup failed for ${portName}: ${err}`)
+      Sentry.captureException(err, {
+        tags: { service: 'geocoding', source: 'cruise-port' },
+        extra: { portName },
+      })
     }
 
     return null
@@ -181,6 +203,10 @@ export class GeocodingService {
       }
     } catch (err) {
       this.logger.debug(`Google Places lookup failed for "${query}": ${err}`)
+      Sentry.captureException(err, {
+        tags: { service: 'geocoding', source: 'google-places' },
+        extra: { query },
+      })
     }
 
     return null
