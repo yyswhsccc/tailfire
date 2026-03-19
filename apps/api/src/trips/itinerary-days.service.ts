@@ -614,24 +614,51 @@ export class ItineraryDaysService {
       )
       .orderBy(asc(this.db.schema.itineraryDays.dayNumber))
 
-    // Filter to days with higher dayNumber and decrement
-    const updates = daysToRenumber
-      .filter((d) => d.dayNumber > dayToDelete.dayNumber)
-      .map((day) =>
-        this.db.client
-          .update(this.db.schema.itineraryDays)
-          .set({
-            dayNumber: day.dayNumber - 1,
-            title: day.title?.startsWith('Day ')
-              ? `Day ${day.dayNumber - 1}`
-              : day.title, // Update auto-generated titles
-            updatedAt: new Date(),
-          })
-          .where(eq(this.db.schema.itineraryDays.id, day.id))
-      )
+    // Get itinerary start date for date recalculation
+    const [itinerary] = await this.db.client
+      .select({ startDate: this.db.schema.itineraries.startDate })
+      .from(this.db.schema.itineraries)
+      .where(eq(this.db.schema.itineraries.id, dayToDelete.itineraryId))
+      .limit(1)
+
+    // Recalculate dayNumber and date for all remaining days (not just shifted ones)
+    // This ensures sequential dayNumbers AND correct calendar dates
+    const updates = daysToRenumber.map((day, index) => {
+      const newDayNumber = index + 1
+      // Recalculate date from itinerary start + day offset
+      let newDate: string | null = day.date as string | null
+      if (itinerary?.startDate) {
+        const dateObj = new Date(itinerary.startDate + 'T00:00:00')
+        dateObj.setDate(dateObj.getDate() + index)
+        newDate = dateObj.toISOString().split('T')[0]!
+      }
+
+      return this.db.client
+        .update(this.db.schema.itineraryDays)
+        .set({
+          dayNumber: newDayNumber,
+          date: newDate,
+          title: day.title?.startsWith('Day ')
+            ? `Day ${newDayNumber}`
+            : day.title, // Preserve custom labels, update auto-generated ones
+          sequenceOrder: index,
+          updatedAt: new Date(),
+        })
+        .where(eq(this.db.schema.itineraryDays.id, day.id))
+    })
 
     if (updates.length > 0) {
       await Promise.all(updates)
+    }
+
+    // Update itinerary end date to match the last day
+    if (itinerary?.startDate && daysToRenumber.length > 0) {
+      const lastDayDate = new Date(itinerary.startDate + 'T00:00:00')
+      lastDayDate.setDate(lastDayDate.getDate() + daysToRenumber.length - 1)
+      await this.db.client
+        .update(this.db.schema.itineraries)
+        .set({ endDate: lastDayDate.toISOString().split('T')[0]! })
+        .where(eq(this.db.schema.itineraries.id, dayToDelete.itineraryId))
     }
 
     // Mark itinerary as having unpublished changes
