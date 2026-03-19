@@ -314,20 +314,46 @@ export function useLinkActivities() {
       return api.get<PackageResponseDto>(`/activities/${bookingId}`)
     },
 
+    onMutate: async ({ bookingId, activityIds }) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: bookingKeys.lists() })
+      await queryClient.cancelQueries({ queryKey: [...bookingKeys.all, 'unlinkedActivities'] })
+
+      // Optimistically remove linked activities from all unlinked queries
+      queryClient.setQueriesData<UnlinkedActivitiesResponseDto>(
+        { queryKey: [...bookingKeys.all, 'unlinkedActivities'] },
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            activities: old.activities.filter((a) => !activityIds.includes(a.id)),
+          }
+        },
+      )
+
+      // Invalidate the package's linked activities + detail so expanded row refetches immediately
+      queryClient.invalidateQueries({ queryKey: bookingKeys.linkedActivities(bookingId) })
+      queryClient.invalidateQueries({ queryKey: bookingKeys.detail(bookingId) })
+      queryClient.invalidateQueries({ queryKey: bookingKeys.lists() })
+    },
+
     onSuccess: (result) => {
-      // Invalidate booking detail and lists
+      // Refetch to get authoritative server state
+      queryClient.invalidateQueries({ queryKey: bookingKeys.linkedActivities(result.id) })
       queryClient.invalidateQueries({ queryKey: bookingKeys.detail(result.id) })
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists() })
-      // Invalidate trip totals (unlinked activities count changed)
       queryClient.invalidateQueries({ queryKey: bookingKeys.tripTotals(result.tripId) })
-      // Invalidate ALL unlinked activities queries for this trip (regardless of itinerary filter)
-      // Use prefix key without itineraryId to match all variants
       queryClient.invalidateQueries({
         queryKey: [...bookingKeys.all, 'unlinkedActivities', result.tripId],
       })
-      // Invalidate activities queries so they reflect new booking link
       queryClient.invalidateQueries({ queryKey: ['activities'] })
       queryClient.invalidateQueries({ queryKey: ['itineraryDays'] })
+    },
+
+    onError: () => {
+      // On error, refetch everything to restore correct state
+      queryClient.invalidateQueries({ queryKey: bookingKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: [...bookingKeys.all, 'unlinkedActivities'] })
     },
   })
 }
