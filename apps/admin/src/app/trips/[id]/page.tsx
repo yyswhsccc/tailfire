@@ -36,7 +36,7 @@ import { useRouter } from 'next/navigation'
 import { DetailLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useTrip, useDeleteTrip, useUncancelTrip, usePublishTrip, usePublishTripSnapshot, useUnpublishTrip, useDuplicateTrip, useTripGroups } from '@/hooks/use-trips'
+import { useTrip, useDeleteTrip, useUncancelTrip, usePublishTripSnapshot, useUnpublishTrip, useDuplicateTrip, useTripGroups } from '@/hooks/use-trips'
 import { useUser } from '@/hooks/use-user'
 import { MoveToGroupDialog } from '@/components/trips/MoveToGroupDialog'
 import { TripOverview } from './_components/trip-overview'
@@ -402,7 +402,6 @@ export default function TripDetailPage() {
   const deleteTrip = useDeleteTrip()
   const uncancelTrip = useUncancelTrip()
   const { isAdmin } = useUser()
-  const publishTrip = usePublishTrip()
   const publishSnapshot = usePublishTripSnapshot()
   const unpublishTrip = useUnpublishTrip()
   const duplicateTrip = useDuplicateTrip()
@@ -478,8 +477,10 @@ export default function TripDetailPage() {
   }
 
   const getClientOrigin = () => {
+    if (process.env.NEXT_PUBLIC_CLIENT_URL) return process.env.NEXT_PUBLIC_CLIENT_URL
     const origin = window.location.origin
     if (origin.includes(':3100')) return origin.replace(':3100', ':3103')
+    if (origin.includes('tailfire.phoenixvoyages.ca')) return 'https://client.phoenixvoyages.ca'
     return origin.replace('admin', 'client')
   }
 
@@ -490,25 +491,9 @@ export default function TripDetailPage() {
     toast({ title: 'Share link copied to clipboard' })
   }
 
-  const handlePreview = async () => {
+  const handlePreview = () => {
     if (!trip) return
-    // Open blank tab synchronously to avoid popup blocker
-    const tab = window.open('', '_blank')
-    if (!tab) {
-      toast({ title: 'Please allow popups for this site', variant: 'destructive' })
-      return
-    }
-    try {
-      let shareToken = trip.shareToken
-      if (!shareToken) {
-        const updated = await publishTrip.mutateAsync(trip.id)
-        shareToken = updated.shareToken
-      }
-      tab.location.href = `${getClientOrigin()}/shared/trips/${shareToken}`
-    } catch {
-      tab.close()
-      toast({ title: 'Error', description: 'Failed to preview trip.', variant: 'destructive' })
-    }
+    router.push(`/trips/${trip.id}/preview`)
   }
 
   const handleDuplicate = async () => {
