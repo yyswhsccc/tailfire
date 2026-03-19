@@ -1911,10 +1911,17 @@ export class ActivitiesService {
     }
 
     // Verify all children belong to the same trip as the package
+    // Regular activities store trip association via itinerary_day_id → itinerary_days → itineraries,
+    // NOT via the trip_id column (which is only set for floating packages).
     if (pkg.tripId) {
-      const crossTrip = activities.filter(a => a.tripId !== pkg.tripId)
-      if (crossTrip.length > 0) {
-        throw new BadRequestException('All activities must belong to the same trip as the package')
+      for (const activity of activities) {
+        let activityTripId = activity.tripId
+        if (!activityTripId && activity.itineraryDayId) {
+          activityTripId = await this.getTripIdFromDayId(activity.itineraryDayId)
+        }
+        if (activityTripId && activityTripId !== pkg.tripId) {
+          throw new BadRequestException('All activities must belong to the same trip as the package')
+        }
       }
     }
 
