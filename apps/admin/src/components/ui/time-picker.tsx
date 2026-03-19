@@ -122,14 +122,18 @@ export function TimePicker({
   const [open, setOpen] = React.useState(false)
   const [inputValue, setInputValue] = React.useState(value || '')
   const [isValid, setIsValid] = React.useState(true)
+  const isTypingRef = React.useRef(false)
 
-  // Sync external value changes
+  // Sync external value changes (only when not actively typing)
   React.useEffect(() => {
-    if (value !== inputValue) {
-      setInputValue(value || '')
-      setIsValid(!value || isValidTimeFormat(value))
+    if (!isTypingRef.current && value !== undefined) {
+      const externalValue = value || ''
+      if (externalValue !== inputValue) {
+        setInputValue(externalValue)
+        setIsValid(!externalValue || isValidTimeFormat(externalValue))
+      }
     }
-  }, [value, inputValue])
+  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Parse current time for selectors
   const parsed = parseTime(value)
@@ -138,10 +142,11 @@ export function TimePicker({
 
   // Handle manual input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    isTypingRef.current = true
     const newValue = e.target.value
     setInputValue(newValue)
 
-    // Validate and update on valid input
+    // Only call onChange for valid values or empty (clear)
     if (newValue === '') {
       setIsValid(true)
       onChange?.(null)
@@ -149,12 +154,14 @@ export function TimePicker({
       setIsValid(true)
       onChange?.(newValue)
     } else {
-      setIsValid(false)
+      // Intermediate typing state (e.g., "1", "11", "11:") — don't call onChange
+      setIsValid(true) // Don't show error while typing
     }
   }
 
-  // Handle input blur - normalize format
+  // Handle input blur - normalize format and clear typing flag
   const handleInputBlur = () => {
+    isTypingRef.current = false
     if (inputValue && isValidTimeFormat(inputValue)) {
       // Normalize to HH:MM format
       const parsed = parseTime(inputValue)
@@ -163,6 +170,9 @@ export function TimePicker({
         setInputValue(normalized)
         onChange?.(normalized)
       }
+    } else if (inputValue && !isValidTimeFormat(inputValue)) {
+      // Invalid on blur — show error
+      setIsValid(false)
     }
   }
 
