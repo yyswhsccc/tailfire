@@ -31,6 +31,8 @@ import type {
 } from '@tailfire/shared-types'
 import type { AuthContext } from '../auth/auth.types'
 import { TripAccessService } from './trip-access.service'
+import { DayLocationService } from './day-location.service'
+import * as Sentry from '@sentry/nestjs'
 
 // Type for activity thumbnails map
 type ThumbnailMap = Map<string, string>
@@ -48,6 +50,7 @@ export class ActivitiesService {
     private readonly activityTravelersService: ActivityTravelersService,
     private readonly travelerBookingsService: TravelerBookingsService,
     private readonly tripAccessService: TripAccessService,
+    private readonly dayLocationService: DayLocationService,
   ) {}
 
   // ============================================================================
@@ -947,6 +950,21 @@ export class ActivitiesService {
     // For floating activities (null itineraryDayId), we need tripId passed explicitly
     const resolvedTripId = tripId ?? (activity.itineraryDayId ? await this.getTripIdFromDayId(activity.itineraryDayId) : null)
 
+    // Capture itineraryId BEFORE delete for day location cascade
+    let preDeleteItineraryId: string | null = null
+    if (activity.itineraryDayId) {
+      try {
+        const [day] = await this.db.client
+          .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+          .from(this.db.schema.itineraryDays)
+          .where(eq(this.db.schema.itineraryDays.id, activity.itineraryDayId))
+          .limit(1)
+        preDeleteItineraryId = day?.itineraryId ?? null
+      } catch {
+        // Non-fatal: cascade will be skipped if we can't resolve
+      }
+    }
+
     // Clean up traveller splits before database delete
     // Note: CASCADE delete would also remove these, but explicit cleanup ensures
     // proper logging and potential notification handling
@@ -993,6 +1011,18 @@ export class ActivitiesService {
 
     // Mark itinerary as having unpublished changes
     await this.markItineraryChanged(activity.itineraryDayId)
+
+    // Cascade day location recalculation (non-fatal — failures logged to Sentry)
+    if (activity.itineraryDayId && preDeleteItineraryId) {
+      try {
+        await this.dayLocationService.recalculateFromDay(preDeleteItineraryId, activity.itineraryDayId)
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: { service: 'day-location', trigger: 'activity-delete' },
+          extra: { activityId: id, dayId: activity.itineraryDayId, itineraryId: preDeleteItineraryId },
+        })
+      }
+    }
   }
 
   /**

@@ -207,6 +207,32 @@ export class ComponentOrchestrationService {
   }
 
   /**
+   * Capture dayId and itineraryId for an activity BEFORE it is deleted.
+   * Returns null if the activity or its day cannot be resolved (non-fatal).
+   */
+  private async getPreDeleteContext(
+    activityId: string
+  ): Promise<{ dayId: string; itineraryId: string } | null> {
+    try {
+      const [activity] = await this.db.client
+        .select({ itineraryDayId: this.db.schema.itineraryActivities.itineraryDayId })
+        .from(this.db.schema.itineraryActivities)
+        .where(eq(this.db.schema.itineraryActivities.id, activityId))
+        .limit(1)
+      if (!activity?.itineraryDayId) return null
+      const itineraryId = await this.getItineraryIdFromDayId(activity.itineraryDayId)
+      if (!itineraryId) return null
+      return { dayId: activity.itineraryDayId, itineraryId }
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { service: 'day-location', trigger: 'pre-delete-context' },
+        extra: { activityId },
+      })
+      return null
+    }
+  }
+
+  /**
    * Clean up storage files for a component before deletion
    * This prevents orphaned files in Supabase Storage when components are deleted
    */
@@ -565,12 +591,20 @@ export class ComponentOrchestrationService {
    * Delete a flight component (cascades to details via FK)
    */
   async deleteFlight(id: string): Promise<void> {
+    // Capture dayId and itineraryId BEFORE delete (activity won't exist after)
+    const preDelete = await this.getPreDeleteContext(id)
+
     await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
     await this.baseService.delete(id)
     // Flight details and documents are automatically deleted via CASCADE foreign key
+
+    // Cascade day location recalculation (non-fatal)
+    if (preDelete) {
+      await this.cascadeDayLocations(id, preDelete.dayId, preDelete.itineraryId)
+    }
   }
 
   // ============================================================================
@@ -827,12 +861,20 @@ export class ComponentOrchestrationService {
    * Delete a lodging component (cascades to details via FK)
    */
   async deleteLodging(id: string): Promise<void> {
+    // Capture dayId and itineraryId BEFORE delete (activity won't exist after)
+    const preDelete = await this.getPreDeleteContext(id)
+
     await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
     await this.baseService.delete(id)
     // Lodging details and documents are automatically deleted via CASCADE foreign key
+
+    // Cascade day location recalculation (non-fatal)
+    if (preDelete) {
+      await this.cascadeDayLocations(id, preDelete.dayId, preDelete.itineraryId)
+    }
   }
 
   // ============================================================================
@@ -1122,12 +1164,20 @@ export class ComponentOrchestrationService {
    * Delete a transportation component (cascades to details via FK)
    */
   async deleteTransportation(id: string): Promise<void> {
+    // Capture dayId and itineraryId BEFORE delete (activity won't exist after)
+    const preDelete = await this.getPreDeleteContext(id)
+
     await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
     await this.baseService.delete(id)
     // Transportation details and documents are automatically deleted via CASCADE foreign key
+
+    // Cascade day location recalculation (non-fatal)
+    if (preDelete) {
+      await this.cascadeDayLocations(id, preDelete.dayId, preDelete.itineraryId)
+    }
   }
 
   // ============================================================================
@@ -1379,12 +1429,20 @@ export class ComponentOrchestrationService {
    * Delete a dining component (cascades to details via FK)
    */
   async deleteDining(id: string): Promise<void> {
+    // Capture dayId and itineraryId BEFORE delete (activity won't exist after)
+    const preDelete = await this.getPreDeleteContext(id)
+
     await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
     await this.baseService.delete(id)
     // Dining details and documents are automatically deleted via CASCADE foreign key
+
+    // Cascade day location recalculation (non-fatal)
+    if (preDelete) {
+      await this.cascadeDayLocations(id, preDelete.dayId, preDelete.itineraryId)
+    }
   }
 
   // ============================================================================
@@ -1533,12 +1591,20 @@ export class ComponentOrchestrationService {
    * Delete a port info component (cascades to details via FK)
    */
   async deletePortInfo(id: string): Promise<void> {
+    // Capture dayId and itineraryId BEFORE delete (activity won't exist after)
+    const preDelete = await this.getPreDeleteContext(id)
+
     await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
     await this.baseService.delete(id)
     // Port info details and documents are automatically deleted via CASCADE foreign key
+
+    // Cascade day location recalculation (non-fatal)
+    if (preDelete) {
+      await this.cascadeDayLocations(id, preDelete.dayId, preDelete.itineraryId)
+    }
   }
 
   // ============================================================================
@@ -1779,12 +1845,20 @@ export class ComponentOrchestrationService {
    * Delete an options component (cascades to details via FK)
    */
   async deleteOptions(id: string): Promise<void> {
+    // Capture dayId and itineraryId BEFORE delete (activity won't exist after)
+    const preDelete = await this.getPreDeleteContext(id)
+
     await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
     await this.baseService.delete(id)
     // Options details and documents are automatically deleted via CASCADE foreign key
+
+    // Cascade day location recalculation (non-fatal)
+    if (preDelete) {
+      await this.cascadeDayLocations(id, preDelete.dayId, preDelete.itineraryId)
+    }
   }
 
   // ============================================================================
@@ -2070,12 +2144,20 @@ export class ComponentOrchestrationService {
    * Delete a custom cruise component (cascades to details via FK)
    */
   async deleteCustomCruise(id: string): Promise<void> {
+    // Capture dayId and itineraryId BEFORE delete (activity won't exist after)
+    const preDelete = await this.getPreDeleteContext(id)
+
     await this.markItineraryChangedForActivity(id)
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
     await this.baseService.delete(id)
     // Custom cruise details and documents are automatically deleted via CASCADE foreign key
+
+    // Cascade day location recalculation (non-fatal)
+    if (preDelete) {
+      await this.cascadeDayLocations(id, preDelete.dayId, preDelete.itineraryId)
+    }
   }
 
   // =============================================================================
@@ -2359,11 +2441,19 @@ export class ComponentOrchestrationService {
    * Delete a custom tour component (cascades to details and tour_day children via FK)
    */
   async deleteCustomTour(id: string): Promise<void> {
+    // Capture dayId and itineraryId BEFORE delete (activity won't exist after)
+    const preDelete = await this.getPreDeleteContext(id)
+
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
     await this.baseService.delete(id)
     // Custom tour details, tour day children, and documents are automatically deleted via CASCADE foreign key
+
+    // Cascade day location recalculation (non-fatal)
+    if (preDelete) {
+      await this.cascadeDayLocations(id, preDelete.dayId, preDelete.itineraryId)
+    }
   }
 
   // =============================================================================
@@ -2527,8 +2617,16 @@ export class ComponentOrchestrationService {
    * Delete a tour day component
    */
   async deleteTourDay(id: string): Promise<void> {
+    // Capture dayId and itineraryId BEFORE delete (activity won't exist after)
+    const preDelete = await this.getPreDeleteContext(id)
+
     await this.markItineraryChangedForActivity(id)
     await this.baseService.delete(id)
+
+    // Cascade day location recalculation (non-fatal)
+    if (preDelete) {
+      await this.cascadeDayLocations(id, preDelete.dayId, preDelete.itineraryId)
+    }
   }
 
   // ============================================================================
