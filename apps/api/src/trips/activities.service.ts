@@ -1061,6 +1061,23 @@ export class ActivitiesService {
     // Mark itinerary as having unpublished changes
     await this.markItineraryChanged(itineraryDayId)
 
+    // Cascade day location recalculation (non-fatal — reorder may change which activity is "last")
+    try {
+      const [day] = await this.db.client
+        .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+        .from(this.db.schema.itineraryDays)
+        .where(eq(this.db.schema.itineraryDays.id, itineraryDayId))
+        .limit(1)
+      if (day?.itineraryId) {
+        await this.dayLocationService.recalculateFromDay(day.itineraryId, itineraryDayId)
+      }
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { service: 'day-location', trigger: 'activity-reorder' },
+        extra: { itineraryDayId },
+      })
+    }
+
     // Return updated activities
     return this.findByDay(itineraryDayId)
   }
@@ -1171,6 +1188,35 @@ export class ActivitiesService {
       await this.markItineraryChanged(currentActivity.itineraryDayId)
     }
     await this.markItineraryChanged(dto.targetDayId)
+
+    // Cascade day location recalculation for both source and target days (non-fatal)
+    try {
+      // Source day lost the activity — recalculate
+      if (currentActivity.itineraryDayId) {
+        const [sourceDay] = await this.db.client
+          .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+          .from(this.db.schema.itineraryDays)
+          .where(eq(this.db.schema.itineraryDays.id, currentActivity.itineraryDayId))
+          .limit(1)
+        if (sourceDay?.itineraryId) {
+          await this.dayLocationService.recalculateFromDay(sourceDay.itineraryId, currentActivity.itineraryDayId)
+        }
+      }
+      // Target day gained the activity — recalculate
+      const [targetDayInfo] = await this.db.client
+        .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+        .from(this.db.schema.itineraryDays)
+        .where(eq(this.db.schema.itineraryDays.id, dto.targetDayId))
+        .limit(1)
+      if (targetDayInfo?.itineraryId) {
+        await this.dayLocationService.recalculateFromDay(targetDayInfo.itineraryId, dto.targetDayId)
+      }
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { service: 'day-location', trigger: 'activity-move' },
+        extra: { activityId: id, sourceDayId: currentActivity.itineraryDayId, targetDayId: dto.targetDayId },
+      })
+    }
 
     return this.formatActivityResponse(activity)
   }

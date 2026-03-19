@@ -556,7 +556,7 @@ export class DayLocationService {
     // Resolve arrival (end location)
     let arrivalLocation: GeoLocation | null = null
 
-    if (lastSegment.arrivalAirportLat && lastSegment.arrivalAirportLon) {
+    if (lastSegment.arrivalAirportLat != null && lastSegment.arrivalAirportLon != null) {
       arrivalLocation = {
         name: lastSegment.arrivalAirportCity
           || lastSegment.arrivalAirportName
@@ -576,7 +576,7 @@ export class DayLocationService {
     // Resolve departure (for Day 1 start location)
     let departureLocation: GeoLocation | null = null
 
-    if (firstSegment.departureAirportLat && firstSegment.departureAirportLon) {
+    if (firstSegment.departureAirportLat != null && firstSegment.departureAirportLon != null) {
       departureLocation = {
         name: firstSegment.departureAirportCity
           || firstSegment.departureAirportName
@@ -610,7 +610,7 @@ export class DayLocationService {
     },
   ): Promise<GeoLocation | null> {
     // Use activity coordinates if available
-    if (activity.coordinates?.lat && activity.coordinates?.lng) {
+    if (activity.coordinates?.lat != null && activity.coordinates?.lng != null) {
       return {
         name: lodging?.propertyName || activity.name,
         lat: activity.coordinates.lat,
@@ -648,7 +648,7 @@ export class DayLocationService {
     },
   ): Promise<GeoLocation | null> {
     // Use port_info_details coordinates first
-    if (portInfo?.coordinates?.lat && portInfo?.coordinates?.lng) {
+    if (portInfo?.coordinates?.lat != null && portInfo?.coordinates?.lng != null) {
       return {
         name: portInfo.portName || portInfo.portLocation || activity.name,
         lat: portInfo.coordinates.lat,
@@ -657,7 +657,7 @@ export class DayLocationService {
     }
 
     // Use activity coordinates
-    if (activity.coordinates?.lat && activity.coordinates?.lng) {
+    if (activity.coordinates?.lat != null && activity.coordinates?.lng != null) {
       return {
         name: portInfo?.portName || portInfo?.portLocation || activity.name,
         lat: activity.coordinates.lat,
