@@ -46,20 +46,29 @@ export function TopNav() {
   const [autoScreenshot, setAutoScreenshot] = useState<Blob | null>(null)
 
   const handleReportBug = async () => {
-    try {
-      // Wait one frame for dropdown overlay to unmount
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    // Open dialog immediately so user sees it right away
+    setBugReportOpen(true)
 
-      // Capture screenshot with timeout
+    // Capture screenshot in the background
+    try {
+      // Wait for dropdown overlay to fully unmount
+      await new Promise((r) => setTimeout(r, 300))
+
       const html2canvas = (await import('html2canvas')).default
       const capturePromise = html2canvas(document.body, {
         useCORS: true,
         allowTaint: true,
         logging: false,
+        ignoreElements: (el) => {
+          // Ignore the dialog overlay so we capture the page beneath
+          return el.getAttribute('role') === 'dialog' ||
+            el.getAttribute('data-state') === 'open' ||
+            el.classList?.contains('fixed')
+        },
       })
 
       const timeoutPromise = new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), 3000)
+        setTimeout(() => resolve(null), 5000)
       )
 
       const canvas = await Promise.race([capturePromise, timeoutPromise])
@@ -67,13 +76,17 @@ export function TopNav() {
         const blob = await new Promise<Blob | null>((resolve) =>
           (canvas as HTMLCanvasElement).toBlob(resolve, 'image/png')
         )
-        setAutoScreenshot(blob)
+        if (blob) {
+          setAutoScreenshot(blob)
+        } else {
+          console.warn('[BugReporter] canvas.toBlob returned null')
+        }
+      } else {
+        console.warn('[BugReporter] html2canvas timed out after 5s')
       }
-    } catch {
-      // Screenshot capture failed — open dialog without it
+    } catch (err) {
+      console.warn('[BugReporter] Screenshot capture failed:', err)
     }
-
-    setBugReportOpen(true)
   }
 
   const handleSignOut = async () => {

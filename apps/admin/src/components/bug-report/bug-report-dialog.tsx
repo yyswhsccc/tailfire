@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -61,6 +61,13 @@ export function BugReportDialog({
   const [manualScreenshots, setManualScreenshots] = useState<File[]>([])
   const [consoleLogs] = useState(() => getConsoleLogs())
   const [logsOpen, setLogsOpen] = useState(false)
+
+  // Sync auto-screenshot when prop changes (capture completes after dialog opens)
+  useEffect(() => {
+    if (initialAutoScreenshot) {
+      setAutoScreenshot(initialAutoScreenshot)
+    }
+  }, [initialAutoScreenshot])
 
   const {
     register,
@@ -170,6 +177,12 @@ export function BugReportDialog({
           {/* Screenshots */}
           <div className="space-y-1.5">
             <Label>Screenshots</Label>
+            {!autoScreenshot && manualScreenshots.length === 0 && (
+              <div className="flex items-center gap-2 rounded border border-dashed border-ash-300 bg-ash-50 p-3 text-sm text-ash-500">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-ash-300 border-t-phoenix-gold-600" />
+                Capturing screenshot...
+              </div>
+            )}
             <ScreenshotCapture
               autoScreenshot={autoScreenshot}
               screenshots={manualScreenshots}
