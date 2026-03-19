@@ -42,6 +42,7 @@ import { dollarsToCents } from '@/lib/pricing/currency-helpers'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
 import { AmenitiesSelector } from '@/components/ui/amenities-selector'
+import { Combobox } from '@/components/ui/combobox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DocumentUploader } from '@/components/document-uploader'
 import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
@@ -1359,21 +1360,14 @@ export function LodgingForm({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Room Type</label>
-                <Select
+                <Combobox
+                  options={ROOM_TYPES.map((type) => ({ value: type.value, label: type.label }))}
                   value={roomTypeValue || 'standard'}
-                  onValueChange={(v) => setValue('lodgingDetails.roomType', v, { shouldDirty: true })}
-                >
-                  <SelectTrigger data-field="lodgingDetails.roomType">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROOM_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onValueChange={(v) => setValue('lodgingDetails.roomType', v || 'standard', { shouldDirty: true })}
+                  placeholder="Select or type room type..."
+                  searchPlaceholder="Search or enter custom type..."
+                  allowCustom
+                />
               </div>
 
               <div className="space-y-2">
