@@ -192,19 +192,31 @@ try {
 
 - [ ] **Step 3: Commit.**
 
-### Task 4: Trigger cascade on activity delete
+### Task 4: Trigger cascade on ALL activity delete paths
 
-**File:** `apps/api/src/trips/activities.service.ts`
+Delete operations happen via `component-orchestration.service.ts` delete methods AND `activities.controller.ts` endpoints.
 
-- [ ] **Step 1: In the delete method**, after removing the activity, call:
+**File:** `apps/api/src/trips/component-orchestration.service.ts`
 
+- [ ] **Step 1: Add recalculate call to ALL delete methods:**
+  - `deleteFlightComponent` (~line 499)
+  - `deleteLodgingComponent` (~line 748)
+  - `deleteTourComponent` (~line 1043)
+  - `deleteTransportation` (~line 1441)
+  - `deleteDining` (~line 1978)
+  - `deleteCustomCruise` (~line 2267)
+  - `deletePortInfo` (~line 2435)
+
+Each must capture the `itineraryId` and `dayId` BEFORE deleting, then call:
 ```typescript
 await this.dayLocationService.recalculateFromDay(itineraryId, dayId)
 ```
 
-This handles the "delete hotel → revert to airport" scenario.
+**File:** `apps/api/src/trips/activities.controller.ts`
 
-- [ ] **Step 2: Commit.**
+- [ ] **Step 2: Check the generic delete endpoints** (~lines 603, 667, 795, 923) — if these bypass orchestration, they also need the cascade trigger.
+
+- [ ] **Step 3: Commit.**
 
 ---
 
@@ -271,6 +283,23 @@ if (firstPortDayId) {
 - Task 2 should be early (geocoding fix)
 - Tasks 3-7 depend on Task 1
 - Tasks 5-6 can run after Task 3 (frontend cleanup after server handles it)
+
+---
+
+## Concurrency: Itinerary-Level Serialization
+
+To prevent race conditions when two activities are saved simultaneously on the same itinerary, use a PostgreSQL advisory lock keyed by itinerary ID:
+
+```typescript
+async recalculateFromDay(itineraryId: string, dayId: string): Promise<void> {
+  // Advisory lock prevents concurrent cascade on same itinerary
+  const lockKey = hashStringToInt(itineraryId) // Convert UUID to int for pg_advisory_lock
+  await this.db.client.execute(sql`SELECT pg_advisory_xact_lock(${lockKey})`)
+  // ... recalculation logic inside the same transaction
+}
+```
+
+This ensures only one cascade runs at a time per itinerary. The lock is released when the transaction commits. Other saves on different itineraries are unaffected.
 
 ---
 
