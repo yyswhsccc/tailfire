@@ -16,7 +16,8 @@ import { CommissionChecksTable } from './_components/commission-checks-table'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { DollarSign } from 'lucide-react'
+import Link from 'next/link'
+import { DollarSign, Plus } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 
 export default function CommissionPage() {
@@ -51,12 +52,22 @@ export default function CommissionPage() {
             {isAdmin ? 'Agency commission tracking and agent payouts' : 'Your commission earnings and claims'}
           </p>
         </div>
-        {!isAdmin && myPayable && myPayable.totalDueCents > 0 && (
-          <Button onClick={handleClaim} disabled={claimCommission.isPending}>
-            <DollarSign className="mr-2 h-4 w-4" />
-            {claimCommission.isPending ? 'Claiming...' : 'Claim Commission'}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button asChild>
+              <Link href="/commission/receive">
+                <Plus className="mr-2 h-4 w-4" />
+                Receive Deposit
+              </Link>
+            </Button>
+          )}
+          {!isAdmin && myPayable && myPayable.totalDueCents > 0 && (
+            <Button onClick={handleClaim} disabled={claimCommission.isPending}>
+              <DollarSign className="mr-2 h-4 w-4" />
+              {claimCommission.isPending ? 'Claiming...' : 'Claim Commission'}
+            </Button>
+          )}
+        </div>
       </div>
 
       <CommissionStats isAdmin={isAdmin} due={due} summary={summary} />
@@ -66,6 +77,7 @@ export default function CommissionPage() {
           {isAdmin && <TabsTrigger value="payable">Payable by Agent</TabsTrigger>}
           <TabsTrigger value="received">Received Checks</TabsTrigger>
           <TabsTrigger value="claims">{isAdmin ? 'Agent Claims' : 'My Claims'}</TabsTrigger>
+          {isAdmin && <TabsTrigger value="unreconciled">Unreconciled</TabsTrigger>}
         </TabsList>
 
         {isAdmin && (
@@ -129,6 +141,21 @@ export default function CommissionPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {isAdmin && (
+          <TabsContent value="unreconciled">
+            <Card>
+              <CardHeader>
+                <CardTitle>Unreconciled Items</CardTitle>
+                <CardDescription>Deposit line items that couldn&apos;t be matched to a booking</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Unreconciled items from finalized deposits will appear here.
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
     </DashboardLayout>

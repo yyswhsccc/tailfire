@@ -588,11 +588,11 @@ export function ActivityForm({
             </div>
             <div data-field="confirmationNumber">
               <label className="text-sm font-medium text-ash-900 block mb-2">
-                Confirmation #
+                Supplier Booking Ref
               </label>
               <Input
                 {...register('confirmationNumber')}
-                placeholder="Booking reference"
+                placeholder="PNR, reservation #, booking #..."
               />
             </div>
           </div>

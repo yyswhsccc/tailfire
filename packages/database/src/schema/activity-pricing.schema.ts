@@ -61,7 +61,6 @@ export const activityPricing = pgTable('activity_pricing', {
   commissionSplitPercentage: decimal('commission_split_percentage', { precision: 5, scale: 2 }),
   commissionExpectedDate: date('commission_expected_date'),
 
-  confirmationNumber: varchar('confirmation_number', { length: 255 }),
   bookingReference: varchar('booking_reference', { length: 255 }), // Links round-trip flights/activities
   bookingStatus: varchar('booking_status', { length: 100 }),
 
@@ -121,6 +120,10 @@ export const commissionTracking = pgTable('commission_tracking', {
   platformFeeCents: integer('platform_fee_cents').default(0),
   source: varchar('source', { length: 100 }).default('manual'),
   sourceBookingRef: varchar('source_booking_ref', { length: 255 }),
+
+  // Reconciliation audit
+  reconciliationDate: timestamp('reconciliation_date', { withTimezone: true }),
+  reconciledBy: uuid('reconciled_by'),
 
   // Audit fields
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

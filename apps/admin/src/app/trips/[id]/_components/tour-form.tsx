@@ -108,6 +108,8 @@ export function TourForm({
     const currentDay = days.find((d) => d.id === dayId)
     if (!currentDay) return []
     const locs: Array<{ label: string; lat: number; lng: number }> = []
+
+    // 1. Prefer day-level start/end locations
     if (currentDay.startLocationLat != null && currentDay.startLocationLng != null) {
       locs.push({
         label: currentDay.startLocationName || 'Start location',
@@ -123,6 +125,22 @@ export function TourForm({
         lng: currentDay.endLocationLng,
       })
     }
+
+    // 2. Fallback: check activities on this day for coordinates
+    if (locs.length === 0 && currentDay.activities) {
+      for (const act of currentDay.activities) {
+        const coords = act.coordinates as { lat?: number; lng?: number } | null
+        if (coords?.lat != null && coords?.lng != null) {
+          locs.push({
+            label: act.location || act.name || 'Activity location',
+            lat: coords.lat,
+            lng: coords.lng,
+          })
+          break // Use first activity with coordinates
+        }
+      }
+    }
+
     return locs
   }, [days, dayId])
 

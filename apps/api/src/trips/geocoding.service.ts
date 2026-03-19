@@ -11,6 +11,7 @@
 
 import { Injectable, Logger } from '@nestjs/common'
 import { sql } from 'drizzle-orm'
+import * as Sentry from '@sentry/nestjs'
 import { DatabaseService } from '../db/database.service'
 import type { GeoLocation } from '../../../../packages/shared-types/src/api'
 
@@ -36,6 +37,10 @@ export class GeocodingService {
   async resolveLocation(input: ResolveLocationInput): Promise<GeoLocation | null> {
     // 1. If coordinates already provided, use them directly
     if (input.lat != null && input.lng != null) {
+      // Guard against zero coordinates (null island)
+      if (input.lat === 0 && input.lng === 0) {
+        return null
+      }
       return {
         name: input.name || input.address || `${input.lat}, ${input.lng}`,
         lat: input.lat,
@@ -50,6 +55,10 @@ export class GeocodingService {
         if (result) return result
       } catch (err) {
         this.logger.warn(`Failed to resolve airport ${input.iataCode}: ${err}`)
+        Sentry.captureException(err, {
+          tags: { service: 'geocoding', source: 'resolve-location' },
+          extra: { iataCode: input.iataCode, step: 'airport' },
+        })
       }
     }
 
@@ -60,16 +69,25 @@ export class GeocodingService {
         if (result) return result
       } catch (err) {
         this.logger.warn(`Failed to resolve cruise port ${input.portName}: ${err}`)
+        Sentry.captureException(err, {
+          tags: { service: 'geocoding', source: 'resolve-location' },
+          extra: { portName: input.portName, step: 'cruise-port' },
+        })
       }
     }
 
     // 4. Google Places Text Search — fallback for addresses/names
     if (input.address || input.name) {
+      const query = input.address || input.name!
       try {
-        const result = await this.resolveViaGooglePlaces(input.address || input.name!)
+        const result = await this.resolveViaGooglePlaces(query)
         if (result) return result
       } catch (err) {
         this.logger.warn(`Failed to resolve via Google Places: ${err}`)
+        Sentry.captureException(err, {
+          tags: { service: 'geocoding', source: 'resolve-location' },
+          extra: { query, step: 'google-places' },
+        })
       }
     }
 
@@ -96,7 +114,8 @@ export class GeocodingService {
         )
         if (response.ok) {
           const data = await response.json() as { fullName?: string; municipalityName?: string; location?: { lat?: number; lon?: number } }
-          if (data.location?.lat && data.location?.lon) {
+          if (data.location?.lat != null && data.location?.lon != null &&
+              !(data.location.lat === 0 && data.location.lon === 0)) {
             return {
               name: data.municipalityName || data.fullName || iataCode,
               lat: data.location.lat,
@@ -106,6 +125,10 @@ export class GeocodingService {
         }
       } catch (err) {
         this.logger.debug(`Aerodatabox lookup failed for ${iataCode}: ${err}`)
+        Sentry.captureException(err, {
+          tags: { service: 'geocoding', source: 'airport' },
+          extra: { iataCode },
+        })
       }
     }
 
@@ -132,6 +155,10 @@ export class GeocodingService {
       }
     } catch (err) {
       this.logger.debug(`Cruise port lookup failed for ${portName}: ${err}`)
+      Sentry.captureException(err, {
+        tags: { service: 'geocoding', source: 'cruise-port' },
+        extra: { portName },
+      })
     }
 
     return null
@@ -162,7 +189,16 @@ export class GeocodingService {
         }),
       })
 
-      if (!response.ok) return null
+      if (!response.ok) {
+        const msg = `Google Places API returned ${response.status}: ${response.statusText}`
+        this.logger.warn(msg)
+        Sentry.captureMessage(msg, {
+          level: 'warning',
+          tags: { service: 'geocoding', source: 'google-places' },
+          extra: { query, status: response.status },
+        })
+        return null
+      }
 
       const data = await response.json() as {
         places?: Array<{
@@ -172,7 +208,8 @@ export class GeocodingService {
       }
 
       const place = data.places?.[0]
-      if (place?.location?.latitude && place?.location?.longitude) {
+      if (place?.location?.latitude != null && place?.location?.longitude != null &&
+          !(place.location.latitude === 0 && place.location.longitude === 0)) {
         return {
           name: place.displayName?.text || query,
           lat: place.location.latitude,
@@ -181,6 +218,10 @@ export class GeocodingService {
       }
     } catch (err) {
       this.logger.debug(`Google Places lookup failed for "${query}": ${err}`)
+      Sentry.captureException(err, {
+        tags: { service: 'geocoding', source: 'google-places' },
+        extra: { query },
+      })
     }
 
     return null

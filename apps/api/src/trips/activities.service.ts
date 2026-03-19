@@ -31,6 +31,8 @@ import type {
 } from '@tailfire/shared-types'
 import type { AuthContext } from '../auth/auth.types'
 import { TripAccessService } from './trip-access.service'
+import { DayLocationService } from './day-location.service'
+import * as Sentry from '@sentry/nestjs'
 
 // Type for activity thumbnails map
 type ThumbnailMap = Map<string, string>
@@ -48,6 +50,7 @@ export class ActivitiesService {
     private readonly activityTravelersService: ActivityTravelersService,
     private readonly travelerBookingsService: TravelerBookingsService,
     private readonly tripAccessService: TripAccessService,
+    private readonly dayLocationService: DayLocationService,
   ) {}
 
   // ============================================================================
@@ -947,6 +950,21 @@ export class ActivitiesService {
     // For floating activities (null itineraryDayId), we need tripId passed explicitly
     const resolvedTripId = tripId ?? (activity.itineraryDayId ? await this.getTripIdFromDayId(activity.itineraryDayId) : null)
 
+    // Capture itineraryId BEFORE delete for day location cascade
+    let preDeleteItineraryId: string | null = null
+    if (activity.itineraryDayId) {
+      try {
+        const [day] = await this.db.client
+          .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+          .from(this.db.schema.itineraryDays)
+          .where(eq(this.db.schema.itineraryDays.id, activity.itineraryDayId))
+          .limit(1)
+        preDeleteItineraryId = day?.itineraryId ?? null
+      } catch {
+        // Non-fatal: cascade will be skipped if we can't resolve
+      }
+    }
+
     // Clean up traveller splits before database delete
     // Note: CASCADE delete would also remove these, but explicit cleanup ensures
     // proper logging and potential notification handling
@@ -993,6 +1011,18 @@ export class ActivitiesService {
 
     // Mark itinerary as having unpublished changes
     await this.markItineraryChanged(activity.itineraryDayId)
+
+    // Cascade day location recalculation (non-fatal — failures logged to Sentry)
+    if (activity.itineraryDayId && preDeleteItineraryId) {
+      try {
+        await this.dayLocationService.recalculateFromDay(preDeleteItineraryId, activity.itineraryDayId)
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: { service: 'day-location', trigger: 'activity-delete' },
+          extra: { activityId: id, dayId: activity.itineraryDayId, itineraryId: preDeleteItineraryId },
+        })
+      }
+    }
   }
 
   /**
@@ -1030,6 +1060,23 @@ export class ActivitiesService {
 
     // Mark itinerary as having unpublished changes
     await this.markItineraryChanged(itineraryDayId)
+
+    // Cascade day location recalculation (non-fatal — reorder may change which activity is "last")
+    try {
+      const [day] = await this.db.client
+        .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+        .from(this.db.schema.itineraryDays)
+        .where(eq(this.db.schema.itineraryDays.id, itineraryDayId))
+        .limit(1)
+      if (day?.itineraryId) {
+        await this.dayLocationService.recalculateFromDay(day.itineraryId, itineraryDayId)
+      }
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { service: 'day-location', trigger: 'activity-reorder' },
+        extra: { itineraryDayId },
+      })
+    }
 
     // Return updated activities
     return this.findByDay(itineraryDayId)
@@ -1141,6 +1188,35 @@ export class ActivitiesService {
       await this.markItineraryChanged(currentActivity.itineraryDayId)
     }
     await this.markItineraryChanged(dto.targetDayId)
+
+    // Cascade day location recalculation for both source and target days (non-fatal)
+    try {
+      // Source day lost the activity — recalculate
+      if (currentActivity.itineraryDayId) {
+        const [sourceDay] = await this.db.client
+          .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+          .from(this.db.schema.itineraryDays)
+          .where(eq(this.db.schema.itineraryDays.id, currentActivity.itineraryDayId))
+          .limit(1)
+        if (sourceDay?.itineraryId) {
+          await this.dayLocationService.recalculateFromDay(sourceDay.itineraryId, currentActivity.itineraryDayId)
+        }
+      }
+      // Target day gained the activity — recalculate
+      const [targetDayInfo] = await this.db.client
+        .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+        .from(this.db.schema.itineraryDays)
+        .where(eq(this.db.schema.itineraryDays.id, dto.targetDayId))
+        .limit(1)
+      if (targetDayInfo?.itineraryId) {
+        await this.dayLocationService.recalculateFromDay(targetDayInfo.itineraryId, dto.targetDayId)
+      }
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { service: 'day-location', trigger: 'activity-move' },
+        extra: { activityId: id, sourceDayId: currentActivity.itineraryDayId, targetDayId: dto.targetDayId },
+      })
+    }
 
     return this.formatActivityResponse(activity)
   }
@@ -1996,13 +2072,12 @@ export class ActivitiesService {
     // Get activity IDs for batch pricing query
     const activityIds = activities.map(a => a.activity.id)
 
-    // Fetch pricing for all activities in a single query (include confirmationNumber)
+    // Fetch pricing for all activities in a single query
     const pricingData = await this.db.client
       .select({
         activityId: this.db.schema.activityPricing.activityId,
         totalPriceCents: this.db.schema.activityPricing.totalPriceCents,
         currency: this.db.schema.activityPricing.currency,
-        confirmationNumber: this.db.schema.activityPricing.confirmationNumber,
       })
       .from(this.db.schema.activityPricing)
       .where(inArray(this.db.schema.activityPricing.activityId, activityIds))
@@ -2102,7 +2177,7 @@ export class ActivitiesService {
       return {
         ...baseResponse,
         supplierName,
-        confirmationNumber: pricing?.confirmationNumber ?? r.activity.confirmationNumber ?? null,
+        confirmationNumber: r.activity.confirmationNumber ?? null,
         isBooked: r.activity.isBooked,
         paymentStatus,
         paidCents: payment?.paidCents ?? null,

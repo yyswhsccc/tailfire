@@ -61,6 +61,24 @@
 2. Dev/Preview environments automatically see Production data through FDW
 3. To test sync code changes: deploy to production and monitor the daily 2 AM sync
 
+### 6. Raw SQL Must Use DB Column Names from Drizzle Schema
+
+**DO NOT:**
+- Guess or invent column names in raw SQL queries
+- Use Drizzle TypeScript property names in raw SQL (e.g., `dayDate` won't work — use `date`)
+
+**WHY:** Raw SQL (`sql\`...\``) bypasses Drizzle's column mapping and hits PostgreSQL directly. The **real DB column name** is the string inside the Drizzle column function: `dayDate: date('date', ...)` → raw SQL uses `date`, NOT `dayDate`.
+
+**ALWAYS:**
+- Read the Drizzle schema file and use the **quoted string** in the column definition:
+  ```typescript
+  name: varchar('name', ...)             // raw SQL → ia.name
+  dayDate: date('date', ...)             // raw SQL → id_day.date (NOT day_date)
+  activityPricingId: uuid('component_pricing_id', ...) // raw SQL → ct.component_pricing_id
+  ```
+- Test raw SQL queries in psql before committing: `source apps/api/.env && psql "$DATABASE_URL" -c "SELECT ..."`
+- Verify columns exist: `psql "$DATABASE_URL" -c "\d table_name"`
+
 ## Development Workflow (A to Z)
 
 ### Complete Flow
@@ -554,6 +572,17 @@ Import is idempotent — scoped by agency + source + booking reference to preven
 | `TRAVELTEK_USERNAME` | OAuth client username |
 | `TRAVELTEK_PASSWORD` | OAuth client password |
 | `TRAVELTEK_SID` | Agency session ID |
+
+## Monitoring
+
+Sentry is integrated in both the API (NestJS) and Admin (Next.js) apps for runtime error capture across all environments.
+
+- **Dashboard**: https://systemsaholic.sentry.io (org: systemsaholic)
+- **Test endpoint**: `GET /api/v1/debug-sentry` — triggers a deliberate error to verify capture is working (disabled in production)
+- **Projects**: `tailfire-api` (Railway) and `tailfire-admin` (Vercel)
+- **Environments**: errors are tagged `development`, `preview`, or `production` based on `SENTRY_ENVIRONMENT` / `NEXT_PUBLIC_SENTRY_ENVIRONMENT` Doppler secrets
+
+See [docs/MONITORING.md](./docs/MONITORING.md) for full configuration details, Doppler secrets reference, troubleshooting runbooks, and beta monitoring SOPs.
 
 ## Codex Collaboration (tmux)
 

@@ -3,7 +3,9 @@ import { ConfigModule } from '@nestjs/config'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ThrottlerModule } from '@nestjs/throttler'
 import { EventEmitterModule } from '@nestjs/event-emitter'
-import { APP_GUARD } from '@nestjs/core'
+import { APP_FILTER, APP_GUARD } from '@nestjs/core'
+import { SentryModule } from '@sentry/nestjs/setup'
+import { SentryGlobalFilter } from '@sentry/nestjs/setup'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { DatabaseModule } from './db/database.module'
@@ -52,6 +54,9 @@ import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
 
 @Module({
   imports: [
+    // Sentry error monitoring (must be first)
+    SentryModule.forRoot(),
+
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
@@ -184,6 +189,11 @@ import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
   controllers: [AppController],
   providers: [
     AppService,
+    // Sentry global exception filter (captures unhandled exceptions)
+    {
+      provide: APP_FILTER,
+      useClass: SentryGlobalFilter,
+    },
     // Global Guards - registered in reverse execution order
     // Execution order: JwtAuthGuard (in AuthModule) → UserStatusGuard → ActiveUserGuard
     {

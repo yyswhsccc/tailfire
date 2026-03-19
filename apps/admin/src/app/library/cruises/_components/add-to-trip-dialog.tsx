@@ -99,6 +99,20 @@ export function AddToTripDialog({
 
   const trips = tripsData?.data ?? []
 
+  // Compute a reliable end date: use catalog endDate if reasonable, otherwise sailDate + nights.
+  // Catalog endDate can be corrupt (Traveltek data quality). But it can also be legitimately
+  // longer than sailDate + nights when there's a land extension in the package.
+  const computedEnd = new Date(sailing.sailDate + 'T00:00:00')
+  computedEnd.setDate(computedEnd.getDate() + sailing.nights)
+  const expectedEndDate = computedEnd.toISOString().split('T')[0]!
+  const catalogEndDate = sailing.endDate
+  const maxReasonableGap = 14 // days — land extensions rarely exceed 2 weeks
+  const catalogEndMs = new Date(catalogEndDate + 'T00:00:00').getTime()
+  const expectedEndMs = new Date(expectedEndDate + 'T00:00:00').getTime()
+  const reliableEndDate = (catalogEndMs - expectedEndMs) > maxReasonableGap * 86400000 || catalogEndMs < expectedEndMs
+    ? expectedEndDate
+    : catalogEndDate
+
   const isProcessing = !!processingTripId || createTripMutation.isPending || addCruiseMutation.isPending
 
   /**
@@ -116,7 +130,7 @@ export function AddToTripDialog({
    */
   const datesNeedExtending = (itinerary: ItineraryResponseDto): boolean => {
     if (!itinerary.startDate || !itinerary.endDate) return false
-    return sailing.sailDate < itinerary.startDate || sailing.endDate > itinerary.endDate
+    return sailing.sailDate < itinerary.startDate || reliableEndDate > itinerary.endDate
   }
 
   /**
@@ -140,7 +154,7 @@ export function AddToTripDialog({
     setPendingExtendParams({
       itineraryId: itinerary.id,
       tripId,
-      cruiseDates: { start: sailing.sailDate, end: sailing.endDate },
+      cruiseDates: { start: sailing.sailDate, end: reliableEndDate },
       itineraryDates: {
         start: itinerary.startDate || '',
         end: itinerary.endDate || '',
@@ -166,7 +180,7 @@ export function AddToTripDialog({
         const newItinerary = await api.post<{ id: string }>(`/trips/${tripId}/itineraries`, {
           name: `${sailing.name} Itinerary`,
           startDate: sailing.sailDate,
-          endDate: sailing.endDate,
+          endDate: reliableEndDate,
         })
         await addCruiseToItinerary(tripId, newItinerary.id)
       } else if (tripItineraries.length === 1) {
@@ -207,14 +221,14 @@ export function AddToTripDialog({
       const newTrip = await createTripMutation.mutateAsync({
         name: tripName,
         startDate: sailing.sailDate,
-        endDate: sailing.endDate,
+        endDate: reliableEndDate,
         tripType: 'leisure',
       })
 
       const newItinerary = await api.post<{ id: string }>(`/trips/${newTrip.id}/itineraries`, {
         name: `${sailing.name} Itinerary`,
         startDate: sailing.sailDate,
-        endDate: sailing.endDate,
+        endDate: reliableEndDate,
       })
 
       await addCruiseMutation.mutateAsync({
@@ -246,7 +260,7 @@ export function AddToTripDialog({
         const newItinerary = await api.post<{ id: string }>(`/trips/${selectedTripId}/itineraries`, {
           name: newItineraryName || `${sailing.name} Itinerary`,
           startDate: sailing.sailDate,
-          endDate: sailing.endDate,
+          endDate: reliableEndDate,
         })
         await addCruiseToItinerary(selectedTripId, newItinerary.id)
       } else {
@@ -325,14 +339,14 @@ export function AddToTripDialog({
               <>
                 Create a new trip or add to an existing one.
                 <span className="block mt-1 text-phoenix-gold-600 font-medium">
-                  {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(sailing.endDate), 'MMM d, yyyy')} ({sailing.nights} nights)
+                  {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(reliableEndDate), 'MMM d, yyyy')} ({sailing.nights} nights)
                 </span>
               </>
             ) : (
               <>
                 This trip has multiple itineraries. Choose one.
                 <span className="block mt-1 text-phoenix-gold-600 font-medium">
-                  Cruise dates: {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(sailing.endDate), 'MMM d, yyyy')}
+                  Cruise dates: {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(reliableEndDate), 'MMM d, yyyy')}
                 </span>
               </>
             )}
@@ -594,7 +608,7 @@ export function AddToTripDialog({
                       Create new itinerary
                     </Label>
                     <p className="text-xs text-ash-500 mt-0.5">
-                      Will use cruise dates: {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(sailing.endDate), 'MMM d, yyyy')}
+                      Will use cruise dates: {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(reliableEndDate), 'MMM d, yyyy')}
                     </p>
                     {createNewItinerary && (
                       <Input

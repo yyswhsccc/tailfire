@@ -132,6 +132,14 @@ export class CustomCruiseDetailsService {
       inclusions: data.inclusions || [],
       specialRequests: data.specialRequests || null,
     })
+
+    // Sync booking_number → itinerary_activities.confirmation_number
+    if (data.bookingNumber) {
+      await this.db.client
+        .update(this.db.schema.itineraryActivities)
+        .set({ confirmationNumber: data.bookingNumber })
+        .where(eq(this.db.schema.itineraryActivities.id, activityId))
+    }
   }
 
   /**
@@ -222,6 +230,14 @@ export class CustomCruiseDetailsService {
         updatedAt: new Date(),
       })
       .where(eq(this.db.schema.customCruiseDetails.activityId, activityId))
+
+    // Sync booking_number → itinerary_activities.confirmation_number
+    if (data.bookingNumber !== undefined) {
+      await this.db.client
+        .update(this.db.schema.itineraryActivities)
+        .set({ confirmationNumber: data.bookingNumber || null })
+        .where(eq(this.db.schema.itineraryActivities.id, activityId))
+    }
   }
 
   /**
