@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { Button } from '@/components/ui/button'
 import { useCreateTripGroup, useUpdateTripGroup } from '@/hooks/use-trips'
 import { useToast } from '@/hooks/use-toast'
@@ -107,6 +108,7 @@ export function GroupFormDialog({
   const { toast } = useToast()
 
   const groupType = form.watch('type')
+  const startDateValue = form.watch('startDate')
 
   // Reset form when group changes or dialog opens
   useEffect(() => {
@@ -281,7 +283,11 @@ export function GroupFormDialog({
                       <FormItem>
                         <FormLabel>Start Date</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                          <DatePickerEnhanced
+                            value={field.value || null}
+                            onChange={(date) => field.onChange(date || '')}
+                            placeholder="Select start date"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -294,7 +300,12 @@ export function GroupFormDialog({
                       <FormItem>
                         <FormLabel>End Date</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                          <DatePickerEnhanced
+                            value={field.value || null}
+                            onChange={(date) => field.onChange(date || '')}
+                            placeholder="Select end date"
+                            minDate={startDateValue || undefined}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
