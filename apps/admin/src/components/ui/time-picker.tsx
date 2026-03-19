@@ -294,7 +294,7 @@ export function TimePicker({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleMinuteChange(5)}
+                    onClick={() => handleMinuteChange(1)}
                     className="h-8 w-8 p-0"
                     aria-label="Increase minutes"
                   >
@@ -307,7 +307,7 @@ export function TimePicker({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleMinuteChange(-5)}
+                    onClick={() => handleMinuteChange(-1)}
                     className="h-8 w-8 p-0"
                     aria-label="Decrease minutes"
                   >
