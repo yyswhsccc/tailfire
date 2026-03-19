@@ -2444,6 +2444,8 @@ export class ComponentOrchestrationService {
     // Capture dayId and itineraryId BEFORE delete (activity won't exist after)
     const preDelete = await this.getPreDeleteContext(id)
 
+    await this.markItineraryChangedForActivity(id)
+
     // Clean up storage files before database delete
     await this.cleanupComponentStorage(id)
 
