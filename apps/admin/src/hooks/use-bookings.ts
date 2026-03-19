@@ -331,12 +331,15 @@ export function useLinkActivities() {
         },
       )
 
-      // Optimistically update booking detail — mark as stale so it refetches
+      // Invalidate the package's linked activities + detail so expanded row refetches immediately
+      queryClient.invalidateQueries({ queryKey: bookingKeys.linkedActivities(bookingId) })
       queryClient.invalidateQueries({ queryKey: bookingKeys.detail(bookingId) })
+      queryClient.invalidateQueries({ queryKey: bookingKeys.lists() })
     },
 
     onSuccess: (result) => {
       // Refetch to get authoritative server state
+      queryClient.invalidateQueries({ queryKey: bookingKeys.linkedActivities(result.id) })
       queryClient.invalidateQueries({ queryKey: bookingKeys.detail(result.id) })
       queryClient.invalidateQueries({ queryKey: bookingKeys.lists() })
       queryClient.invalidateQueries({ queryKey: bookingKeys.tripTotals(result.tripId) })
