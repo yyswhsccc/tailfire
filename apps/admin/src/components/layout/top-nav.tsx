@@ -1,9 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Search, HelpCircle, Settings } from 'lucide-react'
+import { Search, HelpCircle, Settings, Bug } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
 import { useAuth } from '@/providers/auth-provider'
@@ -21,6 +22,7 @@ import { useMyProfile } from '@/hooks/use-user-profile'
 import { NotificationBell } from '@/components/notifications'
 import { CalendarNavbarPopover } from '@/components/calendar'
 import { useUnreadEmailCount } from '@/hooks/use-emails'
+import { BugReportDialog } from '@/components/bug-report/bug-report-dialog'
 
 const navigation = [
   { name: 'Trips', href: '/trips' },
@@ -40,6 +42,39 @@ export function TopNav() {
   const { data: profile } = useMyProfile()
   const isAdmin = claims?.role === 'admin'
   const unreadEmailCount = useUnreadEmailCount()
+  const [bugReportOpen, setBugReportOpen] = useState(false)
+  const [autoScreenshot, setAutoScreenshot] = useState<Blob | null>(null)
+
+  const handleReportBug = async () => {
+    try {
+      // Wait one frame for dropdown overlay to unmount
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+
+      // Capture screenshot with timeout
+      const html2canvas = (await import('html2canvas')).default
+      const capturePromise = html2canvas(document.body, {
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+      })
+
+      const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), 3000)
+      )
+
+      const canvas = await Promise.race([capturePromise, timeoutPromise])
+      if (canvas) {
+        const blob = await new Promise<Blob | null>((resolve) =>
+          (canvas as HTMLCanvasElement).toBlob(resolve, 'image/png')
+        )
+        setAutoScreenshot(blob)
+      }
+    } catch {
+      // Screenshot capture failed — open dialog without it
+    }
+
+    setBugReportOpen(true)
+  }
 
   const handleSignOut = async () => {
     try {
@@ -130,6 +165,11 @@ export function TopNav() {
               <DropdownMenuItem>Documentation</DropdownMenuItem>
               <DropdownMenuItem>Support</DropdownMenuItem>
               <DropdownMenuItem>Keyboard Shortcuts</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleReportBug}>
+                <Bug className="mr-2 h-4 w-4" />
+                Report a Bug
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -180,6 +220,15 @@ export function TopNav() {
           </DropdownMenu>
         </div>
       </div>
+
+      <BugReportDialog
+        open={bugReportOpen}
+        onOpenChange={(open) => {
+          setBugReportOpen(open)
+          if (!open) setAutoScreenshot(null)
+        }}
+        autoScreenshot={autoScreenshot}
+      />
     </header>
   )
 }
