@@ -928,7 +928,7 @@ export default function ContactDetailPage() {
                       <DatePickerEnhanced
                         value={formData.dateOfBirth || null}
                         onChange={(date) => setFormData({ ...formData, dateOfBirth: date || '' })}
-                        placeholder="Select date of birth"
+                        placeholder="YYYY-MM-DD"
                         className="mt-1"
                       />
                     </div>
