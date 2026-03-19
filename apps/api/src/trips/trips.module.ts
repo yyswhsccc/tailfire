@@ -58,6 +58,7 @@ import { ActivityMediaService } from './activity-media.service'
 import { TripMediaService } from './trip-media.service'
 import { GeocodingService } from './geocoding.service'
 import { GeolocationCascadeService } from './geolocation-cascade.service'
+import { DayLocationService } from './day-location.service'
 import { StorageProviderFactory } from '../storage/providers'
 
 // Controllers
@@ -126,6 +127,7 @@ import { TripGroupSharesController } from './trip-group-shares.controller'
     StorageProviderFactory,
     GeocodingService,
     GeolocationCascadeService,
+    DayLocationService,
     TripsService,
     TripAccessService,
     TripGroupAccessService,
@@ -176,6 +178,7 @@ import { TripGroupSharesController } from './trip-group-shares.controller'
     StorageService,
     StorageProviderFactory,
     GeocodingService,
+    DayLocationService,
     // Additional exports for TemplatesModule
     ComponentOrchestrationService,
     BaseComponentService,
