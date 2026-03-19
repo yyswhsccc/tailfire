@@ -18,6 +18,7 @@ import type {
   TripGroupDocumentDto,
   TripGroupMediaDto,
   GroupTravelerDto,
+  SharedTripProposalDto,
 } from '@tailfire/shared-types/api'
 import type { TripStatus } from '@tailfire/shared-types'
 
@@ -586,5 +587,21 @@ export function useDeleteGroupMedia() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: tripGroupKeys.all })
     },
+  })
+}
+
+// ============================================================================
+// PREVIEW PROPOSAL
+// ============================================================================
+
+/**
+ * Fetch trip proposal data for the admin preview page.
+ * Uses the same DTO shape as the client-facing proposal view.
+ */
+export function usePreviewProposal(tripId: string | undefined) {
+  return useQuery({
+    queryKey: [...tripKeys.detail(tripId!), 'preview-proposal'],
+    queryFn: () => api.get<SharedTripProposalDto>(`/trips/${tripId}/preview-proposal`),
+    enabled: !!tripId,
   })
 }
