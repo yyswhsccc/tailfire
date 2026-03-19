@@ -62,6 +62,7 @@ export function RelationshipDialog({
   const updateRelationship = useUpdateRelationship()
 
   const [selectedContactId, setSelectedContactId] = useState<string>('')
+  const [selectedContactDisplay, setSelectedContactDisplay] = useState<{ name: string; initials: string } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [contactSearchOpen, setContactSearchOpen] = useState(false)
   const [showCreateContact, setShowCreateContact] = useState(false)
@@ -84,7 +85,12 @@ export function RelationshipDialog({
         lastName: newLastName.trim() || undefined,
         email: newEmail.trim() || undefined,
       } as Parameters<typeof createContact.mutateAsync>[0])
+      const displayName = newContact.displayName || `${newFirstName.trim()} ${newLastName.trim()}`.trim()
       setSelectedContactId(newContact.id)
+      setSelectedContactDisplay({
+        name: displayName,
+        initials: getInitials(newFirstName.trim(), newLastName.trim()),
+      })
       setShowCreateContact(false)
       setNewFirstName('')
       setNewLastName('')
@@ -139,6 +145,7 @@ export function RelationshipDialog({
         setSelectedContactId(relationship.contactId2)
       } else {
         setSelectedContactId('')
+        setSelectedContactDisplay(null)
       }
       setShowCreateContact(false)
       setNewFirstName('')
@@ -232,6 +239,15 @@ export function RelationshipDialog({
                         </Avatar>
                         <span>{selectedContact.displayName}</span>
                       </div>
+                    ) : selectedContactDisplay ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="text-xs bg-phoenix-gold-100 text-phoenix-gold-700">
+                            {selectedContactDisplay.initials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>{selectedContactDisplay.name}</span>
+                      </div>
                     ) : (
                       <span className="text-ash-500">Select a contact...</span>
                     )}
@@ -255,6 +271,7 @@ export function RelationshipDialog({
                             value={contact.id}
                             onSelect={() => {
                               setSelectedContactId(contact.id)
+                              setSelectedContactDisplay(null) // Clear — will use contactsData lookup
                               setContactSearchOpen(false)
                             }}
                           >
