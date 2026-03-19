@@ -1,8 +1,13 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
-import { X, Upload } from 'lucide-react'
+import { useState, useCallback, useRef, useMemo } from 'react'
+import { X, Upload, ZoomIn } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface ScreenshotCaptureProps {
   autoScreenshot: Blob | null
@@ -24,6 +29,13 @@ export function ScreenshotCapture({
 }: ScreenshotCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  // Stable object URL for auto-screenshot to avoid re-creating on every render
+  const autoScreenshotUrl = useMemo(
+    () => (autoScreenshot ? URL.createObjectURL(autoScreenshot) : null),
+    [autoScreenshot],
+  )
 
   const totalCount = (autoScreenshot ? 1 : 0) + screenshots.length
   const canAddMore = totalCount < maxFiles
@@ -74,13 +86,22 @@ export function ScreenshotCapture({
 
   return (
     <div className="space-y-2" onPaste={handlePaste}>
-      {autoScreenshot && (
+      {autoScreenshot && autoScreenshotUrl && (
         <div className="relative inline-block">
-          <img
-            src={URL.createObjectURL(autoScreenshot)}
-            alt="Auto-captured screenshot"
-            className="h-24 rounded border border-ash-200 object-cover"
-          />
+          <button
+            type="button"
+            className="group relative block cursor-pointer overflow-hidden rounded border border-ash-200"
+            onClick={() => setPreviewUrl(autoScreenshotUrl)}
+          >
+            <img
+              src={autoScreenshotUrl}
+              alt="Auto-captured screenshot"
+              className="h-24 object-cover transition-opacity group-hover:opacity-80"
+            />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+              <ZoomIn className="h-6 w-6 text-white drop-shadow-lg" />
+            </div>
+          </button>
           <Button
             type="button"
             variant="ghost"
@@ -90,30 +111,56 @@ export function ScreenshotCapture({
           >
             <X className="h-3 w-3" />
           </Button>
-          <span className="mt-0.5 block text-xs text-ash-500">Auto-captured</span>
+          <span className="mt-0.5 block text-xs text-ash-500">Auto-captured — click to preview</span>
         </div>
       )}
 
       <div className="flex flex-wrap gap-2">
-        {screenshots.map((file, i) => (
-          <div key={i} className="relative inline-block">
-            <img
-              src={URL.createObjectURL(file)}
-              alt={`Screenshot ${i + 1}`}
-              className="h-24 rounded border border-ash-200 object-cover"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute -right-2 -top-2 h-5 w-5 rounded-full bg-ash-900 text-white hover:bg-red-600"
-              onClick={() => removeManualScreenshot(i)}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        ))}
+        {screenshots.map((file, i) => {
+          const url = URL.createObjectURL(file)
+          return (
+            <div key={i} className="relative inline-block">
+              <button
+                type="button"
+                className="group relative block cursor-pointer overflow-hidden rounded border border-ash-200"
+                onClick={() => setPreviewUrl(url)}
+              >
+                <img
+                  src={url}
+                  alt={`Screenshot ${i + 1}`}
+                  className="h-24 object-cover transition-opacity group-hover:opacity-80"
+                />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+                  <ZoomIn className="h-6 w-6 text-white drop-shadow-lg" />
+                </div>
+              </button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute -right-2 -top-2 h-5 w-5 rounded-full bg-ash-900 text-white hover:bg-red-600"
+                onClick={() => removeManualScreenshot(i)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          )
+        })}
       </div>
+
+      {/* Full-size preview lightbox */}
+      <Dialog open={!!previewUrl} onOpenChange={(open) => { if (!open) setPreviewUrl(null) }}>
+        <DialogContent className="max-h-[95vh] max-w-[95vw] overflow-auto p-2">
+          <DialogTitle className="sr-only">Screenshot Preview</DialogTitle>
+          {previewUrl && (
+            <img
+              src={previewUrl}
+              alt="Screenshot preview"
+              className="h-auto w-full rounded"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {canAddMore && (
         <div
