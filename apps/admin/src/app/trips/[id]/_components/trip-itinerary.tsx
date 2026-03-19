@@ -207,8 +207,9 @@ export function TripItinerary({ trip }: TripItineraryProps) {
     // Always reset active drag item
     setActiveDragItem(null)
 
-    // Early return: No drop target
+    // Early return: No drop target or cancel zone
     if (!over) return
+    if (over.data.current?.type === 'cancel') return
 
     // Extract drag source data
     const dragType = active.data.current?.type
@@ -568,6 +569,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
       collisionDetection={dndCollisionDetectionCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveDragItem(null)}
     >
       {/* TODO: Implement keyboard-based drag and drop
        * @dnd-kit supports keyboard sensors but requires:
@@ -672,7 +674,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
         </div>
 
         {/* Right Sidebar - fixed width, never shrinks */}
-        {selectedItinerary && <div className="flex-shrink-0"><ComponentLibrarySidebar /></div>}
+        {selectedItinerary && <div className="flex-shrink-0"><ComponentLibrarySidebar isDragging={!!activeDragItem} /></div>}
       </div>
 
       {/* Create Itinerary Dialog (TERN pattern) */}
@@ -707,6 +709,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
               )}
               <p className="text-sm font-medium text-ash-900">{activeDragItem.label}</p>
             </div>
+            <p className="text-[10px] text-ash-400 mt-1">Press Esc to cancel</p>
           </div>
         ) : null}
       </DragOverlay>
