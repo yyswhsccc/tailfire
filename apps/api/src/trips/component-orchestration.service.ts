@@ -3464,6 +3464,28 @@ export class ComponentOrchestrationService {
       })
     }
 
+    // Step 5c: Cascade day locations from first port day
+    // This triggers the same recalculation that per-activity creation would have triggered,
+    // since bulkCreate bypasses per-activity orchestration.
+    const firstPortDayId = itineraryDays[0]?.id
+    if (firstPortDayId) {
+      try {
+        await this.dayLocationService.recalculateFromDay(itineraryId, firstPortDayId)
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: { service: 'day-location', trigger: 'cruise-port-schedule' },
+          extra: { cruiseId, itineraryId, firstPortDayId },
+        })
+        this.logger.warn({
+          message: 'Failed to cascade day locations after cruise port schedule generation (non-blocking)',
+          cruiseId,
+          itineraryId,
+          firstPortDayId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
     // Step 6: Construct port info DTOs directly from local data (no N+1 queries)
     // We have all the data we need from portInfoDataList and createdActivities
     const now = new Date().toISOString()
