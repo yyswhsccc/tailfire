@@ -37,6 +37,10 @@ export class GeocodingService {
   async resolveLocation(input: ResolveLocationInput): Promise<GeoLocation | null> {
     // 1. If coordinates already provided, use them directly
     if (input.lat != null && input.lng != null) {
+      // Guard against zero coordinates (null island)
+      if (input.lat === 0 && input.lng === 0) {
+        return null
+      }
       return {
         name: input.name || input.address || `${input.lat}, ${input.lng}`,
         lat: input.lat,
@@ -184,7 +188,16 @@ export class GeocodingService {
         }),
       })
 
-      if (!response.ok) return null
+      if (!response.ok) {
+        const msg = `Google Places API returned ${response.status}: ${response.statusText}`
+        this.logger.warn(msg)
+        Sentry.captureMessage(msg, {
+          level: 'warning',
+          tags: { service: 'geocoding', source: 'google-places' },
+          extra: { query, status: response.status },
+        })
+        return null
+      }
 
       const data = await response.json() as {
         places?: Array<{
