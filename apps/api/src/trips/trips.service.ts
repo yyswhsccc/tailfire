@@ -1895,10 +1895,9 @@ export class TripsService {
 
     const pricingVisible = trip.pricingVisibility === 'show_all'
 
-    // Build all proposing itineraries with LIVE data
-    const proposing = itineraries.filter((it) => it.status === 'proposing')
+    // Build ALL itineraries with LIVE data (preview shows everything, not just proposing)
     const proposedItineraries: SharedItineraryDto[] = []
-    for (const itin of proposing) {
+    for (const itin of itineraries) {
       const dto = await this.buildProposalItinerary(itin, pricingVisible)
       if (dto) {
         dto.publishedVersion = itin.publishedVersion

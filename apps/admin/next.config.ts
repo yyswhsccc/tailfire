@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 
   // Transpile workspace packages
-  transpilePackages: ['@tailfire/shared-types'],
+  transpilePackages: ['@tailfire/shared-types', '@tailfire/trip-proposal-ui', '@tailfire/ui-public'],
 
   eslint: {
     ignoreDuringBuilds: true,
