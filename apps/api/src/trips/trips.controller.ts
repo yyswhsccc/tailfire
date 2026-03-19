@@ -758,6 +758,24 @@ export class TripsController {
   }
 
   /**
+   * Get all known locations from a trip's activities
+   * GET /trips/:id/locations
+   * IMPORTANT: Must come before @Get(':id') to avoid route conflicts
+   *
+   * Returns hotels, airports, ports, and day locations for use as
+   * autocomplete suggestions in the transportation form.
+   * Access check: User must have read access.
+   */
+  @Get(':id/locations')
+  async getTripLocations(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ) {
+    await this.tripAccessService.verifyReadAccess(id, auth)
+    return this.tripsService.getTripLocations(id)
+  }
+
+  /**
    * Get booking status for all activities in a trip
    * GET /trips/:id/booking-status
    * IMPORTANT: Must come before @Get(':id') to avoid route conflicts

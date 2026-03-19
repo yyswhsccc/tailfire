@@ -4912,4 +4912,205 @@ export class TripsService {
       error: result.error,
     }
   }
+
+  // ============================================================================
+  // TRIP LOCATIONS (for transportation form autocomplete)
+  // ============================================================================
+
+  /**
+   * Returns all known locations from a trip's activities for use as
+   * autocomplete suggestions in the transportation form.
+   *
+   * Extracts locations from:
+   * - Lodging activities (hotels): property name + address + coordinates
+   * - Flight segments: departure/arrival airport name + IATA code + coordinates
+   * - Port info activities: port name + coordinates
+   * - Itinerary days: start/end location names + coordinates
+   *
+   * Results are deduplicated by name.
+   */
+  async getTripLocations(tripId: string): Promise<TripLocation[]> {
+    // Step 1: Get all itinerary IDs for the trip
+    const itineraryRows = await this.db.client
+      .select({ id: this.db.schema.itineraries.id })
+      .from(this.db.schema.itineraries)
+      .where(eq(this.db.schema.itineraries.tripId, tripId))
+
+    if (itineraryRows.length === 0) return []
+    const itineraryIds = itineraryRows.map((r) => r.id)
+
+    // Step 2: Get all itinerary days (for day-level locations)
+    const days = await this.db.client
+      .select({
+        id: this.db.schema.itineraryDays.id,
+        dayNumber: this.db.schema.itineraryDays.dayNumber,
+        startLocationName: this.db.schema.itineraryDays.startLocationName,
+        startLocationLat: this.db.schema.itineraryDays.startLocationLat,
+        startLocationLng: this.db.schema.itineraryDays.startLocationLng,
+        endLocationName: this.db.schema.itineraryDays.endLocationName,
+        endLocationLat: this.db.schema.itineraryDays.endLocationLat,
+        endLocationLng: this.db.schema.itineraryDays.endLocationLng,
+      })
+      .from(this.db.schema.itineraryDays)
+      .where(inArray(this.db.schema.itineraryDays.itineraryId, itineraryIds))
+
+    if (days.length === 0) return []
+    const dayIds = days.map((d) => d.id)
+
+    // Step 3: Get all activities for these days (lodging + flight + port_info)
+    const activities = await this.db.client
+      .select({
+        id: this.db.schema.itineraryActivities.id,
+        activityType: this.db.schema.itineraryActivities.activityType,
+      })
+      .from(this.db.schema.itineraryActivities)
+      .where(
+        and(
+          inArray(this.db.schema.itineraryActivities.itineraryDayId, dayIds),
+          inArray(this.db.schema.itineraryActivities.activityType, ['lodging', 'flight', 'port_info'] as any[]),
+        ),
+      )
+
+    const activityIds = activities.map((a) => a.id)
+
+    // Step 4: Batch-fetch detail rows in parallel
+    const [lodgingRows, flightSegmentRows, portInfoRows] = await Promise.all([
+      activityIds.length > 0
+        ? this.db.client
+            .select({
+              activityId: this.db.schema.lodgingDetails.activityId,
+              propertyName: this.db.schema.lodgingDetails.propertyName,
+              address: this.db.schema.lodgingDetails.address,
+            })
+            .from(this.db.schema.lodgingDetails)
+            .where(inArray(this.db.schema.lodgingDetails.activityId, activityIds))
+        : Promise.resolve([]),
+      activityIds.length > 0
+        ? this.db.client
+            .select({
+              activityId: this.db.schema.flightSegments.activityId,
+              departureAirportCode: this.db.schema.flightSegments.departureAirportCode,
+              departureAirportName: this.db.schema.flightSegments.departureAirportName,
+              departureAirportLat: this.db.schema.flightSegments.departureAirportLat,
+              departureAirportLon: this.db.schema.flightSegments.departureAirportLon,
+              arrivalAirportCode: this.db.schema.flightSegments.arrivalAirportCode,
+              arrivalAirportName: this.db.schema.flightSegments.arrivalAirportName,
+              arrivalAirportLat: this.db.schema.flightSegments.arrivalAirportLat,
+              arrivalAirportLon: this.db.schema.flightSegments.arrivalAirportLon,
+            })
+            .from(this.db.schema.flightSegments)
+            .where(inArray(this.db.schema.flightSegments.activityId, activityIds))
+            .orderBy(asc(this.db.schema.flightSegments.segmentOrder))
+        : Promise.resolve([]),
+      activityIds.length > 0
+        ? this.db.client
+            .select({
+              activityId: this.db.schema.portInfoDetails.activityId,
+              portName: this.db.schema.portInfoDetails.portName,
+              coordinates: this.db.schema.portInfoDetails.coordinates,
+            })
+            .from(this.db.schema.portInfoDetails)
+            .where(inArray(this.db.schema.portInfoDetails.activityId, activityIds))
+        : Promise.resolve([]),
+    ])
+
+    // Step 5: Build location list
+    const locations: TripLocation[] = []
+    const seenNames = new Set<string>()
+
+    const addLocation = (loc: TripLocation) => {
+      if (!loc.name) return
+      const key = loc.name.trim().toLowerCase()
+      if (seenNames.has(key)) return
+      seenNames.add(key)
+      locations.push(loc)
+    }
+
+    // Lodging locations
+    for (const row of lodgingRows) {
+      if (row.propertyName) {
+        addLocation({
+          type: 'hotel',
+          name: row.propertyName,
+          address: row.address ?? null,
+          lat: null,
+          lng: null,
+        })
+      }
+    }
+
+    // Airport locations (departure + arrival from each segment)
+    for (const seg of flightSegmentRows) {
+      if (seg.departureAirportName) {
+        addLocation({
+          type: 'airport',
+          name: seg.departureAirportName,
+          address: null,
+          lat: seg.departureAirportLat ?? null,
+          lng: seg.departureAirportLon ?? null,
+          iataCode: seg.departureAirportCode ?? undefined,
+        })
+      }
+      if (seg.arrivalAirportName) {
+        addLocation({
+          type: 'airport',
+          name: seg.arrivalAirportName,
+          address: null,
+          lat: seg.arrivalAirportLat ?? null,
+          lng: seg.arrivalAirportLon ?? null,
+          iataCode: seg.arrivalAirportCode ?? undefined,
+        })
+      }
+    }
+
+    // Port locations
+    for (const row of portInfoRows) {
+      if (row.portName) {
+        const coords = row.coordinates as { lat?: number; lng?: number } | null
+        addLocation({
+          type: 'port',
+          name: row.portName,
+          address: null,
+          lat: coords?.lat ?? null,
+          lng: coords?.lng ?? null,
+        })
+      }
+    }
+
+    // Day-level start/end locations
+    for (const day of days) {
+      if (day.startLocationName) {
+        addLocation({
+          type: 'day_location',
+          name: day.startLocationName,
+          address: null,
+          lat: day.startLocationLat != null ? Number(day.startLocationLat) : null,
+          lng: day.startLocationLng != null ? Number(day.startLocationLng) : null,
+          dayNumber: day.dayNumber,
+        })
+      }
+      if (day.endLocationName) {
+        addLocation({
+          type: 'day_location',
+          name: day.endLocationName,
+          address: null,
+          lat: day.endLocationLat != null ? Number(day.endLocationLat) : null,
+          lng: day.endLocationLng != null ? Number(day.endLocationLng) : null,
+          dayNumber: day.dayNumber,
+        })
+      }
+    }
+
+    return locations
+  }
+}
+
+export interface TripLocation {
+  type: 'hotel' | 'airport' | 'port' | 'day_location'
+  name: string
+  address: string | null
+  lat: number | null
+  lng: number | null
+  iataCode?: string
+  dayNumber?: number
 }
