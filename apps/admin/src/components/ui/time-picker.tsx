@@ -218,13 +218,13 @@ export function TimePicker({
           aria-label={ariaLabel || 'Enter time in HH:MM format'}
           aria-invalid={!isValid}
           className={cn(
-            'min-h-11 pr-24', // 44px min height, space for clock + clear buttons
+            'min-h-11 pr-20', // 44px min height, space for clock + clear buttons
             !isValid && 'border-destructive focus-visible:ring-destructive'
           )}
         />
 
-        {/* Inline buttons */}
-        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+        {/* Inline buttons — pointer-events-none on container so clicks reach the input */}
+        <div className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {/* Clear Button */}
           {showClear && inputValue && !disabled && (
             <Button
@@ -232,7 +232,7 @@ export function TimePicker({
               variant="ghost"
               size="sm"
               onClick={handleClear}
-              className="h-11 w-11 p-0 hover:bg-muted"
+              className="pointer-events-auto h-8 w-8 p-0 hover:bg-muted"
               aria-label="Clear time"
             >
               <X className="h-4 w-4" />
@@ -247,7 +247,7 @@ export function TimePicker({
                 variant="ghost"
                 size="sm"
                 disabled={disabled}
-                className="h-11 w-11 p-0 hover:bg-muted"
+                className="pointer-events-auto h-8 w-8 p-0 hover:bg-muted"
                 aria-label="Open time selector"
               >
                 <Clock className="h-4 w-4" />
