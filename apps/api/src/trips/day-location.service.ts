@@ -106,7 +106,7 @@ export class DayLocationService {
 
       // Step 2: Fetch all location-relevant activities for the itinerary
       const dayIds = days.map(d => d.dayId)
-      const resolvedActivities = await this.fetchAndResolveActivities(dayIds)
+      const resolvedActivities = await this.fetchAndResolveActivities(tx, dayIds)
 
       // Group resolved activities by day
       const activitiesByDay = new Map<string, ResolvedActivity[]>()
@@ -262,17 +262,43 @@ export class DayLocationService {
       })
 
       for (const update of actualUpdates) {
+        const day = days.find(d => d.dayId === update.dayId)!
+
+        const startDiff = !day.startLocationOverride && this.locationDiffers(
+          update.startName
+            ? { name: update.startName, lat: Number(update.startLat), lng: Number(update.startLng) }
+            : null,
+          day.startLocationName,
+          day.startLocationLat,
+          day.startLocationLng,
+        )
+
+        const endDiff = !day.endLocationOverride && this.locationDiffers(
+          update.endName
+            ? { name: update.endName, lat: Number(update.endLat), lng: Number(update.endLng) }
+            : null,
+          day.endLocationName,
+          day.endLocationLat,
+          day.endLocationLng,
+        )
+
+        const setFields: Record<string, unknown> = { updatedAt: new Date() }
+
+        if (startDiff) {
+          setFields.startLocationName = update.startName
+          setFields.startLocationLat = update.startLat
+          setFields.startLocationLng = update.startLng
+        }
+
+        if (endDiff) {
+          setFields.endLocationName = update.endName
+          setFields.endLocationLat = update.endLat
+          setFields.endLocationLng = update.endLng
+        }
+
         await tx
           .update(this.db.schema.itineraryDays)
-          .set({
-            startLocationName: update.startName,
-            startLocationLat: update.startLat,
-            startLocationLng: update.startLng,
-            endLocationName: update.endName,
-            endLocationLat: update.endLat,
-            endLocationLng: update.endLng,
-            updatedAt: new Date(),
-          })
+          .set(setFields)
           .where(eq(this.db.schema.itineraryDays.id, update.dayId))
       }
 
@@ -292,11 +318,14 @@ export class DayLocationService {
    * Fetch location-relevant activities for the given days and resolve
    * their coordinates using the GeocodingService.
    */
-  private async fetchAndResolveActivities(dayIds: string[]): Promise<ResolvedActivity[]> {
+  private async fetchAndResolveActivities(
+    tx: Parameters<Parameters<typeof this.db.client.transaction>[0]>[0],
+    dayIds: string[],
+  ): Promise<ResolvedActivity[]> {
     if (dayIds.length === 0) return []
 
     // Fetch activities with their type-specific details
-    const activities = await this.db.client
+    const activities = await tx
       .select({
         id: this.db.schema.itineraryActivities.id,
         dayId: this.db.schema.itineraryActivities.itineraryDayId,
@@ -322,7 +351,7 @@ export class DayLocationService {
       .map(a => a.id)
 
     const flightSegments = flightActivityIds.length > 0
-      ? await this.db.client
+      ? await tx
           .select({
             activityId: this.db.schema.flightSegments.activityId,
             segmentOrder: this.db.schema.flightSegments.segmentOrder,
@@ -348,7 +377,7 @@ export class DayLocationService {
       .map(a => a.id)
 
     const lodgingDetails = lodgingActivityIds.length > 0
-      ? await this.db.client
+      ? await tx
           .select({
             activityId: this.db.schema.lodgingDetails.activityId,
             address: this.db.schema.lodgingDetails.address,
@@ -364,7 +393,7 @@ export class DayLocationService {
       .map(a => a.id)
 
     const portInfoDetails = portInfoActivityIds.length > 0
-      ? await this.db.client
+      ? await tx
           .select({
             activityId: this.db.schema.portInfoDetails.activityId,
             portName: this.db.schema.portInfoDetails.portName,
