@@ -8,6 +8,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common'
 import { tourItineraryDays } from '@tailfire/database'
 import { asc } from 'drizzle-orm'
+import * as Sentry from '@sentry/nestjs'
 
 // Valid transportation subtypes
 const VALID_TRANSPORTATION_SUBTYPES = [
@@ -40,6 +41,7 @@ import { StorageService } from './storage.service'
 import { DatabaseService } from '../db/database.service'
 import { ItineraryDaysService } from './itinerary-days.service'
 import { ActivitiesService } from './activities.service'
+import { DayLocationService } from './day-location.service'
 import type {
   CreateFlightComponentDto,
   FlightComponentDto,
@@ -90,7 +92,8 @@ export class ComponentOrchestrationService {
     private readonly storageService: StorageService,
     private readonly db: DatabaseService,
     private readonly itineraryDaysService: ItineraryDaysService,
-    private readonly activitiesService: ActivitiesService
+    private readonly activitiesService: ActivitiesService,
+    private readonly dayLocationService: DayLocationService
   ) {}
 
   /**
@@ -147,6 +150,60 @@ export class ComponentOrchestrationService {
       throw new BadRequestException(`Itinerary day ${dayId} not found or has no agency`)
     }
     return day.agencyId
+  }
+
+  /**
+   * Get itineraryId from a dayId
+   */
+  private async getItineraryIdFromDayId(dayId: string): Promise<string | null> {
+    const [day] = await this.db.client
+      .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+      .from(this.db.schema.itineraryDays)
+      .where(eq(this.db.schema.itineraryDays.id, dayId))
+      .limit(1)
+    return day?.itineraryId ?? null
+  }
+
+  /**
+   * Non-blocking cascade of day location recalculation after activity save.
+   * Failures are captured to Sentry but do not block the activity save.
+   */
+  private async cascadeDayLocations(
+    activityId: string,
+    dayId: string,
+    itineraryId: string
+  ): Promise<void> {
+    try {
+      await this.dayLocationService.recalculateFromDay(itineraryId, dayId)
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { service: 'day-location', trigger: 'activity-save' },
+        extra: { activityId, dayId, itineraryId },
+      })
+    }
+  }
+
+  /**
+   * Look up dayId and itineraryId for an existing activity, then cascade.
+   * Used by update methods that only have the activity id.
+   */
+  private async cascadeDayLocationsForActivity(activityId: string): Promise<void> {
+    try {
+      const [activity] = await this.db.client
+        .select({ itineraryDayId: this.db.schema.itineraryActivities.itineraryDayId })
+        .from(this.db.schema.itineraryActivities)
+        .where(eq(this.db.schema.itineraryActivities.id, activityId))
+        .limit(1)
+      if (!activity?.itineraryDayId) return
+      const itineraryId = await this.getItineraryIdFromDayId(activity.itineraryDayId)
+      if (!itineraryId) return
+      await this.dayLocationService.recalculateFromDay(itineraryId, activity.itineraryDayId)
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { service: 'day-location', trigger: 'activity-save' },
+        extra: { activityId },
+      })
+    }
   }
 
   /**
@@ -273,6 +330,14 @@ export class ComponentOrchestrationService {
     }
 
     await this.markItineraryChangedForActivity(activityId)
+
+    // Cascade day location recalculation (non-blocking)
+    if (dto.itineraryDayId) {
+      const itineraryId = await this.getItineraryIdFromDayId(dto.itineraryDayId)
+      if (itineraryId) {
+        await this.cascadeDayLocations(activityId, dto.itineraryDayId, itineraryId)
+      }
+    }
 
     // Return the complete flight component
     return this.getFlight(activityId)
@@ -489,6 +554,9 @@ export class ComponentOrchestrationService {
     // Mark itinerary as having unpublished changes
     await this.markItineraryChangedForActivity(id)
 
+    // Cascade day location recalculation (non-blocking)
+    await this.cascadeDayLocationsForActivity(id)
+
     // Return the updated flight component
     return this.getFlight(id)
   }
@@ -576,6 +644,14 @@ export class ComponentOrchestrationService {
           updatedAt: new Date(),
         })
         .where(eq(this.db.schema.activityPricing.activityId, activityId))
+    }
+
+    // Cascade day location recalculation (non-blocking)
+    if (dto.itineraryDayId) {
+      const itineraryId = await this.getItineraryIdFromDayId(dto.itineraryDayId)
+      if (itineraryId) {
+        await this.cascadeDayLocations(activityId, dto.itineraryDayId, itineraryId)
+      }
     }
 
     return this.getLodging(activityId)
@@ -738,6 +814,9 @@ export class ComponentOrchestrationService {
     }
 
     await this.markItineraryChangedForActivity(id)
+
+    // Cascade day location recalculation (non-blocking)
+    await this.cascadeDayLocationsForActivity(id)
 
     return this.getLodging(id)
   }
@@ -1344,6 +1423,14 @@ export class ComponentOrchestrationService {
       await this.portInfoDetailsService.create(activityId, dto.portInfoDetails)
     }
 
+    // Cascade day location recalculation (non-blocking)
+    if (dto.itineraryDayId) {
+      const itineraryId = await this.getItineraryIdFromDayId(dto.itineraryDayId)
+      if (itineraryId) {
+        await this.cascadeDayLocations(activityId, dto.itineraryDayId, itineraryId)
+      }
+    }
+
     return this.getPortInfo(activityId)
   }
 
@@ -1431,6 +1518,9 @@ export class ComponentOrchestrationService {
     }
 
     await this.markItineraryChangedForActivity(id)
+
+    // Cascade day location recalculation (non-blocking)
+    await this.cascadeDayLocationsForActivity(id)
 
     return this.getPortInfo(id)
   }
