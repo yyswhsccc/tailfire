@@ -568,6 +568,9 @@ export class DayLocationService {
     } else if (lastSegment.arrivalAirportCode) {
       arrivalLocation = await this.geocodingService.resolveLocation({
         iataCode: lastSegment.arrivalAirportCode,
+        name: lastSegment.arrivalAirportName
+          || lastSegment.arrivalAirportCity
+          || `${lastSegment.arrivalAirportCode} airport`,
       })
     }
 
@@ -588,6 +591,9 @@ export class DayLocationService {
     } else if (firstSegment.departureAirportCode) {
       departureLocation = await this.geocodingService.resolveLocation({
         iataCode: firstSegment.departureAirportCode,
+        name: firstSegment.departureAirportName
+          || firstSegment.departureAirportCity
+          || `${firstSegment.departureAirportCode} airport`,
       })
     }
 
