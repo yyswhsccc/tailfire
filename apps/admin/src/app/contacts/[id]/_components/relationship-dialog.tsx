@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
-import { Loader2, Search, ExternalLink } from 'lucide-react'
+import { Loader2, Search, ExternalLink, Plus, UserPlus } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useContacts } from '@/hooks/use-contacts'
+import { useContacts, useCreateContact } from '@/hooks/use-contacts'
 import { useCreateRelationship, useUpdateRelationship } from '@/hooks/use-relationships'
 import { useToast } from '@/hooks/use-toast'
 import { RELATIONSHIP_CATEGORIES } from '@/lib/relationship-constants'
@@ -64,12 +64,43 @@ export function RelationshipDialog({
   const [selectedContactId, setSelectedContactId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const [contactSearchOpen, setContactSearchOpen] = useState(false)
+  const [showCreateContact, setShowCreateContact] = useState(false)
+  const [newFirstName, setNewFirstName] = useState('')
+  const [newLastName, setNewLastName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
 
   const { data: contactsData } = useContacts({
     search: searchQuery,
     limit: 50,
     isActive: true,
   })
+  const createContact = useCreateContact()
+
+  const handleCreateAndSelect = useCallback(async () => {
+    if (!newFirstName.trim()) return
+    try {
+      const newContact = await createContact.mutateAsync({
+        firstName: newFirstName.trim(),
+        lastName: newLastName.trim() || undefined,
+        email: newEmail.trim() || undefined,
+      } as Parameters<typeof createContact.mutateAsync>[0])
+      setSelectedContactId(newContact.id)
+      setShowCreateContact(false)
+      setNewFirstName('')
+      setNewLastName('')
+      setNewEmail('')
+      toast({
+        title: 'Contact created',
+        description: `${newContact.displayName || newFirstName} has been created and selected.`,
+      })
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to create contact. Please try again.',
+        variant: 'destructive',
+      })
+    }
+  }, [newFirstName, newLastName, newEmail, createContact, toast])
 
   const {
     register,
@@ -109,6 +140,10 @@ export function RelationshipDialog({
       } else {
         setSelectedContactId('')
       }
+      setShowCreateContact(false)
+      setNewFirstName('')
+      setNewLastName('')
+      setNewEmail('')
     }
   }, [open, relationship, reset])
 
@@ -242,6 +277,66 @@ export function RelationshipDialog({
                   </Command>
                 </PopoverContent>
               </Popover>
+
+              {/* Create New Contact Option */}
+              {!showCreateContact ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowCreateContact(true)}
+                  className="mt-2 gap-1 text-phoenix-gold-600 hover:text-phoenix-gold-700"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Create new contact
+                </Button>
+              ) : (
+                <div className="mt-2 space-y-2 rounded-lg border border-dashed border-phoenix-gold-300 bg-phoenix-gold-50/50 p-3">
+                  <p className="text-xs font-medium text-ash-700">New Contact</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="First name *"
+                      value={newFirstName}
+                      onChange={(e) => setNewFirstName(e.target.value)}
+                      autoFocus
+                    />
+                    <Input
+                      placeholder="Last name"
+                      value={newLastName}
+                      onChange={(e) => setNewLastName(e.target.value)}
+                    />
+                  </div>
+                  <Input
+                    placeholder="Email (optional)"
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleCreateAndSelect}
+                      disabled={!newFirstName.trim() || createContact.isPending}
+                      className="bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
+                    >
+                      {createContact.isPending ? (
+                        <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Creating...</>
+                      ) : (
+                        <><Plus className="mr-1 h-3 w-3" /> Create & Select</>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowCreateContact(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
