@@ -114,7 +114,8 @@ export class GeocodingService {
         )
         if (response.ok) {
           const data = await response.json() as { fullName?: string; municipalityName?: string; location?: { lat?: number; lon?: number } }
-          if (data.location?.lat && data.location?.lon) {
+          if (data.location?.lat != null && data.location?.lon != null &&
+              !(data.location.lat === 0 && data.location.lon === 0)) {
             return {
               name: data.municipalityName || data.fullName || iataCode,
               lat: data.location.lat,
@@ -207,7 +208,8 @@ export class GeocodingService {
       }
 
       const place = data.places?.[0]
-      if (place?.location?.latitude && place?.location?.longitude) {
+      if (place?.location?.latitude != null && place?.location?.longitude != null &&
+          !(place.location.latitude === 0 && place.location.longitude === 0)) {
         return {
           name: place.displayName?.text || query,
           lat: place.location.latitude,
