@@ -85,9 +85,6 @@ import { mapServerErrors, scrollToFirstError, getErrorMessage, getFirstError, fo
 import { TripDateWarning } from '@/components/ui/trip-date-warning'
 import { getDefaultMonthHint } from '@/lib/date-utils'
 import { usePendingDayResolution } from '@/components/ui/pending-day-picker'
-import type { CascadePreview } from '@tailfire/shared-types/api'
-import { useCascadePreview, useCascadeApply } from '@/hooks/use-itinerary-days'
-import { CascadeConfirmationDialog } from '@/components/cascade-confirmation-dialog'
 
 // Transportation subtype options
 const TRANSPORTATION_SUBTYPES: { value: TransportationSubtype; label: string }[] = [
@@ -241,12 +238,6 @@ export function TransportationForm({
   const { returnToItinerary } = useActivityNavigation()
   const [activityIsBooked, setActivityIsBooked] = useState(activity?.isBooked ?? false)
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
-
-  // Cascade state
-  const [cascadePreview, setCascadePreview] = useState<CascadePreview | null>(null)
-  const [showCascadeDialog, setShowCascadeDialog] = useState(false)
-  const cascadePreviewMutation = useCascadePreview(itineraryId)
-  const cascadeApplyMutation = useCascadeApply(itineraryId)
 
   // Package linkage state for PricingSection
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
@@ -684,34 +675,6 @@ export function TransportationForm({
         lastSavedSnapshotRef.current = JSON.stringify(getValues())
         setSaveStatus('saved')
         setLastSavedAt(new Date())
-
-        // Check for cascade: transfers with dropoff address
-        const subtype = data.transportationDetails?.subtype
-        const dropoffAddress = data.transportationDetails?.dropoffAddress
-        const savedActivityId = response.id || activityId
-        const isTransferType = subtype === 'transfer' || subtype === 'private_car' || subtype === 'shuttle'
-
-        if (isTransferType && dropoffAddress && savedActivityId) {
-          try {
-            const preview = await cascadePreviewMutation.mutateAsync({
-              dayId,
-              request: {
-                location: { name: dropoffAddress, lat: 0, lng: 0 },
-                activityId: savedActivityId,
-                activityType: 'transportation',
-                description: `Transfer arrives at ${dropoffAddress}`,
-              },
-            })
-
-            if (preview.affectedDays.length > 0) {
-              setCascadePreview(preview)
-              setShowCascadeDialog(true)
-              return
-            }
-          } catch {
-            // Non-blocking
-          }
-        }
 
         // Show success overlay and redirect
         setShowSuccess(true)
@@ -1475,34 +1438,6 @@ export function TransportationForm({
         isPending={markActivityBooked.isPending}
       />
 
-      {/* Cascade Confirmation Dialog */}
-      <CascadeConfirmationDialog
-        preview={cascadePreview}
-        open={showCascadeDialog}
-        onOpenChange={setShowCascadeDialog}
-        isApplying={cascadeApplyMutation.isPending}
-        onConfirm={async (dayIds) => {
-          if (!cascadePreview) return
-          try {
-            await cascadeApplyMutation.mutateAsync({
-              dayId,
-              confirmation: { dayIds },
-              preview: cascadePreview,
-            })
-            toast({ title: 'Locations updated', description: `Applied to ${dayIds.length} days.` })
-          } catch {
-            toast({ title: 'Error', description: 'Failed to apply location updates.', variant: 'destructive' })
-          }
-          setShowCascadeDialog(false)
-          setCascadePreview(null)
-          setShowSuccess(true)
-        }}
-        onSkip={() => {
-          setShowCascadeDialog(false)
-          setCascadePreview(null)
-          setShowSuccess(true)
-        }}
-      />
     </div>
   )
 }
