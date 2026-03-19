@@ -67,7 +67,7 @@ export function RelationshipDialog({
 
   const { data: contactsData } = useContacts({
     search: searchQuery,
-    limit: 20,
+    limit: 50,
     isActive: true,
   })
 
