@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { format, parseISO, isWithinInterval, addDays } from 'date-fns'
 import {
   MapPin,
@@ -54,6 +54,7 @@ import {
   type TourDeparture,
   type TourInclusion,
 } from '@/hooks/use-tour-library'
+import { AddToTripDialog } from '@/components/library/add-to-trip-dialog'
 
 // Globus Family image base URL
 const GLOBUS_IMAGE_BASE = 'https://images.globusfamily.com'
@@ -365,6 +366,9 @@ export function TourDetailModal({
   // Extend itinerary confirmation state
   const [showExtendConfirmation, setShowExtendConfirmation] = useState(false)
 
+  // Add to trip dialog state (when no tripContext)
+  const [showAddToTripDialog, setShowAddToTripDialog] = useState(false)
+
   // Departure filtering state
   // Default: show Available and Please Call, hide Not Available
   const [statusFilters, setStatusFilters] = useState<Record<DepartureStatus, boolean>>({
@@ -381,6 +385,7 @@ export function TourDetailModal({
     setSelectedDepartureId(null)
     setActiveTab('overview')
     setShowExtendConfirmation(false)
+    setShowAddToTripDialog(false)
     // Reset filters with default values
     setStatusFilters({
       available: true,
@@ -480,6 +485,30 @@ export function TourDetailModal({
     setShowExtendConfirmation(false)
     performAddToItinerary(true)
   }
+
+  /**
+   * Callback for the shared AddToTripDialog (when no tripContext).
+   * The useAddTourToItinerary mutation handles navigation internally when tripId is provided.
+   */
+  const handleTripAndItinerarySelected = useCallback(async (params: {
+    tripId: string
+    itineraryId: string
+    isNewTrip: boolean
+    isNewItinerary: boolean
+  }) => {
+    if (!tour || !selectedDeparture) return
+
+    await addTourMutation.mutateAsync({
+      tour,
+      departure: selectedDeparture,
+      itineraryId: params.itineraryId,
+      tripId: params.tripId,
+      autoExtendItinerary: params.isNewItinerary, // New itineraries have matching dates, safe to extend
+    })
+
+    setShowAddToTripDialog(false)
+    onClose()
+  }, [tour, selectedDeparture, addTourMutation, onClose])
 
   return (
   <>
@@ -922,6 +951,7 @@ export function TourDetailModal({
                   ) : (
                     <Button
                       disabled={!selectedDeparture}
+                      onClick={() => setShowAddToTripDialog(true)}
                       className="bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
                     >
                       <Plus className="mr-2 h-4 w-4" />
@@ -957,6 +987,21 @@ export function TourDetailModal({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    {/* Add to Trip Dialog - shown when no tripContext */}
+    {tour && selectedDeparture && (
+      <AddToTripDialog
+        isOpen={showAddToTripDialog}
+        onClose={() => setShowAddToTripDialog(false)}
+        activityName={tour.name}
+        activityDates={selectedDeparture.landStartDate ? {
+          start: selectedDeparture.landStartDate,
+          end: selectedDeparture.landEndDate ?? undefined,
+        } : undefined}
+        onTripAndItinerarySelected={handleTripAndItinerarySelected}
+        isProcessing={addTourMutation.isPending}
+      />
+    )}
   </>
   )
 }

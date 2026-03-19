@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
 import {
   Loader2,
@@ -11,7 +10,6 @@ import {
   Ship,
   Calendar,
   Check,
-  AlertTriangle,
 } from 'lucide-react'
 import {
   Dialog,
@@ -21,16 +19,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,25 +28,32 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useTrips, useCreateTrip } from '@/hooks/use-trips'
-import { useAddCruiseToItinerary, type SailingDetailResponse } from '@/hooks/use-cruise-library'
 import type { ItineraryResponseDto } from '@tailfire/shared-types/api'
 
-interface AddToTripDialogProps {
-  sailing: SailingDetailResponse
+export interface AddToTripDialogProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess?: (tripId: string) => void
+  activityName: string
+  activityDates?: { start: string; end?: string }
+  onTripAndItinerarySelected: (params: {
+    tripId: string
+    itineraryId: string
+    isNewTrip: boolean
+    isNewItinerary: boolean
+  }) => Promise<void>
+  isProcessing?: boolean
 }
 
 type Step = 'select-trip' | 'select-itinerary'
 
 export function AddToTripDialog({
-  sailing,
   isOpen,
   onClose,
-  onSuccess,
+  activityName,
+  activityDates,
+  onTripAndItinerarySelected,
+  isProcessing: externalProcessing = false,
 }: AddToTripDialogProps) {
-  const router = useRouter()
   const [step, setStep] = useState<Step>('select-trip')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -66,7 +61,7 @@ export function AddToTripDialog({
   const [showCreateTrip, setShowCreateTrip] = useState(false)
   const [newTripName, setNewTripName] = useState('')
 
-  // Existing trip → itinerary picker state (only shown when trip has 2+ itineraries)
+  // Existing trip -> itinerary picker state (only shown when trip has 2+ itineraries)
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null)
   const [itineraries, setItineraries] = useState<ItineraryResponseDto[]>([])
   const [selectedItineraryId, setSelectedItineraryId] = useState<string | null>(null)
@@ -75,15 +70,6 @@ export function AddToTripDialog({
 
   // Loading state for when a trip is being processed
   const [processingTripId, setProcessingTripId] = useState<string | null>(null)
-
-  // Confirmation dialog state for extending itinerary dates
-  const [showExtendConfirm, setShowExtendConfirm] = useState(false)
-  const [pendingExtendParams, setPendingExtendParams] = useState<{
-    itineraryId: string
-    tripId: string
-    cruiseDates: { start: string; end: string }
-    itineraryDates: { start: string; end: string }
-  } | null>(null)
 
   // Fetch trips (excluding archived)
   const { data: tripsData, isLoading: isLoadingTrips } = useTrips({
@@ -95,79 +81,29 @@ export function AddToTripDialog({
 
   // Mutations
   const createTripMutation = useCreateTrip()
-  const addCruiseMutation = useAddCruiseToItinerary()
 
   const trips = tripsData?.data ?? []
 
-  // Compute a reliable end date: use catalog endDate if reasonable, otherwise sailDate + nights.
-  // Catalog endDate can be corrupt (Traveltek data quality). But it can also be legitimately
-  // longer than sailDate + nights when there's a land extension in the package.
-  const computedEnd = new Date(sailing.sailDate + 'T00:00:00')
-  computedEnd.setDate(computedEnd.getDate() + sailing.nights)
-  const expectedEndDate = computedEnd.toISOString().split('T')[0]!
-  const catalogEndDate = sailing.endDate
-  const maxReasonableGap = 14 // days — land extensions rarely exceed 2 weeks
-  const catalogEndMs = new Date(catalogEndDate + 'T00:00:00').getTime()
-  const expectedEndMs = new Date(expectedEndDate + 'T00:00:00').getTime()
-  const reliableEndDate = (catalogEndMs - expectedEndMs) > maxReasonableGap * 86400000 || catalogEndMs < expectedEndMs
-    ? expectedEndDate
-    : catalogEndDate
+  const isProcessing = externalProcessing || !!processingTripId || createTripMutation.isPending
 
-  const isProcessing = !!processingTripId || createTripMutation.isPending || addCruiseMutation.isPending
-
-  /**
-   * Navigate to trip after successful add
-   */
-  const navigateToTrip = (tripId: string) => {
-    onSuccess?.(tripId)
-    handleClose()
-    router.push(`/trips/${tripId}`)
+  // Format date range for display
+  const formatDateRange = () => {
+    if (!activityDates?.start) return null
+    const startFormatted = format(parseISO(activityDates.start), 'MMM d')
+    if (activityDates.end) {
+      const endFormatted = format(parseISO(activityDates.end), 'MMM d, yyyy')
+      return `${startFormatted} - ${endFormatted}`
+    }
+    return format(parseISO(activityDates.start), 'MMM d, yyyy')
   }
 
-  /**
-   * Check if cruise dates fit within itinerary dates (client-side pre-check).
-   * Returns true if dates fit or itinerary has no dates set.
-   */
-  const datesNeedExtending = (itinerary: ItineraryResponseDto): boolean => {
-    if (!itinerary.startDate || !itinerary.endDate) return false
-    return sailing.sailDate < itinerary.startDate || reliableEndDate > itinerary.endDate
-  }
-
-  /**
-   * Add cruise to an itinerary (shared logic for all flows).
-   * Always uses autoExtendItinerary=true since we pre-check dates client-side.
-   */
-  const addCruiseToItinerary = async (tripId: string, itineraryId: string) => {
-    await addCruiseMutation.mutateAsync({
-      sailing,
-      itineraryId,
-      tripId,
-      autoExtendItinerary: true,
-    })
-    navigateToTrip(tripId)
-  }
-
-  /**
-   * Show the extend dates confirmation dialog (pre-check, before creating anything)
-   */
-  const promptExtendDates = (tripId: string, itinerary: ItineraryResponseDto) => {
-    setPendingExtendParams({
-      itineraryId: itinerary.id,
-      tripId,
-      cruiseDates: { start: sailing.sailDate, end: reliableEndDate },
-      itineraryDates: {
-        start: itinerary.startDate || '',
-        end: itinerary.endDate || '',
-      },
-    })
-    setShowExtendConfirm(true)
-  }
+  const dateRangeText = formatDateRange()
 
   /**
    * Click on an existing trip.
-   * - 0 itineraries → create one and add cruise directly
-   * - 1 itinerary → check dates, then add cruise or prompt extend
-   * - 2+ itineraries → show itinerary picker
+   * - 0 itineraries -> create one and call callback directly
+   * - 1 itinerary -> call callback directly (consumer handles date checks)
+   * - 2+ itineraries -> show itinerary picker
    */
   const handleTripSelect = async (tripId: string) => {
     setProcessingTripId(tripId)
@@ -176,40 +112,44 @@ export function AddToTripDialog({
       const tripItineraries = await api.get<ItineraryResponseDto[]>(`/trips/${tripId}/itineraries`)
 
       if (tripItineraries.length === 0) {
-        // No itineraries — create one with cruise dates (no date conflict possible)
+        // No itineraries -- create one with activity dates
         const newItinerary = await api.post<{ id: string }>(`/trips/${tripId}/itineraries`, {
-          name: `${sailing.name} Itinerary`,
-          startDate: sailing.sailDate,
-          endDate: reliableEndDate,
+          name: `${activityName} Itinerary`,
+          startDate: activityDates?.start,
+          endDate: activityDates?.end,
         })
-        await addCruiseToItinerary(tripId, newItinerary.id)
+        await onTripAndItinerarySelected({
+          tripId,
+          itineraryId: newItinerary.id,
+          isNewTrip: false,
+          isNewItinerary: true,
+        })
       } else if (tripItineraries.length === 1) {
         const itinerary = tripItineraries[0]!
-        if (datesNeedExtending(itinerary)) {
-          // Dates don't fit — ask user BEFORE creating anything
-          promptExtendDates(tripId, itinerary)
-        } else {
-          // Dates fit — add cruise directly
-          await addCruiseToItinerary(tripId, itinerary.id)
-        }
+        await onTripAndItinerarySelected({
+          tripId,
+          itineraryId: itinerary.id,
+          isNewTrip: false,
+          isNewItinerary: false,
+        })
       } else {
-        // Multiple itineraries — show picker
+        // Multiple itineraries -- show picker
         setSelectedTripId(tripId)
         setItineraries(tripItineraries)
         setSelectedItineraryId(null)
         setCreateNewItinerary(false)
-        setNewItineraryName(`${sailing.name} Itinerary`)
+        setNewItineraryName(`${activityName} Itinerary`)
         setStep('select-itinerary')
       }
     } catch {
-      // Errors handled by mutation onError callbacks
+      // Errors handled by consumer's mutation onError callbacks
     } finally {
       setProcessingTripId(null)
     }
   }
 
   /**
-   * Create a new trip, auto-create an itinerary, and add the cruise — all in one action
+   * Create a new trip, auto-create an itinerary, and call callback -- all in one action
    */
   const handleCreateTripAndAdd = async () => {
     const tripName = newTripName.trim()
@@ -220,34 +160,32 @@ export function AddToTripDialog({
     try {
       const newTrip = await createTripMutation.mutateAsync({
         name: tripName,
-        startDate: sailing.sailDate,
-        endDate: reliableEndDate,
+        startDate: activityDates?.start,
+        endDate: activityDates?.end,
         tripType: 'leisure',
       })
 
       const newItinerary = await api.post<{ id: string }>(`/trips/${newTrip.id}/itineraries`, {
-        name: `${sailing.name} Itinerary`,
-        startDate: sailing.sailDate,
-        endDate: reliableEndDate,
+        name: `${activityName} Itinerary`,
+        startDate: activityDates?.start,
+        endDate: activityDates?.end,
       })
 
-      await addCruiseMutation.mutateAsync({
-        sailing,
-        itineraryId: newItinerary.id,
+      await onTripAndItinerarySelected({
         tripId: newTrip.id,
-        autoExtendItinerary: false,
+        itineraryId: newItinerary.id,
+        isNewTrip: true,
+        isNewItinerary: true,
       })
-
-      navigateToTrip(newTrip.id)
     } catch {
-      // Errors handled by mutation onError callbacks
+      // Errors handled by consumer's mutation onError callbacks
     } finally {
       setProcessingTripId(null)
     }
   }
 
   /**
-   * Add cruise to selected itinerary (step 2 — only used when trip has multiple itineraries)
+   * Add to selected itinerary (step 2 -- only used when trip has multiple itineraries)
    */
   const handleAddToSelectedItinerary = async () => {
     if (!selectedTripId) return
@@ -256,47 +194,31 @@ export function AddToTripDialog({
 
     try {
       if (createNewItinerary) {
-        // New itinerary uses cruise dates — no date conflict possible
+        // New itinerary uses activity dates -- no date conflict possible
         const newItinerary = await api.post<{ id: string }>(`/trips/${selectedTripId}/itineraries`, {
-          name: newItineraryName || `${sailing.name} Itinerary`,
-          startDate: sailing.sailDate,
-          endDate: reliableEndDate,
+          name: newItineraryName || `${activityName} Itinerary`,
+          startDate: activityDates?.start,
+          endDate: activityDates?.end,
         })
-        await addCruiseToItinerary(selectedTripId, newItinerary.id)
+        await onTripAndItinerarySelected({
+          tripId: selectedTripId,
+          itineraryId: newItinerary.id,
+          isNewTrip: false,
+          isNewItinerary: true,
+        })
       } else {
         if (!selectedItineraryId) return
-        // Check dates for existing itinerary
-        const selectedItin = itineraries.find((i) => i.id === selectedItineraryId)
-        if (selectedItin && datesNeedExtending(selectedItin)) {
-          promptExtendDates(selectedTripId, selectedItin)
-          return
-        }
-        await addCruiseToItinerary(selectedTripId, selectedItineraryId)
+        await onTripAndItinerarySelected({
+          tripId: selectedTripId,
+          itineraryId: selectedItineraryId,
+          isNewTrip: false,
+          isNewItinerary: false,
+        })
       }
     } catch {
-      // Errors handled by mutation onError callbacks
+      // Errors handled by consumer's mutation onError callbacks
     } finally {
       setProcessingTripId(null)
-    }
-  }
-
-  const handleConfirmExtend = async () => {
-    if (!pendingExtendParams) return
-
-    try {
-      await addCruiseMutation.mutateAsync({
-        sailing,
-        itineraryId: pendingExtendParams.itineraryId,
-        tripId: pendingExtendParams.tripId,
-        autoExtendItinerary: true,
-      })
-
-      setShowExtendConfirm(false)
-      setPendingExtendParams(null)
-      navigateToTrip(pendingExtendParams.tripId)
-    } catch {
-      setShowExtendConfirm(false)
-      setPendingExtendParams(null)
     }
   }
 
@@ -327,7 +249,6 @@ export function AddToTripDialog({
     : !!selectedItineraryId
 
   return (
-    <>
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -338,16 +259,20 @@ export function AddToTripDialog({
             {step === 'select-trip' ? (
               <>
                 Create a new trip or add to an existing one.
-                <span className="block mt-1 text-phoenix-gold-600 font-medium">
-                  {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(reliableEndDate), 'MMM d, yyyy')} ({sailing.nights} nights)
-                </span>
+                {dateRangeText && (
+                  <span className="block mt-1 text-phoenix-gold-600 font-medium">
+                    {dateRangeText}
+                  </span>
+                )}
               </>
             ) : (
               <>
                 This trip has multiple itineraries. Choose one.
-                <span className="block mt-1 text-phoenix-gold-600 font-medium">
-                  Cruise dates: {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(reliableEndDate), 'MMM d, yyyy')}
-                </span>
+                {dateRangeText && (
+                  <span className="block mt-1 text-phoenix-gold-600 font-medium">
+                    Activity dates: {dateRangeText}
+                  </span>
+                )}
               </>
             )}
           </DialogDescription>
@@ -377,7 +302,7 @@ export function AddToTripDialog({
                 </div>
                 <div className="flex-1">
                   <p className="font-medium text-sm text-ash-900">Create New Trip</p>
-                  <p className="text-xs text-ash-500">Start a new trip with this cruise</p>
+                  <p className="text-xs text-ash-500">Start a new trip with this activity</p>
                 </div>
               </div>
               {showCreateTrip && (
@@ -408,7 +333,7 @@ export function AddToTripDialog({
                     ) : (
                       <>
                         <Plus className="mr-2 h-4 w-4" />
-                        Create Trip & Add Cruise
+                        Create Trip & Add Activity
                       </>
                     )}
                   </Button>
@@ -504,7 +429,7 @@ export function AddToTripDialog({
             </ScrollArea>
           </div>
         ) : (
-          /* Step 2: Itinerary picker — only shown when trip has 2+ itineraries */
+          /* Step 2: Itinerary picker -- only shown when trip has 2+ itineraries */
           <div className="space-y-4">
             <Button
               variant="ghost"
@@ -565,10 +490,10 @@ export function AddToTripDialog({
                           {itinerary.startDate && itinerary.endDate ? (
                             <>
                               {format(parseISO(itinerary.startDate), 'MMM d')} - {format(parseISO(itinerary.endDate), 'MMM d, yyyy')}
-                              <span className="mx-1">•</span>
+                              <span className="mx-1">&bull;</span>
                             </>
                           ) : (
-                            <span className="text-ash-400">No dates set • </span>
+                            <span className="text-ash-400">No dates set &bull; </span>
                           )}
                           {itinerary.status}
                         </p>
@@ -607,9 +532,11 @@ export function AddToTripDialog({
                       <Plus className="h-3.5 w-3.5" />
                       Create new itinerary
                     </Label>
-                    <p className="text-xs text-ash-500 mt-0.5">
-                      Will use cruise dates: {format(parseISO(sailing.sailDate), 'MMM d')} - {format(parseISO(reliableEndDate), 'MMM d, yyyy')}
-                    </p>
+                    {dateRangeText && (
+                      <p className="text-xs text-ash-500 mt-0.5">
+                        Will use activity dates: {dateRangeText}
+                      </p>
+                    )}
                     {createNewItinerary && (
                       <Input
                         placeholder="Itinerary name"
@@ -650,67 +577,5 @@ export function AddToTripDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-
-      {/* Confirmation dialog for extending itinerary dates */}
-      <AlertDialog open={showExtendConfirm} onOpenChange={setShowExtendConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Extend Itinerary Dates?
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>
-                  The cruise dates extend beyond the current itinerary dates.
-                </p>
-                {pendingExtendParams && (
-                  <div className="bg-amber-50 rounded-lg p-3 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-ash-600">Cruise dates:</span>
-                      <span className="font-medium">
-                        {format(parseISO(pendingExtendParams.cruiseDates.start), 'MMM d')} -{' '}
-                        {format(parseISO(pendingExtendParams.cruiseDates.end), 'MMM d, yyyy')}
-                      </span>
-                    </div>
-                    {pendingExtendParams.itineraryDates.start && pendingExtendParams.itineraryDates.end && (
-                      <div className="flex justify-between">
-                        <span className="text-ash-600">Itinerary dates:</span>
-                        <span className="font-medium">
-                          {format(parseISO(pendingExtendParams.itineraryDates.start), 'MMM d')} -{' '}
-                          {format(parseISO(pendingExtendParams.itineraryDates.end), 'MMM d, yyyy')}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <p>
-                  Would you like to extend the itinerary dates to accommodate this cruise?
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setShowExtendConfirm(false); setPendingExtendParams(null) }}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmExtend}
-              className="bg-phoenix-gold-600 hover:bg-phoenix-gold-700"
-              disabled={addCruiseMutation.isPending}
-            >
-              {addCruiseMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Extending...
-                </>
-              ) : (
-                'Extend Dates & Add Cruise'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
   )
 }
