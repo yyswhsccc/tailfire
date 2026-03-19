@@ -122,26 +122,52 @@ export function TimePicker({
   const [open, setOpen] = React.useState(false)
   const [inputValue, setInputValue] = React.useState(value || '')
   const [isValid, setIsValid] = React.useState(true)
+  const isTypingRef = React.useRef(false)
 
-  // Sync external value changes
+  // Sync external value changes (only when not actively typing)
   React.useEffect(() => {
-    if (value !== inputValue) {
-      setInputValue(value || '')
-      setIsValid(!value || isValidTimeFormat(value))
+    if (!isTypingRef.current && value !== undefined) {
+      const externalValue = value || ''
+      if (externalValue !== inputValue) {
+        setInputValue(externalValue)
+        setIsValid(!externalValue || isValidTimeFormat(externalValue))
+      }
     }
-  }, [value, inputValue])
+  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Parse current time for selectors
   const parsed = parseTime(value)
   const currentHours = parsed?.hours ?? 12
   const currentMinutes = parsed?.minutes ?? 0
 
+  /**
+   * Auto-format time input as user types.
+   * Strips non-digits, auto-inserts colon after 2 digits.
+   * "1" → "1", "11" → "11", "113" → "11:3", "1130" → "11:30"
+   * Also handles if user types colon manually: "11:" → "11:"
+   */
+  const autoFormatTime = (raw: string): string => {
+    // If user typed a colon, let it through as-is
+    if (raw.includes(':')) return raw
+
+    // Strip non-digits
+    const digits = raw.replace(/\D/g, '')
+
+    // Auto-insert colon after first 2 digits
+    if (digits.length <= 2) return digits
+    return `${digits.slice(0, 2)}:${digits.slice(2, 4)}`
+  }
+
   // Handle manual input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value
+    isTypingRef.current = true
+    const formatted = autoFormatTime(e.target.value)
+
+    // Limit to 5 chars (HH:MM)
+    const newValue = formatted.slice(0, 5)
     setInputValue(newValue)
 
-    // Validate and update on valid input
+    // Only call onChange for valid values or empty (clear)
     if (newValue === '') {
       setIsValid(true)
       onChange?.(null)
@@ -149,20 +175,38 @@ export function TimePicker({
       setIsValid(true)
       onChange?.(newValue)
     } else {
-      setIsValid(false)
+      // Intermediate typing state — don't call onChange or show error
+      setIsValid(true)
     }
   }
 
-  // Handle input blur - normalize format
+  // Handle input blur - normalize format and clear typing flag
   const handleInputBlur = () => {
+    isTypingRef.current = false
+
+    // Try to normalize common formats on blur
+    const digits = inputValue.replace(/\D/g, '')
+    if (digits.length === 3 || digits.length === 4) {
+      // "130" → "01:30", "1130" → "11:30"
+      const padded = digits.padStart(4, '0')
+      const normalized = `${padded.slice(0, 2)}:${padded.slice(2, 4)}`
+      if (isValidTimeFormat(normalized)) {
+        setInputValue(normalized)
+        setIsValid(true)
+        onChange?.(normalized)
+        return
+      }
+    }
+
     if (inputValue && isValidTimeFormat(inputValue)) {
-      // Normalize to HH:MM format
       const parsed = parseTime(inputValue)
       if (parsed) {
         const normalized = formatTime(parsed.hours, parsed.minutes)
         setInputValue(normalized)
         onChange?.(normalized)
       }
+    } else if (inputValue && !isValidTimeFormat(inputValue)) {
+      setIsValid(false)
     }
   }
 
@@ -207,51 +251,48 @@ export function TimePicker({
 
   return (
     <div className={cn('flex items-center gap-1', className)}>
-      <div className="relative flex-1">
-        <Input
-          type="text"
-          value={use12Hour ? getDisplayValue() : inputValue}
-          onChange={handleInputChange}
-          onBlur={handleInputBlur}
-          placeholder={placeholder}
-          disabled={disabled}
-          aria-label={ariaLabel || 'Enter time in HH:MM format'}
-          aria-invalid={!isValid}
-          className={cn(
-            'min-h-11 pr-24', // 44px min height, space for clock + clear buttons
-            !isValid && 'border-destructive focus-visible:ring-destructive'
-          )}
-        />
+      <Input
+        type="text"
+        value={use12Hour ? getDisplayValue() : inputValue}
+        onChange={handleInputChange}
+        onBlur={handleInputBlur}
+        placeholder={placeholder}
+        disabled={disabled}
+        aria-label={ariaLabel || 'Enter time in HH:MM format'}
+        aria-invalid={!isValid}
+        className={cn(
+          'min-h-11 flex-1',
+          !isValid && 'border-destructive focus-visible:ring-destructive'
+        )}
+      />
 
-        {/* Inline buttons */}
-        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          {/* Clear Button */}
-          {showClear && inputValue && !disabled && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleClear}
-              className="h-11 w-11 p-0 hover:bg-muted"
-              aria-label="Clear time"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
+      {/* Clear Button */}
+      {showClear && inputValue && !disabled && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={handleClear}
+          className="h-9 w-9 shrink-0"
+          aria-label="Clear time"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
 
-          {/* Time Selector Popup Button */}
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={disabled}
-                className="h-11 w-11 p-0 hover:bg-muted"
-                aria-label="Open time selector"
-              >
-                <Clock className="h-4 w-4" />
-              </Button>
+      {/* Time Selector Popup Button */}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled}
+            className="h-9 w-9 shrink-0"
+            aria-label="Open time selector"
+          >
+            <Clock className="h-4 w-4" />
+          </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-4" align="end">
               <div className="flex items-center gap-4">
@@ -294,7 +335,7 @@ export function TimePicker({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleMinuteChange(5)}
+                    onClick={() => handleMinuteChange(1)}
                     className="h-8 w-8 p-0"
                     aria-label="Increase minutes"
                   >
@@ -307,7 +348,7 @@ export function TimePicker({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleMinuteChange(-5)}
+                    onClick={() => handleMinuteChange(-1)}
                     className="h-8 w-8 p-0"
                     aria-label="Decrease minutes"
                   >
@@ -382,9 +423,7 @@ export function TimePicker({
                 ))}
               </div>
             </PopoverContent>
-          </Popover>
-        </div>
-      </div>
+      </Popover>
 
       {/* Validation Feedback */}
       {!isValid && inputValue && (

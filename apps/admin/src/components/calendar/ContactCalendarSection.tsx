@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
@@ -373,10 +374,10 @@ export function ContactCalendarSection({ contactId }: ContactCalendarSectionProp
               {!formAllDay && (
                 <div className="space-y-2">
                   <Label>Start time</Label>
-                  <Input
-                    type="time"
-                    value={formStartTime}
-                    onChange={(e) => setFormStartTime(e.target.value)}
+                  <TimePicker
+                    value={formStartTime || null}
+                    onChange={(time) => setFormStartTime(time || '')}
+                    aria-label="Start time"
                   />
                 </div>
               )}
@@ -396,10 +397,10 @@ export function ContactCalendarSection({ contactId }: ContactCalendarSectionProp
               {!formAllDay && (
                 <div className="space-y-2">
                   <Label>End time</Label>
-                  <Input
-                    type="time"
-                    value={formEndTime}
-                    onChange={(e) => setFormEndTime(e.target.value)}
+                  <TimePicker
+                    value={formEndTime || null}
+                    onChange={(time) => setFormEndTime(time || '')}
+                    aria-label="End time"
                   />
                 </div>
               )}

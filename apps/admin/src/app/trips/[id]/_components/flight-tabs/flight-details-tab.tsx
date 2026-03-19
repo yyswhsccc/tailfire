@@ -1,6 +1,7 @@
 'use client'
 
 import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -182,10 +183,11 @@ export function FlightDetailsTab({
             <label className="text-sm font-medium text-ash-900 block mb-2">
               Time
             </label>
-            <Input
-              type="time"
-              value={flightDetails.departureTime}
-              onChange={(e) => onFlightDetailsChange({ ...flightDetails, departureTime: e.target.value })}
+            <TimePicker
+              value={flightDetails.departureTime || null}
+              onChange={(time) => onFlightDetailsChange({ ...flightDetails, departureTime: time || '' })}
+              placeholder="HH:MM"
+              aria-label="Departure time"
             />
           </div>
         </div>
@@ -258,10 +260,11 @@ export function FlightDetailsTab({
             <label className="text-sm font-medium text-ash-900 block mb-2">
               Time
             </label>
-            <Input
-              type="time"
-              value={flightDetails.arrivalTime}
-              onChange={(e) => onFlightDetailsChange({ ...flightDetails, arrivalTime: e.target.value })}
+            <TimePicker
+              value={flightDetails.arrivalTime || null}
+              onChange={(time) => onFlightDetailsChange({ ...flightDetails, arrivalTime: time || '' })}
+              placeholder="HH:MM"
+              aria-label="Arrival time"
             />
           </div>
         </div>

@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import {
   Select,
   SelectContent,
@@ -376,20 +376,20 @@ export function NotificationsTab() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quietHoursStart">Start Time</Label>
-              <Input
-                id="quietHoursStart"
-                type="time"
-                {...form.register('quietHoursStart')}
+              <TimePicker
+                value={form.watch('quietHoursStart') || null}
+                onChange={(time) => form.setValue('quietHoursStart', time || '', { shouldDirty: true })}
                 placeholder="22:00"
+                aria-label="Quiet hours start time"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="quietHoursEnd">End Time</Label>
-              <Input
-                id="quietHoursEnd"
-                type="time"
-                {...form.register('quietHoursEnd')}
+              <TimePicker
+                value={form.watch('quietHoursEnd') || null}
+                onChange={(time) => form.setValue('quietHoursEnd', time || '', { shouldDirty: true })}
                 placeholder="07:00"
+                aria-label="Quiet hours end time"
               />
             </div>
           </div>
