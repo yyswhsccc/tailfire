@@ -8,6 +8,7 @@ import { GlobalLoadingOverlay } from '@/components/ui/loading-overlay'
 import { Toaster } from '@/components/ui/toaster'
 import { AuthProvider } from '@/providers/auth-provider'
 import { NotificationsProvider } from '@/providers/notifications-provider'
+import { ConsoleCaptureProvider } from '@/providers/console-capture-provider'
 
 // Dynamically import devtools only in development
 const ReactQueryDevtools =
@@ -42,7 +43,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <ConsoleCaptureProvider>
+        <AuthProvider>
         <NotificationsProvider>
           <LoadingProvider>
             <ConfirmationDialogProvider>
@@ -57,7 +59,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             </ConfirmationDialogProvider>
           </LoadingProvider>
         </NotificationsProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </ConsoleCaptureProvider>
     </QueryClientProvider>
   )
 }
