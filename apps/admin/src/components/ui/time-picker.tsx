@@ -207,51 +207,48 @@ export function TimePicker({
 
   return (
     <div className={cn('flex items-center gap-1', className)}>
-      <div className="relative flex-1">
-        <Input
-          type="text"
-          value={use12Hour ? getDisplayValue() : inputValue}
-          onChange={handleInputChange}
-          onBlur={handleInputBlur}
-          placeholder={placeholder}
-          disabled={disabled}
-          aria-label={ariaLabel || 'Enter time in HH:MM format'}
-          aria-invalid={!isValid}
-          className={cn(
-            'min-h-11 pr-20', // 44px min height, space for clock + clear buttons
-            !isValid && 'border-destructive focus-visible:ring-destructive'
-          )}
-        />
+      <Input
+        type="text"
+        value={use12Hour ? getDisplayValue() : inputValue}
+        onChange={handleInputChange}
+        onBlur={handleInputBlur}
+        placeholder={placeholder}
+        disabled={disabled}
+        aria-label={ariaLabel || 'Enter time in HH:MM format'}
+        aria-invalid={!isValid}
+        className={cn(
+          'min-h-11 flex-1',
+          !isValid && 'border-destructive focus-visible:ring-destructive'
+        )}
+      />
 
-        {/* Inline buttons — pointer-events-none on container so clicks reach the input */}
-        <div className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          {/* Clear Button */}
-          {showClear && inputValue && !disabled && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleClear}
-              className="pointer-events-auto h-8 w-8 p-0 hover:bg-muted"
-              aria-label="Clear time"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
+      {/* Clear Button */}
+      {showClear && inputValue && !disabled && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={handleClear}
+          className="h-9 w-9 shrink-0"
+          aria-label="Clear time"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
 
-          {/* Time Selector Popup Button */}
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={disabled}
-                className="pointer-events-auto h-8 w-8 p-0 hover:bg-muted"
-                aria-label="Open time selector"
-              >
-                <Clock className="h-4 w-4" />
-              </Button>
+      {/* Time Selector Popup Button */}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled}
+            className="h-9 w-9 shrink-0"
+            aria-label="Open time selector"
+          >
+            <Clock className="h-4 w-4" />
+          </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-4" align="end">
               <div className="flex items-center gap-4">
@@ -382,9 +379,7 @@ export function TimePicker({
                 ))}
               </div>
             </PopoverContent>
-          </Popover>
-        </div>
-      </div>
+      </Popover>
 
       {/* Validation Feedback */}
       {!isValid && inputValue && (
