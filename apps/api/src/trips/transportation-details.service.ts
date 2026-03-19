@@ -18,7 +18,7 @@ import {
 } from './detail-mapper'
 
 // ============================================================================
-// Field Maps (28 fields total)
+// Field Maps (42 fields total)
 // ============================================================================
 
 /** CREATE: Apply appropriate coercion per field */
@@ -50,6 +50,20 @@ const TRANSPORTATION_CREATE_FIELDS: FieldMap = {
   features: coerce.toArray, // || []
   specialRequests: coerce.toNullable,
   flightNumber: coerce.toNullable,
+  pickupName: coerce.toNullable,
+  pickupLat: coerce.toNullable,
+  pickupLng: coerce.toNullable,
+  pickupPlaceId: coerce.toNullable,
+  dropoffName: coerce.toNullable,
+  dropoffLat: coerce.toNullable,
+  dropoffLng: coerce.toNullable,
+  dropoffPlaceId: coerce.toNullable,
+  rentalCompany: coerce.toNullable,
+  rentalBookingRef: coerce.toNullable,
+  rentalCarClass: coerce.toNullable,
+  rentalFuelPolicy: coerce.toNullable,
+  departureStation: coerce.toNullable,
+  arrivalStation: coerce.toNullable,
   isRoundTrip: coerce.toBoolInt, // ? 1 : 0
 }
 
@@ -82,6 +96,20 @@ const TRANSPORTATION_UPDATE_FIELDS: FieldMap = {
   features: coerce.identity, // Pass as-is on update
   specialRequests: coerce.identity,
   flightNumber: coerce.identity,
+  pickupName: coerce.identity,
+  pickupLat: coerce.identity,
+  pickupLng: coerce.identity,
+  pickupPlaceId: coerce.identity,
+  dropoffName: coerce.identity,
+  dropoffLat: coerce.identity,
+  dropoffLng: coerce.identity,
+  dropoffPlaceId: coerce.identity,
+  rentalCompany: coerce.identity,
+  rentalBookingRef: coerce.identity,
+  rentalCarClass: coerce.identity,
+  rentalFuelPolicy: coerce.identity,
+  departureStation: coerce.identity,
+  arrivalStation: coerce.identity,
   isRoundTrip: coerce.toBoolInt, // ALWAYS converts (current behavior)
 }
 
@@ -114,6 +142,20 @@ const TRANSPORTATION_FORMAT_FIELDS: FieldMap = {
   features: coerce.toArray, // || []
   specialRequests: coerce.toNullable,
   flightNumber: coerce.toNullable,
+  pickupName: coerce.toNullable,
+  pickupLat: coerce.toNullable,
+  pickupLng: coerce.toNullable,
+  pickupPlaceId: coerce.toNullable,
+  dropoffName: coerce.toNullable,
+  dropoffLat: coerce.toNullable,
+  dropoffLng: coerce.toNullable,
+  dropoffPlaceId: coerce.toNullable,
+  rentalCompany: coerce.toNullable,
+  rentalBookingRef: coerce.toNullable,
+  rentalCarClass: coerce.toNullable,
+  rentalFuelPolicy: coerce.toNullable,
+  departureStation: coerce.toNullable,
+  arrivalStation: coerce.toNullable,
   isRoundTrip: coerce.fromBoolInt, // === 1
 }
 
