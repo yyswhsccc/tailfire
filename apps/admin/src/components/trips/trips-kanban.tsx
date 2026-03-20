@@ -236,10 +236,10 @@ export function TripsKanban({ trips }: TripsKanbanProps) {
         title: 'Trip updated',
         description: `Trip moved to ${getTripStatusLabel(newStatus)}`,
       })
-    } catch (error) {
+    } catch (error: any) {
       toast({
-        title: 'Error',
-        description: 'Failed to update trip status. Please try again.',
+        title: 'Cannot move trip',
+        description: error?.message || 'Failed to update trip status. Please try again.',
         variant: 'destructive',
       })
     } finally {
