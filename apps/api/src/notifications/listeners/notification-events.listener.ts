@@ -681,6 +681,47 @@ export class NotificationEventsListener {
   }
 
   // =========================================================================
+  // Impersonation Events
+  // =========================================================================
+
+  /**
+   * Handle impersonation.ended event
+   * Notify the target agent that an admin viewed their account
+   */
+  @OnEvent('impersonation.ended')
+  async handleImpersonationEnded(event: {
+    adminUserId: string
+    targetUserId: string
+    agencyId: string
+    sessionId: string
+    duration: number
+  }): Promise<void> {
+    try {
+      // Get admin name
+      const admin = await this.db.client.query.userProfiles.findFirst({
+        where: eq(this.db.schema.userProfiles.id, event.adminUserId),
+        columns: { firstName: true, lastName: true },
+      })
+      const adminName = [admin?.firstName, admin?.lastName].filter(Boolean).join(' ') || 'An admin'
+      const durationMins = Math.round(event.duration / 60000)
+
+      await this.notificationService.send({
+        userId: event.targetUserId,
+        category: 'system_alerts',
+        title: `${adminName} viewed your account`,
+        body: `Admin session lasted ${durationMins} minute(s).`,
+        data: { sessionId: event.sessionId },
+      })
+
+      this.logger.debug(
+        `Sent impersonation.ended notification to user ${event.targetUserId} for session ${event.sessionId}`,
+      )
+    } catch (error) {
+      this.logger.error('Failed to send impersonation ended notification', error)
+    }
+  }
+
+  // =========================================================================
   // Helper Methods
   // =========================================================================
 
