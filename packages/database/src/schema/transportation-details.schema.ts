@@ -15,6 +15,7 @@ import {
   timestamp,
   integer,
   jsonb,
+  numeric,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { itineraryActivities } from './activities.schema'
@@ -86,6 +87,28 @@ export const transportationDetails = pgTable('transportation_details', {
   specialRequests: text('special_requests'),
   flightNumber: varchar('flight_number', { length: 50 }), // For airport transfers
   isRoundTrip: integer('is_round_trip').default(0), // 0 = one way, 1 = round trip
+
+  // Structured pickup location (Google Places + Amadeus)
+  pickupName: varchar('pickup_name', { length: 255 }),
+  pickupLat: numeric('pickup_lat', { precision: 9, scale: 6 }),
+  pickupLng: numeric('pickup_lng', { precision: 10, scale: 6 }),
+  pickupPlaceId: varchar('pickup_place_id', { length: 255 }),
+
+  // Structured dropoff location
+  dropoffName: varchar('dropoff_name', { length: 255 }),
+  dropoffLat: numeric('dropoff_lat', { precision: 9, scale: 6 }),
+  dropoffLng: numeric('dropoff_lng', { precision: 10, scale: 6 }),
+  dropoffPlaceId: varchar('dropoff_place_id', { length: 255 }),
+
+  // Enhanced car rental fields (Amadeus-aligned)
+  rentalCompany: varchar('rental_company', { length: 255 }),
+  rentalBookingRef: varchar('rental_booking_ref', { length: 100 }),
+  rentalCarClass: varchar('rental_car_class', { length: 50 }),
+  rentalFuelPolicy: varchar('rental_fuel_policy', { length: 50 }),
+
+  // Station/terminal for train, ferry, bus
+  departureStation: varchar('departure_station', { length: 255 }),
+  arrivalStation: varchar('arrival_station', { length: 255 }),
 
   // Timestamps
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

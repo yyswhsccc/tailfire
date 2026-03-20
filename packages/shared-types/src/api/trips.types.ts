@@ -834,9 +834,23 @@ export interface SharedTransportDetailDto {
   pickupDate: string | null
   pickupTime: string | null
   pickupAddress: string | null
+  pickupName: string | null
+  pickupLat: number | null
+  pickupLng: number | null
+  pickupPlaceId: string | null
   dropoffDate: string | null
   dropoffTime: string | null
   dropoffAddress: string | null
+  dropoffName: string | null
+  dropoffLat: number | null
+  dropoffLng: number | null
+  dropoffPlaceId: string | null
+  rentalCompany: string | null
+  rentalBookingRef: string | null
+  rentalCarClass: string | null
+  rentalFuelPolicy: string | null
+  departureStation: string | null
+  arrivalStation: string | null
   isRoundTrip: boolean
 }
 
