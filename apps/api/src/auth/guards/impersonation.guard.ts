@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common'
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { eq, and, isNull, gt } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
@@ -8,10 +8,30 @@ import type { AuthContext } from '../auth.types'
 
 @Injectable()
 export class ImpersonationGuard implements CanActivate {
+  private readonly logger = new Logger(ImpersonationGuard.name)
+  private tableExists: boolean | null = null
+
   constructor(
     private readonly reflector: Reflector,
     private readonly db: DatabaseService,
   ) {}
+
+  /**
+   * Check if impersonation_sessions table exists.
+   * Cached after first check to avoid repeated queries.
+   * Handles deploy race conditions where code deploys before migrations run.
+   */
+  private async ensureTableExists(): Promise<boolean> {
+    if (this.tableExists === true) return true
+    try {
+      await this.db.client.execute({ sql: `SELECT 1 FROM impersonation_sessions LIMIT 0`, params: [] } as any)
+      this.tableExists = true
+      return true
+    } catch {
+      this.logger.warn('impersonation_sessions table not found — skipping impersonation checks')
+      return false
+    }
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Skip for public endpoints
@@ -36,6 +56,7 @@ export class ImpersonationGuard implements CanActivate {
     // This prevents admins from bypassing impersonation by omitting the header
     if (!impersonateUserId) {
       if (user?.role === 'admin' && !bypass) {
+        if (!(await this.ensureTableExists())) return true
         const activeSession = await this.db.client.query.impersonationSessions.findFirst({
           where: and(
             eq(this.db.schema.impersonationSessions.adminUserId, user.userId),
@@ -61,6 +82,9 @@ export class ImpersonationGuard implements CanActivate {
     }
 
     // Find active session
+    if (!(await this.ensureTableExists())) {
+      throw new UnauthorizedException('Impersonation not available — table not yet migrated')
+    }
     const session = await this.db.client.query.impersonationSessions.findFirst({
       where: and(
         eq(this.db.schema.impersonationSessions.adminUserId, user.userId),
