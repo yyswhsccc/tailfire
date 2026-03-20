@@ -1031,6 +1031,7 @@ export function TransportationForm({
                     defaultDropoffAddress={dropoffAddressValue || ''}
                     defaultDate={pickupDateValue || ''}
                     defaultTime={pickupTimeValue || ''}
+                    tripCurrency={trip?.currency || 'CAD'}
                   />
                 </div>
               )}
