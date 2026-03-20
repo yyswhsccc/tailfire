@@ -430,6 +430,7 @@ export class NotificationService {
       assignment: ['email', 'push', 'platform'],
       collaboration: ['email', 'platform'],
       payment_alert: ['email', 'push', 'platform'],
+      contact_share: ['platform'],
     }
 
     if (!prefs?.categoryPreferences) {
