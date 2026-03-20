@@ -239,7 +239,12 @@ export function useExternalFlightSearch(
  * @note Name kept for backwards compatibility - consider using alias
  *       `useExternalFlightSearch` if renaming in the future.
  */
-export function useExternalFlightSearchWithRateLimit(flightNumber: string, dateLocal: string) {
+export function useExternalFlightSearchWithRateLimit(
+  flightNumber: string,
+  dateLocal: string,
+  options: { enabled?: boolean } = {}
+) {
+  const { enabled = true } = options
   const queryClient = useQueryClient()
   const { toast } = useToast()
 
@@ -268,9 +273,11 @@ export function useExternalFlightSearchWithRateLimit(flightNumber: string, dateL
         throw error
       }
     },
-    enabled: !!flightNumber && !!dateLocal,
+    enabled: enabled && !!flightNumber && !!dateLocal,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: (failureCount, error) => {
       // Don't retry on client errors
       if (error instanceof ApiError) {
@@ -340,6 +347,8 @@ export function useExternalFlightSearchWithProvider(
     enabled: enabled && !!flightNumber && !!dateLocal,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: (failureCount, error) => {
       if (error instanceof ApiError) {
         if (error.status === 401) return false
