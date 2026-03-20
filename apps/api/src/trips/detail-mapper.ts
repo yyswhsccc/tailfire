@@ -52,6 +52,16 @@ export const coerce = {
    * Update: pass through as-is (preserves empty strings, zeros, etc.)
    */
   identity: ((value: unknown) => value) as FieldTransform,
+
+  /**
+   * Format: parse numeric DB string to JS number, null if absent.
+   * PostgreSQL numeric columns return as strings via Drizzle.
+   */
+  toNumber: ((value: unknown) => {
+    if (value == null) return null
+    const n = Number(value)
+    return Number.isNaN(n) ? null : n
+  }) as FieldTransform,
 }
 
 // === Builder helpers ===

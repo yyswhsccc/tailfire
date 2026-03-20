@@ -61,6 +61,26 @@ export const transportationDetailsDtoSchema = z.object({
   specialRequests: z.string().nullable().optional(),
   flightNumber: z.string().nullable().optional(),
   isRoundTrip: z.boolean().nullable().optional(),
+
+  // Structured location data (Google Places + Amadeus)
+  pickupName: z.string().nullable().optional(),
+  pickupLat: z.number().nullable().optional(),
+  pickupLng: z.number().nullable().optional(),
+  pickupPlaceId: z.string().nullable().optional(),
+  dropoffName: z.string().nullable().optional(),
+  dropoffLat: z.number().nullable().optional(),
+  dropoffLng: z.number().nullable().optional(),
+  dropoffPlaceId: z.string().nullable().optional(),
+
+  // Enhanced car rental
+  rentalCompany: z.string().nullable().optional(),
+  rentalBookingRef: z.string().nullable().optional(),
+  rentalCarClass: z.string().nullable().optional(),
+  rentalFuelPolicy: z.string().nullable().optional(),
+
+  // Station/terminal
+  departureStation: z.string().nullable().optional(),
+  arrivalStation: z.string().nullable().optional(),
 })
 
 export type TransportationDetailsDto = z.infer<typeof transportationDetailsDtoSchema>

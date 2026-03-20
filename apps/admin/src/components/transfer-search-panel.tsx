@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Search, Loader2, Car, AlertCircle, Clock, Users, Briefcase, ArrowUpDown, CheckCircle2 } from 'lucide-react'
+import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TimePicker } from '@/components/ui/time-picker'
@@ -29,6 +30,7 @@ interface TransferSearchPanelProps {
   defaultDropoffAddress?: string
   defaultDate?: string
   defaultTime?: string
+  tripCurrency?: string
   className?: string
 }
 
@@ -54,6 +56,7 @@ export function TransferSearchPanel({
   defaultDropoffAddress = '',
   defaultDate = '',
   defaultTime = '',
+  tripCurrency,
   className,
 }: TransferSearchPanelProps) {
   const [pickupType, setPickupType] = useState<TransferLocationType>('airport')
@@ -64,6 +67,9 @@ export function TransferSearchPanel({
   const [dropoffCode, setDropoffCode] = useState('')
   const [dropoffAddress, setDropoffAddress] = useState(defaultDropoffAddress)
   const [dropoffLocation, setDropoffLocation] = useState<GeoLocation | null>(null)
+
+  // Currency conversion cache: maps "EUR" -> rate to tripCurrency
+  const [fxRates, setFxRates] = useState<Record<string, number>>({})
   const [date, setDate] = useState(defaultDate)
   const [time, setTime] = useState(defaultTime || '10:00')
   const [passengers, setPassengers] = useState('2')
@@ -144,6 +150,48 @@ export function TransferSearchPanel({
 
   const hasResults = filteredResults.length > 0
   const totalResults = data?.results?.length || 0
+
+  // Fetch FX rates for provider currencies that differ from trip currency
+  const fetchFxRates = useCallback(async (currencies: string[]) => {
+    if (!tripCurrency) return
+    const newRates: Record<string, number> = {}
+    for (const cur of currencies) {
+      if (cur === tripCurrency) continue
+      try {
+        const resp = await api.get<{ rate: string }>(
+          `/exchange-rates/${cur}/${tripCurrency}`
+        )
+        newRates[cur] = parseFloat(resp.rate)
+      } catch {
+        // silently skip — will show original currency
+      }
+    }
+    if (Object.keys(newRates).length > 0) {
+      setFxRates(prev => ({ ...prev, ...newRates }))
+    }
+  }, [tripCurrency])
+
+  useEffect(() => {
+    if (!data?.results?.length || !tripCurrency) return
+    const currencies = [...new Set(data.results.map(t => t.price.currency))]
+    const needFetch = currencies.filter(c => c !== tripCurrency && !fxRates[c])
+    if (needFetch.length > 0) fetchFxRates(needFetch)
+  }, [data?.results, tripCurrency, fxRates, fetchFxRates])
+
+  // Helper to format price with optional conversion
+  const formatPrice = (currency: string, total: string) => {
+    const amount = parseFloat(total)
+    if (!tripCurrency || currency === tripCurrency || !fxRates[currency]) {
+      return `${currency} ${amount.toFixed(2)}`
+    }
+    const converted = amount * fxRates[currency]
+    return `~${tripCurrency} ${converted.toFixed(2)}`
+  }
+
+  const formatPriceSubtext = (currency: string, total: string) => {
+    if (!tripCurrency || currency === tripCurrency || !fxRates[currency]) return null
+    return `${currency} ${parseFloat(total).toFixed(2)}`
+  }
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -290,8 +338,15 @@ export function TransferSearchPanel({
                             {transfer.transferType}
                           </span>
                         </div>
-                        <span className="font-semibold text-sm whitespace-nowrap">
-                          {transfer.price.currency} {parseFloat(transfer.price.total).toFixed(2)}
+                        <span className="text-right">
+                          <span className="font-semibold text-sm whitespace-nowrap">
+                            {formatPrice(transfer.price.currency, transfer.price.total)}
+                          </span>
+                          {formatPriceSubtext(transfer.price.currency, transfer.price.total) && (
+                            <span className="block text-[10px] text-gray-400">
+                              {formatPriceSubtext(transfer.price.currency, transfer.price.total)}
+                            </span>
+                          )}
                         </span>
                       </div>
 

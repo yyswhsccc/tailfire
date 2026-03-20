@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { api } from '@/lib/api'
 import { useSaveStatus } from '@/hooks/use-save-status'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
@@ -16,6 +17,8 @@ import type {
   NormalizedTransferResult,
 } from '@tailfire/shared-types/api'
 import { TransferSearchPanel } from '@/components/transfer-search-panel'
+import { TransportationAddressInput } from '@/components/transportation/transportation-address-input'
+import { useTripLocations } from '@/hooks/use-trip-locations'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -51,6 +54,7 @@ import {
   CalendarCheck,
   ChevronUp,
   ChevronDown,
+  Train,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
@@ -129,6 +133,44 @@ const VEHICLE_FEATURES = [
   'Flight Tracking',
 ]
 
+// Subtype-conditional section visibility
+const SUBTYPE_SECTIONS: Record<string, string[]> = {
+  transfer: ['provider', 'pickup', 'dropoff', 'vehicle', 'driver', 'flight', 'features', 'roundTrip', 'transferSearch'],
+  taxi: ['provider', 'pickup', 'dropoff', 'vehicle'],
+  private_car: ['provider', 'pickup', 'dropoff', 'vehicle', 'driver', 'features', 'roundTrip'],
+  limousine: ['provider', 'pickup', 'dropoff', 'vehicle', 'driver', 'features', 'roundTrip'],
+  shuttle: ['provider', 'pickup', 'dropoff', 'flight', 'roundTrip'],
+  train: ['provider', 'pickup', 'dropoff', 'roundTrip'],
+  ferry: ['provider', 'pickup', 'dropoff', 'roundTrip'],
+  bus: ['provider', 'pickup', 'dropoff', 'roundTrip'],
+  car_rental: ['provider', 'pickup', 'dropoff', 'carRental'],
+}
+
+function showSection(subtype: string | null | undefined, section: string): boolean {
+  if (!subtype) return false // Hide optional sections until a type is selected
+  return SUBTYPE_SECTIONS[subtype]?.includes(section) ?? false
+}
+
+// Car class options (Amadeus-aligned)
+const CAR_CLASSES = [
+  { value: 'economy', label: 'Economy' },
+  { value: 'compact', label: 'Compact' },
+  { value: 'midsize', label: 'Midsize' },
+  { value: 'standard', label: 'Standard' },
+  { value: 'full_size', label: 'Full Size' },
+  { value: 'premium', label: 'Premium' },
+  { value: 'luxury', label: 'Luxury' },
+  { value: 'suv', label: 'SUV' },
+  { value: 'minivan', label: 'Minivan' },
+  { value: 'convertible', label: 'Convertible' },
+]
+
+const FUEL_POLICIES = [
+  { value: 'full_to_full', label: 'Full to Full' },
+  { value: 'prepaid', label: 'Prepaid' },
+  { value: 'same_to_same', label: 'Same to Same' },
+]
+
 // Auto-save watched fields (trigger save when these change)
 const AUTO_SAVE_FIELDS = [
   'name',
@@ -160,6 +202,20 @@ const AUTO_SAVE_FIELDS = [
   'transportationDetails.rentalDropoffLocation',
   'transportationDetails.rentalInsuranceType',
   'transportationDetails.rentalMileageLimit',
+  'transportationDetails.pickupName',
+  'transportationDetails.pickupLat',
+  'transportationDetails.pickupLng',
+  'transportationDetails.pickupPlaceId',
+  'transportationDetails.dropoffName',
+  'transportationDetails.dropoffLat',
+  'transportationDetails.dropoffLng',
+  'transportationDetails.dropoffPlaceId',
+  'transportationDetails.rentalCompany',
+  'transportationDetails.rentalBookingRef',
+  'transportationDetails.rentalCarClass',
+  'transportationDetails.rentalFuelPolicy',
+  'transportationDetails.departureStation',
+  'transportationDetails.arrivalStation',
   'transportationDetails.features',
   'transportationDetails.specialRequests',
   'transportationDetails.flightNumber',
@@ -256,6 +312,9 @@ export function TransportationForm({
   // Fetch user profile for commission split settings
   const { data: userProfile } = useMyProfile()
 
+  // Fetch trip locations for address autocomplete
+  const { data: tripLocations = [] } = useTripLocations(trip?.id)
+
   // Track supplier commission rate from selected supplier
   const [supplierCommissionRate, setSupplierCommissionRate] = useState<number | null>(null)
 
@@ -301,6 +360,32 @@ export function TransportationForm({
   // Watch subtype for conditional rendering
   const subtype = useWatch({ control, name: 'transportationDetails.subtype' })
 
+  // Clear fields that don't apply to the new subtype (stale field policy)
+  const prevSubtypeRef = useRef<string | null | undefined>(subtype)
+  useEffect(() => {
+    if (prevSubtypeRef.current === subtype) return
+    const prev = prevSubtypeRef.current
+    prevSubtypeRef.current = subtype
+    if (!prev || !subtype) return // Don't clear on initial load or when clearing subtype
+
+    // Clear car rental fields when switching away from car_rental
+    if (prev === 'car_rental' && subtype !== 'car_rental') {
+      setValue('transportationDetails.rentalCompany', '', { shouldDirty: true })
+      setValue('transportationDetails.rentalBookingRef', '', { shouldDirty: true })
+      setValue('transportationDetails.rentalCarClass', '', { shouldDirty: true })
+      setValue('transportationDetails.rentalFuelPolicy', '', { shouldDirty: true })
+    }
+    // Clear station fields when switching away from train/ferry/bus
+    if (['train', 'ferry', 'bus'].includes(prev) && !['train', 'ferry', 'bus'].includes(subtype)) {
+      setValue('transportationDetails.departureStation', '', { shouldDirty: true })
+      setValue('transportationDetails.arrivalStation', '', { shouldDirty: true })
+    }
+    // Clear flight number when switching away from transfer/shuttle
+    if (['transfer', 'shuttle'].includes(prev) && !['transfer', 'shuttle'].includes(subtype)) {
+      setValue('transportationDetails.flightNumber', '', { shouldDirty: true })
+    }
+  }, [subtype, setValue])
+
   // useWatch for custom components (Selects, DatePickers, TimePickers, Switch, number inputs)
   const vehicleTypeValue = useWatch({ control, name: 'transportationDetails.vehicleType' })
   const vehicleCapacityValue = useWatch({ control, name: 'transportationDetails.vehicleCapacity' })
@@ -315,7 +400,7 @@ export function TransportationForm({
   // Transfer search panel state
   const [showTransferSearch, setShowTransferSearch] = useState(false)
 
-  const handleTransferSelect = (transfer: NormalizedTransferResult) => {
+  const handleTransferSelect = async (transfer: NormalizedTransferResult) => {
     setValue('transportationDetails.providerName', transfer.provider || '', { shouldDirty: true })
     setValue('transportationDetails.vehicleType', transfer.vehicle.type?.toLowerCase() || '', { shouldDirty: true })
     if (transfer.vehicle.maxPassengers) {
@@ -327,14 +412,44 @@ export function TransportationForm({
     if (transfer.dropoffLocation?.address) {
       setValue('transportationDetails.dropoffAddress', transfer.dropoffLocation.address, { shouldDirty: true })
     }
-    // Populate pricing
-    if (transfer.price?.total) {
-      const totalCents = Math.round(parseFloat(transfer.price.total) * 100)
-      setValue('totalPriceCents', totalCents, { shouldDirty: true })
+
+    // Populate pricing — convert to trip currency if different
+    const tripCurrency = trip?.currency || 'CAD'
+    const providerCurrency = transfer.price?.currency || tripCurrency
+    const originalCents = transfer.price?.total
+      ? Math.round(parseFloat(transfer.price.total) * 100)
+      : null
+
+    if (originalCents && providerCurrency !== tripCurrency) {
+      // Convert to trip currency via exchange rate API
+      try {
+        const conversion = await api.post<{
+          convertedAmountCents: number
+          rate: string
+          convertedCurrency: string
+        }>('/exchange-rates/convert', {
+          amountCents: originalCents,
+          fromCurrency: providerCurrency,
+          toCurrency: tripCurrency,
+        })
+        setValue('totalPriceCents', conversion.convertedAmountCents, { shouldDirty: true })
+        setValue('currency', tripCurrency, { shouldDirty: true })
+        // Add conversion note to description
+        const rate = parseFloat(conversion.rate).toFixed(4)
+        setValue('notes',
+          `Approx. conversion: ${providerCurrency} ${transfer.price.total} → ${tripCurrency} ${(conversion.convertedAmountCents / 100).toFixed(2)} (rate: ${rate}). Provider quotes in ${providerCurrency}.`,
+          { shouldDirty: true }
+        )
+      } catch {
+        // Fallback: use original currency if conversion fails
+        setValue('totalPriceCents', originalCents, { shouldDirty: true })
+        setValue('currency', providerCurrency, { shouldDirty: true })
+      }
+    } else if (originalCents) {
+      setValue('totalPriceCents', originalCents, { shouldDirty: true })
+      setValue('currency', tripCurrency, { shouldDirty: true })
     }
-    if (transfer.price?.currency) {
-      setValue('currency', transfer.price.currency, { shouldDirty: true })
-    }
+
     if (transfer.cancellationPolicy) {
       const policyText = transfer.cancellationPolicy.refundable ? 'Free cancellation' : `Non-refundable. ${transfer.cancellationPolicy.description || ''}`
       setValue('cancellationPolicy', policyText, { shouldDirty: true })
@@ -348,7 +463,9 @@ export function TransportationForm({
     setShowTransferSearch(false)
     toast({
       title: 'Transfer Details Applied',
-      description: `${transfer.vehicle.type} - ${transfer.price.currency} ${transfer.price.total}`,
+      description: providerCurrency !== tripCurrency
+        ? `${transfer.vehicle.type} - ${providerCurrency} ${transfer.price.total} → converted to ${tripCurrency} (approx.)`
+        : `${transfer.vehicle.type} - ${tripCurrency} ${transfer.price.total}`,
     })
   }
 
@@ -877,8 +994,17 @@ export function TransportationForm({
             </CardContent>
           </Card>
 
+          {/* Hint when no subtype selected */}
+          {!subtype && (
+            <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center text-muted-foreground">
+              <Car className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+              <p className="font-medium">Select a transportation type above</p>
+              <p className="text-sm">The form will adapt to show relevant fields for the selected type.</p>
+            </div>
+          )}
+
           {/* Search Transfers (only for transfer subtype) */}
-          {subtype === 'transfer' && (
+          {showSection(subtype, 'transferSearch') && (
             <div className="border border-gray-200 rounded-lg">
               <button
                 type="button"
@@ -905,6 +1031,7 @@ export function TransportationForm({
                     defaultDropoffAddress={dropoffAddressValue || ''}
                     defaultDate={pickupDateValue || ''}
                     defaultTime={pickupTimeValue || ''}
+                    tripCurrency={trip?.currency || 'CAD'}
                   />
                 </div>
               )}
@@ -912,6 +1039,7 @@ export function TransportationForm({
           )}
 
           {/* Vehicle Details */}
+          {showSection(subtype, 'vehicle') && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -967,13 +1095,19 @@ export function TransportationForm({
               </div>
             </CardContent>
           </Card>
+          )}
 
-          {/* Pickup Details */}
+          {/* Pickup / Departure Details */}
+          {subtype && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <MapPin className="h-5 w-5 text-green-500" />
-                Pickup Details
+                {['train', 'ferry', 'bus'].includes(subtype || '') ? (
+                  <Train className="h-5 w-5 text-blue-500" />
+                ) : (
+                  <MapPin className="h-5 w-5 text-green-500" />
+                )}
+                {['train', 'ferry', 'bus'].includes(subtype || '') ? 'Departure Details' : 'Pickup Details'}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1031,6 +1165,9 @@ export function TransportationForm({
                     />
                   </div>
                 </div>
+              </div>
+              {showSection(subtype, 'flight') && (
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label>Flight Number</Label>
                   <div className="relative">
@@ -1044,12 +1181,20 @@ export function TransportationForm({
                   </div>
                 </div>
               </div>
+              )}
               <div className="space-y-2">
-                <Label>Pickup Address</Label>
-                <Input
-                  {...register('transportationDetails.pickupAddress')}
-                  data-field="transportationDetails.pickupAddress"
-                  placeholder="Full pickup address"
+                <Label>{['train', 'ferry', 'bus'].includes(subtype || '') ? 'Departure Station' : 'Pickup Address'}</Label>
+                <TransportationAddressInput
+                  value={pickupAddressValue || ''}
+                  onChange={(loc) => {
+                    setValue('transportationDetails.pickupAddress', loc.address, { shouldDirty: true })
+                    setValue('transportationDetails.pickupName', loc.name, { shouldDirty: true })
+                    setValue('transportationDetails.pickupLat', loc.lat, { shouldDirty: true })
+                    setValue('transportationDetails.pickupLng', loc.lng, { shouldDirty: true })
+                    setValue('transportationDetails.pickupPlaceId', loc.placeId, { shouldDirty: true })
+                  }}
+                  tripLocations={tripLocations}
+                  placeholder={['train', 'ferry', 'bus'].includes(subtype || '') ? 'e.g., Union Station, Penn Station' : 'Search address or select trip location'}
                 />
               </div>
               <div className="space-y-2">
@@ -1063,13 +1208,19 @@ export function TransportationForm({
               </div>
             </CardContent>
           </Card>
+          )}
 
-          {/* Dropoff Details */}
+          {/* Dropoff / Arrival Details */}
+          {subtype && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <MapPin className="h-5 w-5 text-red-500" />
-                Dropoff Details
+                {['train', 'ferry', 'bus'].includes(subtype || '') ? (
+                  <Train className="h-5 w-5 text-blue-500" />
+                ) : (
+                  <MapPin className="h-5 w-5 text-red-500" />
+                )}
+                {['train', 'ferry', 'bus'].includes(subtype || '') ? 'Arrival Details' : 'Dropoff Details'}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1113,11 +1264,18 @@ export function TransportationForm({
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Dropoff Address</Label>
-                <Input
-                  {...register('transportationDetails.dropoffAddress')}
-                  data-field="transportationDetails.dropoffAddress"
-                  placeholder="Full dropoff address"
+                <Label>{['train', 'ferry', 'bus'].includes(subtype || '') ? 'Arrival Station' : 'Dropoff Address'}</Label>
+                <TransportationAddressInput
+                  value={dropoffAddressValue || ''}
+                  onChange={(loc) => {
+                    setValue('transportationDetails.dropoffAddress', loc.address, { shouldDirty: true })
+                    setValue('transportationDetails.dropoffName', loc.name, { shouldDirty: true })
+                    setValue('transportationDetails.dropoffLat', loc.lat, { shouldDirty: true })
+                    setValue('transportationDetails.dropoffLng', loc.lng, { shouldDirty: true })
+                    setValue('transportationDetails.dropoffPlaceId', loc.placeId, { shouldDirty: true })
+                  }}
+                  tripLocations={tripLocations}
+                  placeholder={['train', 'ferry', 'bus'].includes(subtype || '') ? 'e.g., Grand Central Terminal' : 'Search address or select trip location'}
                 />
               </div>
               <div className="space-y-2">
@@ -1131,9 +1289,10 @@ export function TransportationForm({
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Car Rental Specific Fields - only show for car rentals */}
-          {subtype === 'car_rental' && (
+          {showSection(subtype, 'carRental') && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -1142,6 +1301,24 @@ export function TransportationForm({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Rental Company</Label>
+                    <Input
+                      {...register('transportationDetails.rentalCompany')}
+                      data-field="transportationDetails.rentalCompany"
+                      placeholder="e.g., Hertz, Avis, Enterprise"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Booking Reference</Label>
+                    <Input
+                      {...register('transportationDetails.rentalBookingRef')}
+                      data-field="transportationDetails.rentalBookingRef"
+                      placeholder="Confirmation #"
+                    />
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Pickup Location</Label>
@@ -1178,11 +1355,46 @@ export function TransportationForm({
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Car Class</Label>
+                    <Select
+                      value={getValues('transportationDetails.rentalCarClass') || ''}
+                      onValueChange={(v) => setValue('transportationDetails.rentalCarClass', v || '', { shouldDirty: true })}
+                    >
+                      <SelectTrigger data-field="transportationDetails.rentalCarClass">
+                        <SelectValue placeholder="Select class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CAR_CLASSES.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fuel Policy</Label>
+                    <Select
+                      value={getValues('transportationDetails.rentalFuelPolicy') || ''}
+                      onValueChange={(v) => setValue('transportationDetails.rentalFuelPolicy', v || '', { shouldDirty: true })}
+                    >
+                      <SelectTrigger data-field="transportationDetails.rentalFuelPolicy">
+                        <SelectValue placeholder="Select policy" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FUEL_POLICIES.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
 
           {/* Driver Information */}
+          {showSection(subtype, 'driver') && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -1213,6 +1425,7 @@ export function TransportationForm({
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Features & Options */}
           <Card>
@@ -1223,6 +1436,7 @@ export function TransportationForm({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {showSection(subtype, 'roundTrip') && (
               <div className="flex items-center space-x-2">
                 <Switch
                   id="round-trip"
@@ -1231,7 +1445,9 @@ export function TransportationForm({
                 />
                 <Label htmlFor="round-trip">Round Trip</Label>
               </div>
+              )}
 
+              {showSection(subtype, 'features') && (
               <div className="space-y-2">
                 <Label>Vehicle Features</Label>
                 <div className="flex flex-wrap gap-2">
@@ -1254,6 +1470,7 @@ export function TransportationForm({
                   })}
                 </div>
               </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Special Requests</Label>
