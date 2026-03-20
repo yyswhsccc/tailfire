@@ -186,3 +186,6 @@ export * from './itinerary-feedback.schema'
 
 // Document template system (block-based Handlebars templates)
 export * from './document-templates.schema'
+
+// Security audit logs (RBAC hardening — permission denials, role changes, impersonation)
+export * from './security-audit-logs.schema'
