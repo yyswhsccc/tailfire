@@ -189,3 +189,6 @@ export * from './document-templates.schema'
 
 // Security audit logs (RBAC hardening — permission denials, role changes, impersonation)
 export * from './security-audit-logs.schema'
+
+// Contact share requests (RBAC hardening — agent requests full access to another agent's contact)
+export * from './contact-share-requests.schema'
