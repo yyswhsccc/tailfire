@@ -146,7 +146,7 @@ const SUBTYPE_SECTIONS: Record<string, string[]> = {
 }
 
 function showSection(subtype: string | null | undefined, section: string): boolean {
-  if (!subtype) return true // Show all when no subtype selected
+  if (!subtype) return false // Hide optional sections until a type is selected
   return SUBTYPE_SECTIONS[subtype]?.includes(section) ?? false
 }
 
@@ -961,6 +961,15 @@ export function TransportationForm({
             </CardContent>
           </Card>
 
+          {/* Hint when no subtype selected */}
+          {!subtype && (
+            <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center text-muted-foreground">
+              <Car className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+              <p className="font-medium">Select a transportation type above</p>
+              <p className="text-sm">The form will adapt to show relevant fields for the selected type.</p>
+            </div>
+          )}
+
           {/* Search Transfers (only for transfer subtype) */}
           {showSection(subtype, 'transferSearch') && (
             <div className="border border-gray-200 rounded-lg">
@@ -1055,6 +1064,7 @@ export function TransportationForm({
           )}
 
           {/* Pickup / Departure Details */}
+          {subtype && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -1164,8 +1174,10 @@ export function TransportationForm({
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Dropoff / Arrival Details */}
+          {subtype && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -1243,8 +1255,7 @@ export function TransportationForm({
               </div>
             </CardContent>
           </Card>
-
-          {/* Station fields folded into pickup/dropoff for train/ferry/bus */}
+          )}
 
           {/* Car Rental Specific Fields - only show for car rentals */}
           {showSection(subtype, 'carRental') && (
