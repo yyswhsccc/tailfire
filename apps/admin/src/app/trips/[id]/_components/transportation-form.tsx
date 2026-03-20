@@ -1244,9 +1244,7 @@ export function TransportationForm({
             </CardContent>
           </Card>
 
-          {/* Station / Terminal card removed — for train/ferry/bus,
-              the pickup/dropoff address fields serve as departure/arrival station */}
-          )}
+          {/* Station fields folded into pickup/dropoff for train/ferry/bus */}
 
           {/* Car Rental Specific Fields - only show for car rentals */}
           {showSection(subtype, 'carRental') && (
