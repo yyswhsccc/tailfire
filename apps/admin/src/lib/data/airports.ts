@@ -82,6 +82,12 @@ export const AIRPORTS: Record<string, StaticAirportData> = {
   GDL: { name: 'Guadalajara International Airport', city: 'Guadalajara', country: 'MX', lat: 20.5218, lon: -103.3111 },
   SJD: { name: 'Los Cabos International Airport', city: 'San Jose del Cabo', country: 'MX', lat: 23.1518, lon: -109.7215 },
   PVR: { name: 'Puerto Vallarta International Airport', city: 'Puerto Vallarta', country: 'MX', lat: 20.6801, lon: -105.2545 },
+  CZM: { name: 'Cozumel International Airport', city: 'Cozumel', country: 'MX', lat: 20.5224, lon: -86.9256 },
+  ZIH: { name: 'Ixtapa-Zihuatanejo International Airport', city: 'Zihuatanejo', country: 'MX', lat: 17.6016, lon: -101.4606 },
+  HUX: { name: 'Huatulco International Airport', city: 'Huatulco', country: 'MX', lat: 15.7753, lon: -96.2626 },
+  MZT: { name: 'Mazatlan International Airport', city: 'Mazatlan', country: 'MX', lat: 23.1614, lon: -106.2661 },
+  MTY: { name: 'Monterrey International Airport', city: 'Monterrey', country: 'MX', lat: 25.7785, lon: -100.1069 },
+  ACA: { name: 'Acapulco International Airport', city: 'Acapulco', country: 'MX', lat: 16.7571, lon: -99.7540 },
 
   // Caribbean
   NAS: { name: 'Lynden Pindling International Airport', city: 'Nassau', country: 'BS', lat: 25.0390, lon: -77.4662 },
