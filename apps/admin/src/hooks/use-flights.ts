@@ -34,6 +34,7 @@ export const flightSearchKeys = {
 export const airportKeys = {
   all: ['airports'] as const,
   lookup: (code: string) => [...airportKeys.all, 'lookup', code.toUpperCase()] as const,
+  search: (keyword: string) => [...airportKeys.all, 'search', keyword.toLowerCase()] as const,
 }
 
 // Airport lookup response type
@@ -504,5 +505,36 @@ export function useAirportLookup(code: string, options: { enabled?: boolean } = 
       }
       return failureCount < 1
     },
+  })
+}
+
+// Airport keyword search result
+export interface AirportSearchResult {
+  iata: string
+  name: string
+  city: string
+  countryCode: string
+}
+
+/**
+ * Search airports by keyword via Amadeus API
+ *
+ * Fallback for when static airport database returns no results.
+ * Searches by city name, airport name, etc.
+ */
+export function useAirportSearch(keyword: string, options: { enabled?: boolean } = {}) {
+  const { enabled = true } = options
+
+  return useQuery({
+    queryKey: airportKeys.search(keyword),
+    queryFn: async (): Promise<AirportSearchResult[]> => {
+      return api.get<AirportSearchResult[]>(
+        `/external-apis/flights/airports/search?keyword=${encodeURIComponent(keyword.trim())}`,
+      )
+    },
+    enabled: enabled && !!keyword && keyword.trim().length >= 3,
+    staleTime: 60 * 1000, // Cache for 1 min
+    gcTime: 5 * 60 * 1000,
+    retry: false,
   })
 }
