@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useContact, useUpdateContact, useContactTrips, useContactBookings, useSendPortalInvite } from '@/hooks/use-contacts'
+import { useUser } from '@/hooks/use-user'
+import { ContactShareRequestButton } from './_components/contact-share-request-button'
 import { useContactTags, useUpdateContactTags, useCreateAndAssignContactTag } from '@/hooks/use-tags'
 import { TagInput } from '@/components/ui/tag-input'
 import { useTasks } from '@/hooks/use-tasks'
@@ -178,6 +180,7 @@ export default function ContactDetailPage() {
   const contactId = params?.id as string
   const { toast } = useToast()
 
+  const { isAdmin } = useUser()
   const { data: contact, isLoading, error } = useContact(contactId)
   const { data: contactTrips = [], isLoading: tripsLoading } = useContactTrips(contactId)
   const { data: contactBookings = [], isLoading: bookingsLoading } = useContactBookings(contactId)
@@ -530,6 +533,14 @@ export default function ContactDetailPage() {
                         <Badge variant="traveling">Portal Pending</Badge>
                       )}
                     </div>
+
+                    {/* Limited View badge + Request Access button for non-admin agents */}
+                    {contact._accessLevel === 'basic' && !isAdmin && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <Badge variant="outline" className="border-amber-500 text-amber-500">Limited View</Badge>
+                        <ContactShareRequestButton contactId={contact.id} />
+                      </div>
+                    )}
 
                     {/* Portal Invite Section */}
                     {contact.email && contact.portalStatus === 'not_invited' && (

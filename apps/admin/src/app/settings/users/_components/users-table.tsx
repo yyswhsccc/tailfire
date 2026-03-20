@@ -8,7 +8,7 @@ import {
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { MoreVertical, Pencil, Lock, Unlock, Trash2, Mail, UserCheck } from 'lucide-react'
+import { MoreVertical, Pencil, Lock, Unlock, Trash2, Mail, UserCheck, UserCog } from 'lucide-react'
 import type { UserListItemDto } from '@tailfire/shared-types'
 import {
   DropdownMenu,
@@ -29,25 +29,29 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { UserStatusBadge } from './user-status-badge'
+import { getRoleDisplayName } from '@/lib/constants/roles'
 
 interface UsersTableProps {
   users: UserListItemDto[]
   currentUserId: string
+  isCurrentUserAdmin?: boolean
   onEdit: (user: UserListItemDto) => void
   onLock: (user: UserListItemDto) => void
   onUnlock: (user: UserListItemDto) => void
   onActivate: (user: UserListItemDto) => void
   onDelete: (user: UserListItemDto) => void
   onResendInvite: (user: UserListItemDto) => void
+  onImpersonate?: (user: UserListItemDto) => void
   rowSelection: RowSelectionState
   onRowSelectionChange: OnChangeFn<RowSelectionState>
 }
 
 function getRoleBadge(role: 'admin' | 'user') {
+  const label = getRoleDisplayName(role)
   if (role === 'admin') {
-    return <Badge variant="outline" className="border-purple-500 text-purple-600">Admin</Badge>
+    return <Badge variant="outline" className="border-purple-500 text-purple-600">{label}</Badge>
   }
-  return <Badge variant="outline">User</Badge>
+  return <Badge variant="outline">{label}</Badge>
 }
 
 function formatName(firstName: string | null, lastName: string | null): string {
@@ -58,12 +62,14 @@ function formatName(firstName: string | null, lastName: string | null): string {
 export function UsersTable({
   users,
   currentUserId,
+  isCurrentUserAdmin = false,
   onEdit,
   onLock,
   onUnlock,
   onActivate,
   onDelete,
   onResendInvite,
+  onImpersonate,
   rowSelection,
   onRowSelectionChange,
 }: UsersTableProps) {
@@ -174,6 +180,13 @@ export function UsersTable({
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit
                 </DropdownMenuItem>
+
+                {isCurrentUserAdmin && user.role !== 'admin' && !isCurrentUser && onImpersonate && (
+                  <DropdownMenuItem onClick={() => onImpersonate(user)}>
+                    <UserCog className="mr-2 h-4 w-4" />
+                    Impersonate
+                  </DropdownMenuItem>
+                )}
 
                 {user.status === 'pending' && (
                   <>

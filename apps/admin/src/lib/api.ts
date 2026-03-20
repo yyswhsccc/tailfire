@@ -10,10 +10,18 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
 
+  const headers: Record<string, string> = {}
+
   if (session?.access_token) {
-    return { Authorization: `Bearer ${session.access_token}` }
+    headers['Authorization'] = `Bearer ${session.access_token}`
   }
-  return {}
+
+  const impersonateUserId = typeof window !== 'undefined' ? localStorage.getItem('impersonate-user-id') : null
+  if (impersonateUserId) {
+    headers['X-Impersonate-User-Id'] = impersonateUserId
+  }
+
+  return headers
 }
 
 /**

@@ -579,6 +579,149 @@ export class NotificationEventsListener {
   }
 
   // =========================================================================
+  // Contact Share Events
+  // =========================================================================
+
+  /**
+   * Handle contact.share_requested event
+   * Notify the contact owner that an agent has requested access
+   */
+  @OnEvent('contact.share_requested')
+  async handleContactShareRequested(event: {
+    requestId: string
+    contactId: string
+    contactName: string
+    ownerId: string
+    requesterId: string
+    requesterName: string
+    agencyId: string
+  }): Promise<void> {
+    await this.notificationService.send({
+      userId: event.ownerId,
+      category: 'contact_share',
+      title: 'Contact Access Request',
+      body: `${event.requesterName} has requested access to your contact "${event.contactName}"`,
+      actionUrl: `/contacts/${event.contactId}`,
+      data: {
+        requestId: event.requestId,
+        contactId: event.contactId,
+        requesterId: event.requesterId,
+        notificationType: 'contact.share_requested',
+      },
+    })
+
+    this.logger.debug(
+      `Sent contact.share_requested notification to user ${event.ownerId} for contact ${event.contactId}`,
+    )
+  }
+
+  /**
+   * Handle contact.share_approved event
+   * Notify the requester that their access request was approved
+   */
+  @OnEvent('contact.share_approved')
+  async handleContactShareApproved(event: {
+    requestId: string
+    contactId: string
+    requesterId: string
+    ownerId: string
+    agencyId: string
+  }): Promise<void> {
+    await this.notificationService.send({
+      userId: event.requesterId,
+      category: 'contact_share',
+      title: 'Contact Access Approved',
+      body: 'Your request for full access to a contact has been approved',
+      actionUrl: `/contacts/${event.contactId}`,
+      data: {
+        requestId: event.requestId,
+        contactId: event.contactId,
+        notificationType: 'contact.share_approved',
+      },
+    })
+
+    this.logger.debug(
+      `Sent contact.share_approved notification to user ${event.requesterId} for contact ${event.contactId}`,
+    )
+  }
+
+  /**
+   * Handle contact.share_denied event
+   * Notify the requester that their access request was denied
+   */
+  @OnEvent('contact.share_denied')
+  async handleContactShareDenied(event: {
+    requestId: string
+    contactId: string
+    requesterId: string
+    ownerId: string
+    reason?: string
+    agencyId: string
+  }): Promise<void> {
+    const body = event.reason
+      ? `Your request for contact access was denied: ${event.reason}`
+      : 'Your request for contact access was denied'
+
+    await this.notificationService.send({
+      userId: event.requesterId,
+      category: 'contact_share',
+      title: 'Contact Access Denied',
+      body,
+      data: {
+        requestId: event.requestId,
+        contactId: event.contactId,
+        reason: event.reason,
+        notificationType: 'contact.share_denied',
+      },
+    })
+
+    this.logger.debug(
+      `Sent contact.share_denied notification to user ${event.requesterId} for contact ${event.contactId}`,
+    )
+  }
+
+  // =========================================================================
+  // Impersonation Events
+  // =========================================================================
+
+  /**
+   * Handle impersonation.ended event
+   * Notify the target agent that an admin viewed their account
+   */
+  @OnEvent('impersonation.ended')
+  async handleImpersonationEnded(event: {
+    adminUserId: string
+    targetUserId: string
+    agencyId: string
+    sessionId: string
+    duration: number
+  }): Promise<void> {
+    try {
+      // Get admin name
+      const admin = await this.db.client.query.userProfiles.findFirst({
+        where: eq(this.db.schema.userProfiles.id, event.adminUserId),
+        columns: { firstName: true, lastName: true },
+      })
+      const adminName = [admin?.firstName, admin?.lastName].filter(Boolean).join(' ') || 'An admin'
+      const durationMins = Math.round(event.duration / 60000)
+
+      await this.notificationService.send({
+        userId: event.targetUserId,
+        category: 'system_alerts',
+        title: `${adminName} viewed your account`,
+        body: `Admin session lasted ${durationMins} minute(s).`,
+        data: { sessionId: event.sessionId },
+      })
+
+      this.logger.debug(
+        `Sent impersonation.ended notification to user ${event.targetUserId} for session ${event.sessionId}`,
+      )
+    } catch (error) {
+      this.logger.error('Failed to send impersonation ended notification', error)
+    }
+  }
+
+  // =========================================================================
   // Helper Methods
   // =========================================================================
 

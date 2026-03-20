@@ -19,6 +19,8 @@ import { ContactDocumentsController } from './contact-documents.controller'
 import { ContactDocumentsService } from './contact-documents.service'
 import { ContactLoyaltyProgramsController } from './contact-loyalty-programs.controller'
 import { ContactLoyaltyProgramsService } from './contact-loyalty-programs.service'
+import { ContactShareRequestsController } from './contact-share-requests.controller'
+import { ContactShareRequestsService } from './contact-share-requests.service'
 import { ActivityLogsModule } from '../activity-logs/activity-logs.module'
 import { EmailModule } from '../email/email.module'
 import { TripsModule } from '../trips/trips.module'
@@ -36,6 +38,7 @@ import { TripsModule } from '../trips/trips.module'
     ContactSharesController,
     ContactDocumentsController,
     ContactLoyaltyProgramsController,
+    ContactShareRequestsController,
   ],
   providers: [
     ContactsService,
@@ -45,6 +48,7 @@ import { TripsModule } from '../trips/trips.module'
     ContactAccessService,
     ContactDocumentsService,
     ContactLoyaltyProgramsService,
+    ContactShareRequestsService,
   ],
   exports: [
     ContactsService,

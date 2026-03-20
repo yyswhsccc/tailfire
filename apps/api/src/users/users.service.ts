@@ -30,6 +30,7 @@ import type {
   UserListResponseDto,
 } from '@tailfire/shared-types'
 import { EmailService } from '../email/email.service'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 
 @Injectable()
 export class UsersService {
@@ -40,6 +41,7 @@ export class UsersService {
     private readonly configService: ConfigService,
     private readonly db: DatabaseService,
     private readonly emailService: EmailService,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL')
     const serviceRoleKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY')
@@ -470,6 +472,17 @@ export class UsersService {
       .update(userProfiles)
       .set(updates)
       .where(eq(userProfiles.id, userId))
+
+    // Emit security.role_changed if role was updated
+    if (dto.role !== undefined && dto.role !== user.role) {
+      this.eventEmitter.emit('security.role_changed', {
+        event: 'security.role_changed',
+        userId,
+        actorId: adminId,
+        agencyId,
+        metadata: { oldRole: user.role, newRole: dto.role },
+      })
+    }
 
     return this.getUserById(userId, agencyId)
   }

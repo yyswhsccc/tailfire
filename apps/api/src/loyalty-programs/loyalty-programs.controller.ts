@@ -17,14 +17,12 @@ import {
   Query,
   HttpCode,
   HttpStatus,
-  UseGuards,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { LoyaltyProgramsService } from './loyalty-programs.service'
 import { CreateLoyaltyProgramCatalogDto, UpdateLoyaltyProgramCatalogDto } from './dto'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
-import { Roles } from '../auth/decorators/roles.decorator'
-import { RolesGuard } from '../auth/guards/roles.guard'
+import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import type { AuthContext } from '../auth/auth.types'
 
 @ApiTags('Loyalty Programs')
@@ -71,8 +69,7 @@ export class LoyaltyProgramsController {
    * POST /loyalty-programs
    */
   @Post()
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @AdminOnly()
   @HttpCode(HttpStatus.CREATED)
   async create(
     @GetAuthContext() auth: AuthContext,
@@ -86,8 +83,7 @@ export class LoyaltyProgramsController {
    * PATCH /loyalty-programs/:id
    */
   @Patch(':id')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @AdminOnly()
   async update(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
@@ -101,8 +97,7 @@ export class LoyaltyProgramsController {
    * DELETE /loyalty-programs/:id
    */
   @Delete(':id')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @AdminOnly()
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
     @GetAuthContext() auth: AuthContext,

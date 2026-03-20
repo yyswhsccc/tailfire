@@ -16,7 +16,6 @@ import {
   Query,
   HttpCode,
   HttpStatus,
-  UseGuards,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { UsersService } from './users.service'
@@ -28,7 +27,7 @@ import {
   ListUsersDto,
 } from './dto'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
-import { AdminGuard } from '../common/guards/admin.guard'
+import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import type { AuthContext } from '../auth/auth.types'
 import type {
   UserListResponseDto,
@@ -39,7 +38,7 @@ import type {
 
 @ApiTags('Users')
 @Controller('users')
-@UseGuards(AdminGuard)
+@AdminOnly()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

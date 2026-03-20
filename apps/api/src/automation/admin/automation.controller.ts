@@ -5,16 +5,15 @@
  * Protected by admin role check (implemented via guards).
  */
 
-import { Controller, Get, Post, Delete, Param, Query, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Delete, Param, Query, Body, HttpCode, HttpStatus } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger'
 import { AutomationService } from '../automation.service'
 import { QUEUES, type QueueName } from '../automation.types'
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard'
-import { AdminRoleGuard } from '../../auth/guards/admin-role.guard'
+import { AdminOnly } from '../../auth/decorators/admin-only.decorator'
 
 @ApiTags('Admin - Automation')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AdminRoleGuard)
+@AdminOnly()
 @Controller('admin/automation')
 export class AutomationController {
   constructor(private readonly automationService: AutomationService) {}

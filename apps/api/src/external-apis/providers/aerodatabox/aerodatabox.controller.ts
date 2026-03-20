@@ -16,12 +16,11 @@ import {
   BadRequestException,
   ServiceUnavailableException,
   Logger,
-  UseGuards,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiQuery, ApiParam, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { IsString, IsOptional, IsIn, MinLength, MaxLength, Matches } from 'class-validator'
 import { Transform } from 'class-transformer'
-import { AdminGuard } from '../../../common/guards/admin.guard'
+import { AdminOnly } from '../../../auth/decorators/admin-only.decorator'
 import { AerodataboxFlightsProvider } from './aerodatabox-flights.provider'
 import { ExternalApiRegistryService } from '../../core/services/external-api-registry.service'
 import { ApiCategory } from '../../core/interfaces'
@@ -56,7 +55,7 @@ class FlightSearchQueryDto {
 
 @ApiTags('External APIs - Flights')
 @ApiBearerAuth()
-@UseGuards(AdminGuard)
+@AdminOnly()
 @Controller('external-apis/flights')
 export class AerodataboxController {
   private readonly logger = new Logger(AerodataboxController.name)

@@ -6,6 +6,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter'
 import { APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { SentryModule } from '@sentry/nestjs/setup'
 import { SentryGlobalFilter } from '@sentry/nestjs/setup'
+import { SecurityExceptionFilter } from './security-audit/security-exception.filter'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { DatabaseModule } from './db/database.module'
@@ -52,6 +53,8 @@ import { EmailAccountsModule } from './email-accounts/email-accounts.module'
 import { BugReportsModule } from './bug-reports/bug-reports.module'
 import { EnrichmentModule } from './enrichment/enrichment.module'
 import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
+import { SecurityAuditModule } from './security-audit/security-audit.module'
+import { ImpersonationModule } from './impersonation/impersonation.module'
 
 @Module({
   imports: [
@@ -189,6 +192,12 @@ import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
 
     // Activity enrichment (geocoding, cruise catalog, hotel photos)
     EnrichmentModule,
+
+    // Security audit logs (RBAC hardening — permission denials, role changes, impersonation)
+    SecurityAuditModule,
+
+    // Impersonation system (RBAC hardening — admin views agent's account)
+    ImpersonationModule,
   ],
   controllers: [AppController],
   providers: [
@@ -197,6 +206,12 @@ import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
     {
       provide: APP_FILTER,
       useClass: SentryGlobalFilter,
+    },
+    // Security exception filter (emits security.login_failed / security.access_denied events)
+    // Registered after SentryGlobalFilter so Sentry still captures the exception first
+    {
+      provide: APP_FILTER,
+      useClass: SecurityExceptionFilter,
     },
     // Global Guards - registered in reverse execution order
     // Execution order: JwtAuthGuard (in AuthModule) → UserStatusGuard → ActiveUserGuard

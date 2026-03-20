@@ -15,6 +15,7 @@ import { Controller, Get, Post, Patch, Param, Body, ForbiddenException } from '@
 import { ApiTags } from '@nestjs/swagger'
 import { StripeConnectService } from './stripe-connect.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
+import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import type { AuthContext } from '../auth/auth.types'
 import type {
   StripeOnboardingResponseDto,
@@ -32,6 +33,7 @@ export class StripeConnectController {
    * Get agency settings
    * GET /agencies/:agencyId/settings
    */
+  @AdminOnly()
   @Get('agencies/:agencyId/settings')
   async getAgencySettings(
     @GetAuthContext() auth: AuthContext,
@@ -47,6 +49,7 @@ export class StripeConnectController {
    * Update agency settings (compliance, branding, etc.)
    * PATCH /agencies/:agencyId/settings
    */
+  @AdminOnly()
   @Patch('agencies/:agencyId/settings')
   async updateAgencySettings(
     @GetAuthContext() auth: AuthContext,
@@ -63,6 +66,7 @@ export class StripeConnectController {
    * Start Stripe Connect onboarding
    * POST /agencies/:agencyId/stripe/onboard
    */
+  @AdminOnly()
   @Post('agencies/:agencyId/stripe/onboard')
   async startOnboarding(
     @GetAuthContext() auth: AuthContext,
@@ -79,6 +83,7 @@ export class StripeConnectController {
    * Refresh and get Stripe account status
    * GET /agencies/:agencyId/stripe/status
    */
+  @AdminOnly()
   @Get('agencies/:agencyId/stripe/status')
   async getAccountStatus(
     @GetAuthContext() auth: AuthContext,
@@ -94,6 +99,7 @@ export class StripeConnectController {
    * Get Stripe Express Dashboard login link
    * POST /agencies/:agencyId/stripe/dashboard
    */
+  @AdminOnly()
   @Post('agencies/:agencyId/stripe/dashboard')
   async getDashboardLink(
     @GetAuthContext() auth: AuthContext,

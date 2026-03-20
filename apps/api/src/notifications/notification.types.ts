@@ -16,6 +16,7 @@ export type NotificationCategory =
   | 'assignment'
   | 'collaboration'
   | 'payment_alert'
+  | 'contact_share'
 
 /**
  * Valid notification category values for validation
@@ -29,6 +30,7 @@ export const NOTIFICATION_CATEGORY_VALUES = [
   'assignment',
   'collaboration',
   'payment_alert',
+  'contact_share',
 ] as const
 
 /**
@@ -48,6 +50,7 @@ export interface CategoryPreferences {
   assignment?: NotificationChannel[]
   collaboration?: NotificationChannel[]
   payment_alert?: NotificationChannel[]
+  contact_share?: NotificationChannel[]
 }
 
 /**

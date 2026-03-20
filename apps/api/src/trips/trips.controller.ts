@@ -21,7 +21,7 @@ import {
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common'
-import { AdminGuard } from '../common/guards/admin.guard'
+import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
 import { Public } from '../auth/decorators/public.decorator'
@@ -893,7 +893,7 @@ export class TripsController {
    * Restore a soft-deleted trip (Admin only)
    * POST /trips/:id/restore
    */
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   @Post(':id/restore')
   async restoreTrip(
     @GetAuthContext() auth: AuthContext,
@@ -906,7 +906,7 @@ export class TripsController {
    * Un-cancel a trip, restoring its previous status (Admin only)
    * POST /trips/:id/uncancel
    */
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   @Post(':id/uncancel')
   async uncancelTrip(
     @GetAuthContext() auth: AuthContext,

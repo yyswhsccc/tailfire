@@ -358,6 +358,9 @@ export interface ContactResponseDto {
   // Audit
   createdAt: string // ISO timestamp
   updatedAt: string // ISO timestamp
+
+  // Access level indicator (set by ContactAccessService.applyAccessControl)
+  _accessLevel?: 'basic' | 'full'
 }
 
 export interface ContactWithRelationshipsResponseDto extends ContactResponseDto {
