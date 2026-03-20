@@ -68,6 +68,8 @@ export function useFlightOfferSearch(
     enabled: enabled && !!params.origin && !!params.destination && !!params.departureDate,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: (failureCount, error) => {
       if (error instanceof ApiError && [401, 403, 404, 429].includes(error.status)) return false
       return failureCount < 1
@@ -124,6 +126,8 @@ export function useTransferSearch(
     enabled: enabled && !!params.pickupType && !!params.dropoffType && !!params.date && !!params.time,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: (failureCount, error) => {
       if (error instanceof ApiError && [401, 403, 404, 429].includes(error.status)) return false
       return failureCount < 1
@@ -169,6 +173,8 @@ export function useActivitySearch(
     enabled: enabled && params.latitude !== undefined && params.longitude !== undefined,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: (failureCount, error) => {
       if (error instanceof ApiError && [401, 403, 404, 429].includes(error.status)) return false
       return failureCount < 1

@@ -282,7 +282,7 @@ export function FlightForm({
     isLoading: isSearching,
     error: searchError,
     refetchSearch,
-  } = useExternalFlightSearchWithRateLimit(searchFlightNumber, searchDate)
+  } = useExternalFlightSearchWithRateLimit(searchFlightNumber, searchDate, { enabled: showSearchResults })
 
   // Amadeus-specific search hook ("More Results" fallback)
   const {
