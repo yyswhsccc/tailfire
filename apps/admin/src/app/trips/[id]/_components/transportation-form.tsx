@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { api } from '@/lib/api'
 import { useSaveStatus } from '@/hooks/use-save-status'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
@@ -399,7 +400,7 @@ export function TransportationForm({
   // Transfer search panel state
   const [showTransferSearch, setShowTransferSearch] = useState(false)
 
-  const handleTransferSelect = (transfer: NormalizedTransferResult) => {
+  const handleTransferSelect = async (transfer: NormalizedTransferResult) => {
     setValue('transportationDetails.providerName', transfer.provider || '', { shouldDirty: true })
     setValue('transportationDetails.vehicleType', transfer.vehicle.type?.toLowerCase() || '', { shouldDirty: true })
     if (transfer.vehicle.maxPassengers) {
@@ -411,14 +412,44 @@ export function TransportationForm({
     if (transfer.dropoffLocation?.address) {
       setValue('transportationDetails.dropoffAddress', transfer.dropoffLocation.address, { shouldDirty: true })
     }
-    // Populate pricing
-    if (transfer.price?.total) {
-      const totalCents = Math.round(parseFloat(transfer.price.total) * 100)
-      setValue('totalPriceCents', totalCents, { shouldDirty: true })
+
+    // Populate pricing — convert to trip currency if different
+    const tripCurrency = trip?.currency || 'CAD'
+    const providerCurrency = transfer.price?.currency || tripCurrency
+    const originalCents = transfer.price?.total
+      ? Math.round(parseFloat(transfer.price.total) * 100)
+      : null
+
+    if (originalCents && providerCurrency !== tripCurrency) {
+      // Convert to trip currency via exchange rate API
+      try {
+        const conversion = await api.post<{
+          convertedAmountCents: number
+          rate: string
+          convertedCurrency: string
+        }>('/exchange-rates/convert', {
+          amountCents: originalCents,
+          fromCurrency: providerCurrency,
+          toCurrency: tripCurrency,
+        })
+        setValue('totalPriceCents', conversion.convertedAmountCents, { shouldDirty: true })
+        setValue('currency', tripCurrency, { shouldDirty: true })
+        // Add conversion note to description
+        const rate = parseFloat(conversion.rate).toFixed(4)
+        setValue('notes',
+          `Approx. conversion: ${providerCurrency} ${transfer.price.total} → ${tripCurrency} ${(conversion.convertedAmountCents / 100).toFixed(2)} (rate: ${rate}). Provider quotes in ${providerCurrency}.`,
+          { shouldDirty: true }
+        )
+      } catch {
+        // Fallback: use original currency if conversion fails
+        setValue('totalPriceCents', originalCents, { shouldDirty: true })
+        setValue('currency', providerCurrency, { shouldDirty: true })
+      }
+    } else if (originalCents) {
+      setValue('totalPriceCents', originalCents, { shouldDirty: true })
+      setValue('currency', tripCurrency, { shouldDirty: true })
     }
-    if (transfer.price?.currency) {
-      setValue('currency', transfer.price.currency, { shouldDirty: true })
-    }
+
     if (transfer.cancellationPolicy) {
       const policyText = transfer.cancellationPolicy.refundable ? 'Free cancellation' : `Non-refundable. ${transfer.cancellationPolicy.description || ''}`
       setValue('cancellationPolicy', policyText, { shouldDirty: true })
@@ -432,7 +463,9 @@ export function TransportationForm({
     setShowTransferSearch(false)
     toast({
       title: 'Transfer Details Applied',
-      description: `${transfer.vehicle.type} - ${transfer.price.currency} ${transfer.price.total}`,
+      description: providerCurrency !== tripCurrency
+        ? `${transfer.vehicle.type} - ${providerCurrency} ${transfer.price.total} → converted to ${tripCurrency} (approx.)`
+        : `${transfer.vehicle.type} - ${tripCurrency} ${transfer.price.total}`,
     })
   }
 
