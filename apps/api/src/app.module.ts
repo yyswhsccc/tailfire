@@ -6,6 +6,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter'
 import { APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { SentryModule } from '@sentry/nestjs/setup'
 import { SentryGlobalFilter } from '@sentry/nestjs/setup'
+import { SecurityExceptionFilter } from './security-audit/security-exception.filter'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { DatabaseModule } from './db/database.module'
@@ -201,6 +202,12 @@ import { SecurityAuditModule } from './security-audit/security-audit.module'
     {
       provide: APP_FILTER,
       useClass: SentryGlobalFilter,
+    },
+    // Security exception filter (emits security.login_failed / security.access_denied events)
+    // Registered after SentryGlobalFilter so Sentry still captures the exception first
+    {
+      provide: APP_FILTER,
+      useClass: SecurityExceptionFilter,
     },
     // Global Guards - registered in reverse execution order
     // Execution order: JwtAuthGuard (in AuthModule) → UserStatusGuard → ActiveUserGuard
