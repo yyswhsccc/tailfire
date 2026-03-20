@@ -9,6 +9,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { firstValueFrom } from 'rxjs'
+import * as Sentry from '@sentry/nestjs'
 import { BaseExternalApi } from '../../core/base/base-external-api'
 import { RateLimiterService } from '../../core/services/rate-limiter.service'
 import { MetricsService } from '../../core/services/metrics.service'
@@ -104,11 +105,17 @@ export class AmadeusActivitiesProvider
         metadata: { provider: this.config.provider, timestamp: new Date().toISOString(), requestId },
       }
     } catch (error: any) {
+      const latencyMs = Date.now() - startTime
       this.logger.error('Amadeus Activities API error', {
         requestId,
-        latencyMs: Date.now() - startTime,
+        latencyMs,
         error: error.message,
         status: error.response?.status,
+      })
+
+      Sentry.captureException(error, {
+        tags: { service: 'amadeus_activities', operation: 'authenticated-request' },
+        extra: { endpoint, requestId, latencyMs, status: error.response?.status },
       })
 
       const errorDetail = error.response?.data?.errors?.[0]

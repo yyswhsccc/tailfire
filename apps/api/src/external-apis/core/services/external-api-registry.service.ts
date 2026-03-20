@@ -17,6 +17,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common'
+import * as Sentry from '@sentry/nestjs'
 import { ApiProvider } from '@tailfire/shared-types'
 import { ApiCategory, IExternalApiProvider } from '../interfaces'
 import { CredentialResolverService } from '../../../api-credentials/credential-resolver.service'
@@ -140,6 +141,10 @@ export class ExternalApiRegistryService {
       this.logger.error(
         `Failed to load credentials for ${providerName}: ${error.message}`
       )
+      Sentry.captureException(error, {
+        tags: { service: 'external-api-registry', operation: 'credential-load' },
+        extra: { provider: providerName },
+      })
     }
   }
 
@@ -267,6 +272,10 @@ export class ExternalApiRegistryService {
         this.logger.warn(`Provider ${providerName} failed: ${error.message}, trying next...`)
         // Record fallback attempt failure with proper endpoint label
         this.metrics.recordRequest(providerName, '_fallback', 'error')
+        Sentry.captureException(error, {
+          tags: { service: 'external-api-registry', operation: 'fallback', provider: providerName },
+          extra: { category, fallbackIndex: i, totalProviders: chain.length },
+        })
         continue
       }
     }
@@ -309,6 +318,10 @@ export class ExternalApiRegistryService {
       } catch (error: any) {
         registration.hasCredentials = false
         this.logger.error(`Failed to refresh credentials for ${providerName}: ${error.message}`)
+        Sentry.captureException(error, {
+          tags: { service: 'external-api-registry', operation: 'credential-refresh' },
+          extra: { provider: providerName },
+        })
       }
     }
 

@@ -9,6 +9,7 @@
 
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
+import * as Sentry from '@sentry/nestjs'
 import { BaseExternalApi } from '../../core/base/base-external-api'
 import { RateLimiterService } from '../../core/services/rate-limiter.service'
 import { MetricsService } from '../../core/services/metrics.service'
@@ -309,6 +310,10 @@ export class AerodataboxFlightsProvider
         message: response.error || 'Connection failed',
       }
     } catch (error: any) {
+      Sentry.captureException(error, {
+        tags: { service: 'aerodatabox', operation: 'test-connection' },
+        level: 'warning',
+      })
       return {
         success: false,
         message: error.message || 'Connection test failed',
