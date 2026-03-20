@@ -29,6 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { UserStatusBadge } from './user-status-badge'
+import { getRoleDisplayName } from '@/lib/constants/roles'
 
 interface UsersTableProps {
   users: UserListItemDto[]
@@ -44,10 +45,11 @@ interface UsersTableProps {
 }
 
 function getRoleBadge(role: 'admin' | 'user') {
+  const label = getRoleDisplayName(role)
   if (role === 'admin') {
-    return <Badge variant="outline" className="border-purple-500 text-purple-600">Admin</Badge>
+    return <Badge variant="outline" className="border-purple-500 text-purple-600">{label}</Badge>
   }
-  return <Badge variant="outline">User</Badge>
+  return <Badge variant="outline">{label}</Badge>
 }
 
 function formatName(firstName: string | null, lastName: string | null): string {
