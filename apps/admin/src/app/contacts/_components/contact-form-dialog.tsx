@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -38,6 +38,97 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { useCreateContact, useUpdateContact } from '@/hooks/use-contacts'
 import { useToast } from '@/hooks/use-toast'
+import { MapPin, Loader2 } from 'lucide-react'
+
+const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
+
+interface GooglePrediction {
+  placeId: string
+  mainText: string
+  secondaryText: string
+}
+
+interface AddressComponents {
+  addressLine1: string
+  city: string
+  province: string
+  postalCode: string
+  country: string
+}
+
+function useAddressAutocomplete(onSelect: (addr: AddressComponents) => void) {
+  const [query, setQuery] = useState('')
+  const [predictions, setPredictions] = useState<GooglePrediction[]>([])
+  const [isOpen, setIsOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const abortRef = useRef<AbortController>()
+
+  const search = useCallback(async (text: string) => {
+    if (!GOOGLE_API_KEY || !text.trim()) return
+    abortRef.current?.abort()
+    abortRef.current = new AbortController()
+    setIsLoading(true)
+    try {
+      const res = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': GOOGLE_API_KEY },
+        body: JSON.stringify({ input: text, includedPrimaryTypes: ['street_address', 'premise', 'subpremise', 'route'] }),
+        signal: abortRef.current.signal,
+      })
+      const data = await res.json()
+      setPredictions(
+        (data.suggestions || [])
+          .filter((s: any) => s.placePrediction)
+          .map((s: any) => ({
+            placeId: s.placePrediction.placeId,
+            mainText: s.placePrediction.structuredFormat?.mainText?.text || s.placePrediction.text?.text || '',
+            secondaryText: s.placePrediction.structuredFormat?.secondaryText?.text || '',
+          }))
+      )
+      setIsOpen(true)
+    } catch (e: any) {
+      if (e.name !== 'AbortError') setPredictions([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  const handleChange = (val: string) => {
+    setQuery(val)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!val.trim()) { setPredictions([]); setIsOpen(false); return }
+    setIsOpen(true)
+    debounceRef.current = setTimeout(() => search(val), 300)
+  }
+
+  const handleSelect = async (prediction: GooglePrediction) => {
+    setIsOpen(false)
+    setQuery(prediction.mainText + (prediction.secondaryText ? `, ${prediction.secondaryText}` : ''))
+    if (!GOOGLE_API_KEY) return
+    setIsLoading(true)
+    try {
+      const res = await fetch(
+        `https://places.googleapis.com/v1/places/${prediction.placeId}?fields=addressComponents,formattedAddress`,
+        { headers: { 'X-Goog-Api-Key': GOOGLE_API_KEY, 'X-Goog-FieldMask': 'addressComponents,formattedAddress' } }
+      )
+      const place = await res.json()
+      const comps = place.addressComponents || []
+      const find = (type: string) => comps.find((c: any) => c.types?.includes(type))
+      const streetNumber = find('street_number')?.longText || ''
+      const route = find('route')?.longText || ''
+      onSelect({
+        addressLine1: streetNumber ? `${streetNumber} ${route}` : (place.formattedAddress || prediction.mainText),
+        city: find('locality')?.longText || find('sublocality')?.longText || '',
+        province: find('administrative_area_level_1')?.shortText || '',
+        postalCode: find('postal_code')?.longText || '',
+        country: find('country')?.shortText || '',
+      })
+    } catch { /* ignore */ } finally { setIsLoading(false) }
+  }
+
+  return { query, setQuery, predictions, isOpen, setIsOpen, isLoading, handleChange, handleSelect }
+}
 
 // Updated schema to reflect Phase 1-4 requirements
 const contactFormSchema = z.object({
@@ -147,6 +238,15 @@ export function ContactFormDialog({
   const updateContact = useUpdateContact()
   const { toast } = useToast()
 
+  // Address autocomplete
+  const addressAC = useAddressAutocomplete((addr) => {
+    form.setValue('addressLine1', addr.addressLine1, { shouldDirty: true })
+    form.setValue('city', addr.city, { shouldDirty: true })
+    form.setValue('province', addr.province, { shouldDirty: true })
+    form.setValue('postalCode', addr.postalCode, { shouldDirty: true })
+    form.setValue('country', addr.country, { shouldDirty: true })
+  })
+
   // Reset form when contact changes or dialog opens
   useEffect(() => {
     if (contact && mode === 'edit') {
@@ -184,10 +284,12 @@ export function ContactFormDialog({
         cabinPreference: contact.cabinPreference || '',
         floorPreference: contact.floorPreference || '',
       })
+      addressAC.setQuery(contact.addressLine1 || '')
     } else if (mode === 'create') {
       form.reset()
+      addressAC.setQuery('')
     }
-  }, [contact, mode, form, open])
+  }, [contact, mode, form, open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSubmit = async (data: ContactFormValues) => {
     try {
@@ -651,7 +753,49 @@ export function ContactFormDialog({
                       <FormItem>
                         <FormLabel>Address Line 1</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <div className="relative">
+                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                            <Input
+                              value={addressAC.query}
+                              onChange={(e) => {
+                                addressAC.handleChange(e.target.value)
+                                field.onChange(e.target.value)
+                              }}
+                              onBlur={() => {
+                                setTimeout(() => addressAC.setIsOpen(false), 200)
+                                field.onBlur()
+                              }}
+                              placeholder="Start typing to search..."
+                              className="pl-9"
+                              autoComplete="off"
+                            />
+                            {addressAC.isLoading && (
+                              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                            )}
+                            {addressAC.isOpen && addressAC.predictions.length > 0 && (
+                              <div className="absolute z-50 mt-1 w-full rounded-md border bg-white shadow-lg max-h-48 overflow-y-auto">
+                                {addressAC.predictions.map((p) => (
+                                  <button
+                                    key={p.placeId}
+                                    type="button"
+                                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-start gap-2"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => {
+                                      addressAC.handleSelect(p)
+                                    }}
+                                  >
+                                    <MapPin className="h-3.5 w-3.5 mt-0.5 text-gray-400 shrink-0" />
+                                    <span>
+                                      <span className="font-medium">{p.mainText}</span>
+                                      {p.secondaryText && (
+                                        <span className="text-gray-500 ml-1">{p.secondaryText}</span>
+                                      )}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
