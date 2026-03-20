@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { AuthProvider } from '@/providers/auth-provider'
 import { NotificationsProvider } from '@/providers/notifications-provider'
 import { ConsoleCaptureProvider } from '@/providers/console-capture-provider'
+import { ImpersonationBanner } from '@/components/impersonation/impersonation-banner'
 
 // Dynamically import devtools only in development
 const ReactQueryDevtools =
@@ -45,6 +46,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ConsoleCaptureProvider>
         <AuthProvider>
+        <ImpersonationBanner />
         <NotificationsProvider>
           <LoadingProvider>
             <ConfirmationDialogProvider>
