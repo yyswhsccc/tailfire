@@ -139,9 +139,9 @@ const SUBTYPE_SECTIONS: Record<string, string[]> = {
   private_car: ['provider', 'pickup', 'dropoff', 'vehicle', 'driver', 'features', 'roundTrip'],
   limousine: ['provider', 'pickup', 'dropoff', 'vehicle', 'driver', 'features', 'roundTrip'],
   shuttle: ['provider', 'pickup', 'dropoff', 'flight', 'roundTrip'],
-  train: ['provider', 'pickup', 'dropoff', 'station', 'roundTrip'],
-  ferry: ['provider', 'pickup', 'dropoff', 'station', 'roundTrip'],
-  bus: ['provider', 'pickup', 'dropoff', 'station', 'roundTrip'],
+  train: ['provider', 'pickup', 'dropoff', 'roundTrip'],
+  ferry: ['provider', 'pickup', 'dropoff', 'roundTrip'],
+  bus: ['provider', 'pickup', 'dropoff', 'roundTrip'],
   car_rental: ['provider', 'pickup', 'dropoff', 'carRental'],
 }
 
@@ -1054,12 +1054,16 @@ export function TransportationForm({
           </Card>
           )}
 
-          {/* Pickup Details */}
+          {/* Pickup / Departure Details */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <MapPin className="h-5 w-5 text-green-500" />
-                Pickup Details
+                {['train', 'ferry', 'bus'].includes(subtype || '') ? (
+                  <Train className="h-5 w-5 text-blue-500" />
+                ) : (
+                  <MapPin className="h-5 w-5 text-green-500" />
+                )}
+                {['train', 'ferry', 'bus'].includes(subtype || '') ? 'Departure Details' : 'Pickup Details'}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1135,7 +1139,7 @@ export function TransportationForm({
               </div>
               )}
               <div className="space-y-2">
-                <Label>Pickup Address</Label>
+                <Label>{['train', 'ferry', 'bus'].includes(subtype || '') ? 'Departure Station' : 'Pickup Address'}</Label>
                 <TransportationAddressInput
                   value={pickupAddressValue || ''}
                   onChange={(loc) => {
@@ -1146,7 +1150,7 @@ export function TransportationForm({
                     setValue('transportationDetails.pickupPlaceId', loc.placeId, { shouldDirty: true })
                   }}
                   tripLocations={tripLocations}
-                  placeholder="Search address or select trip location"
+                  placeholder={['train', 'ferry', 'bus'].includes(subtype || '') ? 'e.g., Union Station, Penn Station' : 'Search address or select trip location'}
                 />
               </div>
               <div className="space-y-2">
@@ -1161,12 +1165,16 @@ export function TransportationForm({
             </CardContent>
           </Card>
 
-          {/* Dropoff Details */}
+          {/* Dropoff / Arrival Details */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <MapPin className="h-5 w-5 text-red-500" />
-                Dropoff Details
+                {['train', 'ferry', 'bus'].includes(subtype || '') ? (
+                  <Train className="h-5 w-5 text-blue-500" />
+                ) : (
+                  <MapPin className="h-5 w-5 text-red-500" />
+                )}
+                {['train', 'ferry', 'bus'].includes(subtype || '') ? 'Arrival Details' : 'Dropoff Details'}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1210,7 +1218,7 @@ export function TransportationForm({
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Dropoff Address</Label>
+                <Label>{['train', 'ferry', 'bus'].includes(subtype || '') ? 'Arrival Station' : 'Dropoff Address'}</Label>
                 <TransportationAddressInput
                   value={dropoffAddressValue || ''}
                   onChange={(loc) => {
@@ -1221,7 +1229,7 @@ export function TransportationForm({
                     setValue('transportationDetails.dropoffPlaceId', loc.placeId, { shouldDirty: true })
                   }}
                   tripLocations={tripLocations}
-                  placeholder="Search address or select trip location"
+                  placeholder={['train', 'ferry', 'bus'].includes(subtype || '') ? 'e.g., Grand Central Terminal' : 'Search address or select trip location'}
                 />
               </div>
               <div className="space-y-2">
@@ -1236,34 +1244,8 @@ export function TransportationForm({
             </CardContent>
           </Card>
 
-          {/* Station / Terminal (train/ferry/bus) */}
-          {showSection(subtype, 'station') && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Train className="h-5 w-5 text-blue-500" />
-                  Station / Terminal
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Departure Station</Label>
-                  <Input
-                    {...register('transportationDetails.departureStation')}
-                    data-field="transportationDetails.departureStation"
-                    placeholder="e.g., Union Station, Penn Station"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Arrival Station</Label>
-                  <Input
-                    {...register('transportationDetails.arrivalStation')}
-                    data-field="transportationDetails.arrivalStation"
-                    placeholder="e.g., Grand Central Terminal"
-                  />
-                </div>
-              </CardContent>
-            </Card>
+          {/* Station / Terminal card removed — for train/ferry/bus,
+              the pickup/dropoff address fields serve as departure/arrival station */}
           )}
 
           {/* Car Rental Specific Fields - only show for car rentals */}
