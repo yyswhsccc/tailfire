@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
-import { eq, and, sql, desc, asc, ilike, or } from 'drizzle-orm'
+import { eq, and, ne, sql, desc, asc, ilike, or } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { EncryptionService } from '../common/encryption/encryption.service'
 import { CreateEmailAccountDto } from './dto/create-email-account.dto'
@@ -104,7 +104,7 @@ export class EmailAccountsService {
     if (dto.smtpTls !== undefined) updateData.smtpTls = dto.smtpTls
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive
 
-    // Re-encrypt if credentials changed
+    // Re-encrypt if credentials changed, and clear auth error to re-enable sync
     if (dto.username !== undefined || dto.password !== undefined) {
       const current = await this.getDecryptedCredentials(id)
       const encrypted = this.encryptionService.encryptObject({
@@ -112,6 +112,7 @@ export class EmailAccountsService {
         password: dto.password ?? current.password,
       })
       updateData.credentials = encrypted
+      updateData.lastSyncError = null
     }
 
     const [updated] = await this.db.client
@@ -203,7 +204,15 @@ export class EmailAccountsService {
         agencyId: this.db.schema.emailAccounts.agencyId,
       })
       .from(this.db.schema.emailAccounts)
-      .where(eq(this.db.schema.emailAccounts.isActive, true))
+      .where(
+        and(
+          eq(this.db.schema.emailAccounts.isActive, true),
+          or(
+            sql`${this.db.schema.emailAccounts.lastSyncError} IS NULL`,
+            ne(this.db.schema.emailAccounts.lastSyncError, 'IMAP_AUTH_FAILED'),
+          ),
+        ),
+      )
   }
 
   async updateSyncState(

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { DndContext, DragOverlay, type DragStartEvent, type DragEndEvent } from '@dnd-kit/core'
-import { Loader2, Pencil, RefreshCw, Mail, Search } from 'lucide-react'
+import { AlertTriangle, Loader2, Pencil, RefreshCw, Mail, Search } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,7 +39,9 @@ export default function EmailInboxPage() {
   const setSortBy = useEmailStore((s) => s.setSortBy)
   const openCompose = useEmailStore((s) => s.openCompose)
 
-  const { data: folders } = useEmailFolders(accountId)
+  const { data: folders, error: foldersError } = useEmailFolders(accountId)
+  const isImapAuthError = activeAccount?.lastSyncError === 'IMAP_AUTH_FAILED'
+    || (foldersError && 'code' in foldersError && (foldersError as any).code === 'IMAP_AUTH_FAILED')
   const { data: emailsData, isLoading: emailsLoading } = useEmails(accountId, {
     folder: activeFolder,
     search: search || undefined,
@@ -175,6 +177,22 @@ export default function EmailInboxPage() {
                 </Button>
               </div>
             </div>
+            {isImapAuthError && (
+              <div className="mb-3 rounded-md border border-destructive/50 bg-destructive/10 p-2.5">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                  <div className="text-xs">
+                    <p className="font-medium text-destructive">Authentication failed</p>
+                    <p className="mt-0.5 text-muted-foreground">
+                      Your email password may have changed.{' '}
+                      <a href="/profile?tab=email" className="text-primary hover:underline">
+                        Update credentials
+                      </a>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             <FolderSidebar
               accountId={accountId}
               folders={folders || []}
