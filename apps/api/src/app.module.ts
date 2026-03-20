@@ -54,6 +54,7 @@ import { BugReportsModule } from './bug-reports/bug-reports.module'
 import { EnrichmentModule } from './enrichment/enrichment.module'
 import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
 import { SecurityAuditModule } from './security-audit/security-audit.module'
+import { ImpersonationModule } from './impersonation/impersonation.module'
 
 @Module({
   imports: [
@@ -194,6 +195,9 @@ import { SecurityAuditModule } from './security-audit/security-audit.module'
 
     // Security audit logs (RBAC hardening — permission denials, role changes, impersonation)
     SecurityAuditModule,
+
+    // Impersonation system (RBAC hardening — admin views agent's account)
+    ImpersonationModule,
   ],
   controllers: [AppController],
   providers: [
