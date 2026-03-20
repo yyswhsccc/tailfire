@@ -12,6 +12,7 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common'
+import * as Sentry from '@sentry/nestjs'
 import { AmadeusActivitiesProvider } from '../amadeus/amadeus-activities.provider'
 import { CredentialResolverService } from '../../../api-credentials/credential-resolver.service'
 import { ApiProvider, TourActivitySearchResponse } from '@tailfire/shared-types'
@@ -53,6 +54,11 @@ export class ActivitiesController {
     })
 
     if (!response.success) {
+      Sentry.captureMessage(`Activities search failed: ${response.error}`, {
+        level: 'warning',
+        tags: { service: 'amadeus', operation: 'activities-search' },
+        extra: { latitude, longitude, keyword, error: response.error },
+      })
       return {
         results: [],
         provider: 'amadeus',

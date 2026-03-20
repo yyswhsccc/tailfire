@@ -15,6 +15,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { firstValueFrom } from 'rxjs'
+import * as Sentry from '@sentry/nestjs'
 import { BaseExternalApi } from '../../core/base/base-external-api'
 import { RateLimiterService } from '../../core/services/rate-limiter.service'
 import { MetricsService } from '../../core/services/metrics.service'
@@ -180,6 +181,11 @@ export class AmadeusFlightsProvider
         error: error.message,
         status: error.response?.status,
         data: error.response?.data,
+      })
+
+      Sentry.captureException(error, {
+        tags: { service: 'amadeus', operation: 'authenticated-request' },
+        extra: { endpoint, requestId, latencyMs, status: error.response?.status },
       })
 
       // Handle specific Amadeus errors

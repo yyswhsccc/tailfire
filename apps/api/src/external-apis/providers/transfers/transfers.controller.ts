@@ -12,6 +12,7 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common'
+import * as Sentry from '@sentry/nestjs'
 import { AmadeusTransfersProvider } from '../amadeus/amadeus-transfers.provider'
 import { CredentialResolverService } from '../../../api-credentials/credential-resolver.service'
 import {
@@ -79,6 +80,11 @@ export class TransfersController {
     })
 
     if (!response.success) {
+      Sentry.captureMessage(`Transfer search failed: ${response.error}`, {
+        level: 'warning',
+        tags: { service: 'amadeus', operation: 'transfer-search' },
+        extra: { pickupType, dropoffType, date, time, error: response.error },
+      })
       return {
         results: [],
         provider: 'amadeus',

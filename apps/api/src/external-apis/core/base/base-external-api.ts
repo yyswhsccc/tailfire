@@ -8,6 +8,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { firstValueFrom } from 'rxjs'
+import * as Sentry from '@sentry/nestjs'
 import {
   ExternalApiConfig,
   RequestOptions,
@@ -265,6 +266,12 @@ export abstract class BaseExternalApi<TSearchParams, TSearchResult>
           this.logger.warn(`Rate limited by ${this.config.provider}, retry after ${retryAfter}s`)
           this.metrics.recordRequest(this.config.provider, endpoint, 'rate_limited')
 
+          Sentry.captureMessage(`External API rate limited: ${this.config.provider}`, {
+            level: 'warning',
+            tags: { service: 'external-api', provider: this.config.provider },
+            extra: { endpoint, retryAfter, requestId },
+          })
+
           return {
             success: false,
             error: 'Rate limited - too many requests',
@@ -296,6 +303,11 @@ export abstract class BaseExternalApi<TSearchParams, TSearchResult>
       requestId,
       latencyMs,
       error: this.extractErrorMessage(lastError),
+    })
+
+    Sentry.captureException(lastError || new Error(this.extractErrorMessage(lastError)), {
+      tags: { service: 'external-api', provider: this.config.provider },
+      extra: { endpoint, requestId, latencyMs, retriesExhausted: true },
     })
 
     return {

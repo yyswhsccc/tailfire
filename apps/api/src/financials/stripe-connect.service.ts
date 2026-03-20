@@ -9,6 +9,7 @@
 
 import { Injectable, BadRequestException } from '@nestjs/common'
 import { eq } from 'drizzle-orm'
+import * as Sentry from '@sentry/nestjs'
 import Stripe from 'stripe'
 import { DatabaseService } from '../db/database.service'
 import type {
@@ -31,6 +32,7 @@ export class StripeConnectService {
       })
     } else {
       console.warn('STRIPE_SECRET_KEY not configured. Stripe features will be disabled.')
+      Sentry.captureMessage('STRIPE_SECRET_KEY not configured', 'warning')
     }
   }
 

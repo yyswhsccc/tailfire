@@ -18,6 +18,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { firstValueFrom } from 'rxjs'
+import * as Sentry from '@sentry/nestjs'
 import { BaseExternalApi } from '../../core/base/base-external-api'
 import { RateLimiterService } from '../../core/services/rate-limiter.service'
 import { MetricsService } from '../../core/services/metrics.service'
@@ -208,6 +209,10 @@ export class BookingComHotelsProvider
         latitude,
         longitude,
       })
+      Sentry.captureException(error, {
+        tags: { service: 'booking_com', operation: 'enrich-amenities' },
+        extra: { hotelName, latitude, longitude, placeId },
+      })
       return emptyResult
     }
   }
@@ -325,6 +330,10 @@ export class BookingComHotelsProvider
         ? 'Invalid RapidAPI key'
         : error.message || 'Connection test failed'
 
+      Sentry.captureException(error, {
+        tags: { service: 'booking_com', operation: 'test-connection' },
+        level: 'warning',
+      })
       return { success: false, message }
     }
   }
@@ -370,6 +379,10 @@ export class BookingComHotelsProvider
       return response.data?.data?.result || []
     } catch (error: any) {
       this.providerLogger.error('Coordinate search failed', { error: error.message })
+      Sentry.captureException(error, {
+        tags: { service: 'booking_com', operation: 'search-by-coordinates' },
+        extra: { latitude, longitude },
+      })
       return []
     }
   }
@@ -582,6 +595,10 @@ export class BookingComHotelsProvider
       this.providerLogger.error('Failed to get facilities', {
         hotelId,
         error: error.message,
+      })
+      Sentry.captureException(error, {
+        tags: { service: 'booking_com', operation: 'get-facilities' },
+        extra: { hotelId },
       })
       return { hotelId, matchScore: 0, amenities: [] }
     }
