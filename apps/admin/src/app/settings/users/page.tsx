@@ -24,6 +24,8 @@ import { BatchConfirmDialog, BatchResult } from './_components/batch-confirm-dia
 import { useUsers, useUpdateUserStatus, useDeleteUser } from '@/hooks/use-users'
 import { useAuthStore } from '@/stores/auth.store'
 import { useToast } from '@/hooks/use-toast'
+import { useUser } from '@/hooks/use-user'
+import { useImpersonation } from '@/hooks/use-impersonation'
 
 type StatusAction = 'lock' | 'unlock' | 'activate' | 'delete' | 'resend-invite'
 type BatchAction = 'lock' | 'unlock' | 'delete'
@@ -37,6 +39,8 @@ const pastTenseMap: Record<BatchAction, string> = {
 export default function UsersSettingsPage() {
   const { user: currentUser } = useAuthStore()
   const { toast } = useToast()
+  const { isAdmin } = useUser()
+  const { start: startImpersonation } = useImpersonation()
   const updateStatus = useUpdateUserStatus()
   const deleteUser = useDeleteUser()
 
@@ -274,12 +278,14 @@ export default function UsersSettingsPage() {
             <UsersTable
               users={data.users}
               currentUserId={currentUser?.id || ''}
+              isCurrentUserAdmin={isAdmin}
               onEdit={handleEdit}
               onLock={(user) => handleStatusAction(user, 'lock')}
               onUnlock={(user) => handleStatusAction(user, 'unlock')}
               onActivate={(user) => handleStatusAction(user, 'activate')}
               onDelete={(user) => handleStatusAction(user, 'delete')}
               onResendInvite={(user) => handleStatusAction(user, 'resend-invite')}
+              onImpersonate={(user) => startImpersonation(user.id)}
               rowSelection={rowSelection}
               onRowSelectionChange={setRowSelection}
             />

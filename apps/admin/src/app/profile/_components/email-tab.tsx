@@ -161,7 +161,11 @@ export function EmailTab() {
                     </p>
                   )}
                   {account.lastSyncError && (
-                    <p className="text-xs text-destructive">Error: {account.lastSyncError}</p>
+                    <p className="text-xs text-destructive">
+                      {account.lastSyncError === 'IMAP_AUTH_FAILED'
+                        ? 'Authentication failed — please update your password'
+                        : `Error: ${account.lastSyncError}`}
+                    </p>
                   )}
                 </div>
                 <div className="flex gap-2">

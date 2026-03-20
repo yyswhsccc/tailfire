@@ -22,7 +22,7 @@ export class DashboardController {
    */
   @Get('stats')
   async getStats(@GetAuthContext() auth: AuthContext): Promise<DashboardStats> {
-    return this.dashboardService.getStats(auth.agencyId)
+    return this.dashboardService.getStats(auth)
   }
 
   /**

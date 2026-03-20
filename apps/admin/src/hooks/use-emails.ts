@@ -346,10 +346,13 @@ export function useSyncEmails(accountId: string | null) {
         description: `${result.newMessages} new message(s) synced.`,
       })
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
+      const isAuthFailed = error?.code === 'IMAP_AUTH_FAILED'
       toast({
-        title: 'Sync failed',
-        description: error.message || 'Could not sync emails.',
+        title: isAuthFailed ? 'Email authentication failed' : 'Sync failed',
+        description: isAuthFailed
+          ? 'Your email password may have changed. Update it in Profile > Email.'
+          : error.message || 'Could not sync emails.',
         variant: 'destructive',
       })
     },

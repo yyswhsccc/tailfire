@@ -6,13 +6,12 @@ import {
   Delete,
   Body,
   Param,
-  UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { ApiCredentialsService } from './api-credentials.service'
-import { AdminGuard } from '../common/guards'
+import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import {
   CreateCredentialDto,
   UpdateCredentialDto,
@@ -42,7 +41,7 @@ import {
  */
 @ApiTags('API Credentials')
 @Controller('api-credentials')
-@UseGuards(AdminGuard)
+@AdminOnly()
 export class ApiCredentialsController {
   constructor(private readonly service: ApiCredentialsService) {}
 

@@ -6,7 +6,9 @@ import helmet from 'helmet'
 import { AppModule } from './app.module'
 import { runMigrations } from '@tailfire/database'
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'
+import { ImpersonationGuard } from './auth/guards/impersonation.guard'
 import { RolesGuard } from './auth/guards/roles.guard'
+import { DatabaseService } from './db/database.service'
 import { setupBullBoard, getQueuesFromApp } from './automation/admin/bull-board.setup'
 import { StripEmptyStringsInterceptor } from './common/interceptors/strip-empty-strings.interceptor'
 
@@ -93,9 +95,11 @@ async function bootstrap() {
 
   // Global auth guards
   const reflector = app.get(Reflector)
+  const dbService = app.get(DatabaseService)
   app.useGlobalGuards(
     new JwtAuthGuard(reflector),
-    new RolesGuard(reflector)
+    new ImpersonationGuard(reflector, dbService),
+    new RolesGuard(reflector),
   )
 
   // Swagger documentation

@@ -233,17 +233,20 @@ export class ContactAccessService {
 
   /**
    * Apply access control filtering to a contact response
+   * Includes _accessLevel in the response so the frontend can show "Limited View" badge.
    */
   async applyAccessControl(
     contact: ContactResponseDto,
     auth: AuthContext,
   ): Promise<ContactResponseDto> {
     const access = await this.canAccessSensitiveData(contact.id, auth)
-    return this.filterSensitiveFields(contact, access.canAccessSensitive)
+    const filtered = this.filterSensitiveFields(contact, access.canAccessSensitive)
+    return { ...filtered, _accessLevel: access.canAccessSensitive ? 'full' : 'basic' }
   }
 
   /**
    * Apply access control filtering to multiple contacts
+   * Includes _accessLevel in each contact response.
    */
   async applyAccessControlToMany(
     contacts: ContactResponseDto[],
@@ -251,7 +254,7 @@ export class ContactAccessService {
   ): Promise<ContactResponseDto[]> {
     // For efficiency, batch check ownership and shares
     if (auth.role === 'admin') {
-      return contacts // Admins see everything
+      return contacts.map((c) => ({ ...c, _accessLevel: 'full' as const }))
     }
 
     // Get all shares for these contacts for this user
@@ -270,17 +273,17 @@ export class ContactAccessService {
     return contacts.map((contact) => {
       // Owner has full access
       if (contact.ownerId === auth.userId) {
-        return contact
+        return { ...contact, _accessLevel: 'full' as const }
       }
 
       // Check share
       const shareLevel = shareMap.get(contact.id)
       if (shareLevel === 'full') {
-        return contact
+        return { ...contact, _accessLevel: 'full' as const }
       }
 
       // Basic access only
-      return this.filterSensitiveFields(contact, false)
+      return { ...this.filterSensitiveFields(contact, false), _accessLevel: 'basic' as const }
     })
   }
 

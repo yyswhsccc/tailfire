@@ -10,10 +10,18 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
 
+  const headers: Record<string, string> = {}
+
   if (session?.access_token) {
-    return { Authorization: `Bearer ${session.access_token}` }
+    headers['Authorization'] = `Bearer ${session.access_token}`
   }
-  return {}
+
+  const impersonateUserId = typeof window !== 'undefined' ? localStorage.getItem('impersonate-user-id') : null
+  if (impersonateUserId) {
+    headers['X-Impersonate-User-Id'] = impersonateUserId
+  }
+
+  return headers
 }
 
 /**
@@ -84,8 +92,9 @@ async function handleErrorResponse(response: Response): Promise<never> {
 
   // Extract metadata from external API responses (e.g., retryAfter from 429)
   const metadata = body.metadata as ApiErrorMetadata | undefined
+  const code = typeof body.code === 'string' ? body.code : undefined
 
-  throw new ApiError(response.status, message, fieldErrors, metadata)
+  throw new ApiError(response.status, message, fieldErrors, metadata, code)
 }
 
 /**
@@ -100,17 +109,20 @@ export interface ApiErrorMetadata {
 export class ApiError extends Error {
   public fieldErrors?: ServerFieldError[]
   public metadata?: ApiErrorMetadata
+  public code?: string
 
   constructor(
     public status: number,
     message: string,
     fieldErrors?: ServerFieldError[],
-    metadata?: ApiErrorMetadata
+    metadata?: ApiErrorMetadata,
+    code?: string,
   ) {
     super(message)
     this.name = 'ApiError'
     this.fieldErrors = fieldErrors
     this.metadata = metadata
+    this.code = code
   }
 }
 

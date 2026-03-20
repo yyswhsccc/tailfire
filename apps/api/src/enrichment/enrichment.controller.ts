@@ -1,8 +1,7 @@
-import { Controller, Post, Param, Body, UseGuards } from '@nestjs/common'
+import { Controller, Post, Param, Body } from '@nestjs/common'
 import { EnrichmentService } from './enrichment.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
-import { RolesGuard } from '../auth/guards/roles.guard'
-import { Roles } from '../auth/decorators/roles.decorator'
+import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import type { AuthContext } from '../auth/auth.types'
 
 @Controller('enrichment')
@@ -34,8 +33,7 @@ export class EnrichmentController {
   }
 
   @Post('backfill/tes')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @AdminOnly()
   async backfillTes(
     @GetAuthContext() auth: AuthContext,
     @Body() body: { dryRun?: boolean; tripIds?: string[] },

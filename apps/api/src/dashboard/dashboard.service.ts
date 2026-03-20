@@ -61,9 +61,39 @@ export class DashboardService {
   // ===================================================================
 
   /**
-   * Get dashboard statistics for an agency
+   * Get dashboard statistics for an agency.
+   * For agents (non-admin), scopes trips to accessible trips, contacts to owned only.
    */
-  async getStats(agencyId: string): Promise<DashboardStats> {
+  async getStats(auth: AuthContext): Promise<DashboardStats> {
+    const { agencyId } = auth
+    const isAdmin = auth.role === 'admin'
+
+    // For agents, scope to accessible trips only
+    let tripFilter: SQL = eq(this.db.schema.trips.agencyId, agencyId)
+    let contactFilter: SQL = eq(this.db.schema.contacts.agencyId, agencyId)
+    // Revenue: suppress for agents (no trip_id on payment_transactions for scoping).
+    // Agents use getOverview() which has proper per-agent KPI scoping.
+    const showRevenue = isAdmin
+
+    if (!isAdmin) {
+      const accessibleTripIds = await this.tripAccessService.getAccessibleTripIds(auth)
+      if (accessibleTripIds !== 'all') {
+        if (accessibleTripIds.length === 0) {
+          return { totalTrips: 0, activeTrips: 0, totalContacts: 0, totalRevenue: 0 }
+        }
+        tripFilter = and(
+          eq(this.db.schema.trips.agencyId, agencyId),
+          inArray(this.db.schema.trips.id, accessibleTripIds),
+        )!
+        // Contacts: scope to owned contacts only for agents
+        contactFilter = and(
+          eq(this.db.schema.contacts.agencyId, agencyId),
+          eq(this.db.schema.contacts.ownerId, auth.userId),
+        )!
+        // Revenue suppressed for agents (showRevenue = false)
+      }
+    }
+
     const [tripsResult, contactsResult, revenueResult] = await Promise.all([
       // Get trip counts
       this.db.client
@@ -72,7 +102,7 @@ export class DashboardService {
           activeTrips: sql<number>`count(*) filter (where ${this.db.schema.trips.status} in ('booked', 'in_progress'))::int`,
         })
         .from(this.db.schema.trips)
-        .where(eq(this.db.schema.trips.agencyId, agencyId)),
+        .where(tripFilter),
 
       // Get contact count
       this.db.client
@@ -80,20 +110,22 @@ export class DashboardService {
           totalContacts: sql<number>`count(*)::int`,
         })
         .from(this.db.schema.contacts)
-        .where(eq(this.db.schema.contacts.agencyId, agencyId)),
+        .where(contactFilter),
 
-      // Get total revenue from payment transactions (payments only, not refunds)
-      this.db.client
-        .select({
-          totalRevenue: sql<number>`coalesce(sum(${this.db.schema.paymentTransactions.amountCents}), 0)::int`,
-        })
-        .from(this.db.schema.paymentTransactions)
-        .where(
-          and(
-            eq(this.db.schema.paymentTransactions.agencyId, agencyId),
-            eq(this.db.schema.paymentTransactions.transactionType, 'payment'),
-          ),
-        ),
+      // Get total revenue — admin only (agent revenue is in getOverview KPIs)
+      showRevenue
+        ? this.db.client
+            .select({
+              totalRevenue: sql<number>`coalesce(sum(${this.db.schema.paymentTransactions.amountCents}), 0)::int`,
+            })
+            .from(this.db.schema.paymentTransactions)
+            .where(
+              and(
+                eq(this.db.schema.paymentTransactions.agencyId, agencyId),
+                eq(this.db.schema.paymentTransactions.transactionType, 'payment'),
+              ),
+            )
+        : Promise.resolve([{ totalRevenue: 0 }]),
     ])
 
     return {
