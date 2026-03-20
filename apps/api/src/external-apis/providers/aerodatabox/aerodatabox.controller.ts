@@ -22,8 +22,13 @@ import { IsString, IsOptional, IsIn, MinLength, MaxLength, Matches } from 'class
 import { Transform } from 'class-transformer'
 import { AdminOnly } from '../../../auth/decorators/admin-only.decorator'
 import { AerodataboxFlightsProvider } from './aerodatabox-flights.provider'
+import { AmadeusAuthService } from '../amadeus/amadeus-auth.service'
 import { ExternalApiRegistryService } from '../../core/services/external-api-registry.service'
+import { CredentialResolverService } from '../../../api-credentials/credential-resolver.service'
 import { ApiCategory } from '../../core/interfaces'
+import { HttpService } from '@nestjs/axios'
+import { firstValueFrom } from 'rxjs'
+import * as Sentry from '@sentry/nestjs'
 import type { FlightStatusParams, NormalizedAirportInfo } from './aerodatabox.types'
 import type { FlightSearchResponse, NormalizedFlightStatus } from '@tailfire/shared-types'
 
@@ -62,7 +67,10 @@ export class AerodataboxController {
 
   constructor(
     private readonly flightsProvider: AerodataboxFlightsProvider,
-    private readonly registry: ExternalApiRegistryService
+    private readonly registry: ExternalApiRegistryService,
+    private readonly amadeusAuthService: AmadeusAuthService,
+    private readonly credentialResolver: CredentialResolverService,
+    private readonly httpService: HttpService,
   ) {}
 
   /**
@@ -176,6 +184,57 @@ export class AerodataboxController {
       success: true,
       data: result.data,
       metadata: result.metadata,
+    }
+  }
+
+  /**
+   * Search airports by keyword (city name, airport name)
+   * Uses Amadeus reference-data/locations API.
+   * Declared BEFORE airports/:code to avoid route collision.
+   *
+   * @example GET /external-apis/flights/airports/search?keyword=cozumel
+   */
+  @Get('airports/search')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Search airports by keyword' })
+  @ApiQuery({ name: 'keyword', required: true, description: 'City or airport name (min 3 chars)' })
+  async searchAirports(
+    @Query('keyword') keyword: string,
+  ): Promise<{ iata: string; name: string; city: string; countryCode: string }[]> {
+    if (!keyword || keyword.trim().length < 3) {
+      throw new BadRequestException('Keyword must be at least 3 characters')
+    }
+
+    try {
+      const creds = await this.credentialResolver.resolve('amadeus' as any)
+      if (!creds) {
+        this.logger.warn('Amadeus credentials not configured for airport search')
+        return []
+      }
+
+      const baseUrl = process.env.AMADEUS_API_URL || 'https://test.api.amadeus.com'
+      const { clientId, clientSecret } = creds as { clientId: string; clientSecret: string }
+      const token = await this.amadeusAuthService.getAccessToken(baseUrl, { clientId, clientSecret })
+
+      const url = `${baseUrl}/v1/reference-data/locations?keyword=${encodeURIComponent(keyword.trim())}&subType=AIRPORT&page%5Blimit%5D=10`
+      const response = await firstValueFrom(
+        this.httpService.get(url, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 8000,
+        }),
+      )
+
+      const locations = response.data?.data || []
+      return locations.map((loc: any) => ({
+        iata: loc.iataCode,
+        name: loc.name,
+        city: loc.address?.cityName || '',
+        countryCode: loc.address?.countryCode || '',
+      })).filter((a: any) => a.iata)
+    } catch (error: any) {
+      this.logger.error(`Airport keyword search failed: ${error.message}`)
+      Sentry.captureException(error, { tags: { service: 'amadeus', operation: 'airport-search' } })
+      return []
     }
   }
 
