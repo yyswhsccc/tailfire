@@ -12,10 +12,10 @@
  * RBAC: admin sees all, agent sees only their own data.
  */
 
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, ForbiddenException } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { CommissionService } from './commission.service'
-import { AdminGuard } from '../../common/guards/admin.guard'
+import { AdminOnly } from '../../auth/decorators/admin-only.decorator'
 import { GetAuthContext } from '../../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../../auth/auth.types'
 import type {
@@ -49,7 +49,7 @@ export class CommissionController {
   // ============================================================================
 
   @Post('commission/checks')
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   async createCheck(
     @GetAuthContext() auth: AuthContext,
     @Body() dto: CreateCommissionCheckDto
@@ -83,7 +83,7 @@ export class CommissionController {
   }
 
   @Patch('commission/checks/:id')
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   async updateCheck(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
@@ -97,7 +97,7 @@ export class CommissionController {
   // ============================================================================
 
   @Post('commission/checks/:id/accept')
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   async acceptCheck(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string
@@ -106,7 +106,7 @@ export class CommissionController {
   }
 
   @Post('commission/checks/:id/recall')
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   async recallCheck(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string
@@ -119,7 +119,7 @@ export class CommissionController {
   // ============================================================================
 
   @Post('commission/checks/:id/items')
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   async addCheckItem(
     @GetAuthContext() auth: AuthContext,
     @Param('id') checkId: string,
@@ -129,7 +129,7 @@ export class CommissionController {
   }
 
   @Delete('commission/checks/:id/items/:itemId')
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   async removeCheckItem(
     @GetAuthContext() auth: AuthContext,
     @Param('id') checkId: string,
@@ -180,7 +180,7 @@ export class CommissionController {
   }
 
   @Post('commission/due/pay')
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   async payAgents(
     @GetAuthContext() auth: AuthContext,
     @Body() dto: PayAgentDto
@@ -205,7 +205,7 @@ export class CommissionController {
   // ============================================================================
 
   @Get('commission/receivables')
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   async getPendingReceivables(
     @GetAuthContext() auth: AuthContext,
     @Query() filter: PendingReceivablesFilterDto
@@ -214,7 +214,7 @@ export class CommissionController {
   }
 
   @Post('commission/deposits')
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   async createDeposit(
     @GetAuthContext() auth: AuthContext,
     @Body() dto: CreateDepositDto
@@ -223,7 +223,7 @@ export class CommissionController {
   }
 
   @Post('commission/deposits/:id/finalize')
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   async finalizeDeposit(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
@@ -233,7 +233,7 @@ export class CommissionController {
   }
 
   @Get('commission/deposits/:id')
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   async getDepositDetail(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string

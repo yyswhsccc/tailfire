@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common'
-import { AdminGuard } from '../common/guards/admin.guard'
+import { Controller, Get, Post, Query } from '@nestjs/common'
+import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import { ApiTags } from '@nestjs/swagger'
 import {
   ReferenceDataService,
@@ -64,7 +64,7 @@ export class ReferenceDataController {
    * Refresh the reference data cache (admin only)
    * POST /reference-data/refresh
    */
-  @UseGuards(AdminGuard)
+  @AdminOnly()
   @Post('refresh')
   async refreshCache(): Promise<{ message: string }> {
     await this.referenceDataService.refreshCache()
