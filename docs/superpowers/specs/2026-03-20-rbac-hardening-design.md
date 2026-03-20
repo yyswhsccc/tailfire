@@ -207,7 +207,7 @@ Agent access limited to personal profile settings under `/user-profiles/me`.
 2. Creates `contact_share_requests` record (status: 'pending')
 3. Emits `contact.share_requested` event
 4. Owner gets notification: "[Agent] requested access to [Contact Name]"
-5. Owner clicks Approve → auto-creates `contact_shares` row via `ContactSharesService.createShare()` (access_level: 'full'), emits `contact.share_approved`, notifies requester
+5. Owner clicks Approve → auto-creates `contact_shares` row via `ContactSharesService.create()` (access_level: 'full'), emits `contact.share_approved`, notifies requester
 6. Owner clicks Deny → updates request status, emits `contact.share_denied`, notifies requester with optional reason
 7. Admin override: Admin uses direct share endpoint, bypasses request flow
 
@@ -218,7 +218,7 @@ Current `NotificationEventsListener` handles `trip.*`, `payment.*`, `proposal.*`
 @OnEvent('contact.share_requested')
 async handleShareRequested(event) {
   // Create notification for contact owner
-  await this.notificationService.createNotification({
+  await this.notificationService.send({
     userId: event.ownerId,
     type: 'contact_share_request',
     title: `${event.requesterName} requested access to ${event.contactName}`,
@@ -240,7 +240,7 @@ async handleShareDenied(event) {
 Add `'contact_share_request'`, `'contact_share_approved'`, `'contact_share_denied'` to notification type enum.
 
 ### Agency Scope Enforcement
-Service validates requester, contact, and owner are all in the same agency before creating a request. Reuses existing `ContactAccessService.checkAccess()` pattern.
+Service validates requester, contact, and owner are all in the same agency before creating a request. Reuses existing `ContactAccessService.canAccessSensitiveData() / canUseContact()` pattern.
 
 ### Duplicate Prevention
 - Cannot request if pending request already exists for same contact + requester
@@ -283,7 +283,7 @@ Pending requests expire after 30 days. Cleanup via scheduled job or on-read filt
 | DELETE | `/admin/impersonate` | Admin only (bypass impersonation swap) | End impersonation |
 | GET | `/admin/impersonate/status` | Admin only (bypass impersonation swap) | Check active session |
 
-**Deadlock prevention:** Impersonation control endpoints (`/admin/impersonate/*`) are marked with a `@BypassImpersonation()` decorator. The `ImpersonationInterceptor` checks for this metadata and skips the context swap, leaving the original admin context intact. This allows the admin to extend/exit/check status while impersonating, without exposing other admin endpoints.
+**Deadlock prevention:** Impersonation control endpoints (`/admin/impersonate/*`) are marked with a `@BypassImpersonation()` decorator. The `ImpersonationGuard` checks for this metadata and skips the context swap, leaving the original admin context intact. This allows the admin to extend/exit/check status while impersonating, without exposing other admin endpoints.
 
 ```typescript
 // apps/api/src/auth/decorators/bypass-impersonation.decorator.ts
