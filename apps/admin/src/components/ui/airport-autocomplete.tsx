@@ -23,7 +23,8 @@ import {
   formatAirportDisplay,
   type AirportSearchResult,
 } from '@/lib/airport-utils'
-import { useAirportLookup } from '@/hooks/use-flights'
+import { useAirportLookup, useAirportSearch } from '@/hooks/use-flights'
+import { useDebounce } from '@/hooks/use-debounce'
 
 interface AirportAutocompleteProps {
   value?: string | null
@@ -82,6 +83,26 @@ export function AirportAutocomplete({
     return searchAirports(searchValue, 15)
   }, [searchValue])
 
+  // Keyword search: triggers when static returns 0 results, input >= 3 chars,
+  // and input is NOT a 3-letter code (that case is handled by AeroDataBox above)
+  const debouncedSearch = useDebounce(searchValue, 300)
+  const shouldKeywordSearch = React.useMemo(() => {
+    const trimmed = debouncedSearch.trim()
+    return (
+      open &&
+      trimmed.length >= 3 &&
+      filteredAirports.length === 0 &&
+      !isUnknownCode // Not a 3-letter code (handled by AeroDataBox)
+    )
+  }, [open, debouncedSearch, filteredAirports.length, isUnknownCode])
+
+  const {
+    data: keywordResults,
+    isLoading: isKeywordLoading,
+  } = useAirportSearch(debouncedSearch.trim(), {
+    enabled: shouldKeywordSearch,
+  })
+
   // Create a combined result with API airport if found
   const apiAirportResult: AirportSearchResult | null = React.useMemo(() => {
     if (!apiAirport?.success || !apiAirport.data) return null
@@ -119,8 +140,11 @@ export function AirportAutocomplete({
           handleSelect(firstMatch.code)
         }
       } else if (apiAirportResult) {
-        // Select API result
+        // Select API result (code lookup)
         handleSelect(apiAirportResult.code)
+      } else if (keywordResults?.length) {
+        // Select first keyword search result
+        handleSelect(keywordResults[0].iata)
       } else if (searchValue.trim()) {
         // Try to use as custom code (3 letters) - fallback for when API fails
         const customCode = searchValue.trim().toUpperCase()
@@ -185,24 +209,18 @@ export function AirportAutocomplete({
           />
           <CommandList>
             <CommandEmpty>
-              {isApiLoading ? (
+              {isApiLoading || isKeywordLoading ? (
                 <span className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Looking up airport...
+                  Searching airports...
                 </span>
               ) : searchValue.trim() && /^[A-Z]{3}$/i.test(searchValue.trim()) ? (
-                isApiError ? (
-                  <span className="text-sm">
-                    Press Enter to use &quot;{searchValue.toUpperCase()}&quot;
-                  </span>
-                ) : (
-                  <span className="text-sm">
-                    Press Enter to use &quot;{searchValue.toUpperCase()}&quot;
-                  </span>
-                )
+                <span className="text-sm">
+                  Press Enter to use &quot;{searchValue.toUpperCase()}&quot;
+                </span>
               ) : (
                 <span className="text-sm text-muted-foreground">
-                  No airports found. Enter a 3-letter code.
+                  No airports found. Try a different search term.
                 </span>
               )}
             </CommandEmpty>
@@ -242,7 +260,7 @@ export function AirportAutocomplete({
               </CommandGroup>
             )}
 
-            {/* API result for unknown airport code */}
+            {/* API result for unknown airport code (AeroDataBox) */}
             {apiAirportResult && filteredAirports.length === 0 && (
               <CommandGroup heading="Found via API">
                 <CommandItem
@@ -271,6 +289,52 @@ export function AirportAutocomplete({
                       {apiAirportResult.name}
                     </span>
                   </div>
+                </CommandItem>
+              </CommandGroup>
+            )}
+
+            {/* Keyword search results (Amadeus) */}
+            {keywordResults && keywordResults.length > 0 && filteredAirports.length === 0 && !apiAirportResult && (
+              <CommandGroup heading="Search Results">
+                {keywordResults.map((result) => (
+                  <CommandItem
+                    key={result.iata}
+                    value={result.iata}
+                    onSelect={() => handleSelect(result.iata)}
+                    className="flex items-start py-2"
+                  >
+                    <Check
+                      className={cn(
+                        'mr-2 h-4 w-4 mt-0.5 flex-shrink-0',
+                        value === result.iata ? 'opacity-100' : 'opacity-0'
+                      )}
+                    />
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-semibold text-primary">
+                          {result.iata}
+                        </span>
+                        <span className="text-sm truncate">{result.city}</span>
+                        <Globe className="h-3 w-3 text-blue-500 ml-auto flex-shrink-0" aria-label="Search result" />
+                        <span className="text-xs text-muted-foreground flex-shrink-0">
+                          {result.countryCode}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {result.name}
+                      </span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+
+            {/* Loading indicator for keyword search */}
+            {isKeywordLoading && filteredAirports.length === 0 && !apiAirportResult && (
+              <CommandGroup heading="Searching...">
+                <CommandItem disabled className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Searching airports...</span>
                 </CommandItem>
               </CommandGroup>
             )}
