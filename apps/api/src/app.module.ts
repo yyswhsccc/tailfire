@@ -52,6 +52,7 @@ import { EmailAccountsModule } from './email-accounts/email-accounts.module'
 import { BugReportsModule } from './bug-reports/bug-reports.module'
 import { EnrichmentModule } from './enrichment/enrichment.module'
 import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
+import { SecurityAuditModule } from './security-audit/security-audit.module'
 
 @Module({
   imports: [
@@ -189,6 +190,9 @@ import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
 
     // Activity enrichment (geocoding, cruise catalog, hotel photos)
     EnrichmentModule,
+
+    // Security audit logs (RBAC hardening — permission denials, role changes, impersonation)
+    SecurityAuditModule,
   ],
   controllers: [AppController],
   providers: [
