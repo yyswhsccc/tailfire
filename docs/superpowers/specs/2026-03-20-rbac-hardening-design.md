@@ -27,6 +27,11 @@ Harden the existing RBAC implementation and expand it with impersonation, contac
 | User management | Full access | No access |
 | Platform settings | Full access | No access |
 | Personal settings | Own profile | Own profile |
+| Delete contacts | Any contact | Own contacts only (not if tied to active trip) |
+| Tasks | View/edit all | View own + assigned only |
+| Email accounts | All agency accounts | Own connected accounts only |
+| Calendar | All agency events | Own events + assigned tasks |
+| Notes (on trips/contacts) | All | Only on own/shared trips/contacts |
 | Automations/queues | Full access | No access |
 | Impersonate users | Yes (agents in same agency only) | No |
 
@@ -35,10 +40,14 @@ Harden the existing RBAC implementation and expand it with impersonation, contac
 ## Work Item 1: `@AdminOnly()` Decorator
 
 ### Problem
-Inconsistent admin protection — some endpoints use `@UseGuards(AdminGuard)`, others use `@Roles('admin')`.
+Three inconsistent admin protection patterns exist:
+
+1. `@UseGuards(AdminGuard)` — api-credentials, users, commission, trips (standalone guard from `common/guards/`)
+2. `@Roles('admin')` with RolesGuard — enrichment, loyalty-programs, suppliers (metadata + guard)
+3. `@UseGuards(JwtAuthGuard, AdminRoleGuard)` — automation controller (explicit JWT + admin from `auth/guards/`)
 
 ### Solution
-Create a single `@AdminOnly()` decorator combining both patterns. Migrate all admin endpoints.
+Create a single `@AdminOnly()` decorator. Migrate all three patterns.
 
 ```typescript
 // apps/api/src/auth/decorators/admin-only.decorator.ts
@@ -48,9 +57,11 @@ export const AdminOnly = () => applyDecorators(
 )
 ```
 
+Note: JwtAuthGuard is global, so pattern 3's explicit JwtAuthGuard is redundant and can be removed.
+
 ### Files
 - Create: `apps/api/src/auth/decorators/admin-only.decorator.ts`
-- Modify: All controllers using `@UseGuards(AdminGuard)` or `@Roles('admin')`
+- Modify: All controllers using any of the three patterns above
 
 ---
 
@@ -61,15 +72,25 @@ Verify every `@Public()` endpoint has proper authorization in its service layer.
 
 | Endpoint | Auth Mechanism | Expected |
 |----------|---------------|----------|
-| `/health` | None | Keep public |
-| `/auth/request-password-reset` | Rate limit 5/min | Keep |
+| `GET /health` | None | Keep public |
+| `POST /auth/request-password-reset` | Rate limit 5/min | Keep |
 | `/cruise-import/*` | InternalApiKeyGuard | Keep |
+| `/tour-import/*` | InternalApiKeyGuard | Keep |
 | `/cruise-repository/*` | CatalogAuthGuard (JWT or API key) | Keep |
+| `/tour-repository/*` | CatalogAuthGuard (JWT or API key) | Keep |
+| `/globus/*` | CatalogAuthGuard | Keep |
 | `/portal/*` | PortalAuthGuard | Keep |
-| Trip share/preview endpoints | Token-based in service | Verify token checks |
+| `/client-portal/*` | PortalAuthGuard | Keep |
+| `/webhooks/stripe` | Stripe signature verification | Keep |
+| `GET /user-profiles/public/:id` | None (returns only public profiles) | Verify returns minimal data |
+| `GET /trips/shared/:token` | Token-based in service | Verify token validation |
+| `POST /trips/shared/:token/approve` | Token + ThrottlerGuard | Verify — write endpoint |
+| `POST /trips/shared/:token/decline` | Token + ThrottlerGuard | Verify — write endpoint |
+| `POST /trips/shared/:token/comments` | Token + ThrottlerGuard | Verify — write endpoint |
+| `POST /trips/shared/:token/responses` | Token + ThrottlerGuard | Verify — write endpoint |
 
 ### Deliverable
-Checklist of all `@Public()` endpoints with verification status.
+Checklist of ALL `@Public()` endpoints individually verified, with special attention to write endpoints.
 
 ---
 
@@ -100,11 +121,11 @@ Contact detail page shows "Limited View" badge for non-owner agents with "Reques
 Agents may see all agency data in dashboard/reports/exports.
 
 ### Solution
-Add `ownerId` filter to dashboard and reporting queries when `auth.role === 'agent'`.
+Verify and extend existing filtering. `dashboard.service.ts` already calls `tripAccessService.getAccessibleTripIds(auth)` and checks `auth.role === 'admin'`. Verify this is applied consistently to ALL dashboard queries and export endpoints.
 
 ### Files
-- `apps/api/src/dashboard/dashboard.service.ts` — filter KPIs by trip owner
-- Any export endpoints — filter by ownership
+- `apps/api/src/dashboard/dashboard.service.ts` — verify existing agent filtering is complete
+- Any export endpoints — verify ownership filter applied
 
 ---
 
@@ -150,9 +171,15 @@ Agent access limited to personal profile settings under `/user-profiles/me`.
 5. Owner clicks Deny → updates request status, notifies requester with optional reason
 6. Admin override: Admin uses direct share endpoint, bypasses request flow
 
+### Agency Scope Enforcement
+Service validates requester, contact, and owner are all in the same agency before creating a request. Reuses existing `ContactAccessService.checkAccess()` pattern.
+
 ### Duplicate Prevention
 - Cannot request if pending request already exists for same contact + requester
 - Cannot request if already shared
+
+### Request Expiration
+Pending requests expire after 30 days. Cleanup via scheduled job or on-read filtering.
 
 ### Existing Infrastructure
 - `contact_shares` table already exists with `accessLevel` ('basic'/'full'), `sharedBy`, `sharedWithUserId`
@@ -193,12 +220,19 @@ Request with X-Impersonate-User-Id header
   → ImpersonationMiddleware:
     1. Verify caller is admin
     2. Verify active impersonation session exists & not expired
-    3. Verify target user is in same agency
-    4. Swap auth context: userId → targetUserId, role → target's role
-    5. Attach originalAdmin { id, name } to request for audit
+    3. Verify X-Impersonate-User-Id === session.targetUserId (reject mismatch)
+    4. Verify target user is in same agency
+    5. Swap auth context: userId → targetUserId, role → target's role
+    6. Attach originalAdmin { id, name } to request for audit
   → All downstream guards/services see impersonated user's permissions
+  → Admin endpoints (@AdminOnly) are BLOCKED during impersonation
   → Audit service logs with original admin identity
 ```
+
+### Write Policy
+Full impersonation — admin can perform all actions the agent can do (create, edit, delete).
+This enables support scenarios: "I can't edit this trip" → admin impersonates → fixes the issue.
+All write actions are logged with the admin's real identity in the audit trail.
 
 ### Safety Rails
 - Admin cannot impersonate other admins
@@ -207,12 +241,14 @@ Request with X-Impersonate-User-Id header
 - Cannot impersonate locked/pending users
 - Sessions logged permanently (never deleted)
 - 30 minute timeout with extend option
+- Maximum 4 hours total session duration (max 8 extensions)
+- Admin endpoints blocked during impersonation (must exit to use admin features)
 
 ### Frontend
 - **Location**: Admin Settings → Users page → action menu per user → "Impersonate"
-- **Banner**: Fixed amber bar at top: "Viewing as [Agent Name] — [MM:SS remaining] — Extend | Exit"
+- **Banner**: Fixed amber bar at top: "Viewing as [Agent Name] — [MM:SS remaining] — Extend | Exit — Admin features disabled"
 - **Exit**: Calls DELETE endpoint, reloads page to admin context
-- **Extend**: Calls extend endpoint, resets 30 min timer
+- **Extend**: Calls extend endpoint, resets 30 min timer (disabled after 8 extensions)
 
 ### Audit Trail
 - Impersonation start: logged to activity_logs as `audit.impersonation_started`
@@ -241,7 +277,21 @@ Request with X-Impersonate-User-Id header
 | `audit.access_denied` | 403 response | userId, endpoint, reason |
 
 ### Implementation
-Extend existing `ActivityLogsService` with `@OnEvent('audit.*')` handler (already configured with EventEmitter2 wildcard).
+Use a separate `security.*` event namespace with a dedicated handler to keep the existing `audit.*` handler (entity-centric) clean. Security events have a different shape — they are not entity-centric and may lack `entityId`/`tripId`.
+
+```typescript
+interface SecurityAuditEvent {
+  event: string           // e.g., 'security.login_failed'
+  userId?: string         // User involved (may be unknown for login failures)
+  actorId?: string        // Who performed the action
+  agencyId?: string       // Agency scope
+  metadata: Record<string, unknown>  // Event-specific data
+  ip?: string             // Request IP
+  timestamp: Date
+}
+```
+
+New handler: `@OnEvent('security.*')` in `ActivityLogsService` or a dedicated `SecurityAuditService`.
 
 ---
 
@@ -259,7 +309,7 @@ Keep `user` in DB enum (no migration risk). Display "Agent" in all UI:
 
 Map in a shared constant:
 ```typescript
-const ROLE_DISPLAY_NAMES = { admin: 'Admin', user: 'Agent' }
+const ROLE_DISPLAY_NAMES = { admin: 'Admin', user: 'Agent', client_portal: 'Client' }
 ```
 
 ---
