@@ -812,8 +812,14 @@ export function FlightForm({
     const arrTime = normalizedTimeToFormFields(flight.arrival.scheduledTime)
 
     // Update segment fields - prefer IATA code for airline autocomplete, fallback to name
+    const airlinePrefix = flight.airline.iataCode || flight.airline.icaoCode || ''
     setValue(`flightSegments.${index}.airline`, flight.airline.iataCode || flight.airline.name || '', { shouldDirty: true })
-    setValue(`flightSegments.${index}.flightNumber`, flight.flightNumber || '', { shouldDirty: true })
+    // Strip airline code prefix from flight number (e.g., "AC1256" → "1256")
+    const rawFlightNum = flight.flightNumber || ''
+    const numericOnly = airlinePrefix && rawFlightNum.toUpperCase().startsWith(airlinePrefix.toUpperCase())
+      ? rawFlightNum.slice(airlinePrefix.length)
+      : rawFlightNum
+    setValue(`flightSegments.${index}.flightNumber`, numericOnly, { shouldDirty: true })
     setValue(`flightSegments.${index}.departureAirport`, flight.departure.airportIata || '', { shouldDirty: true })
     setValue(`flightSegments.${index}.arrivalAirport`, flight.arrival.airportIata || '', { shouldDirty: true })
     setValue(`flightSegments.${index}.departureDate`, depTime.date || null, { shouldDirty: true })
@@ -867,8 +873,14 @@ export function FlightForm({
       const arrDate = seg.arrival.at ? seg.arrival.at.split('T')[0] : ''
       const arrTime = seg.arrival.at ? seg.arrival.at.split('T')[1]?.substring(0, 5) : ''
 
-      setValue(`flightSegments.${i}.airline`, seg.carrier || '', { shouldDirty: true })
-      setValue(`flightSegments.${i}.flightNumber`, seg.flightNumber || '', { shouldDirty: true })
+      const carrier = seg.carrier || ''
+      setValue(`flightSegments.${i}.airline`, carrier, { shouldDirty: true })
+      // Strip airline code prefix from flight number (e.g., "AC1256" → "1256")
+      const rawNum = seg.flightNumber || ''
+      const numOnly = carrier && rawNum.toUpperCase().startsWith(carrier.toUpperCase())
+        ? rawNum.slice(carrier.length)
+        : rawNum
+      setValue(`flightSegments.${i}.flightNumber`, numOnly, { shouldDirty: true })
       setValue(`flightSegments.${i}.departureAirport`, seg.departure.iataCode || '', { shouldDirty: true })
       setValue(`flightSegments.${i}.arrivalAirport`, seg.arrival.iataCode || '', { shouldDirty: true })
       setValue(`flightSegments.${i}.departureDate`, depDate || null, { shouldDirty: true })
