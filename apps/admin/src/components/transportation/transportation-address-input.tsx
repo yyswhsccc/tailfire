@@ -131,11 +131,25 @@ export function TransportationAddressInput({
     if (!val.trim()) {
       setGooglePredictions([])
       setIsOpen(false)
+      // Clear form state when user clears the input
+      onChange({ address: '', name: null, lat: null, lng: null, placeId: null })
       return
     }
 
     setIsOpen(true)
     debounceRef.current = setTimeout(() => fetchGooglePredictions(val), 300)
+  }
+
+  // Propagate manual text edits on blur (when user typed without selecting a suggestion)
+  const handleBlur = () => {
+    // Delay to allow click on dropdown items to fire first
+    setTimeout(() => {
+      setIsOpen(false)
+      // If query differs from current value, user typed manually — persist the text
+      if (query.trim() && query !== value) {
+        onChange({ address: query, name: null, lat: null, lng: null, placeId: null })
+      }
+    }, 200)
   }
 
   const handleSelectTripLocation = (loc: TripLocation) => {
@@ -255,6 +269,7 @@ export function TransportationAddressInput({
               setIsOpen(true)
             }
           }}
+          onBlur={handleBlur}
           placeholder={placeholder}
           disabled={disabled}
           className="pl-9 pr-8"
