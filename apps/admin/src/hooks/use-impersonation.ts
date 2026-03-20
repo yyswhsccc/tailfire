@@ -55,7 +55,7 @@ export function useImpersonation() {
       if (typeof window !== 'undefined') {
         localStorage.setItem('impersonate-user-id', userId)
       }
-      window.location.reload()
+      window.location.href = '/dashboard'
     } finally {
       setLoading(false)
     }
