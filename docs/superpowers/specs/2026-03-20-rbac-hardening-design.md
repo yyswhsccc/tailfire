@@ -161,12 +161,16 @@ Add `@AdminOnly()` to all platform-level settings endpoints. Enumerate:
 
 | Endpoint | Current Protection | Fix |
 |----------|-------------------|-----|
-| `POST /stripe-connect/onboard` | Agency check only | Add `@AdminOnly()` |
-| `GET /stripe-connect/status` | Agency check only | Add `@AdminOnly()` |
-| `GET /stripe-connect/dashboard-link` | Agency check only | Add `@AdminOnly()` |
+| `GET /agencies/:agencyId/settings` | Agency match only | Add `@AdminOnly()` |
+| `PATCH /agencies/:agencyId/settings` | Agency match only | Add `@AdminOnly()` |
+| `POST /agencies/:agencyId/stripe/onboard` | Agency match only | Add `@AdminOnly()` |
+| `GET /agencies/:agencyId/stripe/status` | Agency match only | Add `@AdminOnly()` |
+| `POST /agencies/:agencyId/stripe/dashboard` | Agency match only | Add `@AdminOnly()` |
 | `/api-credentials/*` | `@UseGuards(AdminGuard)` ✅ | Migrate to `@AdminOnly()` |
 | `/users/*` (user management) | `@UseGuards(AdminGuard)` ✅ | Migrate to `@AdminOnly()` |
 | `/admin/automation/*` | `@UseGuards(JwtAuthGuard, AdminRoleGuard)` ✅ | Migrate to `@AdminOnly()` |
+
+**Note:** Routes are under `stripe-connect.controller.ts` with `@Controller()` (no prefix). Actual paths are `/agencies/:agencyId/...`.
 
 Agent access limited to personal profile settings under `/user-profiles/me`.
 
@@ -288,25 +292,46 @@ export const BypassImpersonation = () => SetMetadata('bypass-impersonation', tru
 
 ### Auth Flow During Impersonation
 
-**Implementation: NestJS Interceptor** (not middleware — middleware runs before guards so `request.user` is unavailable). An Interceptor runs after guards, giving access to the authenticated user context.
+**Implementation: Global Guard registered between JwtAuthGuard and RolesGuard.**
 
-```
-Request with X-Impersonate-User-Id header
-  → JwtAuthGuard validates admin JWT (normal) — sets request.user
-  → ImpersonationInterceptor (global, registered via APP_INTERCEPTOR):
-    1. Check for X-Impersonate-User-Id header; if absent, skip
-    2. Verify request.user.role === 'admin'
-    3. Query impersonation_sessions for active session matching adminUserId + targetUserId
-    4. Verify session exists, not expired, and header value === session.targetUserId
-    5. Verify target user is in same agency as admin
-    6. Store original admin context: request.originalAdmin = { id, name, role }
-    7. Swap request.user: userId → targetUserId, role → target's role
-  → Downstream guards/services see impersonated user's permissions
-  → @AdminOnly guard rejects (role is now 'user') EXCEPT impersonation control endpoints
-  → Audit service uses request.originalAdmin for actor identity
+NestJS execution order: Middleware → Guards (in registration order) → Interceptors → Route Handler.
+
+The `ImpersonationGuard` must be registered AFTER `JwtAuthGuard` (which sets `request.user`) but BEFORE `RolesGuard`/`AdminRoleGuard` (which check roles). This way the role swap happens before admin checks, so `@AdminOnly()` endpoints correctly reject impersonating admins.
+
+**Guard registration order in `main.ts`:**
+```typescript
+// Current order (lines 94-99):
+// 1. JwtAuthGuard
+// 2. RolesGuard
+// 3. UserStatusGuard
+// 4. ActiveUserGuard
+
+// New order:
+// 1. JwtAuthGuard          — authenticates admin, sets request.user
+// 2. ImpersonationGuard    — NEW: swaps context if impersonating
+// 3. RolesGuard            — checks role (now sees agent role if impersonating)
+// 4. UserStatusGuard       — checks target user is active
+// 5. ActiveUserGuard       — checks target user is not pending
 ```
 
-**Why Interceptor over Guard:** NestJS execution order is Middleware → Guards → Interceptors → Route Handler. We need the JWT guard to run first to authenticate the admin, then the interceptor swaps context. A guard would work too but interceptors are cleaner for request transformation.
+**ImpersonationGuard logic:**
+```
+canActivate(context):
+  1. Get request from context
+  2. Check for X-Impersonate-User-Id header; if absent, return true (skip)
+  3. Check for @BypassImpersonation() metadata; if set, return true (skip swap)
+  4. Verify request.user exists and request.user.role === 'admin'
+  5. Query impersonation_sessions: active session where
+     adminUserId === request.user.userId AND targetUserId === header value
+  6. If no valid session: throw UnauthorizedException
+  7. Verify session not expired
+  8. Verify target user in same agency
+  9. Store original admin: request.originalAdmin = { id, name, role }
+  10. Swap: request.user = { userId: targetUserId, role: targetRole, agencyId: same }
+  11. Return true
+```
+
+After this guard runs, `RolesGuard` and `AdminRoleGuard` see the impersonated user's role. Admin-only endpoints naturally reject because `role === 'user'`.
 
 ### Write Policy
 Full impersonation — admin can perform all actions the agent can do (create, edit, delete).
