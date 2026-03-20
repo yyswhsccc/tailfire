@@ -1149,6 +1149,13 @@
       "when": 1774267260000,
       "tag": "20260320120100_create_contact_share_requests",
       "breakpoints": false
+    },
+    {
+      "idx": 164,
+      "version": "7",
+      "when": 1774267320000,
+      "tag": "20260320120200_create_impersonation_sessions",
+      "breakpoints": false
     }
   ]
 }

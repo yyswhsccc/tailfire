@@ -192,3 +192,6 @@ export * from './security-audit-logs.schema'
 
 // Contact share requests (RBAC hardening — agent requests full access to another agent's contact)
 export * from './contact-share-requests.schema'
+
+// Impersonation sessions (RBAC hardening — admin views agent's account)
+export * from './impersonation-sessions.schema'
