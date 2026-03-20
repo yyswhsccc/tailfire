@@ -71,11 +71,9 @@ export class DashboardService {
     // For agents, scope to accessible trips only
     let tripFilter: SQL = eq(this.db.schema.trips.agencyId, agencyId)
     let contactFilter: SQL = eq(this.db.schema.contacts.agencyId, agencyId)
-    // paymentTransactions has no direct trip_id column — always use agency filter only
-    const paymentFilter: SQL = and(
-      eq(this.db.schema.paymentTransactions.agencyId, agencyId),
-      eq(this.db.schema.paymentTransactions.transactionType, 'payment'),
-    )!
+    // Revenue: suppress for agents (no trip_id on payment_transactions for scoping).
+    // Agents use getOverview() which has proper per-agent KPI scoping.
+    const showRevenue = isAdmin
 
     if (!isAdmin) {
       const accessibleTripIds = await this.tripAccessService.getAccessibleTripIds(auth)
@@ -92,10 +90,7 @@ export class DashboardService {
           eq(this.db.schema.contacts.agencyId, agencyId),
           eq(this.db.schema.contacts.ownerId, auth.userId),
         )!
-        // Note: revenue (paymentTransactions) is intentionally left agency-scoped
-        // because payment_transactions has no direct trip_id column and the join
-        // chain is complex. This is a legacy/overview metric; getOverview() has
-        // proper per-agent scoping via the full KPI pipeline.
+        // Revenue suppressed for agents (showRevenue = false)
       }
     }
 
@@ -117,13 +112,20 @@ export class DashboardService {
         .from(this.db.schema.contacts)
         .where(contactFilter),
 
-      // Get total revenue from payment transactions (payments only, not refunds)
-      this.db.client
-        .select({
-          totalRevenue: sql<number>`coalesce(sum(${this.db.schema.paymentTransactions.amountCents}), 0)::int`,
-        })
-        .from(this.db.schema.paymentTransactions)
-        .where(paymentFilter),
+      // Get total revenue — admin only (agent revenue is in getOverview KPIs)
+      showRevenue
+        ? this.db.client
+            .select({
+              totalRevenue: sql<number>`coalesce(sum(${this.db.schema.paymentTransactions.amountCents}), 0)::int`,
+            })
+            .from(this.db.schema.paymentTransactions)
+            .where(
+              and(
+                eq(this.db.schema.paymentTransactions.agencyId, agencyId),
+                eq(this.db.schema.paymentTransactions.transactionType, 'payment'),
+              ),
+            )
+        : Promise.resolve([{ totalRevenue: 0 }]),
     ])
 
     return {

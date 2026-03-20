@@ -23,8 +23,17 @@ export function useImpersonation() {
     try {
       const data = await api.get<ImpersonationStatus>('/admin/impersonate/status')
       setStatus(data)
+      // Clear stale localStorage key when session is no longer active
+      // Prevents 401s on all requests after natural session expiry
+      if (!data.active && typeof window !== 'undefined' && localStorage.getItem('impersonate-user-id')) {
+        localStorage.removeItem('impersonate-user-id')
+      }
     } catch {
       setStatus({ active: false })
+      // Also clear on error (e.g., session expired server-side)
+      if (typeof window !== 'undefined' && localStorage.getItem('impersonate-user-id')) {
+        localStorage.removeItem('impersonate-user-id')
+      }
     }
   }, [isAdmin])
 
