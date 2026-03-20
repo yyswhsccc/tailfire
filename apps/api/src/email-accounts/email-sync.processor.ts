@@ -1,5 +1,5 @@
 import { Processor, WorkerHost, InjectQueue } from '@nestjs/bullmq'
-import { Logger } from '@nestjs/common'
+import { HttpException, Logger } from '@nestjs/common'
 import { Job, Queue } from 'bullmq'
 import { QUEUES, type EmailSyncJobData } from '../automation/automation.types'
 import { ImapSyncService } from './imap-sync.service'
@@ -25,9 +25,19 @@ export class EmailSyncProcessor extends WorkerHost {
         return
       }
       this.logger.debug(`Syncing email account ${job.data.emailAccountId}`)
-      const result = await this.imapSyncService.syncAccount(job.data.emailAccountId)
-      if (result.errors.length > 0) {
-        this.logger.warn(`Sync completed with errors: ${result.errors.join('; ')}`)
+      try {
+        const result = await this.imapSyncService.syncAccount(job.data.emailAccountId)
+        if (result.errors.length > 0) {
+          this.logger.warn(`Sync completed with errors: ${result.errors.join('; ')}`)
+        }
+      } catch (err: any) {
+        // Auth failures are expected when credentials change — log and skip, don't retry
+        const resp = err instanceof HttpException ? err.getResponse() : null
+        if (typeof resp === 'object' && resp && (resp as any).code === 'IMAP_AUTH_FAILED') {
+          this.logger.warn(`IMAP auth failed for account ${job.data.emailAccountId} — skipping sync`)
+          return
+        }
+        throw err
       }
     } else if (job.data.type === 'email.dispatch_sync') {
       // Recurring dispatcher: enqueue one job per active account with dedupe

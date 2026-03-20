@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, HttpException, HttpStatus } from '@nestjs/common'
 import { eq, and, sql, count, isNull } from 'drizzle-orm'
 import { assertPublicHost } from '../common/guards/assert-public-host'
 import { DatabaseService } from '../db/database.service'
@@ -44,8 +44,9 @@ export class ImapSyncService {
 
       return { success: true }
     } catch (error: any) {
-      this.logger.warn(`IMAP connection test failed: ${error.message}`)
-      return { success: false, error: error.message }
+      const detail = error.responseText || error.responseStatus || error.message
+      this.logger.warn(`IMAP connection test failed: ${detail}`)
+      return { success: false, error: detail }
     }
   }
 
@@ -133,7 +134,9 @@ export class ImapSyncService {
 
       await client.logout()
     } catch (error: any) {
-      this.logger.error(`Sync failed for account ${accountId}: ${error.message}`)
+      const detail = error.responseText || error.responseStatus || error.message
+      this.logger.error(`Sync failed for account ${accountId}: ${detail}`, error.stack)
+      await this.handleImapAuthFailure(error, accountId, (account.syncState as Record<string, unknown>) ?? {})
       await this.emailAccountsService.updateSyncState(
         accountId,
         (account.syncState as Record<string, unknown>) ?? {},
@@ -247,7 +250,9 @@ export class ImapSyncService {
         await client.logout()
       }
     } catch (error: any) {
-      this.logger.error(`Body fetch failed for email ${emailId}: ${error.message}`)
+      const detail = error.responseText || error.responseStatus || error.message
+      this.logger.error(`Body fetch failed for email ${emailId}: ${detail}`, error.stack)
+      await this.handleImapAuthFailure(error, accountId)
       throw error
     }
   }
@@ -297,7 +302,9 @@ export class ImapSyncService {
         unseenMessages: countsByFolder.get(mb.path)?.unseen ?? 0,
       }))
     } catch (error: any) {
-      this.logger.error(`List folders failed for account ${accountId}: ${error.message}`)
+      const detail = error.responseText || error.responseStatus || error.message
+      this.logger.error(`List folders failed for account ${accountId}: ${detail}`, error.stack)
+      await this.handleImapAuthFailure(error, accountId, (account.syncState as Record<string, unknown>) ?? {})
       return []
     }
   }
@@ -474,42 +481,63 @@ export class ImapSyncService {
       throw new NotFoundException('Email not found')
     }
 
-    const client = await this.createImapClient({
-      host: account.imapHost,
-      port: account.imapPort,
-      secure: account.imapTls,
-      user: credentials.username,
-      pass: credentials.password,
-    })
-
-    await client.connect()
-    const lock = await client.getMailboxLock(email.folder)
-
     try {
-      const downloadResult = await client.download(
-        String(email.imapUid),
-        attachment.imapPartId || undefined,
-        { uid: true },
-      )
-      const chunks: Buffer[] = []
-      for await (const chunk of downloadResult.content) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-      }
+      const client = await this.createImapClient({
+        host: account.imapHost,
+        port: account.imapPort,
+        secure: account.imapTls,
+        user: credentials.username,
+        pass: credentials.password,
+      })
 
-      return {
-        buffer: Buffer.concat(chunks),
-        contentType: attachment.contentType ?? 'application/octet-stream',
-        filename: attachment.filename ?? 'attachment',
+      await client.connect()
+      const lock = await client.getMailboxLock(email.folder)
+
+      try {
+        const downloadResult = await client.download(
+          String(email.imapUid),
+          attachment.imapPartId || undefined,
+          { uid: true },
+        )
+        const chunks: Buffer[] = []
+        for await (const chunk of downloadResult.content) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+        }
+
+        return {
+          buffer: Buffer.concat(chunks),
+          contentType: attachment.contentType ?? 'application/octet-stream',
+          filename: attachment.filename ?? 'attachment',
+        }
+      } finally {
+        lock.release()
+        await client.logout()
       }
-    } finally {
-      lock.release()
-      await client.logout()
+    } catch (error: any) {
+      const detail = error.responseText || error.responseStatus || error.message
+      this.logger.error(`Attachment fetch failed for ${attachmentId}: ${detail}`, error.stack)
+      await this.handleImapAuthFailure(error, accountId)
+      throw error
     }
   }
 
   // ============================================================================
   // Private helpers
   // ============================================================================
+
+  /**
+   * Check if an error is an IMAP authentication failure, mark the account,
+   * and throw a typed HttpException.
+   */
+  private async handleImapAuthFailure(error: any, accountId: string, syncState?: Record<string, unknown>): Promise<void> {
+    if (error.authenticationFailed || error.serverResponseCode === 'AUTHENTICATIONFAILED') {
+      await this.emailAccountsService.updateSyncState(accountId, syncState ?? {}, 'IMAP_AUTH_FAILED')
+      throw new HttpException(
+        { statusCode: HttpStatus.BAD_GATEWAY, code: 'IMAP_AUTH_FAILED', message: 'Email authentication failed. Please update your email password.' },
+        HttpStatus.BAD_GATEWAY,
+      )
+    }
+  }
 
   /**
    * Create an ImapFlow client with an error handler to prevent unhandled

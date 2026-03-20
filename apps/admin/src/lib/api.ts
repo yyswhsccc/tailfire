@@ -84,8 +84,9 @@ async function handleErrorResponse(response: Response): Promise<never> {
 
   // Extract metadata from external API responses (e.g., retryAfter from 429)
   const metadata = body.metadata as ApiErrorMetadata | undefined
+  const code = typeof body.code === 'string' ? body.code : undefined
 
-  throw new ApiError(response.status, message, fieldErrors, metadata)
+  throw new ApiError(response.status, message, fieldErrors, metadata, code)
 }
 
 /**
@@ -100,17 +101,20 @@ export interface ApiErrorMetadata {
 export class ApiError extends Error {
   public fieldErrors?: ServerFieldError[]
   public metadata?: ApiErrorMetadata
+  public code?: string
 
   constructor(
     public status: number,
     message: string,
     fieldErrors?: ServerFieldError[],
-    metadata?: ApiErrorMetadata
+    metadata?: ApiErrorMetadata,
+    code?: string,
   ) {
     super(message)
     this.name = 'ApiError'
     this.fieldErrors = fieldErrors
     this.metadata = metadata
+    this.code = code
   }
 }
 
