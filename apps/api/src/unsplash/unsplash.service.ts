@@ -9,6 +9,7 @@
  */
 
 import { Injectable, OnModuleInit, Logger, ServiceUnavailableException } from '@nestjs/common'
+import * as Sentry from '@sentry/nestjs'
 import { ApiProvider } from '@tailfire/shared-types'
 import { CredentialResolverService } from '../api-credentials/credential-resolver.service'
 
@@ -91,6 +92,9 @@ export class UnsplashService implements OnModuleInit {
         })
         .catch((err) => {
           this.logger.error(`Failed to load Unsplash credentials: ${err.message}`)
+          Sentry.captureException(err, {
+            tags: { service: 'unsplash', operation: 'credential-init' },
+          })
         })
     } else {
       this.logger.warn(
@@ -206,6 +210,10 @@ export class UnsplashService implements OnModuleInit {
     } catch (error) {
       // Don't fail the operation if download tracking fails
       this.logger.warn(`Download tracking error: ${error}`)
+      Sentry.captureException(error, {
+        tags: { service: 'unsplash', operation: 'download-tracking' },
+        extra: { downloadLocation },
+      })
     }
   }
 

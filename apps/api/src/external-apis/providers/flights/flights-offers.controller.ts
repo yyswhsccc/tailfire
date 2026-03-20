@@ -12,6 +12,7 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common'
+import * as Sentry from '@sentry/nestjs'
 import { AmadeusFlightOffersProvider } from '../amadeus/amadeus-flight-offers.provider'
 import { CredentialResolverService } from '../../../api-credentials/credential-resolver.service'
 import { ApiProvider, FlightOfferSearchResponse } from '@tailfire/shared-types'
@@ -64,6 +65,11 @@ export class FlightsOffersController {
     })
 
     if (!response.success) {
+      Sentry.captureMessage(`Flight offers search failed: ${response.error}`, {
+        level: 'warning',
+        tags: { service: 'amadeus', operation: 'flight-offers-search' },
+        extra: { origin, destination, departureDate, error: response.error },
+      })
       return {
         results: [],
         warning: response.error,
