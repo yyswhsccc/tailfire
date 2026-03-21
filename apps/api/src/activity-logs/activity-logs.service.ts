@@ -21,8 +21,8 @@ import {
   AuditEvent,
   AuditEntityType,
 } from './events'
-import { TripInProgressEvent } from '../trips/events/trip-in-progress.event'
-import { TripCompletedEvent } from '../trips/events/trip-completed.event'
+import { TripTravellingEvent } from '../trips/events/trip-travelling.event'
+import { TripTravelledEvent } from '../trips/events/trip-travelled.event'
 import { TripCancelledEvent } from '../trips/events/trip-cancelled.event'
 import { buildAuditDescription } from './audit-sanitizer'
 
@@ -153,10 +153,10 @@ export class ActivityLogsService {
   }
 
   /**
-   * Listen for trip in_progress events (trip started)
+   * Listen for trip travelling events (trip started)
    */
-  @OnEvent('trip.in_progress')
-  async handleTripInProgress(event: TripInProgressEvent) {
+  @OnEvent('trip.travelling')
+  async handleTripTravelling(event: TripTravellingEvent) {
     const description = event.isAutoTransition
       ? `Trip "${event.tripName}" automatically started (scheduled)`
       : `Trip "${event.tripName}" started`
@@ -178,10 +178,10 @@ export class ActivityLogsService {
   }
 
   /**
-   * Listen for trip completed events (trip ended)
+   * Listen for trip travelled events (trip ended)
    */
-  @OnEvent('trip.completed')
-  async handleTripCompleted(event: TripCompletedEvent) {
+  @OnEvent('trip.travelled')
+  async handleTripTravelled(event: TripTravelledEvent) {
     const description = event.isAutoTransition
       ? `Trip "${event.tripName}" automatically completed (scheduled)`
       : `Trip "${event.tripName}" completed`

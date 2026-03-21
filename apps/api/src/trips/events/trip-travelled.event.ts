@@ -1,13 +1,13 @@
 /**
- * Domain Event: Trip In Progress
+ * Domain Event: Trip Travelled
  *
- * Emitted when a trip transitions to 'in_progress' status.
+ * Emitted when a trip transitions to 'travelled' status.
  * Can be triggered by:
- * - Automatic scheduler (when start date is reached)
+ * - Automatic scheduler (day after end date)
  * - Manual status change by user
  */
 
-export class TripInProgressEvent {
+export class TripTravelledEvent {
   constructor(
     public readonly tripId: string,
     public readonly tripName: string,
@@ -15,7 +15,7 @@ export class TripInProgressEvent {
     public readonly agencyId: string,
     /** True if this was an automatic transition by the scheduler */
     public readonly isAutoTransition: boolean,
-    /** The trip's start date */
-    public readonly startDate: string | null,
+    /** The trip's end date */
+    public readonly endDate: string | null,
   ) {}
 }

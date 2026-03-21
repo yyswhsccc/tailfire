@@ -9,10 +9,10 @@ import { EventEmitter2 } from '@nestjs/event-emitter'
 import * as crypto from 'crypto'
 import { eq, and, or, gte, lte, ilike, sql, desc, asc, inArray, isNull, isNotNull } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
-import { TripBookedEvent } from './events/trip-booked.event'
+import { TripActiveEvent } from './events/trip-active.event'
 import { TripCancelledEvent } from './events/trip-cancelled.event'
-import { TripInProgressEvent } from './events/trip-in-progress.event'
-import { TripCompletedEvent } from './events/trip-completed.event'
+import { TripTravellingEvent } from './events/trip-travelling.event'
+import { TripTravelledEvent } from './events/trip-travelled.event'
 import {
   TripCreatedEvent,
   TripUpdatedEvent,
@@ -204,8 +204,8 @@ export class TripsService {
     // If trip is being created as 'active' and has a primary contact, emit event
     if (status === 'active' && dto.primaryContactId && bookingDate) {
       this.eventEmitter.emit(
-        'trip.booked',
-        new TripBookedEvent(trip.id, dto.primaryContactId, bookingDate),
+        'trip.active',
+        new TripActiveEvent(trip.id, dto.primaryContactId, bookingDate),
       )
     }
 
@@ -747,16 +747,16 @@ export class TripsService {
     const primaryContactId = trip.primaryContactId || existingTrip.primaryContactId
     if (isTransitioningToBooked && primaryContactId && bookingDate) {
       this.eventEmitter.emit(
-        'trip.booked',
-        new TripBookedEvent(trip.id, primaryContactId, bookingDate),
+        'trip.active',
+        new TripActiveEvent(trip.id, primaryContactId, bookingDate),
       )
     }
 
     // Emit events for manual status changes to travelling or travelled
     if (isStatusChange && dto.status === 'travelling') {
       this.eventEmitter.emit(
-        'trip.in_progress',
-        new TripInProgressEvent(
+        'trip.travelling',
+        new TripTravellingEvent(
           trip.id,
           trip.name,
           primaryContactId,
@@ -767,8 +767,8 @@ export class TripsService {
       )
     } else if (isStatusChange && dto.status === 'travelled') {
       this.eventEmitter.emit(
-        'trip.completed',
-        new TripCompletedEvent(
+        'trip.travelled',
+        new TripTravelledEvent(
           trip.id,
           trip.name,
           primaryContactId,
@@ -1210,16 +1210,16 @@ export class TripsService {
       // If transitioning to 'active', emit booking event
       if (isTransitioningToBooked && trip.primaryContactId && bookingDate) {
         this.eventEmitter.emit(
-          'trip.booked',
-          new TripBookedEvent(trip.id, trip.primaryContactId, bookingDate),
+          'trip.active',
+          new TripActiveEvent(trip.id, trip.primaryContactId, bookingDate),
         )
       }
 
       // Emit events for manual status changes to travelling or travelled
       if (newStatus === 'travelling') {
         this.eventEmitter.emit(
-          'trip.in_progress',
-          new TripInProgressEvent(
+          'trip.travelling',
+          new TripTravellingEvent(
             trip.id,
             trip.name,
             trip.primaryContactId,
@@ -1230,8 +1230,8 @@ export class TripsService {
         )
       } else if (newStatus === 'travelled') {
         this.eventEmitter.emit(
-          'trip.completed',
-          new TripCompletedEvent(
+          'trip.travelled',
+          new TripTravelledEvent(
             trip.id,
             trip.name,
             trip.primaryContactId,

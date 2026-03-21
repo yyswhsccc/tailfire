@@ -21,8 +21,8 @@ import {
   getTripTransitionJobId,
 } from '../automation.types'
 import { AutomationService } from '../automation.service'
-import { TripInProgressEvent } from '../../trips/events/trip-in-progress.event'
-import { TripCompletedEvent } from '../../trips/events/trip-completed.event'
+import { TripTravellingEvent } from '../../trips/events/trip-travelling.event'
+import { TripTravelledEvent } from '../../trips/events/trip-travelled.event'
 
 @Processor(QUEUES.TRIP_AUTOMATION)
 @Injectable()
@@ -98,8 +98,8 @@ export class TripAutomationProcessor extends WorkerHost {
     // 3. Validate allowed transitions
     // Aligned with TRIP_STATUS_TRANSITIONS in shared-types
     const validTransitions: Record<string, string[]> = {
-      booked: ['in_progress', 'completed', 'cancelled'], // completed allowed for same-day trips
-      in_progress: ['completed', 'cancelled'],
+      active: ['travelling', 'travelled', 'cancelled'], // travelled allowed for same-day trips
+      travelling: ['travelled', 'cancelled'],
     }
 
     const allowed = validTransitions[trip.status]
@@ -127,10 +127,10 @@ export class TripAutomationProcessor extends WorkerHost {
     )
 
     // 5. Emit appropriate event
-    if (toStatus === 'in_progress') {
+    if (toStatus === 'travelling') {
       this.eventEmitter.emit(
-        'trip.in_progress',
-        new TripInProgressEvent(
+        'trip.travelling',
+        new TripTravellingEvent(
           tripId,
           trip.name,
           trip.primaryContactId,
@@ -139,10 +139,10 @@ export class TripAutomationProcessor extends WorkerHost {
           trip.startDate,
         )
       )
-    } else if (toStatus === 'completed') {
+    } else if (toStatus === 'travelled') {
       this.eventEmitter.emit(
-        'trip.completed',
-        new TripCompletedEvent(
+        'trip.travelled',
+        new TripTravelledEvent(
           tripId,
           trip.name,
           trip.primaryContactId,
@@ -183,8 +183,8 @@ export class TripAutomationProcessor extends WorkerHost {
       return
     }
 
-    // Skip reminders for cancelled/completed trips
-    if (trip.status === 'cancelled' || trip.status === 'completed') {
+    // Skip reminders for cancelled/travelled trips
+    if (trip.status === 'cancelled' || trip.status === 'travelled') {
       this.logger.log(`Trip ${tripId} is ${trip.status} - skipping reminder`)
       return
     }
@@ -208,7 +208,7 @@ export class TripAutomationProcessor extends WorkerHost {
 
   /**
    * Backfill existing trips with scheduled jobs
-   * Called on deployment to ensure all booked/in_progress trips have scheduled transitions
+   * Called on deployment to ensure all active/travelling trips have scheduled transitions
    */
   private async handleBackfill(job: Job<TripBackfillJobData>): Promise<void> {
     const { agencyId } = job.data
@@ -217,8 +217,8 @@ export class TripAutomationProcessor extends WorkerHost {
 
     const conditions = [
       or(
-        eq(this.db.schema.trips.status, 'booked'),
-        eq(this.db.schema.trips.status, 'in_progress'),
+        eq(this.db.schema.trips.status, 'active'),
+        eq(this.db.schema.trips.status, 'travelling'),
       ),
     ]
 
@@ -242,15 +242,15 @@ export class TripAutomationProcessor extends WorkerHost {
 
     for (const trip of trips) {
       try {
-        // Schedule in_progress transition if trip is booked with start date
-        if (trip.status === 'booked' && trip.startDate) {
-          const inProgressAt = this.automationService.computeLocalMidnight(
+        // Schedule travelling transition if trip is active with start date
+        if (trip.status === 'active' && trip.startDate) {
+          const travellingAt = this.automationService.computeLocalMidnight(
             trip.startDate,
             trip.timezone ?? undefined
           )
-          const jobId = getTripTransitionJobId(trip.id, 'in_progress')
+          const jobId = getTripTransitionJobId(trip.id, 'travelling')
 
-          if (this.automationService.isInFuture(inProgressAt)) {
+          if (this.automationService.isInFuture(travellingAt)) {
             // Future date - schedule at that time
             await this.automationService.scheduleAt(
               QUEUES.TRIP_AUTOMATION,
@@ -258,22 +258,22 @@ export class TripAutomationProcessor extends WorkerHost {
               {
                 type: JOB_TYPES.TRIP_STATUS_TRANSITION,
                 tripId: trip.id,
-                toStatus: 'in_progress',
+                toStatus: 'travelling',
                 reason: 'backfill',
               },
-              inProgressAt,
+              travellingAt,
               { jobId }
             )
             scheduledCount++
           } else {
-            // Past or same-day - schedule immediately (no delay for in_progress)
+            // Past or same-day - schedule immediately (no delay for travelling)
             await this.automationService.schedule(
               QUEUES.TRIP_AUTOMATION,
               JOB_TYPES.TRIP_STATUS_TRANSITION,
               {
                 type: JOB_TYPES.TRIP_STATUS_TRANSITION,
                 tripId: trip.id,
-                toStatus: 'in_progress',
+                toStatus: 'travelling',
                 reason: 'backfill',
               },
               { jobId, delay: 0 }
@@ -282,15 +282,15 @@ export class TripAutomationProcessor extends WorkerHost {
           }
         }
 
-        // Schedule completed transition if trip has end date
-        if ((trip.status === 'booked' || trip.status === 'in_progress') && trip.endDate) {
-          const completedAt = this.automationService.computeDayAfterMidnight(
+        // Schedule travelled transition if trip has end date
+        if ((trip.status === 'active' || trip.status === 'travelling') && trip.endDate) {
+          const travelledAt = this.automationService.computeDayAfterMidnight(
             trip.endDate,
             trip.timezone ?? undefined
           )
-          const jobId = getTripTransitionJobId(trip.id, 'completed')
+          const jobId = getTripTransitionJobId(trip.id, 'travelled')
 
-          if (this.automationService.isInFuture(completedAt)) {
+          if (this.automationService.isInFuture(travelledAt)) {
             // Future date - schedule at that time
             await this.automationService.scheduleAt(
               QUEUES.TRIP_AUTOMATION,
@@ -298,22 +298,22 @@ export class TripAutomationProcessor extends WorkerHost {
               {
                 type: JOB_TYPES.TRIP_STATUS_TRANSITION,
                 tripId: trip.id,
-                toStatus: 'completed',
+                toStatus: 'travelled',
                 reason: 'backfill',
               },
-              completedAt,
+              travelledAt,
               { jobId }
             )
             scheduledCount++
           } else {
-            // Past or same-day - schedule with 2s delay to ensure in_progress runs first
+            // Past or same-day - schedule with 2s delay to ensure travelling runs first
             await this.automationService.schedule(
               QUEUES.TRIP_AUTOMATION,
               JOB_TYPES.TRIP_STATUS_TRANSITION,
               {
                 type: JOB_TYPES.TRIP_STATUS_TRANSITION,
                 tripId: trip.id,
-                toStatus: 'completed',
+                toStatus: 'travelled',
                 reason: 'backfill',
               },
               { jobId, delay: 2000 }

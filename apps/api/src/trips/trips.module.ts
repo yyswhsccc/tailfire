@@ -9,7 +9,7 @@
  *
  * Note: ContactsModule is imported for ContactAccessService (access control).
  * Communication with ContactsService for booking events still uses domain events
- * (TripBookedEvent) to avoid circular dependencies.
+ * (TripActiveEvent) to avoid circular dependencies.
  */
 
 import { Module, forwardRef } from '@nestjs/common'

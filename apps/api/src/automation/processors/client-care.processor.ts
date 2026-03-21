@@ -235,8 +235,8 @@ export class ClientCareProcessor extends WorkerHost {
       return
     }
 
-    // Only send if trip is completed
-    if (trip.status !== 'completed') {
+    // Only send if trip is travelled
+    if (trip.status !== 'travelled') {
       this.logger.log(`Trip ${tripId} status is ${trip.status} - skipping post-trip email`)
       return
     }
@@ -469,8 +469,8 @@ export class ClientCareProcessor extends WorkerHost {
       return
     }
 
-    // Skip if trip is cancelled or already completed
-    if (trip.status === 'cancelled' || trip.status === 'completed') {
+    // Skip if trip is cancelled or already travelled
+    if (trip.status === 'cancelled' || trip.status === 'travelled') {
       this.logger.log(`Trip ${tripId} status is ${trip.status} - skipping departure reminder`)
       return
     }
@@ -526,8 +526,8 @@ export class ClientCareProcessor extends WorkerHost {
       .where(eq(trips.id, tripId))
       .limit(1)
 
-    if (!trip || trip.status !== 'completed') {
-      this.logger.log(`Trip ${tripId} not completed - skipping thank you email`)
+    if (!trip || trip.status !== 'travelled') {
+      this.logger.log(`Trip ${tripId} not travelled - skipping thank you email`)
       return
     }
 
@@ -572,8 +572,8 @@ export class ClientCareProcessor extends WorkerHost {
       .where(eq(trips.id, tripId))
       .limit(1)
 
-    if (!trip || trip.status !== 'completed') {
-      this.logger.log(`Trip ${tripId} not completed - skipping feedback request`)
+    if (!trip || trip.status !== 'travelled') {
+      this.logger.log(`Trip ${tripId} not travelled - skipping feedback request`)
       return
     }
 
