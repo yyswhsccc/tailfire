@@ -22,6 +22,7 @@ interface FlightOffersSearchPanelProps {
   defaultOrigin?: string
   defaultDestination?: string
   defaultDate?: string
+  currencyCode?: string
   className?: string
 }
 
@@ -30,6 +31,7 @@ export function FlightOffersSearchPanel({
   defaultOrigin = '',
   defaultDestination = '',
   defaultDate = '',
+  currencyCode = 'CAD',
   className,
 }: FlightOffersSearchPanelProps) {
   const [origin, setOrigin] = useState(defaultOrigin)
@@ -40,7 +42,7 @@ export function FlightOffersSearchPanel({
   const [searchEnabled, setSearchEnabled] = useState(false)
 
   const { data, isLoading, error } = useFlightOfferSearch(
-    { origin, destination, departureDate, adults: parseInt(adults, 10), travelClass, currencyCode: 'CAD' },
+    { origin, destination, departureDate, adults: parseInt(adults, 10), travelClass, currencyCode },
     { enabled: searchEnabled && !!origin && !!destination && !!departureDate }
   )
 

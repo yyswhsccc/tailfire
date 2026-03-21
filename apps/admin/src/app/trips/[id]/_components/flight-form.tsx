@@ -1312,6 +1312,7 @@ export function FlightForm({
                   defaultOrigin={segmentFields[0] ? (getValues(`flightSegments.0.departureAirport`) || '') : ''}
                   defaultDestination={segmentFields[0] ? (getValues(`flightSegments.0.arrivalAirport`) || '') : ''}
                   defaultDate={segmentFields[0] ? (getValues(`flightSegments.0.departureDate`) || '') : ''}
+                  currencyCode={trip?.currency || 'CAD'}
                 />
               </div>
             )}
