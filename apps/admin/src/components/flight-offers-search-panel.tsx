@@ -40,7 +40,7 @@ export function FlightOffersSearchPanel({
   const [searchEnabled, setSearchEnabled] = useState(false)
 
   const { data, isLoading, error } = useFlightOfferSearch(
-    { origin, destination, departureDate, adults: parseInt(adults, 10), travelClass },
+    { origin, destination, departureDate, adults: parseInt(adults, 10), travelClass, currencyCode: 'CAD' },
     { enabled: searchEnabled && !!origin && !!destination && !!departureDate }
   )
 
