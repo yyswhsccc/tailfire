@@ -51,8 +51,8 @@ export class CreateTripDto {
 
   // Optional status (includes 'inbound' for incoming leads without assigned owner)
   @IsOptional()
-  @IsIn(['draft', 'quoted', 'booked', 'in_progress', 'completed', 'cancelled', 'inbound'])
-  status?: 'draft' | 'quoted' | 'booked' | 'in_progress' | 'completed' | 'cancelled' | 'inbound'
+  @IsIn(['inbound', 'planning', 'active', 'travelling', 'travelled', 'cancelled'])
+  status?: 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
 
   // Optional associations
   @IsOptional()

@@ -169,7 +169,7 @@ export class ActivityLogsService {
       actorType: event.isAutoTransition ? 'system' : 'user',
       description,
       metadata: {
-        newStatus: 'in_progress',
+        newStatus: 'travelling',
         isAutoTransition: event.isAutoTransition,
         startDate: event.startDate,
       },
@@ -194,7 +194,7 @@ export class ActivityLogsService {
       actorType: event.isAutoTransition ? 'system' : 'user',
       description,
       metadata: {
-        newStatus: 'completed',
+        newStatus: 'travelled',
         isAutoTransition: event.isAutoTransition,
         endDate: event.endDate,
       },

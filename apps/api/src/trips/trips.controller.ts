@@ -124,7 +124,7 @@ export class TripsController {
    * POST /trips/bulk-delete
    *
    * Deletes multiple trips with per-item validation.
-   * Only trips in 'draft' or 'quoted' status can be deleted.
+   * Only trips in 'planning' status can be deleted.
    * User must have write access to each trip.
    *
    * @returns Per-item success/failure with reasons
