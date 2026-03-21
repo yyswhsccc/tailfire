@@ -55,6 +55,7 @@ import { EnrichmentModule } from './enrichment/enrichment.module'
 import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
 import { SecurityAuditModule } from './security-audit/security-audit.module'
 import { ImpersonationModule } from './impersonation/impersonation.module'
+import { ApiHealthModule } from './api-health/api-health.module'
 
 @Module({
   imports: [
@@ -198,6 +199,9 @@ import { ImpersonationModule } from './impersonation/impersonation.module'
 
     // Impersonation system (RBAC hardening — admin views agent's account)
     ImpersonationModule,
+
+    // API Health Dashboard (external API health monitoring via BullMQ)
+    ApiHealthModule,
   ],
   controllers: [AppController],
   providers: [

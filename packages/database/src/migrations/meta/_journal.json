@@ -1156,6 +1156,13 @@
       "when": 1774267320000,
       "tag": "20260320120200_create_impersonation_sessions",
       "breakpoints": false
+    },
+    {
+      "idx": 165,
+      "version": "7",
+      "when": 1774353600000,
+      "tag": "20260321120000_create_api_health_checks",
+      "breakpoints": true
     }
   ]
 }
