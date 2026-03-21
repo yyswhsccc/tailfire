@@ -298,7 +298,8 @@ export class ApiHealthService {
     const baseUrl = this.configService.get<string>('AERODATABOX_API_URL') || 'https://aerodatabox.p.rapidapi.com'
     const rapidApiHost = new URL(baseUrl).host
 
-    const response = await fetch(`${baseUrl}/health/services/feeds/Schedules`, {
+    // Use airport lookup as a lightweight health check (health endpoint returns 400 on some plans)
+    const response = await fetch(`${baseUrl}/airports/iata/YYZ`, {
       method: 'GET',
       headers: {
         'x-rapidapi-key': rapidApiKey,
