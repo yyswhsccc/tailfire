@@ -1001,6 +1001,18 @@ export class PaymentSchedulesService {
       await this.validateTripHasTravelersForPayment(data.expectedPaymentItemId)
     }
 
+    // Validate payment won't exceed expected amount
+    if (data.transactionType === 'payment') {
+      const remainingCents = expectedPaymentItem.expectedAmountCents - expectedPaymentItem.paidAmountCents
+      if (data.amountCents > remainingCents) {
+        const remainingFormatted = (remainingCents / 100).toFixed(2)
+        const paymentFormatted = (data.amountCents / 100).toFixed(2)
+        throw new BadRequestException(
+          `Payment of $${paymentFormatted} exceeds the remaining balance of $${remainingFormatted}`,
+        )
+      }
+    }
+
     // Resolve contact ID (explicit → epi.contact_id → trip primary contact → null)
     const resolvedContactId = await this.resolveTransactionContactId(
       data.expectedPaymentItemId,
@@ -1624,6 +1636,9 @@ export class PaymentSchedulesService {
       return // Item was deleted, nothing to sync
     }
 
+    // Defensive clamp: cap paid amount at expected amount to prevent constraint violation
+    netPaidCents = Math.min(netPaidCents, expectedPaymentItem.expectedAmountCents)
+
     // Determine status based on paid amount vs expected amount
     // Check overdue status first - any unpaid balance past due date is overdue
     const isPastDue = expectedPaymentItem.dueDate
@@ -1685,7 +1700,7 @@ export class PaymentSchedulesService {
     // Ensure non-negative
     netPaidCents = Math.max(0, netPaidCents)
 
-    // Get expected amount to determine status
+    // Get expected amount to determine status and clamp paid amount
     const [expectedPaymentItem] = await tx
       .select()
       .from(this.db.schema.expectedPaymentItems)
@@ -1695,6 +1710,9 @@ export class PaymentSchedulesService {
     if (!expectedPaymentItem) {
       return // Item was deleted, nothing to sync
     }
+
+    // Defensive clamp: cap paid amount at expected amount to prevent constraint violation
+    netPaidCents = Math.min(netPaidCents, expectedPaymentItem.expectedAmountCents)
 
     // Determine status based on paid amount vs expected amount
     // Check overdue status first - any unpaid balance past due date is overdue
