@@ -291,7 +291,7 @@ export class AmadeusHotelsProvider
     const hotelIds = hotels.map(h => h.hotelId).join(',')
 
     // Build offers endpoint
-    let offersEndpoint = `${this.config.baseUrl}/v3/shopping/hotel-offers?hotelIds=${hotelIds}&checkInDate=${params.checkIn}&checkOutDate=${params.checkOut}`
+    let offersEndpoint = `${this.config.baseUrl}/v3/shopping/hotel-offers?hotelIds=${hotelIds}&checkInDate=${params.checkIn}&checkOutDate=${params.checkOut}&currency=CAD`
 
     if (params.adults) {
       offersEndpoint += `&adults=${params.adults}`
@@ -344,7 +344,7 @@ export class AmadeusHotelsProvider
     }
 
     // Get hotel offers for the specific hotel
-    let endpoint = `${this.config.baseUrl}/v3/shopping/hotel-offers?hotelIds=${hotelId}`
+    let endpoint = `${this.config.baseUrl}/v3/shopping/hotel-offers?hotelIds=${hotelId}&currency=CAD`
 
     if (additionalParams?.checkIn && additionalParams?.checkOut) {
       endpoint += `&checkInDate=${additionalParams.checkIn}&checkOutDate=${additionalParams.checkOut}`
