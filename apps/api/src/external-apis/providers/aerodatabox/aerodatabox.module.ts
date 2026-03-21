@@ -12,8 +12,10 @@
 import { Module } from '@nestjs/common'
 import { AerodataboxFlightsProvider } from './aerodatabox-flights.provider'
 import { AerodataboxController } from './aerodatabox.controller'
+import { ApiCredentialsModule } from '../../../api-credentials/api-credentials.module'
 
 @Module({
+  imports: [ApiCredentialsModule],
   controllers: [AerodataboxController],
   providers: [AerodataboxFlightsProvider],
   exports: [AerodataboxFlightsProvider],
