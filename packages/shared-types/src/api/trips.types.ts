@@ -45,7 +45,7 @@ export interface CreateTripDto {
   bookingDate?: string // ISO date string
 
   // Optional status
-  status?: 'inbound' | 'draft' | 'quoted' | 'booked' | 'in_progress' | 'completed' | 'cancelled'
+  status?: 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
 
   // Optional associations
   primaryContactId?: string // UUID
@@ -183,7 +183,7 @@ export interface UpdateTripDto {
   startDate?: string
   endDate?: string
   bookingDate?: string
-  status?: 'inbound' | 'draft' | 'quoted' | 'booked' | 'in_progress' | 'completed' | 'cancelled'
+  status?: 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
   ownerId?: string | null // Can set to null only if status is 'inbound'
   primaryContactId?: string
   referenceNumber?: string
@@ -262,7 +262,7 @@ export interface TripFilterDto {
   search?: string // Full-text search across name, description, reference
 
   // Filters
-  status?: 'inbound' | 'draft' | 'quoted' | 'booked' | 'in_progress' | 'completed' | 'cancelled'
+  status?: 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
   tripType?: 'leisure' | 'business' | 'group' | 'honeymoon' | 'corporate' | 'custom'
   ownerId?: string // Filter by owner
   primaryContactId?: string // Filter by primary contact
@@ -530,7 +530,7 @@ export interface BulkArchiveTripsDto {
  */
 export interface BulkChangeStatusDto {
   tripIds: string[]
-  status: 'inbound' | 'draft' | 'quoted' | 'booked' | 'in_progress' | 'completed' | 'cancelled'
+  status: 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
 }
 
 /**

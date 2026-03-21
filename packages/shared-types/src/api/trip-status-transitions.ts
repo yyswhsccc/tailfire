@@ -4,42 +4,38 @@
  * Defines valid status transitions for trips across the entire system.
  * This is the single source of truth for status workflow validation.
  *
- * IMPORTANT BUSINESS RULE (per TERN system):
- * A TRIP is NOT considered a "BOOKING" until an activity on that trip is PAID or CONFIRMED.
- * The 'booked' status should only be set when there's an actual confirmed/paid activity.
- *
  * Used by:
- * - Database trigger (migration 0009): Enforces transitions at DB level
+ * - Database trigger: Enforces transitions at DB level
  * - TripsService: Validates transitions before update
  * - Frontend: Shows/hides status change buttons based on valid transitions
  *
  * Status Lifecycle:
  * ┌─────────┐
- * │  Draft  │ ──────┐
- * └─────────┘       │
- *      │            │
- *      ▼            ▼
- * ┌─────────┐  ┌──────────┐
- * │ Quoted  │  │ Cancelled│ (terminal)
- * └─────────┘  └──────────┘
- *      │            ▲
- *      ▼            │
- * ┌─────────┐      │
- * │ Booked  │ ─────┤
- * └─────────┘      │
- *      │            │
- *      ▼            │
- * ┌─────────────┐  │
- * │ In Progress │ ─┤
- * └─────────────┘  │
- *      │            │
- *      ▼            │
- * ┌───────────┐    │
- * │ Completed │────┘
+ * │ Inbound │ ──────────────────────────────┐
+ * └─────────┘                               │
+ *      │                                    ▼
+ *      ▼                             ┌──────────┐
+ * ┌──────────┐                       │ Cancelled│ (admin can un-cancel → planning)
+ * │ Planning │ ◄─────────────────────┤          │
+ * └──────────┘                       └──────────┘
+ *      │    ▲                               ▲
+ *      ▼    └─── (from cancelled)           │
+ * ┌──────────┐                             │
+ * │  Active  │ ────────────────────────────┤
+ * └──────────┘                             │
+ *      │                                   │
+ *      ▼                                   │
+ * ┌────────────┐                           │
+ * │ Travelling │ ──────────────────────────┘
+ * └────────────┘
+ *      │
+ *      ▼
+ * ┌───────────┐
+ * │ Travelled │ (terminal)
  * └───────────┘
  */
 
-export type TripStatus = 'inbound' | 'draft' | 'quoted' | 'booked' | 'in_progress' | 'completed' | 'cancelled'
+export type TripStatus = 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
 
 /**
  * Valid status transitions map
@@ -48,22 +44,20 @@ export type TripStatus = 'inbound' | 'draft' | 'quoted' | 'booked' | 'in_progres
  * Value: Array of statuses that can be transitioned to
  *
  * Rules:
- * - Draft → Quoted, Booked, Cancelled (can skip quoted if client accepts immediately)
- * - Quoted → Draft (revise), Booked (when activity confirmed/paid), Cancelled (rejected)
- * - Booked → In Progress (trip started), Completed (if trip finishes same day), Cancelled
- *   NOTE: Trip only becomes 'booked' when an activity is PAID or CONFIRMED (TERN business rule)
- * - In Progress → Completed (normal flow), Cancelled (trip cancelled mid-journey)
- * - Completed → [terminal state - no transitions allowed]
- * - Cancelled → [terminal state - no transitions allowed]
+ * - Inbound → Planning (assign and begin planning), Cancelled
+ * - Planning → Inbound (return to lead queue), Cancelled
+ * - Active → Planning (revert), Travelling (trip started), Cancelled
+ * - Travelling → Travelled (trip completed), Cancelled (trip cancelled mid-journey)
+ * - Travelled → [] (terminal state)
+ * - Cancelled → Planning (admin un-cancel)
  */
 export const TRIP_STATUS_TRANSITIONS: Record<TripStatus, TripStatus[]> = {
-  inbound: ['draft', 'quoted', 'booked', 'cancelled'], // Inbound can transition to any active status
-  draft: ['inbound', 'quoted', 'booked', 'cancelled'],
-  quoted: ['draft', 'booked', 'cancelled'],
-  booked: ['in_progress', 'completed', 'cancelled'],
-  in_progress: ['completed', 'cancelled'],
-  completed: [], // terminal state
-  cancelled: []  // terminal state
+  inbound: ['planning', 'cancelled'],
+  planning: ['inbound', 'cancelled'],
+  active: ['planning', 'travelling', 'cancelled'],
+  travelling: ['travelled', 'cancelled'],
+  travelled: [], // terminal state
+  cancelled: ['planning'] // admin un-cancel
 }
 
 /**
@@ -74,9 +68,9 @@ export const TRIP_STATUS_TRANSITIONS: Record<TripStatus, TripStatus[]> = {
  * @returns true if transition is allowed, false otherwise
  *
  * @example
- * canTransitionTripStatus('draft', 'quoted') // true
- * canTransitionTripStatus('completed', 'booked') // false
- * canTransitionTripStatus('booked', 'in_progress') // true
+ * canTransitionTripStatus('planning', 'active') // true
+ * canTransitionTripStatus('travelled', 'active') // false
+ * canTransitionTripStatus('active', 'travelling') // true
  */
 export function canTransitionTripStatus(from: TripStatus, to: TripStatus): boolean {
   // If status hasn't changed, allow it (no-op update)
@@ -93,8 +87,8 @@ export function canTransitionTripStatus(from: TripStatus, to: TripStatus): boole
  * @returns Array of statuses that can be transitioned to
  *
  * @example
- * getValidTransitions('draft') // ['quoted', 'booked', 'cancelled']
- * getValidTransitions('completed') // []
+ * getValidTransitions('active') // ['planning', 'travelling', 'cancelled']
+ * getValidTransitions('travelled') // []
  */
 export function getValidTransitions(from: TripStatus): TripStatus[] {
   return TRIP_STATUS_TRANSITIONS[from] || []
@@ -108,19 +102,15 @@ export function getValidTransitions(from: TripStatus): TripStatus[] {
  * @returns Error message explaining why the transition is invalid
  *
  * @example
- * getTransitionErrorMessage('completed', 'draft')
- * // "Cannot transition from Completed to Draft. Completed is a terminal state."
+ * getTransitionErrorMessage('travelled', 'active')
+ * // "Cannot transition from Travelled to Active. Travelled is a terminal state."
  */
 export function getTransitionErrorMessage(from: TripStatus, to: TripStatus): string {
   const fromLabel = formatStatusLabel(from)
   const toLabel = formatStatusLabel(to)
 
   // Terminal states
-  if (from === 'completed') {
-    return `Cannot transition from ${fromLabel} to ${toLabel}. ${fromLabel} is a terminal state.`
-  }
-
-  if (from === 'cancelled') {
+  if (from === 'travelled') {
     return `Cannot transition from ${fromLabel} to ${toLabel}. ${fromLabel} is a terminal state.`
   }
 
@@ -141,17 +131,16 @@ export function getTransitionErrorMessage(from: TripStatus, to: TripStatus): str
  * @returns Formatted label
  *
  * @example
- * formatStatusLabel('in_progress') // "In Progress"
- * formatStatusLabel('draft') // "Draft"
+ * formatStatusLabel('travelling') // "Travelling"
+ * formatStatusLabel('planning') // "Planning"
  */
 export function formatStatusLabel(status: TripStatus): string {
   const labels: Record<TripStatus, string> = {
     inbound: 'Inbound',
-    draft: 'Draft',
-    quoted: 'Quoted',
-    booked: 'Booked',
-    in_progress: 'In Progress',
-    completed: 'Completed',
+    planning: 'Planning',
+    active: 'Active',
+    travelling: 'Travelling',
+    travelled: 'Travelled',
     cancelled: 'Cancelled'
   }
 
@@ -165,12 +154,12 @@ export function formatStatusLabel(status: TripStatus): string {
  * @returns true if status is terminal (completed or cancelled)
  *
  * @example
- * isTerminalStatus('completed') // true
+ * isTerminalStatus('travelled') // true
  * isTerminalStatus('cancelled') // true
- * isTerminalStatus('booked') // false
+ * isTerminalStatus('active') // false
  */
 export function isTerminalStatus(status: TripStatus): boolean {
-  return status === 'completed' || status === 'cancelled'
+  return status === 'travelled' || status === 'cancelled'
 }
 
 // ============================================================================
@@ -180,8 +169,8 @@ export function isTerminalStatus(status: TripStatus): boolean {
 /**
  * Statuses that allow trip deletion
  *
- * Only trips in early stages (draft/quoted) can be deleted.
- * Booked, in_progress, completed, and cancelled trips cannot be deleted
+ * Only trips in early stages (inbound/planning) can be deleted.
+ * Active, travelling, travelled, and cancelled trips cannot be deleted
  * because they may have:
  * - Payment records
  * - Booking confirmations
@@ -192,7 +181,7 @@ export function isTerminalStatus(status: TripStatus): boolean {
  * - API: TripsService.remove() validates status before deletion
  * - Frontend: Shows delete vs cancel button based on status
  */
-export const DELETABLE_STATUSES: readonly TripStatus[] = ['inbound', 'draft', 'quoted'] as const
+export const DELETABLE_STATUSES: readonly TripStatus[] = ['inbound', 'planning'] as const
 
 /**
  * Check if a trip can be deleted based on its status
@@ -201,9 +190,9 @@ export const DELETABLE_STATUSES: readonly TripStatus[] = ['inbound', 'draft', 'q
  * @returns true if the trip can be deleted
  *
  * @example
- * canDeleteTrip('draft') // true
- * canDeleteTrip('quoted') // true
- * canDeleteTrip('booked') // false
+ * canDeleteTrip('planning') // true
+ * canDeleteTrip('inbound') // true
+ * canDeleteTrip('active') // false
  * canDeleteTrip(null) // false
  */
 export function canDeleteTrip(status: TripStatus | string | null | undefined): boolean {
@@ -218,12 +207,12 @@ export function canDeleteTrip(status: TripStatus | string | null | undefined): b
  * @returns Error message explaining why deletion is not allowed
  *
  * @example
- * getDeleteErrorMessage('booked')
- * // "Cannot delete a trip that is booked, in progress, completed, or cancelled"
+ * getDeleteErrorMessage('active')
+ * // "Cannot delete a trip that is active, travelling, travelled, or cancelled"
  */
 export function getDeleteErrorMessage(status: TripStatus): string {
   if (canDeleteTrip(status)) {
     return '' // No error, deletion is allowed
   }
-  return 'Cannot delete a trip that is booked, in progress, completed, or cancelled'
+  return 'Cannot delete a trip that is active, travelling, travelled, or cancelled'
 }
