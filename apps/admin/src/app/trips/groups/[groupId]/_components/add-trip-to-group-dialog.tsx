@@ -28,7 +28,6 @@ import { useTrips, useTripGroups, useAddTripsToGroup } from '@/hooks/use-trips'
 import { useDebounce } from '@/hooks/use-debounce'
 import { useToast } from '@/hooks/use-toast'
 import { formatDate } from '@/lib/utils'
-import type { TripResponseDto, TripGroupDto } from '@tailfire/shared-types/api'
 
 interface AddTripToGroupDialogProps {
   open: boolean
