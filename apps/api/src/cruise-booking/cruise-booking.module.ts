@@ -42,6 +42,6 @@ import { ContactsModule } from '../contacts/contacts.module'
     BookingService,
     ImportBookingService,
   ],
-  exports: [BookingService, BookingSessionService],
+  exports: [BookingService, BookingSessionService, TraveltekAuthService],
 })
 export class CruiseBookingModule {}

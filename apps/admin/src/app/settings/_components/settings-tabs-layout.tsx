@@ -18,7 +18,7 @@ interface SettingsTab {
 
 const settingsTabs: SettingsTab[] = [
   { id: 'overview', label: 'Overview', href: '/settings' },
-  { id: 'api-credentials', label: 'API Credentials', href: '/settings/api-credentials' },
+  { id: 'api-credentials', label: 'API Health', href: '/settings/api-credentials' },
   { id: 'cruise-sync', label: 'Cruise Sync', href: '/settings/cruise-sync' },
   { id: 'automation', label: 'Automation', href: '/settings/automation' },
   { id: 'users', label: 'Users', href: '/settings/users' },
