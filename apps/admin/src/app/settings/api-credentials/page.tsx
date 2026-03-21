@@ -353,7 +353,7 @@ export default function ApiHealthPage() {
                     {CATEGORY_LABELS[category] ?? category}
                   </h4>
                   <div className="space-y-2">
-                    {categoryProviders.map(provider => (
+                    {categoryProviders.map((provider: ProviderStatus) => (
                       <ProviderCard
                         key={provider.provider}
                         provider={provider}
@@ -372,7 +372,7 @@ export default function ApiHealthPage() {
                 <div key={category} className="space-y-2">
                   <h4 className="text-sm font-medium text-muted-foreground">{category}</h4>
                   <div className="space-y-2">
-                    {categoryProviders.map(provider => (
+                    {categoryProviders.map((provider: ProviderStatus) => (
                       <ProviderCard
                         key={provider.provider}
                         provider={provider}
