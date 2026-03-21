@@ -66,7 +66,6 @@ export function AirportAutocomplete({
   const {
     data: apiAirport,
     isLoading: isApiLoading,
-    isError: isApiError,
   } = useAirportLookup(searchValue.trim(), {
     enabled: isUnknownCode && open,
   })
