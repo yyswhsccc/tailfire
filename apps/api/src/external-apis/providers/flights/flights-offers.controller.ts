@@ -61,7 +61,7 @@ export class FlightsOffersController {
       travelClass,
       nonStop: nonStop === 'true',
       maxPrice: maxPrice ? parseInt(maxPrice, 10) : undefined,
-      currencyCode,
+      currencyCode: currencyCode || 'CAD',
     })
 
     if (!response.success) {
