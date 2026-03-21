@@ -83,6 +83,11 @@ export class TripFilterDto {
   @IsUUID()
   tripGroupId?: string
 
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  ungrouped?: boolean
+
   // Date filters
   @IsOptional()
   @IsDateString()

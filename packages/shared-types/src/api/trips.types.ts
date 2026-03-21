@@ -271,6 +271,7 @@ export interface TripFilterDto {
   includeDeleted?: boolean
   tags?: string[] // Match any of these tags
   tripGroupId?: string // Filter by trip group
+  ungrouped?: boolean // Filter to trips not in any group
 
   // Date filters
   startDateFrom?: string

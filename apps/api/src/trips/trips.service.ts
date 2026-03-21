@@ -339,6 +339,11 @@ export class TripsService {
       conditions.push(eq(this.db.schema.trips.tripGroupId, filters.tripGroupId))
     }
 
+    // Ungrouped filter — trips not in any group
+    if (filters.ungrouped) {
+      conditions.push(isNull(this.db.schema.trips.tripGroupId))
+    }
+
     // Sorting
     const sortBy = filters.sortBy || 'createdAt'
     const sortOrder = filters.sortOrder || 'desc'
