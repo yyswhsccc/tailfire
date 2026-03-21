@@ -82,6 +82,12 @@ interface TripFormDialogProps {
   onOpenChange: (open: boolean) => void
   mode: 'create' | 'edit'
   trip?: TripResponseDto
+  /** Pre-fill form fields in create mode (merged with defaults) */
+  initialValues?: Partial<TripFormValues>
+  /** When false, skip router.push after creation (default: true) */
+  redirectOnCreate?: boolean
+  /** Callback after successful trip creation */
+  onCreated?: (trip: TripResponseDto) => void
 }
 
 export function TripFormDialog({
@@ -89,6 +95,9 @@ export function TripFormDialog({
   onOpenChange,
   mode,
   trip,
+  initialValues,
+  redirectOnCreate = true,
+  onCreated,
 }: TripFormDialogProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -137,7 +146,8 @@ export function TripFormDialog({
       if (trip && mode === 'edit') {
         form.reset(toTripDefaults(trip))
       } else if (mode === 'create') {
-        form.reset(toTripDefaults())
+        const defaults = toTripDefaults()
+        form.reset(initialValues ? { ...defaults, ...initialValues } : defaults)
         setSelectedTagIds([])
       }
     }
@@ -200,17 +210,21 @@ export function TripFormDialog({
           }
         }
 
-        startLoading('trip-navigation', 'Opening your new trip...')
-        toast({
-          title: 'Trip created',
-          description: 'Redirecting to your new trip...',
-        })
         onOpenChange(false)
         form.reset(toTripDefaults())
         setCoverPhoto(null)
         setSelectedTagIds([])
-        // Navigate to the new trip's detail page
-        router.push(`/trips/${newTrip.id}`)
+
+        if (redirectOnCreate) {
+          startLoading('trip-navigation', 'Opening your new trip...')
+          toast({
+            title: 'Trip created',
+            description: 'Redirecting to your new trip...',
+          })
+          router.push(`/trips/${newTrip.id}`)
+        } else {
+          onCreated?.(newTrip)
+        }
       } else if (trip) {
         const oldStartDate = trip.startDate
         const oldEndDate = trip.endDate
