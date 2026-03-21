@@ -17,6 +17,8 @@ import {
   FileText,
   Image,
   Pencil,
+  Plus,
+  ListPlus,
 } from 'lucide-react'
 import { DetailLayout } from '@/components/layout'
 import { Card } from '@/components/ui/card'
@@ -38,6 +40,8 @@ import { DocumentUploader } from '@/components/document-uploader'
 import { GroupMediaTab } from './_components/group-media-tab'
 import { NotesSection } from '@/components/notes/NotesSection'
 import { GroupFormDialog } from '../../_components/group-form-dialog'
+import { TripFormDialog } from '../../_components/trip-form-dialog'
+import { AddTripToGroupDialog } from './_components/add-trip-to-group-dialog'
 import {
   useTripGroups,
   useTripsByGroup,
@@ -46,10 +50,11 @@ import {
   useRemoveTripFromGroup,
   useUpdateGroupStatus,
 } from '@/hooks/use-trips'
+import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/use-toast'
 import { formatCurrency } from '@/lib/pricing/currency-helpers'
 import { formatDate } from '@/lib/utils'
-import type { TripGroupStatus } from '@tailfire/shared-types/api'
+import type { TripGroupStatus, TripResponseDto } from '@tailfire/shared-types/api'
 
 // ============================================================================
 // HELPER COMPONENTS
@@ -189,6 +194,7 @@ export default function GroupDetailPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   // Data hooks
   const { data: groups, isLoading: groupsLoading } = useTripGroups()
@@ -202,6 +208,8 @@ export default function GroupDetailPage() {
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [showAddTripsDialog, setShowAddTripsDialog] = useState(false)
+  const [showCreateTripDialog, setShowCreateTripDialog] = useState(false)
 
   // Tab state with URL sync (matching trip detail pattern)
   const initialTab = searchParams.get('tab') as GroupTab | null
@@ -308,6 +316,14 @@ export default function GroupDetailPage() {
     }
   }
 
+  const handleTripCreated = (newTrip: TripResponseDto) => {
+    queryClient.invalidateQueries({ queryKey: ['tripGroups'] })
+    toast({
+      title: 'Trip created',
+      description: `${newTrip.name} has been added to this group.`,
+    })
+  }
+
   // ============================================================================
   // TAB CONTENT RENDERER
   // ============================================================================
@@ -370,9 +386,29 @@ export default function GroupDetailPage() {
 
               {/* Individual Trips */}
               <Card className="p-6">
-                <h2 className="text-lg font-semibold text-ash-900 mb-4">
-                  Trips ({trips?.length ?? 0})
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-ash-900">
+                    Trips ({trips?.length ?? 0})
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAddTripsDialog(true)}
+                    >
+                      <ListPlus className="h-4 w-4 mr-1" />
+                      Add Existing
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setShowCreateTripDialog(true)}
+                      className="bg-phoenix-gold-500 hover:bg-phoenix-gold-600 text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      New Trip
+                    </Button>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   {trips?.map((trip) => (
                     <div
@@ -707,6 +743,32 @@ export default function GroupDetailPage() {
         onOpenChange={setEditDialogOpen}
         mode="edit"
         group={group}
+      />
+
+      {/* Add Existing Trips Dialog */}
+      <AddTripToGroupDialog
+        open={showAddTripsDialog}
+        onOpenChange={setShowAddTripsDialog}
+        groupId={groupId}
+        groupName={group?.name || 'Group'}
+        existingTripIds={trips?.map((t) => t.id) || []}
+      />
+
+      {/* Create New Trip Dialog */}
+      <TripFormDialog
+        open={showCreateTripDialog}
+        onOpenChange={setShowCreateTripDialog}
+        mode="create"
+        initialValues={{
+          tripGroupId: groupId,
+          tripType: 'group' as const,
+          ...(group?.startDate && group?.endDate ? {
+            startDate: group.startDate,
+            endDate: group.endDate,
+          } : {}),
+        }}
+        redirectOnCreate={false}
+        onCreated={handleTripCreated}
       />
     </DetailLayout>
   )
