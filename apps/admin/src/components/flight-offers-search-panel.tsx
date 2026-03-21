@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { Search, Loader2, Plane, AlertCircle, Clock, Luggage } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Search, Loader2, Plane, AlertCircle, Clock, Luggage, ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
+// ScrollArea removed — native overflow-y-auto is more reliable for contained result scrolling
 import { AirportAutocomplete } from '@/components/ui/airport-autocomplete'
 import {
   Select,
@@ -40,6 +40,8 @@ export function FlightOffersSearchPanel({
   const [adults] = useState('1')
   const [travelClass, setTravelClass] = useState<FlightOfferSearchParams['travelClass']>()
   const [searchEnabled, setSearchEnabled] = useState(false)
+  const [stopsFilter, setStopsFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<string>('price')
 
   const { data, isLoading, error } = useFlightOfferSearch(
     { origin, destination, departureDate, adults: parseInt(adults, 10), travelClass, currencyCode },
@@ -57,7 +59,36 @@ export function FlightOffersSearchPanel({
     setSearchEnabled(false)
   }
 
-  const hasResults = data?.results && data.results.length > 0
+  // Filter and sort results
+  const filteredResults = useMemo(() => {
+    if (!data?.results) return []
+    let results = [...data.results]
+
+    // Filter by stops
+    if (stopsFilter === 'direct') {
+      results = results.filter(o => o.segments.length === 1)
+    } else if (stopsFilter === '1stop') {
+      results = results.filter(o => o.segments.length <= 2)
+    }
+
+    // Sort
+    if (sortBy === 'price') {
+      results.sort((a, b) => parseFloat(a.price.total) - parseFloat(b.price.total))
+    } else if (sortBy === 'duration') {
+      results.sort((a, b) => {
+        const durA = a.segments[0]?.duration || ''
+        const durB = b.segments[0]?.duration || ''
+        return durA.localeCompare(durB)
+      })
+    } else if (sortBy === 'stops') {
+      results.sort((a, b) => a.segments.length - b.segments.length)
+    }
+
+    return results
+  }, [data?.results, stopsFilter, sortBy])
+
+  const hasResults = filteredResults.length > 0
+  const totalResults = data?.results?.length || 0
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -115,15 +146,48 @@ export function FlightOffersSearchPanel({
         </div>
       )}
 
+      {/* Filters — only show when we have results */}
+      {totalResults > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground">{totalResults} result{totalResults !== 1 ? 's' : ''}</span>
+          <div className="flex items-center gap-1 ml-auto">
+            <Select value={stopsFilter} onValueChange={setStopsFilter}>
+              <SelectTrigger className="h-7 text-xs w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All stops</SelectItem>
+                <SelectItem value="direct">Direct</SelectItem>
+                <SelectItem value="1stop">1 stop max</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="h-7 text-xs w-28">
+                <ArrowUpDown className="h-3 w-3 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="price">Price</SelectItem>
+                <SelectItem value="duration">Duration</SelectItem>
+                <SelectItem value="stops">Fewest stops</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
       {/* Results */}
-      {searchEnabled && !isLoading && !error && !hasResults && (
+      {searchEnabled && !isLoading && !error && !hasResults && totalResults > 0 && (
+        <p className="text-sm text-gray-500 text-center py-2">No results match your filters</p>
+      )}
+      {searchEnabled && !isLoading && !error && totalResults === 0 && (
         <p className="text-sm text-gray-500 text-center py-2">No flight offers found</p>
       )}
 
       {hasResults && (
-        <ScrollArea className="max-h-72 border rounded-lg">
+        <div className="max-h-96 overflow-y-auto border rounded-lg">
           <ul className="divide-y divide-gray-100">
-            {data.results.map((offer) => {
+            {filteredResults.map((offer) => {
               const firstSeg = offer.segments[0]
               const lastSeg = offer.segments[offer.segments.length - 1]
               return (
@@ -173,7 +237,7 @@ export function FlightOffersSearchPanel({
               )
             })}
           </ul>
-        </ScrollArea>
+        </div>
       )}
     </div>
   )
