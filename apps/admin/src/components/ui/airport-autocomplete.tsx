@@ -141,7 +141,7 @@ export function AirportAutocomplete({
       } else if (apiAirportResult) {
         // Select API result (code lookup)
         handleSelect(apiAirportResult.code)
-      } else if (keywordResults?.length) {
+      } else if (keywordResults?.length && keywordResults[0]) {
         // Select first keyword search result
         handleSelect(keywordResults[0].iata)
       } else if (searchValue.trim()) {
