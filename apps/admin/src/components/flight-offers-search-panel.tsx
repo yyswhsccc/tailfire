@@ -5,6 +5,7 @@ import { Search, Loader2, Plane, AlertCircle, Clock, Luggage } from 'lucide-reac
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { AirportAutocomplete } from '@/components/ui/airport-autocomplete'
 import {
   Select,
   SelectContent,
@@ -44,7 +45,7 @@ export function FlightOffersSearchPanel({
   )
 
   const handleSearch = () => {
-    if (origin.length === 3 && destination.length === 3 && departureDate) {
+    if (origin && destination && departureDate) {
       setSearchEnabled(true)
     }
   }
@@ -60,17 +61,15 @@ export function FlightOffersSearchPanel({
     <div className={cn('space-y-3', className)}>
       {/* Search Form */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Input
-          placeholder="Origin (YUL)"
-          value={origin}
-          onChange={(e) => { setOrigin(e.target.value.toUpperCase()); setSearchEnabled(false) }}
-          maxLength={3}
+        <AirportAutocomplete
+          value={origin || null}
+          onValueChange={(v) => { setOrigin(v || ''); setSearchEnabled(false) }}
+          placeholder="Departure airport"
         />
-        <Input
-          placeholder="Dest (CDG)"
-          value={destination}
-          onChange={(e) => { setDestination(e.target.value.toUpperCase()); setSearchEnabled(false) }}
-          maxLength={3}
+        <AirportAutocomplete
+          value={destination || null}
+          onValueChange={(v) => { setDestination(v || ''); setSearchEnabled(false) }}
+          placeholder="Arrival airport"
         />
         <Input
           type="date"
@@ -99,7 +98,7 @@ export function FlightOffersSearchPanel({
         variant="outline"
         size="sm"
         onClick={handleSearch}
-        disabled={origin.length !== 3 || destination.length !== 3 || !departureDate || isLoading}
+        disabled={!origin || !destination || !departureDate || isLoading}
         className="w-full"
       >
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
