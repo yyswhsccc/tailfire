@@ -10,7 +10,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { HttpService } from '@nestjs/axios'
 import { firstValueFrom } from 'rxjs'
-import { eq, desc, lt, and } from 'drizzle-orm'
+import { eq, desc, lt, gt, and } from 'drizzle-orm'
 import Redis from 'ioredis'
 import { DatabaseService } from '../db/database.service'
 import { NotificationService } from '../notifications/notification.service'
@@ -177,7 +177,7 @@ export class ApiHealthService {
       .where(
         and(
           eq(this.db.schema.apiHealthChecks.provider, providerKey),
-          lt(since, this.db.schema.apiHealthChecks.checkedAt),
+          gt(this.db.schema.apiHealthChecks.checkedAt, since),
         ),
       )
       .orderBy(desc(this.db.schema.apiHealthChecks.checkedAt))
