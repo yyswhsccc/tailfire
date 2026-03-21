@@ -195,3 +195,6 @@ export * from './contact-share-requests.schema'
 
 // Impersonation sessions (RBAC hardening — admin views agent's account)
 export * from './impersonation-sessions.schema'
+
+// API Health Checks (periodic external API health monitoring)
+export * from './api-health-checks.schema'
