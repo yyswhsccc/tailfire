@@ -201,7 +201,7 @@ export function useCancelTrip() {
 
 /**
  * Delete trip
- * Note: Only trips with status 'draft' or 'quoted' can be deleted
+ * Note: Only trips with status 'inbound' or 'planning' can be deleted
  */
 /**
  * Restore a trip from cancelled status (admin only)
@@ -234,7 +234,7 @@ export function useUncancelTrip() {
 
 /**
  * Delete trip
- * Note: Only trips with status 'draft' or 'quoted' can be deleted
+ * Note: Only trips with status 'inbound' or 'planning' can be deleted
  */
 export function useDeleteTrip() {
   const queryClient = useQueryClient()
