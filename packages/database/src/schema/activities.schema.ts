@@ -26,11 +26,17 @@ export const activityTypeEnum = pgEnum('activity_type', [
   'insurance', // Insurance activity (linked to trip_insurance_packages)
 ])
 
-export const activityStatusEnum = pgEnum('activity_status', [
-  'proposed',
-  'confirmed',
+export const activityProposalStatusEnum = pgEnum('activity_proposal_status', [
+  'draft',
+  'proposing',
+  'approved',
   'cancelled',
-  'optional',
+])
+
+export const activityBookingStatusEnum = pgEnum('activity_booking_status', [
+  'unbooked',
+  'booked',
+  'cancelled',
 ])
 
 export const pricingTypeEnum = pgEnum('pricing_type', [
@@ -98,10 +104,17 @@ export const itineraryActivities = pgTable('itinerary_activities', {
   // Details
   notes: text('notes'),
   confirmationNumber: varchar('confirmation_number', { length: 100 }),
-  status: activityStatusEnum('status').default('proposed'),
+
+  // Proposal lifecycle
+  proposalStatus: activityProposalStatusEnum('proposal_status').default('draft').notNull(),
+  // Supplier booking lifecycle
+  bookingStatus: activityBookingStatusEnum('booking_status').default('unbooked').notNull(),
+  // Passport verification
+  passportVerified: boolean('passport_verified').default(false).notNull(),
+  passportVerifiedAt: timestamp('passport_verified_at', { withTimezone: true }),
+  passportVerifiedBy: uuid('passport_verified_by'),
 
   // Booking tracking
-  isBooked: boolean('is_booked').notNull().default(false),
   isVisibleInCalendar: boolean('is_visible_in_calendar').default(true).notNull(),
   bookingDate: timestamp('booking_date', { withTimezone: true }),
 
@@ -147,6 +160,7 @@ export type NewItineraryActivity = typeof itineraryActivities.$inferInsert
 
 // Enum types
 export type ActivityType = typeof activityTypeEnum.enumValues[number]
-export type ActivityStatus = typeof activityStatusEnum.enumValues[number]
+export type ActivityProposalStatus = typeof activityProposalStatusEnum.enumValues[number]
+export type ActivityBookingStatus = typeof activityBookingStatusEnum.enumValues[number]
 export type PricingType = typeof pricingTypeEnum.enumValues[number]
 export type PortType = typeof portTypeEnum.enumValues[number]
