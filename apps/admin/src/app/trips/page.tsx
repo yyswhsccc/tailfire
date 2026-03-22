@@ -68,11 +68,18 @@ export default function TernTripsPage() {
     limit: 25,
     sortBy: 'createdAt',
     sortOrder: 'desc',
-    search: urlSearch || undefined,
   })
 
   // Debounced search - updates on blur or enter
-  const [searchInput, setSearchInput] = useState(urlSearch)
+  const [searchInput, setSearchInput] = useState('')
+
+  // Sync URL search param into filters and search input
+  useEffect(() => {
+    if (urlSearch) {
+      setSearchInput(urlSearch)
+      setFilters((prev) => ({ ...prev, search: urlSearch, page: 1 }))
+    }
+  }, [urlSearch])
 
   // Fetch trips with server-side filtering
   const { data, isPending, error, refetch } = useTrips(filters)
