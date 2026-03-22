@@ -109,7 +109,7 @@ export const STATUS_TO_COLUMN: Partial<Record<TripStatus, KanbanColumnId>> = {
  * @returns Typed status configuration with label, variant, and column
  */
 export function getStatusConfig(status: TripStatus): TripStatusConfig {
-  return TRIP_STATUS_CONFIG[status]
+  return TRIP_STATUS_CONFIG[status] ?? TRIP_STATUS_CONFIG.planning
 }
 
 /**
@@ -118,7 +118,7 @@ export function getStatusConfig(status: TripStatus): TripStatusConfig {
  * @returns Human-readable label (e.g., "Inbound", "Planning")
  */
 export function getTripStatusLabel(status: TripStatus): string {
-  return TRIP_STATUS_CONFIG[status].label
+  return (TRIP_STATUS_CONFIG[status] ?? TRIP_STATUS_CONFIG.planning).label
 }
 
 /**
@@ -127,7 +127,7 @@ export function getTripStatusLabel(status: TripStatus): string {
  * @returns Badge variant for UI rendering
  */
 export function getTripStatusVariant(status: TripStatus): TripStatusVariant {
-  return TRIP_STATUS_CONFIG[status].variant
+  return (TRIP_STATUS_CONFIG[status] ?? TRIP_STATUS_CONFIG.planning).variant
 }
 
 /**
@@ -136,7 +136,7 @@ export function getTripStatusVariant(status: TripStatus): TripStatusVariant {
  * @returns Column ID if status belongs to a Kanban column, undefined otherwise
  */
 export function getColumnForStatus(status: TripStatus): KanbanColumnId | undefined {
-  return TRIP_STATUS_CONFIG[status].columnId
+  return (TRIP_STATUS_CONFIG[status] ?? TRIP_STATUS_CONFIG.planning).columnId
 }
 
 /**
@@ -154,7 +154,7 @@ export function getStatusForColumn(columnId: KanbanColumnId): TripStatus {
  * @returns True if status is shown in main Kanban board
  */
 export function isKanbanStatus(status: TripStatus): boolean {
-  return TRIP_STATUS_CONFIG[status].columnId !== undefined
+  return (TRIP_STATUS_CONFIG[status] ?? TRIP_STATUS_CONFIG.planning).columnId !== undefined
 }
 
 /**
