@@ -2,13 +2,9 @@
 
 This document is the canonical business workflow and lifecycle model for trips, itineraries, activities, proposal publishing, and booking capture.
 
-Status note as of 2026-03-21:
+Status as of 2026-03-21: The canonical trip stage vocabulary (Inbound, Planning, Active, Travelling, Travelled, Cancelled) is fully implemented across the database, API, admin, and client surfaces. Activity booking uses explicit proposalStatus + bookingStatus fields. The TripLifecycleService manages system-driven stage transitions.
 
-- The current codebase still implements the legacy trip status set `inbound | draft | quoted | booked | in_progress | completed | cancelled`.
-- Activity fulfillment is still split between legacy activity `status` values and the `isBooked` flag.
-- Itinerary workflows still expose a legacy `declined` status in some API and UI paths.
-
-This document defines the target operating model the platform should converge to. Use [TRIP_WORKFLOW_IMPLEMENTATION_PLAN.md](./TRIP_WORKFLOW_IMPLEMENTATION_PLAN.md) for the rollout plan and [REPOSITORY_REVIEW_ISSUES.md](./REPOSITORY_REVIEW_ISSUES.md) for the current implementation gaps.
+This document is the canonical source of truth for the trip workflow. Use [TRIP_WORKFLOW_IMPLEMENTATION_PLAN.md](./TRIP_WORKFLOW_IMPLEMENTATION_PLAN.md) for the completed rollout record and [REPOSITORY_REVIEW_ISSUES.md](./REPOSITORY_REVIEW_ISSUES.md) for remaining implementation issues.
 
 ## Design Principles
 
@@ -193,11 +189,11 @@ This model already exists in part in the current codebase through `itinerary_ver
 - Required booking fields should be validated consistently for standalone activities and packages.
 - The platform should maintain an explicit allowlist of activity types that count toward booking progress.
 
-## Current-to-Target Mapping
+## Legacy-to-Canonical Mapping (Historical Reference)
 
-During migration, these legacy trip statuses map to the target model as follows:
+The following legacy trip statuses were migrated to the canonical model as part of the trip lifecycle refactoring (completed 2026-03-21):
 
-| Current Stored Status | Target Meaning |
+| Legacy Stored Status | Canonical Stage |
 | --- | --- |
 | `inbound` | `Inbound` |
 | `draft` | `Planning` |
@@ -207,11 +203,11 @@ During migration, these legacy trip statuses map to the target model as follows:
 | `completed` | `Travelled` |
 | `cancelled` | `Cancelled` |
 
-Other important current-state notes:
+All of the following have been resolved:
 
-- Current activity rows still use legacy `status` values such as `proposed` and `confirmed` plus a separate `isBooked` flag.
-- Current itinerary APIs and some admin/client flows still allow `declined` even though the target canonical set does not.
-- Current automation and lifecycle events still use `booked`, `in_progress`, and `completed` naming.
+- Activity rows now use explicit `proposalStatus` and `bookingStatus` fields. The legacy `status` + `isBooked` pattern has been retired.
+- Itinerary `declined` has been removed from all API paths and admin/client flows. Decline outcomes are captured through comments and archive actions.
+- Automation and lifecycle events now use the canonical names: `trip.active`, `trip.travelling`, `trip.travelled`.
 
 ## References
 

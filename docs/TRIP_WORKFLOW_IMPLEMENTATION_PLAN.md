@@ -1,5 +1,7 @@
 # Trip Workflow Implementation Plan
 
+Implementation status as of 2026-03-21: All phases (1–9) are complete. The canonical trip stage vocabulary, activity booking normalization, itinerary lifecycle cleanup, TripLifecycleService, and updated automation event names are fully shipped. Seed data and documentation have been updated to the new vocabulary.
+
 This plan aligns the current codebase to the canonical workflow defined in [TRIP_WORKFLOW.md](./TRIP_WORKFLOW.md).
 
 Scope:
@@ -22,7 +24,7 @@ Non-goal:
 
 ## Recommended Delivery Order
 
-### Phase 1. Freeze Terminology And Migration Map
+### Phase 1. Freeze Terminology And Migration Map [COMPLETE]
 
 Goal:
 
@@ -47,7 +49,7 @@ Primary touchpoints:
 - `apps/admin/src/lib/validation/trip-validation.ts`
 - `apps/api/src/trips/dto/`
 
-### Phase 2. Trip Stage Foundation
+### Phase 2. Trip Stage Foundation [COMPLETE]
 
 Goal:
 
@@ -73,7 +75,7 @@ Primary touchpoints:
 - `apps/admin/src/lib/trip-status-constants.ts`
 - `apps/admin/src/lib/validation/trip-validation.ts`
 
-### Phase 3. Itinerary Lifecycle Cleanup
+### Phase 3. Itinerary Lifecycle Cleanup [COMPLETE]
 
 Goal:
 
@@ -101,7 +103,7 @@ Primary touchpoints:
 - `apps/admin/src/app/trips/[id]/_components/trip-itinerary.tsx`
 - `apps/client/src/app/shared/trips/[token]/_components/ApprovalSection.tsx`
 
-### Phase 4. Proposal Versioning Contract
+### Phase 4. Proposal Versioning Contract [COMPLETE]
 
 Goal:
 
@@ -126,7 +128,7 @@ Primary touchpoints:
 - `packages/trip-proposal-ui/`
 - `apps/client/src/app/shared/trips/[token]/`
 
-### Phase 5. Activity Booking Normalization
+### Phase 5. Activity Booking Normalization [COMPLETE]
 
 Goal:
 
@@ -159,7 +161,7 @@ Primary touchpoints:
 - `apps/admin/src/components/activities/mark-activity-booked-modal.tsx`
 - `apps/admin/src/lib/validation/`
 
-### Phase 6. Trip Lifecycle Engine And Automations
+### Phase 6. Trip Lifecycle Engine And Automations [COMPLETE]
 
 Goal:
 
@@ -187,7 +189,7 @@ Primary touchpoints:
 - `apps/api/src/activity-logs/activity-logs.service.ts`
 - `docs/AUTOMATION.md`
 
-### Phase 7. Payments, Supplier Disbursements, And Service Fees
+### Phase 7. Payments, Supplier Disbursements, And Service Fees [COMPLETE]
 
 Goal:
 
@@ -212,7 +214,7 @@ Primary touchpoints:
 - `apps/admin/src/hooks/use-service-fees.ts`
 - `apps/admin/src/hooks/use-booking-status.ts`
 
-### Phase 8. Admin And Client Surface Follow-Through
+### Phase 8. Admin And Client Surface Follow-Through [COMPLETE]
 
 Goal:
 
@@ -232,7 +234,7 @@ Primary touchpoints:
 - `apps/client/src/app/shared/trips/[token]/`
 - `packages/trip-proposal-ui/`
 
-### Phase 9. Tests, Backfill, And Rollout
+### Phase 9. Tests, Backfill, And Rollout [COMPLETE]
 
 Goal:
 
@@ -259,6 +261,8 @@ Primary touchpoints:
 - `docs/`
 
 ## Acceptance Criteria
+
+All criteria met as of 2026-03-21.
 
 The implementation is complete when all of the following are true:
 
