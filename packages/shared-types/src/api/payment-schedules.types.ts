@@ -84,6 +84,8 @@ export type PaymentScheduleConfigDto = {
   depositType: DepositType | null
   depositPercentage: string | null // numeric(5,2) as string
   depositAmountCents: number | null
+  /** Non-refundable portion of the deposit, in cents. Only relevant when a deposit is configured. */
+  nonRefundableAmountCents: number | null
   createdAt: string
   updatedAt: string
 

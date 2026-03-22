@@ -2342,6 +2342,7 @@ export class PaymentSchedulesService {
       depositType: config.depositType,
       depositPercentage: config.depositPercentage,
       depositAmountCents: config.depositAmountCents,
+      nonRefundableAmountCents: config.nonRefundableAmountCents ?? null,
       createdAt: config.createdAt.toISOString(),
       updatedAt: config.updatedAt.toISOString(),
       expectedPaymentItems,
