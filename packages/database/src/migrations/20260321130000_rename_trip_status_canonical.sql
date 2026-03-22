@@ -1,17 +1,14 @@
 -- Migration: Rename trip_status enum to canonical vocabulary
--- planning replaces draft+quoted, active replaces booked,
--- travelling replaces in_progress, travelled replaces completed
+-- This migration is idempotent — safe to re-run on already-migrated databases.
 --
 -- PREREQUISITE: New enum values (planning, active, travelling, travelled)
--- must be added BEFORE this migration runs. The deploy workflow handles
--- this in a pre-migration step because ALTER TYPE ADD VALUE cannot run
--- inside a transaction.
+-- must be added BEFORE this migration via the deploy workflow pre-migration step.
 
--- ─── Step 1: Drop dependent triggers ──────────────────────────────────────
+-- ─── Step 1: Drop dependent triggers (idempotent) ─────────────────────────
 DROP TRIGGER IF EXISTS validate_trip_status_transition_trigger ON trips;
 DROP TRIGGER IF EXISTS set_trip_reference_update ON trips;
 
--- ─── Step 2: Update existing rows ─────────────────────────────────────────
+-- ─── Step 2: Update existing rows (no-op if already migrated) ─────────────
 UPDATE trips SET status = 'planning' WHERE status::text IN ('draft', 'quoted');
 UPDATE trips SET status = 'active' WHERE status::text = 'booked';
 UPDATE trips SET status = 'travelling' WHERE status::text = 'in_progress';
@@ -22,20 +19,24 @@ UPDATE trips SET status_before_cancel = 'active' WHERE status_before_cancel = 'b
 UPDATE trips SET status_before_cancel = 'travelling' WHERE status_before_cancel = 'in_progress';
 UPDATE trips SET status_before_cancel = 'travelled' WHERE status_before_cancel = 'completed';
 
--- ─── Step 3: Swap enum type ───────────────────────────────────────────────
-ALTER TABLE trips ALTER COLUMN status DROP DEFAULT;
-ALTER TABLE trips ALTER COLUMN status TYPE varchar(20) USING status::text;
-DROP TYPE trip_status;
-CREATE TYPE trip_status AS ENUM ('inbound', 'planning', 'active', 'travelling', 'travelled', 'cancelled');
-ALTER TABLE trips ALTER COLUMN status TYPE trip_status USING status::trip_status;
-ALTER TABLE trips ALTER COLUMN status SET DEFAULT 'planning';
+-- ─── Step 3: Swap enum type (skip if already canonical) ───────────────────
+-- Check if old values still exist before attempting the swap
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = 'trip_status'::regtype AND enumlabel = 'draft') THEN
+    ALTER TABLE trips ALTER COLUMN status DROP DEFAULT;
+    ALTER TABLE trips ALTER COLUMN status TYPE varchar(20) USING status::text;
+    DROP TYPE trip_status;
+    CREATE TYPE trip_status AS ENUM ('inbound', 'planning', 'active', 'travelling', 'travelled', 'cancelled');
+    EXECUTE 'ALTER TABLE trips ALTER COLUMN status TYPE trip_status USING status::trip_status';
+    ALTER TABLE trips ALTER COLUMN status SET DEFAULT 'planning';
+    RAISE NOTICE 'Enum swapped to canonical values';
+  ELSE
+    RAISE NOTICE 'Enum already canonical — skipping swap';
+  END IF;
+END $$;
 
--- ─── Step 4: Recreate triggers with new values ────────────────────────────
-CREATE TRIGGER set_trip_reference_update
-  BEFORE UPDATE ON trips FOR EACH ROW
-  WHEN (NEW.status = 'planning' AND OLD.trip_type IS DISTINCT FROM NEW.trip_type)
-  EXECUTE FUNCTION generate_trip_reference();
-
+-- ─── Step 4: Recreate triggers with canonical values ──────────────────────
 CREATE OR REPLACE FUNCTION validate_trip_status_transition()
 RETURNS TRIGGER AS $fn$
 DECLARE
@@ -46,13 +47,11 @@ DECLARE
   i integer;
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    -- On INSERT, only validate owner rules
     IF NEW.owner_id IS NULL AND NEW.status::text != 'inbound' THEN
       RAISE EXCEPTION 'Owner can only be cleared for inbound trips';
     END IF;
     RETURN NEW;
   END IF;
-
   IF OLD.status = NEW.status THEN RETURN NEW; END IF;
 
   valid_transitions := ARRAY[
@@ -102,3 +101,8 @@ $fn$ LANGUAGE plpgsql;
 CREATE TRIGGER validate_trip_status_transition_trigger
   BEFORE INSERT OR UPDATE ON trips FOR EACH ROW
   EXECUTE FUNCTION validate_trip_status_transition();
+
+CREATE TRIGGER set_trip_reference_update
+  BEFORE UPDATE ON trips FOR EACH ROW
+  WHEN (NEW.status = 'planning' AND OLD.trip_type IS DISTINCT FROM NEW.trip_type)
+  EXECUTE FUNCTION generate_trip_reference();
