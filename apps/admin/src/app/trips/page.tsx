@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, Search, Download, FolderPlus } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { PageHeader } from '@/components/shared'
@@ -37,16 +37,23 @@ import type { TripStatus } from '@tailfire/shared-types'
  */
 export default function TernTripsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const urlSearch = searchParams?.get('search') || ''
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [viewMode, setViewMode] = useState<TripsViewMode>('kanban')
 
   useEffect(() => {
+    // If search param is present, use table view for filtered results
+    if (urlSearch) {
+      setViewMode('table')
+      return
+    }
     const stored = localStorage.getItem('trips-view-mode')
     if (stored === 'table' || stored === 'kanban' || stored === 'groups') {
       setViewMode(stored)
     }
-  }, [])
+  }, [urlSearch])
 
   const handleViewChange = useCallback((mode: TripsViewMode) => {
     setViewMode(mode)
@@ -61,10 +68,11 @@ export default function TernTripsPage() {
     limit: 25,
     sortBy: 'createdAt',
     sortOrder: 'desc',
+    search: urlSearch || undefined,
   })
 
   // Debounced search - updates on blur or enter
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useState(urlSearch)
 
   // Fetch trips with server-side filtering
   const { data, isPending, error, refetch } = useTrips(filters)

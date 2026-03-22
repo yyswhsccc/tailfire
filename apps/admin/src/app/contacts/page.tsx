@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Plus, Search } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { PageHeader } from '@/components/shared'
@@ -15,11 +16,14 @@ import { useToast } from '@/hooks/use-toast'
 import type { ContactFilterDto } from '@tailfire/shared-types/api'
 
 export default function ContactsPage() {
+  const searchParams = useSearchParams()
+  const urlSearch = searchParams?.get('search') || ''
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useState(urlSearch)
   const [filters, setFilters] = useState<ContactFilterDto>({
     page: 1,
     limit: 10,
+    search: urlSearch || undefined,
   })
 
   // Debounce search input (500ms delay)
