@@ -609,7 +609,7 @@ export class PaymentSchedulesService {
 
     if (!trip) return
 
-    const lockedStatuses = ['in_progress', 'completed', 'cancelled']
+    const lockedStatuses = ['travelling', 'travelled', 'cancelled']
     if (lockedStatuses.includes(trip.status)) {
       throw new BadRequestException(
         'Payment schedule cannot be modified after the trip has departed. Contact an admin for changes.'

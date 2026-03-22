@@ -76,14 +76,13 @@ function GroupStatusBadge({ status }: { status: TripGroupStatus | null }) {
 }
 
 function TripStatusBadge({ status }: { status: string }) {
-  const variantMap: Record<string, 'inbound' | 'planning' | 'booked' | 'traveling' | 'completed' | 'cancelled' | 'outline'> = {
-    draft: 'inbound',
-    quoted: 'planning',
-    booked: 'booked',
-    in_progress: 'traveling',
-    completed: 'completed',
-    cancelled: 'cancelled',
+  const variantMap: Record<string, 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled' | 'outline'> = {
     inbound: 'inbound',
+    planning: 'planning',
+    active: 'active',
+    travelling: 'travelling',
+    travelled: 'travelled',
+    cancelled: 'cancelled',
   }
   return (
     <Badge variant={variantMap[status] || 'outline'}>

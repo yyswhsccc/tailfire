@@ -212,7 +212,7 @@ const getSidebarNav = (activeTab: ActiveTab, setActiveTab: (tab: ActiveTab) => v
 ]
 
 // Wrapper functions for backward compatibility
-function getStatusVariant(status: string): 'inbound' | 'planning' | 'booked' | 'traveling' | 'completed' | 'cancelled' {
+function getStatusVariant(status: string): 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled' {
   return getTripStatusVariant(status as TripStatus)
 }
 

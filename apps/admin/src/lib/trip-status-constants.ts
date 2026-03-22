@@ -12,9 +12,9 @@ import { DELETABLE_STATUSES, canDeleteTrip, type TripStatus } from '@tailfire/sh
 // Re-export for consumers of this module
 export { DELETABLE_STATUSES, canDeleteTrip, type TripStatus }
 
-export type TripStatusVariant = 'inbound' | 'planning' | 'booked' | 'traveling' | 'completed' | 'cancelled'
+export type TripStatusVariant = 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
 
-export type KanbanColumnId = 'inbound' | 'planning' | 'booked' | 'traveling' | 'traveled'
+export type KanbanColumnId = 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled'
 
 interface TripStatusConfig {
   status: TripStatus
@@ -30,39 +30,33 @@ interface TripStatusConfig {
 export const TRIP_STATUS_CONFIG: Record<TripStatus, TripStatusConfig> = {
   inbound: {
     status: 'inbound',
-    label: 'Inbound Lead',
+    label: 'Inbound',
     variant: 'inbound',
     columnId: 'inbound',
   },
-  draft: {
-    status: 'draft',
-    label: 'Draft',
-    variant: 'inbound',
-    columnId: 'inbound',
-  },
-  quoted: {
-    status: 'quoted',
+  planning: {
+    status: 'planning',
     label: 'Planning',
     variant: 'planning',
     columnId: 'planning',
   },
-  booked: {
-    status: 'booked',
-    label: 'Booked',
-    variant: 'booked',
-    columnId: 'booked',
+  active: {
+    status: 'active',
+    label: 'Active',
+    variant: 'active',
+    columnId: 'active',
   },
-  in_progress: {
-    status: 'in_progress',
-    label: 'Traveling',
-    variant: 'traveling',
-    columnId: 'traveling',
+  travelling: {
+    status: 'travelling',
+    label: 'Travelling',
+    variant: 'travelling',
+    columnId: 'travelling',
   },
-  completed: {
-    status: 'completed',
-    label: 'Traveled',
-    variant: 'completed',
-    columnId: 'traveled',
+  travelled: {
+    status: 'travelled',
+    label: 'Travelled',
+    variant: 'travelled',
+    columnId: 'travelled',
   },
   cancelled: {
     status: 'cancelled',
@@ -76,42 +70,22 @@ export const TRIP_STATUS_CONFIG: Record<TripStatus, TripStatusConfig> = {
  * Kanban column configuration
  */
 export const KANBAN_COLUMNS = [
-  {
-    id: 'inbound' as const,
-    title: 'Inbound',
-    statuses: ['inbound' as const, 'draft' as const],
-  },
-  {
-    id: 'planning' as const,
-    title: 'Planning',
-    statuses: ['quoted' as const],
-  },
-  {
-    id: 'booked' as const,
-    title: 'Booked',
-    statuses: ['booked' as const],
-  },
-  {
-    id: 'traveling' as const,
-    title: 'Traveling',
-    statuses: ['in_progress' as const],
-  },
-  {
-    id: 'traveled' as const,
-    title: 'Traveled',
-    statuses: ['completed' as const],
-  },
+  { id: 'inbound' as const, title: 'Inbound', statuses: ['inbound' as const] },
+  { id: 'planning' as const, title: 'Planning', statuses: ['planning' as const] },
+  { id: 'active' as const, title: 'Active', statuses: ['active' as const] },
+  { id: 'travelling' as const, title: 'Travelling', statuses: ['travelling' as const] },
+  { id: 'travelled' as const, title: 'Travelled', statuses: ['travelled' as const] },
 ] as const
 
 /**
  * Map column IDs to their primary status
  */
 export const COLUMN_TO_STATUS: Record<KanbanColumnId, TripStatus> = {
-  inbound: 'draft',
-  planning: 'quoted',
-  booked: 'booked',
-  traveling: 'in_progress',
-  traveled: 'completed',
+  inbound: 'inbound',
+  planning: 'planning',
+  active: 'active',
+  travelling: 'travelling',
+  travelled: 'travelled',
 } as const
 
 /**
@@ -119,11 +93,10 @@ export const COLUMN_TO_STATUS: Record<KanbanColumnId, TripStatus> = {
  */
 export const STATUS_TO_COLUMN: Partial<Record<TripStatus, KanbanColumnId>> = {
   inbound: 'inbound',
-  draft: 'inbound',
-  quoted: 'planning',
-  booked: 'booked',
-  in_progress: 'traveling',
-  completed: 'traveled',
+  planning: 'planning',
+  active: 'active',
+  travelling: 'travelling',
+  travelled: 'travelled',
 } as const
 
 // ============================================================================

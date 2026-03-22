@@ -333,7 +333,7 @@ export class BookingSessionService {
       JOIN contacts c ON c.id = tt.contact_id
       WHERE ia.id = ${activityId}
         AND c.user_id = ${clientUserId}
-        AND t.status IN ('quoted', 'accepted')
+        AND t.status IN ('planning', 'accepted')
       LIMIT 1
     `) as unknown as HandoffAuthRow[]
 

@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -583,13 +585,13 @@ export function TripFormDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="quoted">Quoted</SelectItem>
+                        <SelectItem value="inbound">Inbound</SelectItem>
+                        <SelectItem value="planning">Planning</SelectItem>
                         {mode === 'edit' && (
                           <>
-                            <SelectItem value="booked">Booked</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="travelling">Travelling</SelectItem>
+                            <SelectItem value="travelled">Travelled</SelectItem>
                             <SelectItem value="cancelled">Cancelled</SelectItem>
                           </>
                         )}

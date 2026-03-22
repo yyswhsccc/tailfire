@@ -91,7 +91,7 @@ describe('Package Read Path via Activities API (Regression)', () => {
         name: 'Package Read Path Test Trip',
         primaryContactId: testContactId,
         ownerId: '00000000-0000-0000-0000-000000000001', // Required field
-        status: 'draft',
+        status: 'planning',
         currency: 'USD',
       })
       .returning()

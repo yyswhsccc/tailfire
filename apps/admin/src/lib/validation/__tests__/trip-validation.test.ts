@@ -130,7 +130,7 @@ describe('tripFormSchema', () => {
   // ============================================================================
 
   it('accepts valid status values', () => {
-    const statuses = ['draft', 'quoted', 'booked', 'in_progress', 'completed', 'cancelled']
+    const statuses = ['inbound', 'planning', 'active', 'travelling', 'travelled', 'cancelled']
 
     for (const status of statuses) {
       const result = tripFormSchema.safeParse({

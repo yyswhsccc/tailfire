@@ -26,13 +26,12 @@ export const tripTypeEnum = pgEnum('trip_type', [
 ])
 
 export const tripStatusEnum = pgEnum('trip_status', [
-  'draft',
-  'quoted',
-  'booked',
-  'in_progress',
-  'completed',
-  'cancelled',
-  'inbound'  // Incoming leads without assigned owner
+  'inbound',
+  'planning',
+  'active',
+  'travelling',
+  'travelled',
+  'cancelled'
 ])
 
 export const travelerTypeEnum = pgEnum('traveler_type', [
@@ -132,7 +131,7 @@ export const trips = pgTable('trips', {
   bookingDate: date('booking_date'),
 
   // Status
-  status: tripStatusEnum('status').default('draft').notNull(),
+  status: tripStatusEnum('status').default('planning').notNull(),
 
   // Primary Contact
   primaryContactId: uuid('primary_contact_id').references(() => contacts.id, { onDelete: 'set null' }),
