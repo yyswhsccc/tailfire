@@ -148,6 +148,7 @@ export class TripLifecycleService {
       WHERE (i.trip_id = ${tripId} OR ia.trip_id = ${tripId})
         AND ia.booking_status = 'booked'
         AND ia.activity_type NOT IN ('port_info', 'tour_day')
+        AND (i.id IS NULL OR i.status != 'archived')
     `) as unknown as CountRow[]
 
     return Number(rows[0]?.count ?? 0)
@@ -193,7 +194,12 @@ export class TripLifecycleService {
         statusAutoTransitionedAt: now,
         updatedAt: now,
       })
-      .where(eq(this.db.schema.trips.id, tripId))
+      .where(
+        and(
+          eq(this.db.schema.trips.id, tripId),
+          eq(this.db.schema.trips.status, 'planning'),
+        ),
+      )
 
     this.logger.log(`Trip ${tripId} promoted: planning → active`)
 
@@ -222,7 +228,12 @@ export class TripLifecycleService {
         statusAutoTransitionedAt: now,
         updatedAt: now,
       })
-      .where(eq(this.db.schema.trips.id, tripId))
+      .where(
+        and(
+          eq(this.db.schema.trips.id, tripId),
+          eq(this.db.schema.trips.status, 'active'),
+        ),
+      )
 
     this.logger.log(`Trip ${tripId} demoted: active → planning (all bookings removed)`)
   }
