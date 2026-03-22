@@ -23,6 +23,7 @@ import { NotificationBell } from '@/components/notifications'
 import { CalendarNavbarPopover } from '@/components/calendar'
 import { useUnreadEmailCount } from '@/hooks/use-emails'
 import { BugReportDialog } from '@/components/bug-report/bug-report-dialog'
+import { SuperSearchDialog } from '@/components/layout/super-search-dialog'
 
 const navigation = [
   { name: 'Trips', href: '/trips' },
@@ -42,6 +43,7 @@ export function TopNav() {
   const { data: profile } = useMyProfile()
   const isAdmin = claims?.role === 'admin'
   const unreadEmailCount = useUnreadEmailCount()
+  const [searchOpen, setSearchOpen] = useState(false)
   const [bugReportOpen, setBugReportOpen] = useState(false)
   const [autoScreenshot, setAutoScreenshot] = useState<Blob | null>(null)
 
@@ -151,6 +153,7 @@ export function TopNav() {
             variant="outline"
             size="sm"
             className="h-8 w-64 justify-start text-sm text-ash-500 border-ash-200"
+            onClick={() => setSearchOpen(true)}
           >
             <Search className="mr-2 h-4 w-4" />
             Search
@@ -242,6 +245,7 @@ export function TopNav() {
         }}
         autoScreenshot={autoScreenshot}
       />
+      <SuperSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
     </header>
   )
 }
