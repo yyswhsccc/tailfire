@@ -27,6 +27,8 @@ import type {
   BusinessConfiguration,
   TripOrderPaymentSummary,
   TripOrderBookingDetail,
+  TripOrderPaymentScheduleSummary,
+  CostBreakdown,
 } from './pdf/types'
 import type {
   GenerateTripOrderDto,
@@ -116,11 +118,15 @@ export class TripOrderService {
     // Get bookings
     const bookings = await this.getTripBookings(tripId)
 
-    // Get payments
+    // Get payments and schedule
     const payments = await this.getTripPayments(tripId)
+    const paymentScheduleInfo = await this.getTripPaymentScheduleInfo(tripId)
 
-    // Build payment summary
-    const paymentSummary = this.buildPaymentSummary(payments, financialSummary.grandTotal.totalCostCents / 100)
+    // Build payment summary with schedule
+    const paymentSummary = {
+      ...this.buildPaymentSummary(payments, financialSummary.grandTotal.totalCostCents / 100),
+      payment_schedule: paymentScheduleInfo,
+    }
 
     // Build Handlebars template context
     const context = this.buildTemplateContext({
@@ -315,6 +321,7 @@ export class TripOrderService {
     const agent = await this.getTripAgent(tripId)
     const bookings = await this.getTripBookings(tripId)
     const payments = await this.getTripPayments(tripId)
+    const paymentScheduleInfo = await this.getTripPaymentScheduleInfo(tripId)
 
     // Build data structures
     const orderData = this.buildTripOrderData({
@@ -326,10 +333,13 @@ export class TripOrderService {
       agent,
       bookings,
     })
-    const paymentSummary = this.buildPaymentSummary(
-      payments,
-      financialSummary.grandTotal.totalCostCents / 100
-    )
+    const paymentSummary = {
+      ...this.buildPaymentSummary(
+        payments,
+        financialSummary.grandTotal.totalCostCents / 100
+      ),
+      payment_schedule: paymentScheduleInfo,
+    }
     const bookingDetails = this.buildBookingDetails(bookings)
 
     // Get next version number and insert
@@ -431,8 +441,78 @@ export class TripOrderService {
   }
 
   /**
+   * Validate TICO compliance requirements (Ontario Regulation 26/05, Section 38)
+   * Returns array of compliance violations — empty means compliant.
+   */
+  validateTICOCompliance(tripOrder: {
+    orderData: unknown
+    paymentSummary: unknown
+    bookingDetails: unknown
+    businessConfig: unknown
+  }): string[] {
+    const violations: string[] = []
+    const orderData = tripOrder.orderData as TICOTripOrder | null
+    const businessConfig = tripOrder.businessConfig as BusinessConfiguration | null
+    const paymentSummary = tripOrder.paymentSummary as TripOrderPaymentSummary | null
+    const bookingDetails = tripOrder.bookingDetails as TripOrderBookingDetail[] | null
+
+    // §38(1) — Customer name and address
+    const customer = orderData?.order_header?.customer_info
+    if (!customer?.name || customer.name === 'Customer') {
+      violations.push('Customer name is required (Reg. 26/05 §38(1))')
+    }
+
+    // §38(2) — Date of booking
+    if (!orderData?.order_header?.order_date) {
+      violations.push('Order date is required (Reg. 26/05 §38(2))')
+    }
+
+    // §38(3) — Payment amount and balance owing
+    if (paymentSummary == null) {
+      violations.push('Payment summary is required (Reg. 26/05 §38(3))')
+    }
+
+    // §38(5) — Total price of travel services
+    if (!orderData?.cost_breakdown?.final_total && orderData?.cost_breakdown?.final_total !== 0) {
+      violations.push('Total price is required (Reg. 26/05 §38(5))')
+    }
+
+    // §38(6) — Agency info is built into the template from agency_settings,
+    // so we only check that businessConfig was populated at all
+    if (!businessConfig) {
+      violations.push('Agency configuration is missing — cannot generate compliant invoice')
+    }
+
+    // §38(7) — Service description with destination and departure date
+    if (!orderData?.service_details?.description) {
+      violations.push('Service description is required (Reg. 26/05 §38(7))')
+    }
+    if (!orderData?.service_details?.travel_dates?.departure) {
+      violations.push('Departure date is required (Reg. 26/05 §38(7))')
+    }
+
+    // §38(7) — At least one booking/service must be listed
+    if (!bookingDetails || bookingDetails.length === 0) {
+      violations.push('At least one booking must be included (Reg. 26/05 §38(7))')
+    }
+
+    // §38(12) — Travel counsellor name
+    if (!orderData?.order_header?.agent_info?.name) {
+      violations.push('Travel counsellor name is required (Reg. 26/05 §38(12))')
+    }
+
+    // §38 — Compliance statement must be present
+    if (!orderData?.compliance_statement) {
+      violations.push('TICO compliance statement is required')
+    }
+
+    return violations
+  }
+
+  /**
    * Finalize a trip order (draft -> finalized)
-   * Once finalized, the trip order is locked and cannot be edited
+   * Once finalized, the trip order is locked and cannot be edited.
+   * ALL TICO compliance requirements must be satisfied before finalization.
    */
   async finalizeTripOrder(id: string, agencyId: string, userId: string): Promise<TripOrderSnapshotDto> {
     const [tripOrder] = await this.db.client
@@ -452,6 +532,15 @@ export class TripOrderService {
 
     if (tripOrder.status !== 'draft') {
       throw new BadRequestException(`Trip order ${id} is already ${tripOrder.status}`)
+    }
+
+    // TICO compliance gate — block finalization if requirements are not met
+    const violations = this.validateTICOCompliance(tripOrder)
+    if (violations.length > 0) {
+      throw new BadRequestException({
+        message: 'Trip order cannot be finalized — TICO compliance requirements not met',
+        violations,
+      })
     }
 
     const [updated] = await this.db.client
@@ -802,6 +891,11 @@ export class TripOrderService {
       payment: {
         amountPaid: paymentSummary.processed_payments,
         balanceDue: paymentSummary.balance_due,
+        totalPayments: paymentSummary.total_payments,
+        pendingPayments: paymentSummary.pending_payments,
+        refunds: paymentSummary.refunds,
+        paymentsList: paymentSummary.payments_list,
+        schedule: (paymentSummary as any).payment_schedule,
       },
       passengers: passengers.map((p) => ({
         full_name: [p.firstName, p.lastName].filter(Boolean).join(' '),
@@ -819,6 +913,11 @@ export class TripOrderService {
         end_date: b.endDate,
         amount: Number(b.totalPrice || 0),
         currency: b.currency || 'CAD',
+        cancellation_policy: b.cancellationPolicy || null,
+        non_refundable: b.nonRefundableDeposit ?? false,
+        net_price: b.netPrice ?? null,
+        supplier: b.supplier || null,
+        per_passenger_breakdown: b.perPassengerBreakdown || null,
       })),
     }
   }
@@ -882,6 +981,11 @@ export class TripOrderService {
       payment: {
         amountPaid: paymentSummary?.processed_payments ?? 0,
         balanceDue: paymentSummary?.balance_due ?? costBreak.final_total,
+        totalPayments: paymentSummary?.total_payments ?? 0,
+        pendingPayments: paymentSummary?.pending_payments ?? 0,
+        refunds: paymentSummary?.refunds ?? 0,
+        paymentsList: paymentSummary?.payments_list ?? [],
+        schedule: (paymentSummary as any)?.payment_schedule ?? null,
       },
       passengers: (orderData.service_details?.passengers || []).map((p) => ({
         full_name: [p.firstName, p.lastName].filter(Boolean).join(' '),
@@ -1068,9 +1172,7 @@ export class TripOrderService {
   }
 
   private async getTripBookings(tripId: string) {
-    // Query itinerary activities with their pricing
-    // Join through itinerary chain: itineraries -> itinerary_days -> itinerary_activities
-    // Note: itinerary_activities.trip_id may be NULL, so we must join through the chain
+    // Query itinerary activities with their pricing and financial details
     const activities = await this.db.client
       .select({
         id: this.db.schema.itineraryActivities.id,
@@ -1081,6 +1183,11 @@ export class TripOrderService {
         endDatetime: this.db.schema.itineraryActivities.endDatetime,
         totalPriceCents: this.db.schema.activityPricing.totalPriceCents,
         currency: this.db.schema.activityPricing.currency,
+        cancellationPolicy: this.db.schema.activityPricing.cancellationPolicy,
+        nonRefundableDeposit: this.db.schema.activityPricing.nonRefundableDeposit,
+        netPriceCents: this.db.schema.activityPricing.netPriceCents,
+        pricingBreakdownJson: this.db.schema.activityPricing.pricingBreakdownJson,
+        supplier: this.db.schema.activityPricing.supplier,
       })
       .from(this.db.schema.itineraryActivities)
       .innerJoin(
@@ -1097,30 +1204,202 @@ export class TripOrderService {
       )
       .where(eq(this.db.schema.itineraries.tripId, tripId))
 
-    // Transform to booking format expected by PDF
-    return activities.map((a) => ({
-      id: a.id,
-      title: a.name,
-      bookingType: a.activityType,
-      vendorConfirmation: a.confirmationNumber,
-      startDate: a.startDatetime ? new Date(a.startDatetime).toISOString().split('T')[0] : null,
-      endDate: a.endDatetime ? new Date(a.endDatetime).toISOString().split('T')[0] : null,
-      totalPrice: a.totalPriceCents ? a.totalPriceCents / 100 : 0,
-      currency: a.currency || 'CAD',
+    // For each activity, get per-passenger pricing from traveler_bookings
+    const bookingsWithPassengers = await Promise.all(
+      activities.map(async (a) => {
+        const travelerBookings = await this.db.client
+          .select({
+            priceCents: this.db.schema.travelerBookings.priceCents,
+            currency: this.db.schema.travelerBookings.currency,
+            firstName: this.db.schema.contacts.firstName,
+            lastName: this.db.schema.contacts.lastName,
+            travelerId: this.db.schema.tripTravelers.id,
+          })
+          .from(this.db.schema.travelerBookings)
+          .innerJoin(
+            this.db.schema.tripTravelers,
+            eq(this.db.schema.travelerBookings.tripTravelerId, this.db.schema.tripTravelers.id)
+          )
+          .innerJoin(
+            this.db.schema.contacts,
+            eq(this.db.schema.tripTravelers.contactId, this.db.schema.contacts.id)
+          )
+          .where(eq(this.db.schema.travelerBookings.activityId, a.id))
+
+        return {
+          id: a.id,
+          title: a.name,
+          bookingType: a.activityType,
+          vendorConfirmation: a.confirmationNumber,
+          startDate: a.startDatetime ? new Date(a.startDatetime).toISOString().split('T')[0] : null,
+          endDate: a.endDatetime ? new Date(a.endDatetime).toISOString().split('T')[0] : null,
+          totalPrice: a.totalPriceCents ? a.totalPriceCents / 100 : 0,
+          currency: a.currency || 'CAD',
+          cancellationPolicy: a.cancellationPolicy || null,
+          nonRefundableDeposit: a.nonRefundableDeposit ?? false,
+          netPrice: a.netPriceCents ? a.netPriceCents / 100 : null,
+          supplier: a.supplier || null,
+          perPassengerBreakdown: travelerBookings.length > 0
+            ? travelerBookings.map((tb) => ({
+                passengerId: tb.travelerId,
+                passengerName: [tb.firstName, tb.lastName].filter(Boolean).join(' '),
+                total: tb.priceCents ? tb.priceCents / 100 : 0,
+              }))
+            : a.pricingBreakdownJson
+              ? (a.pricingBreakdownJson as any[]).map((p: any) => ({
+                  passengerId: p.travelerId || p.id,
+                  passengerName: p.name || p.travelerName || 'Passenger',
+                  total: p.totalCents ? p.totalCents / 100 : (p.total || 0),
+                }))
+              : null,
+        }
+      })
+    )
+
+    return bookingsWithPassengers
+  }
+
+  private async getTripPayments(tripId: string) {
+    // Join through: payment_transactions → expected_payment_items → payment_schedule_config
+    //   → activity_pricing → itinerary_activities → itinerary_days → itineraries (where trip_id)
+    const transactions = await this.db.client
+      .select({
+        id: this.db.schema.paymentTransactions.id,
+        amountCents: this.db.schema.paymentTransactions.amountCents,
+        transactionType: this.db.schema.paymentTransactions.transactionType,
+        paymentMethod: this.db.schema.paymentTransactions.paymentMethod,
+        transactionDate: this.db.schema.paymentTransactions.transactionDate,
+        referenceNumber: this.db.schema.paymentTransactions.referenceNumber,
+        notes: this.db.schema.paymentTransactions.notes,
+      })
+      .from(this.db.schema.paymentTransactions)
+      .innerJoin(
+        this.db.schema.expectedPaymentItems,
+        eq(this.db.schema.paymentTransactions.expectedPaymentItemId, this.db.schema.expectedPaymentItems.id)
+      )
+      .innerJoin(
+        this.db.schema.paymentScheduleConfig,
+        eq(this.db.schema.expectedPaymentItems.paymentScheduleConfigId, this.db.schema.paymentScheduleConfig.id)
+      )
+      .innerJoin(
+        this.db.schema.activityPricing,
+        eq(this.db.schema.paymentScheduleConfig.activityPricingId, this.db.schema.activityPricing.id)
+      )
+      .innerJoin(
+        this.db.schema.itineraryActivities,
+        eq(this.db.schema.activityPricing.activityId, this.db.schema.itineraryActivities.id)
+      )
+      .innerJoin(
+        this.db.schema.itineraryDays,
+        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id)
+      )
+      .innerJoin(
+        this.db.schema.itineraries,
+        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
+      )
+      .where(eq(this.db.schema.itineraries.tripId, tripId))
+
+    // Map transaction_type to the status format expected by buildPaymentSummary
+    return transactions.map((t) => ({
+      id: t.id,
+      amount: t.amountCents / 100,
+      paymentDate: t.transactionDate ? new Date(t.transactionDate).toISOString().split('T')[0] : null,
+      paymentMethodType: t.paymentMethod,
+      status: t.transactionType === 'payment' ? 'processed'
+            : t.transactionType === 'refund' ? 'refunded'
+            : 'processed', // adjustments treated as processed
+      notes: t.notes,
     }))
   }
 
-  private async getTripPayments(_tripId: string) {
-    // Payment transactions are linked via activity → pricing → paymentScheduleConfig → expectedPaymentItems
-    // For simplicity, return empty array for now - payment history will be populated from financial summary
-    return [] as Array<{
-      id: string
-      amount: number
-      paymentDate: string | null
-      paymentMethodType: string | null
-      status: string
-      notes: string | null
-    }>
+  /**
+   * Get payment schedule info for TICO compliance:
+   * deposit amounts, non-refundable amounts, and expected payment items with due dates
+   */
+  private async getTripPaymentScheduleInfo(tripId: string): Promise<TripOrderPaymentScheduleSummary> {
+    // Get expected payment items with their schedule config and activity name
+    const items = await this.db.client
+      .select({
+        itemId: this.db.schema.expectedPaymentItems.id,
+        paymentName: this.db.schema.expectedPaymentItems.paymentName,
+        expectedAmountCents: this.db.schema.expectedPaymentItems.expectedAmountCents,
+        paidAmountCents: this.db.schema.expectedPaymentItems.paidAmountCents,
+        dueDate: this.db.schema.expectedPaymentItems.dueDate,
+        status: this.db.schema.expectedPaymentItems.status,
+        sequenceOrder: this.db.schema.expectedPaymentItems.sequenceOrder,
+        scheduleType: this.db.schema.paymentScheduleConfig.scheduleType,
+        nonRefundableAmountCents: this.db.schema.paymentScheduleConfig.nonRefundableAmountCents,
+        depositAmountCents: this.db.schema.paymentScheduleConfig.depositAmountCents,
+        activityName: this.db.schema.itineraryActivities.name,
+      })
+      .from(this.db.schema.expectedPaymentItems)
+      .innerJoin(
+        this.db.schema.paymentScheduleConfig,
+        eq(this.db.schema.expectedPaymentItems.paymentScheduleConfigId, this.db.schema.paymentScheduleConfig.id)
+      )
+      .innerJoin(
+        this.db.schema.activityPricing,
+        eq(this.db.schema.paymentScheduleConfig.activityPricingId, this.db.schema.activityPricing.id)
+      )
+      .innerJoin(
+        this.db.schema.itineraryActivities,
+        eq(this.db.schema.activityPricing.activityId, this.db.schema.itineraryActivities.id)
+      )
+      .innerJoin(
+        this.db.schema.itineraryDays,
+        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id)
+      )
+      .innerJoin(
+        this.db.schema.itineraries,
+        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
+      )
+      .where(eq(this.db.schema.itineraries.tripId, tripId))
+
+    let totalScheduledAmount = 0
+    let totalPendingAmount = 0
+    let totalPaidFromSchedule = 0
+
+    const scheduleItems = items.map((item) => {
+      const expected = item.expectedAmountCents / 100
+      const paid = (item.paidAmountCents ?? 0) / 100
+      totalScheduledAmount += expected
+      totalPaidFromSchedule += paid
+      if (item.status === 'pending' || item.status === 'partial' || item.status === 'overdue') {
+        totalPendingAmount += expected - paid
+      }
+
+      // Build TICO disclosure for non-refundable deposits
+      let disclosureText: string | undefined
+      if (item.nonRefundableAmountCents && item.nonRefundableAmountCents > 0) {
+        const nonRefundable = item.nonRefundableAmountCents / 100
+        disclosureText = `Includes $${nonRefundable.toFixed(2)} non-refundable`
+      }
+
+      return {
+        booking_title: item.activityName || 'Booking',
+        description: item.paymentName,
+        due_date: item.dueDate || '',
+        amount: expected,
+        amount_paid: paid,
+        status: item.status,
+        disclosure_text: disclosureText,
+      }
+    })
+
+    // Sort by sequence order then due date
+    scheduleItems.sort((a, b) => {
+      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date)
+      if (a.due_date) return -1
+      if (b.due_date) return 1
+      return 0
+    })
+
+    return {
+      total_scheduled_amount: totalScheduledAmount,
+      total_pending_amount: totalPendingAmount,
+      total_paid_from_schedule: totalPaidFromSchedule,
+      schedule_items: scheduleItems,
+    }
   }
 
   // ============================================================================
@@ -1214,10 +1493,58 @@ export class TripOrderService {
           'This Trip Order shows all costs you will pay for travel services and any applicable agency fees.',
           'The agency receives commission from suppliers included in the quoted prices.',
         ],
+        per_passenger_breakdown: this.buildPerPassengerBreakdown(bookings, passengers),
       },
       compliance_statement: this.generateComplianceStatement(businessConfig),
       generated_at: new Date().toISOString(),
     }
+  }
+
+  /**
+   * Build per-passenger cost breakdown from booking data.
+   * Uses traveler_bookings pricing when available, otherwise divides evenly.
+   */
+  private buildPerPassengerBreakdown(
+    bookings: any[],
+    passengers: any[]
+  ): CostBreakdown['per_passenger_breakdown'] {
+    if (passengers.length === 0) return undefined
+
+    // Check if any booking has per-passenger data
+    const hasPerPassengerData = bookings.some((b) => b.perPassengerBreakdown?.length > 0)
+
+    if (hasPerPassengerData) {
+      // Aggregate per-passenger totals across all bookings
+      const passengerTotals = new Map<string, { name: string; total: number }>()
+      for (const booking of bookings) {
+        if (!booking.perPassengerBreakdown) continue
+        for (const pp of booking.perPassengerBreakdown) {
+          const existing = passengerTotals.get(pp.passengerId)
+          if (existing) {
+            existing.total += pp.total
+          } else {
+            passengerTotals.set(pp.passengerId, { name: pp.passengerName, total: pp.total })
+          }
+        }
+      }
+      return Array.from(passengerTotals.entries()).map(([id, data]) => ({
+        passenger_id: id,
+        passenger_name: data.name,
+        base_fare: data.total,
+        total: data.total,
+      }))
+    }
+
+    // Fallback: divide total evenly among passengers
+    const totalCost = bookings.reduce((sum, b) => sum + Number(b.totalPrice || 0), 0)
+    const perPerson = totalCost / passengers.length
+
+    return passengers.map((p) => ({
+      passenger_id: p.id,
+      passenger_name: [p.firstName, p.lastName].filter(Boolean).join(' '),
+      base_fare: Math.round(perPerson * 100) / 100,
+      total: Math.round(perPerson * 100) / 100,
+    }))
   }
 
   private buildPaymentSummary(payments: any[], totalCost: number): TripOrderPaymentSummary {
@@ -1263,7 +1590,13 @@ export class TripOrderService {
       taxes: 0,
       amount: Number(booking.totalPrice || 0),
       currency: booking.currency || 'CAD',
-    }))
+      // TICO-required financial details
+      cancellation_policy: booking.cancellationPolicy || undefined,
+      non_refundable: booking.nonRefundableDeposit ?? false,
+      net_price: booking.netPrice ?? undefined,
+      supplier: booking.supplier || undefined,
+      per_passenger_breakdown: booking.perPassengerBreakdown || undefined,
+    } as TripOrderBookingDetail))
   }
 
   private formatPaymentMethod(type: string): string {

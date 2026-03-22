@@ -37,6 +37,16 @@ export interface TripOrderBookingDetail {
   taxes?: number
   amount?: number
   currency?: string
+  // TICO-required financial details
+  cancellation_policy?: string
+  non_refundable?: boolean
+  net_price?: number
+  supplier?: string
+  per_passenger_breakdown?: Array<{
+    passengerId: string
+    passengerName: string
+    total: number
+  }>
 }
 
 /**

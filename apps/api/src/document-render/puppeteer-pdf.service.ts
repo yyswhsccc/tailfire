@@ -27,7 +27,7 @@ export class PuppeteerPdfService implements OnModuleDestroy {
     const page = await browser.newPage()
 
     try {
-      await page.setContent(fullHtml, { waitUntil: 'networkidle0' })
+      await page.setContent(fullHtml, { waitUntil: 'domcontentloaded', timeout: 15000 })
 
       const pdfBuffer = await page.pdf({
         format: 'letter',

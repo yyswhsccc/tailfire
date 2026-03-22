@@ -40,6 +40,7 @@ import {
   Plus,
   Send,
   Download,
+  Eye,
   Lock,
   Clock,
   CheckCircle2,
@@ -50,8 +51,10 @@ import { format } from 'date-fns'
 import { useUser } from '@/hooks/use-user'
 import {
   useTripOrders,
+  useTripOrderCompliance,
   useGenerateTripOrderSnapshot,
   useFinalizeTripOrder,
+  usePreviewStoredTripOrder,
   useDownloadStoredTripOrder,
   useSendStoredTripOrderEmail,
   type TripOrderSnapshot,
@@ -122,11 +125,17 @@ export function TripOrderGeneratorModal({
   // Mutations
   const generateSnapshot = useGenerateTripOrderSnapshot(tripId)
   const finalizeTripOrder = useFinalizeTripOrder()
+  const previewTripOrder = usePreviewStoredTripOrder()
   const downloadTripOrder = useDownloadStoredTripOrder()
   const sendTripOrderEmail = useSendStoredTripOrderEmail()
 
   // Get selected order (or latest if none selected)
   const selectedOrder = tripOrders?.find((o) => o.id === selectedOrderId) ?? tripOrders?.[0]
+
+  // TICO compliance check for draft orders
+  const { data: compliance } = useTripOrderCompliance(
+    selectedOrder?.status === 'draft' ? selectedOrder.id : null,
+  )
 
   // Reset state when modal closes
   const handleOpenChange = (newOpen: boolean) => {
@@ -156,6 +165,13 @@ export function TripOrderGeneratorModal({
     if (!selectedOrder || !agencyId || !userId) return
 
     finalizeTripOrder.mutate({ id: selectedOrder.id })
+  }
+
+  // Preview PDF in new tab
+  const handlePreview = () => {
+    if (!selectedOrder || !agencyId) return
+
+    previewTripOrder.mutate({ id: selectedOrder.id })
   }
 
   // Download PDF
@@ -250,6 +266,7 @@ export function TripOrderGeneratorModal({
   const isLoading =
     generateSnapshot.isPending ||
     finalizeTripOrder.isPending ||
+    previewTripOrder.isPending ||
     downloadTripOrder.isPending ||
     sendTripOrderEmail.isPending
 
@@ -326,6 +343,19 @@ export function TripOrderGeneratorModal({
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={handlePreview}
+                      disabled={isLoading}
+                    >
+                      {previewTripOrder.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                      <span className="ml-1">Preview</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={handleDownload}
                       disabled={isLoading}
                     >
@@ -375,13 +405,31 @@ export function TripOrderGeneratorModal({
                   )}
                 </div>
 
-                {/* Draft Warning */}
+                {/* Draft Warning + Compliance Check */}
                 {selectedOrder.status === 'draft' && (
-                  <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 rounded-lg p-3">
-                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <p>
-                      This invoice is a draft. Finalize it to lock the data before sending.
-                    </p>
+                  <div className="space-y-2">
+                    {compliance && !compliance.compliant ? (
+                      <div className="text-sm text-red-700 bg-red-50 rounded-lg p-3 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                          <p className="font-medium">
+                            TICO compliance issues must be resolved before finalizing:
+                          </p>
+                        </div>
+                        <ul className="list-disc list-inside pl-6 space-y-1">
+                          {compliance.violations.map((v, i) => (
+                            <li key={i}>{v}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 rounded-lg p-3">
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <p>
+                          This invoice is a draft. Finalize it to lock the data before sending.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -429,12 +477,12 @@ export function TripOrderGeneratorModal({
             Close
           </Button>
 
-          {/* Finalize Button - only for drafts */}
+          {/* Finalize Button - only for drafts, blocked by compliance */}
           {selectedOrder?.status === 'draft' && (
             <Button
               variant="secondary"
               onClick={handleFinalize}
-              disabled={isLoading || !userId}
+              disabled={isLoading || !userId || (compliance != null && !compliance.compliant)}
             >
               {finalizeTripOrder.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

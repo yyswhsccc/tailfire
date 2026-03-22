@@ -60,11 +60,17 @@ interface SendTripOrderEmailResponse {
 // Query Keys
 // ============================================================================
 
+export interface ComplianceCheckResult {
+  compliant: boolean
+  violations: string[]
+}
+
 export const tripOrderKeys = {
   all: ['trip-orders'] as const,
   byTrip: (tripId: string) => [...tripOrderKeys.all, 'trip', tripId] as const,
   latest: (tripId: string) => [...tripOrderKeys.all, 'trip', tripId, 'latest'] as const,
   detail: (id: string) => [...tripOrderKeys.all, 'detail', id] as const,
+  compliance: (id: string) => [...tripOrderKeys.all, 'compliance', id] as const,
 }
 
 // ============================================================================
@@ -124,6 +130,24 @@ export function useTripOrder(
       return api.get<TripOrderSnapshot>(`/trip-orders/${id}`)
     },
     enabled: !!id && !!agencyId,
+    ...options,
+  })
+}
+
+/**
+ * Check TICO compliance for a trip order
+ * Returns violations that must be resolved before finalization
+ */
+export function useTripOrderCompliance(
+  id: string | null,
+  options?: Omit<UseQueryOptions<ComplianceCheckResult>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: tripOrderKeys.compliance(id ?? ''),
+    queryFn: async () => {
+      return api.get<ComplianceCheckResult>(`/trip-orders/${id}/compliance`)
+    },
+    enabled: !!id,
     ...options,
   })
 }
@@ -189,10 +213,16 @@ export function useFinalizeTripOrder() {
         description: 'The invoice has been finalized and is ready to send.',
       })
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
+      // Extract TICO compliance violations from structured error response
+      const violations = error?.response?.violations || error?.violations
+      const description = violations?.length
+        ? `${violations.length} compliance issue${violations.length > 1 ? 's' : ''}: ${violations[0]}`
+        : error.message || 'An unexpected error occurred.'
+
       toast({
-        title: 'Failed to finalize invoice',
-        description: error.message || 'An unexpected error occurred.',
+        title: 'Cannot finalize — compliance check failed',
+        description,
         variant: 'destructive',
       })
     },
@@ -252,6 +282,56 @@ export function useDownloadStoredTripOrder() {
     onError: (error: Error) => {
       toast({
         title: 'Failed to download invoice',
+        description: error.message || 'An unexpected error occurred.',
+        variant: 'destructive',
+      })
+    },
+  })
+}
+
+/**
+ * Preview PDF from a stored trip order snapshot
+ * Opens the PDF in a new browser tab for review before sending
+ */
+export function usePreviewStoredTripOrder() {
+  const { toast } = useToast()
+
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+
+      const response = await fetch(`${API_URL}/trip-orders/${id}/download`, {
+        method: 'POST',
+        headers,
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to preview invoice')
+      }
+
+      return response.blob()
+    },
+    onSuccess: (blob) => {
+      // Open PDF in new tab for preview
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      // Revoke after a delay to give the tab time to load
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to preview invoice',
         description: error.message || 'An unexpected error occurred.',
         variant: 'destructive',
       })
