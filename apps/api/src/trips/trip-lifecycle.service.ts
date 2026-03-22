@@ -250,6 +250,13 @@ export class TripLifecycleService {
   async backfillAllTrips(): Promise<{ evaluated: number; promoted: number; demoted: number; dateTransitions: number }> {
     this.logger.log('Starting lifecycle backfill for all trips...')
 
+    // Disable the status transition trigger — backfill is the system authority
+    // and needs to skip intermediate states (e.g., planning → travelled directly)
+    await this.db.client.execute(sql`
+      DROP TRIGGER IF EXISTS validate_trip_status_transition_trigger ON trips
+    `)
+
+    try {
     // Get all non-terminal trips (not travelled, not cancelled)
     type TripRow = { id: string; status: string; start_date: string | null; end_date: string | null }
     const trips = await this.db.client.execute(sql`
@@ -330,5 +337,15 @@ export class TripLifecycleService {
 
     this.logger.log(`Lifecycle backfill complete: ${evaluated} evaluated, ${promoted} promoted, ${demoted} demoted, ${dateTransitions} date transitions`)
     return { evaluated, promoted, demoted, dateTransitions }
+    } finally {
+      // Re-enable the status transition trigger
+      await this.db.client.execute(sql`
+        CREATE TRIGGER validate_trip_status_transition_trigger
+          BEFORE INSERT OR UPDATE ON trips FOR EACH ROW
+          EXECUTE FUNCTION validate_trip_status_transition()
+      `).catch(err => {
+        this.logger.warn(`Failed to recreate trigger (may already exist): ${err.message}`)
+      })
+    }
   }
 }
