@@ -196,7 +196,7 @@ export function DiningForm({
   } = form
 
   // useWatch for custom components (Selects, DatePicker, TimePicker, number inputs with null handling)
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   const mealTypeValue = useWatch({ control, name: 'diningDetails.mealType' })
   const reservationDateValue = useWatch({ control, name: 'diningDetails.reservationDate' })
   const reservationTimeValue = useWatch({ control, name: 'diningDetails.reservationTime' })
@@ -309,7 +309,7 @@ export function DiningForm({
         componentType: 'dining',
         name: diningData.name,
         description: diningData.description,
-        status: diningData.status,
+        proposalStatus: diningData.proposalStatus,
         totalPriceCents: initialPricing.totalPriceCents,
         taxesAndFeesCents: initialPricing.taxesAndFeesCents,
         currency: trip?.currency || initialPricing.currency,
@@ -578,7 +578,7 @@ export function DiningForm({
               <span className="text-sm text-gray-600">Status</span>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as DiningFormData['status'], { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as DiningFormData['proposalStatus'], { shouldDirty: true })}
               >
                 <SelectTrigger className="w-32 h-8">
                   <SelectValue />

@@ -316,7 +316,7 @@ describe('toDiningApiPayload', () => {
       componentType: 'dining' as const,
       name: 'Test Restaurant',
       description: 'A test dining',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       diningDetails: {
         restaurantName: 'Le Restaurant',
         cuisineType: 'French',
@@ -365,7 +365,7 @@ describe('toDiningApiPayload', () => {
       componentType: 'dining' as const,
       name: 'Test',
       description: '',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       diningDetails: {
         restaurantName: 'Test Restaurant',
         cuisineType: '',

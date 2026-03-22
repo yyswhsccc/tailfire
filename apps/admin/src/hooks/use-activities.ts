@@ -86,7 +86,7 @@ export function useActivities(filters: ActivityFilterDto = {}) {
       const params = new URLSearchParams()
       if (filters.itineraryDayId) params.append('itineraryDayId', filters.itineraryDayId)
       if (filters.activityType) params.append('activityType', filters.activityType)
-      if (filters.status) params.append('status', filters.status)
+      if (filters.proposalStatus) params.append('proposalStatus', filters.proposalStatus)
       if (filters.sortBy) params.append('sortBy', filters.sortBy)
       if (filters.sortOrder) params.append('sortOrder', filters.sortOrder)
       if (filters.limit) params.append('limit', filters.limit.toString())

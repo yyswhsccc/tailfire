@@ -186,7 +186,7 @@ export function toPackageApiPayload(
     confirmationNumber: data.confirmationNumber || null,
     supplierId: data.supplierId || null,
     supplierName: data.supplierName || null,
-    status: data.status as PackageStatus,
+    proposalStatus: data.proposalStatus as PackageStatus,
     currency: data.currency,
     // Pricing fields
     totalPriceCents: data.totalPriceCents,
@@ -218,7 +218,7 @@ export function toPackageUpdatePayload(
   if (data.confirmationNumber !== undefined) payload.confirmationNumber = data.confirmationNumber || null
   if (data.supplierId !== undefined) payload.supplierId = data.supplierId || null
   if (data.supplierName !== undefined) payload.supplierName = data.supplierName || null
-  if (data.status !== undefined) payload.status = data.status as PackageStatus
+  if (data.proposalStatus !== undefined) payload.proposalStatus = data.proposalStatus as PackageStatus
   if (data.paymentStatus !== undefined) payload.paymentStatus = data.paymentStatus as PackagePaymentStatus
   if (data.currency !== undefined) payload.currency = data.currency
   // Pricing fields

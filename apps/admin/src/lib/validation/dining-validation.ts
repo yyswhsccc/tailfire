@@ -213,7 +213,7 @@ export function toDiningApiPayload(data: DiningFormData): CreateDiningActivityDt
     componentType: 'dining',
     name: data.diningDetails.restaurantName, // Auto-name from restaurant
     description: data.description,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     diningDetails: {
       restaurantName: data.diningDetails.restaurantName,
       cuisineType: data.diningDetails.cuisineType,

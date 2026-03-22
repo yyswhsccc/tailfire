@@ -229,7 +229,7 @@ export function toOptionsApiPayload(data: OptionsFormData): CreateOptionsActivit
     componentType: 'options',
     name: data.name,
     description: data.description,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     optionsDetails: {
       optionCategory: data.optionsDetails.optionCategory as OptionCategory | null,
       isSelected: data.optionsDetails.isSelected,

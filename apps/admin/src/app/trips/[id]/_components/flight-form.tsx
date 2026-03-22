@@ -321,7 +321,7 @@ export function FlightForm({
 
   // useWatch for non-segment custom components (Selects)
   // Using individual useWatch calls to avoid Controller registration issues
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   const itineraryDisplayValue = useWatch({ control, name: 'itineraryDisplay' })
   const nameValue = useWatch({ control, name: 'name' })
 
@@ -543,7 +543,7 @@ export function FlightForm({
           itineraryDayId: dayId,
           name: sourceData.name,
           description: sourceData.description || '',
-          status: coerceStatus(sourceData.status),
+          proposalStatus: coerceStatus(sourceData.proposalStatus),
           flightDetails: coerceFlightDetails(sourceData.flightDetails),
           totalPriceCents: initialPricing.totalPriceCents,
           taxesAndFeesCents: initialPricing.taxesAndFeesCents,

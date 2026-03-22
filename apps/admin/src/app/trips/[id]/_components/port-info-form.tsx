@@ -139,7 +139,7 @@ export function PortInfoForm({
   } = form
 
   // useWatch for custom components (Selects, DatePickers, TimePickers, Checkbox)
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   const arrivalDateValue = useWatch({ control, name: 'portInfoDetails.arrivalDate' })
   const departureDateValue = useWatch({ control, name: 'portInfoDetails.departureDate' })
   const arrivalTimeValue = useWatch({ control, name: 'portInfoDetails.arrivalTime' })
@@ -255,7 +255,7 @@ export function PortInfoForm({
         itineraryDayId: dayId,
         name: portInfoData.name,
         description: portInfoData.description || '',
-        status: portInfoData.status as PortInfoFormData['status'],
+        proposalStatus: portInfoData.proposalStatus as PortInfoFormData['proposalStatus'],
         portInfoDetails: details ? {
           portName: details.portName || '',
           portLocation: details.portLocation || '',
@@ -495,7 +495,7 @@ export function PortInfoForm({
               <span className="text-sm text-gray-600">Status</span>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as PortInfoFormData['status'], { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as PortInfoFormData['proposalStatus'], { shouldDirty: true })}
               >
                 <SelectTrigger className="w-32 h-8">
                   <SelectValue />

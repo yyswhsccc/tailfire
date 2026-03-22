@@ -23,7 +23,7 @@ describe('tripFormSchema', () => {
     const validData = {
       name: 'Summer Vacation',
       tripType: 'leisure',
-      status: 'draft',
+      status: 'planning',
       tags: ['family', 'beach'],
       startDate: '2025-07-01',
       endDate: '2025-07-14',
@@ -142,7 +142,7 @@ describe('tripFormSchema', () => {
     }
   })
 
-  it('defaults to draft status', () => {
+  it('defaults to planning status', () => {
     const result = tripFormSchema.safeParse({
       name: 'Test Trip',
       addDatesLater: true,
@@ -150,7 +150,7 @@ describe('tripFormSchema', () => {
 
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.status).toBe('draft')
+      expect(result.data.status).toBe('planning')
     }
   })
 
@@ -363,7 +363,7 @@ describe('toTripDefaults', () => {
 
     expect(defaults.name).toBe('')
     expect(defaults.tripType).toBe('leisure')
-    expect(defaults.status).toBe('draft')
+    expect(defaults.status).toBe('planning')
     expect(defaults.tags).toEqual([])
     expect(defaults.startDate).toBe('')
     expect(defaults.endDate).toBe('')
@@ -458,7 +458,7 @@ describe('toTripApiPayload', () => {
     const formData: TripFormValues = {
       name: 'Test Trip',
       tripType: 'leisure',
-      status: 'draft',
+      status: 'planning',
       tags: ['family', 'vacation'],
       startDate: '2025-07-01',
       endDate: '2025-07-14',
@@ -470,7 +470,7 @@ describe('toTripApiPayload', () => {
 
     expect(payload.name).toBe('Test Trip')
     expect(payload.tripType).toBe('leisure')
-    expect(payload.status).toBe('draft')
+    expect(payload.status).toBe('planning')
     expect(payload.tags).toEqual(['family', 'vacation'])
     expect(payload.startDate).toBe('2025-07-01')
     expect(payload.endDate).toBe('2025-07-14')
@@ -481,7 +481,7 @@ describe('toTripApiPayload', () => {
     const formData: TripFormValues = {
       name: 'Test Trip',
       tripType: '',
-      status: 'draft',
+      status: 'planning',
       tags: [],
       startDate: '',
       endDate: '',
@@ -498,7 +498,7 @@ describe('toTripApiPayload', () => {
     const formData: TripFormValues = {
       name: 'Test Trip',
       tripType: '',
-      status: 'draft',
+      status: 'planning',
       tags: [],
       startDate: '2025-07-01',
       endDate: '2025-07-14',
@@ -515,7 +515,7 @@ describe('toTripApiPayload', () => {
     const formData: TripFormValues = {
       name: 'Test Trip',
       tripType: 'leisure',
-      status: 'draft',
+      status: 'planning',
       tags: [],
       startDate: '2025-07-01',
       endDate: '2025-07-14',
@@ -532,7 +532,7 @@ describe('toTripApiPayload', () => {
     const formData: TripFormValues = {
       name: 'Test Trip',
       tripType: 'leisure',
-      status: 'draft',
+      status: 'planning',
       tags: [],
       startDate: '2025-07-01', // Has a value but should be cleared
       endDate: '2025-07-14',
@@ -550,7 +550,7 @@ describe('toTripApiPayload', () => {
     const formData: TripFormValues = {
       name: 'Test Trip',
       tripType: '',
-      status: 'draft',
+      status: 'planning',
       tags: [],
       startDate: '2025-07-01',
       endDate: '2025-07-14',
@@ -567,7 +567,7 @@ describe('toTripApiPayload', () => {
     const formData: TripFormValues = {
       name: 'Test Trip',
       tripType: '',
-      status: 'draft',
+      status: 'planning',
       tags: ['tag1'],
       startDate: '2025-07-01',
       endDate: '2025-07-14',
@@ -584,7 +584,7 @@ describe('toTripApiPayload', () => {
     const formData: TripFormValues = {
       name: 'Test Trip',
       tripType: '',
-      status: 'draft',
+      status: 'planning',
       tags: [],
       startDate: '',
       endDate: '',

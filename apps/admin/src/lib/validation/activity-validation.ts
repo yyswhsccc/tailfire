@@ -177,7 +177,7 @@ export function toActivityApiPayload(
     location: data.location || undefined,
     address: data.address || undefined,
     confirmationNumber: data.confirmationNumber || undefined,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     pricingType: data.pricingType as PricingType,
     currency: data.currency,
     notes: data.notes || undefined,

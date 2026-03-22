@@ -287,11 +287,11 @@ export function PackagesList({ tripId, currency, itineraryId, filterItineraryId 
     setIsLinkerOpen(true)
   }
 
-  const handleMarkAsBooked = (booking: { id: string; name: string; status: string }) => {
+  const handleMarkAsBooked = (booking: { id: string; name: string; proposalStatus: string }) => {
     setMarkAsBookedTarget({
       id: booking.id,
       name: booking.name,
-      status: booking.status,
+      status: booking.proposalStatus,
     })
     setIsMarkAsBookedOpen(true)
   }
@@ -394,7 +394,7 @@ export function PackagesList({ tripId, currency, itineraryId, filterItineraryId 
   const getBookingsForActivity = (activity: UnlinkedActivityDto) => {
     return allBookings.filter((booking) => {
       // Exclude cancelled bookings
-      if (booking.status === 'cancelled') return false
+      if (booking.proposalStatus === 'cancelled') return false
       // Bookings with no linked activities can accept any activity
       if (!booking.itineraryIds || booking.itineraryIds.length === 0) return true
       // Bookings must be from the same itinerary
@@ -568,8 +568,8 @@ export function PackagesList({ tripId, currency, itineraryId, filterItineraryId 
                           {booking.supplierName || '—'}
                         </TableCell>
                         <TableCell className="py-1.5 px-2">
-                          <Badge variant={getPackageStatusVariant(booking.status)} className="text-[10px] px-1 py-0 leading-tight">
-                            {getPackageStatusLabel(booking.status)}
+                          <Badge variant={getPackageStatusVariant(booking.proposalStatus)} className="text-[10px] px-1 py-0 leading-tight">
+                            {getPackageStatusLabel(booking.proposalStatus)}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-1.5 px-2">
@@ -609,7 +609,7 @@ export function PackagesList({ tripId, currency, itineraryId, filterItineraryId 
                                 <Link2 className="h-4 w-4 mr-2" />
                                 Link Activities
                               </DropdownMenuItem>
-                              {['draft', 'pending'].includes(booking.status) && (
+                              {['draft', 'proposing'].includes(booking.proposalStatus) && (
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation()

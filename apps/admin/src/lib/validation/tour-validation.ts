@@ -305,7 +305,7 @@ export function toTourApiPayload(data: TourFormData): CreateActivityDto & {
     activityType: 'tour',
     name: tourDetails.tourName,
     description: data.description,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     location: tourDetails.location || null,
     address: tourDetails.address || null,
     startDatetime: computeDatetime(tourDetails.tourDate, tourDetails.startTime, tourDetails.timezone),

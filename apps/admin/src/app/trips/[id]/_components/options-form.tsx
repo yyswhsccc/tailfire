@@ -88,7 +88,7 @@ const OPTION_CATEGORIES: { value: OptionCategory; label: string }[] = [
 const AUTO_SAVE_FIELDS = [
   'name',
   'description',
-  'status',
+  'proposalStatus',
   'optionsDetails.optionCategory',
   'optionsDetails.isSelected',
   'optionsDetails.availabilityStartDate',
@@ -227,7 +227,7 @@ export function OptionsForm({
 
   // Watch specific fields for display
   const watchedName = useWatch({ control, name: 'name' })
-  const watchedStatus = useWatch({ control, name: 'status' })
+  const watchedStatus = useWatch({ control, name: 'proposalStatus' })
 
   // Watch custom component fields (Selects, DatePickers, TimePicker, Checkbox, number inputs with null)
   const optionCategoryValue = useWatch({ control, name: 'optionsDetails.optionCategory' })
@@ -379,7 +379,7 @@ export function OptionsForm({
         itineraryDayId: dayId,
         name: optionsData.name,
         description: optionsData.description,
-        status: optionsData.status,
+        proposalStatus: optionsData.proposalStatus,
         pricingType: optionsData.pricingType || 'per_person',
         currency: optionsData.currency || 'USD',
         totalPriceCents: optionsData.totalPriceCents,

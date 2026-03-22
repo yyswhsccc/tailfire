@@ -296,7 +296,7 @@ export function toCustomCruiseApiPayload(data: CustomCruiseFormData): CreateCust
     componentType: 'custom_cruise',
     name: data.name || generateCruiseName(data),
     description: data.description || undefined,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     // Timing - critical for spanning activity detection
     startDatetime,
     endDatetime,

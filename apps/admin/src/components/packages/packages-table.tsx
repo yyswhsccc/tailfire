@@ -120,7 +120,7 @@ type UnifiedBookingRow =
       supplierName: string | null
       confirmationNumber: string | null
       paymentStatus: string
-      status: string
+      proposalStatus: string
       dateBooked: string | null
       activityCount: number
       commissionTotalCents: number | null
@@ -766,7 +766,7 @@ function SelectionActionMenu({
           </DialogHeader>
           <div className="py-4 space-y-2 max-h-64 overflow-y-auto">
             {packages
-              .filter((p) => p.status !== 'cancelled')
+              .filter((p) => p.proposalStatus !== 'cancelled')
               .map((pkg) => (
                 <button
                   key={pkg.id}
@@ -905,7 +905,7 @@ export function PackagesTable({
         supplierName: pkg.supplierName || null,
         confirmationNumber: pkg.confirmationNumber || null,
         paymentStatus: pkg.paymentStatus ?? 'unpaid',
-        status: pkg.status,
+        proposalStatus: pkg.proposalStatus,
         dateBooked: pkg.dateBooked || null,
         activityCount: pkg.activityCount ?? 0,
         commissionTotalCents: pkg.pricing?.commissionTotalCents ?? null,

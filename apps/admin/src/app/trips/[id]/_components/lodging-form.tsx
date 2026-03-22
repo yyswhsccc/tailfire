@@ -121,7 +121,7 @@ const ROOM_TYPES = [
 
 // Auto-save watched fields (trigger save when these change)
 const AUTO_SAVE_FIELDS = [
-  'status',
+  'proposalStatus',
   'description',
   'lodgingDetails.propertyName',
   'lodgingDetails.address',
@@ -291,7 +291,7 @@ export function LodgingForm({
 
   // useWatch for custom components (Selects, DatePickers, TimePickers)
   // Using individual useWatch calls to avoid Controller registration issues
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   const checkInDateValue = useWatch({ control, name: 'lodgingDetails.checkInDate' })
   const checkInTimeValue = useWatch({ control, name: 'lodgingDetails.checkInTime' })
   const checkOutDateValue = useWatch({ control, name: 'lodgingDetails.checkOutDate' })

@@ -252,7 +252,7 @@ describe('toActivityDefaults', () => {
     expect(defaults.activityType).toBe('tour')
     expect(defaults.name).toBe('')
     expect(defaults.description).toBe('')
-    expect(defaults.status).toBe('proposed')
+    expect(defaults.proposalStatus).toBe('draft')
     expect(defaults.pricingType).toBe('per_person')
     expect(defaults.currency).toBe('USD')
   })
@@ -283,7 +283,7 @@ describe('toActivityDefaults', () => {
       activityType: 'dining' as const,
       name: 'Loaded Activity',
       description: 'From server',
-      status: 'confirmed' as const,
+      proposalStatus: 'approved' as const,
       location: 'Downtown',
       address: '456 Main St',
       pricingType: 'flat_rate' as const,
@@ -297,7 +297,7 @@ describe('toActivityDefaults', () => {
     expect(defaults.activityType).toBe('dining')
     expect(defaults.name).toBe('Loaded Activity')
     expect(defaults.description).toBe('From server')
-    expect(defaults.status).toBe('confirmed')
+    expect(defaults.proposalStatus).toBe('approved')
     expect(defaults.location).toBe('Downtown')
     expect(defaults.pricingType).toBe('flat_rate')
     expect(defaults.currency).toBe('EUR')
@@ -332,7 +332,7 @@ describe('toActivityApiPayload', () => {
       location: 'Beach',
       address: '123 Ocean Ave',
       confirmationNumber: 'ABC123',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       pricingType: 'per_person' as const,
       currency: 'USD',
       notes: 'Test notes',
@@ -356,7 +356,7 @@ describe('toActivityApiPayload', () => {
       location: '',
       address: '',
       confirmationNumber: '',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       pricingType: 'per_person' as const,
       currency: 'USD',
       notes: '',
@@ -379,7 +379,7 @@ describe('toActivityApiPayload', () => {
       location: '',
       address: '',
       confirmationNumber: '',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       pricingType: 'per_person' as const,
       currency: 'USD',
       notes: '',
@@ -401,7 +401,7 @@ describe('toActivityApiPayload', () => {
       location: '',
       address: '',
       confirmationNumber: '',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       pricingType: 'per_person' as const,
       currency: 'USD',
       notes: '',
@@ -428,7 +428,7 @@ describe('toActivityApiPayload', () => {
       location: '',
       address: '',
       confirmationNumber: '',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       pricingType: 'per_person' as const,
       currency: 'USD',
       notes: '',
@@ -451,7 +451,7 @@ describe('toActivityApiPayload', () => {
       location: '',
       address: '',
       confirmationNumber: '',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       pricingType: 'per_person' as const,
       currency: 'USD',
       notes: '',
@@ -476,7 +476,7 @@ describe('toActivityApiPayload', () => {
       location: '',
       address: '',
       confirmationNumber: '',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       pricingType: 'per_person' as const,
       currency: 'USD',
       notes: '',

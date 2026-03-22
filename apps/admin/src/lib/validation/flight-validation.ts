@@ -438,7 +438,7 @@ export function toFlightApiPayload(data: FlightFormData): CreateFlightActivityDt
     componentType: 'flight',
     name: flightName,
     description: data.description,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     flightDetails,
     totalPriceCents: data.totalPriceCents,
     taxesAndFeesCents: data.taxesAndFeesCents,

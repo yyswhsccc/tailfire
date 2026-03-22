@@ -316,7 +316,7 @@ export function toApiPayload(data: LodgingFormData): CreateLodgingActivityDto {
     componentType: 'lodging',
     name: data.lodgingDetails.propertyName, // Auto-name from property
     description: data.description,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     // Compute startDatetime/endDatetime for spanning activity display
     startDatetime: combineDateAndTime(
       data.lodgingDetails.checkInDate,

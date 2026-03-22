@@ -190,7 +190,7 @@ export function SpanningActivityBar({
 
           {/* Status Badge */}
           <Badge variant="secondary" className="flex-shrink-0">
-            {activity.status}
+            {activity.proposalStatus}
           </Badge>
 
           {/* Client Response Badge */}
