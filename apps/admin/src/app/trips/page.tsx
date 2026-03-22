@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, Search, Download, FolderPlus } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
@@ -35,7 +35,15 @@ import type { TripStatus } from '@tailfire/shared-types'
  * Trips Page
  * Supports both Kanban and Table views with bulk operations
  */
-export default function TernTripsPage() {
+export default function TripsPageWrapper() {
+  return (
+    <Suspense>
+      <TripsPage />
+    </Suspense>
+  )
+}
+
+function TripsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const urlSearch = searchParams?.get('search') || ''
