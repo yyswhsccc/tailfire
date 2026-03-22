@@ -292,7 +292,7 @@ export function TransportationForm({
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
-  const [activityIsBooked, setActivityIsBooked] = useState(activity?.isBooked ?? false)
+  const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
 
   // Package linkage state for PricingSection
@@ -610,7 +610,7 @@ export function TransportationForm({
         componentType: 'transportation' as const,
         name: transportationData.name,
         description: transportationData.description || '',
-        status: transportationData.status as 'proposed' | 'confirmed' | 'cancelled' | 'pending',
+        proposalStatus: transportationData.proposalStatus as 'draft' | 'proposing' | 'approved' | 'cancelled',
         notes: transportationData.notes || '',
         confirmationNumber: transportationData.confirmationNumber || '',
         transportationDetails: transportationData.transportationDetails,

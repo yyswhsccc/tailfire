@@ -15,6 +15,11 @@
 export {
   activityTypeSchema,
   type ActivityType,
+  activityProposalStatusSchema,
+  type ActivityProposalStatus,
+  activityBookingStatusSchema,
+  type ActivityBookingStatus,
+  // Backward compatibility aliases
   activityStatusSchema,
   type ActivityStatus,
   pricingTypeSchema,

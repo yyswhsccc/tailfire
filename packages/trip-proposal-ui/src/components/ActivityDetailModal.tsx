@@ -71,7 +71,7 @@ export function ActivityDetailModal({
   if (!activity) return null
 
   const Icon = typeIcons[activity.activityType] ?? MoreHorizontal
-  const statusInfo = statusVariants[activity.status] ?? { label: 'Proposed', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' }
+  const statusInfo = statusVariants[activity.proposalStatus] ?? { label: 'Draft', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' }
   const dateRange = formatDateRange(activity.startDatetime, activity.endDatetime, activity.timezone)
 
   // Use media array if available, fall back to thumbnail

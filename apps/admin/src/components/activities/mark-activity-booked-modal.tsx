@@ -4,7 +4,7 @@
  * Mark Activity as Booked Modal
  *
  * Modal dialog for marking an activity as booked/confirmed.
- * Sets isBooked=true and records the booking date.
+ * Sets bookingStatus='booked' and records the booking date.
  *
  * This is separate from the booking system modal - this tracks
  * when activities are confirmed/booked directly on the activity.

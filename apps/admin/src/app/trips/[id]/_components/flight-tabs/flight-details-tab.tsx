@@ -13,8 +13,8 @@ import {
 } from '@/components/ui/select'
 
 const STATUSES = [
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'optional', label: 'Optional' },
 ] as const

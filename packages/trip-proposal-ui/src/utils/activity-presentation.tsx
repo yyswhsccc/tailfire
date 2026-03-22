@@ -31,9 +31,9 @@ export const typeIcons: Record<string, typeof Plane> = {
 }
 
 export const statusVariants: Record<string, { label: string; className: string }> = {
-  confirmed: { label: 'Confirmed', className: 'bg-green-500/10 text-green-400 border-green-500/20' },
-  proposed: { label: 'Proposed', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-  optional: { label: 'Optional', className: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  approved: { label: 'Approved', className: 'bg-green-500/10 text-green-400 border-green-500/20' },
+  draft: { label: 'Draft', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+  proposing: { label: 'Proposing', className: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
   cancelled: { label: 'Cancelled', className: 'bg-red-500/10 text-red-400 border-red-500/20 line-through' },
 }
 

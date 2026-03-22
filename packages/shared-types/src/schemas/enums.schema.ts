@@ -30,17 +30,39 @@ export const activityTypeSchema = z.enum([
 export type ActivityType = z.infer<typeof activityTypeSchema>
 
 // =============================================================================
-// Activity Status
+// Activity Proposal Status (replaces old ActivityStatus)
 // =============================================================================
 
-export const activityStatusSchema = z.enum([
-  'proposed',
-  'confirmed',
+export const activityProposalStatusSchema = z.enum([
+  'draft',
+  'proposing',
+  'approved',
   'cancelled',
-  'optional',
 ])
 
-export type ActivityStatus = z.infer<typeof activityStatusSchema>
+export type ActivityProposalStatus = z.infer<typeof activityProposalStatusSchema>
+
+// =============================================================================
+// Activity Booking Status (replaces old isBooked boolean)
+// =============================================================================
+
+export const activityBookingStatusSchema = z.enum([
+  'unbooked',
+  'booked',
+  'cancelled',
+])
+
+export type ActivityBookingStatus = z.infer<typeof activityBookingStatusSchema>
+
+/**
+ * @deprecated Use ActivityProposalStatus instead. Kept for backward compatibility during migration.
+ */
+export const activityStatusSchema = activityProposalStatusSchema
+
+/**
+ * @deprecated Use ActivityProposalStatus instead.
+ */
+export type ActivityStatus = ActivityProposalStatus
 
 // =============================================================================
 // Pricing Type

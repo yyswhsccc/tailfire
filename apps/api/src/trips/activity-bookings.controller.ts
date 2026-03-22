@@ -6,12 +6,12 @@
  * Key Distinction:
  * - Activity = Core entity (tour, flight, dining, transportation, custom-cruise, package, etc.)
  * - Package = An activity type that holds sub-activities
- * - Booking = A status applied to an activity (isBooked flag + bookingDate)
+ * - Booking = A status applied to an activity (bookingStatus field + bookingDate)
  *
  * Routes:
  * - POST /bookings/activities/:activityId/mark - Mark activity as booked
  * - POST /bookings/activities/:activityId/unmark - Remove booking status
- * - GET /bookings/activities?tripId=...&isBooked=... - List activities with booking status
+ * - GET /bookings/activities?tripId=...&bookingStatus=... - List activities with booking status
  *
  * Access control: All endpoints verify trip access via TripAccessService.
  */
@@ -82,7 +82,7 @@ export class ActivityBookingsController {
    *
    * Business rules:
    * - Activities with packageId cannot be unmarked individually (400 error)
-   * - Sets isBooked to false and bookingDate to null
+   * - Sets bookingStatus to 'unbooked' and bookingDate to null
    *
    * Access check: User must have write access to the trip.
    */
@@ -103,12 +103,12 @@ export class ActivityBookingsController {
 
   /**
    * List activities with booking status
-   * GET /bookings/activities?tripId=...&itineraryId=...&isBooked=...
+   * GET /bookings/activities?tripId=...&itineraryId=...&bookingStatus=...
    *
    * Query parameters:
    * - tripId (required): Filter by trip
    * - itineraryId (optional): Filter by specific itinerary
-   * - isBooked (optional, default: true): Filter by booking status
+   * - bookingStatus (optional, default: 'booked'): Filter by booking status
    *
    * Response includes:
    * - paymentScheduleMissing: Warning flag for missing payment schedule
@@ -121,7 +121,7 @@ export class ActivityBookingsController {
   @ApiOperation({ summary: 'List activities with booking information' })
   @ApiQuery({ name: 'tripId', required: true, description: 'Trip ID (required for scoping)' })
   @ApiQuery({ name: 'itineraryId', required: false, description: 'Filter by itinerary' })
-  @ApiQuery({ name: 'isBooked', required: false, description: 'Filter by booking status (default: true)' })
+  @ApiQuery({ name: 'bookingStatus', required: false, description: 'Filter by booking status (default: booked)' })
   @ApiResponse({ status: 200, description: 'List of activities with booking information' })
   @ApiResponse({ status: 400, description: 'tripId is required' })
   async listBooked(

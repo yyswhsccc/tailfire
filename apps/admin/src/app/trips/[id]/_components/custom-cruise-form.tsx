@@ -72,25 +72,25 @@ interface CustomCruiseFormProps {
 }
 
 const STATUSES = [
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const
 
-// Valid status values
-const VALID_STATUSES = ['proposed', 'confirmed', 'cancelled'] as const
+// Valid proposal status values
+const VALID_STATUSES = ['draft', 'proposing', 'approved', 'cancelled'] as const
 type FormStatus = (typeof VALID_STATUSES)[number]
 
 // Valid pricing types
 const VALID_PRICING_TYPES = ['per_person', 'per_room', 'flat_rate', 'per_night', 'per_group', 'fixed', 'total'] as const
 type FormPricingType = (typeof VALID_PRICING_TYPES)[number]
 
-// Coerce API status to form status
+// Coerce API proposal status to form status
 function coerceStatus(status: string | undefined | null): FormStatus {
   if (status && VALID_STATUSES.includes(status as FormStatus)) {
     return status as FormStatus
   }
-  return 'proposed'
+  return 'draft'
 }
 
 // Coerce API pricing type to form pricing type
@@ -200,7 +200,7 @@ export function CustomCruiseForm({
 
   // Booking status state
   const [showBookingModal, setShowBookingModal] = useState(false)
-  const [activityIsBooked, setActivityIsBooked] = useState(activity?.isBooked ?? false)
+  const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
 
   // Auto-save state

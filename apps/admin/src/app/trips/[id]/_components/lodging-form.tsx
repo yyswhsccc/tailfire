@@ -102,8 +102,8 @@ interface LodgingFormProps {
 }
 
 const STATUSES = [
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const
 
@@ -205,7 +205,7 @@ export function LodgingForm({
   })
 
   // Track booking status from activity data
-  const [activityIsBooked, setActivityIsBooked] = useState(activity?.isBooked ?? false)
+  const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
 
   // Package linkage state for PricingSection
@@ -407,7 +407,7 @@ export function LodgingForm({
         componentType: 'lodging' as const,
         name: lodgingData.name,
         description: lodgingData.description,
-        status: lodgingData.status as 'proposed' | 'confirmed' | 'cancelled',
+        proposalStatus: lodgingData.proposalStatus as 'draft' | 'proposing' | 'approved' | 'cancelled',
         totalPriceCents: initialPricing.totalPriceCents,
         taxesAndFeesCents: initialPricing.taxesAndFeesCents,
         currency: trip?.currency || initialPricing.currency,
@@ -986,7 +986,7 @@ export function LodgingForm({
               <span className="text-sm text-gray-600">Status</span>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as 'proposed' | 'confirmed' | 'cancelled', { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as 'draft' | 'proposing' | 'approved' | 'cancelled', { shouldDirty: true })}
               >
                 <SelectTrigger className="w-32 h-8" data-field="status">
                   <SelectValue />

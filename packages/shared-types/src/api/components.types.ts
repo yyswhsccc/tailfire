@@ -5,7 +5,7 @@
  * Shared between API (NestJS) and client (React/Next.js).
  */
 
-import { ActivityType, ActivityStatus, PricingType, PortType, Coordinates, Photo, PricingBreakdownItem } from './activities.types'
+import { ActivityType, ActivityProposalStatus, ActivityBookingStatus, PricingType, PortType, Coordinates, Photo, PricingBreakdownItem } from './activities.types'
 
 // =============================================================================
 // Imports from Zod Schemas (for local use)
@@ -467,7 +467,8 @@ export type BaseComponentDto = {
   // Details
   notes: string | null
   confirmationNumber: string | null
-  status: ActivityStatus
+  proposalStatus: ActivityProposalStatus
+  bookingStatus: ActivityBookingStatus
 
   // Pricing (kept in base for backwards compatibility)
   pricingType: PricingType | null
@@ -663,7 +664,8 @@ export type BaseCreateComponentDto = {
   // Details
   notes?: string | null
   confirmationNumber?: string | null
-  status?: ActivityStatus
+  proposalStatus?: ActivityProposalStatus
+  bookingStatus?: ActivityBookingStatus
 
   // Pricing
   pricingType?: PricingType | null
@@ -835,7 +837,8 @@ export type BaseUpdateComponentDto = {
   // Details
   notes?: string | null
   confirmationNumber?: string | null
-  status?: ActivityStatus
+  proposalStatus?: ActivityProposalStatus
+  bookingStatus?: ActivityBookingStatus
 
   // Pricing
   pricingType?: PricingType | null

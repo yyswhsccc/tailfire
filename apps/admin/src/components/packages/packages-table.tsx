@@ -136,7 +136,7 @@ type UnifiedBookingRow =
       endDayNumber: number | null
       totalPriceCents: number | null
       supplierName: string | null
-      isBooked: boolean
+      bookingStatus: string
       confirmationNumber: string | null
       paymentStatus: string | null
       currency: string | null
@@ -461,7 +461,7 @@ type UnlinkedActivity = {
   totalPriceCents: number | null
   parentActivityId: string | null
   supplierName: string | null
-  isBooked: boolean
+  bookingStatus: string
   confirmationNumber: string | null
   paymentStatus: string | null
   paidCents: number | null
@@ -925,7 +925,7 @@ export function PackagesTable({
         endDayNumber: activity.endDayNumber ?? null,
         totalPriceCents: activity.totalPriceCents,
         supplierName: activity.supplierName ?? null,
-        isBooked: activity.isBooked ?? false,
+        bookingStatus: activity.bookingStatus ?? 'unbooked',
         confirmationNumber: activity.confirmationNumber ?? null,
         paymentStatus: activity.paymentStatus ?? null,
         currency: activity.currency ?? null,

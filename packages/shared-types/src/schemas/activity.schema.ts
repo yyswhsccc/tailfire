@@ -8,7 +8,8 @@
 import { z } from 'zod'
 import {
   activityTypeSchema,
-  activityStatusSchema,
+  activityProposalStatusSchema,
+  activityBookingStatusSchema,
   pricingTypeSchema,
 } from './enums.schema'
 import { coordinatesSchema, photoSchema } from './common.schema'
@@ -49,7 +50,8 @@ export const createActivityDtoSchema = z.object({
   // Details - all nullable/optional
   notes: z.string().nullable().optional(),
   confirmationNumber: z.string().nullable().optional(),
-  status: activityStatusSchema.optional(),
+  proposalStatus: activityProposalStatusSchema.optional(),
+  bookingStatus: activityBookingStatusSchema.optional(),
 
   // Pricing - all nullable/optional
   pricingType: pricingTypeSchema.nullable().optional(),
@@ -98,10 +100,10 @@ export const updateActivityDtoSchema = z.object({
   // Details
   notes: z.string().nullable().optional(),
   confirmationNumber: z.string().nullable().optional(),
-  status: activityStatusSchema.optional(),
+  proposalStatus: activityProposalStatusSchema.optional(),
+  bookingStatus: activityBookingStatusSchema.optional(),
 
   // Update-only fields
-  isBooked: z.boolean().optional(),
   isVisibleInCalendar: z.boolean().optional(),
   bookingDate: z.string().nullable().optional(),
 

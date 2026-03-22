@@ -6,8 +6,10 @@
  * Key Distinction:
  * - Activity = Core entity (tour, flight, dining, transportation, custom-cruise, package, etc.)
  * - Package = An activity type that holds sub-activities
- * - Booking = A status applied to an activity (isBooked flag + bookingDate)
+ * - Booking = A status applied to an activity (bookingStatus field + bookingDate)
  */
+
+import type { ActivityBookingStatus } from './activities.types'
 
 // Request DTOs
 
@@ -18,7 +20,7 @@ export type MarkActivityBookedDto = {
 export type ActivityBookingsFilterDto = {
   tripId: string // Required - enforces tenant scoping
   itineraryId?: string
-  isBooked?: boolean // Defaults to true
+  bookingStatus?: ActivityBookingStatus // Defaults to 'booked'
 }
 
 // Response DTOs
@@ -27,7 +29,7 @@ export type ActivityBookingResponseDto = {
   id: string
   name: string
   activityType: string
-  isBooked: boolean
+  bookingStatus: ActivityBookingStatus
   bookingDate: string | null // YYYY-MM-DD format (UTC)
   parentActivityId: string | null // If set and parent is a package, this activity cannot be booked directly
   paymentScheduleMissing: boolean

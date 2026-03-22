@@ -51,7 +51,7 @@ export function ActivityCard({ activity }: { activity: ItineraryActivity }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h4 className="font-medium text-white">{activity.name}</h4>
-              {activity.isBooked && (
+              {activity.bookingStatus === 'booked' && (
                 <Badge variant="outline" className="text-xs border-green-500/30 text-green-400">
                   <CheckCircle2 className="h-3 w-3 mr-1" />
                   Booked

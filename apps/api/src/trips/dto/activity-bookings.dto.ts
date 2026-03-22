@@ -6,11 +6,10 @@
  * Key Distinction:
  * - Activity = Core entity (tour, flight, dining, transportation, custom-cruise, package, etc.)
  * - Package = An activity type that holds sub-activities
- * - Booking = A status applied to an activity (isBooked flag + bookingDate)
+ * - Booking = A status applied to an activity (bookingStatus field + bookingDate)
  */
 
-import { IsOptional, IsUUID, IsBoolean, Matches, IsDefined } from 'class-validator'
-import { Transform } from 'class-transformer'
+import { IsOptional, IsUUID, IsIn, Matches, IsDefined } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 /**
@@ -49,15 +48,11 @@ export class ActivityBookingsFilterDto {
   itineraryId?: string
 
   @ApiPropertyOptional({
-    description: 'Filter by booking status (defaults to true)',
-    example: true,
+    description: 'Filter by booking status (defaults to booked)',
+    example: 'booked',
+    enum: ['unbooked', 'booked', 'cancelled'],
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    // Return undefined for missing values so service default (true) kicks in
-    if (value === undefined || value === null || value === '') return undefined
-    return value === 'true' || value === true
-  })
-  @IsBoolean()
-  isBooked?: boolean
+  @IsIn(['unbooked', 'booked', 'cancelled'])
+  bookingStatus?: 'unbooked' | 'booked' | 'cancelled'
 }

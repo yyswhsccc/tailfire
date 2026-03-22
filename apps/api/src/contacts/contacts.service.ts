@@ -669,7 +669,7 @@ export class ContactsService {
 
   /**
    * Get booked activities for a contact across all their trips.
-   * Returns activities where isBooked = true from trips the contact is a traveler on.
+   * Returns activities where bookingStatus = 'booked' from trips the contact is a traveler on.
    */
   async getBookingsForContact(contactId: string, agencyId: string) {
     // Get trip IDs where contact is a traveler
@@ -687,7 +687,7 @@ export class ContactsService {
         activityId: this.db.schema.itineraryActivities.id,
         activityName: this.db.schema.itineraryActivities.name,
         activityType: this.db.schema.itineraryActivities.activityType,
-        status: this.db.schema.itineraryActivities.status,
+        proposalStatus: this.db.schema.itineraryActivities.proposalStatus,
         startDatetime: this.db.schema.itineraryActivities.startDatetime,
         endDatetime: this.db.schema.itineraryActivities.endDatetime,
         location: this.db.schema.itineraryActivities.location,
@@ -713,7 +713,7 @@ export class ContactsService {
       .where(
         and(
           inArray(this.db.schema.itineraries.tripId, tripIds),
-          eq(this.db.schema.itineraryActivities.isBooked, true),
+          eq(this.db.schema.itineraryActivities.bookingStatus, 'booked'),
           eq(this.db.schema.trips.agencyId, agencyId),
         ),
       )

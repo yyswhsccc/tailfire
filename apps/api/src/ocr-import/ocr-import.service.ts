@@ -419,7 +419,8 @@ export class OcrImportService {
         ? `${lastSegment.arrivalDate}T${lastSegment.arrivalTime || '23:59'}`
         : undefined,
       confirmationNumber: flight.confirmationNumber || undefined,
-      status: 'confirmed',
+      proposalStatus: 'approved',
+      bookingStatus: 'booked',
       currency: flight.currency || 'CAD',
       totalPriceCents: flight.totalPriceCents || undefined,
       flightDetails: {
@@ -454,7 +455,7 @@ export class OcrImportService {
     // Mark as booked (confirmed invoices are booked)
     await this.db.client
       .update(schema.itineraryActivities)
-      .set({ isBooked: true, bookingDate: flight.bookingDate ? new Date(`${flight.bookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
+      .set({ bookingStatus: 'booked', bookingDate: flight.bookingDate ? new Date(`${flight.bookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
       .where(eq(schema.itineraryActivities.id, activity.id))
 
     // Create travelers and link
@@ -537,7 +538,8 @@ export class OcrImportService {
         ? `${lodging.checkOutDate}T${lodging.checkOutTime || '11:00'}`
         : undefined,
       confirmationNumber: lodging.confirmationNumber || undefined,
-      status: 'confirmed',
+      proposalStatus: 'approved',
+      bookingStatus: 'booked',
       currency: lodging.currency || 'CAD',
       totalPriceCents: lodging.totalPriceCents || undefined,
       address: lodging.address || undefined,
@@ -560,7 +562,7 @@ export class OcrImportService {
     // Mark as booked (confirmed invoices are booked)
     await this.db.client
       .update(schema.itineraryActivities)
-      .set({ isBooked: true, bookingDate: lodging.bookingDate ? new Date(`${lodging.bookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
+      .set({ bookingStatus: 'booked', bookingDate: lodging.bookingDate ? new Date(`${lodging.bookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
       .where(eq(schema.itineraryActivities.id, activity.id))
 
     const { travelersCreated, travelersMatched } = await this.createAndLinkTravelers(
@@ -662,7 +664,8 @@ export class OcrImportService {
       startDatetime: cruise.departureDate || undefined,
       endDatetime: cruise.arrivalDate || undefined,
       confirmationNumber: cruise.confirmationNumber || undefined,
-      status: 'confirmed',
+      proposalStatus: 'approved',
+      bookingStatus: 'booked',
       currency: cruise.currency || 'CAD',
       totalPriceCents: cruise.totalPriceCents || undefined,
       customCruiseDetails: {
@@ -684,7 +687,7 @@ export class OcrImportService {
     const cruiseBookingDate = extraction.booking?.bookingDate
     await this.db.client
       .update(schema.itineraryActivities)
-      .set({ isBooked: true, bookingDate: cruiseBookingDate ? new Date(`${cruiseBookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
+      .set({ bookingStatus: 'booked', bookingDate: cruiseBookingDate ? new Date(`${cruiseBookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
       .where(eq(schema.itineraryActivities.id, activity.id))
 
     const { travelersCreated, travelersMatched } = await this.createAndLinkTravelers(
@@ -1027,7 +1030,8 @@ export class OcrImportService {
         ? `${transport.dropoffDate}T${transport.dropoffTime || '23:59'}`
         : undefined,
       confirmationNumber: transport.confirmationNumber || undefined,
-      status: 'confirmed',
+      proposalStatus: 'approved',
+      bookingStatus: 'booked',
       currency: transport.currency || 'CAD',
       totalPriceCents: transport.totalPriceCents || undefined,
       transportationDetails: {
@@ -1110,7 +1114,8 @@ export class OcrImportService {
         ? `${dining.reservationDate}T${dining.reservationTime || '19:00'}`
         : undefined,
       confirmationNumber: dining.confirmationNumber || undefined,
-      status: 'confirmed',
+      proposalStatus: 'approved',
+      bookingStatus: 'booked',
       currency: dining.currency || 'CAD',
       totalPriceCents: dining.totalPriceCents || undefined,
       address: dining.address || undefined,
@@ -1219,7 +1224,8 @@ export class OcrImportService {
           ? `${pkg.supplierName} — ${pkg.bookingReference || 'Package'}`.trim()
           : `Package ${pkg.bookingReference || ''}`.trim(),
         confirmationNumber: pkg.bookingReference || undefined,
-        status: 'confirmed',
+        proposalStatus: 'approved',
+        bookingStatus: 'booked',
         currency: pkg.currency || 'CAD',
         totalPriceCents,
         taxesCents: pkg.taxesAndFees ? Math.round(pkg.taxesAndFees * 100) : undefined,
@@ -1250,7 +1256,7 @@ export class OcrImportService {
     // 6b. Mark package as booked (confirmed invoices are booked)
     await this.db.client
       .update(schema.itineraryActivities)
-      .set({ isBooked: true, bookingDate: pkg.bookingDate ? new Date(`${pkg.bookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
+      .set({ bookingStatus: 'booked', bookingDate: pkg.bookingDate ? new Date(`${pkg.bookingDate}T12:00:00`) : new Date(), updatedAt: new Date() })
       .where(eq(schema.itineraryActivities.id, packageActivity.id))
 
     // 7. Create child activities for each component (using normalized components)
@@ -1463,7 +1469,8 @@ export class OcrImportService {
             ? `${f.arrivalDate}T${f.arrivalTime || '23:59'}`
             : undefined,
           confirmationNumber: f?.confirmationNumber || confirmationNumber,
-          status: 'confirmed',
+          proposalStatus: 'approved',
+          bookingStatus: 'booked',
           currency,
           totalPriceCents: 0, // child pricing = zero (parent has total)
           flightDetails: {
@@ -1497,7 +1504,8 @@ export class OcrImportService {
           startDatetime: l?.checkInDate ? `${l.checkInDate}T15:00` : undefined,
           endDatetime: l?.checkOutDate ? `${l.checkOutDate}T11:00` : undefined,
           confirmationNumber,
-          status: 'confirmed',
+          proposalStatus: 'approved',
+          bookingStatus: 'booked',
           currency,
           totalPriceCents: 0, // child pricing = zero
           address: l?.address || undefined,
@@ -1519,7 +1527,8 @@ export class OcrImportService {
           startDatetime: t?.pickupDate ? `${t.pickupDate}T00:00` : undefined,
           endDatetime: t?.dropoffDate ? `${t.dropoffDate}T23:59` : undefined,
           confirmationNumber,
-          status: 'confirmed',
+          proposalStatus: 'approved',
+          bookingStatus: 'booked',
           currency,
           totalPriceCents: 0, // child pricing = zero
           transportationDetails: {

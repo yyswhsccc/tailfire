@@ -17,8 +17,8 @@ export interface ItineraryActivity {
   address: string | null
   coordinates: { lat: number; lng: number } | null
   confirmationNumber: string | null
-  status: string | null
-  isBooked: boolean
+  proposalStatus: string | null
+  bookingStatus: string
   photos: { url: string; caption?: string }[] | null
 }
 

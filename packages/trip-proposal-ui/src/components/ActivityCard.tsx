@@ -37,7 +37,7 @@ export function ActivityCard({
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const Icon = typeIcons[activity.activityType] ?? MoreHorizontal
-  const statusInfo = statusVariants[activity.status] ?? { label: 'Proposed', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' }
+  const statusInfo = statusVariants[activity.proposalStatus] ?? { label: 'Draft', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' }
 
   const handleConfirm = async () => {
     if (!onConfirm || isSubmitting) return

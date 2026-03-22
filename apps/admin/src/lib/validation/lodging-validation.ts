@@ -91,7 +91,7 @@ export const lodgingFormSchema = z.object({
   componentType: z.literal('lodging').default('lodging'),
   name: z.string().optional().default(''), // Auto-generated from propertyName
   description: z.string().optional().default(''),
-  status: z.enum(['proposed', 'confirmed', 'cancelled']).default('proposed'),
+  proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
 
   // Nested lodging details
   lodgingDetails: lodgingDetailsSchema,
@@ -231,7 +231,7 @@ export function toLodgingDefaults(
     componentType: 'lodging',
     name: serverData?.name ?? '',
     description: serverData?.description ?? '',
-    status: serverData?.status ?? 'proposed',
+    proposalStatus: serverData?.proposalStatus ?? 'draft',
 
     lodgingDetails: {
       propertyName: serverDetails?.propertyName ?? '',

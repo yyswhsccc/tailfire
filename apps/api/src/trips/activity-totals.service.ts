@@ -97,7 +97,7 @@ export class ActivityTotalsService {
     const result = await this.db.client.execute(sql`
       WITH booked_items AS (
         -- Packages (always shown in payments) and standalone booked activities
-        SELECT ia.id, ia.activity_type, ia.status, ia.is_booked,
+        SELECT ia.id, ia.activity_type, ia.proposal_status, ia.booking_status,
                ap.total_price_cents, ia.parent_activity_id
         FROM itinerary_activities ia
         JOIN itinerary_days id ON ia.itinerary_day_id = id.id
@@ -106,18 +106,18 @@ export class ActivityTotalsService {
         WHERE i.trip_id = ${tripId}
           AND (
             ia.activity_type = 'package'
-            OR (ia.is_booked = true AND ia.parent_activity_id IS NULL)
+            OR (ia.booking_status = 'booked' AND ia.parent_activity_id IS NULL)
           )
       ),
       -- Include children of packages for cost aggregation
       all_costs AS (
-        SELECT bi.id as root_id, bi.activity_type, bi.status, bi.is_booked,
+        SELECT bi.id as root_id, bi.activity_type, bi.proposal_status, bi.booking_status,
                COALESCE(bi.total_price_cents, 0) + COALESCE(SUM(child_ap.total_price_cents), 0) as total_cost
         FROM booked_items bi
         LEFT JOIN itinerary_activities child ON child.parent_activity_id = bi.id
         LEFT JOIN activity_pricing child_ap ON child_ap.activity_id = child.id
         WHERE bi.activity_type = 'package' OR bi.parent_activity_id IS NULL
-        GROUP BY bi.id, bi.activity_type, bi.status, bi.is_booked, bi.total_price_cents
+        GROUP BY bi.id, bi.activity_type, bi.proposal_status, bi.booking_status, bi.total_price_cents
       ),
       payments AS (
         SELECT ac.root_id, COALESCE(SUM(ptx.amount_cents), 0) as paid
