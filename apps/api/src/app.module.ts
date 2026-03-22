@@ -56,6 +56,7 @@ import { CatalogMatcherModule } from './catalog-matcher/catalog-matcher.module'
 import { SecurityAuditModule } from './security-audit/security-audit.module'
 import { ImpersonationModule } from './impersonation/impersonation.module'
 import { ApiHealthModule } from './api-health/api-health.module'
+import { SearchModule } from './search/search.module'
 
 @Module({
   imports: [
@@ -202,6 +203,9 @@ import { ApiHealthModule } from './api-health/api-health.module'
 
     // API Health Dashboard (external API health monitoring via BullMQ)
     ApiHealthModule,
+
+    // Super Search (cross-entity search across trips, contacts)
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [
