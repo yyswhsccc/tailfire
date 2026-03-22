@@ -50,6 +50,7 @@ import { PaymentTemplatesService } from './payment-templates.service'
 import { ActivityTotalsService } from './activity-totals.service'
 import { ActivityTravelersService } from './activity-travelers.service'
 import { ActivityBookingsService } from './activity-bookings.service'
+import { BookingValidationService } from './booking-validation.service'
 import { TravelerBookingsService } from './traveler-bookings.service'
 import { InsuranceService } from './insurance.service'
 import { StorageService } from './storage.service'
@@ -157,6 +158,7 @@ import { TripGroupSharesController } from './trip-group-shares.controller'
     ActivityTotalsService,
     ActivityTravelersService,
     ActivityBookingsService,
+    BookingValidationService,
     TravelerBookingsService,
     InsuranceService,
     StorageService,

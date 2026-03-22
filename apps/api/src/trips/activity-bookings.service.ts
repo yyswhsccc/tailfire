@@ -13,6 +13,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { ActivitiesService } from './activities.service'
+import { BookingValidationService } from './booking-validation.service'
 import type {
   MarkActivityBookedDto,
   ActivityBookingsFilterDto,
@@ -24,7 +25,8 @@ import type {
 export class ActivityBookingsService {
   constructor(
     private readonly db: DatabaseService,
-    private readonly activitiesService: ActivitiesService
+    private readonly activitiesService: ActivitiesService,
+    private readonly bookingValidationService: BookingValidationService
   ) {}
 
   /**
@@ -50,6 +52,15 @@ export class ActivityBookingsService {
     // Package guard: block if activity is a child of a package
     if (activity.parentActivityId && activity.parentActivityType === 'package') {
       throw new BadRequestException('Activity is linked to a package. Use package booking instead.')
+    }
+
+    // Tier 1 booking validation
+    const validation = await this.bookingValidationService.validateBooking(activityId)
+    if (!validation.valid) {
+      throw new BadRequestException({
+        message: 'Activity does not meet booking requirements',
+        errors: validation.errors,
+      })
     }
 
     // Determine booking date (default to today UTC)
