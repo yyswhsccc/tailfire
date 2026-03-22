@@ -180,6 +180,10 @@ export function TripsKanban({ trips }: TripsKanbanProps) {
     // Get the column ID from the over container
     const overId = over.id.toString()
 
+    // Only inbound and planning are manually settable via drag.
+    // Active, Travelling, and Travelled are system-driven.
+    const allowedDropColumns: KanbanColumnId[] = ['inbound', 'planning']
+
     // Check if we're dropping over a column
     const targetColumn = KANBAN_COLUMNS.find(col => col.id === overId)
     if (!targetColumn) {
@@ -193,9 +197,29 @@ export function TripsKanban({ trips }: TripsKanbanProps) {
       )
       if (!column) return
 
+      // Guard: block drops onto system-driven columns
+      if (!allowedDropColumns.includes(column.id as KanbanColumnId)) {
+        toast({
+          title: 'Cannot move trip here',
+          description: 'Active, Travelling, and Travelled are set automatically by the system.',
+          variant: 'destructive',
+        })
+        return
+      }
+
       const newStatus = getStatusForColumn(column.id as KanbanColumnId)
       await updateTripStatus(active.id.toString(), newStatus)
     } else {
+      // Guard: block drops onto system-driven columns
+      if (!allowedDropColumns.includes(targetColumn.id as KanbanColumnId)) {
+        toast({
+          title: 'Cannot move trip here',
+          description: 'Active, Travelling, and Travelled are set automatically by the system.',
+          variant: 'destructive',
+        })
+        return
+      }
+
       const newStatus = getStatusForColumn(targetColumn.id)
       await updateTripStatus(active.id.toString(), newStatus)
     }
