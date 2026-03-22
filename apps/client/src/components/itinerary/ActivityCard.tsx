@@ -57,9 +57,9 @@ export function ActivityCard({ activity }: { activity: ItineraryActivity }) {
                   Booked
                 </Badge>
               )}
-              {activity.status === "optional" && (
-                <Badge variant="outline" className="text-xs border-phoenix-gold/30 text-phoenix-text-muted">
-                  Optional
+              {activity.proposalStatus === "cancelled" && (
+                <Badge variant="outline" className="text-xs border-red-500/30 text-red-400">
+                  Cancelled
                 </Badge>
               )}
             </div>
