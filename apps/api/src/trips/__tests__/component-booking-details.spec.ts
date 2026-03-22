@@ -78,7 +78,7 @@ describe('Component Booking Details (Integration)', () => {
       .insert(trips)
       .values({
         name: 'Booking Details Test Trip',
-        status: 'draft',
+        status: 'planning',
         primaryContactId: testContactId,
         currency: 'CAD',
         ownerId: '00000000-0000-0000-0000-000000000001',

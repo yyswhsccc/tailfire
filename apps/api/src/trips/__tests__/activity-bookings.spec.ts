@@ -81,7 +81,7 @@ describe('Activity Bookings API (Integration)', () => {
         name: 'Activity Bookings Test Trip',
         primaryContactId: testContactId,
         ownerId: testContactId,
-        status: 'draft',
+        status: 'planning',
         currency: 'CAD',
       })
       .returning()
@@ -220,7 +220,7 @@ describe('Activity Bookings API (Integration)', () => {
           name: 'Empty Trip',
           primaryContactId: testContactId,
           ownerId: testContactId,
-          status: 'draft',
+          status: 'planning',
           currency: 'CAD',
         })
         .returning()

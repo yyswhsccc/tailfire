@@ -4,9 +4,9 @@
  * Tests the complete trip lifecycle including:
  * - Trip creation with status transitions
  * - Primary contact association and first booking date
- * - Reference number immutability after leaving draft
- * - Contact status updates when trip is booked
- * - Full lifecycle: draft → quoted → booked → in_progress → completed
+ * - Reference number immutability after leaving planning
+ * - Contact status updates when trip becomes active
+ * - Full lifecycle: planning → active → travelling → travelled
  */
 
 import { Test, TestingModule } from '@nestjs/testing'
@@ -105,8 +105,8 @@ describe('Trips Workflow (Integration)', () => {
   })
 
   describe('Trip Creation and Primary Contact', () => {
-    it('should create trip with primary contact and NOT set first booking date (draft)', async () => {
-      // Create trip in draft status
+    it('should create trip with primary contact and NOT set first booking date (planning)', async () => {
+      // Create trip in planning status
       const trip = await tripsService.create(
         {
           name: 'Test Trip',
@@ -119,7 +119,7 @@ describe('Trips Workflow (Integration)', () => {
       )
 
       expect(trip).toBeDefined()
-      expect(trip.status).toBe('draft')
+      expect(trip.status).toBe('planning')
       expect(trip.primaryContactId).toBe(testContactId)
       expect(trip.referenceNumber).toMatch(/^FIT-\d{4}-\d{6}$/)
 
@@ -128,8 +128,8 @@ describe('Trips Workflow (Integration)', () => {
       expect(contact.firstBookingDate).toBeNull()
     })
 
-    it('should create trip as "booked" and set first booking date on contact', async () => {
-      // Create trip directly as booked
+    it('should create trip as "active" and set first booking date on contact', async () => {
+      // Create trip directly as active
       const trip = await tripsService.create(
         {
           name: 'Booked Trip',
@@ -137,13 +137,13 @@ describe('Trips Workflow (Integration)', () => {
           primaryContactId: testContactId,
           startDate: '2025-07-01',
           endDate: '2025-07-15',
-          status: 'booked',
+          status: 'active',
         },
         testOwnerId
       )
 
       expect(trip).toBeDefined()
-      expect(trip.status).toBe('booked')
+      expect(trip.status).toBe('active')
       expect(trip.bookingDate).toBeDefined()
 
       // Wait for event to process
@@ -157,8 +157,8 @@ describe('Trips Workflow (Integration)', () => {
   })
 
   describe('Status Transitions and Booking Date', () => {
-    it('should set first booking date when transitioning from draft → booked', async () => {
-      // Create as draft
+    it('should set first booking date when transitioning from planning → active', async () => {
+      // Create as planning
       const trip = await tripsService.create(
         {
           name: 'Draft to Booked',
@@ -170,18 +170,18 @@ describe('Trips Workflow (Integration)', () => {
         testOwnerId
       )
 
-      expect(trip.status).toBe('draft')
+      expect(trip.status).toBe('planning')
 
       // Verify contact has no first booking date yet
       let contact = await contactsService.findOneInternal(testContactId)
       expect(contact.firstBookingDate).toBeNull()
 
-      // Transition to booked
+      // Transition to active
       const bookedTrip = await tripsService.update(trip.id, {
-        status: 'booked',
+        status: 'active',
       })
 
-      expect(bookedTrip.status).toBe('booked')
+      expect(bookedTrip.status).toBe('active')
       expect(bookedTrip.bookingDate).toBeDefined()
 
       // Wait for event to process
@@ -203,20 +203,20 @@ describe('Trips Workflow (Integration)', () => {
      * firstBookingDate is stored as YYYY-MM-DD format, matching trip.bookingDate.
      */
     it('should store firstBookingDate in YYYY-MM-DD format (regression)', async () => {
-      // Create trip as booked
+      // Create trip as active
       const trip = await tripsService.create(
         {
           name: 'Date Format Regression Test',
           tripType: 'leisure',
           primaryContactId: testContactId,
-          status: 'booked',
+          status: 'active',
           startDate: '2025-12-15',
           endDate: '2025-12-25',
         },
         testOwnerId
       )
 
-      expect(trip.status).toBe('booked')
+      expect(trip.status).toBe('active')
       expect(trip.bookingDate).toBeDefined()
 
       // Wait for event to process
@@ -234,13 +234,13 @@ describe('Trips Workflow (Integration)', () => {
     })
 
     it('should NOT change first booking date on subsequent bookings', async () => {
-      // Create first booked trip
+      // Create first active trip
       await tripsService.create(
         {
           name: 'First Booking',
           tripType: 'leisure',
           primaryContactId: testContactId,
-          status: 'booked',
+          status: 'active',
           startDate: '2025-09-01',
           endDate: '2025-09-15',
         },
@@ -255,13 +255,13 @@ describe('Trips Workflow (Integration)', () => {
 
       expect(firstBookingDate).toBeDefined()
 
-      // Create second booked trip (later date)
+      // Create second active trip (later date)
       await tripsService.create(
         {
           name: 'Second Booking',
           tripType: 'group',
           primaryContactId: testContactId,
-          status: 'booked',
+          status: 'active',
           startDate: '2025-10-01',
           endDate: '2025-10-15',
         },
@@ -278,8 +278,8 @@ describe('Trips Workflow (Integration)', () => {
   })
 
   describe('Reference Number Immutability', () => {
-    it('should lock reference number after leaving draft status', async () => {
-      // Create as draft with leisure type (FIT prefix)
+    it('should lock reference number after leaving planning status', async () => {
+      // Create as planning with leisure type (FIT prefix)
       const trip = await tripsService.create(
         {
           name: 'Reference Lock Test',
@@ -291,15 +291,15 @@ describe('Trips Workflow (Integration)', () => {
         testOwnerId
       )
 
-      const draftRef = trip.referenceNumber
-      expect(draftRef).toContain('FIT-')
+      const planningRef = trip.referenceNumber
+      expect(planningRef).toContain('FIT-')
 
-      // Transition to quoted
-      const quotedTrip = await tripsService.update(trip.id, {
-        status: 'quoted',
+      // Transition to active
+      const activeTrip = await tripsService.update(trip.id, {
+        status: 'active',
       })
 
-      expect(quotedTrip.referenceNumber).toBe(draftRef)
+      expect(activeTrip.referenceNumber).toBe(planningRef)
 
       // Try to change trip type - reference should NOT regenerate
       const updatedTrip = await tripsService.update(trip.id, {
@@ -307,14 +307,14 @@ describe('Trips Workflow (Integration)', () => {
       })
 
       expect(updatedTrip.tripType).toBe('group')
-      expect(updatedTrip.referenceNumber).toBe(draftRef) // Still FIT prefix
+      expect(updatedTrip.referenceNumber).toBe(planningRef) // Still FIT prefix
     })
   })
 
   describe('Full Lifecycle Workflow', () => {
-    it('should complete full trip lifecycle: draft → quoted → booked → in_progress → completed', async () => {
-      // Step 1: Create draft trip
-      const draftTrip = await tripsService.create(
+    it('should complete full trip lifecycle: planning → active → travelling → travelled', async () => {
+      // Step 1: Create planning trip
+      const planningTrip = await tripsService.create(
         {
           name: 'Full Lifecycle Trip',
           tripType: 'leisure',
@@ -325,70 +325,62 @@ describe('Trips Workflow (Integration)', () => {
         testOwnerId
       )
 
-      expect(draftTrip.status).toBe('draft')
-      const referenceNumber = draftTrip.referenceNumber
+      expect(planningTrip.status).toBe('planning')
+      const referenceNumber = planningTrip.referenceNumber
 
-      // Step 2: Transition to quoted
-      const quotedTrip = await tripsService.update(draftTrip.id, {
-        status: 'quoted',
+      // Step 2: Transition to active
+      const activeTrip = await tripsService.update(planningTrip.id, {
+        status: 'active',
       })
 
-      expect(quotedTrip.status).toBe('quoted')
-      expect(quotedTrip.referenceNumber).toBe(referenceNumber)
-
-      // Step 3: Transition to booked
-      const bookedTrip = await tripsService.update(quotedTrip.id, {
-        status: 'booked',
-      })
-
-      expect(bookedTrip.status).toBe('booked')
-      expect(bookedTrip.bookingDate).toBeDefined()
-      expect(bookedTrip.referenceNumber).toBe(referenceNumber)
+      expect(activeTrip.status).toBe('active')
+      expect(activeTrip.bookingDate).toBeDefined()
+      expect(activeTrip.referenceNumber).toBe(referenceNumber)
 
       // Wait for event to process
       await waitForEvents()
 
       // Verify first booking date was set on contact
       const contactAfterBooking = await contactsService.findOneInternal(testContactId)
-      expect(contactAfterBooking.firstBookingDate).toBe(bookedTrip.bookingDate)
+      expect(contactAfterBooking.firstBookingDate).toBe(activeTrip.bookingDate)
 
-      // Step 4: Transition to in_progress
-      const inProgressTrip = await tripsService.update(bookedTrip.id, {
-        status: 'in_progress',
+      // Step 3: Transition to travelling
+      const travellingTrip = await tripsService.update(activeTrip.id, {
+        status: 'travelling',
       })
 
-      expect(inProgressTrip.status).toBe('in_progress')
-      expect(inProgressTrip.referenceNumber).toBe(referenceNumber)
+      expect(travellingTrip.status).toBe('travelling')
+      expect(travellingTrip.referenceNumber).toBe(referenceNumber)
 
-      // Step 5: Transition to completed
-      const completedTrip = await tripsService.update(inProgressTrip.id, {
-        status: 'completed',
+      // Step 4: Transition to travelled
+      const travelledTrip = await tripsService.update(travellingTrip.id, {
+        status: 'travelled',
       })
 
-      expect(completedTrip.status).toBe('completed')
-      expect(completedTrip.referenceNumber).toBe(referenceNumber)
+      expect(travelledTrip.status).toBe('travelled')
+      expect(travelledTrip.referenceNumber).toBe(referenceNumber)
 
       // Final verification
-      expect(completedTrip.id).toBe(draftTrip.id)
-      expect(completedTrip.name).toBe('Full Lifecycle Trip')
-      expect(completedTrip.primaryContactId).toBe(testContactId)
+      expect(travelledTrip.id).toBe(planningTrip.id)
+      expect(travelledTrip.name).toBe('Full Lifecycle Trip')
+      expect(travelledTrip.primaryContactId).toBe(testContactId)
     })
 
     it('should allow cancellation at any non-terminal stage', async () => {
-      // Create and transition to booked
+      // Create and transition to active
       const trip = await tripsService.create(
         {
           name: 'Cancellation Test',
           tripType: 'leisure',
           primaryContactId: testContactId,
-          status: 'booked',
+          status: 'active',
           startDate: '2026-01-01',
           endDate: '2026-01-15',
         },
         testOwnerId
       )
 
-      expect(trip.status).toBe('booked')
+      expect(trip.status).toBe('active')
 
       // Cancel the trip
       const cancelledTrip = await tripsService.update(trip.id, {
@@ -399,13 +391,13 @@ describe('Trips Workflow (Integration)', () => {
 
       // Cancelled is terminal - cannot transition to other states
       await expect(
-        tripsService.update(cancelledTrip.id, { status: 'completed' })
+        tripsService.update(cancelledTrip.id, { status: 'travelled' })
       ).rejects.toThrow()
     })
   })
 
   describe('Invalid State Transitions', () => {
-    it('should reject invalid transition: draft → in_progress', async () => {
+    it('should reject invalid transition: planning → travelling', async () => {
       const trip = await tripsService.create(
         {
           name: 'Invalid Transition Test',
@@ -417,62 +409,65 @@ describe('Trips Workflow (Integration)', () => {
         testOwnerId
       )
 
-      expect(trip.status).toBe('draft')
+      expect(trip.status).toBe('planning')
 
       // Try invalid transition
       await expect(
-        tripsService.update(trip.id, { status: 'in_progress' })
+        tripsService.update(trip.id, { status: 'travelling' })
       ).rejects.toThrow(/cannot transition/i)
     })
 
-    it('should reject invalid transition: booked → draft', async () => {
+    it('should reject invalid transition: active → planning', async () => {
       const trip = await tripsService.create(
         {
-          name: 'Booked to Draft Test',
+          name: 'Active to Planning Test',
           tripType: 'leisure',
           primaryContactId: testContactId,
-          status: 'booked',
+          status: 'active',
           startDate: '2026-03-01',
           endDate: '2026-03-15',
         },
         testOwnerId
       )
 
-      expect(trip.status).toBe('booked')
+      expect(trip.status).toBe('active')
 
       // Try invalid transition
       await expect(
-        tripsService.update(trip.id, { status: 'draft' })
+        tripsService.update(trip.id, { status: 'planning' })
       ).rejects.toThrow(/cannot transition/i)
     })
 
-    it('should reject any transition from completed (terminal state)', async () => {
+    it('should reject any transition from travelled (terminal state)', async () => {
       const trip = await tripsService.create(
         {
           name: 'Terminal State Test',
           tripType: 'leisure',
           primaryContactId: testContactId,
-          status: 'booked',
+          status: 'active',
           startDate: '2026-04-01',
           endDate: '2026-04-15',
         },
         testOwnerId
       )
 
-      // Complete the trip
-      const completedTrip = await tripsService.update(trip.id, {
-        status: 'completed',
+      // Transition through to travelled
+      const travellingTrip = await tripsService.update(trip.id, {
+        status: 'travelling',
+      })
+      const travelledTrip = await tripsService.update(travellingTrip.id, {
+        status: 'travelled',
       })
 
-      expect(completedTrip.status).toBe('completed')
+      expect(travelledTrip.status).toBe('travelled')
 
-      // Try to transition from completed to anything else
+      // Try to transition from travelled to anything else
       await expect(
-        tripsService.update(completedTrip.id, { status: 'in_progress' })
+        tripsService.update(travelledTrip.id, { status: 'travelling' })
       ).rejects.toThrow(/cannot transition/i)
 
       await expect(
-        tripsService.update(completedTrip.id, { status: 'cancelled' })
+        tripsService.update(travelledTrip.id, { status: 'cancelled' })
       ).rejects.toThrow(/cannot transition/i)
     })
   })
