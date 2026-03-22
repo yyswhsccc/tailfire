@@ -121,7 +121,7 @@ export function SuperSearchDialog({ open, onOpenChange }: SuperSearchDialogProps
                 {trips.hasMore && (
                   <CommandItem
                     value="view-all-trips"
-                    onSelect={() => handleSelect('/trips')}
+                    onSelect={() => handleSelect(`/trips?search=${encodeURIComponent(query)}`)}
                     className="cursor-pointer justify-center text-muted-foreground"
                   >
                     <span className="text-xs">View all trip results</span>
@@ -161,7 +161,7 @@ export function SuperSearchDialog({ open, onOpenChange }: SuperSearchDialogProps
                 {contacts.hasMore && (
                   <CommandItem
                     value="view-all-contacts"
-                    onSelect={() => handleSelect('/contacts')}
+                    onSelect={() => handleSelect(`/contacts?search=${encodeURIComponent(query)}`)}
                     className="cursor-pointer justify-center text-muted-foreground"
                   >
                     <span className="text-xs">View all contact results</span>
