@@ -49,12 +49,12 @@ import { ApiError } from '@/lib/api'
 import { dollarsToCents } from '@/lib/pricing/currency-helpers'
 
 // Form validation schema
-// Status uses ActivityStatus values: proposed, confirmed, cancelled, optional
+// Proposal status uses ActivityProposalStatus values: draft, proposing, approved, cancelled
 const bookingFormSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
   confirmationNumber: z.string().max(255).optional().nullable(),
   supplierName: z.string().max(255).optional().nullable(),
-  status: z.enum(['proposed', 'confirmed', 'cancelled', 'optional']),
+  proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']),
   paymentStatus: z.enum(['unpaid', 'deposit_paid', 'paid', 'refunded', 'partially_refunded']),
   pricingType: z.enum(['flat_rate', 'per_person']),
   travelerCount: z.number().int().min(1).default(1),
@@ -117,7 +117,7 @@ export function BookingFormSheet({
       name: '',
       confirmationNumber: null,
       supplierName: null,
-      status: 'proposed',
+      proposalStatus: 'draft',
       paymentStatus: 'unpaid',
       pricingType: 'flat_rate',
       travelerCount: 1,
@@ -146,7 +146,7 @@ export function BookingFormSheet({
         name: booking.name,
         confirmationNumber: booking.confirmationNumber,
         supplierName: details?.supplierName ?? null,
-        status: booking.status,
+        proposalStatus: booking.proposalStatus,
         paymentStatus: details?.paymentStatus ?? 'unpaid',
         pricingType: toPackagePricingType(details?.pricingType),
         travelerCount: booking.travelers?.length ?? 1,
@@ -180,7 +180,7 @@ export function BookingFormSheet({
         name: data.name,
         confirmationNumber: data.confirmationNumber || null,
         supplierName: data.supplierName || null,
-        status: data.status as PackageStatus,
+        proposalStatus: data.proposalStatus as PackageStatus,
         paymentStatus: data.paymentStatus as PackagePaymentStatus,
         pricingType: data.pricingType,
         travelerCount: data.travelerCount,
@@ -296,7 +296,7 @@ export function BookingFormSheet({
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="status"
+                    name="proposalStatus"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Booking Status</FormLabel>
@@ -307,10 +307,10 @@ export function BookingFormSheet({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="proposed">Proposed</SelectItem>
-                            <SelectItem value="confirmed">Confirmed</SelectItem>
+                            <SelectItem value="draft">Draft</SelectItem>
+                            <SelectItem value="proposing">Proposing</SelectItem>
+                            <SelectItem value="approved">Approved</SelectItem>
                             <SelectItem value="cancelled">Cancelled</SelectItem>
-                            <SelectItem value="optional">Optional</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />

@@ -1163,6 +1163,34 @@
       "when": 1774353600000,
       "tag": "20260321120000_create_api_health_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 166,
+      "version": "7",
+      "when": 1774357200000,
+      "tag": "20260321130000_rename_trip_status_canonical",
+      "breakpoints": true
+    },
+    {
+      "idx": 167,
+      "version": "7",
+      "when": 1774360800000,
+      "tag": "20260321140000_remove_itinerary_declined",
+      "breakpoints": true
+    },
+    {
+      "idx": 168,
+      "version": "7",
+      "when": 1774364400000,
+      "tag": "20260321150000_add_version_to_itinerary_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 169,
+      "version": "7",
+      "when": 1774368000000,
+      "tag": "20260321160000_activity_booking_normalization",
+      "breakpoints": true
     }
   ]
 }

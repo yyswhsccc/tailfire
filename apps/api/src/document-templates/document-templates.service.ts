@@ -513,7 +513,7 @@ export class DocumentTemplatesService {
         destination: 'Mediterranean',
         currency: 'CAD',
         totalCost: 12450.00,
-        status: 'booked',
+        status: 'active',
       },
       agent: {
         full_name: 'Sarah Johnson',

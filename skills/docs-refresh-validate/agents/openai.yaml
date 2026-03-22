@@ -1,0 +1,4 @@
+interface:
+  display_name: "Docs Refresh Validator"
+  short_description: "Refresh and validate repo docs and guides"
+  default_prompt: "Use $docs-refresh-validate to audit this repo against its current codebase, update the canonical docs and user guide where applicable, and produce a prioritized issues file."

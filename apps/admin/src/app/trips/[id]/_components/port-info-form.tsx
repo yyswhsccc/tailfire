@@ -59,8 +59,8 @@ interface PortInfoFormProps {
 }
 
 const STATUSES = [
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const
 
@@ -107,7 +107,7 @@ export function PortInfoForm({
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
-  const [activityIsBooked, setActivityIsBooked] = useState(activity?.isBooked ?? false)
+  const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
 
   // Auto-save state (with date validation)
@@ -139,7 +139,7 @@ export function PortInfoForm({
   } = form
 
   // useWatch for custom components (Selects, DatePickers, TimePickers, Checkbox)
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   const arrivalDateValue = useWatch({ control, name: 'portInfoDetails.arrivalDate' })
   const departureDateValue = useWatch({ control, name: 'portInfoDetails.departureDate' })
   const arrivalTimeValue = useWatch({ control, name: 'portInfoDetails.arrivalTime' })
@@ -211,14 +211,14 @@ export function PortInfoForm({
   const markActivityBooked = useMarkActivityBooked()
 
   // Handler for marking port info as booked
-  const handleMarkAsBooked = async (newBookingDate: string) => {
+  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
     if (!activityId) {
       throw new Error('Activity must be saved before marking as booked')
     }
 
     const result = await markActivityBooked.mutateAsync({
       activityId,
-      data: { bookingDate: newBookingDate },
+      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
     })
 
     // Update local state - preserve YYYY-MM-DD format
@@ -255,7 +255,7 @@ export function PortInfoForm({
         itineraryDayId: dayId,
         name: portInfoData.name,
         description: portInfoData.description || '',
-        status: portInfoData.status as PortInfoFormData['status'],
+        proposalStatus: portInfoData.proposalStatus as PortInfoFormData['proposalStatus'],
         portInfoDetails: details ? {
           portName: details.portName || '',
           portLocation: details.portLocation || '',
@@ -495,7 +495,7 @@ export function PortInfoForm({
               <span className="text-sm text-gray-600">Status</span>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as PortInfoFormData['status'], { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as PortInfoFormData['proposalStatus'], { shouldDirty: true })}
               >
                 <SelectTrigger className="w-32 h-8">
                   <SelectValue />

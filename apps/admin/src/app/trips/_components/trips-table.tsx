@@ -1,3 +1,5 @@
+'use client'
+
 import { useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import type { TripResponseDto } from '@tailfire/shared-types/api'
@@ -36,15 +38,15 @@ export function TripsTable({ trips, onDelete, isDeleting }: TripsTableProps) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'draft':
+      case 'inbound':
         return 'bg-gray-50 text-gray-700'
-      case 'quoted':
+      case 'planning':
         return 'bg-yellow-50 text-yellow-700'
-      case 'booked':
+      case 'active':
         return 'bg-blue-50 text-blue-700'
-      case 'in_progress':
+      case 'travelling':
         return 'bg-cyan-50 text-cyan-700'
-      case 'completed':
+      case 'travelled':
         return 'bg-green-50 text-green-700'
       case 'cancelled':
         return 'bg-red-50 text-red-700'

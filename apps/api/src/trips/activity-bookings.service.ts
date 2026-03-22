@@ -6,13 +6,15 @@
  * Key Distinction:
  * - Activity = Core entity (tour, flight, dining, transportation, custom-cruise, package, etc.)
  * - Package = An activity type that holds sub-activities
- * - Booking = A status applied to an activity (isBooked flag + bookingDate)
+ * - Booking = A status applied to an activity (bookingStatus field + bookingDate)
  */
 
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { ActivitiesService } from './activities.service'
+import { BookingValidationService } from './booking-validation.service'
+import { TripLifecycleService } from './trip-lifecycle.service'
 import type {
   MarkActivityBookedDto,
   ActivityBookingsFilterDto,
@@ -24,7 +26,9 @@ import type {
 export class ActivityBookingsService {
   constructor(
     private readonly db: DatabaseService,
-    private readonly activitiesService: ActivitiesService
+    private readonly activitiesService: ActivitiesService,
+    private readonly bookingValidationService: BookingValidationService,
+    private readonly tripLifecycleService: TripLifecycleService,
   ) {}
 
   /**
@@ -52,16 +56,28 @@ export class ActivityBookingsService {
       throw new BadRequestException('Activity is linked to a package. Use package booking instead.')
     }
 
+    // Tier 1 booking validation
+    const validation = await this.bookingValidationService.validateBooking(activityId)
+    if (!validation.valid) {
+      throw new BadRequestException({
+        message: 'Activity does not meet booking requirements',
+        errors: validation.errors,
+      })
+    }
+
     // Determine booking date (default to today UTC)
     const bookingDate: string = dto.bookingDate ?? new Date().toISOString().split('T')[0]!
 
     // Route through ActivitiesService.update() to preserve audit events
     await this.activitiesService.update(
       activityId,
-      { isBooked: true, bookingDate },
+      { bookingStatus: 'booked', bookingDate },
       actorId,
       activity.tripId
     )
+
+    // Evaluate trip lifecycle — first booking may promote planning → active
+    await this.tripLifecycleService.onActivityBooked(activityId)
 
     // Check payment schedule status
     const paymentScheduleMissing = await this.getPaymentScheduleMissing(activityId)
@@ -70,7 +86,7 @@ export class ActivityBookingsService {
       id: activityId,
       name: activity.name,
       activityType: activity.activityType,
-      isBooked: true,
+      bookingStatus: 'booked' as const,
       bookingDate,
       parentActivityId: activity.parentActivityId,
       paymentScheduleMissing,
@@ -101,10 +117,13 @@ export class ActivityBookingsService {
     // Route through ActivitiesService.update() to preserve audit events
     await this.activitiesService.update(
       activityId,
-      { isBooked: false, bookingDate: null },
+      { bookingStatus: 'unbooked', bookingDate: null },
       actorId,
       activity.tripId
     )
+
+    // Evaluate trip lifecycle — removing last booking may demote active → planning
+    await this.tripLifecycleService.onBookingCancelled(activityId)
 
     // Check payment schedule status
     const paymentScheduleMissing = await this.getPaymentScheduleMissing(activityId)
@@ -113,7 +132,7 @@ export class ActivityBookingsService {
       id: activityId,
       name: activity.name,
       activityType: activity.activityType,
-      isBooked: false,
+      bookingStatus: 'unbooked' as const,
       bookingDate: null,
       parentActivityId: activity.parentActivityId,
       paymentScheduleMissing,
@@ -127,11 +146,11 @@ export class ActivityBookingsService {
    *
    * Business rules:
    * - tripId is required for scoping
-   * - isBooked defaults to true
+   * - bookingStatus defaults to 'booked'
    * - Children of package activities are included with bookable: false
    */
   async listBooked(filter: ActivityBookingsFilterDto): Promise<ActivityBookingsListResponseDto> {
-    const { tripId, itineraryId, isBooked = true } = filter
+    const { tripId, itineraryId, bookingStatus = 'booked' } = filter
 
     // Build the query with proper joins
     // Single SQL query with COUNT(*) OVER() for total
@@ -140,7 +159,7 @@ export class ActivityBookingsService {
       id: string
       name: string
       activity_type: string
-      is_booked: boolean
+      booking_status: string
       booking_date: string | null
       parent_activity_id: string | null
       parent_activity_type: string | null
@@ -155,7 +174,7 @@ export class ActivityBookingsService {
         ia.id,
         ia.name,
         ia.activity_type,
-        ia.is_booked,
+        ia.booking_status,
         ia.booking_date,
         ia.parent_activity_id,
         parent.activity_type as parent_activity_type,
@@ -175,7 +194,7 @@ export class ActivityBookingsService {
       ${itineraryId ? sql`AND ia.itinerary_day_id IN (
         SELECT id FROM itinerary_days WHERE itinerary_id = ${itineraryId}
       )` : sql``}
-      AND ia.is_booked = ${isBooked}
+      AND ia.booking_status = ${bookingStatus}
       ORDER BY ia.created_at DESC
     `) as unknown as ActivityBookingRow[]
 
@@ -190,7 +209,7 @@ export class ActivityBookingsService {
       id: row.id,
       name: row.name,
       activityType: row.activity_type,
-      isBooked: row.is_booked,
+      bookingStatus: row.booking_status as 'unbooked' | 'booked' | 'cancelled',
       bookingDate: row.booking_date
         ? new Date(row.booking_date).toISOString().split('T')[0]!
         : null,
@@ -246,7 +265,7 @@ export class ActivityBookingsService {
     activityType: string
     parentActivityId: string | null
     parentActivityType: string | null
-    isBooked: boolean
+    bookingStatus: string
     bookingDate: Date | null
     tripId: string
   } | null> {
@@ -256,7 +275,7 @@ export class ActivityBookingsService {
       activity_type: string
       parent_activity_id: string | null
       parent_activity_type: string | null
-      is_booked: boolean
+      booking_status: string
       booking_date: Date | null
       trip_id: string
     }
@@ -268,7 +287,7 @@ export class ActivityBookingsService {
         ia.activity_type,
         ia.parent_activity_id,
         parent.activity_type as parent_activity_type,
-        ia.is_booked,
+        ia.booking_status,
         ia.booking_date,
         i.trip_id
       FROM itinerary_activities ia
@@ -290,7 +309,7 @@ export class ActivityBookingsService {
       activityType: row.activity_type,
       parentActivityId: row.parent_activity_id || null,
       parentActivityType: row.parent_activity_type || null,
-      isBooked: row.is_booked,
+      bookingStatus: row.booking_status,
       bookingDate: row.booking_date,
       tripId: row.trip_id,
     }

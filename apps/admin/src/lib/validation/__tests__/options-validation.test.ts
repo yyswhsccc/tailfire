@@ -327,7 +327,7 @@ describe('toOptionsApiPayload', () => {
       componentType: 'options' as const,
       name: 'Test Option',
       description: 'A test option',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       optionsDetails: {
         optionCategory: 'tour' as const,
         isSelected: true,
@@ -382,7 +382,7 @@ describe('toOptionsApiPayload', () => {
       componentType: 'options' as const,
       name: 'Test',
       description: '',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       optionsDetails: {
         optionCategory: null,
         isSelected: false,

@@ -41,6 +41,8 @@ export interface BaseComponentData {
   notes?: string | null
   confirmationNumber?: string | null
   status?: string
+  proposalStatus?: string
+  bookingStatus?: string
   pricingType?: string | null
   currency?: string
   photos?: any[] | null
@@ -59,6 +61,8 @@ export interface UpdateBaseComponentData {
   notes?: string | null
   confirmationNumber?: string | null
   status?: string
+  proposalStatus?: string
+  bookingStatus?: string
   pricingType?: string | null
   currency?: string
   photos?: any[] | null
@@ -153,7 +157,8 @@ export class BaseComponentService {
         coordinates: data.coordinates || null,
         notes: data.notes || null,
         confirmationNumber: data.confirmationNumber || null,
-        status: (data.status as any) || 'proposed',
+        proposalStatus: (data.proposalStatus as any) || 'draft',
+        bookingStatus: (data.bookingStatus as any) || 'unbooked',
         pricingType: data.pricingType as any,
         currency,
         photos: data.photos || null,
@@ -230,7 +235,8 @@ export class BaseComponentService {
         ...(data.coordinates !== undefined && { coordinates: data.coordinates }),
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.confirmationNumber !== undefined && { confirmationNumber: data.confirmationNumber }),
-        ...(data.status && { status: data.status as any }),
+        ...(data.proposalStatus && { proposalStatus: data.proposalStatus as any }),
+        ...(data.bookingStatus && { bookingStatus: data.bookingStatus as any }),
         ...(data.pricingType !== undefined && { pricingType: data.pricingType as any }),
         ...(data.currency && { currency: data.currency }),
         ...(data.photos !== undefined && { photos: data.photos }),

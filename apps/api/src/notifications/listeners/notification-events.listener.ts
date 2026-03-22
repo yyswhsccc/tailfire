@@ -17,9 +17,9 @@ import { NotificationService } from '../notification.service'
 // Import event types
 import { TripCreatedEvent } from '../../activity-logs/events/trip-created.event'
 import { TripUpdatedEvent } from '../../activity-logs/events/trip-updated.event'
-import { TripBookedEvent } from '../../trips/events/trip-booked.event'
-import { TripInProgressEvent } from '../../trips/events/trip-in-progress.event'
-import { TripCompletedEvent } from '../../trips/events/trip-completed.event'
+import { TripActiveEvent } from '../../trips/events/trip-active.event'
+import { TripTravellingEvent } from '../../trips/events/trip-travelling.event'
+import { TripTravelledEvent } from '../../trips/events/trip-travelled.event'
 import { TripCancelledEvent } from '../../trips/events/trip-cancelled.event'
 
 /**
@@ -147,11 +147,11 @@ export class NotificationEventsListener {
   }
 
   /**
-   * Handle trip.booked event
-   * Notify trip owner when a trip is booked
+   * Handle trip.active event
+   * Notify trip owner when a trip is booked/activated
    */
-  @OnEvent('trip.booked')
-  async handleTripBooked(event: TripBookedEvent): Promise<void> {
+  @OnEvent('trip.active')
+  async handleTripActive(event: TripActiveEvent): Promise<void> {
     const { tripId, bookingDate } = event
 
     const trip = await this.getTrip(tripId)
@@ -167,19 +167,19 @@ export class NotificationEventsListener {
         tripId,
         tripName: trip.name,
         bookingDate,
-        notificationType: 'trip.booked',
+        notificationType: 'trip.active',
       },
     })
 
-    this.logger.debug(`Sent trip.booked notification to user ${trip.ownerId} for trip ${tripId}`)
+    this.logger.debug(`Sent trip.active notification to user ${trip.ownerId} for trip ${tripId}`)
   }
 
   /**
-   * Handle trip.in_progress event
-   * Notify trip owner when a trip starts (traveling)
+   * Handle trip.travelling event
+   * Notify trip owner when a trip starts (travelling)
    */
-  @OnEvent('trip.in_progress')
-  async handleTripInProgress(event: TripInProgressEvent): Promise<void> {
+  @OnEvent('trip.travelling')
+  async handleTripTravelling(event: TripTravellingEvent): Promise<void> {
     const { tripId, tripName, isAutoTransition, startDate } = event
 
     const trip = await this.getTrip(tripId)
@@ -191,26 +191,26 @@ export class NotificationEventsListener {
       title: 'Trip Started',
       body: isAutoTransition
         ? `Trip "${tripName}" has automatically started (departure date reached)`
-        : `Trip "${tripName}" is now in progress`,
+        : `Trip "${tripName}" is now travelling`,
       actionUrl: `/trips/${tripId}`,
       data: {
         tripId,
         tripName,
         startDate,
         isAutoTransition,
-        notificationType: 'trip.in_progress',
+        notificationType: 'trip.travelling',
       },
     })
 
-    this.logger.debug(`Sent trip.in_progress notification to user ${trip.ownerId} for trip ${tripId}`)
+    this.logger.debug(`Sent trip.travelling notification to user ${trip.ownerId} for trip ${tripId}`)
   }
 
   /**
-   * Handle trip.completed event
+   * Handle trip.travelled event
    * Notify trip owner when a trip completes
    */
-  @OnEvent('trip.completed')
-  async handleTripCompleted(event: TripCompletedEvent): Promise<void> {
+  @OnEvent('trip.travelled')
+  async handleTripTravelled(event: TripTravelledEvent): Promise<void> {
     const { tripId, tripName, isAutoTransition, endDate } = event
 
     const trip = await this.getTrip(tripId)
@@ -222,18 +222,18 @@ export class NotificationEventsListener {
       title: 'Trip Completed',
       body: isAutoTransition
         ? `Trip "${tripName}" has automatically completed (return date passed)`
-        : `Trip "${tripName}" has been marked as completed`,
+        : `Trip "${tripName}" has been marked as travelled`,
       actionUrl: `/trips/${tripId}`,
       data: {
         tripId,
         tripName,
         endDate,
         isAutoTransition,
-        notificationType: 'trip.completed',
+        notificationType: 'trip.travelled',
       },
     })
 
-    this.logger.debug(`Sent trip.completed notification to user ${trip.ownerId} for trip ${tripId}`)
+    this.logger.debug(`Sent trip.travelled notification to user ${trip.ownerId} for trip ${tripId}`)
   }
 
   /**

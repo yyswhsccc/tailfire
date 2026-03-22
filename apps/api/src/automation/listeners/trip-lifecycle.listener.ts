@@ -10,7 +10,7 @@ import { OnEvent } from '@nestjs/event-emitter'
 import { addDays } from 'date-fns'
 import { AutomationService } from '../automation.service'
 import { QUEUES, JOB_TYPES, getPostTripJobId } from '../automation.types'
-import type { TripCompletedEvent } from '../../trips/events/trip-completed.event'
+import type { TripTravelledEvent } from '../../trips/events/trip-travelled.event'
 
 @Injectable()
 export class TripLifecycleListener {
@@ -19,11 +19,11 @@ export class TripLifecycleListener {
   constructor(private readonly automationService: AutomationService) {}
 
   /**
-   * Handle trip.completed event
+   * Handle trip.travelled event
    * Schedules post-trip thank-you email and feedback request
    */
-  @OnEvent('trip.completed')
-  async handleTripCompleted(event: TripCompletedEvent): Promise<void> {
+  @OnEvent('trip.travelled')
+  async handleTripTravelled(event: TripTravelledEvent): Promise<void> {
     const { tripId, primaryContactId, agencyId, tripName } = event
 
     if (!primaryContactId) {

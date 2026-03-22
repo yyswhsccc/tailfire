@@ -76,10 +76,9 @@ interface PackageFormProps {
 
 const STATUSES = [
   { value: 'draft', label: 'Draft' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'proposing', label: 'Proposing' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
-  { value: 'completed', label: 'Completed' },
 ] as const
 
 const PAYMENT_STATUSES = [
@@ -160,7 +159,7 @@ export function PackageForm({
   } = form
 
   // useWatch for form fields
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   const paymentStatusValue = useWatch({ control, name: 'paymentStatus' })
   const nameValue = useWatch({ control, name: 'name' })
   const supplierNameValue = useWatch({ control, name: 'supplierName' })
@@ -480,7 +479,7 @@ export function PackageForm({
               <span className="text-sm text-gray-600">Status</span>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as PackageFormData['status'], { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as PackageFormData['proposalStatus'], { shouldDirty: true })}
               >
                 <SelectTrigger className="w-32 h-8">
                   <SelectValue />

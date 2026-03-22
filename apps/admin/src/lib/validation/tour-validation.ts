@@ -68,7 +68,7 @@ export const tourFormSchema = z.object({
   componentType: z.literal('tour').default('tour'),
   name: z.string().optional().default(''), // Auto-generated from tourName
   description: z.string().optional().default(''),
-  status: z.enum(['proposed', 'confirmed', 'cancelled']).default('proposed'),
+  proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
 
   // Nested tour details
   tourDetails: tourDetailsSchema,
@@ -185,7 +185,7 @@ export function toTourDefaults(
     componentType: 'tour',
     name: serverData?.name ?? '',
     description: serverData?.description ?? '',
-    status: serverData?.status ?? 'proposed',
+    proposalStatus: serverData?.proposalStatus ?? 'draft',
 
     tourDetails: {
       tourName: serverDetails?.tourName ?? '',
@@ -305,7 +305,7 @@ export function toTourApiPayload(data: TourFormData): CreateActivityDto & {
     activityType: 'tour',
     name: tourDetails.tourName,
     description: data.description,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     location: tourDetails.location || null,
     address: tourDetails.address || null,
     startDatetime: computeDatetime(tourDetails.tourDate, tourDetails.startTime, tourDetails.timezone),

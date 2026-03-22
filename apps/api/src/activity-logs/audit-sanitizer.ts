@@ -15,13 +15,13 @@
 const ALLOWED_FIELDS: Record<string, string[]> = {
   activity: [
     'name',
-    'status',
+    'proposalStatus',
     'activityType',
     'startTime',
     'endTime',
     'startDate',
     'endDate',
-    'isBooked',
+    'bookingStatus',
     'bookingDate',
     'location',
     'description',

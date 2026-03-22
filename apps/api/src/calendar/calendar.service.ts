@@ -767,7 +767,7 @@ export class CalendarService {
         startDatetime: this.db.schema.itineraryActivities.startDatetime,
         endDatetime: this.db.schema.itineraryActivities.endDatetime,
         location: this.db.schema.itineraryActivities.location,
-        status: this.db.schema.itineraryActivities.status,
+        proposalStatus: this.db.schema.itineraryActivities.proposalStatus,
         tripId: this.db.schema.trips.id,
         tripName: this.db.schema.trips.name,
       })
@@ -834,7 +834,7 @@ export class CalendarService {
         clickable: true,
         metadata: {
           activityType: a.activityType,
-          status: a.status,
+          status: a.proposalStatus,
         },
       }
     })

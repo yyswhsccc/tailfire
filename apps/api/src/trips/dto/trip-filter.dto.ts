@@ -38,8 +38,8 @@ export class TripFilterDto {
 
   // Filters
   @IsOptional()
-  @IsIn(['draft', 'quoted', 'booked', 'in_progress', 'completed', 'cancelled', 'inbound'])
-  status?: 'draft' | 'quoted' | 'booked' | 'in_progress' | 'completed' | 'cancelled' | 'inbound'
+  @IsIn(['inbound', 'planning', 'active', 'travelling', 'travelled', 'cancelled'])
+  status?: 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
 
   @IsOptional()
   @IsIn(['leisure', 'business', 'group', 'honeymoon', 'corporate', 'custom'])

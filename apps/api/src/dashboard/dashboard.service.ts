@@ -99,7 +99,7 @@ export class DashboardService {
       this.db.client
         .select({
           totalTrips: sql<number>`count(*)::int`,
-          activeTrips: sql<number>`count(*) filter (where ${this.db.schema.trips.status} in ('booked', 'in_progress'))::int`,
+          activeTrips: sql<number>`count(*) filter (where ${this.db.schema.trips.status} in ('active', 'travelling'))::int`,
         })
         .from(this.db.schema.trips)
         .where(tripFilter),
@@ -275,7 +275,7 @@ export class DashboardService {
       SELECT count(*)::int AS bookings
       FROM trips t
       WHERE ${tripFilter}
-        AND t.status IN ('booked', 'in_progress', 'completed')
+        AND t.status IN ('active', 'travelling', 'travelled')
         AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
         AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
     `)
@@ -294,7 +294,7 @@ export class DashboardService {
         JOIN itineraries itin ON itin.id = iday.itinerary_id
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
-          AND t.status IN ('booked', 'in_progress', 'completed')
+          AND t.status IN ('active', 'travelling', 'travelled')
           AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
           AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
       `)
@@ -309,7 +309,7 @@ export class DashboardService {
         JOIN itineraries itin ON itin.id = iday.itinerary_id
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
-          AND t.status IN ('booked', 'in_progress', 'completed')
+          AND t.status IN ('active', 'travelling', 'travelled')
           AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
           AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
           AND t.id IN ${tripIdList}
@@ -447,7 +447,7 @@ export class DashboardService {
       WHERE ${tripFilter}
         AND t.start_date >= CURRENT_DATE
         AND t.start_date <= CURRENT_DATE + INTERVAL '30 days'
-        AND t.status IN ('booked', 'in_progress')
+        AND t.status IN ('active', 'travelling')
       ORDER BY t.start_date ASC
       LIMIT 4
     `)
@@ -605,7 +605,7 @@ export class DashboardService {
         JOIN itineraries itin ON itin.id = iday.itinerary_id
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
-          AND t.status IN ('booked', 'in_progress', 'completed')
+          AND t.status IN ('active', 'travelling', 'travelled')
           AND extract(year FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at)) = ${year}
         GROUP BY extract(month FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at))
       `) as any[]
@@ -623,7 +623,7 @@ export class DashboardService {
         JOIN itineraries itin ON itin.id = iday.itinerary_id
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
-          AND t.status IN ('booked', 'in_progress', 'completed')
+          AND t.status IN ('active', 'travelling', 'travelled')
           AND extract(year FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at)) = ${year}
           AND t.id IN ${tripIdList}
         GROUP BY extract(month FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at))
@@ -790,7 +790,7 @@ export class DashboardService {
           count(DISTINCT t.id)::int AS bookings
         FROM trips t
         WHERE t.agency_id = ${agencyId}
-          AND t.status IN ('booked', 'in_progress', 'completed')
+          AND t.status IN ('active', 'travelling', 'travelled')
           AND t.created_at >= ${startIso}::timestamptz
           AND t.created_at <= ${endIso}::timestamptz
           AND t.owner_id IS NOT NULL

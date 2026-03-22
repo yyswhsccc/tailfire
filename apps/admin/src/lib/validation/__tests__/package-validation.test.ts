@@ -155,7 +155,7 @@ describe('toPackageDefaults', () => {
       const defaults = toPackageDefaults(null)
 
       expect(defaults.name).toBe('')
-      expect(defaults.status).toBe('proposed')
+      expect(defaults.proposalStatus).toBe('draft')
       expect(defaults.totalPriceCents).toBe(0)
       expect(defaults.taxesCents).toBe(0)
       expect(defaults.currency).toBe('CAD')
@@ -252,7 +252,7 @@ describe('toPackageApiPayload', () => {
   it('includes taxes in API payload', () => {
     const formData = {
       name: 'Test Package',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       pricingType: 'flat_rate' as const,
       totalPriceCents: 10000,
       taxesCents: 1500, // Should be included in payload
@@ -281,7 +281,7 @@ describe('toPackageApiPayload', () => {
   it('includes commission in API payload', () => {
     const formData = {
       name: 'Test Package',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       pricingType: 'flat_rate' as const,
       totalPriceCents: 10000,
       taxesCents: 0,

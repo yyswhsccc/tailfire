@@ -59,6 +59,24 @@ jobs:
       - name: Build database package
         run: pnpm --filter @tailfire/database build
 
+      - name: Pre-migration enum additions
+        run: |
+          psql "$DATABASE_URL" -c "ALTER TYPE trip_status ADD VALUE IF NOT EXISTS 'planning'" || true
+          psql "$DATABASE_URL" -c "ALTER TYPE trip_status ADD VALUE IF NOT EXISTS 'active'" || true
+          psql "$DATABASE_URL" -c "ALTER TYPE trip_status ADD VALUE IF NOT EXISTS 'travelling'" || true
+          psql "$DATABASE_URL" -c "ALTER TYPE trip_status ADD VALUE IF NOT EXISTS 'travelled'" || true
+          psql "$DATABASE_URL" <<'ENUMSQL'
+          DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'activity_proposal_status') THEN
+              CREATE TYPE activity_proposal_status AS ENUM ('draft', 'proposing', 'approved', 'cancelled');
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'activity_booking_status') THEN
+              CREATE TYPE activity_booking_status AS ENUM ('unbooked', 'booked', 'cancelled');
+            END IF;
+          END $$;
+          ENUMSQL
+          echo "✅ Pre-migration enum setup complete"
+
       - name: Run Drizzle migrations
         working-directory: apps/api
         run: pnpm db:migrate

@@ -79,7 +79,7 @@ describe('Payment Schedules (Integration)', () => {
       .insert(trips)
       .values({
         name: 'Payment Schedule Test Trip',
-        status: 'draft',
+        status: 'planning',
         primaryContactId: testContactId,
         currency: 'CAD',
         ownerId: '00000000-0000-0000-0000-000000000001',
@@ -124,7 +124,7 @@ describe('Payment Schedules (Integration)', () => {
         activityType: 'lodging',
         name: 'Test Hotel',
         sequenceOrder: 0,
-        status: 'confirmed',
+        proposalStatus: 'approved',
       })
       .returning()
 

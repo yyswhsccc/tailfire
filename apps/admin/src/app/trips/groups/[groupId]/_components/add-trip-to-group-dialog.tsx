@@ -164,13 +164,12 @@ export function AddTripToGroupDialog({
   }, [selectedTripIds, groupId, groupName, addTripsToGroup, toast, resetState, onOpenChange])
 
   const statusVariant = (status: string) => {
-    const map: Record<string, 'inbound' | 'planning' | 'booked' | 'traveling' | 'completed' | 'cancelled' | 'secondary'> = {
+    const map: Record<string, 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled' | 'secondary'> = {
       inbound: 'inbound',
-      draft: 'secondary',
-      quoted: 'planning',
-      booked: 'booked',
-      in_progress: 'traveling',
-      completed: 'completed',
+      planning: 'planning',
+      active: 'active',
+      travelling: 'travelling',
+      travelled: 'travelled',
       cancelled: 'cancelled',
     }
     return map[status] ?? 'secondary'

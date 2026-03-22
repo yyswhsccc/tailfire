@@ -425,7 +425,7 @@ export function ItineraryTableView({ trip, itinerary, responseMap, commentCounts
         <TableBody>
           {tableRows.map((row, index) => {
             const metadata = getActivityTypeMetadata(row.activity.activityType)
-            const statusVariant = statusVariants[row.activity.status] || 'default'
+            const statusVariant = statusVariants[row.activity.proposalStatus] || 'default'
             const cruiseColor = getCruiseColor(row.activity, cruiseColorMap)
 
             // Show day info only for first activity of each day
@@ -563,7 +563,7 @@ export function ItineraryTableView({ trip, itinerary, responseMap, commentCounts
                   <div className="flex items-center gap-1 flex-wrap">
                     <Badge variant={statusVariant}>
                       <span className="capitalize text-xs">
-                        {row.activity.status}
+                        {row.activity.proposalStatus}
                       </span>
                     </Badge>
                     {responseMap?.[row.activity.id] === 'confirmed' && (

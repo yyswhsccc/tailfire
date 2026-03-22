@@ -95,7 +95,7 @@ export const transportationFormSchema = z.object({
   componentType: z.literal('transportation').default('transportation'),
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional().default(''),
-  status: z.enum(['proposed', 'confirmed', 'cancelled', 'optional']).default('proposed'),
+  proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
   notes: z.string().optional().default(''),
   confirmationNumber: z.string().optional().default(''),
 
@@ -228,7 +228,7 @@ export function toTransportationDefaults(
     componentType: 'transportation',
     name: serverData?.name ?? 'New Transportation',
     description: serverData?.description ?? '',
-    status: serverData?.status ?? 'proposed',
+    proposalStatus: serverData?.proposalStatus ?? 'draft',
     notes: serverData?.notes ?? '',
     confirmationNumber: serverData?.confirmationNumber ?? '',
 
@@ -305,7 +305,7 @@ export function toTransportationApiPayload(data: TransportationFormData): Create
     componentType: 'transportation',
     name: data.name,
     description: data.description || null,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     notes: data.notes || null,
     confirmationNumber: data.confirmationNumber || null,
     transportationDetails: {

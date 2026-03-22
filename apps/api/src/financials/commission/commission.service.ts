@@ -632,7 +632,7 @@ export class CommissionService {
         AND cc.check_type = 'received'
         AND cc.status = 'accepted'
         AND cis.id IS NULL
-        AND t.status IN ('in_progress', 'completed')
+        AND t.status IN ('travelling', 'travelled')
         ${scopeUserId ? sql`AND up.id = ${scopeUserId}` : sql``}
       GROUP BY up.id, up.first_name, up.last_name, up.email, up.commission_settings
     `)
@@ -719,7 +719,7 @@ export class CommissionService {
           LEFT JOIN commission_item_settlements existing
             ON existing.check_item_id = cci.id AND existing.recipient_user_id = ${agent.userId}
           WHERE existing.id IS NULL
-            AND t.status IN ('in_progress', 'completed')
+            AND t.status IN ('travelling', 'travelled')
             AND cci.check_id IN (
               SELECT cc.id FROM commission_checks cc
               WHERE cc.agency_id = ${agencyId} AND cc.check_type = 'received' AND cc.status = 'accepted'

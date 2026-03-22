@@ -4,7 +4,7 @@
  * Domain events emitted by the trips module for cross-module communication.
  */
 
-export * from './trip-booked.event'
-export * from './trip-in-progress.event'
-export * from './trip-completed.event'
+export * from './trip-active.event'
+export * from './trip-travelling.event'
+export * from './trip-travelled.event'
 export * from './trip-cancelled.event'

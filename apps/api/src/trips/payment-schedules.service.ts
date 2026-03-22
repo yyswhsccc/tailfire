@@ -609,7 +609,7 @@ export class PaymentSchedulesService {
 
     if (!trip) return
 
-    const lockedStatuses = ['in_progress', 'completed', 'cancelled']
+    const lockedStatuses = ['travelling', 'travelled', 'cancelled']
     if (lockedStatuses.includes(trip.status)) {
       throw new BadRequestException(
         'Payment schedule cannot be modified after the trip has departed. Contact an admin for changes.'
@@ -2342,6 +2342,7 @@ export class PaymentSchedulesService {
       depositType: config.depositType,
       depositPercentage: config.depositPercentage,
       depositAmountCents: config.depositAmountCents,
+      nonRefundableAmountCents: config.nonRefundableAmountCents ?? null,
       createdAt: config.createdAt.toISOString(),
       updatedAt: config.updatedAt.toISOString(),
       expectedPaymentItems,

@@ -72,8 +72,8 @@ interface TourFormProps {
 }
 
 const STATUSES = [
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const
 
@@ -239,7 +239,7 @@ export function TourForm({
   } = form
 
   // useWatch for custom components
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   const tourSubtypeValue = useWatch({ control, name: 'tourDetails.tourSubtype' })
   const tourDateValue = useWatch({ control, name: 'tourDetails.tourDate' })
   const startTimeValue = useWatch({ control, name: 'tourDetails.startTime' })
@@ -358,7 +358,7 @@ export function TourForm({
       setActivityPricingId((tourData as any).activityPricingId || null)
 
       // Update booking status from server data
-      setIsBooked(tourData.isBooked ?? false)
+      setIsBooked(tourData.bookingStatus === 'booked')
       setBookingDate(tourData.bookingDate ?? null)
 
       // Build initial pricing state from server data
@@ -391,7 +391,7 @@ export function TourForm({
         componentType: 'tour',
         name: tourData.name,
         description: tourData.description,
-        status: tourData.status,
+        proposalStatus: tourData.proposalStatus,
         totalPriceCents: initialPricing.totalPriceCents,
         taxesAndFeesCents: initialPricing.taxesAndFeesCents,
         currency: trip?.currency || initialPricing.currency,
@@ -651,14 +651,14 @@ export function TourForm({
   }
 
   // Handle marking activity as booked
-  const handleMarkAsBooked = async (newBookingDate: string) => {
+  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
     if (!activityId) {
       throw new Error('Activity must be saved before marking as booked')
     }
 
     const result = await markActivityBooked.mutateAsync({
       activityId,
-      data: { bookingDate: newBookingDate },
+      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
     })
 
     // Update local state - preserve YYYY-MM-DD format
@@ -762,7 +762,7 @@ export function TourForm({
               <span className="text-sm text-gray-600">Status</span>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as TourFormData['status'], { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as TourFormData['proposalStatus'], { shouldDirty: true })}
               >
                 <SelectTrigger className="w-32 h-8">
                   <SelectValue />

@@ -5,7 +5,7 @@
  * Created when clients approve or request changes to proposed itineraries.
  */
 
-import { pgTable, uuid, text, timestamp, pgEnum, jsonb } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp, pgEnum, jsonb, integer } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { itineraries } from './trips.schema'
 import { contacts } from './contacts.schema'
@@ -43,6 +43,7 @@ export const itineraryFeedback = pgTable('itinerary_feedback', {
   feedbackType: itineraryFeedbackTypeEnum('feedback_type').notNull(),
   message: text('message'),
   activityNotes: jsonb('activity_notes').$type<{ activityId: string; activityName: string; note: string }[]>(),
+  versionNumber: integer('version_number'),
 
   // Agent workflow
   status: itineraryFeedbackStatusEnum('status').default('pending').notNull(),

@@ -68,8 +68,8 @@ const ACTIVITY_TYPES = [
 ] as const
 
 const STATUSES = [
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const
 
@@ -154,7 +154,7 @@ export function ActivityForm({
 
   // useWatch for custom components (Selects and datetime inputs that need null handling)
   const activityTypeValue = useWatch({ control, name: 'activityType' })
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   const pricingTypeValue = useWatch({ control, name: 'pricingType' })
   const startDatetimeValue = useWatch({ control, name: 'startDatetime' })
   const endDatetimeValue = useWatch({ control, name: 'endDatetime' })
@@ -174,7 +174,7 @@ export function ActivityForm({
         location: activity.location || '',
         address: activity.address || '',
         confirmationNumber: activity.confirmationNumber || '',
-        status: activity.status as ActivityFormData['status'],
+        proposalStatus: activity.proposalStatus as ActivityFormData['proposalStatus'],
         pricingType: activity.pricingType as ActivityFormData['pricingType'],
         currency: activity.currency || 'USD',
         notes: activity.notes || '',
@@ -572,7 +572,7 @@ export function ActivityForm({
               </label>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as ActivityFormData['status'], { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as ActivityFormData['proposalStatus'], { shouldDirty: true })}
               >
                 <SelectTrigger>
                   <SelectValue />

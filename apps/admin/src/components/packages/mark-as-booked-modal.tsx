@@ -42,8 +42,11 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2, AlertCircle } from 'lucide-react'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 // Form validation schema
 const markAsBookedSchema = z.object({
@@ -72,6 +75,10 @@ export function MarkAsBookedModal({
   onSuccess,
 }: MarkAsBookedModalProps) {
   const [rootError, setRootError] = useState<string | null>(null)
+  const [bookingErrors, setBookingErrors] = useState<string[]>([])
+  const [passportVerified, setPassportVerified] = useState(false)
+  const [nonRefundableDeposit, setNonRefundableDeposit] = useState(false)
+  const [nonRefundableAmount, setNonRefundableAmount] = useState<number>(0)
   const markAsBooked = useMarkAsBooked()
   const { toast } = useToast()
 
@@ -91,6 +98,10 @@ export function MarkAsBookedModal({
   useEffect(() => {
     if (open) {
       setRootError(null)
+      setBookingErrors([])
+      setPassportVerified(false)
+      setNonRefundableDeposit(false)
+      setNonRefundableAmount(0)
       form.reset({
         confirmationNumber: '',
         dateBooked: new Date().toISOString().split('T')[0],
@@ -103,6 +114,7 @@ export function MarkAsBookedModal({
     if (!bookingId) return
 
     setRootError(null)
+    setBookingErrors([])
 
     try {
       await markAsBooked.mutateAsync({
@@ -123,7 +135,9 @@ export function MarkAsBookedModal({
       onSuccess?.()
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.status === 400) {
+        if (error.errors && error.errors.length > 0) {
+          setBookingErrors(error.errors)
+        } else if (error.status === 400) {
           setRootError(error.message || 'This booking cannot be marked as booked.')
         } else if (error.status === 409) {
           setRootError('A booking with this confirmation number already exists for this trip.')
@@ -224,6 +238,57 @@ export function MarkAsBookedModal({
                   </FormItem>
                 )}
               />
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="passport-verified"
+                  checked={passportVerified}
+                  onCheckedChange={(checked) => setPassportVerified(checked === true)}
+                />
+                <Label htmlFor="passport-verified">
+                  I have verified all traveler passports are valid
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="non-refundable-deposit"
+                  checked={nonRefundableDeposit}
+                  onCheckedChange={(checked) => setNonRefundableDeposit(checked === true)}
+                />
+                <Label htmlFor="non-refundable-deposit">
+                  Deposit includes a non-refundable amount
+                </Label>
+              </div>
+
+              {nonRefundableDeposit && (
+                <div className="space-y-2">
+                  <Label>Non-refundable amount</Label>
+                  <Input
+                    type="number"
+                    value={nonRefundableAmount}
+                    onChange={(e) => setNonRefundableAmount(Number(e.target.value))}
+                    placeholder="Pre-filled with deposit amount"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Amount included in the deposit that is non-refundable
+                  </p>
+                </div>
+              )}
+
+              {bookingErrors.length > 0 && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Booking requirements not met</AlertTitle>
+                  <AlertDescription>
+                    <ul className="list-disc pl-4 mt-2 space-y-1">
+                      {bookingErrors.map((error, i) => (
+                        <li key={i} className="text-sm">{error}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {rootError && (
                 <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">

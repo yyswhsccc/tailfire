@@ -23,7 +23,7 @@ interface TripsBulkActionsProps {
   isChangingStatus?: boolean
 }
 
-const TARGET_STATUSES: TripStatus[] = ['draft', 'quoted', 'booked', 'in_progress', 'completed']
+const TARGET_STATUSES: TripStatus[] = ['inbound', 'planning', 'active', 'travelling', 'travelled']
 
 export function TripsBulkActions({
   selectedCount,

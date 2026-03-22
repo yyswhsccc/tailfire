@@ -4,12 +4,12 @@
  * Tests the canTransitionTripStatus() helper to ensure it correctly validates
  * all legal and illegal state transitions according to the workflow:
  *
- * Draft → Quoted, Booked, Cancelled
- * Quoted → Draft, Booked, Cancelled
- * Booked → In Progress, Completed, Cancelled
- * In Progress → Completed, Cancelled
- * Completed → [terminal]
- * Cancelled → [terminal]
+ * Inbound → Planning, Cancelled
+ * Planning → Inbound, Cancelled
+ * Active → Planning, Travelling, Cancelled
+ * Travelling → Travelled, Cancelled
+ * Travelled → [terminal]
+ * Cancelled → Planning (admin un-cancel)
  */
 
 import {
@@ -18,135 +18,135 @@ import {
 } from '../trip-status-transitions.js'
 
 describe('canTransitionTripStatus', () => {
-  describe('from DRAFT', () => {
-    const from: TripStatus = 'draft'
+  describe('from INBOUND', () => {
+    const from: TripStatus = 'inbound'
 
-    it('should allow transition to QUOTED', () => {
-      expect(canTransitionTripStatus(from, 'quoted')).toBe(true)
-    })
-
-    it('should allow transition to BOOKED', () => {
-      expect(canTransitionTripStatus(from, 'booked')).toBe(true)
+    it('should allow transition to PLANNING', () => {
+      expect(canTransitionTripStatus(from, 'planning')).toBe(true)
     })
 
     it('should allow transition to CANCELLED', () => {
       expect(canTransitionTripStatus(from, 'cancelled')).toBe(true)
     })
 
-    it('should reject transition to IN_PROGRESS', () => {
-      expect(canTransitionTripStatus(from, 'in_progress')).toBe(false)
+    it('should reject transition to ACTIVE', () => {
+      expect(canTransitionTripStatus(from, 'active')).toBe(false)
     })
 
-    it('should reject transition to COMPLETED', () => {
-      expect(canTransitionTripStatus(from, 'completed')).toBe(false)
+    it('should reject transition to TRAVELLING', () => {
+      expect(canTransitionTripStatus(from, 'travelling')).toBe(false)
+    })
+
+    it('should reject transition to TRAVELLED', () => {
+      expect(canTransitionTripStatus(from, 'travelled')).toBe(false)
     })
 
     it('should allow no-op (same status)', () => {
-      expect(canTransitionTripStatus(from, 'draft')).toBe(true)
+      expect(canTransitionTripStatus(from, 'inbound')).toBe(true)
     })
   })
 
-  describe('from QUOTED', () => {
-    const from: TripStatus = 'quoted'
+  describe('from PLANNING', () => {
+    const from: TripStatus = 'planning'
 
-    it('should allow transition to DRAFT', () => {
-      expect(canTransitionTripStatus(from, 'draft')).toBe(true)
-    })
-
-    it('should allow transition to BOOKED', () => {
-      expect(canTransitionTripStatus(from, 'booked')).toBe(true)
+    it('should allow transition to INBOUND', () => {
+      expect(canTransitionTripStatus(from, 'inbound')).toBe(true)
     })
 
     it('should allow transition to CANCELLED', () => {
       expect(canTransitionTripStatus(from, 'cancelled')).toBe(true)
     })
 
-    it('should reject transition to IN_PROGRESS', () => {
-      expect(canTransitionTripStatus(from, 'in_progress')).toBe(false)
+    it('should reject transition to ACTIVE', () => {
+      expect(canTransitionTripStatus(from, 'active')).toBe(false)
     })
 
-    it('should reject transition to COMPLETED', () => {
-      expect(canTransitionTripStatus(from, 'completed')).toBe(false)
+    it('should reject transition to TRAVELLING', () => {
+      expect(canTransitionTripStatus(from, 'travelling')).toBe(false)
+    })
+
+    it('should reject transition to TRAVELLED', () => {
+      expect(canTransitionTripStatus(from, 'travelled')).toBe(false)
     })
 
     it('should allow no-op (same status)', () => {
-      expect(canTransitionTripStatus(from, 'quoted')).toBe(true)
+      expect(canTransitionTripStatus(from, 'planning')).toBe(true)
     })
   })
 
-  describe('from BOOKED', () => {
-    const from: TripStatus = 'booked'
+  describe('from ACTIVE', () => {
+    const from: TripStatus = 'active'
 
-    it('should allow transition to IN_PROGRESS', () => {
-      expect(canTransitionTripStatus(from, 'in_progress')).toBe(true)
+    it('should allow transition to PLANNING', () => {
+      expect(canTransitionTripStatus(from, 'planning')).toBe(true)
     })
 
-    it('should allow transition to COMPLETED', () => {
-      expect(canTransitionTripStatus(from, 'completed')).toBe(true)
+    it('should allow transition to TRAVELLING', () => {
+      expect(canTransitionTripStatus(from, 'travelling')).toBe(true)
     })
 
     it('should allow transition to CANCELLED', () => {
       expect(canTransitionTripStatus(from, 'cancelled')).toBe(true)
     })
 
-    it('should reject transition to DRAFT', () => {
-      expect(canTransitionTripStatus(from, 'draft')).toBe(false)
+    it('should reject transition to INBOUND', () => {
+      expect(canTransitionTripStatus(from, 'inbound')).toBe(false)
     })
 
-    it('should reject transition to QUOTED', () => {
-      expect(canTransitionTripStatus(from, 'quoted')).toBe(false)
+    it('should reject transition to TRAVELLED', () => {
+      expect(canTransitionTripStatus(from, 'travelled')).toBe(false)
     })
 
     it('should allow no-op (same status)', () => {
-      expect(canTransitionTripStatus(from, 'booked')).toBe(true)
+      expect(canTransitionTripStatus(from, 'active')).toBe(true)
     })
   })
 
-  describe('from IN_PROGRESS', () => {
-    const from: TripStatus = 'in_progress'
+  describe('from TRAVELLING', () => {
+    const from: TripStatus = 'travelling'
 
-    it('should allow transition to COMPLETED', () => {
-      expect(canTransitionTripStatus(from, 'completed')).toBe(true)
+    it('should allow transition to TRAVELLED', () => {
+      expect(canTransitionTripStatus(from, 'travelled')).toBe(true)
     })
 
     it('should allow transition to CANCELLED', () => {
       expect(canTransitionTripStatus(from, 'cancelled')).toBe(true)
     })
 
-    it('should reject transition to DRAFT', () => {
-      expect(canTransitionTripStatus(from, 'draft')).toBe(false)
+    it('should reject transition to INBOUND', () => {
+      expect(canTransitionTripStatus(from, 'inbound')).toBe(false)
     })
 
-    it('should reject transition to QUOTED', () => {
-      expect(canTransitionTripStatus(from, 'quoted')).toBe(false)
+    it('should reject transition to PLANNING', () => {
+      expect(canTransitionTripStatus(from, 'planning')).toBe(false)
     })
 
-    it('should reject transition to BOOKED', () => {
-      expect(canTransitionTripStatus(from, 'booked')).toBe(false)
+    it('should reject transition to ACTIVE', () => {
+      expect(canTransitionTripStatus(from, 'active')).toBe(false)
     })
 
     it('should allow no-op (same status)', () => {
-      expect(canTransitionTripStatus(from, 'in_progress')).toBe(true)
+      expect(canTransitionTripStatus(from, 'travelling')).toBe(true)
     })
   })
 
-  describe('from COMPLETED (terminal state)', () => {
-    const from: TripStatus = 'completed'
+  describe('from TRAVELLED (terminal state)', () => {
+    const from: TripStatus = 'travelled'
 
-    it('should reject transition to DRAFT', () => {
-      expect(canTransitionTripStatus(from, 'draft')).toBe(false)
+    it('should reject transition to INBOUND', () => {
+      expect(canTransitionTripStatus(from, 'inbound')).toBe(false)
     })
 
-    it('should reject transition to QUOTED', () => {
-      expect(canTransitionTripStatus(from, 'quoted')).toBe(false)
+    it('should reject transition to PLANNING', () => {
+      expect(canTransitionTripStatus(from, 'planning')).toBe(false)
     })
 
-    it('should reject transition to BOOKED', () => {
-      expect(canTransitionTripStatus(from, 'booked')).toBe(false)
+    it('should reject transition to ACTIVE', () => {
+      expect(canTransitionTripStatus(from, 'active')).toBe(false)
     })
 
-    it('should reject transition to IN_PROGRESS', () => {
-      expect(canTransitionTripStatus(from, 'in_progress')).toBe(false)
+    it('should reject transition to TRAVELLING', () => {
+      expect(canTransitionTripStatus(from, 'travelling')).toBe(false)
     })
 
     it('should reject transition to CANCELLED', () => {
@@ -154,31 +154,31 @@ describe('canTransitionTripStatus', () => {
     })
 
     it('should allow no-op (same status)', () => {
-      expect(canTransitionTripStatus(from, 'completed')).toBe(true)
+      expect(canTransitionTripStatus(from, 'travelled')).toBe(true)
     })
   })
 
-  describe('from CANCELLED (terminal state)', () => {
+  describe('from CANCELLED (admin un-cancel allowed)', () => {
     const from: TripStatus = 'cancelled'
 
-    it('should reject transition to DRAFT', () => {
-      expect(canTransitionTripStatus(from, 'draft')).toBe(false)
+    it('should allow transition to PLANNING (admin un-cancel)', () => {
+      expect(canTransitionTripStatus(from, 'planning')).toBe(true)
     })
 
-    it('should reject transition to QUOTED', () => {
-      expect(canTransitionTripStatus(from, 'quoted')).toBe(false)
+    it('should reject transition to INBOUND', () => {
+      expect(canTransitionTripStatus(from, 'inbound')).toBe(false)
     })
 
-    it('should reject transition to BOOKED', () => {
-      expect(canTransitionTripStatus(from, 'booked')).toBe(false)
+    it('should reject transition to ACTIVE', () => {
+      expect(canTransitionTripStatus(from, 'active')).toBe(false)
     })
 
-    it('should reject transition to IN_PROGRESS', () => {
-      expect(canTransitionTripStatus(from, 'in_progress')).toBe(false)
+    it('should reject transition to TRAVELLING', () => {
+      expect(canTransitionTripStatus(from, 'travelling')).toBe(false)
     })
 
-    it('should reject transition to COMPLETED', () => {
-      expect(canTransitionTripStatus(from, 'completed')).toBe(false)
+    it('should reject transition to TRAVELLED', () => {
+      expect(canTransitionTripStatus(from, 'travelled')).toBe(false)
     })
 
     it('should allow no-op (same status)', () => {
@@ -189,11 +189,11 @@ describe('canTransitionTripStatus', () => {
   describe('edge cases', () => {
     it('should always allow no-op transitions for all statuses', () => {
       const statuses: TripStatus[] = [
-        'draft',
-        'quoted',
-        'booked',
-        'in_progress',
-        'completed',
+        'inbound',
+        'planning',
+        'active',
+        'travelling',
+        'travelled',
         'cancelled',
       ]
 

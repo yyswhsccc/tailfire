@@ -68,8 +68,8 @@ interface DiningFormProps {
 }
 
 const STATUSES = [
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const
 
@@ -144,7 +144,7 @@ export function DiningForm({
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
-  const [activityIsBooked, setActivityIsBooked] = useState(activity?.isBooked ?? false)
+  const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
 
   // Package linkage state for PricingSection
@@ -196,7 +196,7 @@ export function DiningForm({
   } = form
 
   // useWatch for custom components (Selects, DatePicker, TimePicker, number inputs with null handling)
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   const mealTypeValue = useWatch({ control, name: 'diningDetails.mealType' })
   const reservationDateValue = useWatch({ control, name: 'diningDetails.reservationDate' })
   const reservationTimeValue = useWatch({ control, name: 'diningDetails.reservationTime' })
@@ -262,14 +262,14 @@ export function DiningForm({
   const markActivityBooked = useMarkActivityBooked()
 
   // Handler for marking dining as booked
-  const handleMarkAsBooked = async (newBookingDate: string) => {
+  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
     if (!activityId) {
       throw new Error('Activity must be saved before marking as booked')
     }
 
     const result = await markActivityBooked.mutateAsync({
       activityId,
-      data: { bookingDate: newBookingDate },
+      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
     })
 
     // Update local state - preserve YYYY-MM-DD format
@@ -309,7 +309,7 @@ export function DiningForm({
         componentType: 'dining',
         name: diningData.name,
         description: diningData.description,
-        status: diningData.status,
+        proposalStatus: diningData.proposalStatus,
         totalPriceCents: initialPricing.totalPriceCents,
         taxesAndFeesCents: initialPricing.taxesAndFeesCents,
         currency: trip?.currency || initialPricing.currency,
@@ -578,7 +578,7 @@ export function DiningForm({
               <span className="text-sm text-gray-600">Status</span>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as DiningFormData['status'], { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as DiningFormData['proposalStatus'], { shouldDirty: true })}
               >
                 <SelectTrigger className="w-32 h-8">
                   <SelectValue />

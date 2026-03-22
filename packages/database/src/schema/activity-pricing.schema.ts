@@ -152,6 +152,7 @@ export const paymentScheduleConfig = pgTable('payment_schedule_config', {
   depositType: depositTypeEnum('deposit_type'),
   depositPercentage: decimal('deposit_percentage', { precision: 5, scale: 2 }),
   depositAmountCents: integer('deposit_amount_cents'),
+  nonRefundableAmountCents: integer('non_refundable_amount_cents'),
 
   // Audit fields
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

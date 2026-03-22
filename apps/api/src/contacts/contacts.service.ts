@@ -19,7 +19,7 @@ import { eq, and, ilike, or, sql, desc, asc, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { UserValidationService } from '../common/user-validation.service'
 import { EmailService } from '../email/email.service'
-import { TripBookedEvent } from '../trips/events/trip-booked.event'
+import { TripActiveEvent } from '../trips/events/trip-active.event'
 import { AuditEvent } from '../activity-logs/events/audit.event'
 import { sanitizeForAudit, computeAuditDiff } from '../activity-logs/audit-sanitizer'
 import type {
@@ -590,13 +590,13 @@ export class ContactsService {
   }
 
   /**
-   * Event Listener: Handle TripBookedEvent
+   * Event Listener: Handle TripActiveEvent
    *
-   * When a trip is booked, set the contact's first booking date if it's not already set.
+   * When a trip is activated (booked), set the contact's first booking date if it's not already set.
    * This decouples ContactsService from TripsService by using domain events.
    */
-  @OnEvent('trip.booked')
-  async handleTripBooked(event: TripBookedEvent): Promise<void> {
+  @OnEvent('trip.active')
+  async handleTripActive(event: TripActiveEvent): Promise<void> {
     if (!event.primaryContactId) {
       return
     }
@@ -669,7 +669,7 @@ export class ContactsService {
 
   /**
    * Get booked activities for a contact across all their trips.
-   * Returns activities where isBooked = true from trips the contact is a traveler on.
+   * Returns activities where bookingStatus = 'booked' from trips the contact is a traveler on.
    */
   async getBookingsForContact(contactId: string, agencyId: string) {
     // Get trip IDs where contact is a traveler
@@ -687,7 +687,7 @@ export class ContactsService {
         activityId: this.db.schema.itineraryActivities.id,
         activityName: this.db.schema.itineraryActivities.name,
         activityType: this.db.schema.itineraryActivities.activityType,
-        status: this.db.schema.itineraryActivities.status,
+        proposalStatus: this.db.schema.itineraryActivities.proposalStatus,
         startDatetime: this.db.schema.itineraryActivities.startDatetime,
         endDatetime: this.db.schema.itineraryActivities.endDatetime,
         location: this.db.schema.itineraryActivities.location,
@@ -713,7 +713,7 @@ export class ContactsService {
       .where(
         and(
           inArray(this.db.schema.itineraries.tripId, tripIds),
-          eq(this.db.schema.itineraryActivities.isBooked, true),
+          eq(this.db.schema.itineraryActivities.bookingStatus, 'booked'),
           eq(this.db.schema.trips.agencyId, agencyId),
         ),
       )
@@ -723,7 +723,7 @@ export class ContactsService {
       id: r.activityId,
       name: r.activityName,
       activityType: r.activityType,
-      status: r.status,
+      status: r.proposalStatus,
       startDatetime: r.startDatetime?.toISOString() || null,
       endDatetime: r.endDatetime?.toISOString() || null,
       location: r.location,

@@ -398,7 +398,7 @@ export function useUnlinkActivities() {
 
 /**
  * Mark a booking as booked/confirmed
- * Uses PATCH /activities/:id with status and isBooked fields
+ * Uses PATCH /activities/:id with proposalStatus and bookingStatus fields
  */
 export function useMarkAsBooked() {
   const queryClient = useQueryClient()
@@ -406,8 +406,8 @@ export function useMarkAsBooked() {
   return useMutation({
     mutationFn: ({ bookingId, data }: { bookingId: string; data: MarkPackageAsBookedDto }) =>
       api.patch<PackageResponseDto>(`/activities/${bookingId}`, {
-        status: 'confirmed',
-        isBooked: true,
+        proposalStatus: 'approved',
+        bookingStatus: 'booked',
         confirmationNumber: data.confirmationNumber,
         bookingDate: data.bookingDate,
       }),
@@ -420,7 +420,7 @@ export function useMarkAsBooked() {
         queryClient.invalidateQueries({ queryKey: bookingKeys.tripTotals(result.tripId) })
         queryClient.invalidateQueries({ queryKey: bookingKeys.unlinkedActivities(result.tripId) })
       }
-      // Refresh Trip Overview (itinerary activities show isBooked/status)
+      // Refresh Trip Overview (itinerary activities show bookingStatus/proposalStatus)
       queryClient.invalidateQueries({ queryKey: ['activities'] })
       queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
     },
@@ -521,7 +521,8 @@ export function getPackageStatusVariant(
   status: string
 ): 'default' | 'secondary' | 'outline' | 'destructive' {
   switch (status) {
-    case 'confirmed':
+    case 'approved':
+    case 'booked':
     case 'completed':
       return 'default'
     case 'pending':

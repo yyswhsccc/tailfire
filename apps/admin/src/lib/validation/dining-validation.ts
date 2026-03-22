@@ -45,7 +45,7 @@ export const diningFormSchema = z.object({
   componentType: z.literal('dining').default('dining'),
   name: z.string().optional().default(''), // Auto-generated from restaurantName
   description: z.string().optional().default(''),
-  status: z.enum(['proposed', 'confirmed', 'cancelled']).default('proposed'),
+  proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
 
   // Nested dining details
   diningDetails: diningDetailsSchema,
@@ -161,7 +161,7 @@ export function toDiningDefaults(
     componentType: 'dining',
     name: serverData?.name ?? '',
     description: serverData?.description ?? '',
-    status: serverData?.status ?? 'proposed',
+    proposalStatus: serverData?.proposalStatus ?? 'draft',
 
     diningDetails: {
       restaurantName: serverDetails?.restaurantName ?? '',
@@ -213,7 +213,7 @@ export function toDiningApiPayload(data: DiningFormData): CreateDiningActivityDt
     componentType: 'dining',
     name: data.diningDetails.restaurantName, // Auto-name from restaurant
     description: data.description,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     diningDetails: {
       restaurantName: data.diningDetails.restaurantName,
       cuisineType: data.diningDetails.cuisineType,

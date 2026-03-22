@@ -142,8 +142,8 @@ export class ItineraryDaysService {
           coordinates: activity.coordinates || null,
           notes: activity.notes || null,
           confirmationNumber: activity.confirmationNumber || null,
-          status: activity.status || 'proposed',
-          isBooked: activity.isBooked ?? false,
+          proposalStatus: activity.proposalStatus || 'draft',
+          bookingStatus: activity.bookingStatus || 'unbooked',
           bookingDate: activity.bookingDate?.toISOString() || null,
           packageId: null, // Deprecated: use parentActivityId for package relationships
           pricing: null, // Pricing comes from activity_pricing table

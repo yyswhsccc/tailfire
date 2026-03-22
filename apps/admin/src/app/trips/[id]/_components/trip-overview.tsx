@@ -84,7 +84,7 @@ export function TripOverview({ trip }: TripOverviewProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Traveler Warning Banner */}
-      {!loadingTravelers && travelers.length === 0 && ['inbound', 'draft', 'quoted'].includes(trip.status) && (
+      {!loadingTravelers && travelers.length === 0 && ['inbound', 'planning'].includes(trip.status) && (
         <div className="lg:col-span-3 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <AlertTriangle className="h-4 w-4 flex-shrink-0" />
           <span>This trip has no travelers. Add travelers before publishing or booking.</span>

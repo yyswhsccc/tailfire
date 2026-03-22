@@ -28,6 +28,7 @@ import { Public } from '../auth/decorators/public.decorator'
 import { ApiTags } from '@nestjs/swagger'
 import { TripsService } from './trips.service'
 import { TripAccessService } from './trip-access.service'
+import { TripLifecycleService } from './trip-lifecycle.service'
 import { TripGroupAccessService } from './trip-group-access.service'
 import { StorageService } from './storage.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
@@ -73,6 +74,7 @@ export class TripsController {
     private readonly activityLogsService: ActivityLogsService,
     private readonly paymentSchedulesService: PaymentSchedulesService,
     private readonly storageService: StorageService,
+    private readonly tripLifecycleService: TripLifecycleService,
   ) {}
 
   /**
@@ -124,7 +126,7 @@ export class TripsController {
    * POST /trips/bulk-delete
    *
    * Deletes multiple trips with per-item validation.
-   * Only trips in 'draft' or 'quoted' status can be deleted.
+   * Only trips in 'planning' status can be deleted.
    * User must have write access to each trip.
    *
    * @returns Per-item success/failure with reasons
@@ -916,6 +918,19 @@ export class TripsController {
   }
 
   /**
+   * Backfill trip lifecycle — evaluate all trips through TripLifecycleService.
+   * Promotes planning trips with booked activities to active,
+   * and applies date-driven transitions for active/travelling trips.
+   * POST /trips/backfill-lifecycle
+   */
+  @AdminOnly()
+  @Post('backfill-lifecycle')
+  @HttpCode(HttpStatus.OK)
+  async backfillLifecycle(): Promise<{ evaluated: number; promoted: number; demoted: number; dateTransitions: number }> {
+    return this.tripLifecycleService.backfillAllTrips()
+  }
+
+  /**
    * Re-assign trip ownership (Admin only)
    * PATCH /trips/:id/owner
    *
@@ -999,7 +1014,7 @@ export class TripsController {
         totalPriceCents: a.pricing?.totalPriceCents ?? null,
         parentActivityId: a.parentActivityId,
         supplierName: a.supplierName ?? null,
-        isBooked: a.isBooked ?? false,
+        bookingStatus: a.bookingStatus ?? 'unbooked',
         confirmationNumber: a.confirmationNumber ?? null,
         paymentStatus: a.paymentStatus ?? null,
         paidCents: a.paidCents ?? null,

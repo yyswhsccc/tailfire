@@ -72,25 +72,25 @@ interface CustomCruiseFormProps {
 }
 
 const STATUSES = [
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const
 
-// Valid status values
-const VALID_STATUSES = ['proposed', 'confirmed', 'cancelled'] as const
+// Valid proposal status values
+const VALID_STATUSES = ['draft', 'proposing', 'approved', 'cancelled'] as const
 type FormStatus = (typeof VALID_STATUSES)[number]
 
 // Valid pricing types
 const VALID_PRICING_TYPES = ['per_person', 'per_room', 'flat_rate', 'per_night', 'per_group', 'fixed', 'total'] as const
 type FormPricingType = (typeof VALID_PRICING_TYPES)[number]
 
-// Coerce API status to form status
+// Coerce API proposal status to form status
 function coerceStatus(status: string | undefined | null): FormStatus {
   if (status && VALID_STATUSES.includes(status as FormStatus)) {
     return status as FormStatus
   }
-  return 'proposed'
+  return 'draft'
 }
 
 // Coerce API pricing type to form pricing type
@@ -200,7 +200,7 @@ export function CustomCruiseForm({
 
   // Booking status state
   const [showBookingModal, setShowBookingModal] = useState(false)
-  const [activityIsBooked, setActivityIsBooked] = useState(activity?.isBooked ?? false)
+  const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
 
   // Auto-save state
@@ -222,14 +222,14 @@ export function CustomCruiseForm({
   const markActivityBooked = useMarkActivityBooked()
 
   // Handler for marking cruise as booked
-  const handleMarkAsBooked = async (newBookingDate: string) => {
+  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
     if (!activityId) {
       throw new Error('Activity must be saved before marking as booked')
     }
 
     const result = await markActivityBooked.mutateAsync({
       activityId,
-      data: { bookingDate: newBookingDate },
+      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
     })
 
     // Update local state - preserve YYYY-MM-DD format
@@ -271,7 +271,7 @@ export function CustomCruiseForm({
     defaultValues: toCustomCruiseDefaults(
       {
         itineraryDayId: effectiveDayId,
-        status: coerceStatus(activity?.status),
+        proposalStatus: coerceStatus(activity?.proposalStatus),
         pricingType: coercePricingType((activity as any)?.pricingType),
         currency: trip?.currency || 'USD',
       },
@@ -343,7 +343,7 @@ export function CustomCruiseForm({
             itineraryDayId: loadedDayId,
             name: cruiseData.name,
             description: cruiseData.description ?? undefined,
-            status: coerceStatus(cruiseData.status),
+            proposalStatus: coerceStatus(cruiseData.proposalStatus),
             pricingType: coercePricingType(cruiseData.pricingType),
             currency: cruiseData.currency || 'USD',
             totalPriceCents: cruiseData.totalPriceCents,
@@ -426,7 +426,7 @@ export function CustomCruiseForm({
   const watchedDepartureDate = watch('customCruiseDetails.departureDate')
 
   // Watch custom component fields (Selects, DatePickers, TimePickers, Comboboxes, number inputs)
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   // Cruise line and ship
   const cruiseLineNameValue = useWatch({ control, name: 'customCruiseDetails.cruiseLineName' })
   const shipNameValue = useWatch({ control, name: 'customCruiseDetails.shipName' })
@@ -983,7 +983,7 @@ export function CustomCruiseForm({
               <span className="text-sm text-gray-600">Status</span>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as CustomCruiseFormData['status'], { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as CustomCruiseFormData['proposalStatus'], { shouldDirty: true })}
               >
                 <SelectTrigger className="w-32 h-8" data-field="status">
                   <SelectValue />

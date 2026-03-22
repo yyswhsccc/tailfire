@@ -120,7 +120,7 @@ type UnifiedBookingRow =
       supplierName: string | null
       confirmationNumber: string | null
       paymentStatus: string
-      status: string
+      proposalStatus: string
       dateBooked: string | null
       activityCount: number
       commissionTotalCents: number | null
@@ -136,7 +136,7 @@ type UnifiedBookingRow =
       endDayNumber: number | null
       totalPriceCents: number | null
       supplierName: string | null
-      isBooked: boolean
+      bookingStatus: string
       confirmationNumber: string | null
       paymentStatus: string | null
       currency: string | null
@@ -461,7 +461,7 @@ type UnlinkedActivity = {
   totalPriceCents: number | null
   parentActivityId: string | null
   supplierName: string | null
-  isBooked: boolean
+  bookingStatus: string
   confirmationNumber: string | null
   paymentStatus: string | null
   paidCents: number | null
@@ -766,7 +766,7 @@ function SelectionActionMenu({
           </DialogHeader>
           <div className="py-4 space-y-2 max-h-64 overflow-y-auto">
             {packages
-              .filter((p) => p.status !== 'cancelled')
+              .filter((p) => p.proposalStatus !== 'cancelled')
               .map((pkg) => (
                 <button
                   key={pkg.id}
@@ -905,7 +905,7 @@ export function PackagesTable({
         supplierName: pkg.supplierName || null,
         confirmationNumber: pkg.confirmationNumber || null,
         paymentStatus: pkg.paymentStatus ?? 'unpaid',
-        status: pkg.status,
+        proposalStatus: pkg.proposalStatus,
         dateBooked: pkg.dateBooked || null,
         activityCount: pkg.activityCount ?? 0,
         commissionTotalCents: pkg.pricing?.commissionTotalCents ?? null,
@@ -925,7 +925,7 @@ export function PackagesTable({
         endDayNumber: activity.endDayNumber ?? null,
         totalPriceCents: activity.totalPriceCents,
         supplierName: activity.supplierName ?? null,
-        isBooked: activity.isBooked ?? false,
+        bookingStatus: activity.bookingStatus ?? 'unbooked',
         confirmationNumber: activity.confirmationNumber ?? null,
         paymentStatus: activity.paymentStatus ?? null,
         currency: activity.currency ?? null,

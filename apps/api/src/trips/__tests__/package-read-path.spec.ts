@@ -91,7 +91,7 @@ describe('Package Read Path via Activities API (Regression)', () => {
         name: 'Package Read Path Test Trip',
         primaryContactId: testContactId,
         ownerId: '00000000-0000-0000-0000-000000000001', // Required field
-        status: 'draft',
+        status: 'planning',
         currency: 'USD',
       })
       .returning()
@@ -130,7 +130,7 @@ describe('Package Read Path via Activities API (Regression)', () => {
       {
         activityType: 'package',
         name: 'Test Package',
-        status: 'confirmed',
+        proposalStatus: 'approved',
         totalPriceCents: 150000,
         taxesCents: 15000,
         commissionTotalCents: 22500,
@@ -156,7 +156,7 @@ describe('Package Read Path via Activities API (Regression)', () => {
       parentActivityId: testPackageId,
       activityType: 'tour',
       name: 'Linked Tour Activity',
-      status: 'proposed',
+      proposalStatus: 'draft',
     })
     linkedActivityId = linkedResult.id
   })
@@ -203,7 +203,7 @@ describe('Package Read Path via Activities API (Regression)', () => {
       expect(pkg.id).toBe(testPackageId)
       expect(pkg.name).toBe('Test Package')
       expect(pkg.activityType).toBe('package')
-      expect(pkg.status).toBe('confirmed')
+      expect(pkg.proposalStatus).toBe('approved')
       // Note: Floating packages (no itineraryDayId) don't have tripId resolved
       // because they're not linked through the day → itinerary → trip chain
       expect(pkg.tripId).toBeDefined()
@@ -270,7 +270,7 @@ describe('Package Read Path via Activities API (Regression)', () => {
         parentActivityId: testPackageId,
         activityType: 'tour',
         name: 'Linked Tour Activity',
-        status: 'proposed',
+        proposalStatus: 'draft',
       })
       linkedActivityId = newLinked.id
     })

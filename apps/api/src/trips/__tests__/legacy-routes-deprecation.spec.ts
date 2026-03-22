@@ -57,7 +57,7 @@ describe('Legacy Routes Deprecation (/components/*)', () => {
 
     const [trip] = await db.insert(schema.trips).values({
       name: 'Legacy Test Trip',
-      status: 'draft',
+      status: 'planning',
       primaryContactId: testContactId,
       ownerId: testContactId,
     }).returning()
@@ -81,7 +81,7 @@ describe('Legacy Routes Deprecation (/components/*)', () => {
       activityType: 'lodging',
       name: 'Test Hotel',
       sequenceOrder: 0,
-      status: 'confirmed',
+      proposalStatus: 'approved',
     }).returning()
     testActivityId = activity!.id
   })

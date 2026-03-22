@@ -102,8 +102,8 @@ interface LodgingFormProps {
 }
 
 const STATUSES = [
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const
 
@@ -121,7 +121,7 @@ const ROOM_TYPES = [
 
 // Auto-save watched fields (trigger save when these change)
 const AUTO_SAVE_FIELDS = [
-  'status',
+  'proposalStatus',
   'description',
   'lodgingDetails.propertyName',
   'lodgingDetails.address',
@@ -205,7 +205,7 @@ export function LodgingForm({
   })
 
   // Track booking status from activity data
-  const [activityIsBooked, setActivityIsBooked] = useState(activity?.isBooked ?? false)
+  const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
 
   // Package linkage state for PricingSection
@@ -291,7 +291,7 @@ export function LodgingForm({
 
   // useWatch for custom components (Selects, DatePickers, TimePickers)
   // Using individual useWatch calls to avoid Controller registration issues
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   const checkInDateValue = useWatch({ control, name: 'lodgingDetails.checkInDate' })
   const checkInTimeValue = useWatch({ control, name: 'lodgingDetails.checkInTime' })
   const checkOutDateValue = useWatch({ control, name: 'lodgingDetails.checkOutDate' })
@@ -361,14 +361,14 @@ export function LodgingForm({
   const markActivityBooked = useMarkActivityBooked()
 
   // Handler for marking activity as booked
-  const handleMarkAsBooked = async (newBookingDate: string) => {
+  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
     if (!activityId) {
       throw new Error('Activity must be saved before marking as booked')
     }
 
     const result = await markActivityBooked.mutateAsync({
       activityId,
-      data: { bookingDate: newBookingDate },
+      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
     })
 
     // Update local state - preserve YYYY-MM-DD format
@@ -407,7 +407,7 @@ export function LodgingForm({
         componentType: 'lodging' as const,
         name: lodgingData.name,
         description: lodgingData.description,
-        status: lodgingData.status as 'proposed' | 'confirmed' | 'cancelled',
+        proposalStatus: lodgingData.proposalStatus as 'draft' | 'proposing' | 'approved' | 'cancelled',
         totalPriceCents: initialPricing.totalPriceCents,
         taxesAndFeesCents: initialPricing.taxesAndFeesCents,
         currency: trip?.currency || initialPricing.currency,
@@ -986,7 +986,7 @@ export function LodgingForm({
               <span className="text-sm text-gray-600">Status</span>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as 'proposed' | 'confirmed' | 'cancelled', { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as 'draft' | 'proposing' | 'approved' | 'cancelled', { shouldDirty: true })}
               >
                 <SelectTrigger className="w-32 h-8" data-field="status">
                   <SelectValue />

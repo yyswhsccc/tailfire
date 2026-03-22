@@ -69,8 +69,8 @@ interface OptionsFormProps {
 }
 
 const STATUSES = [
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const
 
@@ -88,7 +88,7 @@ const OPTION_CATEGORIES: { value: OptionCategory; label: string }[] = [
 const AUTO_SAVE_FIELDS = [
   'name',
   'description',
-  'status',
+  'proposalStatus',
   'optionsDetails.optionCategory',
   'optionsDetails.isSelected',
   'optionsDetails.availabilityStartDate',
@@ -170,7 +170,7 @@ export function OptionsForm({
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
-  const [activityIsBooked, setActivityIsBooked] = useState(activity?.isBooked ?? false)
+  const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
 
   // Package linkage state for PricingSection
@@ -227,7 +227,7 @@ export function OptionsForm({
 
   // Watch specific fields for display
   const watchedName = useWatch({ control, name: 'name' })
-  const watchedStatus = useWatch({ control, name: 'status' })
+  const watchedStatus = useWatch({ control, name: 'proposalStatus' })
 
   // Watch custom component fields (Selects, DatePickers, TimePicker, Checkbox, number inputs with null)
   const optionCategoryValue = useWatch({ control, name: 'optionsDetails.optionCategory' })
@@ -297,14 +297,14 @@ export function OptionsForm({
   const markActivityBooked = useMarkActivityBooked()
 
   // Handler for marking option as booked
-  const handleMarkAsBooked = async (newBookingDate: string) => {
+  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
     if (!activityId) {
       throw new Error('Activity must be saved before marking as booked')
     }
 
     const result = await markActivityBooked.mutateAsync({
       activityId,
-      data: { bookingDate: newBookingDate },
+      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
     })
 
     // Update local state - preserve YYYY-MM-DD format
@@ -379,7 +379,7 @@ export function OptionsForm({
         itineraryDayId: dayId,
         name: optionsData.name,
         description: optionsData.description,
-        status: optionsData.status,
+        proposalStatus: optionsData.proposalStatus,
         pricingType: optionsData.pricingType || 'per_person',
         currency: optionsData.currency || 'USD',
         totalPriceCents: optionsData.totalPriceCents,
@@ -612,8 +612,8 @@ export function OptionsForm({
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Status</span>
               <Select
-                value={watchedStatus || 'proposed'}
-                onValueChange={(value) => setValue('status', value as any, { shouldDirty: true, shouldValidate: true })}
+                value={watchedStatus || 'draft'}
+                onValueChange={(value) => setValue('proposalStatus', value as any, { shouldDirty: true, shouldValidate: true })}
               >
                 <SelectTrigger className="w-32 h-8">
                   <SelectValue />

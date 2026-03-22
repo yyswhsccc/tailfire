@@ -5,8 +5,8 @@
  * Covers:
  * - Auto-generation on INSERT with all trip type prefixes (FIT, GRP, BUS, MICE, DFT)
  * - Sequential numbering per type and year
- * - Regeneration on UPDATE when trip_type changes (draft only)
- * - Immutability once status leaves 'draft'
+ * - Regeneration on UPDATE when trip_type changes (planning only)
+ * - Immutability once status leaves 'planning'
  * - Year rollover behavior
  */
 
@@ -244,8 +244,8 @@ describe('Trip Reference Numbers (Integration)', () => {
     })
   })
 
-  describe('Regeneration on UPDATE (draft only)', () => {
-    it('should regenerate reference when trip_type changes in draft status', async () => {
+  describe('Regeneration on UPDATE (planning only)', () => {
+    it('should regenerate reference when trip_type changes in planning status', async () => {
       const db = getDb()
 
       // Create as leisure (FIT)
@@ -275,7 +275,7 @@ describe('Trip Reference Numbers (Integration)', () => {
       expect(updated!.referenceNumber).not.toBe(originalRef)
     })
 
-    it('should regenerate reference number on second update (draft)', async () => {
+    it('should regenerate reference number on second update (planning)', async () => {
       const db = getDb()
 
       // Create as leisure (FIT)
@@ -319,7 +319,7 @@ describe('Trip Reference Numbers (Integration)', () => {
       expect(busRef).not.toBe(fitRef)
     })
 
-    it('should NOT regenerate when trip_type unchanged (draft)', async () => {
+    it('should NOT regenerate when trip_type unchanged (planning)', async () => {
       const db = getDb()
 
       const [trip] = await db
@@ -346,7 +346,7 @@ describe('Trip Reference Numbers (Integration)', () => {
       expect(updated!.referenceNumber).toBe(originalRef)
     })
 
-    it('should NOT regenerate once status leaves draft', async () => {
+    it('should NOT regenerate once status leaves planning', async () => {
       const db = getDb()
 
       // Create as leisure (FIT)
@@ -364,10 +364,10 @@ describe('Trip Reference Numbers (Integration)', () => {
       const fitRef = trip!.referenceNumber
       expect(fitRef).toContain('FIT-')
 
-      // Move to quoted status
+      // Move to active status
       const [quoted] = await db
         .update(trips)
-        .set({ status: 'quoted' })
+        .set({ status: 'active' })
         .where(eq(trips.id, trip!.id))
         .returning()
 
@@ -387,7 +387,7 @@ describe('Trip Reference Numbers (Integration)', () => {
   })
 
   describe('Immutability after draft', () => {
-    it('should preserve reference number when transitioning to booked', async () => {
+    it('should preserve reference number when transitioning to active', async () => {
       const db = getDb()
 
       const [trip] = await db
@@ -405,7 +405,7 @@ describe('Trip Reference Numbers (Integration)', () => {
 
       const [booked] = await db
         .update(trips)
-        .set({ status: 'booked' })
+        .set({ status: 'active' })
         .where(eq(trips.id, trip!.id))
         .returning()
 
@@ -429,19 +429,16 @@ describe('Trip Reference Numbers (Integration)', () => {
       expect(trip).toBeDefined()
       const originalRef = trip!.referenceNumber
 
-      // draft -> quoted
-      await db.update(trips).set({ status: 'quoted' }).where(eq(trips.id, trip!.id))
+      // planning -> active
+      await db.update(trips).set({ status: 'active' }).where(eq(trips.id, trip!.id))
 
-      // quoted -> booked
-      await db.update(trips).set({ status: 'booked' }).where(eq(trips.id, trip!.id))
+      // active -> travelling
+      await db.update(trips).set({ status: 'travelling' }).where(eq(trips.id, trip!.id))
 
-      // booked -> in_progress
-      await db.update(trips).set({ status: 'in_progress' }).where(eq(trips.id, trip!.id))
-
-      // in_progress -> completed
+      // travelling -> travelled
       const [completed] = await db
         .update(trips)
-        .set({ status: 'completed' })
+        .set({ status: 'travelled' })
         .where(eq(trips.id, trip!.id))
         .returning()
 

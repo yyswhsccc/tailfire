@@ -251,7 +251,7 @@ describe('toPortInfoApiPayload', () => {
       componentType: 'port_info' as const,
       name: 'Test Port',
       description: 'A test port',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       portInfoDetails: {
         portName: 'Nassau, Bahamas',
         portLocation: 'Caribbean',
@@ -287,7 +287,7 @@ describe('toPortInfoApiPayload', () => {
       componentType: 'port_info' as const,
       name: '',
       description: '',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       portInfoDetails: {
         portName: 'Minimal Port',
         portLocation: '',

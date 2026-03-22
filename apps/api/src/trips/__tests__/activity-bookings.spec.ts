@@ -2,7 +2,7 @@
  * Integration Tests: Activity Bookings API
  *
  * Tests the /bookings/activities endpoints:
- * - List defaults to isBooked=true when query param is omitted
+ * - List defaults to bookingStatus=booked when query param is omitted
  * - Mark/unmark respects package guard
  * - Payment schedule missing flag is correctly computed
  */
@@ -81,7 +81,7 @@ describe('Activity Bookings API (Integration)', () => {
         name: 'Activity Bookings Test Trip',
         primaryContactId: testContactId,
         ownerId: testContactId,
-        status: 'draft',
+        status: 'planning',
         currency: 'CAD',
       })
       .returning()
@@ -122,7 +122,7 @@ describe('Activity Bookings API (Integration)', () => {
         componentType: 'tour',
         name: 'Booked Tour',
         sequenceOrder: 1,
-        isBooked: true,
+        bookingStatus: 'booked',
         bookingDate: new Date('2024-12-15'),
       })
       .returning()
@@ -139,7 +139,7 @@ describe('Activity Bookings API (Integration)', () => {
         componentType: 'tour',
         name: 'Unbooked Tour',
         sequenceOrder: 2,
-        isBooked: false,
+        bookingStatus: 'unbooked',
       })
       .returning()
 
@@ -164,7 +164,7 @@ describe('Activity Bookings API (Integration)', () => {
   })
 
   describe('GET /bookings/activities', () => {
-    it('should default to isBooked=true when query param is omitted', async () => {
+    it('should default to bookingStatus=booked when query param is omitted', async () => {
       const response = await request(app.getHttpServer())
         .get('/bookings/activities')
         .query({ tripId: testTripId })
@@ -173,26 +173,26 @@ describe('Activity Bookings API (Integration)', () => {
       // Should only return booked activities
       expect(response.body.activities).toHaveLength(1)
       expect(response.body.activities[0].id).toBe(bookedActivityId)
-      expect(response.body.activities[0].isBooked).toBe(true)
+      expect(response.body.activities[0].bookingStatus).toBe('booked')
       expect(response.body.total).toBe(1)
     })
 
-    it('should return unbooked activities when isBooked=false', async () => {
+    it('should return unbooked activities when bookingStatus=unbooked', async () => {
       const response = await request(app.getHttpServer())
         .get('/bookings/activities')
-        .query({ tripId: testTripId, isBooked: 'false' })
+        .query({ tripId: testTripId, bookingStatus: 'unbooked' })
         .expect(200)
 
       // Should only return unbooked activities
       expect(response.body.activities).toHaveLength(1)
       expect(response.body.activities[0].id).toBe(unbookedActivityId)
-      expect(response.body.activities[0].isBooked).toBe(false)
+      expect(response.body.activities[0].bookingStatus).toBe('unbooked')
     })
 
-    it('should return booked activities when isBooked=true explicitly', async () => {
+    it('should return booked activities when bookingStatus=booked explicitly', async () => {
       const response = await request(app.getHttpServer())
         .get('/bookings/activities')
-        .query({ tripId: testTripId, isBooked: 'true' })
+        .query({ tripId: testTripId, bookingStatus: 'booked' })
         .expect(200)
 
       expect(response.body.activities).toHaveLength(1)
@@ -220,7 +220,7 @@ describe('Activity Bookings API (Integration)', () => {
           name: 'Empty Trip',
           primaryContactId: testContactId,
           ownerId: testContactId,
-          status: 'draft',
+          status: 'planning',
           currency: 'CAD',
         })
         .returning()
@@ -246,7 +246,7 @@ describe('Activity Bookings API (Integration)', () => {
         .expect(200)
 
       expect(response.body.id).toBe(unbookedActivityId)
-      expect(response.body.isBooked).toBe(true)
+      expect(response.body.bookingStatus).toBe('booked')
       expect(response.body.bookingDate).toBe('2024-12-18')
       expect(response.body.bookable).toBe(true)
       expect(response.body.blockedReason).toBeNull()
@@ -287,7 +287,7 @@ describe('Activity Bookings API (Integration)', () => {
         .expect(200)
 
       expect(response.body.id).toBe(bookedActivityId)
-      expect(response.body.isBooked).toBe(false)
+      expect(response.body.bookingStatus).toBe('unbooked')
       expect(response.body.bookingDate).toBeNull()
     })
   })
@@ -321,7 +321,7 @@ describe('Activity Bookings API (Integration)', () => {
           componentType: 'custom_cruise',
           name: 'Standalone Custom Cruise',
           sequenceOrder: 3,
-          isBooked: false,
+          bookingStatus: 'unbooked',
         })
         .returning()
 
@@ -337,7 +337,7 @@ describe('Activity Bookings API (Integration)', () => {
           componentType: 'tour',
           name: 'Child Tour (in package)',
           sequenceOrder: 4,
-          isBooked: false,
+          bookingStatus: 'unbooked',
           packageId: testPackageId,
         })
         .returning()
@@ -361,7 +361,7 @@ describe('Activity Bookings API (Integration)', () => {
         .send({})
         .expect(200)
 
-      expect(response.body.isBooked).toBe(true)
+      expect(response.body.bookingStatus).toBe('booked')
     })
 
     it('should include child activities in list with bookable=false', async () => {
@@ -369,7 +369,7 @@ describe('Activity Bookings API (Integration)', () => {
       const db = getDb()
       await db
         .update(itineraryActivities)
-        .set({ isBooked: true, bookingDate: new Date() })
+        .set({ bookingStatus: 'booked', bookingDate: new Date() })
         .where(eq(itineraryActivities.id, childActivityId))
 
       const response = await request(app.getHttpServer())

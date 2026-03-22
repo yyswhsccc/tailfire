@@ -136,7 +136,8 @@ export class ActivitiesService {
     const {
       itineraryDayId,
       activityType,
-      status,
+      proposalStatus,
+      bookingStatus,
       sortBy = 'sequenceOrder',
       sortOrder = 'asc',
       limit = 100,
@@ -151,8 +152,11 @@ export class ActivitiesService {
     if (activityType) {
       conditions.push(eq(this.db.schema.itineraryActivities.activityType, activityType))
     }
-    if (status) {
-      conditions.push(eq(this.db.schema.itineraryActivities.status, status))
+    if (proposalStatus) {
+      conditions.push(eq(this.db.schema.itineraryActivities.proposalStatus, proposalStatus))
+    }
+    if (bookingStatus) {
+      conditions.push(eq(this.db.schema.itineraryActivities.bookingStatus, bookingStatus))
     }
 
     // Map sortBy to actual column reference
@@ -426,7 +430,7 @@ export class ActivitiesService {
         id: this.db.schema.itineraryActivities.id,
         name: this.db.schema.itineraryActivities.name,
         activityType: this.db.schema.itineraryActivities.activityType,
-        status: this.db.schema.itineraryActivities.status,
+        proposalStatus: this.db.schema.itineraryActivities.proposalStatus,
         parentActivityId: this.db.schema.itineraryActivities.parentActivityId,
         sequenceOrder: this.db.schema.itineraryActivities.sequenceOrder,
         dayNumber: this.db.schema.itineraryDays.dayNumber,
@@ -473,7 +477,7 @@ export class ActivitiesService {
         id: r.id,
         name: r.name,
         activityType: r.activityType as any,
-        status: r.status as any,
+        proposalStatus: r.proposalStatus as any,
         dayNumber: r.dayNumber,
         // Defensive: only lodging/custom_cruise can have spans
         endDayNumber: ['lodging', 'custom_cruise'].includes(r.activityType) ? (r.endDayNumber ?? null) : null,
@@ -592,7 +596,8 @@ export class ActivitiesService {
         coordinates: dto.coordinates || null,
         notes: dto.notes || null,
         confirmationNumber: dto.confirmationNumber || null,
-        status: dto.status || 'proposed',
+        proposalStatus: dto.proposalStatus || 'draft',
+        bookingStatus: dto.bookingStatus || 'unbooked',
         pricingType: dto.pricingType || null,
         currency: dto.currency || tripCurrency,
         photos: dto.photos || null,
@@ -700,7 +705,8 @@ export class ActivitiesService {
       coordinates?: { lat: number; lng: number } | null
       notes?: string | null
       confirmationNumber?: string | null
-      status?: 'proposed' | 'confirmed' | 'cancelled' | 'optional'
+      proposalStatus?: 'draft' | 'proposing' | 'approved' | 'cancelled'
+      bookingStatus?: 'unbooked' | 'booked' | 'cancelled'
     }>
   ): Promise<Array<{ id: string; itineraryDayId: string | null; name: string }>> {
     if (activities.length === 0) return []
@@ -725,7 +731,8 @@ export class ActivitiesService {
       coordinates: dto.coordinates || null,
       notes: dto.notes || null,
       confirmationNumber: dto.confirmationNumber || null,
-      status: dto.status || 'proposed',
+      proposalStatus: dto.proposalStatus || 'draft',
+      bookingStatus: dto.bookingStatus || 'unbooked',
     }))
 
     // Single bulk INSERT with RETURNING
@@ -773,7 +780,7 @@ export class ActivitiesService {
     // Bypass prevention: block direct booking status changes for packaged activities
     // Users must use the dedicated /bookings/activities endpoints for booking operations,
     // which enforce package control rules
-    if ((dto.isBooked !== undefined || dto.bookingDate !== undefined) && beforeActivity.parentActivityId) {
+    if ((dto.bookingStatus !== undefined || dto.bookingDate !== undefined) && beforeActivity.parentActivityId) {
       // Check if parent is a package
       const parent = await this.findOneInternal(beforeActivity.parentActivityId)
       if (parent?.activityType === 'package') {
@@ -800,8 +807,8 @@ export class ActivitiesService {
         ...(dto.coordinates !== undefined && { coordinates: dto.coordinates }),
         ...(dto.notes !== undefined && { notes: dto.notes }),
         ...(dto.confirmationNumber !== undefined && { confirmationNumber: dto.confirmationNumber }),
-        ...(dto.status && { status: dto.status }),
-        ...(dto.isBooked !== undefined && { isBooked: dto.isBooked }),
+        ...(dto.proposalStatus && { proposalStatus: dto.proposalStatus }),
+        ...(dto.bookingStatus !== undefined && { bookingStatus: dto.bookingStatus }),
         ...(dto.isVisibleInCalendar !== undefined && { isVisibleInCalendar: dto.isVisibleInCalendar }),
         ...(dto.bookingDate !== undefined && {
           bookingDate: dto.bookingDate ? new Date(dto.bookingDate) : null
@@ -857,37 +864,37 @@ export class ActivitiesService {
     }
 
     // Cascade booking status to children when a package booking status changes
-    if (beforeActivity.activityType === 'package' && dto.isBooked !== undefined) {
-      if (dto.isBooked === true) {
+    if (beforeActivity.activityType === 'package' && dto.bookingStatus !== undefined) {
+      if (dto.bookingStatus === 'booked') {
         // Mark non-cancelled children as booked
         await this.db.client
           .update(this.db.schema.itineraryActivities)
           .set({
-            isBooked: true,
-            status: 'confirmed',
+            bookingStatus: 'booked',
+            proposalStatus: 'approved',
             bookingDate: dto.bookingDate ? new Date(dto.bookingDate) : new Date(),
             updatedAt: new Date(),
           })
           .where(
             and(
               eq(this.db.schema.itineraryActivities.parentActivityId, id),
-              ne(this.db.schema.itineraryActivities.status, 'cancelled')
+              ne(this.db.schema.itineraryActivities.proposalStatus, 'cancelled')
             )
           )
-      } else {
+      } else if (dto.bookingStatus === 'unbooked') {
         // Un-book non-cancelled children when package is un-booked
         await this.db.client
           .update(this.db.schema.itineraryActivities)
           .set({
-            isBooked: false,
-            status: 'proposed',
+            bookingStatus: 'unbooked',
+            proposalStatus: 'draft',
             bookingDate: null,
             updatedAt: new Date(),
           })
           .where(
             and(
               eq(this.db.schema.itineraryActivities.parentActivityId, id),
-              ne(this.db.schema.itineraryActivities.status, 'cancelled')
+              ne(this.db.schema.itineraryActivities.proposalStatus, 'cancelled')
             )
           )
       }
@@ -1250,7 +1257,6 @@ export class ActivitiesService {
       notes: activity.notes || null,
       confirmationNumber: activity.confirmationNumber || null,
       // Booking tracking
-      isBooked: activity.isBooked ?? false,
       isVisibleInCalendar: activity.isVisibleInCalendar ?? true,
       bookingDate: activity.bookingDate?.toISOString() || null,
       bookingId: activity.bookingId || null,
@@ -1460,7 +1466,8 @@ export class ActivitiesService {
           coordinates: sourceActivity.coordinates || null,
           notes: sourceActivity.notes || null,
           confirmationNumber: sourceActivity.confirmationNumber || null,
-          status: sourceActivity.status,
+          proposalStatus: sourceActivity.proposalStatus,
+          bookingStatus: sourceActivity.bookingStatus,
           pricingType: sourceActivity.pricingType || null,
           currency: sourceActivity.currency || 'USD',
           photos: sourceActivity.photos || null,
@@ -2185,7 +2192,7 @@ export class ActivitiesService {
         ...baseResponse,
         supplierName,
         confirmationNumber: r.activity.confirmationNumber ?? null,
-        isBooked: r.activity.isBooked,
+        bookingStatus: r.activity.bookingStatus,
         paymentStatus,
         paidCents: payment?.paidCents ?? null,
         currency: pricing?.currency ?? 'CAD',
@@ -2591,7 +2598,7 @@ export class ActivitiesService {
     // Payment chain: activity → activity_pricing → payment_schedule_config → expected_payment_items → payment_transactions
     const [result] = await this.db.client.execute(sql`
       WITH trip_packages AS (
-        SELECT ia.id, ia.is_booked
+        SELECT ia.id, ia.booking_status
         FROM itinerary_activities ia
         LEFT JOIN itinerary_days id ON ia.itinerary_day_id = id.id
         LEFT JOIN itineraries i ON id.itinerary_id = i.id
@@ -2604,7 +2611,7 @@ export class ActivitiesService {
       package_totals AS (
         SELECT
           tp.id,
-          tp.is_booked,
+          tp.booking_status,
           COALESCE(ap.total_price_cents, 0) as price_cents,
           COALESCE(ap.commission_total_cents, 0) as commission_cents
         FROM trip_packages tp
@@ -2624,10 +2631,10 @@ export class ActivitiesService {
       SELECT
         COUNT(DISTINCT pt.id)::text as total_packages,
         COALESCE(SUM(pt.price_cents), 0)::text as grand_total_cents,
-        COALESCE(SUM(pt.price_cents) FILTER (WHERE pt.is_booked = true), 0)::text as booked_total_cents,
+        COALESCE(SUM(pt.price_cents) FILTER (WHERE pt.booking_status = 'booked'), 0)::text as booked_total_cents,
         COALESCE(SUM(p.paid_cents), 0)::text as total_collected_cents,
-        COALESCE(SUM(pt.commission_cents) FILTER (WHERE pt.is_booked = true), 0)::text as expected_commission_cents,
-        COALESCE(SUM(pt.commission_cents) FILTER (WHERE pt.is_booked = false), 0)::text as pending_commission_cents
+        COALESCE(SUM(pt.commission_cents) FILTER (WHERE pt.booking_status = 'booked'), 0)::text as expected_commission_cents,
+        COALESCE(SUM(pt.commission_cents) FILTER (WHERE pt.booking_status != 'booked'), 0)::text as pending_commission_cents
       FROM package_totals pt
       LEFT JOIN payments p ON p.package_id = pt.id
     `) as unknown as TotalsRow[]

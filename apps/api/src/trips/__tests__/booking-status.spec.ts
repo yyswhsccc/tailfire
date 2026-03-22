@@ -78,7 +78,7 @@ describe('Booking Status Aggregation (Integration)', () => {
       .insert(trips)
       .values({
         name: 'Booking Status Test Trip',
-        status: 'draft',
+        status: 'planning',
         primaryContactId: testContactId,
         currency: 'CAD',
         ownerId: '00000000-0000-0000-0000-000000000001',
@@ -120,7 +120,7 @@ describe('Booking Status Aggregation (Integration)', () => {
         activityType: 'lodging',
         name: 'Test Hotel',
         sequenceOrder: 0,
-        status: 'confirmed',
+        proposalStatus: 'approved',
       })
       .returning()
 
@@ -187,7 +187,7 @@ describe('Booking Status Aggregation (Integration)', () => {
           activityType: 'tour',
           name: 'Free Tour',
           sequenceOrder: 1,
-          status: 'confirmed',
+          proposalStatus: 'approved',
         })
         .returning()
 

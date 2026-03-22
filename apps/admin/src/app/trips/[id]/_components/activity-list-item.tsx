@@ -191,7 +191,7 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
                   {activity.name}
                 </h4>
                 <Badge variant="secondary" className="flex-shrink-0">
-                  {activity.status}
+                  {activity.proposalStatus}
                 </Badge>
                 {activity.packageId && (
                   <TooltipProvider>

@@ -45,7 +45,7 @@ export interface CreateTripDto {
   bookingDate?: string // ISO date string
 
   // Optional status
-  status?: 'inbound' | 'draft' | 'quoted' | 'booked' | 'in_progress' | 'completed' | 'cancelled'
+  status?: 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
 
   // Optional associations
   primaryContactId?: string // UUID
@@ -168,7 +168,7 @@ export interface CreateItineraryDto {
   overview?: string // Rich text overview statement (TERN pattern)
   startDate?: string // ISO date string - can override trip start date (TERN pattern)
   endDate?: string // ISO date string - can override trip end date (TERN pattern)
-  status?: 'draft' | 'proposing' | 'approved' | 'archived' | 'declined'
+  status?: 'draft' | 'proposing' | 'approved' | 'archived'
   sequenceOrder?: number
 }
 
@@ -183,7 +183,7 @@ export interface UpdateTripDto {
   startDate?: string
   endDate?: string
   bookingDate?: string
-  status?: 'inbound' | 'draft' | 'quoted' | 'booked' | 'in_progress' | 'completed' | 'cancelled'
+  status?: 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
   ownerId?: string | null // Can set to null only if status is 'inbound'
   primaryContactId?: string
   referenceNumber?: string
@@ -244,7 +244,7 @@ export interface UpdateItineraryDto {
   secondaryDestinationName?: string | null
   secondaryDestinationLat?: number | null
   secondaryDestinationLng?: number | null
-  status?: 'draft' | 'proposing' | 'approved' | 'archived' | 'declined'
+  status?: 'draft' | 'proposing' | 'approved' | 'archived'
   isSelected?: boolean
   sequenceOrder?: number
 }
@@ -262,7 +262,7 @@ export interface TripFilterDto {
   search?: string // Full-text search across name, description, reference
 
   // Filters
-  status?: 'inbound' | 'draft' | 'quoted' | 'booked' | 'in_progress' | 'completed' | 'cancelled'
+  status?: 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
   tripType?: 'leisure' | 'business' | 'group' | 'honeymoon' | 'corporate' | 'custom'
   ownerId?: string // Filter by owner
   primaryContactId?: string // Filter by primary contact
@@ -299,7 +299,7 @@ export interface TravelerGroupFilterDto {
 
 export interface ItineraryFilterDto {
   tripId?: string
-  status?: 'draft' | 'proposing' | 'approved' | 'archived' | 'declined'
+  status?: 'draft' | 'proposing' | 'approved' | 'archived'
   isSelected?: boolean
 }
 
@@ -530,7 +530,7 @@ export interface BulkArchiveTripsDto {
  */
 export interface BulkChangeStatusDto {
   tripIds: string[]
-  status: 'inbound' | 'draft' | 'quoted' | 'booked' | 'in_progress' | 'completed' | 'cancelled'
+  status: 'inbound' | 'planning' | 'active' | 'travelling' | 'travelled' | 'cancelled'
 }
 
 /**
@@ -765,8 +765,16 @@ export type SharedActivityType =
   | 'cruise'
   | 'tour_day'
 
-/** Activity status for display */
-export type SharedActivityStatus = 'proposed' | 'confirmed' | 'cancelled' | 'optional'
+/** Activity proposal status for display */
+export type SharedProposalStatus = 'draft' | 'proposing' | 'approved' | 'cancelled'
+
+/** Activity booking status for display */
+export type SharedBookingStatus = 'unbooked' | 'booked' | 'cancelled'
+
+/**
+ * @deprecated Use SharedProposalStatus instead
+ */
+export type SharedActivityStatus = SharedProposalStatus
 
 /** Sanitized pricing breakdown item (no traveler names) */
 export interface SharedPricingBreakdownItem {
@@ -965,8 +973,8 @@ export interface SharedActivityDto {
   timezone: string | null
   location: string | null
   address: string | null
-  status: SharedActivityStatus
-  isBooked: boolean
+  proposalStatus: SharedProposalStatus
+  bookingStatus: SharedBookingStatus
   confirmationNumber: string | null
   thumbnail: string | null
   media: SharedMediaDto[]

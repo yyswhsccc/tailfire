@@ -22,8 +22,8 @@ export const tripFormSchema = z.object({
     .optional()
     .or(z.literal('')),
   status: z
-    .enum(['draft', 'quoted', 'booked', 'in_progress', 'completed', 'cancelled'])
-    .default('draft'),
+    .enum(['inbound', 'planning', 'active', 'travelling', 'travelled', 'cancelled'])
+    .default('planning'),
   tags: z.array(z.string()).default([]),
   startDate: z.string().optional().or(z.literal('')),
   endDate: z.string().optional().or(z.literal('')),
@@ -96,7 +96,7 @@ export function toTripDefaults(trip?: TripResponseDto | null): TripFormValues {
     return {
       name: '',
       tripType: 'leisure',
-      status: 'draft',
+      status: 'planning',
       tags: [],
       startDate: '',
       endDate: '',
@@ -109,7 +109,7 @@ export function toTripDefaults(trip?: TripResponseDto | null): TripFormValues {
   return {
     name: trip.name ?? '',
     tripType: (trip.tripType as TripFormValues['tripType']) ?? '',
-    status: (trip.status as TripFormValues['status']) ?? 'draft',
+    status: (trip.status as TripFormValues['status']) ?? 'planning',
     tags: trip.tags ?? [],
     startDate: trip.startDate ?? '',
     endDate: trip.endDate ?? '',

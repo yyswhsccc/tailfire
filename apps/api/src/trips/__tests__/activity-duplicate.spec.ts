@@ -82,7 +82,7 @@ describe('Activity Duplicate (Integration)', () => {
       .values({
         agencyId: testAgencyId,
         name: 'Duplicate Test Trip',
-        status: 'draft',
+        status: 'planning',
         primaryContactId: testContactId,
         currency: 'CAD',
         ownerId: '00000000-0000-0000-0000-000000000001',
@@ -221,7 +221,7 @@ describe('Activity Duplicate (Integration)', () => {
         location: 'Test Location',
         address: '123 Test Street',
         confirmationNumber: 'CONF123',
-        status: 'confirmed',
+        proposalStatus: 'approved',
         pricingType: 'per_person',
         currency: 'CAD',
         notes: 'Test notes',
@@ -236,7 +236,7 @@ describe('Activity Duplicate (Integration)', () => {
       expect(duplicate.location).toBe(source.location)
       expect(duplicate.address).toBe(source.address)
       expect(duplicate.confirmationNumber).toBe(source.confirmationNumber)
-      expect(duplicate.status).toBe(source.status)
+      expect(duplicate.proposalStatus).toBe(source.proposalStatus)
       expect(duplicate.pricingType).toBe(source.pricingType)
       expect(duplicate.currency).toBe(source.currency)
       expect(duplicate.notes).toBe(source.notes)
@@ -306,7 +306,7 @@ describe('Activity Duplicate (Integration)', () => {
         .values({
           agencyId: testAgencyId,
           name: 'Second Trip',
-          status: 'draft',
+          status: 'planning',
           primaryContactId: testContactId,
           currency: 'CAD',
           ownerId: '00000000-0000-0000-0000-000000000002',

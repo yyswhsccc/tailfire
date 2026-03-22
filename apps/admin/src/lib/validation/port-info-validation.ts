@@ -40,7 +40,7 @@ export const portInfoFormSchema = z.object({
   componentType: z.literal('port_info').default('port_info'),
   name: z.string().optional().default(''), // Auto-generated from portName
   description: z.string().optional().default(''),
-  status: z.enum(['proposed', 'confirmed', 'cancelled']).default('proposed'),
+  proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
 
   // Nested port info details
   portInfoDetails: portInfoDetailsSchema,
@@ -94,7 +94,7 @@ export function toPortInfoDefaults(
     componentType: 'port_info',
     name: serverData?.name ?? '',
     description: serverData?.description ?? '',
-    status: serverData?.status ?? 'proposed',
+    proposalStatus: serverData?.proposalStatus ?? 'draft',
 
     portInfoDetails: {
       portName: serverDetails?.portName ?? '',
@@ -129,7 +129,7 @@ export function toPortInfoApiPayload(data: PortInfoFormData): CreatePortInfoActi
     componentType: 'port_info',
     name: data.portInfoDetails.portName, // Auto-name from port
     description: data.description,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     portInfoDetails: {
       portName: data.portInfoDetails.portName,
       portLocation: data.portInfoDetails.portLocation,

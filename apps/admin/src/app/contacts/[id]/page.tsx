@@ -1389,7 +1389,7 @@ export default function ContactDetailPage() {
                             <div className="min-w-0">
                               <p className="font-medium truncate">{trip.name}</p>
                               <div className="flex items-center gap-2 mt-1">
-                                <Badge variant={trip.status === 'booked' ? 'booked' : trip.status === 'completed' ? 'completed' : 'secondary'}>
+                                <Badge variant={trip.status === 'active' ? 'active' : trip.status === 'travelled' ? 'travelled' : 'secondary'}>
                                   {trip.status}
                                 </Badge>
                                 {trip.tripType && (
