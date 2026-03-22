@@ -237,4 +237,98 @@ export class TripLifecycleService {
 
     this.logger.log(`Trip ${tripId} demoted: active → planning (all bookings removed)`)
   }
+
+  // ============================================================================
+  // BACKFILL
+  // ============================================================================
+
+  /**
+   * Evaluate ALL non-terminal trips through the lifecycle engine.
+   * Use after bulk imports (e.g., TES migration) to ensure trips
+   * are in the correct stage based on their booking state and dates.
+   */
+  async backfillAllTrips(): Promise<{ evaluated: number; promoted: number; demoted: number; dateTransitions: number }> {
+    this.logger.log('Starting lifecycle backfill for all trips...')
+
+    // Get all non-terminal trips (not travelled, not cancelled)
+    type TripRow = { id: string; status: string; start_date: string | null; end_date: string | null }
+    const trips = await this.db.client.execute(sql`
+      SELECT id, status::text, start_date, end_date
+      FROM trips
+      WHERE status NOT IN ('travelled', 'cancelled')
+        AND deleted_at IS NULL
+      ORDER BY created_at ASC
+    `) as unknown as TripRow[]
+
+    let evaluated = 0
+    let promoted = 0
+    let demoted = 0
+    let dateTransitions = 0
+
+    for (const trip of trips) {
+      evaluated++
+      const bookedCount = await this.countBookedActivities(trip.id)
+      const now = new Date()
+      const startDate = trip.start_date ? new Date(trip.start_date) : null
+      const endDate = trip.end_date ? new Date(trip.end_date) : null
+
+      if (trip.status === 'planning' || trip.status === 'inbound') {
+        if (bookedCount > 0) {
+          // Has bookings — should be at least active
+          if (endDate && endDate < now) {
+            // End date passed — go straight to travelled
+            await this.db.client.execute(sql`
+              UPDATE trips SET status = 'travelled', last_status_change_at = ${now}, status_auto_transitioned_at = ${now}, updated_at = ${now}
+              WHERE id = ${trip.id} AND status IN ('planning', 'inbound')
+            `)
+            dateTransitions++
+            this.logger.log(`Backfill: Trip ${trip.id} → travelled (had bookings, end date passed)`)
+          } else if (startDate && startDate <= now) {
+            // Start date passed — should be travelling
+            await this.db.client.execute(sql`
+              UPDATE trips SET status = 'travelling', last_status_change_at = ${now}, status_auto_transitioned_at = ${now}, updated_at = ${now}
+              WHERE id = ${trip.id} AND status IN ('planning', 'inbound')
+            `)
+            dateTransitions++
+            this.logger.log(`Backfill: Trip ${trip.id} → travelling (had bookings, start date passed)`)
+          } else {
+            // Future dates — promote to active
+            await this.promoteToActive(trip.id, null)
+            promoted++
+          }
+        }
+      } else if (trip.status === 'active') {
+        if (bookedCount === 0) {
+          await this.demoteToPlanning(trip.id)
+          demoted++
+        } else if (endDate && endDate < now) {
+          await this.db.client.execute(sql`
+            UPDATE trips SET status = 'travelled', last_status_change_at = ${now}, status_auto_transitioned_at = ${now}, updated_at = ${now}
+            WHERE id = ${trip.id} AND status = 'active'
+          `)
+          dateTransitions++
+          this.logger.log(`Backfill: Trip ${trip.id} → travelled (active, end date passed)`)
+        } else if (startDate && startDate <= now) {
+          await this.db.client.execute(sql`
+            UPDATE trips SET status = 'travelling', last_status_change_at = ${now}, status_auto_transitioned_at = ${now}, updated_at = ${now}
+            WHERE id = ${trip.id} AND status = 'active'
+          `)
+          dateTransitions++
+          this.logger.log(`Backfill: Trip ${trip.id} → travelling (active, start date passed)`)
+        }
+      } else if (trip.status === 'travelling') {
+        if (endDate && endDate < now) {
+          await this.db.client.execute(sql`
+            UPDATE trips SET status = 'travelled', last_status_change_at = ${now}, status_auto_transitioned_at = ${now}, updated_at = ${now}
+            WHERE id = ${trip.id} AND status = 'travelling'
+          `)
+          dateTransitions++
+          this.logger.log(`Backfill: Trip ${trip.id} → travelled (travelling, end date passed)`)
+        }
+      }
+    }
+
+    this.logger.log(`Lifecycle backfill complete: ${evaluated} evaluated, ${promoted} promoted, ${demoted} demoted, ${dateTransitions} date transitions`)
+    return { evaluated, promoted, demoted, dateTransitions }
+  }
 }

@@ -28,6 +28,7 @@ import { Public } from '../auth/decorators/public.decorator'
 import { ApiTags } from '@nestjs/swagger'
 import { TripsService } from './trips.service'
 import { TripAccessService } from './trip-access.service'
+import { TripLifecycleService } from './trip-lifecycle.service'
 import { TripGroupAccessService } from './trip-group-access.service'
 import { StorageService } from './storage.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
@@ -73,6 +74,7 @@ export class TripsController {
     private readonly activityLogsService: ActivityLogsService,
     private readonly paymentSchedulesService: PaymentSchedulesService,
     private readonly storageService: StorageService,
+    private readonly tripLifecycleService: TripLifecycleService,
   ) {}
 
   /**
@@ -913,6 +915,19 @@ export class TripsController {
     @Param('id') id: string,
   ): Promise<TripResponseDto> {
     return this.tripsService.uncancelTrip(id, auth.userId)
+  }
+
+  /**
+   * Backfill trip lifecycle — evaluate all trips through TripLifecycleService.
+   * Promotes planning trips with booked activities to active,
+   * and applies date-driven transitions for active/travelling trips.
+   * POST /trips/backfill-lifecycle
+   */
+  @AdminOnly()
+  @Post('backfill-lifecycle')
+  @HttpCode(HttpStatus.OK)
+  async backfillLifecycle(): Promise<{ evaluated: number; promoted: number; demoted: number; dateTransitions: number }> {
+    return this.tripLifecycleService.backfillAllTrips()
   }
 
   /**
