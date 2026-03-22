@@ -59,6 +59,43 @@ jobs:
       - name: Build database package
         run: pnpm --filter @tailfire/database build
 
+      - name: Pre-migration enum additions
+        run: |
+          # ALTER TYPE ADD VALUE cannot run inside a transaction.
+          # Drizzle runs migrations in a transaction, so we add new enum
+          # values here first. These are idempotent (IF NOT EXISTS).
+          node -e "
+            const postgres = require('postgres');
+            const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+            (async () => {
+              try {
+                const tripEnumExists = await sql\`SELECT 1 FROM pg_type WHERE typname = 'trip_status'\`;
+                if (tripEnumExists.length > 0) {
+                  const existing = await sql\`SELECT enumlabel FROM pg_enum WHERE enumtypid = 'trip_status'::regtype\`;
+                  const labels = existing.map(r => r.enumlabel);
+                  for (const val of ['planning', 'active', 'travelling', 'travelled']) {
+                    if (!labels.includes(val)) {
+                      await sql.unsafe(\`ALTER TYPE trip_status ADD VALUE '\${val}'\`);
+                      console.log('Added trip_status value:', val);
+                    }
+                  }
+                }
+                const proposalExists = await sql\`SELECT 1 FROM pg_type WHERE typname = 'activity_proposal_status'\`;
+                if (proposalExists.length === 0) {
+                  await sql.unsafe(\"CREATE TYPE activity_proposal_status AS ENUM ('draft', 'proposing', 'approved', 'cancelled')\");
+                  console.log('Created activity_proposal_status enum');
+                }
+                const bookingExists = await sql\`SELECT 1 FROM pg_type WHERE typname = 'activity_booking_status'\`;
+                if (bookingExists.length === 0) {
+                  await sql.unsafe(\"CREATE TYPE activity_booking_status AS ENUM ('unbooked', 'booked', 'cancelled')\");
+                  console.log('Created activity_booking_status enum');
+                }
+                console.log('Pre-migration enum setup complete');
+              } catch (e) { console.error('Pre-migration error:', e.message); }
+              await sql.end();
+            })();
+          "
+
       - name: Run Drizzle migrations
         working-directory: apps/api
         run: pnpm db:migrate

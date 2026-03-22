@@ -2,10 +2,10 @@
 -- planning replaces draft+quoted, active replaces booked,
 -- travelling replaces in_progress, travelled replaces completed
 --
--- NOTE: ALTER TYPE ADD VALUE cannot run inside a transaction.
--- Since Drizzle runs migrations in a transaction, we assume the new
--- values were already added via a pre-migration step or manually.
--- This migration handles: data update, enum swap, trigger recreation.
+-- PREREQUISITE: New enum values (planning, active, travelling, travelled)
+-- must be added BEFORE this migration runs. The deploy workflow handles
+-- this in a pre-migration step because ALTER TYPE ADD VALUE cannot run
+-- inside a transaction.
 
 -- ─── Step 1: Drop dependent triggers ──────────────────────────────────────
 DROP TRIGGER IF EXISTS validate_trip_status_transition_trigger ON trips;
@@ -45,7 +45,14 @@ DECLARE
   is_valid boolean := FALSE;
   i integer;
 BEGIN
-  IF TG_OP = 'INSERT' THEN RETURN NEW; END IF;
+  IF TG_OP = 'INSERT' THEN
+    -- On INSERT, only validate owner rules
+    IF NEW.owner_id IS NULL AND NEW.status::text != 'inbound' THEN
+      RAISE EXCEPTION 'Owner can only be cleared for inbound trips';
+    END IF;
+    RETURN NEW;
+  END IF;
+
   IF OLD.status = NEW.status THEN RETURN NEW; END IF;
 
   valid_transitions := ARRAY[
@@ -93,5 +100,5 @@ END;
 $fn$ LANGUAGE plpgsql;
 
 CREATE TRIGGER validate_trip_status_transition_trigger
-  BEFORE UPDATE ON trips FOR EACH ROW
+  BEFORE INSERT OR UPDATE ON trips FOR EACH ROW
   EXECUTE FUNCTION validate_trip_status_transition();
