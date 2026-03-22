@@ -175,7 +175,7 @@ const FUEL_POLICIES = [
 const AUTO_SAVE_FIELDS = [
   'name',
   'description',
-  'status',
+  'proposalStatus',
   'notes',
   'confirmationNumber',
   'transportationDetails.subtype',

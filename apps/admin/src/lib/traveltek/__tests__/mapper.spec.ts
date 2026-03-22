@@ -466,11 +466,11 @@ describe('Traveltek Mapper', () => {
     })
 
     describe('Default Values', () => {
-      it('should set status to proposed', () => {
+      it('should set proposalStatus to draft', () => {
         const cruise = createMinimalCruise()
         const result = mapTraveltekToTailfire(cruise)
 
-        expect(result.dto.status).toBe('proposed')
+        expect(result.dto.proposalStatus).toBe('draft')
       })
 
       it('should set pricingType to per_person', () => {

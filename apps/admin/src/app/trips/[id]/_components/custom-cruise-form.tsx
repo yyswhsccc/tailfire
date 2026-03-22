@@ -271,7 +271,7 @@ export function CustomCruiseForm({
     defaultValues: toCustomCruiseDefaults(
       {
         itineraryDayId: effectiveDayId,
-        status: coerceStatus(activity?.status),
+        proposalStatus: coerceStatus(activity?.proposalStatus),
         pricingType: coercePricingType((activity as any)?.pricingType),
         currency: trip?.currency || 'USD',
       },
@@ -343,7 +343,7 @@ export function CustomCruiseForm({
             itineraryDayId: loadedDayId,
             name: cruiseData.name,
             description: cruiseData.description ?? undefined,
-            status: coerceStatus(cruiseData.status),
+            proposalStatus: coerceStatus(cruiseData.proposalStatus),
             pricingType: coercePricingType(cruiseData.pricingType),
             currency: cruiseData.currency || 'USD',
             totalPriceCents: cruiseData.totalPriceCents,
@@ -426,7 +426,7 @@ export function CustomCruiseForm({
   const watchedDepartureDate = watch('customCruiseDetails.departureDate')
 
   // Watch custom component fields (Selects, DatePickers, TimePickers, Comboboxes, number inputs)
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   // Cruise line and ship
   const cruiseLineNameValue = useWatch({ control, name: 'customCruiseDetails.cruiseLineName' })
   const shipNameValue = useWatch({ control, name: 'customCruiseDetails.shipName' })
@@ -983,7 +983,7 @@ export function CustomCruiseForm({
               <span className="text-sm text-gray-600">Status</span>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as CustomCruiseFormData['status'], { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as CustomCruiseFormData['proposalStatus'], { shouldDirty: true })}
               >
                 <SelectTrigger className="w-32 h-8" data-field="status">
                   <SelectValue />

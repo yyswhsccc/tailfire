@@ -117,7 +117,7 @@ export function ActivitySummaryItem({ itineraryId, activity, dayId, cruiseColor,
           </p>
           <div className="flex items-center gap-1 flex-wrap">
             <Badge variant="secondary" className="text-[10px] px-1 py-0">
-              {activity.status}
+              {activity.proposalStatus}
             </Badge>
             {clientResponse === 'confirmed' && (
               <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-medium bg-emerald-100 text-emerald-800">

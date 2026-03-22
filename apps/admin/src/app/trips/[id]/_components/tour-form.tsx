@@ -239,7 +239,7 @@ export function TourForm({
   } = form
 
   // useWatch for custom components
-  const statusValue = useWatch({ control, name: 'status' })
+  const statusValue = useWatch({ control, name: 'proposalStatus' })
   const tourSubtypeValue = useWatch({ control, name: 'tourDetails.tourSubtype' })
   const tourDateValue = useWatch({ control, name: 'tourDetails.tourDate' })
   const startTimeValue = useWatch({ control, name: 'tourDetails.startTime' })
@@ -391,7 +391,7 @@ export function TourForm({
         componentType: 'tour',
         name: tourData.name,
         description: tourData.description,
-        status: tourData.status,
+        proposalStatus: tourData.proposalStatus,
         totalPriceCents: initialPricing.totalPriceCents,
         taxesAndFeesCents: initialPricing.taxesAndFeesCents,
         currency: trip?.currency || initialPricing.currency,
@@ -762,7 +762,7 @@ export function TourForm({
               <span className="text-sm text-gray-600">Status</span>
               <Select
                 value={statusValue}
-                onValueChange={(v) => setValue('status', v as TourFormData['status'], { shouldDirty: true })}
+                onValueChange={(v) => setValue('proposalStatus', v as TourFormData['proposalStatus'], { shouldDirty: true })}
               >
                 <SelectTrigger className="w-32 h-8">
                   <SelectValue />

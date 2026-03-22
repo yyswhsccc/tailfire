@@ -129,7 +129,7 @@ export function toPortInfoApiPayload(data: PortInfoFormData): CreatePortInfoActi
     componentType: 'port_info',
     name: data.portInfoDetails.portName, // Auto-name from port
     description: data.description,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     portInfoDetails: {
       portName: data.portInfoDetails.portName,
       portLocation: data.portInfoDetails.portLocation,

@@ -146,7 +146,7 @@ export function BookingFormSheet({
         name: booking.name,
         confirmationNumber: booking.confirmationNumber,
         supplierName: details?.supplierName ?? null,
-        status: booking.status,
+        proposalStatus: booking.proposalStatus,
         paymentStatus: details?.paymentStatus ?? 'unpaid',
         pricingType: toPackagePricingType(details?.pricingType),
         travelerCount: booking.travelers?.length ?? 1,
@@ -180,7 +180,7 @@ export function BookingFormSheet({
         name: data.name,
         confirmationNumber: data.confirmationNumber || null,
         supplierName: data.supplierName || null,
-        status: data.status as PackageStatus,
+        proposalStatus: data.proposalStatus as PackageStatus,
         paymentStatus: data.paymentStatus as PackagePaymentStatus,
         pricingType: data.pricingType,
         travelerCount: data.travelerCount,
@@ -296,7 +296,7 @@ export function BookingFormSheet({
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="status"
+                    name="proposalStatus"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Booking Status</FormLabel>
@@ -307,10 +307,10 @@ export function BookingFormSheet({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="proposed">Proposed</SelectItem>
-                            <SelectItem value="confirmed">Confirmed</SelectItem>
+                            <SelectItem value="draft">Draft</SelectItem>
+                            <SelectItem value="proposing">Proposing</SelectItem>
+                            <SelectItem value="approved">Approved</SelectItem>
                             <SelectItem value="cancelled">Cancelled</SelectItem>
-                            <SelectItem value="optional">Optional</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />

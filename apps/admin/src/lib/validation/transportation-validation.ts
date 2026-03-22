@@ -305,7 +305,7 @@ export function toTransportationApiPayload(data: TransportationFormData): Create
     componentType: 'transportation',
     name: data.name,
     description: data.description || null,
-    status: data.status,
+    proposalStatus: data.proposalStatus,
     notes: data.notes || null,
     confirmationNumber: data.confirmationNumber || null,
     transportationDetails: {
