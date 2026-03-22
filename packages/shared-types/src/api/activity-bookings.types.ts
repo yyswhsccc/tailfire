@@ -15,6 +15,8 @@ import type { ActivityBookingStatus } from './activities.types'
 
 export type MarkActivityBookedDto = {
   bookingDate?: string // YYYY-MM-DD format, defaults to today
+  passportVerified?: boolean // Agent confirms all traveler passports have been validated
+  nonRefundableAmountCents?: number // Non-refundable portion of deposit, in cents
 }
 
 export type ActivityBookingsFilterDto = {

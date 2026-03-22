@@ -94,7 +94,12 @@ async function handleErrorResponse(response: Response): Promise<never> {
   const metadata = body.metadata as ApiErrorMetadata | undefined
   const code = typeof body.code === 'string' ? body.code : undefined
 
-  throw new ApiError(response.status, message, fieldErrors, metadata, code)
+  // Extract errors string[] (e.g., booking validation errors from BookingValidationService)
+  const errors = Array.isArray(body.errors) && body.errors.every((e) => typeof e === 'string')
+    ? (body.errors as string[])
+    : undefined
+
+  throw new ApiError(response.status, message, fieldErrors, metadata, code, errors)
 }
 
 /**
@@ -110,6 +115,7 @@ export class ApiError extends Error {
   public fieldErrors?: ServerFieldError[]
   public metadata?: ApiErrorMetadata
   public code?: string
+  public errors?: string[]
 
   constructor(
     public status: number,
@@ -117,12 +123,14 @@ export class ApiError extends Error {
     fieldErrors?: ServerFieldError[],
     metadata?: ApiErrorMetadata,
     code?: string,
+    errors?: string[],
   ) {
     super(message)
     this.name = 'ApiError'
     this.fieldErrors = fieldErrors
     this.metadata = metadata
     this.code = code
+    this.errors = errors
   }
 }
 

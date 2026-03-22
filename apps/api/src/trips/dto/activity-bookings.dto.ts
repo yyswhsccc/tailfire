@@ -9,7 +9,7 @@
  * - Booking = A status applied to an activity (bookingStatus field + bookingDate)
  */
 
-import { IsOptional, IsUUID, IsIn, Matches, IsDefined } from 'class-validator'
+import { IsOptional, IsUUID, IsIn, Matches, IsDefined, IsBoolean, IsInt, Min } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 /**
@@ -25,6 +25,23 @@ export class MarkActivityBookedDto {
     message: 'bookingDate must be YYYY-MM-DD format',
   })
   bookingDate?: string
+
+  @ApiPropertyOptional({
+    description: 'Agent confirms all traveler passports have been validated',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  passportVerified?: boolean
+
+  @ApiPropertyOptional({
+    description: 'Non-refundable portion of the deposit, in cents',
+    example: 50000,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  nonRefundableAmountCents?: number
 }
 
 /**

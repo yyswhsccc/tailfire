@@ -72,9 +72,12 @@ export function useMarkActivityBooked() {
       activityId: string
       data?: MarkActivityBookedDto
     }) => {
+      const body: MarkActivityBookedDto = {
+        ...data,
+      }
       return api.post<ActivityBookingResponseDto>(
         `/bookings/activities/${activityId}/mark`,
-        data ?? {}
+        body
       )
     },
     onSuccess: () => {

@@ -525,14 +525,14 @@ export function TransportationForm({
   const markActivityBooked = useMarkActivityBooked()
 
   // Handler for marking transportation as booked
-  const handleMarkAsBooked = async (newBookingDate: string) => {
+  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
     if (!activityId) {
       throw new Error('Activity must be saved before marking as booked')
     }
 
     const result = await markActivityBooked.mutateAsync({
       activityId,
-      data: { bookingDate: newBookingDate },
+      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
     })
 
     // Update local state - preserve YYYY-MM-DD format
