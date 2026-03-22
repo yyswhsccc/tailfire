@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Plus, Search } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
@@ -15,7 +15,15 @@ import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { useToast } from '@/hooks/use-toast'
 import type { ContactFilterDto } from '@tailfire/shared-types/api'
 
-export default function ContactsPage() {
+export default function ContactsPageWrapper() {
+  return (
+    <Suspense>
+      <ContactsPage />
+    </Suspense>
+  )
+}
+
+function ContactsPage() {
   const searchParams = useSearchParams()
   const urlSearch = searchParams?.get('search') || ''
   const [isCreateOpen, setIsCreateOpen] = useState(false)
