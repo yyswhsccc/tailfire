@@ -56,10 +56,9 @@ export const travelerGroupTypeEnum = pgEnum('traveler_group_type', [
 
 export const itineraryStatusEnum = pgEnum('itinerary_status', [
   'draft',
-  'proposing',  // was 'presented' - ready for client review
-  'approved',   // was 'selected' - client approved this option
-  'archived',   // was 'rejected' - no longer active
-  'declined'    // client explicitly declined the proposal
+  'proposing',  // ready for client review
+  'approved',   // client approved this option
+  'archived',   // no longer active
 ])
 
 export const activityEntityTypeEnum = pgEnum('activity_entity_type', [

@@ -168,7 +168,7 @@ export interface CreateItineraryDto {
   overview?: string // Rich text overview statement (TERN pattern)
   startDate?: string // ISO date string - can override trip start date (TERN pattern)
   endDate?: string // ISO date string - can override trip end date (TERN pattern)
-  status?: 'draft' | 'proposing' | 'approved' | 'archived' | 'declined'
+  status?: 'draft' | 'proposing' | 'approved' | 'archived'
   sequenceOrder?: number
 }
 
@@ -244,7 +244,7 @@ export interface UpdateItineraryDto {
   secondaryDestinationName?: string | null
   secondaryDestinationLat?: number | null
   secondaryDestinationLng?: number | null
-  status?: 'draft' | 'proposing' | 'approved' | 'archived' | 'declined'
+  status?: 'draft' | 'proposing' | 'approved' | 'archived'
   isSelected?: boolean
   sequenceOrder?: number
 }
@@ -299,7 +299,7 @@ export interface TravelerGroupFilterDto {
 
 export interface ItineraryFilterDto {
   tripId?: string
-  status?: 'draft' | 'proposing' | 'approved' | 'archived' | 'declined'
+  status?: 'draft' | 'proposing' | 'approved' | 'archived'
   isSelected?: boolean
 }
 
