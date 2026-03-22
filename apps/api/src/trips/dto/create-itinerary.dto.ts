@@ -24,8 +24,8 @@ export class CreateItineraryDto {
   description?: string
 
   @IsOptional()
-  @IsIn(['draft', 'proposing', 'approved', 'archived', 'declined'])
-  status?: 'draft' | 'proposing' | 'approved' | 'archived' | 'declined'
+  @IsIn(['draft', 'proposing', 'approved', 'archived'])
+  status?: 'draft' | 'proposing' | 'approved' | 'archived'
 
   @IsOptional()
   @IsInt()

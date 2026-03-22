@@ -301,6 +301,17 @@ export class ClientPortalService {
         activityNotes: dto.activityNotes || null,
       })
 
+    // Archive any previously approved itinerary for this trip (single-approved rule)
+    await this.db.client
+      .update(this.db.schema.itineraries)
+      .set({ status: 'archived', isSelected: false })
+      .where(
+        and(
+          eq(this.db.schema.itineraries.tripId, tripId),
+          eq(this.db.schema.itineraries.status, 'approved'),
+        ),
+      )
+
     // Transition itinerary to approved
     await this.db.client
       .update(this.db.schema.itineraries)

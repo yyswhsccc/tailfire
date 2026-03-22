@@ -2612,7 +2612,8 @@ export class TripsService {
 
   /**
    * Decline a proposal (public, no auth).
-   * Sets itinerary status to 'declined' and optionally posts a reason as a comment.
+   * Archives the itinerary and optionally posts a reason as a comment.
+   * Client decline is implicit — the itinerary is archived, not given a separate status.
    */
   async declineProposal(
     token: string,
@@ -2624,14 +2625,14 @@ export class TripsService {
       throw new BadRequestException('No itinerary found for this proposal')
     }
 
-    // Idempotent: already declined
-    if (selectedItinerary.status === 'declined') {
-      return { success: true, status: 'declined' }
+    // Idempotent: already archived
+    if (selectedItinerary.status === 'archived') {
+      return { success: true, status: 'archived' }
     }
 
     await this.itinerariesService.update(
       selectedItinerary.id,
-      { status: 'declined' },
+      { status: 'archived' },
       trip.id,
     )
 
@@ -2647,7 +2648,7 @@ export class TripsService {
       itineraryId: selectedItinerary.id,
     })
 
-    return { success: true, status: 'declined' }
+    return { success: true, status: 'archived' }
   }
 
   // ============================================================================
@@ -4508,7 +4509,10 @@ export class TripsService {
     if (!trip) throw new NotFoundException(`Trip with ID ${id} not found`)
     if (trip.status !== 'cancelled') throw new BadRequestException('Trip is not cancelled')
 
-    const restoreStatus = (trip.statusBeforeCancel || 'planning') as 'planning' | 'active' | 'travelling'
+    // Always restore to planning — bookings made before cancellation may no longer
+    // be valid (active trips), or trip dates may have passed (travelling trips).
+    // The agent must re-evaluate and re-book after uncancelling.
+    const restoreStatus = 'planning' as const
 
     const [restored] = await this.db.client
       .update(this.db.schema.trips)
@@ -4526,16 +4530,9 @@ export class TripsService {
 
     if (!restored) throw new NotFoundException(`Trip with ID ${id} not found`)
 
-    // Re-schedule automation jobs only for active/travelling
-    if (['active', 'travelling'].includes(restoreStatus) && restored.startDate && restored.endDate) {
-      await this.scheduleStatusTransitions(
-        restored.id,
-        restored.startDate,
-        restored.endDate,
-        restored.timezone || 'America/Toronto',
-        restoreStatus,
-      )
-    }
+    // No automation scheduling needed — restored trips always land in planning,
+    // which has no automated transitions. Scheduling will be triggered again when
+    // the trip transitions to active.
 
     this.eventEmitter.emit('audit.updated', {
       entityType: 'trip',

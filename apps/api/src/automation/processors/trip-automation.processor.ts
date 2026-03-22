@@ -98,7 +98,7 @@ export class TripAutomationProcessor extends WorkerHost {
     // 3. Validate allowed transitions
     // Aligned with TRIP_STATUS_TRANSITIONS in shared-types
     const validTransitions: Record<string, string[]> = {
-      active: ['travelling', 'travelled', 'cancelled'], // travelled allowed for same-day trips
+      active: ['travelling', 'cancelled'],
       travelling: ['travelled', 'cancelled'],
     }
 

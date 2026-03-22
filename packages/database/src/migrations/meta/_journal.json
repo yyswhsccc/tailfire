@@ -1170,6 +1170,13 @@
       "when": 1774357200000,
       "tag": "20260321130000_rename_trip_status_canonical",
       "breakpoints": true
+    },
+    {
+      "idx": 167,
+      "version": "7",
+      "when": 1774360800000,
+      "tag": "20260321140000_remove_itinerary_declined",
+      "breakpoints": true
     }
   ]
 }
