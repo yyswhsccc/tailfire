@@ -120,11 +120,29 @@ export class TripOrderController {
   }
 
   /**
+   * Check TICO compliance for a Trip-Order
+   * GET /trip-orders/:id/compliance
+   *
+   * Returns list of compliance violations. Empty array means compliant.
+   */
+  @Get('trip-orders/:id/compliance')
+  @ApiOperation({ summary: 'Check TICO compliance for trip order' })
+  async checkCompliance(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string
+  ): Promise<{ compliant: boolean; violations: string[] }> {
+    const tripOrder = await this.tripOrderService.getTripOrderById(id, auth.agencyId)
+    const violations = this.tripOrderService.validateTICOCompliance(tripOrder)
+    return { compliant: violations.length === 0, violations }
+  }
+
+  /**
    * Finalize a Trip-Order (draft -> finalized)
    * POST /trip-orders/:id/finalize
    *
    * Once finalized, the snapshot cannot be modified.
    * Only draft snapshots can be finalized.
+   * ALL TICO compliance requirements must be satisfied.
    */
   @Post('trip-orders/:id/finalize')
   @HttpCode(HttpStatus.OK)
