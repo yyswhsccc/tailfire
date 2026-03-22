@@ -13,7 +13,7 @@ describe('audit-sanitizer', () => {
       it('only includes whitelisted fields for activity entity type', () => {
         const input = {
           name: 'Hotel California',
-          status: 'confirmed',
+          proposalStatus: 'approved',
           activityType: 'lodging',
           password: 'secret123',
           notes: 'Internal notes should not be logged',
@@ -24,7 +24,7 @@ describe('audit-sanitizer', () => {
 
         expect(result).toEqual({
           name: 'Hotel California',
-          status: 'confirmed',
+          proposalStatus: 'approved',
           activityType: 'lodging',
         })
         expect(result).not.toHaveProperty('password')
@@ -233,7 +233,7 @@ describe('audit-sanitizer', () => {
       it('skips null field values', () => {
         const input = {
           name: 'Test',
-          status: null,
+          proposalStatus: null,
           activityType: 'tour',
         }
 
@@ -243,13 +243,13 @@ describe('audit-sanitizer', () => {
           name: 'Test',
           activityType: 'tour',
         })
-        expect(result).not.toHaveProperty('status')
+        expect(result).not.toHaveProperty('proposalStatus')
       })
 
       it('skips undefined field values', () => {
         const input = {
           name: 'Test',
-          status: undefined,
+          proposalStatus: undefined,
           activityType: 'tour',
         }
 
@@ -259,13 +259,13 @@ describe('audit-sanitizer', () => {
           name: 'Test',
           activityType: 'tour',
         })
-        expect(result).not.toHaveProperty('status')
+        expect(result).not.toHaveProperty('proposalStatus')
       })
 
       it('skips empty string values', () => {
         const input = {
           name: 'Test',
-          status: '',
+          proposalStatus: '',
           activityType: '   ', // whitespace only
           description: 'Valid',
         }
@@ -336,13 +336,13 @@ describe('audit-sanitizer', () => {
     describe('data types preservation', () => {
       it('preserves boolean values', () => {
         const input = {
-          isBooked: true,
+          isPrimary: true,
         }
 
-        const result = sanitizeForAudit('activity', input)
+        const result = sanitizeForAudit('activity_media', input)
 
-        expect(result.isBooked).toBe(true)
-        expect(typeof result.isBooked).toBe('boolean')
+        expect(result.isPrimary).toBe(true)
+        expect(typeof result.isPrimary).toBe('boolean')
       })
 
       it('preserves number values', () => {
@@ -375,12 +375,12 @@ describe('audit-sanitizer', () => {
     it('computes diff between before and after states', () => {
       const before = {
         name: 'Old Name',
-        status: 'pending',
+        proposalStatus: 'draft',
         activityType: 'tour',
       }
       const after = {
         name: 'New Name',
-        status: 'confirmed',
+        proposalStatus: 'approved',
         activityType: 'tour', // unchanged
       }
 
@@ -388,23 +388,23 @@ describe('audit-sanitizer', () => {
 
       expect(result.before).toEqual({
         name: 'Old Name',
-        status: 'pending',
+        proposalStatus: 'draft',
         activityType: 'tour',
       })
       expect(result.after).toEqual({
         name: 'New Name',
-        status: 'confirmed',
+        proposalStatus: 'approved',
         activityType: 'tour',
       })
       expect(result.changedFields).toContain('name')
-      expect(result.changedFields).toContain('status')
+      expect(result.changedFields).toContain('proposalStatus')
       expect(result.changedFields).not.toContain('activityType')
     })
 
     it('handles null before state (creation)', () => {
       const after = {
         name: 'New Activity',
-        status: 'pending',
+        proposalStatus: 'draft',
       }
 
       const result = computeAuditDiff('activity', null, after)
@@ -412,46 +412,46 @@ describe('audit-sanitizer', () => {
       expect(result.before).toEqual({})
       expect(result.after).toEqual({
         name: 'New Activity',
-        status: 'pending',
+        proposalStatus: 'draft',
       })
       expect(result.changedFields).toContain('name')
-      expect(result.changedFields).toContain('status')
+      expect(result.changedFields).toContain('proposalStatus')
     })
 
     it('handles null after state (deletion)', () => {
       const before = {
         name: 'Deleted Activity',
-        status: 'active',
+        proposalStatus: 'approved',
       }
 
       const result = computeAuditDiff('activity', before, null)
 
       expect(result.before).toEqual({
         name: 'Deleted Activity',
-        status: 'active',
+        proposalStatus: 'approved',
       })
       expect(result.after).toEqual({})
       expect(result.changedFields).toContain('name')
-      expect(result.changedFields).toContain('status')
+      expect(result.changedFields).toContain('proposalStatus')
     })
 
     it('detects field additions', () => {
       const before = { name: 'Test' }
-      const after = { name: 'Test', status: 'active' }
+      const after = { name: 'Test', proposalStatus: 'approved' }
 
       const result = computeAuditDiff('activity', before, after)
 
-      expect(result.changedFields).toContain('status')
+      expect(result.changedFields).toContain('proposalStatus')
       expect(result.changedFields).not.toContain('name')
     })
 
     it('detects field removals', () => {
-      const before = { name: 'Test', status: 'active' }
+      const before = { name: 'Test', proposalStatus: 'approved' }
       const after = { name: 'Test' }
 
       const result = computeAuditDiff('activity', before, after)
 
-      expect(result.changedFields).toContain('status')
+      expect(result.changedFields).toContain('proposalStatus')
       expect(result.changedFields).not.toContain('name')
     })
 
@@ -476,8 +476,8 @@ describe('audit-sanitizer', () => {
     })
 
     it('returns empty changedFields when nothing changed', () => {
-      const before = { name: 'Test', status: 'active' }
-      const after = { name: 'Test', status: 'active' }
+      const before = { name: 'Test', proposalStatus: 'approved' }
+      const after = { name: 'Test', proposalStatus: 'approved' }
 
       const result = computeAuditDiff('activity', before, after)
 

@@ -120,7 +120,7 @@ describe('Booking Status Aggregation (Integration)', () => {
         activityType: 'lodging',
         name: 'Test Hotel',
         sequenceOrder: 0,
-        status: 'confirmed',
+        proposalStatus: 'approved',
       })
       .returning()
 
@@ -187,7 +187,7 @@ describe('Booking Status Aggregation (Integration)', () => {
           activityType: 'tour',
           name: 'Free Tour',
           sequenceOrder: 1,
-          status: 'confirmed',
+          proposalStatus: 'approved',
         })
         .returning()
 

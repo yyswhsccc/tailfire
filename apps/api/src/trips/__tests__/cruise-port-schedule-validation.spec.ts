@@ -140,7 +140,7 @@ describe('Cruise Port Schedule Validation (Integration)', () => {
         activityType: 'custom_cruise',
         name: 'Test Cruise',
         sequenceOrder: 0,
-        status: 'proposed',
+        proposalStatus: 'draft',
       })
       .returning()
 

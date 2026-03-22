@@ -124,7 +124,7 @@ describe('Payment Schedules (Integration)', () => {
         activityType: 'lodging',
         name: 'Test Hotel',
         sequenceOrder: 0,
-        status: 'confirmed',
+        proposalStatus: 'approved',
       })
       .returning()
 
