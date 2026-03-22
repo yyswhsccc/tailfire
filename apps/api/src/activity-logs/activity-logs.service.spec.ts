@@ -100,9 +100,9 @@ describe('ActivityLogsService', () => {
           'user-789',
           'Hotel California',
           {
-            before: { name: 'Old Name', status: 'pending' },
-            after: { name: 'New Name', status: 'confirmed' },
-            changedFields: ['name', 'status'],
+            before: { name: 'Old Name', proposalStatus: 'draft' },
+            after: { name: 'New Name', proposalStatus: 'approved' },
+            changedFields: ['name', 'proposalStatus'],
           }
         )
 
@@ -113,9 +113,9 @@ describe('ActivityLogsService', () => {
             entityType: 'activity',
             action: 'updated',
             metadata: {
-              before: { name: 'Old Name', status: 'pending' },
-              after: { name: 'New Name', status: 'confirmed' },
-              changedFields: ['name', 'status'],
+              before: { name: 'Old Name', proposalStatus: 'draft' },
+              after: { name: 'New Name', proposalStatus: 'approved' },
+              changedFields: ['name', 'proposalStatus'],
             },
           })
         )

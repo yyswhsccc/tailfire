@@ -81,7 +81,7 @@ describe('Legacy Routes Deprecation (/components/*)', () => {
       activityType: 'lodging',
       name: 'Test Hotel',
       sequenceOrder: 0,
-      status: 'confirmed',
+      proposalStatus: 'approved',
     }).returning()
     testActivityId = activity!.id
   })
