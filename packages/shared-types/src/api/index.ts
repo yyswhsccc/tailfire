@@ -103,5 +103,8 @@ export * from './loyalty-programs.types.js'
 // Commission System
 export * from './commission.types.js'
 
+// Super Search
+export * from './search.types.js'
+
 // Future exports:
 // export * from './auth.types'
