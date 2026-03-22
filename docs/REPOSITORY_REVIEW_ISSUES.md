@@ -58,7 +58,9 @@ Suggested next step:
 
 ### Trip lifecycle, itinerary workflow, and supplier booking are still split across conflicting state models
 
-Evidence:
+**RESOLVED 2026-03-21** — The canonical trip stage vocabulary (`Inbound`, `Planning`, `Active`, `Travelling`, `Travelled`, `Cancelled`) is fully implemented across the database enum, shared types, API DTOs, admin constants, and automation event names. Itinerary `declined` has been removed from all stored paths. The `TripLifecycleService` is the single system-owned lifecycle engine. See `docs/TRIP_WORKFLOW.md` for the authoritative model.
+
+Evidence (historical):
 
 - `packages/database/src/schema/trips.schema.ts`
 - `packages/shared-types/src/api/trip-status-transitions.ts`
@@ -67,19 +69,11 @@ Evidence:
 - `apps/api/src/trips/dto/create-itinerary.dto.ts`
 - `apps/api/src/trips/trips.service.ts`
 
-Why it matters:
-
-- The repo still stores legacy trip statuses `draft`, `quoted`, `booked`, `in_progress`, and `completed` even though the agreed business model is now `Inbound`, `Planning`, `Active`, `Travelling`, `Travelled`, and `Cancelled`.
-- Itinerary workflows still expose `declined`, which conflicts with the simplified target set of `Draft`, `Proposing`, `Approved`, and `Archived`.
-- Automation, admin Kanban labels, DTO validation, and business terminology can drift because there is not yet one implemented lifecycle contract.
-
-Suggested next step:
-
-- Implement the canonical workflow documented in `docs/TRIP_WORKFLOW.md`, starting with shared types, database enums, validators, and automation vocabulary.
-
 ### Supplier booking capture is inconsistent between standalone activities and packages
 
-Evidence:
+**RESOLVED 2026-03-21** — Both standalone activity booking and package booking now route through `BookingValidationService`, which enforces the same required booking payload (supplier, confirmation number, booking date, booking authority, payment schedule state) for both paths. Package children cannot be booked directly. The first required booking automatically promotes the trip to `Active` via `TripLifecycleService`. The legacy `isBooked` flag and `status='confirmed'` pattern have been retired in favour of explicit `proposalStatus` and `bookingStatus` fields.
+
+Evidence (historical):
 
 - `apps/api/src/trips/activity-bookings.service.ts`
 - `apps/api/src/trips/activities.service.ts`
@@ -87,16 +81,6 @@ Evidence:
 - `apps/admin/src/hooks/use-bookings.ts`
 - `apps/admin/src/components/packages/mark-as-booked-modal.tsx`
 - `apps/api/src/trips/trips.service.ts`
-
-Why it matters:
-
-- Standalone activity booking currently records `isBooked` and `bookingDate`, while package booking also forces activity `status='confirmed'` and cascades that state to child activities.
-- The package booking modal collects `paymentStatus`, but the mutation path does not send it through consistently.
-- Proposal approval and booking capture do not currently feed a single trip lifecycle engine, so the system cannot reliably auto-promote a trip to the target `Active` stage from the first real supplier booking.
-
-Suggested next step:
-
-- Create one canonical booking command/service for standalone activities and packages, then use that service to drive trip lifecycle progression and booking-progress derivation.
 
 ## Priority 2
 
