@@ -1,6 +1,6 @@
 'use client'
 
-import { Info, CheckCircle2, XCircle } from 'lucide-react'
+import { Info, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ItineraryResponseDto, ClientActivityResponseType } from '@tailfire/shared-types/api'
 
@@ -12,7 +12,7 @@ interface ClientFeedbackBannerProps {
 
 /**
  * Banner showing client feedback status for a proposed itinerary.
- * Only shown when itinerary status is proposing/approved/declined.
+ * Only shown when itinerary status is proposing/approved.
  */
 export function ClientFeedbackBanner({
   itinerary,
@@ -22,7 +22,7 @@ export function ClientFeedbackBanner({
   const status = itinerary.status
 
   // Only show for proposal-related statuses
-  if (!['proposing', 'approved', 'declined'].includes(status)) {
+  if (!['proposing', 'approved'].includes(status)) {
     return null
   }
 
@@ -51,18 +51,6 @@ export function ClientFeedbackBanner({
       )}>
         <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
         <span>Client approved this proposal.</span>
-      </div>
-    )
-  }
-
-  if (status === 'declined') {
-    return (
-      <div className={cn(
-        'flex items-center gap-2 px-3 py-2 rounded-lg text-sm',
-        'bg-red-50 border border-red-200 text-red-800'
-      )}>
-        <XCircle className="h-4 w-4 flex-shrink-0" />
-        <span>Client declined this proposal.</span>
       </div>
     )
   }

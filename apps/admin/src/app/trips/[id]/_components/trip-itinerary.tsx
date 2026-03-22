@@ -110,7 +110,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
   const { data: days } = useItineraryDaysWithActivities(selectedItinerary?.id || '')
 
   // Client feedback data — only fetch for proposal-related statuses
-  const isProposalStatus = selectedItinerary && ['proposing', 'approved', 'declined'].includes(selectedItinerary.status)
+  const isProposalStatus = selectedItinerary && ['proposing', 'approved'].includes(selectedItinerary.status)
   const { data: activityResponsesData } = useActivityResponses(
     trip.id,
     selectedItinerary?.id || '',

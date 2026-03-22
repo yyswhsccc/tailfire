@@ -2612,7 +2612,8 @@ export class TripsService {
 
   /**
    * Decline a proposal (public, no auth).
-   * Sets itinerary status to 'declined' and optionally posts a reason as a comment.
+   * Archives the itinerary and optionally posts a reason as a comment.
+   * Client decline is implicit — the itinerary is archived, not given a separate status.
    */
   async declineProposal(
     token: string,
@@ -2624,14 +2625,14 @@ export class TripsService {
       throw new BadRequestException('No itinerary found for this proposal')
     }
 
-    // Idempotent: already declined
-    if (selectedItinerary.status === 'declined') {
-      return { success: true, status: 'declined' }
+    // Idempotent: already archived
+    if (selectedItinerary.status === 'archived') {
+      return { success: true, status: 'archived' }
     }
 
     await this.itinerariesService.update(
       selectedItinerary.id,
-      { status: 'declined' },
+      { status: 'archived' },
       trip.id,
     )
 
@@ -2647,7 +2648,7 @@ export class TripsService {
       itineraryId: selectedItinerary.id,
     })
 
-    return { success: true, status: 'declined' }
+    return { success: true, status: 'archived' }
   }
 
   // ============================================================================
