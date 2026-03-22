@@ -41,6 +41,8 @@ export interface BaseComponentData {
   notes?: string | null
   confirmationNumber?: string | null
   status?: string
+  proposalStatus?: string
+  bookingStatus?: string
   pricingType?: string | null
   currency?: string
   photos?: any[] | null
@@ -59,6 +61,8 @@ export interface UpdateBaseComponentData {
   notes?: string | null
   confirmationNumber?: string | null
   status?: string
+  proposalStatus?: string
+  bookingStatus?: string
   pricingType?: string | null
   currency?: string
   photos?: any[] | null

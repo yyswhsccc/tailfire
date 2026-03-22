@@ -834,7 +834,7 @@ export class CalendarService {
         clickable: true,
         metadata: {
           activityType: a.activityType,
-          status: a.status,
+          status: a.proposalStatus,
         },
       }
     })

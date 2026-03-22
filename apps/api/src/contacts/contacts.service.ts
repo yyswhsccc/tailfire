@@ -723,7 +723,7 @@ export class ContactsService {
       id: r.activityId,
       name: r.activityName,
       activityType: r.activityType,
-      status: r.status,
+      status: r.proposalStatus,
       startDatetime: r.startDatetime?.toISOString() || null,
       endDatetime: r.endDatetime?.toISOString() || null,
       location: r.location,
