@@ -289,7 +289,7 @@ export class ClientPortalService {
       throw new NotFoundException('Itinerary not available for approval')
     }
 
-    // Record feedback
+    // Record feedback — capture the published version the client was reviewing
     await this.db.client
       .insert(this.db.schema.itineraryFeedback)
       .values({
@@ -299,6 +299,7 @@ export class ClientPortalService {
         feedbackType: 'approval',
         message: dto.message || null,
         activityNotes: dto.activityNotes || null,
+        versionNumber: itinerary.publishedVersion ?? null,
       })
 
     // Archive any previously approved itinerary for this trip (single-approved rule)
@@ -357,7 +358,7 @@ export class ClientPortalService {
       throw new NotFoundException('Itinerary not found')
     }
 
-    // Record feedback
+    // Record feedback — capture the published version the client was reviewing
     await this.db.client
       .insert(this.db.schema.itineraryFeedback)
       .values({
@@ -367,6 +368,7 @@ export class ClientPortalService {
         feedbackType: 'change_request',
         message: dto.message || null,
         activityNotes: dto.activityNotes || null,
+        versionNumber: itinerary.publishedVersion ?? null,
       })
 
     return { success: true }
