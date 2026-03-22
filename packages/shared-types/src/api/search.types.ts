@@ -1,3 +1,5 @@
+import type { TripStatus } from './trip-status-transitions.js'
+
 export type SearchResultType = 'trip' | 'contact'
 
 export interface SearchResultItem {
@@ -11,6 +13,7 @@ export interface SearchResultItem {
 
 export interface TripSearchResult extends SearchResultItem {
   type: 'trip'
+  status: TripStatus
   referenceNumber?: string
   startDate?: string
   endDate?: string
