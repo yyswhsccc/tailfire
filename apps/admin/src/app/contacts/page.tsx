@@ -19,12 +19,19 @@ export default function ContactsPage() {
   const searchParams = useSearchParams()
   const urlSearch = searchParams?.get('search') || ''
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [searchInput, setSearchInput] = useState(urlSearch)
+  const [searchInput, setSearchInput] = useState('')
   const [filters, setFilters] = useState<ContactFilterDto>({
     page: 1,
     limit: 10,
-    search: urlSearch || undefined,
   })
+
+  // Sync URL search param into filters and search input
+  useEffect(() => {
+    if (urlSearch) {
+      setSearchInput(urlSearch)
+      setFilters((prev) => ({ ...prev, search: urlSearch, page: 1 }))
+    }
+  }, [urlSearch])
 
   // Debounce search input (500ms delay)
   useEffect(() => {
