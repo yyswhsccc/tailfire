@@ -587,14 +587,6 @@ export function TripFormDialog({
                       <SelectContent>
                         <SelectItem value="inbound">Inbound</SelectItem>
                         <SelectItem value="planning">Planning</SelectItem>
-                        {mode === 'edit' && (
-                          <>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="travelling">Travelling</SelectItem>
-                            <SelectItem value="travelled">Travelled</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </>
-                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
