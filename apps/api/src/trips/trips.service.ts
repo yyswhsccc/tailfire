@@ -4508,7 +4508,10 @@ export class TripsService {
     if (!trip) throw new NotFoundException(`Trip with ID ${id} not found`)
     if (trip.status !== 'cancelled') throw new BadRequestException('Trip is not cancelled')
 
-    const restoreStatus = (trip.statusBeforeCancel || 'planning') as 'planning' | 'active' | 'travelling'
+    // Always restore to planning — bookings made before cancellation may no longer
+    // be valid (active trips), or trip dates may have passed (travelling trips).
+    // The agent must re-evaluate and re-book after uncancelling.
+    const restoreStatus = 'planning' as const
 
     const [restored] = await this.db.client
       .update(this.db.schema.trips)
@@ -4526,16 +4529,9 @@ export class TripsService {
 
     if (!restored) throw new NotFoundException(`Trip with ID ${id} not found`)
 
-    // Re-schedule automation jobs only for active/travelling
-    if (['active', 'travelling'].includes(restoreStatus) && restored.startDate && restored.endDate) {
-      await this.scheduleStatusTransitions(
-        restored.id,
-        restored.startDate,
-        restored.endDate,
-        restored.timezone || 'America/Toronto',
-        restoreStatus,
-      )
-    }
+    // No automation scheduling needed — restored trips always land in planning,
+    // which has no automated transitions. Scheduling will be triggered again when
+    // the trip transitions to active.
 
     this.eventEmitter.emit('audit.updated', {
       entityType: 'trip',

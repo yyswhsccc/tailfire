@@ -26,11 +26,11 @@ import { useClientTrip } from "@/hooks/use-client-trips"
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case "booked": return "bg-green-600"
-    case "quoted": return "bg-phoenix-orange"
+    case "active": return "bg-green-600"
+    case "planning": return "bg-phoenix-orange"
     case "draft": return "bg-blue-600"
-    case "in_progress": return "bg-emerald-600"
-    case "completed": return "bg-phoenix-gold"
+    case "travelling": return "bg-emerald-600"
+    case "travelled": return "bg-phoenix-gold"
     case "proposing": return "bg-blue-500"
     case "approved": return "bg-green-500"
     case "archived": return "bg-gray-500"

@@ -35,11 +35,11 @@ const quickActions = [
 function getStatusBadgeClass(status: string) {
   switch (status) {
     case "confirmed":
-    case "in_progress":
+    case "travelling":
       return "bg-green-600 text-white border-0";
-    case "booked":
+    case "active":
       return "bg-blue-600 text-white border-0";
-    case "completed":
+    case "travelled":
       return "bg-phoenix-gold text-white border-0";
     default:
       return "bg-phoenix-orange text-white border-0";
