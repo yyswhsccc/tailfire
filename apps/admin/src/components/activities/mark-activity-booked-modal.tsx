@@ -4,7 +4,7 @@
  * Mark Activity as Booked Modal
  *
  * Modal dialog for marking an activity as booked/confirmed.
- * Sets isBooked=true and records the booking date.
+ * Sets bookingStatus='booked' and records the booking date.
  *
  * This is separate from the booking system modal - this tracks
  * when activities are confirmed/booked directly on the activity.
@@ -34,9 +34,13 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Button } from '@/components/ui/button'
-import { Check, Loader2, CalendarCheck } from 'lucide-react'
+import { Check, Loader2, CalendarCheck, AlertCircle } from 'lucide-react'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 // Form validation schema
 const markActivityBookedSchema = z.object({
@@ -51,7 +55,11 @@ interface MarkActivityBookedModalProps {
   activityName: string
   isBooked: boolean
   currentBookingDate: string | null
-  onConfirm: (bookingDate: string) => Promise<void>
+  onConfirm: (
+    bookingDate: string,
+    passportVerified: boolean,
+    nonRefundableAmountCents?: number
+  ) => Promise<void>
   isPending?: boolean
 }
 
@@ -65,6 +73,10 @@ export function MarkActivityBookedModal({
   isPending = false,
 }: MarkActivityBookedModalProps) {
   const [rootError, setRootError] = useState<string | null>(null)
+  const [bookingErrors, setBookingErrors] = useState<string[]>([])
+  const [passportVerified, setPassportVerified] = useState(false)
+  const [nonRefundableDeposit, setNonRefundableDeposit] = useState(false)
+  const [nonRefundableAmount, setNonRefundableAmount] = useState<number>(0)
   const { toast } = useToast()
 
   const form = useForm<MarkActivityBookedFormValues>({
@@ -78,6 +90,10 @@ export function MarkActivityBookedModal({
   useEffect(() => {
     if (open) {
       setRootError(null)
+      setBookingErrors([])
+      setPassportVerified(false)
+      setNonRefundableDeposit(false)
+      setNonRefundableAmount(0)
       form.reset({
         bookingDate: currentBookingDate
           ? currentBookingDate.split('T')[0]
@@ -88,9 +104,14 @@ export function MarkActivityBookedModal({
 
   const onSubmit = async (data: MarkActivityBookedFormValues) => {
     setRootError(null)
+    setBookingErrors([])
 
     try {
-      await onConfirm(data.bookingDate)
+      await onConfirm(
+        data.bookingDate,
+        passportVerified,
+        nonRefundableDeposit ? nonRefundableAmount * 100 : undefined
+      )
 
       toast({
         title: 'Activity marked as booked',
@@ -100,7 +121,11 @@ export function MarkActivityBookedModal({
       onOpenChange(false)
     } catch (error) {
       if (error instanceof ApiError) {
-        setRootError(error.message || 'Failed to mark activity as booked.')
+        if (error.errors && error.errors.length > 0) {
+          setBookingErrors(error.errors)
+        } else {
+          setRootError(error.message || 'Failed to mark activity as booked.')
+        }
       } else {
         setRootError('Failed to mark activity as booked. Please try again.')
       }
@@ -163,6 +188,57 @@ export function MarkActivityBookedModal({
                 </FormItem>
               )}
             />
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="passport-verified"
+                checked={passportVerified}
+                onCheckedChange={(checked) => setPassportVerified(checked === true)}
+              />
+              <Label htmlFor="passport-verified">
+                I have verified all traveler passports are valid
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="non-refundable-deposit"
+                checked={nonRefundableDeposit}
+                onCheckedChange={(checked) => setNonRefundableDeposit(checked === true)}
+              />
+              <Label htmlFor="non-refundable-deposit">
+                Deposit includes a non-refundable amount
+              </Label>
+            </div>
+
+            {nonRefundableDeposit && (
+              <div className="space-y-2">
+                <Label>Non-refundable amount</Label>
+                <Input
+                  type="number"
+                  value={nonRefundableAmount}
+                  onChange={(e) => setNonRefundableAmount(Number(e.target.value))}
+                  placeholder="Pre-filled with deposit amount"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Amount included in the deposit that is non-refundable
+                </p>
+              </div>
+            )}
+
+            {bookingErrors.length > 0 && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Booking requirements not met</AlertTitle>
+                <AlertDescription>
+                  <ul className="list-disc pl-4 mt-2 space-y-1">
+                    {bookingErrors.map((error, i) => (
+                      <li key={i} className="text-sm">{error}</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
 
             {rootError && (
               <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">

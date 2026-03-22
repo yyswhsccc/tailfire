@@ -292,7 +292,7 @@ export function TransportationForm({
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
-  const [activityIsBooked, setActivityIsBooked] = useState(activity?.isBooked ?? false)
+  const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
 
   // Package linkage state for PricingSection
@@ -525,14 +525,14 @@ export function TransportationForm({
   const markActivityBooked = useMarkActivityBooked()
 
   // Handler for marking transportation as booked
-  const handleMarkAsBooked = async (newBookingDate: string) => {
+  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
     if (!activityId) {
       throw new Error('Activity must be saved before marking as booked')
     }
 
     const result = await markActivityBooked.mutateAsync({
       activityId,
-      data: { bookingDate: newBookingDate },
+      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
     })
 
     // Update local state - preserve YYYY-MM-DD format
@@ -610,7 +610,7 @@ export function TransportationForm({
         componentType: 'transportation' as const,
         name: transportationData.name,
         description: transportationData.description || '',
-        status: transportationData.status as 'proposed' | 'confirmed' | 'cancelled' | 'pending',
+        proposalStatus: transportationData.proposalStatus as 'draft' | 'proposing' | 'approved' | 'cancelled',
         notes: transportationData.notes || '',
         confirmationNumber: transportationData.confirmationNumber || '',
         transportationDetails: transportationData.transportationDetails,

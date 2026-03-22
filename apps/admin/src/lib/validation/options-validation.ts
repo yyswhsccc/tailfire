@@ -47,7 +47,7 @@ export const optionsFormSchema = z.object({
   componentType: z.literal('options').default('options'),
   name: z.string().min(1, 'Option name is required'),
   description: z.string().optional().default(''),
-  status: z.enum(['proposed', 'confirmed', 'cancelled']).default('proposed'),
+  proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
 
   // Nested options details
   optionsDetails: optionsDetailsSchema,
@@ -171,7 +171,7 @@ export function toOptionsDefaults(
     componentType: 'options',
     name: serverData?.name ?? '',
     description: serverData?.description ?? '',
-    status: serverData?.status ?? 'proposed',
+    proposalStatus: serverData?.proposalStatus ?? 'draft',
 
     optionsDetails: {
       optionCategory: serverDetails?.optionCategory ?? null,

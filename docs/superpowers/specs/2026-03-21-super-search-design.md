@@ -254,9 +254,31 @@ Each group's footer link navigates to the entity's list page:
 ## Out of Scope
 
 - Additional entity types (tasks, suppliers, emails, etc.) — v2, requires deep-link contracts
-- `?search=` query param hydration on list pages — v2
 - Recent searches / search history
 - Quick actions (create trip, go to dashboard)
 - Full-text search indexes (pg_trgm, tsvector)
 - Search analytics or tracking
-- Modifying `CommandDialog` wrapper (render Dialog + Command directly instead)
+
+## v2 Enhancements
+
+### Additional Entity Types
+- **Trip Groups / Folders** — `listTripGroups()` in `trips.service.ts:3619` already has access control (owner/shared/folder visibility). Needs: add `search` filter with ILIKE on `name`, `description`, `destination`, `groupNumber`. Navigate to `/trips/groups/:id`.
+- **Tasks** — Service has search support but no detail page route. Needs: define deep-link contract (e.g., `?taskId=` param to open modal on `/tasks`).
+- **Suppliers** — Service has search support but no detail page route. Needs: define deep-link contract for `/library/suppliers`.
+- **Emails** — Two separate systems (agency email logs vs user synced mailbox). Needs: pick one, define route contract for `/emails/inbox`.
+
+### Deeper Trip Search
+- Current trip search only matches `name`, `description`, `referenceNumber` on the trips table.
+- v2 should also search: **destinations** (itinerary day locations), **activity names**, **traveler names** (contact firstName/lastName on trip travelers), **supplier names** on activities.
+- This requires JOIN-based search or a denormalized search index.
+
+### Performance
+- Replace generic `findAll()` calls with dedicated `searchSummary()` methods that skip count queries and heavy DTO assembly.
+- Consider `pg_trgm` extension for fuzzy/typo-tolerant search.
+- Consider a denormalized search table or materialized view for cross-entity search at scale.
+
+### UX
+- Recent searches stored in localStorage (last 5-10 queries)
+- Quick actions: "Create new trip", "Create new contact", "Go to Dashboard"
+- Keyboard navigation hints in the dialog
+- Search result ranking/relevance ordering across entity types

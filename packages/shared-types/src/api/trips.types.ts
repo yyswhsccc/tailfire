@@ -765,8 +765,16 @@ export type SharedActivityType =
   | 'cruise'
   | 'tour_day'
 
-/** Activity status for display */
-export type SharedActivityStatus = 'proposed' | 'confirmed' | 'cancelled' | 'optional'
+/** Activity proposal status for display */
+export type SharedProposalStatus = 'draft' | 'proposing' | 'approved' | 'cancelled'
+
+/** Activity booking status for display */
+export type SharedBookingStatus = 'unbooked' | 'booked' | 'cancelled'
+
+/**
+ * @deprecated Use SharedProposalStatus instead
+ */
+export type SharedActivityStatus = SharedProposalStatus
 
 /** Sanitized pricing breakdown item (no traveler names) */
 export interface SharedPricingBreakdownItem {
@@ -965,8 +973,8 @@ export interface SharedActivityDto {
   timezone: string | null
   location: string | null
   address: string | null
-  status: SharedActivityStatus
-  isBooked: boolean
+  proposalStatus: SharedProposalStatus
+  bookingStatus: SharedBookingStatus
   confirmationNumber: string | null
   thumbnail: string | null
   media: SharedMediaDto[]

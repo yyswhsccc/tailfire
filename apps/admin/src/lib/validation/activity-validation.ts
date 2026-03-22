@@ -34,7 +34,7 @@ export const activityFormSchema = z.object({
   location: z.string().optional().default(''),
   address: z.string().optional().default(''),
   confirmationNumber: z.string().optional().default(''),
-  status: z.enum(['proposed', 'confirmed', 'cancelled']).default('proposed'),
+  proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
 
   // Pricing fields (pricing data managed via activity_pricing table)
   pricingType: z.enum(['per_person', 'per_room', 'flat_rate', 'per_night']).default('per_person'),
@@ -139,7 +139,7 @@ export function toActivityDefaults(
     location: serverData?.location ?? '',
     address: serverData?.address ?? '',
     confirmationNumber: serverData?.confirmationNumber ?? '',
-    status: serverData?.status ?? 'proposed',
+    proposalStatus: serverData?.proposalStatus ?? 'draft',
     pricingType: serverData?.pricingType ?? 'per_person',
     currency: serverData?.currency ?? 'USD',
     notes: serverData?.notes ?? '',

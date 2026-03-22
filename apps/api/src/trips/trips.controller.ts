@@ -999,7 +999,7 @@ export class TripsController {
         totalPriceCents: a.pricing?.totalPriceCents ?? null,
         parentActivityId: a.parentActivityId,
         supplierName: a.supplierName ?? null,
-        isBooked: a.isBooked ?? false,
+        bookingStatus: a.bookingStatus ?? 'unbooked',
         confirmationNumber: a.confirmationNumber ?? null,
         paymentStatus: a.paymentStatus ?? null,
         paidCents: a.paidCents ?? null,

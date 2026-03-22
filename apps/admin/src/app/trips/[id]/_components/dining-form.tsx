@@ -68,8 +68,8 @@ interface DiningFormProps {
 }
 
 const STATUSES = [
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const
 
@@ -144,7 +144,7 @@ export function DiningForm({
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
-  const [activityIsBooked, setActivityIsBooked] = useState(activity?.isBooked ?? false)
+  const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
 
   // Package linkage state for PricingSection
@@ -262,14 +262,14 @@ export function DiningForm({
   const markActivityBooked = useMarkActivityBooked()
 
   // Handler for marking dining as booked
-  const handleMarkAsBooked = async (newBookingDate: string) => {
+  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
     if (!activityId) {
       throw new Error('Activity must be saved before marking as booked')
     }
 
     const result = await markActivityBooked.mutateAsync({
       activityId,
-      data: { bookingDate: newBookingDate },
+      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
     })
 
     // Update local state - preserve YYYY-MM-DD format

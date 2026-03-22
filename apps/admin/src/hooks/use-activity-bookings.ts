@@ -6,7 +6,7 @@
  * Key Distinction:
  * - Activity = Core entity (tour, flight, dining, transportation, custom-cruise, package, etc.)
  * - Package = An activity type that holds sub-activities
- * - Booking = A status applied to an activity (isBooked flag + bookingDate)
+ * - Booking = A status applied to an activity (bookingStatus field + bookingDate)
  *
  * API: /bookings/activities
  */
@@ -41,7 +41,7 @@ export function useActivityBookings(filters: ActivityBookingsFilterDto) {
       const params = new URLSearchParams()
       params.set('tripId', filters.tripId)
       if (filters.itineraryId) params.set('itineraryId', filters.itineraryId)
-      if (filters.isBooked !== undefined) params.set('isBooked', String(filters.isBooked))
+      if (filters.bookingStatus) params.set('bookingStatus', filters.bookingStatus)
 
       return api.get<ActivityBookingsListResponseDto>(`/bookings/activities?${params.toString()}`)
     },
@@ -72,9 +72,12 @@ export function useMarkActivityBooked() {
       activityId: string
       data?: MarkActivityBookedDto
     }) => {
+      const body: MarkActivityBookedDto = {
+        ...data,
+      }
       return api.post<ActivityBookingResponseDto>(
         `/bookings/activities/${activityId}/mark`,
-        data ?? {}
+        body
       )
     },
     onSuccess: () => {
@@ -91,7 +94,7 @@ export function useMarkActivityBooked() {
  *
  * Business rules:
  * - Activities with packageId cannot be unmarked individually (400 error)
- * - Sets isBooked to false and bookingDate to null
+ * - Sets bookingStatus to 'unbooked' and bookingDate to null
  */
 export function useUnmarkActivityBooked() {
   const queryClient = useQueryClient()

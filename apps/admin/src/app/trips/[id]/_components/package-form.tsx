@@ -76,10 +76,9 @@ interface PackageFormProps {
 
 const STATUSES = [
   { value: 'draft', label: 'Draft' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'proposing', label: 'Proposing' },
+  { value: 'approved', label: 'Approved' },
   { value: 'cancelled', label: 'Cancelled' },
-  { value: 'completed', label: 'Completed' },
 ] as const
 
 const PAYMENT_STATUSES = [

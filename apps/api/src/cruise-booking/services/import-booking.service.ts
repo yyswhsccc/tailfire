@@ -186,7 +186,8 @@ export class ImportBookingService {
       name: cruiseItem.name || `Cruise ${dto.bookingReference}`,
       startDatetime: cruiseItem.startdate,
       endDatetime: cruiseItem.enddate,
-      status: 'confirmed',
+      proposalStatus: 'approved',
+      bookingStatus: 'booked',
       currency: dto.currency ?? 'CAD',
       totalPriceCents: totalPriceCents,
       taxesAndFeesCents: taxesAndFeesCents ?? null,
@@ -201,7 +202,7 @@ export class ImportBookingService {
     await this.db.client
       .update(this.db.schema.itineraryActivities)
       .set({
-        isBooked: true,
+        bookingStatus: 'booked',
         bookingDate: new Date(),
         confirmationNumber: dto.bookingReference,
       })

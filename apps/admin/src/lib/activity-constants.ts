@@ -286,20 +286,20 @@ export function parseColorClass(colorClass: string): { iconColor: string; badgeB
  * Default values for creating new components
  * Used when dragging from component library or quick-adding
  */
-export const COMPONENT_DEFAULTS: Record<UIActivityType, { name: string; status: string }> = {
-  flight: { name: 'Flight', status: 'proposed' },
-  lodging: { name: 'Hotel Stay', status: 'proposed' },
-  transportation: { name: 'Transportation', status: 'proposed' },
-  tour: { name: 'Tour', status: 'proposed' },
-  options: { name: 'Options', status: 'proposed' },
-  custom_cruise: { name: 'Custom Cruise', status: 'proposed' },
-  port_info: { name: 'Port Information', status: 'proposed' },
-  dining: { name: 'Restaurant', status: 'proposed' },
-  cruise: { name: 'Cruise', status: 'proposed' },
-  package: { name: 'Package', status: 'proposed' },
-  custom_tour: { name: 'Custom Tour', status: 'proposed' },
-  tour_day: { name: 'Tour Day', status: 'proposed' },
-  insurance: { name: 'Insurance', status: 'proposed' },
+export const COMPONENT_DEFAULTS: Record<UIActivityType, { name: string; proposalStatus: string }> = {
+  flight: { name: 'Flight', proposalStatus: 'draft' },
+  lodging: { name: 'Hotel Stay', proposalStatus: 'draft' },
+  transportation: { name: 'Transportation', proposalStatus: 'draft' },
+  tour: { name: 'Tour', proposalStatus: 'draft' },
+  options: { name: 'Options', proposalStatus: 'draft' },
+  custom_cruise: { name: 'Custom Cruise', proposalStatus: 'draft' },
+  port_info: { name: 'Port Information', proposalStatus: 'draft' },
+  dining: { name: 'Restaurant', proposalStatus: 'draft' },
+  cruise: { name: 'Cruise', proposalStatus: 'draft' },
+  package: { name: 'Package', proposalStatus: 'draft' },
+  custom_tour: { name: 'Custom Tour', proposalStatus: 'draft' },
+  tour_day: { name: 'Tour Day', proposalStatus: 'draft' },
+  insurance: { name: 'Insurance', proposalStatus: 'draft' },
 } as const
 
 /**
@@ -309,12 +309,15 @@ export type StatusVariant = 'inbound' | 'planning' | 'booked' | 'secondary'
 
 export function getStatusVariant(status: string): StatusVariant {
   switch (status) {
-    case 'proposed':
+    case 'draft':
       return 'inbound'
-    case 'confirmed':
+    case 'approved':
+    case 'booked':
       return 'booked'
     case 'cancelled':
       return 'secondary'
+    case 'proposing':
+      return 'planning'
     default:
       return 'planning'
   }

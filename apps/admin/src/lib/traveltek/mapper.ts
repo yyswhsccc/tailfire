@@ -292,7 +292,7 @@ export function mapTraveltekToTailfire(
     componentType: 'custom_cruise',
     name: cruiseName,
     description: null,
-    status: 'proposed',
+    proposalStatus: 'draft',
 
     // Pricing (not set from import)
     pricingType: 'per_person',

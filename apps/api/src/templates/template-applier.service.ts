@@ -284,7 +284,7 @@ export class TemplateApplierService {
       itineraryDayId: dto.anchorDayId, // Anchor to the starting day
       activityType: 'package',
       name: packageMetadata.name,
-      status: 'proposed',
+      proposalStatus: 'draft',
       currency: packageMetadata.currency ?? 'CAD',
       pricingType: packageMetadata.pricingType ?? 'flat_rate',
     })
@@ -357,7 +357,7 @@ export class TemplateApplierService {
       parentActivityId,
       name: activity.name,
       sequenceOrder: activity.sequenceOrder,
-      status: 'proposed' as const, // Default status on apply
+      proposalStatus: 'draft' as const, // Default proposal status on apply
       startDatetime,
       endDatetime,
       timezone: activity.timezone,

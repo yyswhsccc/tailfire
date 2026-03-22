@@ -36,8 +36,8 @@ export const packageFormSchema = z.object({
   supplierId: z.string().uuid().optional().nullable(),
   supplierName: z.string().max(255).optional().nullable(),
 
-  // Status (ActivityStatus: proposed, confirmed, cancelled, optional)
-  status: z.enum(['proposed', 'confirmed', 'cancelled', 'optional']).default('proposed'),
+  // Proposal status (ActivityProposalStatus: draft, proposing, approved, cancelled)
+  proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
   paymentStatus: z.enum(['unpaid', 'deposit_paid', 'paid', 'refunded', 'partially_refunded']).default('unpaid'),
 
   // Pricing (Package-specific - flat_rate or per_person only)
@@ -125,7 +125,7 @@ export function toPackageDefaults(
       groupBookingNumber: null,
       supplierId: null,
       supplierName: null,
-      status: 'proposed',
+      proposalStatus: 'draft',
       paymentStatus: 'unpaid',
       pricingType: 'flat_rate',
       totalPriceCents: 0,
@@ -151,7 +151,7 @@ export function toPackageDefaults(
     groupBookingNumber: details?.groupBookingNumber ?? null,
     supplierId: details?.supplierId ?? null,
     supplierName: details?.supplierName ?? null,
-    status: serverData.status as 'proposed' | 'confirmed' | 'cancelled' | 'optional',
+    proposalStatus: serverData.proposalStatus as 'draft' | 'proposing' | 'approved' | 'cancelled',
     paymentStatus: details?.paymentStatus ?? 'unpaid',
     pricingType: (details?.pricingType ?? 'flat_rate') as 'flat_rate' | 'per_person',
     // Read pricing from server response (activity_pricing table)

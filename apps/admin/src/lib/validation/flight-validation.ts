@@ -111,7 +111,7 @@ export const flightFormSchema = z.object({
   componentType: z.literal('flight').default('flight'),
   name: z.string().default(''), // Auto-generated from flight info
   description: z.string().default(''),
-  status: z.enum(['proposed', 'confirmed', 'cancelled']).default('proposed'),
+  proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
 
   // Flight details (main flight info)
   flightDetails: flightDetailsSchema.optional(),
@@ -297,7 +297,7 @@ export function toFlightDefaults(
     componentType: 'flight',
     name: serverData?.name ?? '',
     description: serverData?.description ?? '',
-    status: serverData?.status ?? 'proposed',
+    proposalStatus: serverData?.proposalStatus ?? 'draft',
 
     flightDetails: serverData?.flightDetails ?? {
       airline: '',

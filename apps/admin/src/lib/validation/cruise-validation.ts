@@ -114,7 +114,7 @@ export const customCruiseFormSchema = z.object({
   componentType: z.literal('custom_cruise').default('custom_cruise'),
   name: z.string().default(''),
   description: z.string().default(''),
-  status: z.enum(['proposed', 'confirmed', 'cancelled']).default('proposed'),
+  proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
 
   // Pricing fields (pricing data managed via activity_pricing table)
   totalPriceCents: z.coerce.number()
@@ -203,7 +203,7 @@ export function toCustomCruiseDefaults(
     componentType: 'custom_cruise',
     name: serverData?.name ?? '',
     description: serverData?.description ?? '',
-    status: serverData?.status ?? 'proposed',
+    proposalStatus: serverData?.proposalStatus ?? 'draft',
 
     totalPriceCents: serverData?.totalPriceCents ?? null,
     taxesAndFeesCents: serverData?.taxesAndFeesCents ?? null,

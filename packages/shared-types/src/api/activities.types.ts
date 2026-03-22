@@ -11,6 +11,8 @@
 
 import type {
   ActivityType,
+  ActivityProposalStatus,
+  ActivityBookingStatus,
   ActivityStatus,
   PricingType,
   PortType,
@@ -21,16 +23,16 @@ import type {
 } from '../schemas'
 
 // Re-export for external consumers
-export type { ActivityType, ActivityStatus, PricingType, PortType, Coordinates, Photo, CreateActivityDto, UpdateActivityDto }
+export type { ActivityType, ActivityProposalStatus, ActivityBookingStatus, ActivityStatus, PricingType, PortType, Coordinates, Photo, CreateActivityDto, UpdateActivityDto }
 
 // =============================================================================
 // Package Type Aliases (for backward compatibility)
 // =============================================================================
 
 /**
- * Package status type alias (packages use ActivityStatus)
+ * Package status type alias (packages use ActivityProposalStatus)
  */
-export type PackageStatus = ActivityStatus
+export type PackageStatus = ActivityProposalStatus
 
 /**
  * Package payment status type
@@ -45,6 +47,8 @@ export type PackagePricingType = PricingType
 // Re-export schemas for validation use
 export {
   activityTypeSchema,
+  activityProposalStatusSchema,
+  activityBookingStatusSchema,
   activityStatusSchema,
   pricingTypeSchema,
   portTypeSchema,
@@ -119,10 +123,10 @@ export type ActivityResponseDto = {
   // Details
   notes: string | null
   confirmationNumber: string | null
-  status: ActivityStatus
+  proposalStatus: ActivityProposalStatus
+  bookingStatus: ActivityBookingStatus
 
   // Booking tracking
-  isBooked: boolean
   isVisibleInCalendar: boolean
   bookingDate: string | null // ISO 8601 date when booking was confirmed
 
@@ -181,7 +185,8 @@ export type MoveActivityDto = {
 export type ActivityFilterDto = {
   itineraryDayId?: string // Filter by day
   activityType?: ActivityType // Filter by type
-  status?: ActivityStatus // Filter by status
+  proposalStatus?: ActivityProposalStatus // Filter by proposal status
+  bookingStatus?: ActivityBookingStatus // Filter by booking status
   sortBy?: 'sequenceOrder' | 'startDatetime' | 'createdAt'
   sortOrder?: 'asc' | 'desc'
   limit?: number
@@ -288,7 +293,7 @@ export type PackageSummaryDto = {
   id: string
   tripId: string
   name: string
-  status: ActivityStatus
+  proposalStatus: ActivityProposalStatus
   paymentStatus: 'unpaid' | 'deposit_paid' | 'paid' | 'refunded' | 'partially_refunded'
   supplierName: string | null
   confirmationNumber: string | null
@@ -345,7 +350,7 @@ export type PackageLinkedActivityDto = {
   id: string
   name: string
   activityType: ActivityType
-  status: ActivityStatus
+  proposalStatus: ActivityProposalStatus
   dayNumber: number | null
   endDayNumber: number | null // For spanning activities (lodging, cruise): last day number
   dayDate: string | null // ISO date
@@ -434,7 +439,7 @@ export type UnlinkedActivityDto = {
   totalPriceCents: number | null
   parentActivityId: string | null
   supplierName: string | null
-  isBooked: boolean
+  bookingStatus: ActivityBookingStatus
   confirmationNumber: string | null
   paymentStatus: string | null // 'paid' | 'deposit_paid' | 'unpaid' | null (no schedule)
   paidCents: number | null
@@ -460,10 +465,10 @@ export type PackageFilterDto = {
   page?: number
   pageSize?: number
   search?: string
-  status?: ActivityStatus
+  proposalStatus?: ActivityProposalStatus
   paymentStatus?: 'unpaid' | 'deposit_paid' | 'paid' | 'refunded' | 'partially_refunded'
   supplierId?: string
-  sortBy?: 'name' | 'createdAt' | 'totalPriceCents' | 'status'
+  sortBy?: 'name' | 'createdAt' | 'totalPriceCents' | 'proposalStatus'
   sortOrder?: 'asc' | 'desc'
 }
 
@@ -475,7 +480,7 @@ export type CreatePackageDto = {
   tripId: string
   name: string
   itineraryDayId?: string | null // Optional - packages can float
-  status?: ActivityStatus
+  proposalStatus?: ActivityProposalStatus
   confirmationNumber?: string | null
   notes?: string | null
   currency?: string
@@ -503,7 +508,7 @@ export type CreatePackageDto = {
  */
 export type UpdatePackageDto = {
   name?: string
-  status?: ActivityStatus
+  proposalStatus?: ActivityProposalStatus
   confirmationNumber?: string | null
   notes?: string | null
   currency?: string
