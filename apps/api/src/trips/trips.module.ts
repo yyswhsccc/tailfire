@@ -51,6 +51,7 @@ import { ActivityTotalsService } from './activity-totals.service'
 import { ActivityTravelersService } from './activity-travelers.service'
 import { ActivityBookingsService } from './activity-bookings.service'
 import { BookingValidationService } from './booking-validation.service'
+import { TripLifecycleService } from './trip-lifecycle.service'
 import { TravelerBookingsService } from './traveler-bookings.service'
 import { InsuranceService } from './insurance.service'
 import { StorageService } from './storage.service'
@@ -159,6 +160,7 @@ import { TripGroupSharesController } from './trip-group-shares.controller'
     ActivityTravelersService,
     ActivityBookingsService,
     BookingValidationService,
+    TripLifecycleService,
     TravelerBookingsService,
     InsuranceService,
     StorageService,

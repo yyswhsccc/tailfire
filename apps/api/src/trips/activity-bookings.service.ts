@@ -14,6 +14,7 @@ import { sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { ActivitiesService } from './activities.service'
 import { BookingValidationService } from './booking-validation.service'
+import { TripLifecycleService } from './trip-lifecycle.service'
 import type {
   MarkActivityBookedDto,
   ActivityBookingsFilterDto,
@@ -26,7 +27,8 @@ export class ActivityBookingsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly activitiesService: ActivitiesService,
-    private readonly bookingValidationService: BookingValidationService
+    private readonly bookingValidationService: BookingValidationService,
+    private readonly tripLifecycleService: TripLifecycleService,
   ) {}
 
   /**
@@ -74,6 +76,9 @@ export class ActivityBookingsService {
       activity.tripId
     )
 
+    // Evaluate trip lifecycle — first booking may promote planning → active
+    await this.tripLifecycleService.onActivityBooked(activityId)
+
     // Check payment schedule status
     const paymentScheduleMissing = await this.getPaymentScheduleMissing(activityId)
 
@@ -116,6 +121,9 @@ export class ActivityBookingsService {
       actorId,
       activity.tripId
     )
+
+    // Evaluate trip lifecycle — removing last booking may demote active → planning
+    await this.tripLifecycleService.onBookingCancelled(activityId)
 
     // Check payment schedule status
     const paymentScheduleMissing = await this.getPaymentScheduleMissing(activityId)
