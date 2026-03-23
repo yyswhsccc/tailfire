@@ -1,8 +1,8 @@
 /**
  * Amadeus Flights Provider
  *
- * External API provider for flight schedule data via Amadeus On Demand Flight Status API.
- * Used as a fallback when Aerodatabox returns no results (Priority 2).
+ * External API provider for flight schedule data via Amadeus Flight Schedule API.
+ * Primary provider for segment search (Priority 1) — broadest flight coverage via OAG/SSIM data.
  *
  * Features:
  * - OAuth2 client credentials authentication with token caching
@@ -64,9 +64,13 @@ function buildAmadeusConfig(): ExternalApiConfig {
 }
 
 /**
- * Priority for fallback ordering (2 = fallback after Aerodatabox)
+ * Priority for fallback ordering (1 = primary provider)
+ *
+ * Amadeus Schedule API is primary because it has broader flight coverage
+ * (OAG/SSIM data — all scheduled flights worldwide). AeroDataBox is fallback
+ * but will be used for live status tracking/alerts in the future.
  */
-const PROVIDER_PRIORITY = 2
+const PROVIDER_PRIORITY = 1
 
 /**
  * Buffer time before token expiry (60 seconds)
