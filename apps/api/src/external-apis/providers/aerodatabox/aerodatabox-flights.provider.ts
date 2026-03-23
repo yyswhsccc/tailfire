@@ -61,9 +61,13 @@ function buildAerodataboxConfig(): ExternalApiConfig {
 }
 
 /**
- * Priority for fallback ordering (1 = highest priority)
+ * Priority for fallback ordering (2 = fallback after Amadeus Schedule)
+ *
+ * AeroDataBox provides live flight status (delays, cancellations, gate changes,
+ * actual times) that Amadeus Schedule doesn't. Will be primary source for
+ * flight tracking alerts when that feature is built.
  */
-const PROVIDER_PRIORITY = 1
+const PROVIDER_PRIORITY = 2
 
 @Injectable()
 export class AerodataboxFlightsProvider
