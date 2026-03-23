@@ -384,9 +384,9 @@ export function PricingSection({
           )}
 
           {/* Price Details */}
-          <div className={`grid ${isPerPerson ? 'grid-cols-3' : 'grid-cols-3'} gap-4 pt-4 border-t`}>
+          <div className={`grid ${isPerPerson ? 'grid-cols-3' : 'grid-cols-3'} gap-4 pt-4 border-t`} data-field="paymentSchedule">
             {/* Total Price */}
-            <div className="space-y-2">
+            <div className="space-y-2" data-field="totalPrice">
               <Label className="text-sm font-medium text-gray-700">
                 Total Price (including taxes & fees)
                 <InfoTooltip text="The full price the client pays, including all taxes and fees. This is the amount used for payment schedules and commission calculations." />

@@ -49,6 +49,8 @@ interface SupplierComboboxProps {
   supplierType?: string
   /** Filter to show only active suppliers (default: true) */
   showOnlyActive?: boolean
+  /** data-field anchor for targeting specific fields (e.g. booking validation UX) */
+  'data-field'?: string
 }
 
 export function SupplierCombobox({
@@ -61,6 +63,7 @@ export function SupplierCombobox({
   allowCreate = true,
   supplierType,
   showOnlyActive = true,
+  'data-field': dataField,
 }: SupplierComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [searchValue, setSearchValue] = React.useState('')
@@ -139,6 +142,7 @@ export function SupplierCombobox({
     !isLoading
 
   return (
+    <div data-field={dataField}>
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
@@ -225,5 +229,6 @@ export function SupplierCombobox({
         </Command>
       </PopoverContent>
     </Popover>
+    </div>
   )
 }

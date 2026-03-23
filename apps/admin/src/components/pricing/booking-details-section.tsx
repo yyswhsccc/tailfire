@@ -97,7 +97,7 @@ export function BookingDetailsSection({
       <h3 className="text-lg font-semibold">Booking Details</h3>
 
       {/* Supplier */}
-      <div className="space-y-2">
+      <div className="space-y-2" data-field="supplier">
         <Label className="text-sm font-medium text-gray-700">Supplier</Label>
         <SupplierCombobox
           value={pricingData.supplier || null}
@@ -136,7 +136,7 @@ export function BookingDetailsSection({
       <div className="space-y-4">
         <h4 className="text-md font-semibold">Confirmation Details</h4>
 
-        <div className="space-y-2">
+        <div className="space-y-2" data-field="confirmationNumber">
           <Label className="text-sm font-medium text-gray-700">Confirmation Number</Label>
           <Input
             placeholder="Enter confirmation number..."

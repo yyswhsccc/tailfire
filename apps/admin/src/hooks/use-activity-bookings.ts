@@ -20,6 +20,16 @@ import type {
   ActivityBookingsListResponseDto,
 } from '@tailfire/shared-types'
 
+export interface BookingValidationError {
+  message: string
+  code: string
+}
+
+export interface BookingValidationResult {
+  valid: boolean
+  errors: BookingValidationError[]
+}
+
 // Query Keys
 export const activityBookingKeys = {
   all: ['activity-bookings'] as const,
@@ -108,6 +118,17 @@ export function useUnmarkActivityBooked() {
       queryClient.invalidateQueries({ queryKey: ['activities'] })
       queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
       queryClient.invalidateQueries({ queryKey: activityBookingKeys.all })
+    },
+  })
+}
+
+/**
+ * Validate booking requirements without changing state (dry run)
+ */
+export function useValidateBooking() {
+  return useMutation({
+    mutationFn: async (activityId: string) => {
+      return api.get<BookingValidationResult>(`/bookings/activities/${activityId}/validate`)
     },
   })
 }
