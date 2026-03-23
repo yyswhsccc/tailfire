@@ -120,6 +120,16 @@ export const updateActivityDtoSchema = z.object({
 
   // Media
   photos: z.array(photoSchema).nullable().optional(),
+
+  // Package-specific fields (stored in package_details table)
+  supplierName: z.string().max(255).nullable().optional(),
+  supplierId: z.string().uuid().nullable().optional(),
+  supplier: z.string().max(255).nullable().optional(), // activity_pricing.supplier
+  cancellationPolicy: z.string().nullable().optional(),
+  cancellationDeadline: z.string().nullable().optional(),
+  termsAndConditions: z.string().nullable().optional(),
+  groupBookingNumber: z.string().max(255).nullable().optional(),
+  paymentStatus: z.string().max(50).nullable().optional(),
 })
 
 export type UpdateActivityDto = z.infer<typeof updateActivityDtoSchema>
