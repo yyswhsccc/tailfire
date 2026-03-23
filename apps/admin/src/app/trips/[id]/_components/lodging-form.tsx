@@ -9,7 +9,7 @@ import { useSearchParams, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Building2, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, Package, CalendarCheck } from 'lucide-react'
+import { Building2, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, Package } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
@@ -30,8 +30,8 @@ import { useCreateLodging, useUpdateLodging, useLodging } from '@/hooks/use-lodg
 import { useBooking, useBookings, useUnlinkActivities, bookingKeys } from '@/hooks/use-bookings'
 import { useQueryClient } from '@tanstack/react-query'
 import { activityKeys } from '@/hooks/use-activities'
-import { useMarkActivityBooked } from '@/hooks/use-activity-bookings'
 import { useIsChildOfPackage } from '@/hooks/use-is-child-of-package'
+import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import { itineraryDayKeys } from '@/hooks/use-itinerary-days'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { PaymentScheduleSection } from './payment-schedule-section'
@@ -45,8 +45,6 @@ import { AmenitiesSelector } from '@/components/ui/amenities-selector'
 import { Combobox } from '@/components/ui/combobox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DocumentUploader } from '@/components/document-uploader'
-import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
-import { ChildOfPackageBookingSection } from '@/components/activities/child-of-package-booking-section'
 import { ComponentMediaTab } from '@/components/shared'
 import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
 import { HotelSearchPanel } from '@/components/hotel-search-panel'
@@ -198,7 +196,6 @@ export function LodgingForm({
   const [showTravelersDialog, setShowTravelersDialog] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
-  const [showBookingModal, setShowBookingModal] = useState(false)
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams.get('tab')
     return tabParam === 'booking' ? 'booking' : 'general'
@@ -358,31 +355,6 @@ export function LodgingForm({
   // Mutations - use effectiveDayId to support pendingDay mode
   const createLodging = useCreateLodging(itineraryId, effectiveDayId)
   const updateLodging = useUpdateLodging(itineraryId, effectiveDayId)
-  const markActivityBooked = useMarkActivityBooked()
-
-  // Handler for marking activity as booked
-  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
-    if (!activityId) {
-      throw new Error('Activity must be saved before marking as booked')
-    }
-
-    const result = await markActivityBooked.mutateAsync({
-      activityId,
-      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
-    })
-
-    // Update local state - preserve YYYY-MM-DD format
-    setActivityIsBooked(true)
-    setActivityBookingDate(newBookingDate)
-
-    // Show warning if payment schedule is missing
-    if (result.paymentScheduleMissing) {
-      toast({
-        title: 'Payment schedule missing',
-        description: 'This activity is booked but has no payment schedule configured.',
-      })
-    }
-  }
 
   // Ref to track loaded lodging ID (prevents re-seeding on every render)
   const lodgingIdRef = useRef<string | null>(null)
@@ -960,7 +932,7 @@ export function LodgingForm({
 
           <div className="flex items-center gap-6 flex-wrap">
             {/* Travelers */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" data-field="travelers">
               <span className="text-sm text-gray-600">Travelers ({travelers.length} of {totalTravelers})</span>
               <div className="flex -space-x-2">
                 {travelers.map((traveler: any) => (
@@ -1034,6 +1006,34 @@ export function LodgingForm({
             </>
           )}
         </div>
+
+        {/* Booking Button */}
+        <BookingHeaderButton
+          activityId={activityId}
+          activityName={displayName || 'Lodging'}
+          activityType="lodging"
+          isBooked={activityIsBooked}
+          bookingDate={activityBookingDate}
+          isChildOfPackage={isChildOfPackage}
+          parentPackageId={parentPackageId}
+          parentPackageName={parentPackageName}
+          tripId={trip?.id || ''}
+          onNavigateToTab={(tab) => { if (tab) setActiveTab(tab) }}
+          onBooked={() => {
+            setActivityIsBooked(true)
+            setActivityBookingDate(new Date().toISOString().split('T')[0] ?? null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+          onUnbooked={() => {
+            setActivityIsBooked(false)
+            setActivityBookingDate(null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+        />
       </div>
 
       {/* Tabbed Interface */}
@@ -1252,7 +1252,7 @@ export function LodgingForm({
               <div className="space-y-4">
                 <h4 className="font-medium text-gray-700">Check-in</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-field="startDatetime">
                     <label className="text-sm font-medium text-gray-700">Date *</label>
                     <DatePickerEnhanced
                       value={dateToString(checkInDateValue)}
@@ -1301,7 +1301,7 @@ export function LodgingForm({
               <div className="space-y-4">
                 <h4 className="font-medium text-gray-700">Check-out</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-field="endDatetime">
                     <label className="text-sm font-medium text-gray-700">Date *</label>
                     <DatePickerEnhanced
                       value={dateToString(checkOutDateValue)}
@@ -1448,49 +1448,6 @@ export function LodgingForm({
         </TabsContent>
 
         <TabsContent value="booking" className="mt-6 space-y-6">
-          {/* Booking Status Section */}
-          {isChildOfPackage && parentPackageId ? (
-            <ChildOfPackageBookingSection
-              parentPackageId={parentPackageId}
-              parentPackageName={parentPackageName}
-              tripId={trip?.id || ''}
-              activityIsBooked={activityIsBooked}
-              activityBookingDate={activityBookingDate}
-            />
-          ) : activityId ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CalendarCheck className="h-5 w-5 text-gray-500" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">Booking Status</h3>
-                    <p className="text-xs text-gray-500">
-                      Mark this lodging as booked when it&apos;s been confirmed
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <BookingStatusBadge
-                    isBooked={activityIsBooked}
-                    bookingDate={activityBookingDate}
-                    onClick={() => setShowBookingModal(true)}
-                  />
-                  <Button
-                    type="button"
-                    variant={activityIsBooked ? 'outline' : 'default'}
-                    size="sm"
-                    onClick={() => setShowBookingModal(true)}
-                    className={activityIsBooked ? '' : 'bg-green-600 hover:bg-green-700'}
-                  >
-                    {activityIsBooked ? 'Update Booking' : 'Mark as Booked'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <Separator />
-
           {/* Pricing Section */}
           <PricingSection
             pricingData={pricingData}
@@ -1576,16 +1533,6 @@ export function LodgingForm({
         />
       )}
 
-      {/* Mark as Booked Modal */}
-      <MarkActivityBookedModal
-        open={showBookingModal}
-        onOpenChange={setShowBookingModal}
-        activityName={propertyNameValue || 'Lodging'}
-        isBooked={activityIsBooked}
-        currentBookingDate={activityBookingDate}
-        onConfirm={handleMarkAsBooked}
-        isPending={markActivityBooked.isPending}
-      />
     </div>
   )
 }
