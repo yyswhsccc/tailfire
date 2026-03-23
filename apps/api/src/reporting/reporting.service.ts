@@ -15,7 +15,6 @@
 
 import {
   Injectable,
-  Logger,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common'
@@ -326,8 +325,6 @@ const CATALOG_MAP = new Map<string, ReportDefinition>(
 
 @Injectable()
 export class ReportingService {
-  private readonly logger = new Logger(ReportingService.name)
-
   constructor(
     private readonly db: DatabaseService,
     private readonly tripAccess: TripAccessService,
