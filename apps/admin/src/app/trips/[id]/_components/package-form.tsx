@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useSaveStatus } from '@/hooks/use-save-status'
@@ -47,6 +48,7 @@ import { PricingSection, CommissionSection, BookingDetailsSection, type Supplier
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { DocumentUploader } from '@/components/document-uploader'
 import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
+import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import { SupplierCombobox } from '@/components/suppliers/supplier-combobox'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import type { PricingData, PricingBreakdownItem } from '@/lib/pricing'
@@ -98,11 +100,16 @@ export function PackageForm({
   onCancel,
 }: PackageFormProps) {
   const { toast } = useToast()
+  const queryClient = useQueryClient()
   const isEditing = !!packageId
 
   const [activeTab, setActiveTab] = useState<PackageTab>(defaultTab)
   const [currentPackageId, setCurrentPackageId] = useState<string | null>(packageId || null)
   const [activityPricingId, setActivityPricingId] = useState<string | null>(null)
+
+  // Booking status state — kept in sync with packageData and refreshed after book/unbook
+  const [isBooked, setIsBooked] = useState<boolean>(initialPackageData?.bookingStatus === 'booked')
+  const [bookingDate, setBookingDate] = useState<string | null>(initialPackageData?.bookingDate ?? null)
 
   // User profile for commission split settings
   const { data: userProfile } = useMyProfile()
@@ -179,6 +186,8 @@ export function PackageForm({
       packageIdRef.current = packageData.id
       setCurrentPackageId(packageData.id)
       setActivityPricingId(packageData.activityPricingId || null)
+      setIsBooked(packageData.bookingStatus === 'booked')
+      setBookingDate(packageData.bookingDate ?? null)
 
       const defaults = toPackageDefaults(packageData)
 
@@ -532,6 +541,32 @@ export function PackageForm({
                 <span className="text-red-500">Save failed</span>
               )}
             </div>
+
+            {/* Booking Button */}
+            <BookingHeaderButton
+              activityId={currentPackageId}
+              activityName={nameValue || 'Package'}
+              activityType="package"
+              isBooked={isBooked}
+              bookingDate={bookingDate}
+              isChildOfPackage={false}
+              tripId={tripId}
+              onNavigateToTab={(tab) => setActiveTab(tab as PackageTab)}
+              onBooked={(cascadedCount) => {
+                setIsBooked(true)
+                setBookingDate(new Date().toISOString().split('T')[0])
+                queryClient.invalidateQueries({ queryKey: ['activities'] })
+                queryClient.invalidateQueries({ queryKey: ['bookings'] })
+                queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+              }}
+              onUnbooked={() => {
+                setIsBooked(false)
+                setBookingDate(null)
+                queryClient.invalidateQueries({ queryKey: ['activities'] })
+                queryClient.invalidateQueries({ queryKey: ['bookings'] })
+                queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+              }}
+            />
           </div>
         </div>
       </div>
@@ -589,7 +624,7 @@ export function PackageForm({
 
               <div className="grid grid-cols-2 gap-4">
                 {/* Confirmation Number */}
-                <div className="space-y-2">
+                <div className="space-y-2" data-field="confirmationNumber">
                   <label className="text-sm font-medium text-gray-700">Confirmation Number</label>
                   <Input
                     {...register('confirmationNumber')}
@@ -608,7 +643,7 @@ export function PackageForm({
               </div>
 
               {/* Supplier */}
-              <div className="space-y-2">
+              <div className="space-y-2" data-field="supplier">
                 <label className="text-sm font-medium text-gray-700">Supplier</label>
                 <SupplierCombobox
                   value={supplierNameValue}
