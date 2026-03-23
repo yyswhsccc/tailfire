@@ -1,60 +1,57 @@
-# Mark as Booked UX Overhaul — Implementation Plan
+# Mark as Booked UX Overhaul — Implementation Plan (v2)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the "Mark as Booked" action prominent on every activity form, add booking controls to packages, cascade booking to child activities, and show validation errors inline with field navigation.
 
-**Architecture:** A shared `BookingHeaderButton` component replaces the buried booking controls across all 9 activity forms. The API's `BookingValidationService` returns structured errors with field/tab mapping. Package booking cascades to children via `ActivityBookingsService`. Insurance task auto-created post-booking via `TasksService`.
+**Architecture:** A shared `BookingHeaderButton` component replaces the buried booking controls across all 9 activity forms. The API's `BookingValidationService` returns structured errors with error codes. The frontend maps error codes to form-specific tab/field locations. Package booking leverages the existing cascade in `ActivitiesService.update()`. Insurance task auto-created post-booking via `TasksService`.
 
 **Tech Stack:** Next.js (Admin), NestJS (API), React Hook Form, Drizzle ORM, shadcn/ui, React Query
 
 **Spec:** `docs/superpowers/specs/2026-03-23-mark-as-booked-ux-design.md`
 
+**Codex Review:** v1 plan had 7 issues identified by Codex. All addressed in v2:
+1. Package cascade: use existing `ActivitiesService.update()` cascade (line 867), don't duplicate
+2. Validate-then-confirm: split validation into "check everything except booking-time inputs" + "confirm with booking-time inputs"
+3. Insurance task: fix DTO shape — `taskType: 'automatic'`, `assigneeUserId`, pass `agencyId` + `userId`
+4. Tab mapping: return stable error codes from backend, map to tabs per form type client-side
+5. Field highlighting: add `data-field` anchors to shared pricing components
+6. Shared-types: add `BookingValidationError`/`Result` types, update `ApiError` parser
+7. Stale references: align to actual current UI (no dropdown to replace, correct tab values)
+
 ---
 
-## File Structure
+## Tab Map (actual values from each form)
 
-### New Files
-- `apps/admin/src/components/activities/booking-header-button.tsx` — Shared booking button + inline confirmation panel
-- `apps/api/src/trips/dto/booking-validation-error.dto.ts` — Structured validation error type with field/tab mapping
-
-### Modified Files (API)
-- `apps/api/src/trips/booking-validation.service.ts` — Return structured errors with `field` + `tab`
-- `apps/api/src/trips/activity-bookings.service.ts` — Package cascade logic + insurance task creation
-- `apps/api/src/trips/activity-bookings.controller.ts` — Add `GET /bookings/activities/:activityId/validate` endpoint
-
-### Modified Files (Admin — 9 activity forms)
-- `apps/admin/src/app/trips/[id]/_components/package-form.tsx` — Add BookingHeaderButton (currently missing)
-- `apps/admin/src/app/trips/[id]/_components/flight-form.tsx` — Replace buried button with BookingHeaderButton in header
-- `apps/admin/src/app/trips/[id]/_components/lodging-form.tsx` — Same
-- `apps/admin/src/app/trips/[id]/_components/tour-form.tsx` — Same
-- `apps/admin/src/app/trips/[id]/_components/custom-cruise-form.tsx` — Same
-- `apps/admin/src/app/trips/[id]/_components/dining-form.tsx` — Same
-- `apps/admin/src/app/trips/[id]/_components/options-form.tsx` — Same
-- `apps/admin/src/app/trips/[id]/_components/transportation-form.tsx` — Same
-- `apps/admin/src/app/trips/[id]/_components/port-info-form.tsx` — Same
-
-### Modified Files (Admin — hooks/components)
-- `apps/admin/src/hooks/use-activity-bookings.ts` — Add `useValidateBooking` hook + update cache invalidation
-- `apps/admin/src/components/packages/packages-table.tsx` — Inline "Book" button per row replacing dropdown
+| Form | Booking/Pricing Tab Value | Start/End Fields Tab |
+|------|--------------------------|---------------------|
+| flight | `booking` | `general` |
+| lodging | `booking` | `general` |
+| tour | `booking` | `general` |
+| custom-cruise | `pricing` | `general` |
+| dining | `pricing` | `general` |
+| options | `pricing` | `general` |
+| transportation | `pricing` | `general` |
+| port-info | `pricing` | `general` |
+| package | `booking` | `general` |
 
 ---
 
 ## Task 1: Structured Validation Errors (API)
 
 **Files:**
-- Create: `apps/api/src/trips/dto/booking-validation-error.dto.ts`
+- Modify: `packages/shared-types/src/api/activity-bookings.types.ts`
 - Modify: `apps/api/src/trips/booking-validation.service.ts`
+- Modify: `apps/api/src/trips/activity-bookings.service.ts`
 
-- [ ] **Step 1: Create the structured error DTO**
+- [ ] **Step 1: Add structured error types to shared-types**
 
-Create `apps/api/src/trips/dto/booking-validation-error.dto.ts`:
+In `packages/shared-types/src/api/activity-bookings.types.ts`, add:
 
 ```typescript
 export interface BookingValidationError {
   message: string
-  field: string
-  tab: string
+  code: string  // stable error code, e.g. 'SUPPLIER_MISSING', 'TRAVELER_DOB_MISSING'
 }
 
 export interface BookingValidationResult {
@@ -63,45 +60,58 @@ export interface BookingValidationResult {
 }
 ```
 
-- [ ] **Step 2: Update BookingValidationService to return structured errors**
+Error codes (stable, form-agnostic):
 
-In `apps/api/src/trips/booking-validation.service.ts`, replace every `errors.push('message')` with `errors.push({ message, field, tab })`.
+| Code | Message Template |
+|------|-----------------|
+| `SUPPLIER_MISSING` | Supplier must be identified |
+| `START_DATE_MISSING` | Start date/time is required |
+| `END_DATE_MISSING` | End date/time is required |
+| `DATE_ORDER_INVALID` | Start must be before end |
+| `NO_TRAVELERS` | At least one traveler must be assigned |
+| `TRAVELER_FIRST_NAME` | Traveler "{name}" missing first name |
+| `TRAVELER_LAST_NAME` | Traveler "{name}" missing last name |
+| `TRAVELER_DOB` | Traveler "{name}" missing date of birth |
+| `TRAVELER_ADDRESS` | Traveler "{name}" missing address |
+| `PRICE_MISSING` | Total price must be greater than zero |
+| `PAYMENT_SCHEDULE_MISSING` | Payment schedule must be defined |
+| `PAYMENT_ITEMS_MISSING` | Expected payment items must exist |
+| `PAYMENT_DUE_DATE_MISSING` | Payment item must have a due date |
+| `CONFIRMATION_NUMBER_MISSING` | Confirmation number is required |
+| `PASSPORT_NUMBER_MISSING` | Traveler "{name}" missing passport number |
+| `PASSPORT_EXPIRY_MISSING` | Traveler "{name}" missing passport expiry |
+| `PASSPORT_EXPIRY_TOO_SOON` | Traveler "{name}" passport expires too soon |
+| `FINAL_PAYMENT_AFTER_DEPARTURE` | Final payment must be before departure |
+| `NON_REFUNDABLE_NOT_SET` | Non-refundable amount not set |
+| `NON_REFUNDABLE_EXCEEDS_DEPOSIT` | Non-refundable exceeds deposit |
 
-Field-to-tab mapping:
+- [ ] **Step 2: Update BookingValidationService**
 
-| Check | field | tab |
-|-------|-------|-----|
-| Supplier | `supplier` | `pricing` |
-| Booking date | `bookingDate` | `pricing` |
-| Start date | `startDatetime` | `general` |
-| End date | `endDatetime` | `general` |
-| Travelers | `travelers` | `travelers` |
-| Traveler first name | `traveler.firstName` | `travelers` |
-| Traveler last name | `traveler.lastName` | `travelers` |
-| Traveler DOB | `traveler.dateOfBirth` | `travelers` |
-| Traveler address | `traveler.address` | `travelers` |
-| Total price | `totalPriceCents` | `pricing` |
-| Payment schedule | `paymentSchedule` | `pricing` |
-| Expected payment items | `expectedPaymentItems` | `pricing` |
-| Due date on items | `expectedPaymentDueDate` | `pricing` |
-| Confirmation number | `confirmationNumber` | `pricing` |
-| Passport number | `traveler.passportNumber` | `travelers` |
-| Passport expiry | `traveler.passportExpiry` | `travelers` |
-| Final payment date | `finalPaymentDate` | `pricing` |
-| Non-refundable amount | `nonRefundableAmount` | `pricing` |
+Replace every `errors.push('message')` with `errors.push({ message, code })`. The return type changes from `{ valid: boolean, errors: string[] }` to `BookingValidationResult`.
 
-Update the return type from `{ valid: boolean, errors: string[] }` to `BookingValidationResult`.
+**Important:** Do NOT include `booking_date` check (Check 2) or passport verification in the validate-only endpoint — these are confirmed at booking time by the user.
 
-Update `ActivityBookingsService.markAsBooked()` to pass structured errors in the BadRequestException.
+- [ ] **Step 3: Update ActivityBookingsService.markAsBooked error format**
 
-- [ ] **Step 3: Update the DTO export**
+Change the `BadRequestException` to pass structured errors:
 
-Add the new type to `apps/api/src/trips/dto/index.ts` barrel export.
+```typescript
+throw new BadRequestException({
+  message: 'Activity does not meet booking requirements',
+  errors: validation.errors, // Array of { message, code }
+})
+```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Rebuild shared-types**
+
+```bash
+cd packages/shared-types && pnpm build
+```
+
+- [ ] **Step 5: Commit**
 
 ```
-git commit -m "feat(api): return structured booking validation errors with field/tab mapping"
+git commit -m "feat(api): structured booking validation errors with stable codes"
 ```
 
 ---
@@ -112,9 +122,7 @@ git commit -m "feat(api): return structured booking validation errors with field
 - Modify: `apps/api/src/trips/activity-bookings.controller.ts`
 - Modify: `apps/api/src/trips/activity-bookings.service.ts`
 
-- [ ] **Step 1: Add validateBooking method to service**
-
-In `ActivityBookingsService`, add a public method that runs validation without changing state:
+- [ ] **Step 1: Add public validateBooking method to service**
 
 ```typescript
 async validateBooking(activityId: string): Promise<BookingValidationResult> {
@@ -124,11 +132,9 @@ async validateBooking(activityId: string): Promise<BookingValidationResult> {
 
 - [ ] **Step 2: Add GET endpoint to controller**
 
-Add `GET /bookings/activities/:activityId/validate` endpoint:
-
 ```typescript
 @Get(':activityId/validate')
-@ApiOperation({ summary: 'Validate booking requirements (dry run)' })
+@ApiOperation({ summary: 'Validate booking requirements (dry run — does not change state)' })
 async validateBooking(
   @GetAuthContext() auth: AuthContext,
   @Param('activityId', ParseUUIDPipe) activityId: string
@@ -146,68 +152,43 @@ git commit -m "feat(api): add booking validation dry-run endpoint"
 
 ---
 
-## Task 3: Package Booking Cascade (API)
+## Task 3: Package Cascade — Use Existing Logic (API)
 
 **Files:**
 - Modify: `apps/api/src/trips/activity-bookings.service.ts`
 
-- [ ] **Step 1: Add cascade logic to markAsBooked**
+The cascade already exists in `ActivitiesService.update()` at line 867. When `bookingStatus` is set to `'booked'` on a package, it automatically cascades to all non-cancelled children. No new cascade code is needed.
 
-After the existing `this.activitiesService.update()` call and before `this.tripLifecycleService.onActivityBooked()`, add:
+- [ ] **Step 1: Add cascadedCount to the response**
+
+After calling `this.activitiesService.update()`, query the count of affected children:
 
 ```typescript
-// Package cascade: if this is a package, book all children
 let cascadedCount = 0
 if (activity.activityType === 'package') {
   const children = await this.db.client
-    .select({ id: this.db.schema.itineraryActivities.id })
+    .select({ count: sql`count(*)::int` })
     .from(this.db.schema.itineraryActivities)
-    .where(eq(this.db.schema.itineraryActivities.parentActivityId, activityId))
-
-  for (const child of children) {
-    await this.activitiesService.update(
-      child.id,
-      { bookingStatus: 'booked', bookingDate },
-      actorId,
-      activity.tripId
+    .where(
+      and(
+        eq(this.db.schema.itineraryActivities.parentActivityId, activityId),
+        eq(this.db.schema.itineraryActivities.bookingStatus, 'booked')
+      )
     )
-    cascadedCount++
-  }
+  cascadedCount = children[0]?.count ?? 0
 }
 ```
 
-Add `cascadedCount` to the response DTO.
+Add `cascadedCount` to the response.
 
-- [ ] **Step 2: Add cascade logic to unmarkAsBooked**
+- [ ] **Step 2: Update ActivityBookingResponseDto in shared-types**
 
-Same pattern — unbook all children when a package is unbooked:
+Add `cascadedCount?: number` to the response type.
 
-```typescript
-if (activity.activityType === 'package') {
-  const children = await this.db.client
-    .select({ id: this.db.schema.itineraryActivities.id })
-    .from(this.db.schema.itineraryActivities)
-    .where(eq(this.db.schema.itineraryActivities.parentActivityId, activityId))
-
-  for (const child of children) {
-    await this.activitiesService.update(
-      child.id,
-      { bookingStatus: 'unbooked', bookingDate: null },
-      actorId,
-      activity.tripId
-    )
-  }
-}
-```
-
-- [ ] **Step 3: Add `cascadedCount` to ActivityBookingResponseDto**
-
-In shared-types, add `cascadedCount?: number` to the response type.
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Rebuild shared-types and commit**
 
 ```
-git commit -m "feat(api): cascade booking status to package child activities"
+git commit -m "feat(api): expose cascadedCount in booking response for packages"
 ```
 
 ---
@@ -216,24 +197,22 @@ git commit -m "feat(api): cascade booking status to package child activities"
 
 **Files:**
 - Modify: `apps/api/src/trips/activity-bookings.service.ts`
+- Modify: `apps/api/src/trips/trips.module.ts` (if TasksModule not already imported)
 
-- [ ] **Step 1: Add insurance task creation after successful booking**
+- [ ] **Step 1: Inject TasksService**
 
-After the lifecycle evaluation in `markAsBooked()`, add:
+Add `TasksService` to `ActivityBookingsService` constructor. Check `trips.module.ts` — if `TasksModule` is not in imports, add it with `forwardRef` if needed.
 
-```typescript
-// Auto-create insurance review task
-await this.createInsuranceTaskIfNeeded(activity.tripId, activityId, activity.name, bookingDate)
-```
-
-Implement the private method:
+- [ ] **Step 2: Add insurance task creation method**
 
 ```typescript
 private async createInsuranceTaskIfNeeded(
   tripId: string,
   activityId: string,
   activityName: string,
-  bookingDate: string
+  bookingDate: string,
+  agencyId: string,
+  userId: string,
 ): Promise<void> {
   // Check for existing open insurance task on this trip
   const existingTask = await this.db.client
@@ -248,7 +227,7 @@ private async createInsuranceTaskIfNeeded(
     .limit(1)
 
   if (existingTask.length > 0) {
-    // Check if insurance already sold/waived — if so, create review task for new booking
+    // Check if insurance already exists on trip — create review task for new booking
     const insuranceExists = await this.db.client
       .select({ id: this.db.schema.tripInsurancePackages.id })
       .from(this.db.schema.tripInsurancePackages)
@@ -256,7 +235,6 @@ private async createInsuranceTaskIfNeeded(
       .limit(1)
 
     if (insuranceExists.length > 0) {
-      // Insurance exists + new booking = review task
       const dueDate = new Date(bookingDate)
       dueDate.setDate(dueDate.getDate() + 3)
 
@@ -265,18 +243,17 @@ private async createInsuranceTaskIfNeeded(
         tripId,
         activityId,
         priority: 'medium',
-        taskType: 'automated',
+        taskType: 'automatic',
         dueDate: dueDate.toISOString().split('T')[0],
-      })
+      }, agencyId, userId)
     }
-    return // Open insurance task exists, don't create duplicate
+    return
   }
 
   // No open insurance task — create one
   const dueDate = new Date(bookingDate)
   dueDate.setDate(dueDate.getDate() + 3)
 
-  // Get trip owner for assignment
   const [trip] = await this.db.client
     .select({ ownerId: this.db.schema.trips.ownerId })
     .from(this.db.schema.trips)
@@ -287,19 +264,35 @@ private async createInsuranceTaskIfNeeded(
     title: 'Review and initiate insurance coverage',
     tripId,
     priority: 'high',
-    taskType: 'automated',
+    taskType: 'automatic',
     dueDate: dueDate.toISOString().split('T')[0],
-    assigneeId: trip?.ownerId || undefined,
+    assigneeUserId: trip?.ownerId || userId,
     assigneeType: 'user',
-  })
+  }, agencyId, userId)
 }
 ```
 
-- [ ] **Step 2: Inject TasksService into ActivityBookingsService**
+- [ ] **Step 3: Call from markAsBooked**
 
-Add `TasksService` to the constructor. Handle circular dependency with `forwardRef` if needed.
+After the lifecycle evaluation, add:
 
-- [ ] **Step 3: Commit**
+```typescript
+// Resolve agencyId for task creation
+const [tripData] = await this.db.client
+  .select({ agencyId: this.db.schema.trips.agencyId })
+  .from(this.db.schema.trips)
+  .where(eq(this.db.schema.trips.id, activity.tripId))
+  .limit(1)
+
+if (tripData) {
+  await this.createInsuranceTaskIfNeeded(
+    activity.tripId, activityId, activity.name, bookingDate,
+    tripData.agencyId, actorId || ''
+  )
+}
+```
+
+- [ ] **Step 4: Commit**
 
 ```
 git commit -m "feat(api): auto-create insurance review task on booking"
@@ -307,12 +300,24 @@ git commit -m "feat(api): auto-create insurance review task on booking"
 
 ---
 
-## Task 5: Validate Booking Hook (Frontend)
+## Task 5: Frontend Hooks + Error Parsing (Admin)
 
 **Files:**
 - Modify: `apps/admin/src/hooks/use-activity-bookings.ts`
+- Modify: `apps/admin/src/lib/api.ts` (update ApiError to parse structured errors)
 
-- [ ] **Step 1: Add useValidateBooking hook**
+- [ ] **Step 1: Update ApiError to handle structured booking errors**
+
+In `apps/admin/src/lib/api.ts`, update the error normalization to preserve structured error arrays. When the response body has `errors` as an array of objects (not strings), keep them as-is:
+
+```typescript
+// In the error handler, check for structured errors
+if (Array.isArray(body.errors) && body.errors[0]?.code) {
+  error.structuredErrors = body.errors // Array<{ message, code }>
+}
+```
+
+- [ ] **Step 2: Add useValidateBooking hook**
 
 ```typescript
 export function useValidateBooking() {
@@ -324,130 +329,119 @@ export function useValidateBooking() {
 }
 ```
 
-Add the `BookingValidationResult` type (or import from shared-types):
-
-```typescript
-interface BookingValidationError {
-  message: string
-  field: string
-  tab: string
-}
-
-interface BookingValidationResult {
-  valid: boolean
-  errors: BookingValidationError[]
-}
-```
-
-- [ ] **Step 2: Commit**
+- [ ] **Step 3: Commit**
 
 ```
-git commit -m "feat(admin): add useValidateBooking hook"
+git commit -m "feat(admin): add useValidateBooking hook and structured error support"
 ```
 
 ---
 
-## Task 6: BookingHeaderButton Component (Frontend)
+## Task 6: BookingHeaderButton Component (Admin)
 
 **Files:**
 - Create: `apps/admin/src/components/activities/booking-header-button.tsx`
 
-- [ ] **Step 1: Create the shared component**
+- [ ] **Step 1: Create the component**
 
 Props:
 ```typescript
 interface BookingHeaderButtonProps {
   activityId: string | null
   activityName: string
+  activityType: string // used to determine tab mapping
   isBooked: boolean
   bookingDate: string | null
   isChildOfPackage: boolean
   parentPackageId?: string | null
+  parentPackageName?: string | null
   tripId: string
   /** Callback to switch to a specific tab in the parent form */
   onNavigateToTab?: (tab: string) => void
-  /** Callback to highlight/focus a field */
-  onHighlightField?: (field: string) => void
   /** Called after successful booking */
-  onBooked?: () => void
+  onBooked?: (cascadedCount?: number) => void
   /** Called after successful unbooking */
   onUnbooked?: () => void
 }
 ```
 
-Component behavior:
+**Error code → tab mapping (client-side, per form type):**
 
-**Unbooked state:**
-- Gold outline button: `CalendarCheck` icon + "Mark as Booked"
-- Click → calls `GET /bookings/activities/:id/validate`
-- If errors: jump to first error tab (via `onNavigateToTab`), highlight field (via `onHighlightField`), toast all errors with clickable items
-- If valid: show inline confirmation panel (passport checkbox + booking date)
-- Confirm → calls `POST /bookings/activities/:id/mark`
-- Success → green badge, toast, call `onBooked()`
-
-**Booked state:**
-- Green badge: "Booked — Mar 23, 2026"
-- Dropdown with "Unbook" option
-- Unbook → calls `POST /bookings/activities/:id/unmark`, calls `onUnbooked()`
-
-**Child of package state:**
-- Read-only badge: "Booked via Package" or "Unbooked — managed by package"
-- Link to parent package form
-
-**Not yet saved state (activityId is null):**
-- Disabled button: "Save first to book"
-
-- [ ] **Step 2: Implement the inline confirmation panel**
-
-A collapsible panel that slides in below the header when validation passes:
-
-```tsx
-{showConfirmation && (
-  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-4">
-    <Check className="h-5 w-5 text-green-600" />
-    <span className="text-sm">All checks passed.</span>
-    <div className="flex items-center gap-2">
-      <Checkbox
-        id="passport-verified"
-        checked={passportVerified}
-        onCheckedChange={setPassportVerified}
-      />
-      <Label htmlFor="passport-verified" className="text-sm">
-        Passports verified
-      </Label>
-    </div>
-    <Input
-      type="date"
-      value={bookingDate}
-      onChange={(e) => setBookingDate(e.target.value)}
-      className="w-40 h-8"
-    />
-    <Button size="sm" onClick={handleConfirm} disabled={!passportVerified || isPending}>
-      Confirm Booking
-    </Button>
-    <Button size="sm" variant="ghost" onClick={() => setShowConfirmation(false)}>
-      Cancel
-    </Button>
-  </div>
-)}
+```typescript
+const TAB_MAP: Record<string, Record<string, string>> = {
+  // Forms with "booking" tab for pricing/supplier
+  flight:        { SUPPLIER_MISSING: 'booking', PRICE_MISSING: 'booking', PAYMENT_SCHEDULE_MISSING: 'booking', CONFIRMATION_NUMBER_MISSING: 'booking', START_DATE_MISSING: 'general', END_DATE_MISSING: 'general', NO_TRAVELERS: 'general' },
+  lodging:       { SUPPLIER_MISSING: 'booking', PRICE_MISSING: 'booking', PAYMENT_SCHEDULE_MISSING: 'booking', CONFIRMATION_NUMBER_MISSING: 'booking', START_DATE_MISSING: 'general', END_DATE_MISSING: 'general', NO_TRAVELERS: 'general' },
+  tour:          { SUPPLIER_MISSING: 'booking', PRICE_MISSING: 'booking', PAYMENT_SCHEDULE_MISSING: 'booking', CONFIRMATION_NUMBER_MISSING: 'booking', START_DATE_MISSING: 'general', END_DATE_MISSING: 'general', NO_TRAVELERS: 'general' },
+  package:       { SUPPLIER_MISSING: 'booking', PRICE_MISSING: 'booking', PAYMENT_SCHEDULE_MISSING: 'booking', CONFIRMATION_NUMBER_MISSING: 'booking', START_DATE_MISSING: 'general', END_DATE_MISSING: 'general', NO_TRAVELERS: 'general' },
+  // Forms with "pricing" tab
+  custom_cruise: { SUPPLIER_MISSING: 'pricing', PRICE_MISSING: 'pricing', PAYMENT_SCHEDULE_MISSING: 'pricing', CONFIRMATION_NUMBER_MISSING: 'pricing', START_DATE_MISSING: 'general', END_DATE_MISSING: 'general', NO_TRAVELERS: 'general' },
+  dining:        { SUPPLIER_MISSING: 'pricing', PRICE_MISSING: 'pricing', PAYMENT_SCHEDULE_MISSING: 'pricing', CONFIRMATION_NUMBER_MISSING: 'pricing', START_DATE_MISSING: 'general', END_DATE_MISSING: 'general', NO_TRAVELERS: 'general' },
+  options:       { SUPPLIER_MISSING: 'pricing', PRICE_MISSING: 'pricing', PAYMENT_SCHEDULE_MISSING: 'pricing', CONFIRMATION_NUMBER_MISSING: 'pricing', START_DATE_MISSING: 'general', END_DATE_MISSING: 'general', NO_TRAVELERS: 'general' },
+  transportation:{ SUPPLIER_MISSING: 'pricing', PRICE_MISSING: 'pricing', PAYMENT_SCHEDULE_MISSING: 'pricing', CONFIRMATION_NUMBER_MISSING: 'pricing', START_DATE_MISSING: 'general', END_DATE_MISSING: 'general', NO_TRAVELERS: 'general' },
+  port_info:     { SUPPLIER_MISSING: 'pricing', PRICE_MISSING: 'pricing', PAYMENT_SCHEDULE_MISSING: 'pricing', CONFIRMATION_NUMBER_MISSING: 'pricing', START_DATE_MISSING: 'general', END_DATE_MISSING: 'general', NO_TRAVELERS: 'general' },
+}
+// Traveler errors always go to 'general' tab (travelers section is on general)
+// Fallback: 'general'
 ```
 
-- [ ] **Step 3: Implement the validation error toast with navigation**
+**Error code → data-field mapping:**
 
-Use the existing `useToast` with a custom description containing clickable error items:
+```typescript
+const FIELD_MAP: Record<string, string> = {
+  SUPPLIER_MISSING: 'supplier',
+  START_DATE_MISSING: 'startDatetime',
+  END_DATE_MISSING: 'endDatetime',
+  PRICE_MISSING: 'totalPrice',
+  CONFIRMATION_NUMBER_MISSING: 'confirmationNumber',
+  PAYMENT_SCHEDULE_MISSING: 'paymentSchedule',
+  NO_TRAVELERS: 'travelers',
+  // Traveler-specific errors don't map to a single field
+}
+```
 
+- [ ] **Step 2: Component states**
+
+**Unbooked:** Gold outline button — "Mark as Booked"
+- Click → `GET /bookings/activities/:id/validate`
+- Errors → navigate first error's tab, highlight field, toast all errors
+- Valid → show inline confirmation panel
+
+**Inline confirmation panel:**
 ```tsx
-toast({
-  title: `${errors.length} booking requirement${errors.length > 1 ? 's' : ''} not met`,
-  description: errors.map(e => e.message).join('; '),
-  variant: 'destructive',
-  duration: 10000, // persistent enough to read
-})
+<div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+  <div className="flex items-center gap-4 flex-wrap">
+    <div className="flex items-center gap-2">
+      <Check className="h-4 w-4 text-green-600" />
+      <span className="text-sm font-medium">All checks passed</span>
+    </div>
+    <div className="flex items-center gap-2">
+      <Checkbox checked={passportVerified} onCheckedChange={setPassportVerified} />
+      <Label className="text-sm">Passports verified</Label>
+    </div>
+    <Input type="date" value={bookingDate} onChange={...} className="w-40 h-8" />
+    <Button size="sm" onClick={handleConfirm} disabled={!passportVerified}>Confirm</Button>
+    <Button size="sm" variant="ghost" onClick={dismiss}>Cancel</Button>
+  </div>
+</div>
+```
 
-// Navigate to first error
-if (errors[0]) {
-  onNavigateToTab?.(errors[0].tab)
-  onHighlightField?.(errors[0].field)
+**Booked:** Green badge "Booked — Mar 23, 2026" with dropdown → Unbook
+
+**Child of package:** Read-only badge with link to parent
+
+**Not saved:** Disabled "Save first to book"
+
+- [ ] **Step 3: Field highlighting helper**
+
+```typescript
+function highlightField(fieldId: string) {
+  const el = document.querySelector(`[data-field="${fieldId}"]`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('ring-2', 'ring-red-500')
+    setTimeout(() => el.classList.remove('ring-2', 'ring-red-500'), 5000)
+  }
 }
 ```
 
@@ -459,24 +453,54 @@ git commit -m "feat(admin): create BookingHeaderButton shared component"
 
 ---
 
-## Task 7: Add BookingHeaderButton to Package Form
+## Task 7: Add data-field Anchors to Shared Pricing Components
+
+**Files:**
+- Modify: `apps/admin/src/components/pricing/booking-details-section.tsx`
+- Modify: `apps/admin/src/components/pricing/pricing-section.tsx`
+- Modify: `apps/admin/src/components/suppliers/supplier-combobox.tsx`
+
+- [ ] **Step 1: Add data-field to booking-details-section**
+
+Add `data-field="confirmationNumber"` to the confirmation number input.
+
+- [ ] **Step 2: Add data-field to pricing-section**
+
+Add `data-field="totalPrice"` to the total price input, `data-field="paymentSchedule"` to the payment schedule section container.
+
+- [ ] **Step 3: Add data-field support to SupplierCombobox**
+
+Add an optional `data-field` prop that passes through to the trigger element:
+
+```typescript
+interface SupplierComboboxProps {
+  // ... existing
+  'data-field'?: string
+}
+```
+
+- [ ] **Step 4: Commit**
+
+```
+git commit -m "feat(admin): add data-field anchors to shared pricing components"
+```
+
+---
+
+## Task 8: Add BookingHeaderButton to Package Form
 
 **Files:**
 - Modify: `apps/admin/src/app/trips/[id]/_components/package-form.tsx`
 
-- [ ] **Step 1: Import and add state**
+- [ ] **Step 1: Import BookingHeaderButton and add it to form header**
 
-Import `BookingHeaderButton`. Add state for `bookingStatus` and `bookingDate` from the activity data. Add a `setActiveTab` callback for tab navigation.
+The package form header is simpler than other forms. Add `BookingHeaderButton` after the title/status area. Wire `onNavigateToTab` to the form's tab setter. Pass `activityType="package"`.
 
-- [ ] **Step 2: Add BookingHeaderButton to the header area**
+- [ ] **Step 2: Add data-field attributes to key inputs in package form**
 
-Place it in the header section after the auto-save indicator. Pass `onNavigateToTab` that calls the form's tab setter, and `onHighlightField` that focuses the matching input.
+Add `data-field="supplier"`, `data-field="startDatetime"`, `data-field="confirmationNumber"` to the relevant inputs.
 
-- [ ] **Step 3: Remove old booking section from packages-list if present**
-
-The `MarkAsBookedModal` import in package-form is not present (it was never added). No removal needed.
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```
 git commit -m "feat(admin): add booking controls to package form"
@@ -484,74 +508,66 @@ git commit -m "feat(admin): add booking controls to package form"
 
 ---
 
-## Task 8: Replace Buried Button in Activity Forms (8 forms)
+## Task 9: Replace Buried Button in 8 Activity Forms
 
-**Files:**
-- Modify: `apps/admin/src/app/trips/[id]/_components/flight-form.tsx`
-- Modify: `apps/admin/src/app/trips/[id]/_components/lodging-form.tsx`
-- Modify: `apps/admin/src/app/trips/[id]/_components/tour-form.tsx`
-- Modify: `apps/admin/src/app/trips/[id]/_components/custom-cruise-form.tsx`
-- Modify: `apps/admin/src/app/trips/[id]/_components/dining-form.tsx`
-- Modify: `apps/admin/src/app/trips/[id]/_components/options-form.tsx`
-- Modify: `apps/admin/src/app/trips/[id]/_components/transportation-form.tsx`
-- Modify: `apps/admin/src/app/trips/[id]/_components/port-info-form.tsx`
+**Files:** All 8 non-package activity forms.
 
 For each form:
 
-- [ ] **Step 1: Import BookingHeaderButton**
+- [ ] **Step 1: Import BookingHeaderButton, add to form header**
 
-- [ ] **Step 2: Add BookingHeaderButton to the form header**
+Place after the auto-save indicator in the header `<div>`. Wire `onNavigateToTab` to the form's `setActiveTab`. Pass the correct `activityType`.
 
-Place it in the header `<div>` (the section at ~line 946 in custom-cruise-form pattern — the area with title, travelers, status, auto-save). Add it after the auto-save indicator.
+- [ ] **Step 2: Remove the old Booking Status Section**
 
-Wire `onNavigateToTab` to the form's tab state setter (e.g., `setActiveTab`). Wire `onHighlightField` to scroll + focus the field by `data-field` attribute.
+Remove the `{/* Booking Status Section */}` card from the bottom of the form, the `MarkActivityBookedModal`, `BookingStatusBadge` imports, `showBookingModal` state, and related handler code.
 
-- [ ] **Step 3: Remove the old booking section**
+Keep `ChildOfPackageBookingSection` for package children — `BookingHeaderButton` handles this via `isChildOfPackage` prop.
 
-Remove the `{/* Booking Status Section */}` card and the `MarkActivityBookedModal` from the bottom of the form. Keep the `ChildOfPackageBookingSection` for package children — `BookingHeaderButton` handles this case with `isChildOfPackage` prop.
+- [ ] **Step 3: Add data-field attributes to key inputs**
 
-- [ ] **Step 4: Remove unused imports**
+Add `data-field="startDatetime"`, `data-field="endDatetime"` to the date fields in the general tab. Pricing fields already get anchors from the shared components (Task 7).
 
-Remove `MarkActivityBookedModal`, `BookingStatusBadge`, `showBookingModal` state, `handleMarkAsBooked` handler, and related code that's replaced by `BookingHeaderButton`.
-
-- [ ] **Step 5: Commit per form (or batch 2-3 similar forms)**
+- [ ] **Step 4: Commit in batches**
 
 ```
-git commit -m "feat(admin): move booking button to form header — flight + lodging"
-git commit -m "feat(admin): move booking button to form header — tour + cruise"
-git commit -m "feat(admin): move booking button to form header — dining + options"
-git commit -m "feat(admin): move booking button to form header — transportation + port-info"
+git commit -m "feat(admin): booking header button — flight + lodging + tour"
+git commit -m "feat(admin): booking header button — cruise + dining + options"
+git commit -m "feat(admin): booking header button — transportation + port-info"
 ```
 
 ---
 
-## Task 9: Bookings Tab Inline Button
+## Task 10: Bookings Tab — Inline Book Button
 
 **Files:**
 - Modify: `apps/admin/src/components/packages/packages-table.tsx`
 
-- [ ] **Step 1: Add inline Book button to unbooked rows**
+- [ ] **Step 1: Add inline button to rows**
 
-Replace the dropdown "Mark as Booked" menu item with an inline button in the row actions:
+The packages table currently has Edit/Delete in the row actions. Add an inline "Book" button for unbooked activities:
 
-For unbooked activities:
 ```tsx
-<Button
-  variant="outline"
-  size="sm"
-  onClick={() => router.push(`/trips/${tripId}/activities/${activityId}/edit?type=${activityType}&tab=pricing`)}
->
-  <CalendarCheck className="h-3 w-3 mr-1" />
-  Book
-</Button>
-```
-
-For booked activities:
-```tsx
-<Badge variant="outline" className="border-green-500 text-green-700">
-  <Check className="h-3 w-3 mr-1" />
-  Booked
-</Badge>
+{row.bookingStatus !== 'booked' && (
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={() => router.push(
+      `/trips/${tripId}/activities/${row.id}/edit?type=${row.activityType}&tab=${
+        ['flight','lodging','tour','package'].includes(row.activityType) ? 'booking' : 'pricing'
+      }`
+    )}
+  >
+    <CalendarCheck className="h-3 w-3 mr-1" />
+    Book
+  </Button>
+)}
+{row.bookingStatus === 'booked' && (
+  <Badge variant="outline" className="border-green-500 text-green-700 gap-1">
+    <Check className="h-3 w-3" />
+    Booked
+  </Badge>
+)}
 ```
 
 - [ ] **Step 2: Commit**
@@ -562,42 +578,9 @@ git commit -m "feat(admin): inline Book button on bookings tab table rows"
 
 ---
 
-## Task 10: Field Highlighting Support
+## Task 11: Integration Test + Cleanup
 
-**Files:**
-- Modify: All 9 activity forms (add `data-field` attributes to key inputs)
-
-- [ ] **Step 1: Add `data-field` attributes to inputs across forms**
-
-Each form needs `data-field="fieldName"` on the relevant inputs so `BookingHeaderButton` can scroll to them. Example:
-
-```tsx
-<Input data-field="supplier" value={supplier} ... />
-<Input data-field="confirmationNumber" value={confirmationNumber} ... />
-<DatePicker data-field="startDatetime" ... />
-```
-
-The `onHighlightField` callback in `BookingHeaderButton` does:
-```typescript
-const el = document.querySelector(`[data-field="${field}"]`)
-if (el) {
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  el.classList.add('ring-2', 'ring-red-500')
-  setTimeout(() => el.classList.remove('ring-2', 'ring-red-500'), 5000)
-}
-```
-
-- [ ] **Step 2: Commit**
-
-```
-git commit -m "feat(admin): add data-field attributes for booking validation highlighting"
-```
-
----
-
-## Task 11: Cleanup and Integration Test
-
-- [ ] **Step 1: Verify TypeScript compiles**
+- [ ] **Step 1: TypeScript compile check**
 
 ```bash
 npx tsc --noEmit --project apps/api/tsconfig.json 2>&1 | grep -E "booking|activity-bookings|package-form"
@@ -608,23 +591,18 @@ Expected: No new errors.
 
 - [ ] **Step 2: Manual integration test**
 
-1. Open any activity form → verify "Mark as Booked" button is in the header
-2. Click it with missing fields → verify it navigates to the correct tab and highlights the field
-3. Fill all required fields → verify confirmation panel appears
-4. Confirm → verify activity is booked, trip promotes if first booking
-5. Open a package form → verify button is present
-6. Book the package → verify children are also booked
-7. Check Trip Tasks → verify insurance review task was created
-8. Open bookings tab → verify inline "Book" button on unbooked rows
+1. Open any activity form → verify "Mark as Booked" button in header
+2. Click with missing fields → verify tab navigation + field highlight + toast
+3. Fill all fields → verify confirmation panel appears
+4. Confirm → verify booked state, trip lifecycle promotes
+5. Open package form → verify booking button present
+6. Book package → verify children cascaded, `cascadedCount` shown
+7. Check tasks → verify insurance review task created
+8. Open bookings tab → verify inline Book/Booked per row
 
-- [ ] **Step 3: Final commit**
-
-```
-git commit -m "chore: cleanup booking UX overhaul"
-```
-
-- [ ] **Step 4: Push to preview**
+- [ ] **Step 3: Commit and push**
 
 ```bash
+git push origin main
 git checkout preview && git merge main --no-edit && git push origin preview && git checkout main
 ```
