@@ -18,6 +18,20 @@ export interface KpiMetrics {
   commissionTrend: number | null
 }
 
+export interface SalesKpiMetrics {
+  bookedSalesCents: number
+  departedSalesCents: number
+  bookedSalesTrend: number | null
+  departedSalesTrend: number | null
+}
+
+export interface InsuranceKpiMetrics {
+  totalTravelers: number
+  coveredTravelers: number
+  attachRate: number
+  attachRateTrend: number | null
+}
+
 export interface TripSummary {
   id: string
   name: string
@@ -85,6 +99,10 @@ export interface AgentLeaderboardEntry {
 export interface DashboardOverview {
   personal: KpiMetrics
   agency: KpiMetrics | null
+  personalSalesKpi: SalesKpiMetrics
+  agencySalesKpi: SalesKpiMetrics | null
+  personalInsuranceKpi: InsuranceKpiMetrics
+  agencyInsuranceKpi: InsuranceKpiMetrics | null
   recentTrips: TripSummary[]
   leavingSoon: TripSummary[]
   tasksDue: TaskDueSummary[]

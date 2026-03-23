@@ -15,6 +15,8 @@ import type {
   DashboardOverviewQueryDto,
   DashboardOverview,
   KpiMetrics,
+  SalesKpiMetrics,
+  InsuranceKpiMetrics,
   TripSummary,
   TaskDueSummary,
   PaymentDueSummary,
@@ -36,6 +38,19 @@ interface RawKpiMetrics {
   bookings: number
   salesVolumeCents: number
   commissionReceivedDollars: number
+}
+
+/** Raw values for the new sales KPIs */
+interface RawSalesKpi {
+  bookedSalesCents: number
+  departedSalesCents: number
+}
+
+/** Raw values for insurance attach rate */
+interface RawInsuranceKpi {
+  totalTravelers: number
+  coveredTravelers: number
+  attachRate: number
 }
 
 /** Date range for a period */
@@ -169,6 +184,11 @@ export class DashboardService {
       tasksDue, paymentsDue,
       monthlySales, monthlyCommission,
       projection, leaderboard,
+      // New KPIs
+      personalSalesCurrent, personalSalesPrior,
+      agencySalesCurrent, agencySalesPrior,
+      personalInsuranceCurrent, personalInsurancePrior,
+      agencyInsuranceCurrent, agencyInsurancePrior,
     ] = await Promise.all([
       // Personal KPIs (scoped to user's own trips)
       this.getKpiMetrics(auth.agencyId, personalTripIds, startDate, endDate),
@@ -185,12 +205,32 @@ export class DashboardService {
       this.getMonthlyCommission(auth.agencyId, tripIds, query.chartYear || now.getFullYear(), query.includeYoy || false),
       this.getProjection(auth.agencyId, tripIds),
       isAdmin ? this.getAgentLeaderboard(auth.agencyId, startDate, endDate) : Promise.resolve(null),
+      // New KPIs — Booked Sales & Departed Sales (personal)
+      this.getSalesKpi(auth.agencyId, personalTripIds, startDate, endDate),
+      this.getSalesKpi(auth.agencyId, personalTripIds, priorStartDate, priorEndDate),
+      // New KPIs — Booked Sales & Departed Sales (agency, admin only)
+      isAdmin ? this.getSalesKpi(auth.agencyId, 'all', startDate, endDate) : Promise.resolve(null),
+      isAdmin ? this.getSalesKpi(auth.agencyId, 'all', priorStartDate, priorEndDate) : Promise.resolve(null),
+      // New KPIs — Insurance Attach Rate (personal)
+      this.getInsuranceKpi(auth.agencyId, personalTripIds, startDate, endDate),
+      this.getInsuranceKpi(auth.agencyId, personalTripIds, priorStartDate, priorEndDate),
+      // New KPIs — Insurance Attach Rate (agency, admin only)
+      isAdmin ? this.getInsuranceKpi(auth.agencyId, 'all', startDate, endDate) : Promise.resolve(null),
+      isAdmin ? this.getInsuranceKpi(auth.agencyId, 'all', priorStartDate, priorEndDate) : Promise.resolve(null),
     ])
 
     return {
       personal: this.computeKpiWithTrends(personalCurrent, personalPrior),
       agency: isAdmin && agencyCurrent && agencyPrior
         ? this.computeKpiWithTrends(agencyCurrent, agencyPrior)
+        : null,
+      personalSalesKpi: this.computeSalesKpiWithTrends(personalSalesCurrent, personalSalesPrior),
+      agencySalesKpi: isAdmin && agencySalesCurrent && agencySalesPrior
+        ? this.computeSalesKpiWithTrends(agencySalesCurrent, agencySalesPrior)
+        : null,
+      personalInsuranceKpi: this.computeInsuranceKpiWithTrends(personalInsuranceCurrent, personalInsurancePrior),
+      agencyInsuranceKpi: isAdmin && agencyInsuranceCurrent && agencyInsurancePrior
+        ? this.computeInsuranceKpiWithTrends(agencyInsuranceCurrent, agencyInsurancePrior)
         : null,
       recentTrips,
       leavingSoon,
@@ -820,5 +860,142 @@ export class DashboardService {
       salesVolumeCents: Number(row.sales_volume_cents ?? 0),
       bookings: Number(row.bookings ?? 0),
     }))
+  }
+
+  // ===================================================================
+  // Booked Sales & Departed Sales KPIs
+  // ===================================================================
+
+  /**
+   * Get booked sales (by booking date) and departed sales (by trip start date)
+   * for a given date range.
+   */
+  private async getSalesKpi(
+    agencyId: string,
+    tripIds: string[] | 'all',
+    startDate: Date,
+    endDate: Date,
+  ): Promise<RawSalesKpi> {
+    const startIso = startDate.toISOString()
+    const endIso = endDate.toISOString()
+
+    const tripFilter = tripIds === 'all'
+      ? sql`t.agency_id = ${agencyId}`
+      : tripIds.length === 0
+        ? sql`false`
+        : sql`t.agency_id = ${agencyId} AND t.id IN ${this.sqlIdList(tripIds)}`
+
+    // Booked Sales — SUM of activity_pricing.total_price_cents
+    // where trip booking date falls in period
+    const bookedResult = await this.db.client.execute(sql`
+      SELECT coalesce(sum(ap.total_price_cents), 0)::bigint AS total
+      FROM activity_pricing ap
+      JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+      LEFT JOIN itineraries itin ON itin.id = iday.itinerary_id
+      JOIN trips t ON t.id = COALESCE(itin.trip_id, ia.trip_id)
+      WHERE ${tripFilter}
+        AND t.status IN ('active', 'travelling', 'travelled')
+        AND ia.booking_status = 'booked'
+        AND ia.activity_type NOT IN ('port_info', 'tour_day')
+        AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
+        AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
+    `)
+    const bookedSalesCents = Number((bookedResult as any)[0]?.total ?? 0)
+
+    // Departed Sales — SUM of activity_pricing.total_price_cents
+    // where trip start_date falls in period
+    const departedResult = await this.db.client.execute(sql`
+      SELECT coalesce(sum(ap.total_price_cents), 0)::bigint AS total
+      FROM activity_pricing ap
+      JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+      LEFT JOIN itineraries itin ON itin.id = iday.itinerary_id
+      JOIN trips t ON t.id = COALESCE(itin.trip_id, ia.trip_id)
+      WHERE ${tripFilter}
+        AND t.status IN ('active', 'travelling', 'travelled')
+        AND ia.booking_status = 'booked'
+        AND ia.activity_type NOT IN ('port_info', 'tour_day')
+        AND t.start_date >= ${startIso}::date
+        AND t.start_date <= ${endIso}::date
+    `)
+    const departedSalesCents = Number((departedResult as any)[0]?.total ?? 0)
+
+    return { bookedSalesCents, departedSalesCents }
+  }
+
+  private computeSalesKpiWithTrends(current: RawSalesKpi, prior: RawSalesKpi): SalesKpiMetrics {
+    return {
+      bookedSalesCents: current.bookedSalesCents,
+      departedSalesCents: current.departedSalesCents,
+      bookedSalesTrend: this.computeTrend(current.bookedSalesCents, prior.bookedSalesCents),
+      departedSalesTrend: this.computeTrend(current.departedSalesCents, prior.departedSalesCents),
+    }
+  }
+
+  // ===================================================================
+  // Insurance Attach Rate KPI
+  // ===================================================================
+
+  /**
+   * Get insurance attach rate for trips booked in the period.
+   * Rate = (covered travelers / total travelers) * 100
+   * Covered = status IN ('selected_package', 'has_own_insurance')
+   */
+  private async getInsuranceKpi(
+    agencyId: string,
+    tripIds: string[] | 'all',
+    startDate: Date,
+    endDate: Date,
+  ): Promise<RawInsuranceKpi> {
+    const startIso = startDate.toISOString()
+    const endIso = endDate.toISOString()
+
+    const tripFilter = tripIds === 'all'
+      ? sql`t.agency_id = ${agencyId}`
+      : tripIds.length === 0
+        ? sql`false`
+        : sql`t.agency_id = ${agencyId} AND t.id IN ${this.sqlIdList(tripIds)}`
+
+    // Total travelers on trips booked in period
+    const totalResult = await this.db.client.execute(sql`
+      SELECT count(*)::int AS total
+      FROM trip_travelers tt
+      JOIN trips t ON t.id = tt.trip_id
+      WHERE ${tripFilter}
+        AND t.status IN ('active', 'travelling', 'travelled')
+        AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
+        AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
+    `)
+    const totalTravelers = Number((totalResult as any)[0]?.total ?? 0)
+
+    // Covered travelers (selected_package or has_own_insurance)
+    const coveredResult = await this.db.client.execute(sql`
+      SELECT count(*)::int AS covered
+      FROM trip_traveler_insurance tti
+      JOIN trip_travelers tt ON tt.id = tti.trip_traveler_id
+      JOIN trips t ON t.id = tt.trip_id
+      WHERE ${tripFilter}
+        AND tti.status IN ('selected_package', 'has_own_insurance')
+        AND t.status IN ('active', 'travelling', 'travelled')
+        AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
+        AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
+    `)
+    const coveredTravelers = Number((coveredResult as any)[0]?.covered ?? 0)
+
+    const attachRate = totalTravelers > 0
+      ? Math.round((coveredTravelers / totalTravelers) * 10000) / 100 // 2 decimal places
+      : 0
+
+    return { totalTravelers, coveredTravelers, attachRate }
+  }
+
+  private computeInsuranceKpiWithTrends(current: RawInsuranceKpi, prior: RawInsuranceKpi): InsuranceKpiMetrics {
+    return {
+      totalTravelers: current.totalTravelers,
+      coveredTravelers: current.coveredTravelers,
+      attachRate: current.attachRate,
+      attachRateTrend: this.computeTrend(current.attachRate, prior.attachRate),
+    }
   }
 }

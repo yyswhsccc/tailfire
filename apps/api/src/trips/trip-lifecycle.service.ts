@@ -275,14 +275,15 @@ export class TripLifecycleService {
     for (const trip of trips) {
       evaluated++
       const bookedCount = await this.countBookedActivities(trip.id)
-      const now = new Date()
+      const nowDate = new Date()
+      const now = nowDate.toISOString()
       const startDate = trip.start_date ? new Date(trip.start_date) : null
       const endDate = trip.end_date ? new Date(trip.end_date) : null
 
       if (trip.status === 'planning' || trip.status === 'inbound') {
         if (bookedCount > 0) {
           // Has bookings — should be at least active
-          if (endDate && endDate < now) {
+          if (endDate && endDate < nowDate) {
             // End date passed — go straight to travelled
             await this.db.client.execute(sql`
               UPDATE trips SET status = 'travelled', last_status_change_at = ${now}, status_auto_transitioned_at = ${now}, updated_at = ${now}
@@ -290,7 +291,7 @@ export class TripLifecycleService {
             `)
             dateTransitions++
             this.logger.log(`Backfill: Trip ${trip.id} → travelled (had bookings, end date passed)`)
-          } else if (startDate && startDate <= now) {
+          } else if (startDate && startDate <= nowDate) {
             // Start date passed — should be travelling
             await this.db.client.execute(sql`
               UPDATE trips SET status = 'travelling', last_status_change_at = ${now}, status_auto_transitioned_at = ${now}, updated_at = ${now}
@@ -308,14 +309,14 @@ export class TripLifecycleService {
         if (bookedCount === 0) {
           await this.demoteToPlanning(trip.id)
           demoted++
-        } else if (endDate && endDate < now) {
+        } else if (endDate && endDate < nowDate) {
           await this.db.client.execute(sql`
             UPDATE trips SET status = 'travelled', last_status_change_at = ${now}, status_auto_transitioned_at = ${now}, updated_at = ${now}
             WHERE id = ${trip.id} AND status = 'active'
           `)
           dateTransitions++
           this.logger.log(`Backfill: Trip ${trip.id} → travelled (active, end date passed)`)
-        } else if (startDate && startDate <= now) {
+        } else if (startDate && startDate <= nowDate) {
           await this.db.client.execute(sql`
             UPDATE trips SET status = 'travelling', last_status_change_at = ${now}, status_auto_transitioned_at = ${now}, updated_at = ${now}
             WHERE id = ${trip.id} AND status = 'active'
@@ -324,7 +325,7 @@ export class TripLifecycleService {
           this.logger.log(`Backfill: Trip ${trip.id} → travelling (active, start date passed)`)
         }
       } else if (trip.status === 'travelling') {
-        if (endDate && endDate < now) {
+        if (endDate && endDate < nowDate) {
           await this.db.client.execute(sql`
             UPDATE trips SET status = 'travelled', last_status_change_at = ${now}, status_auto_transitioned_at = ${now}, updated_at = ${now}
             WHERE id = ${trip.id} AND status = 'travelling'

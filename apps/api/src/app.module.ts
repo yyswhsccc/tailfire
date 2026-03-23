@@ -57,6 +57,7 @@ import { SecurityAuditModule } from './security-audit/security-audit.module'
 import { ImpersonationModule } from './impersonation/impersonation.module'
 import { ApiHealthModule } from './api-health/api-health.module'
 import { SearchModule } from './search/search.module'
+import { ReportingModule } from './reporting/reporting.module'
 
 @Module({
   imports: [
@@ -206,6 +207,9 @@ import { SearchModule } from './search/search.module'
 
     // Super Search (cross-entity search across trips, contacts)
     SearchModule,
+
+    // Reporting system (catalog, query execution, PDF/CSV export)
+    ReportingModule,
   ],
   controllers: [AppController],
   providers: [
