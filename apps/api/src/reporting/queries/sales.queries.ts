@@ -178,6 +178,7 @@ export async function queryBookedSales(
     agentName: [row.agent_first_name, row.agent_last_name].filter(Boolean).join(' ') || null,
     clientName: [row.client_first_name, row.client_last_name].filter(Boolean).join(' ') || null,
     totalPriceCents: Number(row.total_price_cents ?? 0),
+    currency: 'CAD',
     activityCount: Number(row.activity_count ?? 0),
     travelerCount: Number(row.traveler_count ?? 0),
   }))
@@ -293,10 +294,11 @@ export async function queryDepartedSales(
     tripType: row.trip_type,
     bookedDate: row.booked_date ? String(row.booked_date) : null,
     departureDate: row.departure_date ? String(row.departure_date) : null,
-    endDate: row.end_date ? String(row.end_date) : null,
+    returnDate: row.end_date ? String(row.end_date) : null,
     agentName: [row.agent_first_name, row.agent_last_name].filter(Boolean).join(' ') || null,
     clientName: [row.client_first_name, row.client_last_name].filter(Boolean).join(' ') || null,
     totalPriceCents: Number(row.total_price_cents ?? 0),
+    currency: 'CAD',
     activityCount: Number(row.activity_count ?? 0),
     travelerCount: Number(row.traveler_count ?? 0),
   }))
@@ -400,6 +402,7 @@ export async function querySalesByAgent(
     bookingCount: Number(row.booking_count ?? 0),
     totalSalesCents: Number(row.total_sales_cents ?? 0),
     avgBookingValueCents: Number(row.avg_booking_value_cents ?? 0),
+    currency: 'CAD',
   }))
 
   // Summary: agency-wide totals
@@ -510,6 +513,7 @@ export async function querySalesByDestination(
     bookingCount: Number(row.booking_count ?? 0),
     totalSalesCents: Number(row.total_sales_cents ?? 0),
     travelerCount: Number(row.traveler_count ?? 0),
+    currency: 'CAD',
   }))
 
   // Summary
@@ -622,8 +626,9 @@ export async function querySalesBySupplier(
     activityType: row.activity_type,
     activityCount: Number(row.activity_count ?? 0),
     totalSalesCents: Number(row.total_sales_cents ?? 0),
-    totalCommissionCents: Number(row.total_commission_cents ?? 0),
+    commissionCents: Number(row.total_commission_cents ?? 0),
     netCommissionCents: Number(row.net_commission_cents ?? 0),
+    currency: 'CAD',
   }))
 
   // Summary
@@ -713,7 +718,8 @@ export async function queryBookingPipeline(
   const data = (dataResult as any[]).map((row: any) => ({
     status: row.status,
     tripCount: Number(row.trip_count ?? 0),
-    estimatedTotalCents: Number(row.estimated_total_cents ?? 0),
+    totalEstimatedCents: Number(row.estimated_total_cents ?? 0),
+    currency: 'CAD',
   }))
 
   // Summary: total across all statuses

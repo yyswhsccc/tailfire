@@ -82,6 +82,9 @@ export async function queryInsurancePenetration(
         WHERE tti.status IN ('selected_package', 'has_own_insurance')
       )::int AS covered_travelers,
       count(DISTINCT tt.id) FILTER (
+        WHERE tti.status = 'has_own_insurance'
+      )::int AS own_insurance_travelers,
+      count(DISTINCT tt.id) FILTER (
         WHERE tti.status = 'declined'
       )::int AS declined_travelers,
       count(DISTINCT tt.id) FILTER (
@@ -109,9 +112,10 @@ export async function queryInsurancePenetration(
   `)
 
   const data = (dataResult as any[]).map((row: any) => ({
-    monthLabel: row.month_label,
+    period: row.month_label,
     totalTravelers: Number(row.total_travelers ?? 0),
     coveredTravelers: Number(row.covered_travelers ?? 0),
+    ownInsuranceTravelers: Number(row.own_insurance_travelers ?? 0),
     declinedTravelers: Number(row.declined_travelers ?? 0),
     pendingTravelers: Number(row.pending_travelers ?? 0),
     penetrationRate: Number(row.penetration_rate ?? 0),
@@ -222,13 +226,12 @@ export async function queryInsuranceDeclines(
     referenceNumber: row.reference_number,
     departureDate: row.departure_date ? String(row.departure_date) : null,
     contactId: row.contact_id,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    travelerName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     declinedReason: row.declined_reason,
     declinedAt: row.declined_at ? String(row.declined_at) : null,
     acknowledgedAt: row.acknowledged_at ? String(row.acknowledged_at) : null,
-    notAcknowledged: row.not_acknowledged === true || row.not_acknowledged === 't',
+    isAcknowledged: row.acknowledged_at != null,
   }))
 
   // Summary
@@ -296,6 +299,7 @@ export async function queryInsuranceRevenue(
       tip.policy_type,
       count(DISTINCT tip.id)::int AS package_count,
       coalesce(sum(tip.premium_cents), 0)::bigint AS total_premium_cents,
+      coalesce(sum(tip.coverage_amount_cents), 0)::bigint AS total_coverage_cents,
       coalesce(selections.traveler_count, 0)::int AS traveler_selections
     FROM trip_insurance_packages tip
     JOIN trips t ON t.id = tip.trip_id
@@ -318,8 +322,10 @@ export async function queryInsuranceRevenue(
     packageName: row.package_name,
     policyType: row.policy_type,
     packageCount: Number(row.package_count ?? 0),
+    travelerCount: Number(row.traveler_selections ?? 0),
     totalPremiumCents: Number(row.total_premium_cents ?? 0),
-    travelerSelections: Number(row.traveler_selections ?? 0),
+    totalCoverageCents: Number(row.total_coverage_cents ?? 0),
+    currency: 'CAD',
   }))
 
   // Summary
@@ -418,9 +424,11 @@ export async function queryInsuranceByPolicyType(
   const data = (dataResult as any[]).map((row: any) => ({
     policyType: row.policy_type,
     packageCount: Number(row.package_count ?? 0),
+    travelerCount: Number(row.traveler_count ?? 0),
     totalPremiumCents: Number(row.total_premium_cents ?? 0),
     avgPremiumCents: Number(row.avg_premium_cents ?? 0),
-    travelerCount: Number(row.traveler_count ?? 0),
+    penetrationRate: 0,
+    currency: 'CAD',
   }))
 
   return { data, totalRows }
@@ -470,11 +478,14 @@ export async function queryInsuranceUnresolved(
       c.last_name,
       c.email,
       c.phone,
+      up.first_name AS agent_first_name,
+      up.last_name AS agent_last_name,
       tti.created_at AS pending_since
     FROM trip_traveler_insurance tti
     JOIN trips t ON t.id = tti.trip_id
     JOIN trip_travelers tt ON tt.id = tti.trip_traveler_id
     JOIN contacts c ON c.id = tt.contact_id
+    LEFT JOIN user_profiles up ON up.id = t.owner_id
     WHERE ${scope}
       AND tti.status = 'pending'
       AND t.status IN ('active', 'travelling')
@@ -492,10 +503,11 @@ export async function queryInsuranceUnresolved(
     departureDate: row.departure_date ? String(row.departure_date) : null,
     daysUntilDeparture: Number(row.days_until_departure ?? 0),
     contactId: row.contact_id,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    travelerName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     phone: row.phone,
+    agentName: row.agent_first_name ? [row.agent_first_name, row.agent_last_name].filter(Boolean).join(' ') : null,
+    status: 'pending',
     pendingSince: row.pending_since ? String(row.pending_since) : null,
   }))
 

@@ -145,7 +145,7 @@ export async function queryUpcomingDepartures(
     status: row.status,
     tripType: row.trip_type,
     departureDate: row.departure_date ? String(row.departure_date) : null,
-    endDate: row.end_date ? String(row.end_date) : null,
+    returnDate: row.end_date ? String(row.end_date) : null,
     daysUntilDeparture: Number(row.days_until_departure ?? 0),
     clientId: row.client_id,
     clientName: [row.client_first_name, row.client_last_name].filter(Boolean).join(' ') || null,
@@ -155,7 +155,10 @@ export async function queryUpcomingDepartures(
     travelerCount: Number(row.traveler_count ?? 0),
     totalExpectedCents: Number(row.total_expected_cents ?? 0),
     totalPaidCents: Number(row.total_paid_cents ?? 0),
+    outstandingCents: Number(row.total_expected_cents ?? 0) - Number(row.total_paid_cents ?? 0),
     paymentStatus: row.payment_status,
+    documentsComplete: false,
+    currency: 'CAD',
   }))
 
   // Summary
