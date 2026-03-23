@@ -30,6 +30,13 @@ export interface ReportQueryParams {
   filters?: Record<string, string>
 }
 
+// Structured summary item for summary cards
+export interface SummaryItem {
+  label: string
+  value: string
+  format?: 'currency' | 'number' | 'percent' | 'text'
+}
+
 // Response Envelope
 export interface ReportResponse<T> {
   reportSlug: string
@@ -42,6 +49,11 @@ export interface ReportResponse<T> {
   pageSize: number
   data: T[]
   summary?: Record<string, number | string>
+  summaryItems?: SummaryItem[]
+  /** Page-level totals (sum of current page rows) */
+  pageTotals?: Record<string, number | null>
+  /** Full dataset totals (sum across ALL rows, ignoring pagination) */
+  grandTotals?: Record<string, number | null>
 }
 
 // === Per-Report Row Types ===

@@ -146,8 +146,7 @@ export async function queryClientSpending(
 
   const data = (dataResult as any[]).map((row: any) => ({
     contactId: row.contact_id,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     tripCount: Number(row.trip_count ?? 0),
     totalSpendCents: Number(row.total_spend_cents ?? 0),
@@ -234,8 +233,7 @@ export async function queryRepeatClients(
 
   const data = (dataResult as any[]).map((row: any) => ({
     contactId: row.contact_id,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     tripCount: Number(row.trip_count ?? 0),
     avgDaysBetweenTrips: row.avg_days_between_trips != null ? Number(row.avg_days_between_trips) : null,
@@ -319,8 +317,7 @@ export async function queryDormantClients(
 
   const data = (dataResult as any[]).map((row: any) => ({
     contactId: row.contact_id,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     phone: row.phone,
     tripCount: Number(row.trip_count ?? 0),
@@ -398,8 +395,7 @@ export async function queryPassportExpiry(
 
   const data = (dataResult as any[]).map((row: any) => ({
     contactId: row.contact_id,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     phone: row.phone,
     passportNumber: row.passport_number,
@@ -476,8 +472,7 @@ export async function queryUpcomingBirthdays(
 
   const data = (dataResult as any[]).map((row: any) => ({
     contactId: row.contact_id,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     phone: row.phone,
     dateOfBirth: row.date_of_birth ? String(row.date_of_birth) : null,
@@ -552,8 +547,7 @@ export async function queryNewClients(
 
   const data = (dataResult as any[]).map((row: any) => ({
     contactId: row.contact_id,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     phone: row.phone,
     contactType: row.contact_type,
@@ -587,7 +581,7 @@ export async function queryClientCompleteness(
 
   const sortCol = options.sortBy === 'completenessScore'
     ? sql`completeness_score`
-    : options.sortBy === 'lastName'
+    : options.sortBy === 'clientName'
       ? sql`c.last_name`
       : sql`completeness_score`
   const sortDir = options.sortOrder === 'desc' ? sql`DESC` : sql`ASC`
@@ -632,8 +626,7 @@ export async function queryClientCompleteness(
 
     return {
       contactId: row.contact_id,
-      firstName: row.first_name,
-      lastName: row.last_name,
+      clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
       email: row.email,
       completenessScore: Number(row.completeness_score ?? 0),
       missingFields: missing,
@@ -745,8 +738,7 @@ export async function queryTopClientsRevenue(
 
   const data = (dataResult as any[]).map((row: any) => ({
     contactId: row.contact_id,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     phone: row.phone,
     tripCount: Number(row.trip_count ?? 0),

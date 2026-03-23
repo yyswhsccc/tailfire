@@ -5,13 +5,22 @@ import Link from 'next/link'
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useUser } from '@/hooks/use-user'
 import { useReport, useReportCatalog } from '@/hooks/use-reporting'
 import { DateRangePicker } from './date-range-picker'
 import { ReportTable, type ReportColumnDef } from './report-table'
 import { ReportExportButtons } from './report-export-buttons'
 import { ReportFilters } from './report-filters'
-import type { DatePreset, ReportQueryParams } from '@tailfire/shared-types/api'
+import { ReportSummaryCards } from './report-summary-cards'
+import { REPORT_MANIFEST } from '../_lib/report-manifest'
+import type { DatePreset, ReportQueryParams, SummaryItem } from '@tailfire/shared-types/api'
 
 interface ReportViewProps {
   slug: string
@@ -62,7 +71,7 @@ export function ReportView({ slug }: ReportViewProps) {
   const [endDate, setEndDate] = useState(initial.endDate)
   const [preset, setPreset] = useState<DatePreset>('mtd')
   const [page, setPage] = useState(1)
-  const [pageSize] = useState(50)
+  const [pageSize, setPageSize] = useState(50)
   const [sortBy, setSortBy] = useState<string | undefined>()
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [viewScope, setViewScope] = useState<'my' | 'agency'>('agency')
@@ -85,11 +94,57 @@ export function ReportView({ slug }: ReportViewProps) {
 
   const { data: reportData, isLoading, isError, isFetching } = useReport(slug, queryParams)
 
-  // Derive columns from data
+  // Use manifest columns if available, fall back to deriving from data
+  const manifest = REPORT_MANIFEST[slug]
+
   const columns = useMemo<ReportColumnDef[]>(() => {
+    if (manifest) {
+      return manifest.columns.map((col) => ({
+        key: col.key,
+        label: col.label,
+        align: col.align,
+        mono: col.mono ?? col.format === 'currency',
+      }))
+    }
     const rows = (reportData?.data ?? []) as Record<string, unknown>[]
     return deriveColumns(rows)
-  }, [reportData?.data])
+  }, [manifest, reportData?.data])
+
+  // Build summary items from API response or manifest + grand totals
+  // Summary cards always show full-dataset values (grandTotals), not page values
+  const summaryItems = useMemo<SummaryItem[]>(() => {
+    // Prefer structured summaryItems from API
+    if (reportData?.summaryItems && reportData.summaryItems.length > 0) {
+      return reportData.summaryItems
+    }
+
+    // Build from manifest summary cards + API grand totals (full dataset)
+    if (manifest?.summaryCards && reportData) {
+      const apiTotals = reportData.grandTotals ?? reportData.pageTotals ?? {}
+      const items: SummaryItem[] = []
+
+      for (const card of manifest.summaryCards) {
+        let value: string
+        if (card.key === '_rowCount') {
+          value = String(reportData.totalRows)
+        } else if (apiTotals[card.key] != null) {
+          value = String(apiTotals[card.key])
+        } else if (reportData.summary && reportData.summary[card.key] != null) {
+          value = String(reportData.summary[card.key])
+        } else {
+          continue
+        }
+        items.push({
+          label: card.label,
+          value,
+          format: card.format === 'currency' ? 'currency' : card.format === 'percent' ? 'percent' : 'number',
+        })
+      }
+      return items
+    }
+
+    return []
+  }, [reportData, manifest])
 
   const totalPages = useMemo(() => {
     if (!reportData) return 1
@@ -126,6 +181,18 @@ export function ReportView({ slug }: ReportViewProps) {
     },
     [],
   )
+
+  const handlePageSizeChange = useCallback(
+    (value: string) => {
+      const newSize = value === 'all' ? 0 : Number(value)
+      setPageSize(newSize)
+      setPage(1)
+    },
+    [],
+  )
+
+  // For "Show All" (pageSize=0), the API returns all rows on page 1
+  const showingAll = pageSize === 0
 
   // Loading catalog
   if (!catalog) {
@@ -209,30 +276,8 @@ export function ReportView({ slug }: ReportViewProps) {
         </div>
       )}
 
-      {/* Summary metrics */}
-      {reportData?.summary && Object.keys(reportData.summary).length > 0 && (
-        <div className="flex flex-wrap gap-4">
-          {Object.entries(reportData.summary).map(([key, value]) => {
-            const isCents = /[Cc]ents$/.test(key) || /[Pp]rice$/.test(key)
-            const displayValue = isCents
-              ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
-                  Number(value) / 100,
-                )
-              : String(value)
-            const displayLabel = key
-              .replace(/([A-Z])/g, ' $1')
-              .replace(/^./, (s) => s.toUpperCase())
-              .trim()
-
-            return (
-              <div key={key} className="rounded-md border bg-muted/30 px-4 py-2">
-                <p className="text-xs text-muted-foreground">{displayLabel}</p>
-                <p className="text-lg font-semibold font-mono tabular-nums">{displayValue}</p>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {/* Summary cards (top) */}
+      <ReportSummaryCards items={summaryItems} />
 
       {/* Table */}
       <ReportTable
@@ -242,6 +287,9 @@ export function ReportView({ slug }: ReportViewProps) {
         sortOrder={sortOrder}
         onSort={handleSort}
         isLoading={isLoading}
+        pageTotals={reportData?.pageTotals}
+        grandTotals={reportData?.grandTotals}
+        totalPages={totalPages}
       />
 
       {/* Footer: Pagination + Export */}
@@ -254,8 +302,27 @@ export function ReportView({ slug }: ReportViewProps) {
             </p>
           )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
+          {/* Page size selector */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Show</span>
+            <Select
+              value={pageSize === 0 ? 'all' : String(pageSize)}
+              onValueChange={handlePageSizeChange}
+            >
+              <SelectTrigger className="h-8 w-[70px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Pagination — hidden when showing all */}
+          {!showingAll && totalPages > 1 && (
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"

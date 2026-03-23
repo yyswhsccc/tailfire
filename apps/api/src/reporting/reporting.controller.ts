@@ -340,12 +340,39 @@ export class ReportingController {
   // -------------------------------------------------------------------------
 
   @Get(':slug')
-  runReport(
+  async runReport(
     @Param('slug') slug: string,
     @GetAuthContext() auth: AuthContext,
     @Query() query: ReportQueryDto,
   ) {
-    return this.reporting.runReport(slug, auth, query)
+    // pageSize=0 means "show all rows" — use a large page size
+    if (query.pageSize === 0) {
+      query.pageSize = 100000
+    }
+
+    const result = await this.reporting.runReport(slug, auth, query)
+
+    // Compute page totals, grand totals, and summaryItems from column definitions
+    const columns = this.getColumnsForReport(slug)
+    if (columns && Array.isArray(result.data) && result.data.length > 0) {
+      result.pageTotals = this.computePageTotals(result.data as any[], columns)
+      result.grandTotals = this.buildGrandTotals(
+        slug,
+        result.summary ?? {},
+        columns,
+        result.data as any[],
+        result.totalRows,
+        result.pageSize,
+      )
+      result.summaryItems = this.buildSummaryItems(
+        result.data as any[],
+        columns,
+        result.totalRows,
+        result.summary,
+      )
+    }
+
+    return result
   }
 
   // -------------------------------------------------------------------------
@@ -498,6 +525,194 @@ export class ReportingController {
       rows: exportRows,
       summaryItems: summaryItems.length > 0 ? summaryItems : undefined,
     }
+  }
+
+  /**
+   * Determine if a column key represents a summable financial or count field.
+   */
+  private isSummableColumn(key: string): boolean {
+    return (
+      /[Cc]ents$/.test(key) ||
+      /[Pp]rice$/.test(key) ||
+      /[Cc]ount$/.test(key)
+    )
+  }
+
+  /**
+   * Determine if a column key represents an averageable field (rates, scores).
+   */
+  private isAverageableColumn(key: string): boolean {
+    return /[Rr]ate$/.test(key) || /[Ss]core$/.test(key)
+  }
+
+  /**
+   * Compute column totals from current page data rows.
+   */
+  private computePageTotals(
+    data: any[],
+    columns: ColumnDef[],
+  ): Record<string, number | null> {
+    const totals: Record<string, number | null> = {}
+
+    for (const col of columns) {
+      if (this.isSummableColumn(col.key)) {
+        totals[col.key] = data.reduce(
+          (sum, row) => sum + (Number(row[col.key]) || 0),
+          0,
+        )
+      } else if (this.isAverageableColumn(col.key)) {
+        const values = data
+          .map((row) => Number(row[col.key]))
+          .filter((v) => !isNaN(v))
+        totals[col.key] =
+          values.length > 0
+            ? Math.round(
+                (values.reduce((a, b) => a + b, 0) / values.length) * 100,
+              ) / 100
+            : null
+      } else {
+        totals[col.key] = null
+      }
+    }
+
+    return totals
+  }
+
+  /**
+   * Summary-key to column-key mapping per report slug.
+   * Maps summary field names (from DB queries) to the column keys used in the table.
+   */
+  private static readonly SUMMARY_TO_COLUMN_MAP: Record<string, Record<string, string>> = {
+    'booked-sales': {
+      totalSalesCents: 'totalPriceCents',
+      totalBookings: '_rowCount',
+    },
+    'departed-sales': {
+      totalSalesCents: 'totalPriceCents',
+      totalBookings: '_rowCount',
+    },
+    'sales-by-agent': {
+      totalSalesCents: 'totalSalesCents',
+      totalBookings: 'bookingCount',
+    },
+    'sales-by-destination': {
+      totalSalesCents: 'totalSalesCents',
+      totalBookings: 'bookingCount',
+    },
+    'booked-sales-by-supplier': {
+      totalSalesCents: 'totalSalesCents',
+      totalCommissionCents: 'commissionCents',
+      totalActivities: 'activityCount',
+    },
+    'departed-sales-by-supplier': {
+      totalSalesCents: 'totalSalesCents',
+      totalCommissionCents: 'commissionCents',
+      totalActivities: 'activityCount',
+    },
+    'booking-pipeline': {
+      estimatedTotalCents: 'totalEstimatedCents',
+      totalTrips: 'tripCount',
+    },
+    'commission-aging': {
+      totalOutstanding: 'outstandingCents',
+    },
+    'commission-reconciliation': {
+      totalCheckAmount: 'checkAmountCents',
+      totalMatched: 'matchedAmountCents',
+      totalUnmatched: 'unmatchedAmountCents',
+      totalChecks: 'itemCount',
+    },
+    'payment-schedule': {
+      totalExpected: 'amountCents',
+      totalPaid: 'paidCents',
+      totalRemaining: 'remainingCents',
+    },
+    'agent-commission-statement': {
+      totalSalesCents: 'totalSalesCents',
+      totalGrossCommission: 'grossCommissionCents',
+      totalReceived: 'receivedCents',
+      totalPaidToAgents: 'paidToAgentCents',
+      totalPending: 'pendingCents',
+    },
+    'upcoming-departures': {},
+    'ontario-gross-sales': {
+      // Summary keys would need separate mapping if available
+    },
+  }
+
+  /**
+   * Build grand totals (full dataset) from the summary data returned by DB queries.
+   * Falls back to page totals when data fits on a single page.
+   */
+  private buildGrandTotals(
+    slug: string,
+    summary: Record<string, any>,
+    columns: ColumnDef[],
+    pageData: any[],
+    totalRows: number,
+    pageSize: number,
+  ): Record<string, number | null> {
+    // If all data fits on one page, page totals ARE grand totals
+    if (totalRows <= pageSize) {
+      return this.computePageTotals(pageData, columns)
+    }
+
+    const grandTotals: Record<string, number | null> = {}
+    const mapping = ReportingController.SUMMARY_TO_COLUMN_MAP[slug] ?? {}
+
+    // Build reverse lookup: column key -> summary value for this report
+    const summaryByColumn: Record<string, number> = {}
+    for (const [summaryKey, colKey] of Object.entries(mapping)) {
+      if (summary[summaryKey] != null && colKey !== '_rowCount') {
+        summaryByColumn[colKey] = Number(summary[summaryKey])
+      }
+    }
+
+    for (const col of columns) {
+      if (summaryByColumn[col.key] != null) {
+        grandTotals[col.key] = summaryByColumn[col.key]
+      } else if (this.isSummableColumn(col.key) || this.isAverageableColumn(col.key)) {
+        // No summary data available for this column — set null to indicate unknown
+        grandTotals[col.key] = null
+      } else {
+        grandTotals[col.key] = null
+      }
+    }
+
+    return grandTotals
+  }
+
+  /**
+   * Build structured summary items for frontend summary cards.
+   */
+  private buildSummaryItems(
+    data: any[],
+    columns: ColumnDef[],
+    totalRows: number,
+    existingSummary?: Record<string, number | string>,
+  ): { label: string; value: string; format?: 'currency' | 'number' | 'percent' | 'text' }[] {
+    const items: { label: string; value: string; format?: 'currency' | 'number' | 'percent' | 'text' }[] = []
+
+    // Use existing summary values if available, converting to structured items
+    if (existingSummary) {
+      for (const [key, value] of Object.entries(existingSummary)) {
+        const isCents =
+          /[Cc]ents$/.test(key) || /[Pp]rice$/.test(key)
+        const isRate = /[Rr]ate$/.test(key) || /[Ss]core$/.test(key)
+        const label = key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, (s) => s.toUpperCase())
+          .trim()
+
+        items.push({
+          label,
+          value: String(value),
+          format: isCents ? 'currency' : isRate ? 'percent' : 'number',
+        })
+      }
+    }
+
+    return items
   }
 
   /**
