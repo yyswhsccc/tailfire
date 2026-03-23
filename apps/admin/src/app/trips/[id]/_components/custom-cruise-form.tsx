@@ -6,7 +6,7 @@ import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { useSearchParams } from 'next/navigation'
 import { useForm, useWatch } from 'react-hook-form'
-import { Ship, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, DollarSign, FileText, ImageIcon, Calendar, Anchor, RefreshCw, CalendarCheck, Plus, Trash2 } from 'lucide-react'
+import { Ship, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, DollarSign, FileText, ImageIcon, Calendar, Anchor, RefreshCw, Plus, Trash2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
@@ -25,11 +25,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
 import { useCreateCustomCruise, useUpdateCustomCruise, useCustomCruise, useGenerateCruisePortSchedule, useCruisePortSchedule } from '@/hooks/use-custom-cruise'
-import { useMarkActivityBooked } from '@/hooks/use-activity-bookings'
 import { useIsChildOfPackage } from '@/hooks/use-is-child-of-package'
 import { useBookings } from '@/hooks/use-bookings'
-import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
-import { ChildOfPackageBookingSection } from '@/components/activities/child-of-package-booking-section'
+import { useQueryClient } from '@tanstack/react-query'
+import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { CruisePassengersSection } from './cruise-passengers-section'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
@@ -199,9 +198,9 @@ export function CustomCruiseForm({
   const [supplierCommissionRate, setSupplierCommissionRate] = useState<number | null>(null)
 
   // Booking status state
-  const [showBookingModal, setShowBookingModal] = useState(false)
   const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
+  const queryClient = useQueryClient()
 
   // Auto-save state
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -217,33 +216,6 @@ export function CustomCruiseForm({
 
   // Query for existing port schedule
   const { data: portSchedule } = useCruisePortSchedule(activityId || undefined)
-
-  // Booking status mutation
-  const markActivityBooked = useMarkActivityBooked()
-
-  // Handler for marking cruise as booked
-  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
-    if (!activityId) {
-      throw new Error('Activity must be saved before marking as booked')
-    }
-
-    const result = await markActivityBooked.mutateAsync({
-      activityId,
-      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
-    })
-
-    // Update local state - preserve YYYY-MM-DD format
-    setActivityIsBooked(true)
-    setActivityBookingDate(newBookingDate)
-
-    // Show warning if payment schedule is missing
-    if (result.paymentScheduleMissing) {
-      toast({
-        title: 'Payment schedule missing',
-        description: 'This activity is booked but has no payment schedule configured.',
-      })
-    }
-  }
 
   // Trip month hint for date picker calendar default
   const tripMonthHint = useMemo(
@@ -957,7 +929,7 @@ export function CustomCruiseForm({
 
           <div className="flex items-center gap-6 flex-wrap">
             {/* Travelers */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" data-field="travelers">
               <span className="text-sm text-gray-600">Travelers ({travelers.length} of {totalTravelers})</span>
               <div className="flex -space-x-2">
                 {travelers.map((traveler: any) => (
@@ -1031,6 +1003,34 @@ export function CustomCruiseForm({
             </>
           )}
         </div>
+
+        {/* Booking Button */}
+        <BookingHeaderButton
+          activityId={activityId}
+          activityName={displayName || 'Cruise'}
+          activityType="custom_cruise"
+          isBooked={activityIsBooked}
+          bookingDate={activityBookingDate}
+          isChildOfPackage={isChildOfPackage}
+          parentPackageId={parentPackageId}
+          parentPackageName={parentPackageName}
+          tripId={trip?.id || ''}
+          onNavigateToTab={(tab) => { if (tab) setActiveTab(tab) }}
+          onBooked={() => {
+            setActivityIsBooked(true)
+            setActivityBookingDate(new Date().toISOString().split('T')[0] ?? null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+          onUnbooked={() => {
+            setActivityIsBooked(false)
+            setActivityBookingDate(null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+        />
       </div>
 
       {/* Tabbed Interface - 5 tabs */}
@@ -1356,7 +1356,7 @@ export function CustomCruiseForm({
                     />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-field="startDatetime">
                     <label className="text-sm font-medium text-gray-700">Date</label>
                     <DatePickerEnhanced
                       value={departureDateValue || undefined}
@@ -1441,7 +1441,7 @@ export function CustomCruiseForm({
                     />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-field="endDatetime">
                     <label className="text-sm font-medium text-gray-700">Date</label>
                     <DatePickerEnhanced
                       value={arrivalDateValue || undefined}
@@ -2240,54 +2240,6 @@ export function CustomCruiseForm({
 
           <Separator />
 
-          {/* Booking Status Section */}
-          {isChildOfPackage && parentPackageId ? (
-            <ChildOfPackageBookingSection
-              parentPackageId={parentPackageId}
-              parentPackageName={parentPackageName}
-              tripId={trip?.id || ''}
-              activityIsBooked={activityIsBooked}
-              activityBookingDate={activityBookingDate}
-            />
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CalendarCheck className="h-5 w-5" />
-                  Booking Status
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Current Status</p>
-                    <div className="mt-1">
-                      <BookingStatusBadge
-                        isBooked={activityIsBooked}
-                        bookingDate={activityBookingDate}
-                      />
-                    </div>
-                  </div>
-                  {activityId && !activityIsBooked && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowBookingModal(true)}
-                      className="flex items-center gap-2"
-                    >
-                      <CalendarCheck className="h-4 w-4" />
-                      Mark As Booked
-                    </Button>
-                  )}
-                </div>
-                {!activityId && (
-                  <p className="text-sm text-gray-500">
-                    Save the cruise first to mark it as booked.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         <TabsContent value="comments" className="mt-6">
@@ -2339,16 +2291,6 @@ export function CustomCruiseForm({
         />
       )}
 
-      {/* Mark As Booked Modal */}
-      <MarkActivityBookedModal
-        open={showBookingModal}
-        onOpenChange={setShowBookingModal}
-        activityName={currentValues.name || 'Cruise'}
-        isBooked={activityIsBooked}
-        currentBookingDate={activityBookingDate}
-        onConfirm={handleMarkAsBooked}
-        isPending={markActivityBooked.isPending}
-      />
     </div>
   )
 }
