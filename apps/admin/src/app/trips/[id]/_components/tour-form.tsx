@@ -43,9 +43,7 @@ import { TimePicker } from '@/components/ui/time-picker'
 import { DocumentUploader } from '@/components/document-uploader'
 import { ComponentMediaTab } from '@/components/shared'
 import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
-import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
-import { ChildOfPackageBookingSection } from '@/components/activities/child-of-package-booking-section'
-import { useMarkActivityBooked } from '@/hooks/use-activity-bookings'
+import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import { useBookings } from '@/hooks/use-bookings'
 import {
   tourFormSchema,
@@ -183,7 +181,6 @@ export function TourForm({
   // Booking status tracking
   const [isBooked, setIsBooked] = useState<boolean>(false)
   const [bookingDate, setBookingDate] = useState<string | null>(null)
-  const [showBookingModal, setShowBookingModal] = useState(false)
 
   // Package linkage state for PricingSection
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
@@ -305,7 +302,6 @@ export function TourForm({
   // Mutations
   const createTour = useCreateTour(itineraryId, effectiveDayId)
   const updateTour = useUpdateTour(itineraryId, effectiveDayId)
-  const markActivityBooked = useMarkActivityBooked()
 
   // Import Amadeus pictures to media tab
   const importPicturesToMedia = useCallback(async (targetActivityId: string, pictures: string[]) => {
@@ -650,29 +646,6 @@ export function TourForm({
     }
   }
 
-  // Handle marking activity as booked
-  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
-    if (!activityId) {
-      throw new Error('Activity must be saved before marking as booked')
-    }
-
-    const result = await markActivityBooked.mutateAsync({
-      activityId,
-      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
-    })
-
-    // Update local state - preserve YYYY-MM-DD format
-    setIsBooked(true)
-    setBookingDate(newBookingDate)
-
-    // Show warning if payment schedule is missing
-    if (result.paymentScheduleMissing) {
-      toast({
-        title: 'Payment schedule missing',
-        description: 'This activity is booked but has no payment schedule configured. Consider adding one in the Payments tab.',
-      })
-    }
-  }
 
   // Tag management helpers
   const addTag = (field: 'tourDetails.inclusions' | 'tourDetails.exclusions' | 'tourDetails.whatToBring', value: string) => {
@@ -736,7 +709,7 @@ export function TourForm({
 
           <div className="flex items-center gap-6 flex-wrap">
             {/* Travelers */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" data-field="travelers">
               <span className="text-sm text-gray-600">Travelers ({travelers.length} of {totalTravelers})</span>
               <div className="flex -space-x-2">
                 {travelers.map((traveler: any) => (
@@ -810,6 +783,34 @@ export function TourForm({
             </>
           )}
         </div>
+
+        {/* Booking Button */}
+        <BookingHeaderButton
+          activityId={activityId}
+          activityName={displayName || 'Tour'}
+          activityType="tour"
+          isBooked={isBooked}
+          bookingDate={bookingDate}
+          isChildOfPackage={isChildOfPackage}
+          parentPackageId={parentPackageId}
+          parentPackageName={parentPackageName}
+          tripId={trip?.id || ''}
+          onNavigateToTab={(tab) => { if (tab) setActiveTab(tab) }}
+          onBooked={() => {
+            setIsBooked(true)
+            setBookingDate(new Date().toISOString().split('T')[0] ?? null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+          onUnbooked={() => {
+            setIsBooked(false)
+            setBookingDate(null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+        />
       </div>
 
       {/* Tabbed Interface */}
@@ -995,7 +996,7 @@ export function TourForm({
             <h3 className="text-lg font-semibold">Tour Schedule</h3>
 
             <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2" data-field="tourDetails.tourDate">
+              <div className="space-y-2" data-field="startDatetime">
                 <label className="text-sm font-medium text-gray-700">Date</label>
                 <DatePickerEnhanced
                   value={tourDateValue}
@@ -1335,54 +1336,6 @@ export function TourForm({
         </TabsContent>
 
         <TabsContent value="booking" className="mt-6 space-y-6">
-          {/* Booking Status Section */}
-          {isChildOfPackage && parentPackageId ? (
-            <ChildOfPackageBookingSection
-              parentPackageId={parentPackageId}
-              parentPackageName={parentPackageName}
-              tripId={trip?.id || ''}
-              activityIsBooked={isBooked}
-              activityBookingDate={bookingDate}
-            />
-          ) : (
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold">Booking Status</h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {isBooked
-                      ? `This tour was marked as booked on ${bookingDate ? new Date(bookingDate).toLocaleDateString() : 'an unknown date'}.`
-                      : 'This tour has not been marked as booked yet. Mark it as booked when confirmed with the supplier.'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <BookingStatusBadge
-                    isBooked={isBooked}
-                    bookingDate={bookingDate}
-                    onClick={() => setShowBookingModal(true)}
-                  />
-                  {!isBooked && activityId && (
-                    <Button
-                      variant="default"
-                      className="bg-green-600 hover:bg-green-700"
-                      onClick={() => setShowBookingModal(true)}
-                    >
-                      <Check className="h-4 w-4 mr-2" />
-                      Mark as Booked
-                    </Button>
-                  )}
-                </div>
-              </div>
-              {!activityId && (
-                <p className="text-sm text-amber-600 mt-2">
-                  Save the tour first before marking it as booked.
-                </p>
-              )}
-            </div>
-          )}
-
-          <Separator />
-
           {/* Pricing Section */}
           <PricingSection
             pricingData={pricingData}
@@ -1486,16 +1439,6 @@ export function TourForm({
         />
       )}
 
-      {/* Mark as Booked Modal */}
-      <MarkActivityBookedModal
-        open={showBookingModal}
-        onOpenChange={setShowBookingModal}
-        activityName={getValues('tourDetails.tourName') || 'Tour'}
-        isBooked={isBooked}
-        currentBookingDate={bookingDate}
-        onConfirm={handleMarkAsBooked}
-        isPending={markActivityBooked.isPending}
-      />
     </div>
   )
 }

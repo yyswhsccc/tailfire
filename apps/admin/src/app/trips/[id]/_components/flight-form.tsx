@@ -8,7 +8,7 @@ import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useForm, useWatch, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plane, ChevronDown, ChevronUp, Sparkles, Plus, MoreVertical, Loader2, Check, AlertCircle, X, Trash2, CalendarCheck, Pencil } from 'lucide-react'
+import { Plane, ChevronDown, ChevronUp, Sparkles, Plus, MoreVertical, Loader2, Check, AlertCircle, X, Trash2, Pencil } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
@@ -40,9 +40,8 @@ import {
   useExternalFlightSearchWithProvider,
 } from '@/hooks/use-flights'
 import { useIsChildOfPackage } from '@/hooks/use-is-child-of-package'
-import { useMarkActivityBooked } from '@/hooks/use-activity-bookings'
-import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
-import { ChildOfPackageBookingSection } from '@/components/activities/child-of-package-booking-section'
+import { useQueryClient } from '@tanstack/react-query'
+import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import type { NormalizedFlightStatus, NormalizedFlightOffer } from '@tailfire/shared-types/api'
 import { FlightOffersSearchPanel } from '@/components/flight-offers-search-panel'
 import { normalizedTimeToFormFields } from '@/lib/flight-time-utils'
@@ -216,12 +215,11 @@ export function FlightForm({
     return tabParam === 'booking' ? 'booking' : 'general'
   })
 
-  // Booking status state
-  const [showBookingModal, setShowBookingModal] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
   const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
+  const queryClient = useQueryClient()
 
   // Package linkage state
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
@@ -421,32 +419,6 @@ export function FlightForm({
   const createMutation = useCreateFlight(itineraryId, effectiveDayId)
   const updateMutation = useUpdateFlight(itineraryId, effectiveDayId)
 
-  // Booking status mutation
-  const markActivityBooked = useMarkActivityBooked()
-
-  // Handler for marking flight as booked
-  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
-    if (!activityId) {
-      throw new Error('Activity must be saved before marking as booked')
-    }
-
-    const result = await markActivityBooked.mutateAsync({
-      activityId,
-      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
-    })
-
-    // Update local state - preserve YYYY-MM-DD format
-    setActivityIsBooked(true)
-    setActivityBookingDate(newBookingDate)
-
-    // Show warning if payment schedule is missing
-    if (result.paymentScheduleMissing) {
-      toast({
-        title: 'Payment schedule missing',
-        description: 'This activity is booked but has no payment schedule configured.',
-      })
-    }
-  }
 
   // Trip month hint for date pickers (opens calendar to trip's month)
   const tripMonthHint = useMemo(
@@ -1136,7 +1108,7 @@ export function FlightForm({
 
           <div className="flex items-center gap-6 flex-wrap">
             {/* Travelers */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" data-field="travelers">
               <span className="text-sm text-gray-600">Travelers ({travelers.length} of {totalTravelers})</span>
               <div className="flex -space-x-2">
                 {travelers.map((traveler) => (
@@ -1210,6 +1182,34 @@ export function FlightForm({
             </>
           )}
         </div>
+
+        {/* Booking Button */}
+        <BookingHeaderButton
+          activityId={activityId}
+          activityName={displayTitle || 'Flight'}
+          activityType="flight"
+          isBooked={activityIsBooked}
+          bookingDate={activityBookingDate}
+          isChildOfPackage={isChildOfPackage}
+          parentPackageId={parentPackageId}
+          parentPackageName={parentPackageName}
+          tripId={trip?.id || ''}
+          onNavigateToTab={(tab) => { if (tab) setActiveTab(tab) }}
+          onBooked={() => {
+            setActivityIsBooked(true)
+            setActivityBookingDate(new Date().toISOString().split('T')[0] ?? null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+          onUnbooked={() => {
+            setActivityIsBooked(false)
+            setActivityBookingDate(null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+        />
       </div>
 
       {/* Tabbed Interface */}
@@ -1712,6 +1712,7 @@ export function FlightForm({
                       </div>
 
                       {/* Flight Dates - no nested Controllers, direct useWatch values */}
+                      <div data-field="startDatetime">
                       <DateRangeInput
                         fromValue={departureDateValue}
                         toValue={arrivalDateValue}
@@ -1727,6 +1728,7 @@ export function FlightForm({
                         fromPlaceholder="YYYY-MM-DD"
                         toPlaceholder="YYYY-MM-DD"
                       />
+                      </div>
                       <div className="flex gap-4 mt-1">
                         <div className="flex-1">
                           <TripDateWarning
@@ -1954,47 +1956,6 @@ export function FlightForm({
         </TabsContent>
 
         <TabsContent value="booking" className="mt-6 space-y-6">
-          {/* Booking Status Section */}
-          {isChildOfPackage && parentPackageId ? (
-            <ChildOfPackageBookingSection
-              parentPackageId={parentPackageId}
-              parentPackageName={parentPackageName}
-              tripId={trip?.id || ''}
-              activityIsBooked={activityIsBooked}
-              activityBookingDate={activityBookingDate}
-            />
-          ) : activityId ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CalendarCheck className="h-5 w-5 text-gray-500" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">Booking Status</h3>
-                    <p className="text-xs text-gray-500">
-                      Mark this flight as booked when it&apos;s been confirmed
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <BookingStatusBadge
-                    isBooked={activityIsBooked}
-                    bookingDate={activityBookingDate}
-                    onClick={() => setShowBookingModal(true)}
-                  />
-                  <Button
-                    type="button"
-                    variant={activityIsBooked ? 'outline' : 'default'}
-                    size="sm"
-                    onClick={() => setShowBookingModal(true)}
-                    className={activityIsBooked ? '' : 'bg-green-600 hover:bg-green-700'}
-                  >
-                    {activityIsBooked ? 'Update Booking' : 'Mark as Booked'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
           {/* Pricing Section */}
           <PricingSection
             pricingData={pricingData}
@@ -2079,17 +2040,6 @@ export function FlightForm({
           trip={trip}
         />
       )}
-
-      {/* Mark As Booked Modal */}
-      <MarkActivityBookedModal
-        open={showBookingModal}
-        onOpenChange={setShowBookingModal}
-        activityName="Flight"
-        isBooked={activityIsBooked}
-        currentBookingDate={activityBookingDate}
-        onConfirm={handleMarkAsBooked}
-        isPending={markActivityBooked.isPending}
-      />
 
     </div>
   )

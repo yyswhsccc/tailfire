@@ -9,17 +9,19 @@
  * - Booking = A status applied to an activity (bookingStatus field + bookingDate)
  */
 
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
-import { sql } from 'drizzle-orm'
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common'
+import { sql, and, eq } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { ActivitiesService } from './activities.service'
 import { BookingValidationService } from './booking-validation.service'
 import { TripLifecycleService } from './trip-lifecycle.service'
+import { TasksService } from '../tasks/tasks.service'
 import type {
   MarkActivityBookedDto,
   ActivityBookingsFilterDto,
   ActivityBookingResponseDto,
   ActivityBookingsListResponseDto,
+  BookingValidationResult,
 } from '@tailfire/shared-types'
 
 @Injectable()
@@ -29,6 +31,8 @@ export class ActivityBookingsService {
     private readonly activitiesService: ActivitiesService,
     private readonly bookingValidationService: BookingValidationService,
     private readonly tripLifecycleService: TripLifecycleService,
+    @Inject(forwardRef(() => TasksService))
+    private readonly tasksService: TasksService,
   ) {}
 
   /**
@@ -79,6 +83,35 @@ export class ActivityBookingsService {
     // Evaluate trip lifecycle — first booking may promote planning → active
     await this.tripLifecycleService.onActivityBooked(activityId)
 
+    // Count cascaded children for package bookings
+    let cascadedCount = 0
+    if (activity.activityType === 'package') {
+      const result = await this.db.client
+        .select({ count: sql`count(*)::int` })
+        .from(this.db.schema.itineraryActivities)
+        .where(
+          and(
+            eq(this.db.schema.itineraryActivities.parentActivityId, activityId),
+            eq(this.db.schema.itineraryActivities.bookingStatus, 'booked')
+          )
+        )
+      cascadedCount = (result as any)[0]?.count ?? 0
+    }
+
+    // Auto-create insurance review task
+    const [tripForTask] = await this.db.client
+      .select({ agencyId: this.db.schema.trips.agencyId })
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.id, activity.tripId))
+      .limit(1)
+
+    if (tripForTask) {
+      await this.createInsuranceTaskIfNeeded(
+        activity.tripId, activityId, activity.name, bookingDate,
+        tripForTask.agencyId, actorId || ''
+      )
+    }
+
     // Check payment schedule status
     const paymentScheduleMissing = await this.getPaymentScheduleMissing(activityId)
 
@@ -92,7 +125,15 @@ export class ActivityBookingsService {
       paymentScheduleMissing,
       bookable: true,
       blockedReason: null,
+      cascadedCount,
     }
+  }
+
+  /**
+   * Validate booking requirements without changing state (dry run)
+   */
+  async validateBooking(activityId: string): Promise<BookingValidationResult> {
+    return this.bookingValidationService.validateBooking(activityId)
   }
 
   /**
@@ -220,6 +261,90 @@ export class ActivityBookingsService {
     }))
 
     return { activities, total }
+  }
+
+  /**
+   * Auto-create an insurance review task after a booking is confirmed.
+   *
+   * Logic:
+   * 1. If an open insurance task already exists on the trip AND insurance has been sold,
+   *    create a "review coverage for new booking" task (medium priority).
+   * 2. If no open insurance task exists, create the initial "review and initiate coverage" task
+   *    (high priority, assigned to trip owner).
+   * 3. If an open insurance task exists but insurance has NOT been sold, do nothing (task is already pending).
+   *
+   * Errors are swallowed — booking must not fail due to task creation issues.
+   */
+  private async createInsuranceTaskIfNeeded(
+    tripId: string,
+    activityId: string,
+    activityName: string,
+    bookingDate: string,
+    agencyId: string,
+    userId: string,
+  ): Promise<void> {
+    try {
+      // Check for existing open insurance task on this trip
+      const existingTask = await this.db.client
+        .select({ id: this.db.schema.tasks.id })
+        .from(this.db.schema.tasks)
+        .where(and(
+          eq(this.db.schema.tasks.tripId, tripId),
+          sql`title ILIKE '%insurance%'`,
+          sql`status != 'completed'`,
+          eq(this.db.schema.tasks.isDeleted, false),
+        ))
+        .limit(1)
+
+      if (existingTask.length > 0) {
+        // Open insurance task exists — check if insurance already sold (need review task for new booking)
+        const insuranceExists = await this.db.client
+          .select({ id: this.db.schema.tripInsurancePackages.id })
+          .from(this.db.schema.tripInsurancePackages)
+          .where(eq(this.db.schema.tripInsurancePackages.tripId, tripId))
+          .limit(1)
+
+        if (insuranceExists.length > 0) {
+          // Insurance exists + new booking = create review task
+          const dueDate = new Date(bookingDate)
+          dueDate.setDate(dueDate.getDate() + 3)
+
+          await this.tasksService.create({
+            title: `Review insurance coverage for new booking — ${activityName}`,
+            tripId,
+            activityId,
+            priority: 'medium',
+            taskType: 'automatic',
+            dueDate: dueDate.toISOString().split('T')[0],
+          }, agencyId, userId)
+        }
+        return // Don't create duplicate insurance task
+      }
+
+      // No open insurance task — create one
+      const dueDate = new Date(bookingDate)
+      dueDate.setDate(dueDate.getDate() + 3)
+
+      // Get trip owner for assignment
+      const [trip] = await this.db.client
+        .select({ ownerId: this.db.schema.trips.ownerId })
+        .from(this.db.schema.trips)
+        .where(eq(this.db.schema.trips.id, tripId))
+        .limit(1)
+
+      await this.tasksService.create({
+        title: 'Review and initiate insurance coverage',
+        tripId,
+        priority: 'high',
+        taskType: 'automatic',
+        dueDate: dueDate.toISOString().split('T')[0],
+        assigneeUserId: trip?.ownerId || userId,
+        assigneeType: 'user',
+      }, agencyId, userId)
+    } catch (err) {
+      // Don't fail the booking if task creation fails — log and continue
+      console.error(`Failed to create insurance task for trip ${tripId}:`, err)
+    }
   }
 
   /**

@@ -38,6 +38,7 @@ import { MarkActivityBookedDto, ActivityBookingsFilterDto } from './dto'
 import type {
   ActivityBookingResponseDto,
   ActivityBookingsListResponseDto,
+  BookingValidationResult,
 } from '@tailfire/shared-types'
 
 @ApiTags('Activity Bookings')
@@ -48,6 +49,24 @@ export class ActivityBookingsController {
     private readonly activitiesService: ActivitiesService,
     private readonly tripAccessService: TripAccessService,
   ) {}
+
+  /**
+   * Validate booking requirements without changing state (dry run)
+   * GET /bookings/activities/:activityId/validate
+   *
+   * Access check: User must have read access to the trip.
+   */
+  @Get(':activityId/validate')
+  @ApiOperation({ summary: 'Validate booking requirements (dry run — does not change state)' })
+  @ApiParam({ name: 'activityId', description: 'Activity UUID' })
+  @ApiResponse({ status: 200, description: 'Validation result with structured errors' })
+  async validateBooking(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityId', ParseUUIDPipe) activityId: string
+  ): Promise<BookingValidationResult> {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, false)
+    return this.activityBookingsService.validateBooking(activityId)
+  }
 
   /**
    * Mark an activity as booked

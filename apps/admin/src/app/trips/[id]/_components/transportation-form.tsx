@@ -51,7 +51,6 @@ import {
   Loader2,
   Check,
   AlertCircle,
-  CalendarCheck,
   ChevronUp,
   ChevronDown,
   Train,
@@ -64,11 +63,10 @@ import {
   useCreateTransportation,
   useUpdateTransportation,
 } from '@/hooks/use-transportation'
-import { useMarkActivityBooked } from '@/hooks/use-activity-bookings'
 import { useIsChildOfPackage } from '@/hooks/use-is-child-of-package'
 import { useBookings } from '@/hooks/use-bookings'
-import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
-import { ChildOfPackageBookingSection } from '@/components/activities/child-of-package-booking-section'
+import { useQueryClient } from '@tanstack/react-query'
+import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import { useToast } from '@/hooks/use-toast'
 import { DocumentUploader } from '@/components/document-uploader'
 import { ComponentMediaTab } from '@/components/shared'
@@ -289,11 +287,11 @@ export function TransportationForm({
   const [activityPricingId, setActivityPricingId] = useState<string | null>(null)
 
   // Booking status state
-  const [showBookingModal, setShowBookingModal] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
   const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
+  const queryClient = useQueryClient()
 
   // Package linkage state for PricingSection
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
@@ -520,33 +518,6 @@ export function TransportationForm({
   // Mutations - use effectiveDayId to support pendingDay mode
   const createMutation = useCreateTransportation(itineraryId, effectiveDayId)
   const updateMutation = useUpdateTransportation(itineraryId, effectiveDayId)
-
-  // Booking status mutation
-  const markActivityBooked = useMarkActivityBooked()
-
-  // Handler for marking transportation as booked
-  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
-    if (!activityId) {
-      throw new Error('Activity must be saved before marking as booked')
-    }
-
-    const result = await markActivityBooked.mutateAsync({
-      activityId,
-      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
-    })
-
-    // Update local state - preserve YYYY-MM-DD format
-    setActivityIsBooked(true)
-    setActivityBookingDate(newBookingDate)
-
-    // Show warning if payment schedule is missing
-    if (result.paymentScheduleMissing) {
-      toast({
-        title: 'Payment schedule missing',
-        description: 'This activity is booked but has no payment schedule configured.',
-      })
-    }
-  }
 
   // Build pricingData for pricing sections (uses watchedFields to refresh)
   const pricingData: PricingData = useMemo(() => {
@@ -872,6 +843,35 @@ export function TransportationForm({
               </>
             )}
           </div>
+
+          {/* Booking Button */}
+          <BookingHeaderButton
+            activityId={activityId}
+            activityName={displayName || 'Transportation'}
+            activityType="transportation"
+            isBooked={activityIsBooked}
+            bookingDate={activityBookingDate}
+            isChildOfPackage={isChildOfPackage}
+            parentPackageId={parentPackageId}
+            parentPackageName={parentPackageName}
+            tripId={trip?.id || ''}
+            onNavigateToTab={(tab) => { if (tab) setActiveTab(tab) }}
+            onBooked={() => {
+              setActivityIsBooked(true)
+              setActivityBookingDate(new Date().toISOString().split('T')[0] ?? null)
+              queryClient.invalidateQueries({ queryKey: ['activities'] })
+              queryClient.invalidateQueries({ queryKey: ['bookings'] })
+              queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+            }}
+            onUnbooked={() => {
+              setActivityIsBooked(false)
+              setActivityBookingDate(null)
+              queryClient.invalidateQueries({ queryKey: ['activities'] })
+              queryClient.invalidateQueries({ queryKey: ['bookings'] })
+              queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+            }}
+          />
+
           {onCancel && (
             <Button variant="outline" onClick={onCancel}>
               Cancel
@@ -1112,7 +1112,7 @@ export function TransportationForm({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-4 gap-4">
-                <div className="space-y-2">
+                <div className="space-y-2" data-field="startDatetime">
                   <Label>Pickup Date</Label>
                   <DatePickerEnhanced
                     value={pickupDateValue || null}
@@ -1225,7 +1225,7 @@ export function TransportationForm({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
+                <div className="space-y-2" data-field="endDatetime">
                   <Label>Dropoff Date</Label>
                   <DatePickerEnhanced
                     value={dropoffDateValue || null}
@@ -1537,48 +1537,8 @@ export function TransportationForm({
 
         {/* Booking & Pricing Tab */}
         <TabsContent value="pricing" className="mt-6 space-y-6">
-          {/* Booking Status Section */}
-          {isChildOfPackage && parentPackageId ? (
-            <ChildOfPackageBookingSection
-              parentPackageId={parentPackageId}
-              parentPackageName={parentPackageName}
-              tripId={trip?.id || ''}
-              activityIsBooked={activityIsBooked}
-              activityBookingDate={activityBookingDate}
-            />
-          ) : activityId ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CalendarCheck className="h-5 w-5 text-gray-500" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">Booking Status</h3>
-                    <p className="text-xs text-gray-500">
-                      Mark this transportation as booked when it&apos;s been confirmed
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <BookingStatusBadge
-                    isBooked={activityIsBooked}
-                    bookingDate={activityBookingDate}
-                    onClick={() => setShowBookingModal(true)}
-                  />
-                  <Button
-                    type="button"
-                    variant={activityIsBooked ? 'outline' : 'default'}
-                    size="sm"
-                    onClick={() => setShowBookingModal(true)}
-                    className={activityIsBooked ? '' : 'bg-green-600 hover:bg-green-700'}
-                  >
-                    {activityIsBooked ? 'Update Booking' : 'Mark as Booked'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
           {/* Pricing Section */}
+          <div data-field="travelers">
           <PricingSection
             pricingData={pricingData}
             onUpdate={handlePricingUpdate}
@@ -1591,6 +1551,7 @@ export function TransportationForm({
             parentPackageName={parentPackageName}
             travelers={travelers}
           />
+          </div>
 
           <Separator />
 
@@ -1643,17 +1604,6 @@ export function TransportationForm({
           )}
         </TabsContent>
       </Tabs>
-
-      {/* Mark As Booked Modal */}
-      <MarkActivityBookedModal
-        open={showBookingModal}
-        onOpenChange={setShowBookingModal}
-        activityName="Transportation"
-        isBooked={activityIsBooked}
-        currentBookingDate={activityBookingDate}
-        onConfirm={handleMarkAsBooked}
-        isPending={markActivityBooked.isPending}
-      />
 
     </div>
   )

@@ -99,7 +99,16 @@ async function handleErrorResponse(response: Response): Promise<never> {
     ? (body.errors as string[])
     : undefined
 
-  throw new ApiError(response.status, message, fieldErrors, metadata, code, errors)
+  // Extract structured errors (e.g., BookingValidationResult errors: Array<{message, code}>)
+  const structuredErrors =
+    Array.isArray(body.errors) &&
+    body.errors.length > 0 &&
+    typeof body.errors[0] === 'object' &&
+    body.errors[0] !== null
+      ? (body.errors as Array<{ message: string; code: string }>)
+      : undefined
+
+  throw new ApiError(response.status, message, fieldErrors, metadata, code, errors, structuredErrors)
 }
 
 /**
@@ -116,6 +125,7 @@ export class ApiError extends Error {
   public metadata?: ApiErrorMetadata
   public code?: string
   public errors?: string[]
+  public structuredErrors?: Array<{ message: string; code: string }>
 
   constructor(
     public status: number,
@@ -124,6 +134,7 @@ export class ApiError extends Error {
     metadata?: ApiErrorMetadata,
     code?: string,
     errors?: string[],
+    structuredErrors?: Array<{ message: string; code: string }>,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -131,6 +142,7 @@ export class ApiError extends Error {
     this.metadata = metadata
     this.code = code
     this.errors = errors
+    this.structuredErrors = structuredErrors
   }
 }
 

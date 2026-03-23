@@ -8,7 +8,7 @@ import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { UtensilsCrossed, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, CalendarCheck } from 'lucide-react'
+import { UtensilsCrossed, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ActivityResponseDto, ItineraryDayWithActivitiesDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
@@ -26,11 +26,10 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import { useCreateDining, useUpdateDining, useDining } from '@/hooks/use-dining'
-import { useMarkActivityBooked } from '@/hooks/use-activity-bookings'
 import { useIsChildOfPackage } from '@/hooks/use-is-child-of-package'
 import { useBookings } from '@/hooks/use-bookings'
-import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
-import { ChildOfPackageBookingSection } from '@/components/activities/child-of-package-booking-section'
+import { useQueryClient } from '@tanstack/react-query'
+import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
@@ -141,11 +140,11 @@ export function DiningForm({
   const [activityPricingId, setActivityPricingId] = useState<string | null>(null)
 
   // Booking status state
-  const [showBookingModal, setShowBookingModal] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
   const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
+  const queryClient = useQueryClient()
 
   // Package linkage state for PricingSection
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
@@ -257,33 +256,6 @@ export function DiningForm({
   // Mutations - use effectiveDayId to support pendingDay mode
   const createDining = useCreateDining(itineraryId, effectiveDayId)
   const updateDining = useUpdateDining(itineraryId, effectiveDayId)
-
-  // Booking status mutation
-  const markActivityBooked = useMarkActivityBooked()
-
-  // Handler for marking dining as booked
-  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
-    if (!activityId) {
-      throw new Error('Activity must be saved before marking as booked')
-    }
-
-    const result = await markActivityBooked.mutateAsync({
-      activityId,
-      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
-    })
-
-    // Update local state - preserve YYYY-MM-DD format
-    setActivityIsBooked(true)
-    setActivityBookingDate(newBookingDate)
-
-    // Show warning if payment schedule is missing
-    if (result.paymentScheduleMissing) {
-      toast({
-        title: 'Payment schedule missing',
-        description: 'This activity is booked but has no payment schedule configured.',
-      })
-    }
-  }
 
   // Ref to track loaded dining ID (prevents re-seeding on every render)
   const diningIdRef = useRef<string | null>(null)
@@ -552,7 +524,7 @@ export function DiningForm({
 
           <div className="flex items-center gap-6 flex-wrap">
             {/* Travelers */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" data-field="travelers">
               <span className="text-sm text-gray-600">Travelers ({travelers.length} of {totalTravelers})</span>
               <div className="flex -space-x-2">
                 {travelers.map((traveler: any) => (
@@ -626,6 +598,34 @@ export function DiningForm({
             </>
           )}
         </div>
+
+        {/* Booking Button */}
+        <BookingHeaderButton
+          activityId={activityId}
+          activityName={displayName || 'Dining Reservation'}
+          activityType="dining"
+          isBooked={activityIsBooked}
+          bookingDate={activityBookingDate}
+          isChildOfPackage={isChildOfPackage}
+          parentPackageId={parentPackageId}
+          parentPackageName={parentPackageName}
+          tripId={trip?.id || ''}
+          onNavigateToTab={(tab) => { if (tab) setActiveTab(tab === 'pricing' ? 'booking' : tab) }}
+          onBooked={() => {
+            setActivityIsBooked(true)
+            setActivityBookingDate(new Date().toISOString().split('T')[0] ?? null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+          onUnbooked={() => {
+            setActivityIsBooked(false)
+            setActivityBookingDate(null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+        />
       </div>
 
       {/* Tabbed Interface */}
@@ -797,7 +797,7 @@ export function DiningForm({
             <h3 className="text-lg font-semibold">Reservation Details</h3>
 
             <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2" data-field="diningDetails.reservationDate">
+              <div className="space-y-2" data-field="startDatetime">
                 <label className="text-sm font-medium text-gray-700">Date</label>
                 <DatePickerEnhanced
                   value={reservationDateValue}
@@ -981,47 +981,6 @@ export function DiningForm({
         </TabsContent>
 
         <TabsContent value="booking" className="mt-6 space-y-6">
-          {/* Booking Status Section */}
-          {isChildOfPackage && parentPackageId ? (
-            <ChildOfPackageBookingSection
-              parentPackageId={parentPackageId}
-              parentPackageName={parentPackageName}
-              tripId={trip?.id || ''}
-              activityIsBooked={activityIsBooked}
-              activityBookingDate={activityBookingDate}
-            />
-          ) : activityId ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CalendarCheck className="h-5 w-5 text-gray-500" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900">Booking Status</h3>
-                    <p className="text-xs text-gray-500">
-                      Mark this dining reservation as booked when it&apos;s been confirmed
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <BookingStatusBadge
-                    isBooked={activityIsBooked}
-                    bookingDate={activityBookingDate}
-                    onClick={() => setShowBookingModal(true)}
-                  />
-                  <Button
-                    type="button"
-                    variant={activityIsBooked ? 'outline' : 'default'}
-                    size="sm"
-                    onClick={() => setShowBookingModal(true)}
-                    className={activityIsBooked ? '' : 'bg-green-600 hover:bg-green-700'}
-                  >
-                    {activityIsBooked ? 'Update Booking' : 'Mark as Booked'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
           {/* Pricing Section */}
           <PricingSection
             pricingData={pricingData}
@@ -1125,16 +1084,6 @@ export function DiningForm({
         />
       )}
 
-      {/* Mark As Booked Modal */}
-      <MarkActivityBookedModal
-        open={showBookingModal}
-        onOpenChange={setShowBookingModal}
-        activityName="Dining Reservation"
-        isBooked={activityIsBooked}
-        currentBookingDate={activityBookingDate}
-        onConfirm={handleMarkAsBooked}
-        isPending={markActivityBooked.isPending}
-      />
     </div>
   )
 }

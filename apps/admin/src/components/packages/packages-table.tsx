@@ -66,6 +66,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   AlertCircle,
+  CalendarCheck,
+  Check,
   ChevronDown,
   ChevronRight,
   Loader2,
@@ -1411,7 +1413,28 @@ export function PackagesTable({
                               ? formatCurrency(row.commissionTotalCents, row.currency || 'CAD')
                               : '–'}
                           </td>
-                          <td className="px-4 py-3"></td>
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                            {row.bookingStatus === 'booked' ? (
+                              <Badge variant="outline" className="border-green-500 text-green-700 gap-1">
+                                <Check className="h-3 w-3" />
+                                Booked
+                              </Badge>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1 h-7"
+                                onClick={() => {
+                                  const typeSlug = row.activityType.replace(/_/g, '-')
+                                  const tab = ['flight', 'lodging', 'tour', 'package'].includes(row.activityType) ? 'booking' : 'pricing'
+                                  router.push(`/trips/${tripId}/activities/${row.id}/edit?type=${typeSlug}&tab=${tab}`)
+                                }}
+                              >
+                                <CalendarCheck className="h-3 w-3" />
+                                Book
+                              </Button>
+                            )}
+                          </td>
                         </tr>
                         {/* Child ports (Level 2 under standalone cruise) */}
                         {isCruise && isCruiseExpanded && row.children.map((child, idx) => {

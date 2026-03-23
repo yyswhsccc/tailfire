@@ -8,11 +8,9 @@
 import { Injectable } from '@nestjs/common'
 import { sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
+import type { BookingValidationResult } from '@tailfire/shared-types'
 
-export interface BookingValidationResult {
-  valid: boolean
-  errors: string[]
-}
+export type { BookingValidationResult }
 
 @Injectable()
 export class BookingValidationService {
@@ -24,12 +22,12 @@ export class BookingValidationService {
    * or { valid: false, errors: [...] } with human-readable error messages.
    */
   async validateBooking(activityId: string): Promise<BookingValidationResult> {
-    const errors: string[] = []
+    const errors: BookingValidationResult['errors'] = []
 
     // Fetch activity + pricing in one query
     const activityData = await this.fetchActivityWithPricing(activityId)
     if (!activityData) {
-      return { valid: false, errors: ['Activity not found'] }
+      return { valid: false, errors: [{ message: 'Activity not found', code: 'ACTIVITY_NOT_FOUND' }] }
     }
 
     // Fetch travelers with their contacts
@@ -40,32 +38,32 @@ export class BookingValidationService {
 
     // === Check 1: Supplier identified ===
     if (!activityData.supplier || activityData.supplier.trim() === '') {
-      errors.push('Supplier must be identified')
+      errors.push({ message: 'Supplier must be identified', code: 'SUPPLIER_MISSING' })
     }
 
     // === Check 2: Booking date set ===
     if (!activityData.booking_date) {
-      errors.push('Booking date is required')
+      errors.push({ message: 'Booking date is required', code: 'BOOKING_DATE_MISSING' })
     }
 
     // === Check 3: Departure + return dates ===
     if (!activityData.start_datetime) {
-      errors.push('Start date/time is required')
+      errors.push({ message: 'Start date/time is required', code: 'START_DATE_MISSING' })
     }
     if (!activityData.end_datetime) {
-      errors.push('End date/time is required')
+      errors.push({ message: 'End date/time is required', code: 'END_DATE_MISSING' })
     }
     if (activityData.start_datetime && activityData.end_datetime) {
       const start = new Date(activityData.start_datetime)
       const end = new Date(activityData.end_datetime)
       if (start >= end) {
-        errors.push('Start date/time must be before end date/time')
+        errors.push({ message: 'Start date/time must be before end date/time', code: 'DATE_ORDER_INVALID' })
       }
     }
 
     // === Check 4: Traveler assigned ===
     if (travelers.length === 0) {
-      errors.push('At least one traveler must be assigned to this activity')
+      errors.push({ message: 'At least one traveler must be assigned to this activity', code: 'NO_TRAVELERS' })
     }
 
     // === Check 5: Traveler contact complete ===
@@ -75,42 +73,42 @@ export class BookingValidationService {
         : t.first_name || t.last_name || 'Unknown traveler'
 
       if (!t.first_name || t.first_name.trim() === '') {
-        errors.push(`Traveler "${name}" is missing first name`)
+        errors.push({ message: `Traveler "${name}" is missing first name`, code: 'TRAVELER_FIRST_NAME' })
       }
       if (!t.last_name || t.last_name.trim() === '') {
-        errors.push(`Traveler "${name}" is missing last name`)
+        errors.push({ message: `Traveler "${name}" is missing last name`, code: 'TRAVELER_LAST_NAME' })
       }
       if (!t.date_of_birth) {
-        errors.push(`Traveler "${name}" is missing date of birth`)
+        errors.push({ message: `Traveler "${name}" is missing date of birth`, code: 'TRAVELER_DOB' })
       }
       if (!t.address_line1 || t.address_line1.trim() === '') {
-        errors.push(`Traveler "${name}" is missing address`)
+        errors.push({ message: `Traveler "${name}" is missing address`, code: 'TRAVELER_ADDRESS' })
       }
     }
 
     // === Check 6: Total price > 0 ===
     if (!activityData.total_price_cents || activityData.total_price_cents <= 0) {
-      errors.push('Total price must be greater than zero')
+      errors.push({ message: 'Total price must be greater than zero', code: 'PRICE_MISSING' })
     }
 
     // === Check 7: Payment schedule defined ===
     if (paymentData.scheduleConfigs.length === 0) {
-      errors.push('Payment schedule must be defined')
+      errors.push({ message: 'Payment schedule must be defined', code: 'PAYMENT_SCHEDULE_MISSING' })
     }
 
     // === Check 8: Deposit + due dates ===
     if (paymentData.expectedItems.length === 0) {
-      errors.push('At least one expected payment item must exist')
+      errors.push({ message: 'At least one expected payment item must exist', code: 'PAYMENT_ITEMS_MISSING' })
     } else {
       const hasItemWithDueDate = paymentData.expectedItems.some(item => item.due_date !== null)
       if (!hasItemWithDueDate) {
-        errors.push('At least one expected payment item must have a due date')
+        errors.push({ message: 'At least one expected payment item must have a due date', code: 'PAYMENT_DUE_DATE_MISSING' })
       }
     }
 
     // === Check 9: Confirmation number ===
     if (!activityData.confirmation_number || activityData.confirmation_number.trim() === '') {
-      errors.push('Confirmation number is required')
+      errors.push({ message: 'Confirmation number is required', code: 'CONFIRMATION_NUMBER_MISSING' })
     }
 
     // === Check 10: Passport check ===
@@ -121,12 +119,12 @@ export class BookingValidationService {
           : t.first_name || t.last_name || 'Unknown traveler'
 
         if (!t.passport_number) {
-          errors.push(`Traveler "${name}" is missing passport number`)
+          errors.push({ message: `Traveler "${name}" is missing passport number`, code: 'PASSPORT_NUMBER_MISSING' })
           continue
         }
 
         if (!t.passport_expiry) {
-          errors.push(`Traveler "${name}" is missing passport expiry date`)
+          errors.push({ message: `Traveler "${name}" is missing passport expiry date`, code: 'PASSPORT_EXPIRY_MISSING' })
           continue
         }
 
@@ -138,9 +136,10 @@ export class BookingValidationService {
 
           const passportExpiry = new Date(t.passport_expiry)
           if (passportExpiry <= sixMonthsAfterEnd) {
-            errors.push(
-              `Traveler "${name}" passport expires too soon (must be valid at least 6 months after trip end)`
-            )
+            errors.push({
+              message: `Traveler "${name}" passport expires too soon (must be valid at least 6 months after trip end)`,
+              code: 'PASSPORT_EXPIRY_TOO_SOON',
+            })
           }
         }
       }
@@ -156,18 +155,19 @@ export class BookingValidationService {
         const lastDueDate = new Date(itemsWithDueDate[0]!.due_date!)
         const startDate = new Date(activityData.start_datetime)
         if (lastDueDate >= startDate) {
-          errors.push('Final payment due date must be before departure date')
+          errors.push({ message: 'Final payment due date must be before departure date', code: 'FINAL_PAYMENT_AFTER_DEPARTURE' })
         }
       }
     }
 
     // === Check 12: Non-refundable flagged ===
-    for (const config of paymentData.scheduleConfigs) {
-      if (config.non_refundable_deposit === true) {
+    // non_refundable_deposit flag lives on activity_pricing, amounts on payment_schedule_config
+    if (activityData.non_refundable_deposit === true) {
+      for (const config of paymentData.scheduleConfigs) {
         if (!config.non_refundable_amount_cents || config.non_refundable_amount_cents <= 0) {
-          errors.push('Non-refundable deposit is flagged but non-refundable amount is not set or zero')
+          errors.push({ message: 'Non-refundable deposit is flagged but non-refundable amount is not set or zero', code: 'NON_REFUNDABLE_NOT_SET' })
         } else if (config.deposit_amount_cents && config.non_refundable_amount_cents > config.deposit_amount_cents) {
-          errors.push('Non-refundable amount cannot exceed deposit amount')
+          errors.push({ message: 'Non-refundable amount cannot exceed deposit amount', code: 'NON_REFUNDABLE_EXCEEDS_DEPOSIT' })
         }
       }
     }
@@ -268,7 +268,6 @@ export class BookingValidationService {
       schedule_type: string
       deposit_type: string | null
       deposit_amount_cents: number | null
-      non_refundable_deposit: boolean | null
       non_refundable_amount_cents: number | null
     }
 
@@ -286,7 +285,6 @@ export class BookingValidationService {
           schedule_type,
           deposit_type,
           deposit_amount_cents,
-          non_refundable_deposit,
           non_refundable_amount_cents
         FROM payment_schedule_config
         WHERE component_pricing_id = ${pricingId}
