@@ -37,7 +37,7 @@ function buildConfig(): ExternalApiConfig {
   return {
     provider: 'amadeus_offers',
     category: ApiCategory.FLIGHTS,
-    baseUrl: process.env.AMADEUS_API_URL || 'https://test.api.amadeus.com',
+    baseUrl: process.env.AMADEUS_OFFERS_API_URL || process.env.AMADEUS_API_URL || 'https://test.api.amadeus.com',
     rateLimit: {
       requestsPerMinute: parseInt(process.env.AMADEUS_OFFERS_RATE_LIMIT_PER_MINUTE || '10', 10),
       requestsPerHour: parseInt(process.env.AMADEUS_RATE_LIMIT_PER_HOUR || '100', 10),
