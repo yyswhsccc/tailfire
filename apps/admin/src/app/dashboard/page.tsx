@@ -8,7 +8,7 @@ import { PanelRight, AlertCircle, RefreshCw, Loader2 } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { useDashboardOverview } from '@/hooks/use-dashboard'
-import { KpiCards } from './_components/kpi-cards'
+import { KpiCards, SalesKpiCards } from './_components/kpi-cards'
 import { TripCardRow } from './_components/trip-card-row'
 import { TasksDueWidget } from './_components/tasks-due-widget'
 import { PaymentsDueWidget } from './_components/payments-due-widget'
@@ -159,6 +159,23 @@ export default function DashboardPage() {
           {/* Agency KPI Row (admin only) */}
           {isAdmin && data.agency && (
             <KpiCards metrics={data.agency} periodLabel={periodLabel} variant="agency" />
+          )}
+
+          {/* Booked Sales, Departed Sales, Insurance Attach Rate */}
+          <SalesKpiCards
+            salesKpi={data.personalSalesKpi}
+            insuranceKpi={data.personalInsuranceKpi}
+            periodLabel={periodLabel}
+          />
+
+          {/* Agency Sales KPIs (admin only) */}
+          {isAdmin && data.agencySalesKpi && data.agencyInsuranceKpi && (
+            <SalesKpiCards
+              salesKpi={data.agencySalesKpi}
+              insuranceKpi={data.agencyInsuranceKpi}
+              periodLabel={periodLabel}
+              variant="agency"
+            />
           )}
 
           {/* Jump Back In */}
