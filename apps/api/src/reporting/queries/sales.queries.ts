@@ -51,13 +51,13 @@ export interface SalesQueryResult {
 // ============================================================================
 
 /** Build a parameterized SQL list from an array of IDs -- safe from SQL injection */
-function sqlIdList(ids: string[]): SQL {
+export function sqlIdList(ids: string[]): SQL {
   const params = ids.map((id, i) => (i === 0 ? sql`${id}` : sql`, ${id}`))
   return sql`(${sql.join(params, sql.raw(''))})`
 }
 
 /** Build trip-scope filter fragment: either agency-wide or limited to specific trip IDs */
-function tripScopeFilter(tripIds: string[] | 'all', agencyId: string): SQL {
+export function tripScopeFilter(tripIds: string[] | 'all', agencyId: string): SQL {
   if (tripIds === 'all') {
     return sql`t.agency_id = ${agencyId}`
   }
@@ -80,7 +80,7 @@ const CANONICAL_JOIN = sql`
 `
 
 /** Apply pagination offset/limit */
-function paginationSql(page: number, pageSize: number): SQL {
+export function paginationSql(page: number, pageSize: number): SQL {
   const offset = (page - 1) * pageSize
   return sql`LIMIT ${pageSize} OFFSET ${offset}`
 }
