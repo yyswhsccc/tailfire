@@ -5,6 +5,7 @@ import {
   Table,
   TableHeader,
   TableBody,
+  TableFooter,
   TableRow,
   TableHead,
   TableCell,
@@ -25,6 +26,7 @@ interface ReportTableProps {
   sortOrder?: 'asc' | 'desc'
   onSort?: (columnKey: string) => void
   isLoading?: boolean
+  totals?: Record<string, number | null>
 }
 
 /** Format cents values as $X,XXX.XX */
@@ -32,9 +34,9 @@ function formatCents(value: unknown): string {
   if (value == null) return '--'
   const cents = Number(value)
   if (isNaN(cents)) return String(value)
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-CA', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'CAD',
   }).format(cents / 100)
 }
 
@@ -71,6 +73,7 @@ export function ReportTable({
   sortOrder,
   onSort,
   isLoading,
+  totals,
 }: ReportTableProps) {
   if (isLoading) {
     return (
@@ -174,6 +177,34 @@ export function ReportTable({
             </TableRow>
           ))}
         </TableBody>
+        {totals && (
+          <TableFooter>
+            <TableRow className="bg-muted/50 font-semibold">
+              {columns.map((col, i) => {
+                const alignClass =
+                  col.align === 'right'
+                    ? 'text-right'
+                    : col.align === 'center'
+                      ? 'text-center'
+                      : 'text-left'
+                const monoClass = col.mono || isCentsColumn(col.key) ? 'font-mono tabular-nums' : ''
+
+                return (
+                  <TableCell
+                    key={col.key}
+                    className={`${alignClass} ${monoClass}`}
+                  >
+                    {i === 0
+                      ? 'Total'
+                      : totals[col.key] != null
+                        ? formatCellValue(col.key, totals[col.key])
+                        : ''}
+                  </TableCell>
+                )
+              })}
+            </TableRow>
+          </TableFooter>
+        )}
       </Table>
     </div>
   )

@@ -1,4 +1,4 @@
-import { ReportResponse, ReportDateRange } from '@tailfire/shared-types'
+import { ReportResponse, ReportDateRange, SummaryItem } from '@tailfire/shared-types'
 
 export function buildReportResponse<T>(params: {
   slug: string
@@ -10,6 +10,8 @@ export function buildReportResponse<T>(params: {
   page: number
   pageSize: number
   summary?: Record<string, number | string>
+  summaryItems?: SummaryItem[]
+  totals?: Record<string, number | null>
 }): ReportResponse<T> {
   return {
     reportSlug: params.slug,
@@ -22,5 +24,7 @@ export function buildReportResponse<T>(params: {
     pageSize: params.pageSize,
     data: params.data,
     summary: params.summary,
+    summaryItems: params.summaryItems,
+    totals: params.totals,
   }
 }

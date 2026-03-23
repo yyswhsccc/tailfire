@@ -11,7 +11,9 @@ import { DateRangePicker } from './date-range-picker'
 import { ReportTable, type ReportColumnDef } from './report-table'
 import { ReportExportButtons } from './report-export-buttons'
 import { ReportFilters } from './report-filters'
-import type { DatePreset, ReportQueryParams } from '@tailfire/shared-types/api'
+import { ReportSummaryCards } from './report-summary-cards'
+import { REPORT_MANIFEST } from '../_lib/report-manifest'
+import type { DatePreset, ReportQueryParams, SummaryItem } from '@tailfire/shared-types/api'
 
 interface ReportViewProps {
   slug: string
@@ -85,11 +87,56 @@ export function ReportView({ slug }: ReportViewProps) {
 
   const { data: reportData, isLoading, isError, isFetching } = useReport(slug, queryParams)
 
-  // Derive columns from data
+  // Use manifest columns if available, fall back to deriving from data
+  const manifest = REPORT_MANIFEST[slug]
+
   const columns = useMemo<ReportColumnDef[]>(() => {
+    if (manifest) {
+      return manifest.columns.map((col) => ({
+        key: col.key,
+        label: col.label,
+        align: col.align,
+        mono: col.mono ?? col.format === 'currency',
+      }))
+    }
     const rows = (reportData?.data ?? []) as Record<string, unknown>[]
     return deriveColumns(rows)
-  }, [reportData?.data])
+  }, [manifest, reportData?.data])
+
+  // Build summary items from API response or manifest + totals
+  const summaryItems = useMemo<SummaryItem[]>(() => {
+    // Prefer structured summaryItems from API
+    if (reportData?.summaryItems && reportData.summaryItems.length > 0) {
+      return reportData.summaryItems
+    }
+
+    // Build from manifest summary cards + API totals
+    if (manifest?.summaryCards && reportData) {
+      const apiTotals = reportData.totals ?? {}
+      const items: SummaryItem[] = []
+
+      for (const card of manifest.summaryCards) {
+        let value: string
+        if (card.key === '_rowCount') {
+          value = String(reportData.totalRows)
+        } else if (apiTotals[card.key] != null) {
+          value = String(apiTotals[card.key])
+        } else if (reportData.summary && reportData.summary[card.key] != null) {
+          value = String(reportData.summary[card.key])
+        } else {
+          continue
+        }
+        items.push({
+          label: card.label,
+          value,
+          format: card.format === 'currency' ? 'currency' : card.format === 'percent' ? 'percent' : 'number',
+        })
+      }
+      return items
+    }
+
+    return []
+  }, [reportData, manifest])
 
   const totalPages = useMemo(() => {
     if (!reportData) return 1
@@ -209,30 +256,8 @@ export function ReportView({ slug }: ReportViewProps) {
         </div>
       )}
 
-      {/* Summary metrics */}
-      {reportData?.summary && Object.keys(reportData.summary).length > 0 && (
-        <div className="flex flex-wrap gap-4">
-          {Object.entries(reportData.summary).map(([key, value]) => {
-            const isCents = /[Cc]ents$/.test(key) || /[Pp]rice$/.test(key)
-            const displayValue = isCents
-              ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
-                  Number(value) / 100,
-                )
-              : String(value)
-            const displayLabel = key
-              .replace(/([A-Z])/g, ' $1')
-              .replace(/^./, (s) => s.toUpperCase())
-              .trim()
-
-            return (
-              <div key={key} className="rounded-md border bg-muted/30 px-4 py-2">
-                <p className="text-xs text-muted-foreground">{displayLabel}</p>
-                <p className="text-lg font-semibold font-mono tabular-nums">{displayValue}</p>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {/* Summary cards (top) */}
+      <ReportSummaryCards items={summaryItems} />
 
       {/* Table */}
       <ReportTable
@@ -242,6 +267,7 @@ export function ReportView({ slug }: ReportViewProps) {
         sortOrder={sortOrder}
         onSort={handleSort}
         isLoading={isLoading}
+        totals={reportData?.totals}
       />
 
       {/* Footer: Pagination + Export */}

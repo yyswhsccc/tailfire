@@ -340,12 +340,26 @@ export class ReportingController {
   // -------------------------------------------------------------------------
 
   @Get(':slug')
-  runReport(
+  async runReport(
     @Param('slug') slug: string,
     @GetAuthContext() auth: AuthContext,
     @Query() query: ReportQueryDto,
   ) {
-    return this.reporting.runReport(slug, auth, query)
+    const result = await this.reporting.runReport(slug, auth, query)
+
+    // Compute totals and summaryItems from column definitions
+    const columns = this.getColumnsForReport(slug)
+    if (columns && Array.isArray(result.data) && result.data.length > 0) {
+      result.totals = this.computeTotals(result.data as any[], columns)
+      result.summaryItems = this.buildSummaryItems(
+        result.data as any[],
+        columns,
+        result.totalRows,
+        result.summary,
+      )
+    }
+
+    return result
   }
 
   // -------------------------------------------------------------------------
@@ -498,6 +512,90 @@ export class ReportingController {
       rows: exportRows,
       summaryItems: summaryItems.length > 0 ? summaryItems : undefined,
     }
+  }
+
+  /**
+   * Determine if a column key represents a summable financial or count field.
+   */
+  private isSummableColumn(key: string): boolean {
+    return (
+      /[Cc]ents$/.test(key) ||
+      /[Pp]rice$/.test(key) ||
+      /[Cc]ount$/.test(key)
+    )
+  }
+
+  /**
+   * Determine if a column key represents an averageable field (rates, scores).
+   */
+  private isAverageableColumn(key: string): boolean {
+    return /[Rr]ate$/.test(key) || /[Ss]core$/.test(key)
+  }
+
+  /**
+   * Compute column totals from data rows.
+   */
+  private computeTotals(
+    data: any[],
+    columns: ColumnDef[],
+  ): Record<string, number | null> {
+    const totals: Record<string, number | null> = {}
+
+    for (const col of columns) {
+      if (this.isSummableColumn(col.key)) {
+        totals[col.key] = data.reduce(
+          (sum, row) => sum + (Number(row[col.key]) || 0),
+          0,
+        )
+      } else if (this.isAverageableColumn(col.key)) {
+        const values = data
+          .map((row) => Number(row[col.key]))
+          .filter((v) => !isNaN(v))
+        totals[col.key] =
+          values.length > 0
+            ? Math.round(
+                (values.reduce((a, b) => a + b, 0) / values.length) * 100,
+              ) / 100
+            : null
+      } else {
+        totals[col.key] = null
+      }
+    }
+
+    return totals
+  }
+
+  /**
+   * Build structured summary items for frontend summary cards.
+   */
+  private buildSummaryItems(
+    data: any[],
+    columns: ColumnDef[],
+    totalRows: number,
+    existingSummary?: Record<string, number | string>,
+  ): { label: string; value: string; format?: 'currency' | 'number' | 'percent' | 'text' }[] {
+    const items: { label: string; value: string; format?: 'currency' | 'number' | 'percent' | 'text' }[] = []
+
+    // Use existing summary values if available, converting to structured items
+    if (existingSummary) {
+      for (const [key, value] of Object.entries(existingSummary)) {
+        const isCents =
+          /[Cc]ents$/.test(key) || /[Pp]rice$/.test(key)
+        const isRate = /[Rr]ate$/.test(key) || /[Ss]core$/.test(key)
+        const label = key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, (s) => s.toUpperCase())
+          .trim()
+
+        items.push({
+          label,
+          value: String(value),
+          format: isCents ? 'currency' : isRate ? 'percent' : 'number',
+        })
+      }
+    }
+
+    return items
   }
 
   /**
