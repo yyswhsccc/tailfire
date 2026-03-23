@@ -831,7 +831,8 @@ export class ActivitiesService {
       dto.taxesCents !== undefined ||
       dto.pricingType !== undefined ||
       dto.commissionTotalCents !== undefined ||
-      dto.commissionSplitPercentage !== undefined
+      dto.commissionSplitPercentage !== undefined ||
+      dto.supplier !== undefined
 
     if (hasPricingUpdates) {
       // Child pricing guard: block pricing updates on children linked to packages
@@ -854,6 +855,7 @@ export class ActivitiesService {
             pricing_type = COALESCE(${dto.pricingType ?? null}, pricing_type),
             commission_total_cents = COALESCE(${dto.commissionTotalCents ?? null}, commission_total_cents),
             commission_split_percentage = COALESCE(${dto.commissionSplitPercentage?.toString() ?? null}, commission_split_percentage),
+            supplier = COALESCE(${dto.supplier ?? null}, supplier),
             updated_at = NOW()
           WHERE activity_id = ${id}
         `)
@@ -897,6 +899,36 @@ export class ActivitiesService {
               ne(this.db.schema.itineraryActivities.proposalStatus, 'cancelled')
             )
           )
+      }
+    }
+
+    // Update package_details if any package-specific fields are provided
+    const hasPackageUpdates =
+      dto.supplierName !== undefined ||
+      dto.supplierId !== undefined ||
+      dto.cancellationPolicy !== undefined ||
+      dto.cancellationDeadline !== undefined ||
+      dto.termsAndConditions !== undefined ||
+      dto.groupBookingNumber !== undefined ||
+      dto.paymentStatus !== undefined
+
+    if (hasPackageUpdates && beforeActivity.activityType === 'package') {
+      try {
+        await this.db.client.execute(sql`
+          UPDATE package_details
+          SET
+            supplier_name = COALESCE(${dto.supplierName ?? null}, supplier_name),
+            supplier_id = COALESCE(${dto.supplierId ?? null}, supplier_id),
+            cancellation_policy = COALESCE(${dto.cancellationPolicy ?? null}, cancellation_policy),
+            cancellation_deadline = COALESCE(${dto.cancellationDeadline ?? null}, cancellation_deadline),
+            terms_and_conditions = COALESCE(${dto.termsAndConditions ?? null}, terms_and_conditions),
+            group_booking_number = COALESCE(${dto.groupBookingNumber ?? null}, group_booking_number),
+            payment_status = COALESCE(${dto.paymentStatus ?? null}, payment_status),
+            updated_at = NOW()
+          WHERE activity_id = ${id}
+        `)
+      } catch (error) {
+        this.logger.warn(`Failed to update package_details for activity ${id}: ${error}`)
       }
     }
 
