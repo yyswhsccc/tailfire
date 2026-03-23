@@ -112,29 +112,31 @@ export async function queryOntarioGrossSales(
     const totalSalesCents = Number(row.total_sales_cents ?? 0)
     const serviceFeesCents = feesByMonth.get(row.month_label) ?? 0
     return {
-      monthLabel: row.month_label,
+      month: row.month_label,
       bookingCount: Number(row.booking_count ?? 0),
       totalSalesCents,
       serviceFeesCents,
       grossSalesCents: totalSalesCents + serviceFeesCents,
+      currency: 'CAD',
     }
   })
 
   // Also include months that have only service fees but no activity sales
-  const activityMonths = new Set(data.map(d => d.monthLabel))
+  const activityMonths = new Set(data.map(d => d.month))
   for (const [month, feesCents] of feesByMonth.entries()) {
     if (!activityMonths.has(month)) {
       data.push({
-        monthLabel: month,
+        month,
         bookingCount: 0,
         totalSalesCents: 0,
         serviceFeesCents: feesCents,
         grossSalesCents: feesCents,
+        currency: 'CAD',
       })
     }
   }
   // Re-sort after merging
-  data.sort((a, b) => a.monthLabel.localeCompare(b.monthLabel))
+  data.sort((a, b) => a.month.localeCompare(b.month))
 
   // Summary: annual totals
   const summaryResult = await db.client.execute(sql`
