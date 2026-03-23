@@ -10,7 +10,7 @@
  */
 
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
-import { sql } from 'drizzle-orm'
+import { sql, and, eq } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { ActivitiesService } from './activities.service'
 import { BookingValidationService } from './booking-validation.service'
@@ -20,6 +20,7 @@ import type {
   ActivityBookingsFilterDto,
   ActivityBookingResponseDto,
   ActivityBookingsListResponseDto,
+  BookingValidationResult,
 } from '@tailfire/shared-types'
 
 @Injectable()
@@ -79,6 +80,21 @@ export class ActivityBookingsService {
     // Evaluate trip lifecycle — first booking may promote planning → active
     await this.tripLifecycleService.onActivityBooked(activityId)
 
+    // Count cascaded children for package bookings
+    let cascadedCount = 0
+    if (activity.activityType === 'package') {
+      const result = await this.db.client
+        .select({ count: sql`count(*)::int` })
+        .from(this.db.schema.itineraryActivities)
+        .where(
+          and(
+            eq(this.db.schema.itineraryActivities.parentActivityId, activityId),
+            eq(this.db.schema.itineraryActivities.bookingStatus, 'booked')
+          )
+        )
+      cascadedCount = (result as any)[0]?.count ?? 0
+    }
+
     // Check payment schedule status
     const paymentScheduleMissing = await this.getPaymentScheduleMissing(activityId)
 
@@ -92,7 +108,15 @@ export class ActivityBookingsService {
       paymentScheduleMissing,
       bookable: true,
       blockedReason: null,
+      cascadedCount,
     }
+  }
+
+  /**
+   * Validate booking requirements without changing state (dry run)
+   */
+  async validateBooking(activityId: string): Promise<BookingValidationResult> {
+    return this.bookingValidationService.validateBooking(activityId)
   }
 
   /**

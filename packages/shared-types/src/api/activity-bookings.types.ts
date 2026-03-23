@@ -49,6 +49,7 @@ export type ActivityBookingResponseDto = {
   paymentScheduleMissing: boolean
   bookable: boolean // false if parentActivityId points to a package (child of package)
   blockedReason: 'part_of_package' | null
+  cascadedCount?: number // Number of package children that were also marked booked
 }
 
 export type ActivityBookingsListResponseDto = {
