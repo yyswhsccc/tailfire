@@ -161,8 +161,9 @@ export class BookingValidationService {
     }
 
     // === Check 12: Non-refundable flagged ===
-    for (const config of paymentData.scheduleConfigs) {
-      if (config.non_refundable_deposit === true) {
+    // non_refundable_deposit flag lives on activity_pricing, amounts on payment_schedule_config
+    if (activityData.non_refundable_deposit === true) {
+      for (const config of paymentData.scheduleConfigs) {
         if (!config.non_refundable_amount_cents || config.non_refundable_amount_cents <= 0) {
           errors.push({ message: 'Non-refundable deposit is flagged but non-refundable amount is not set or zero', code: 'NON_REFUNDABLE_NOT_SET' })
         } else if (config.deposit_amount_cents && config.non_refundable_amount_cents > config.deposit_amount_cents) {
@@ -267,7 +268,6 @@ export class BookingValidationService {
       schedule_type: string
       deposit_type: string | null
       deposit_amount_cents: number | null
-      non_refundable_deposit: boolean | null
       non_refundable_amount_cents: number | null
     }
 
@@ -285,7 +285,6 @@ export class BookingValidationService {
           schedule_type,
           deposit_type,
           deposit_amount_cents,
-          non_refundable_deposit,
           non_refundable_amount_cents
         FROM payment_schedule_config
         WHERE component_pricing_id = ${pricingId}
