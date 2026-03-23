@@ -106,5 +106,8 @@ export * from './commission.types.js'
 // Super Search
 export * from './search.types.js'
 
+// Reporting System
+export * from './reporting.types.js'
+
 // Future exports:
 // export * from './auth.types'
