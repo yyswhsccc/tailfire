@@ -22,6 +22,7 @@ import { ContactsModule } from '../contacts/contacts.module'
 import { AutomationModule } from '../automation/automation.module'
 import { EmailModule } from '../email/email.module'
 import { TemplatesModule } from '../templates/templates.module'
+import { TasksModule } from '../tasks/tasks.module'
 
 // Services
 import { TripsService } from './trips.service'
@@ -101,6 +102,7 @@ import { TripGroupSharesController } from './trip-group-shares.controller'
     forwardRef(() => ContactsModule), // For ContactAccessService (access control)
     forwardRef(() => AutomationModule), // For trip status auto-transitions
     forwardRef(() => TemplatesModule), // For ItineraryCloneService (duplication)
+    forwardRef(() => TasksModule), // For ActivityBookingsService insurance task creation
   ],
   controllers: [
     TripsController,
