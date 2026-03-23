@@ -7,7 +7,7 @@ import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Anchor, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, CalendarCheck } from 'lucide-react'
+import { Anchor, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ActivityResponseDto, ItineraryDayWithActivitiesDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
@@ -25,8 +25,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { useCreatePortInfo, useUpdatePortInfo, usePortInfo } from '@/hooks/use-port-info'
-import { useMarkActivityBooked } from '@/hooks/use-activity-bookings'
-import { MarkActivityBookedModal, BookingStatusBadge } from '@/components/activities/mark-activity-booked-modal'
+import { useQueryClient } from '@tanstack/react-query'
+import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
@@ -104,11 +104,11 @@ export function PortInfoForm({
   const createInProgressRef = useRef(false)
 
   // Booking status state
-  const [showBookingModal, setShowBookingModal] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
   const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
+  const queryClient = useQueryClient()
 
   // Auto-save state (with date validation)
   const {
@@ -206,33 +206,6 @@ export function PortInfoForm({
   // Mutations - use effectiveDayId for pendingDay mode
   const createPortInfo = useCreatePortInfo(itineraryId, effectiveDayId)
   const updatePortInfo = useUpdatePortInfo(itineraryId, effectiveDayId)
-
-  // Booking status mutation
-  const markActivityBooked = useMarkActivityBooked()
-
-  // Handler for marking port info as booked
-  const handleMarkAsBooked = async (newBookingDate: string, passportVerified: boolean, nonRefundableAmountCents?: number) => {
-    if (!activityId) {
-      throw new Error('Activity must be saved before marking as booked')
-    }
-
-    const result = await markActivityBooked.mutateAsync({
-      activityId,
-      data: { bookingDate: newBookingDate, passportVerified, nonRefundableAmountCents },
-    })
-
-    // Update local state - preserve YYYY-MM-DD format
-    setActivityIsBooked(true)
-    setActivityBookingDate(newBookingDate)
-
-    // Show warning if payment schedule is missing
-    if (result.paymentScheduleMissing) {
-      toast({
-        title: 'Payment schedule missing',
-        description: 'This activity is booked but has no payment schedule configured.',
-      })
-    }
-  }
 
   // Ref to track loaded port info ID
   const portInfoIdRef = useRef<string | null>(null)
@@ -469,7 +442,7 @@ export function PortInfoForm({
 
           <div className="flex items-center gap-6 flex-wrap">
             {/* Travelers */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" data-field="travelers">
               <span className="text-sm text-gray-600">Travelers ({travelers.length} of {totalTravelers})</span>
               <div className="flex -space-x-2">
                 {travelers.map((traveler: any) => (
@@ -543,6 +516,32 @@ export function PortInfoForm({
             </>
           )}
         </div>
+
+        {/* Booking Button */}
+        <BookingHeaderButton
+          activityId={activityId}
+          activityName={watchedValues.portInfoDetails?.portName || 'Port Info'}
+          activityType="port_info"
+          isBooked={activityIsBooked}
+          bookingDate={activityBookingDate}
+          isChildOfPackage={false}
+          tripId={trip?.id || ''}
+          onNavigateToTab={(tab) => { if (tab) setActiveTab(tab === 'pricing' ? 'booking' : tab) }}
+          onBooked={() => {
+            setActivityIsBooked(true)
+            setActivityBookingDate(new Date().toISOString().split('T')[0] ?? null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+          onUnbooked={() => {
+            setActivityIsBooked(false)
+            setActivityBookingDate(null)
+            queryClient.invalidateQueries({ queryKey: ['activities'] })
+            queryClient.invalidateQueries({ queryKey: ['bookings'] })
+            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+          }}
+        />
       </div>
 
       {/* Tabbed Interface - No Booking tab for port_info */}
@@ -668,7 +667,7 @@ export function PortInfoForm({
             <h3 className="text-lg font-semibold">Arrival & Departure</h3>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2" data-field="portInfoDetails.arrivalDate">
+              <div className="space-y-2" data-field="startDatetime">
                 <label className="text-sm font-medium text-gray-700">Arrival Date</label>
                 <DatePickerEnhanced
                   value={arrivalDateValue || undefined}
@@ -710,7 +709,7 @@ export function PortInfoForm({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2" data-field="portInfoDetails.departureDate">
+              <div className="space-y-2" data-field="endDatetime">
                 <label className="text-sm font-medium text-gray-700">Departure Date</label>
                 <DatePickerEnhanced
                   value={departureDateValue || undefined}
@@ -847,46 +846,8 @@ export function PortInfoForm({
         </TabsContent>
 
         <TabsContent value="booking" className="mt-6">
-          <div className="space-y-6">
-            {/* Booking Status Section */}
-            <div className="border border-gray-200 rounded-lg p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <CalendarCheck className="h-5 w-5 text-blue-600" />
-                <h3 className="text-lg font-semibold">Booking Status</h3>
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Current Status</p>
-                    <div className="mt-1">
-                      <BookingStatusBadge
-                        isBooked={activityIsBooked}
-                        bookingDate={activityBookingDate}
-                      />
-                    </div>
-                  </div>
-                  {activityId && !activityIsBooked && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowBookingModal(true)}
-                      className="flex items-center gap-2"
-                    >
-                      <CalendarCheck className="h-4 w-4" />
-                      Mark As Booked
-                    </Button>
-                  )}
-                </div>
-                {!activityId && (
-                  <p className="text-sm text-gray-500">
-                    Save the port information first to mark it as booked.
-                  </p>
-                )}
-                <p className="text-sm text-gray-500 mt-2">
-                  Note: Port info is typically part of a cruise booking and may not need to be separately marked as booked.
-                </p>
-              </div>
-            </div>
+          <div className="text-center py-12 text-gray-500">
+            <p>Use the booking button in the header to manage booking status.</p>
           </div>
         </TabsContent>
 
@@ -914,16 +875,6 @@ export function PortInfoForm({
         />
       )}
 
-      {/* Mark As Booked Modal */}
-      <MarkActivityBookedModal
-        open={showBookingModal}
-        onOpenChange={setShowBookingModal}
-        activityName={watchedValues.portInfoDetails?.portName || 'Port Info'}
-        isBooked={activityIsBooked}
-        currentBookingDate={activityBookingDate}
-        onConfirm={handleMarkAsBooked}
-        isPending={markActivityBooked.isPending}
-      />
     </div>
   )
 }
