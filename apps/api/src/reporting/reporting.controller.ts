@@ -345,12 +345,25 @@ export class ReportingController {
     @GetAuthContext() auth: AuthContext,
     @Query() query: ReportQueryDto,
   ) {
+    // pageSize=0 means "show all rows" — use a large page size
+    if (query.pageSize === 0) {
+      query.pageSize = 100000
+    }
+
     const result = await this.reporting.runReport(slug, auth, query)
 
-    // Compute totals and summaryItems from column definitions
+    // Compute page totals, grand totals, and summaryItems from column definitions
     const columns = this.getColumnsForReport(slug)
     if (columns && Array.isArray(result.data) && result.data.length > 0) {
-      result.totals = this.computeTotals(result.data as any[], columns)
+      result.pageTotals = this.computePageTotals(result.data as any[], columns)
+      result.grandTotals = this.buildGrandTotals(
+        slug,
+        result.summary ?? {},
+        columns,
+        result.data as any[],
+        result.totalRows,
+        result.pageSize,
+      )
       result.summaryItems = this.buildSummaryItems(
         result.data as any[],
         columns,
@@ -533,9 +546,9 @@ export class ReportingController {
   }
 
   /**
-   * Compute column totals from data rows.
+   * Compute column totals from current page data rows.
    */
-  private computeTotals(
+  private computePageTotals(
     data: any[],
     columns: ColumnDef[],
   ): Record<string, number | null> {
@@ -563,6 +576,110 @@ export class ReportingController {
     }
 
     return totals
+  }
+
+  /**
+   * Summary-key to column-key mapping per report slug.
+   * Maps summary field names (from DB queries) to the column keys used in the table.
+   */
+  private static readonly SUMMARY_TO_COLUMN_MAP: Record<string, Record<string, string>> = {
+    'booked-sales': {
+      totalSalesCents: 'totalPriceCents',
+      totalBookings: '_rowCount',
+    },
+    'departed-sales': {
+      totalSalesCents: 'totalPriceCents',
+      totalBookings: '_rowCount',
+    },
+    'sales-by-agent': {
+      totalSalesCents: 'totalSalesCents',
+      totalBookings: 'bookingCount',
+    },
+    'sales-by-destination': {
+      totalSalesCents: 'totalSalesCents',
+      totalBookings: 'bookingCount',
+    },
+    'booked-sales-by-supplier': {
+      totalSalesCents: 'totalSalesCents',
+      totalCommissionCents: 'commissionCents',
+      totalActivities: 'activityCount',
+    },
+    'departed-sales-by-supplier': {
+      totalSalesCents: 'totalSalesCents',
+      totalCommissionCents: 'commissionCents',
+      totalActivities: 'activityCount',
+    },
+    'booking-pipeline': {
+      estimatedTotalCents: 'totalEstimatedCents',
+      totalTrips: 'tripCount',
+    },
+    'commission-aging': {
+      totalOutstanding: 'outstandingCents',
+    },
+    'commission-reconciliation': {
+      totalCheckAmount: 'checkAmountCents',
+      totalMatched: 'matchedAmountCents',
+      totalUnmatched: 'unmatchedAmountCents',
+      totalChecks: 'itemCount',
+    },
+    'payment-schedule': {
+      totalExpected: 'amountCents',
+      totalPaid: 'paidCents',
+      totalRemaining: 'remainingCents',
+    },
+    'agent-commission-statement': {
+      totalSalesCents: 'totalSalesCents',
+      totalGrossCommission: 'grossCommissionCents',
+      totalReceived: 'receivedCents',
+      totalPaidToAgents: 'paidToAgentCents',
+      totalPending: 'pendingCents',
+    },
+    'upcoming-departures': {},
+    'ontario-gross-sales': {
+      // Summary keys would need separate mapping if available
+    },
+  }
+
+  /**
+   * Build grand totals (full dataset) from the summary data returned by DB queries.
+   * Falls back to page totals when data fits on a single page.
+   */
+  private buildGrandTotals(
+    slug: string,
+    summary: Record<string, any>,
+    columns: ColumnDef[],
+    pageData: any[],
+    totalRows: number,
+    pageSize: number,
+  ): Record<string, number | null> {
+    // If all data fits on one page, page totals ARE grand totals
+    if (totalRows <= pageSize) {
+      return this.computePageTotals(pageData, columns)
+    }
+
+    const grandTotals: Record<string, number | null> = {}
+    const mapping = ReportingController.SUMMARY_TO_COLUMN_MAP[slug] ?? {}
+
+    // Build reverse lookup: column key -> summary value for this report
+    const summaryByColumn: Record<string, number> = {}
+    for (const [summaryKey, colKey] of Object.entries(mapping)) {
+      if (summary[summaryKey] != null && colKey !== '_rowCount') {
+        summaryByColumn[colKey] = Number(summary[summaryKey])
+      }
+    }
+
+    for (const col of columns) {
+      if (summaryByColumn[col.key] != null) {
+        grandTotals[col.key] = summaryByColumn[col.key]
+      } else if (this.isSummableColumn(col.key) || this.isAverageableColumn(col.key)) {
+        // No summary data available for this column — set null to indicate unknown
+        grandTotals[col.key] = null
+      } else {
+        grandTotals[col.key] = null
+      }
+    }
+
+    return grandTotals
   }
 
   /**

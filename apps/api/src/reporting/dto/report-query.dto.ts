@@ -21,8 +21,8 @@ export class ReportQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(1)
-  @Max(500)
+  @Min(0)
+  @Max(100000)
   pageSize?: number = 50
 
   @IsOptional()

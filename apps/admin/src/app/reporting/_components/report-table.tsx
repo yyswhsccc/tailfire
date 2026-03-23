@@ -26,7 +26,9 @@ interface ReportTableProps {
   sortOrder?: 'asc' | 'desc'
   onSort?: (columnKey: string) => void
   isLoading?: boolean
-  totals?: Record<string, number | null>
+  pageTotals?: Record<string, number | null>
+  grandTotals?: Record<string, number | null>
+  totalPages?: number
 }
 
 /** Format cents values as $X,XXX.XX */
@@ -73,7 +75,9 @@ export function ReportTable({
   sortOrder,
   onSort,
   isLoading,
-  totals,
+  pageTotals,
+  grandTotals,
+  totalPages = 1,
 }: ReportTableProps) {
   if (isLoading) {
     return (
@@ -177,32 +181,62 @@ export function ReportTable({
             </TableRow>
           ))}
         </TableBody>
-        {totals && (
+        {(pageTotals || grandTotals) && (
           <TableFooter>
-            <TableRow className="bg-muted/50 font-semibold">
-              {columns.map((col, i) => {
-                const alignClass =
-                  col.align === 'right'
-                    ? 'text-right'
-                    : col.align === 'center'
-                      ? 'text-center'
-                      : 'text-left'
-                const monoClass = col.mono || isCentsColumn(col.key) ? 'font-mono tabular-nums' : ''
+            {/* Subtotal row: only shown when there are multiple pages */}
+            {totalPages > 1 && pageTotals && (
+              <TableRow className="bg-muted/30 font-medium text-sm">
+                {columns.map((col, i) => {
+                  const alignClass =
+                    col.align === 'right'
+                      ? 'text-right'
+                      : col.align === 'center'
+                        ? 'text-center'
+                        : 'text-left'
+                  const monoClass = col.mono || isCentsColumn(col.key) ? 'font-mono tabular-nums' : ''
 
-                return (
-                  <TableCell
-                    key={col.key}
-                    className={`${alignClass} ${monoClass}`}
-                  >
-                    {i === 0
-                      ? 'Total'
-                      : totals[col.key] != null
-                        ? formatCellValue(col.key, totals[col.key])
-                        : ''}
-                  </TableCell>
-                )
-              })}
-            </TableRow>
+                  return (
+                    <TableCell
+                      key={col.key}
+                      className={`${alignClass} ${monoClass}`}
+                    >
+                      {i === 0
+                        ? 'Subtotal'
+                        : pageTotals[col.key] != null
+                          ? formatCellValue(col.key, pageTotals[col.key])
+                          : ''}
+                    </TableCell>
+                  )
+                })}
+              </TableRow>
+            )}
+            {/* Grand total row: always shown */}
+            {grandTotals && (
+              <TableRow className="bg-muted/50 font-semibold border-t-2 border-foreground/20">
+                {columns.map((col, i) => {
+                  const alignClass =
+                    col.align === 'right'
+                      ? 'text-right'
+                      : col.align === 'center'
+                        ? 'text-center'
+                        : 'text-left'
+                  const monoClass = col.mono || isCentsColumn(col.key) ? 'font-mono tabular-nums' : ''
+
+                  return (
+                    <TableCell
+                      key={col.key}
+                      className={`${alignClass} ${monoClass}`}
+                    >
+                      {i === 0
+                        ? 'Total'
+                        : grandTotals[col.key] != null
+                          ? formatCellValue(col.key, grandTotals[col.key])
+                          : ''}
+                    </TableCell>
+                  )
+                })}
+              </TableRow>
+            )}
           </TableFooter>
         )}
       </Table>

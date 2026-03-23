@@ -11,7 +11,8 @@ export function buildReportResponse<T>(params: {
   pageSize: number
   summary?: Record<string, number | string>
   summaryItems?: SummaryItem[]
-  totals?: Record<string, number | null>
+  pageTotals?: Record<string, number | null>
+  grandTotals?: Record<string, number | null>
 }): ReportResponse<T> {
   return {
     reportSlug: params.slug,
@@ -25,6 +26,7 @@ export function buildReportResponse<T>(params: {
     data: params.data,
     summary: params.summary,
     summaryItems: params.summaryItems,
-    totals: params.totals,
+    pageTotals: params.pageTotals,
+    grandTotals: params.grandTotals,
   }
 }
