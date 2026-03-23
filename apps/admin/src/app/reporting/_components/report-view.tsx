@@ -30,7 +30,8 @@ interface ReportViewProps {
 function deriveColumns(data: Record<string, unknown>[]): ReportColumnDef[] {
   if (data.length === 0) return []
   const sample = data[0]
-  return Object.keys(sample).map((key) => {
+  if (!sample) return []
+  return Object.keys(sample as Record<string, unknown>).map((key) => {
     const isCents = /[Cc]ents$/.test(key) || /[Pp]rice$/.test(key)
     const isCount = /[Cc]ount$/.test(key) || /[Rr]ate$/.test(key) || /[Ss]core$/.test(key)
     return {
