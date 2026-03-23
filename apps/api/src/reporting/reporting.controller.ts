@@ -42,6 +42,7 @@ interface ColumnDef {
 }
 
 const REPORT_COLUMNS: Record<string, ColumnDef[]> = {
+  // ── Sales ────────────────────────────────────────────────────────────────
   'booked-sales': [
     { key: 'tripName', header: 'Trip' },
     { key: 'referenceNumber', header: 'Ref #', mono: true },
@@ -52,6 +53,264 @@ const REPORT_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'travelerCount', header: 'Pax', align: 'right' },
     { key: 'activityCount', header: 'Items', align: 'right' },
     { key: 'totalPriceCents', header: 'Total', align: 'right' },
+  ],
+
+  'departed-sales': [
+    { key: 'tripName', header: 'Trip' },
+    { key: 'referenceNumber', header: 'Ref #', mono: true },
+    { key: 'agentName', header: 'Agent' },
+    { key: 'clientName', header: 'Client' },
+    { key: 'departureDate', header: 'Departure' },
+    { key: 'returnDate', header: 'Return' },
+    { key: 'travelerCount', header: 'Pax', align: 'right' },
+    { key: 'activityCount', header: 'Items', align: 'right' },
+    { key: 'totalPriceCents', header: 'Total', align: 'right' },
+  ],
+
+  'sales-by-agent': [
+    { key: 'agentName', header: 'Agent' },
+    { key: 'bookingCount', header: 'Bookings', align: 'right' },
+    { key: 'totalSalesCents', header: 'Total Sales', align: 'right' },
+    { key: 'avgBookingValueCents', header: 'Avg Booking', align: 'right' },
+    { key: 'currency', header: 'Currency' },
+  ],
+
+  'sales-by-destination': [
+    { key: 'destination', header: 'Destination' },
+    { key: 'tripType', header: 'Trip Type' },
+    { key: 'bookingCount', header: 'Bookings', align: 'right' },
+    { key: 'travelerCount', header: 'Pax', align: 'right' },
+    { key: 'totalSalesCents', header: 'Total Sales', align: 'right' },
+    { key: 'currency', header: 'Currency' },
+  ],
+
+  'booked-sales-by-supplier': [
+    { key: 'supplierName', header: 'Supplier' },
+    { key: 'activityType', header: 'Type' },
+    { key: 'activityCount', header: 'Items', align: 'right' },
+    { key: 'totalSalesCents', header: 'Total Sales', align: 'right' },
+    { key: 'commissionCents', header: 'Commission', align: 'right' },
+    { key: 'currency', header: 'Currency' },
+  ],
+
+  'departed-sales-by-supplier': [
+    { key: 'supplierName', header: 'Supplier' },
+    { key: 'activityType', header: 'Type' },
+    { key: 'activityCount', header: 'Items', align: 'right' },
+    { key: 'totalSalesCents', header: 'Total Sales', align: 'right' },
+    { key: 'commissionCents', header: 'Commission', align: 'right' },
+    { key: 'currency', header: 'Currency' },
+  ],
+
+  // ── Financial ─────────────────────────────────────────────────────────────
+  'booking-pipeline': [
+    { key: 'status', header: 'Status' },
+    { key: 'tripCount', header: 'Trips', align: 'right' },
+    { key: 'totalEstimatedCents', header: 'Est. Value', align: 'right' },
+    { key: 'currency', header: 'Currency' },
+  ],
+
+  'commission-aging': [
+    { key: 'activityName', header: 'Activity' },
+    { key: 'supplierName', header: 'Supplier' },
+    { key: 'tripName', header: 'Trip' },
+    { key: 'agentName', header: 'Agent' },
+    { key: 'departureDate', header: 'Departure' },
+    { key: 'daysSinceDeparture', header: 'Days Out', align: 'right' },
+    { key: 'agingBucket', header: 'Aging' },
+    { key: 'expectedCents', header: 'Expected', align: 'right' },
+    { key: 'receivedCents', header: 'Received', align: 'right' },
+    { key: 'outstandingCents', header: 'Outstanding', align: 'right' },
+  ],
+
+  'commission-reconciliation': [
+    { key: 'checkNumber', header: 'Check #', mono: true },
+    { key: 'supplierName', header: 'Supplier' },
+    { key: 'checkDate', header: 'Date' },
+    { key: 'status', header: 'Status' },
+    { key: 'itemCount', header: 'Items', align: 'right' },
+    { key: 'checkAmountCents', header: 'Check Amount', align: 'right' },
+    { key: 'matchedAmountCents', header: 'Matched', align: 'right' },
+    { key: 'unmatchedAmountCents', header: 'Unmatched', align: 'right' },
+  ],
+
+  'payment-schedule': [
+    { key: 'tripName', header: 'Trip' },
+    { key: 'clientName', header: 'Client' },
+    { key: 'agentName', header: 'Agent' },
+    { key: 'itemLabel', header: 'Payment' },
+    { key: 'dueDate', header: 'Due Date' },
+    { key: 'daysUntilDue', header: 'Days Until Due', align: 'right' },
+    { key: 'status', header: 'Status' },
+    { key: 'amountCents', header: 'Amount', align: 'right' },
+    { key: 'paidCents', header: 'Paid', align: 'right' },
+    { key: 'remainingCents', header: 'Remaining', align: 'right' },
+  ],
+
+  'agent-commission-statement': [
+    { key: 'activityName', header: 'Activity' },
+    { key: 'tripName', header: 'Trip' },
+    { key: 'supplierName', header: 'Supplier' },
+    { key: 'departureDate', header: 'Departure' },
+    { key: 'totalSalesCents', header: 'Sales', align: 'right' },
+    { key: 'commissionRate', header: 'Rate %', align: 'right' },
+    { key: 'grossCommissionCents', header: 'Gross Comm.', align: 'right' },
+    { key: 'receivedCents', header: 'Received', align: 'right' },
+    { key: 'paidToAgentCents', header: 'Paid to Agent', align: 'right' },
+    { key: 'pendingCents', header: 'Pending', align: 'right' },
+  ],
+
+  // ── Operational ───────────────────────────────────────────────────────────
+  'upcoming-departures': [
+    { key: 'tripName', header: 'Trip' },
+    { key: 'clientName', header: 'Client' },
+    { key: 'agentName', header: 'Agent' },
+    { key: 'departureDate', header: 'Departure' },
+    { key: 'daysUntilDeparture', header: 'Days Away', align: 'right' },
+    { key: 'travelerCount', header: 'Pax', align: 'right' },
+    { key: 'paymentStatus', header: 'Payment' },
+    { key: 'outstandingCents', header: 'Outstanding', align: 'right' },
+    { key: 'documentsComplete', header: 'Docs' },
+  ],
+
+  // ── Compliance ────────────────────────────────────────────────────────────
+  'ontario-gross-sales': [
+    { key: 'month', header: 'Month' },
+    { key: 'bookingCount', header: 'Bookings', align: 'right' },
+    { key: 'totalSalesCents', header: 'Total Sales', align: 'right' },
+    { key: 'serviceFeesCents', header: 'Service Fees', align: 'right' },
+    { key: 'grossSalesCents', header: 'Gross Sales', align: 'right' },
+    { key: 'currency', header: 'Currency' },
+  ],
+
+  // ── CRM ───────────────────────────────────────────────────────────────────
+  'client-spending': [
+    { key: 'clientName', header: 'Client' },
+    { key: 'email', header: 'Email' },
+    { key: 'tripCount', header: 'Trips', align: 'right' },
+    { key: 'totalSpendCents', header: 'Total Spend', align: 'right' },
+    { key: 'avgTripValueCents', header: 'Avg Trip', align: 'right' },
+    { key: 'firstTripDate', header: 'First Trip' },
+    { key: 'lastTripDate', header: 'Last Trip' },
+  ],
+
+  'repeat-clients': [
+    { key: 'clientName', header: 'Client' },
+    { key: 'email', header: 'Email' },
+    { key: 'tripCount', header: 'Trips', align: 'right' },
+    { key: 'totalSpendCents', header: 'Total Spend', align: 'right' },
+    { key: 'firstTripDate', header: 'First Trip' },
+    { key: 'lastTripDate', header: 'Last Trip' },
+    { key: 'avgDaysBetweenTrips', header: 'Avg Days Between', align: 'right' },
+  ],
+
+  'dormant-clients': [
+    { key: 'clientName', header: 'Client' },
+    { key: 'email', header: 'Email' },
+    { key: 'phone', header: 'Phone' },
+    { key: 'agentName', header: 'Agent' },
+    { key: 'lastTripDate', header: 'Last Trip' },
+    { key: 'daysSinceLastTrip', header: 'Days Dormant', align: 'right' },
+    { key: 'tripCount', header: 'Trips', align: 'right' },
+    { key: 'lifetimeSpendCents', header: 'Lifetime Spend', align: 'right' },
+  ],
+
+  'passport-expiry': [
+    { key: 'travelerName', header: 'Traveler' },
+    { key: 'passportNumber', header: 'Passport #', mono: true },
+    { key: 'nationality', header: 'Nationality' },
+    { key: 'passportExpiry', header: 'Expiry Date' },
+    { key: 'daysUntilExpiry', header: 'Days Until Expiry', align: 'right' },
+    { key: 'upcomingTripName', header: 'Upcoming Trip' },
+    { key: 'upcomingTripDate', header: 'Trip Date' },
+  ],
+
+  'upcoming-birthdays': [
+    { key: 'clientName', header: 'Client' },
+    { key: 'email', header: 'Email' },
+    { key: 'phone', header: 'Phone' },
+    { key: 'agentName', header: 'Agent' },
+    { key: 'birthDate', header: 'Birthday' },
+    { key: 'age', header: 'Age', align: 'right' },
+    { key: 'daysUntilBirthday', header: 'Days Away', align: 'right' },
+  ],
+
+  'new-clients': [
+    { key: 'clientName', header: 'Client' },
+    { key: 'email', header: 'Email' },
+    { key: 'agentName', header: 'Agent' },
+    { key: 'createdAt', header: 'Joined' },
+    { key: 'hasTrip', header: 'Has Trip' },
+    { key: 'firstTripDate', header: 'First Trip' },
+  ],
+
+  'client-data-completeness': [
+    { key: 'clientName', header: 'Client' },
+    { key: 'completenessScore', header: 'Score %', align: 'right' },
+    { key: 'hasEmail', header: 'Email' },
+    { key: 'hasPhone', header: 'Phone' },
+    { key: 'hasAddress', header: 'Address' },
+    { key: 'hasDob', header: 'DOB' },
+    { key: 'hasPassport', header: 'Passport' },
+    { key: 'missingFields', header: 'Missing' },
+  ],
+
+  'top-clients-revenue': [
+    { key: 'clientName', header: 'Client' },
+    { key: 'email', header: 'Email' },
+    { key: 'tripCount', header: 'Trips', align: 'right' },
+    { key: 'totalSpendCents', header: 'Total Spend', align: 'right' },
+    { key: 'avgTripValueCents', header: 'Avg Trip', align: 'right' },
+    { key: 'lastTripDate', header: 'Last Trip' },
+  ],
+
+  // ── Insurance ─────────────────────────────────────────────────────────────
+  'insurance-penetration': [
+    { key: 'period', header: 'Period' },
+    { key: 'totalTravelers', header: 'Total Pax', align: 'right' },
+    { key: 'coveredTravelers', header: 'Covered', align: 'right' },
+    { key: 'ownInsuranceTravelers', header: 'Own Insurance', align: 'right' },
+    { key: 'declinedTravelers', header: 'Declined', align: 'right' },
+    { key: 'pendingTravelers', header: 'Pending', align: 'right' },
+    { key: 'penetrationRate', header: 'Rate %', align: 'right' },
+  ],
+
+  'insurance-declines': [
+    { key: 'tripName', header: 'Trip' },
+    { key: 'travelerName', header: 'Traveler' },
+    { key: 'departureDate', header: 'Departure' },
+    { key: 'declinedAt', header: 'Declined At' },
+    { key: 'declinedReason', header: 'Reason' },
+    { key: 'isAcknowledged', header: 'Acknowledged' },
+    { key: 'acknowledgedAt', header: 'Acknowledged At' },
+  ],
+
+  'insurance-revenue': [
+    { key: 'providerName', header: 'Provider' },
+    { key: 'packageName', header: 'Package' },
+    { key: 'policyType', header: 'Policy Type' },
+    { key: 'packageCount', header: 'Policies', align: 'right' },
+    { key: 'travelerCount', header: 'Travelers', align: 'right' },
+    { key: 'totalPremiumCents', header: 'Total Premium', align: 'right' },
+    { key: 'totalCoverageCents', header: 'Total Coverage', align: 'right' },
+  ],
+
+  'insurance-by-policy-type': [
+    { key: 'policyType', header: 'Policy Type' },
+    { key: 'packageCount', header: 'Policies', align: 'right' },
+    { key: 'travelerCount', header: 'Travelers', align: 'right' },
+    { key: 'totalPremiumCents', header: 'Total Premium', align: 'right' },
+    { key: 'avgPremiumCents', header: 'Avg Premium', align: 'right' },
+    { key: 'penetrationRate', header: 'Rate %', align: 'right' },
+  ],
+
+  'insurance-unresolved': [
+    { key: 'tripName', header: 'Trip' },
+    { key: 'travelerName', header: 'Traveler' },
+    { key: 'agentName', header: 'Agent' },
+    { key: 'departureDate', header: 'Departure' },
+    { key: 'daysUntilDeparture', header: 'Days Away', align: 'right' },
+    { key: 'status', header: 'Status' },
   ],
 }
 
