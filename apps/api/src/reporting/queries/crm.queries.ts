@@ -153,6 +153,7 @@ export async function queryClientSpending(
     avgTripValueCents: Number(row.avg_trip_value_cents ?? 0),
     firstTripDate: row.first_trip_date ? String(row.first_trip_date) : null,
     lastTripDate: row.last_trip_date ? String(row.last_trip_date) : null,
+    currency: 'CAD',
   }))
 
   return { data, totalRows }
@@ -236,9 +237,11 @@ export async function queryRepeatClients(
     clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     tripCount: Number(row.trip_count ?? 0),
+    totalSpendCents: 0,
     avgDaysBetweenTrips: row.avg_days_between_trips != null ? Number(row.avg_days_between_trips) : null,
     firstTripDate: row.first_trip_date ? String(row.first_trip_date) : null,
     lastTripDate: row.last_trip_date ? String(row.last_trip_date) : null,
+    currency: 'CAD',
   }))
 
   return { data, totalRows }
@@ -320,10 +323,12 @@ export async function queryDormantClients(
     clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     phone: row.phone,
+    agentName: null as string | null,
     tripCount: Number(row.trip_count ?? 0),
-    lastTripEndDate: row.last_trip_end_date ? String(row.last_trip_end_date) : null,
+    lastTripDate: row.last_trip_end_date ? String(row.last_trip_end_date) : null,
     daysSinceLastTrip: Number(row.days_since_last_trip ?? 0),
     lifetimeSpendCents: Number(row.lifetime_spend_cents ?? 0),
+    currency: 'CAD',
   }))
 
   return { data, totalRows }
@@ -395,16 +400,16 @@ export async function queryPassportExpiry(
 
   const data = (dataResult as any[]).map((row: any) => ({
     contactId: row.contact_id,
-    clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
+    travelerName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     phone: row.phone,
     passportNumber: row.passport_number,
     passportExpiry: row.passport_expiry ? String(row.passport_expiry) : null,
-    passportCountry: row.passport_country,
+    nationality: row.passport_country,
     daysUntilExpiry: Number(row.days_until_expiry ?? 0),
     upcomingTripId: row.upcoming_trip_id,
     upcomingTripName: row.upcoming_trip_name,
-    upcomingDepartureDate: row.upcoming_departure_date ? String(row.upcoming_departure_date) : null,
+    upcomingTripDate: row.upcoming_departure_date ? String(row.upcoming_departure_date) : null,
   }))
 
   return { data, totalRows }
@@ -475,8 +480,9 @@ export async function queryUpcomingBirthdays(
     clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     phone: row.phone,
-    dateOfBirth: row.date_of_birth ? String(row.date_of_birth) : null,
-    currentAge: Number(row.current_age ?? 0),
+    birthDate: row.date_of_birth ? String(row.date_of_birth) : null,
+    age: Number(row.current_age ?? 0),
+    agentName: null as string | null,
     nextBirthday: row.next_birthday ? String(row.next_birthday) : null,
     daysUntilBirthday: Number(row.days_until_birthday ?? 0),
   }))
@@ -550,9 +556,11 @@ export async function queryNewClients(
     clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
     email: row.email,
     phone: row.phone,
+    agentName: null as string | null,
     contactType: row.contact_type,
     createdAt: row.created_at ? String(row.created_at) : null,
     hasTrip: row.has_trip === true || row.has_trip === 't',
+    firstTripDate: null as string | null,
     tripId: row.trip_id,
     tripName: row.trip_name,
     tripStatus: row.trip_status,
@@ -627,7 +635,11 @@ export async function queryClientCompleteness(
     return {
       contactId: row.contact_id,
       clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
-      email: row.email,
+      hasEmail: !!row.email,
+      hasPhone: !!row.phone,
+      hasAddress: !!row.address_line1,
+      hasDob: !!row.date_of_birth,
+      hasPassport: !!row.passport_number,
       completenessScore: Number(row.completeness_score ?? 0),
       missingFields: missing,
     }
@@ -746,6 +758,7 @@ export async function queryTopClientsRevenue(
     avgTripValueCents: Number(row.avg_trip_value_cents ?? 0),
     firstTripDate: row.first_trip_date ? String(row.first_trip_date) : null,
     lastTripDate: row.last_trip_date ? String(row.last_trip_date) : null,
+    currency: 'CAD',
   }))
 
   return { data, totalRows }

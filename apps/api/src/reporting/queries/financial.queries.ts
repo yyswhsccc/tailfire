@@ -138,16 +138,17 @@ export async function queryCommissionAging(
   const data = (dataResult as any[]).map((row: any) => ({
     commissionTrackingId: row.commission_tracking_id,
     activityName: row.activity_name,
-    supplier: row.supplier,
+    supplierName: row.supplier,
     tripName: row.trip_name,
     tripId: row.trip_id,
     agentName: [row.agent_first_name, row.agent_last_name].filter(Boolean).join(' ') || null,
     expectedCents: Number(row.expected_cents ?? 0),
     receivedCents: Number(row.received_cents ?? 0),
-    outstanding: Number(row.outstanding ?? 0),
+    outstandingCents: Number(row.outstanding ?? 0),
     departureDate: row.departure_date ? String(row.departure_date) : null,
     daysSinceDeparture: Number(row.days_since_departure ?? 0),
     agingBucket: row.aging_bucket,
+    currency: 'CAD',
   }))
 
   // Summary: totals by aging bucket
@@ -263,9 +264,10 @@ export async function queryCommissionReconciliation(
     checkDate: row.check_date ? String(row.check_date) : null,
     checkAmountCents: Number(row.check_amount_cents ?? 0),
     status: row.status,
-    matchedReceivedCents: Number(row.matched_received_cents ?? 0),
-    unmatchedAmount: Number(row.unmatched_amount ?? 0),
+    matchedAmountCents: Number(row.matched_received_cents ?? 0),
+    unmatchedAmountCents: Number(row.unmatched_amount ?? 0),
     itemCount: Number(row.item_count ?? 0),
+    currency: 'CAD',
   }))
 
   // Summary
@@ -390,11 +392,12 @@ export async function queryPaymentSchedule(
     agentName: [row.agent_first_name, row.agent_last_name].filter(Boolean).join(' ') || null,
     itemLabel: row.item_label,
     dueDate: row.due_date ? String(row.due_date) : null,
-    expectedAmountCents: Number(row.expected_amount_cents ?? 0),
-    paidAmountCents: Number(row.paid_amount_cents ?? 0),
-    remaining: Number(row.remaining ?? 0),
+    amountCents: Number(row.expected_amount_cents ?? 0),
+    paidCents: Number(row.paid_amount_cents ?? 0),
+    remainingCents: Number(row.remaining ?? 0),
     status: row.status,
     daysUntilDue: row.days_until_due != null ? Number(row.days_until_due) : null,
+    currency: 'CAD',
   }))
 
   // Summary
@@ -505,19 +508,21 @@ export async function queryAgentCommissionStatement(
 
   const data = (dataResult as any[]).map((row: any) => ({
     commissionTrackingId: row.commission_tracking_id,
+    activityId: row.commission_tracking_id,
     activityName: row.activity_name,
     tripId: row.trip_id,
     tripName: row.trip_name,
-    supplier: row.supplier,
+    supplierName: row.supplier,
     departureDate: row.departure_date ? String(row.departure_date) : null,
     agentId: row.agent_id,
     agentName: [row.agent_first_name, row.agent_last_name].filter(Boolean).join(' ') || null,
     totalSalesCents: Number(row.total_sales_cents ?? 0),
     commissionRate: row.commission_rate != null ? Number(row.commission_rate) : null,
-    grossCommission: Number(row.gross_commission ?? 0),
-    received: Number(row.received ?? 0),
-    paidToAgent: Number(row.paid_to_agent ?? 0),
-    pending: Number(row.pending ?? 0),
+    grossCommissionCents: Number(row.gross_commission ?? 0),
+    receivedCents: Number(row.received ?? 0),
+    paidToAgentCents: Number(row.paid_to_agent ?? 0),
+    pendingCents: Number(row.pending ?? 0),
+    currency: 'CAD',
   }))
 
   // Summary: aggregates across all matching rows
