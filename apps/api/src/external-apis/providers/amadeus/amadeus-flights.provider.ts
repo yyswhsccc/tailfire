@@ -51,7 +51,7 @@ function buildAmadeusConfig(): ExternalApiConfig {
   return {
     provider: 'amadeus',
     category: ApiCategory.FLIGHTS,
-    baseUrl: process.env.AMADEUS_API_URL || 'https://test.api.amadeus.com',
+    baseUrl: process.env.AMADEUS_SCHEDULE_API_URL || process.env.AMADEUS_API_URL || 'https://test.api.amadeus.com',
     rateLimit: {
       requestsPerMinute: parseInt(process.env.AMADEUS_RATE_LIMIT_PER_MINUTE || '60', 10),
       requestsPerHour: parseInt(process.env.AMADEUS_RATE_LIMIT_PER_HOUR || '100', 10),
@@ -103,8 +103,22 @@ export class AmadeusFlightsProvider
 
   /**
    * Get a valid OAuth2 access token via shared auth service
+   *
+   * Uses AMADEUS_SCHEDULE_CLIENT_ID/SECRET if set (allows schedule-specific
+   * live credentials while other Amadeus providers stay on sandbox),
+   * falling back to the shared credentials from the registry.
    */
   private async getAccessToken(): Promise<string> {
+    const scheduleClientId = process.env.AMADEUS_SCHEDULE_CLIENT_ID
+    const scheduleClientSecret = process.env.AMADEUS_SCHEDULE_CLIENT_SECRET
+
+    if (scheduleClientId && scheduleClientSecret) {
+      return this.authService.getAccessToken(this.config.baseUrl, {
+        clientId: scheduleClientId,
+        clientSecret: scheduleClientSecret,
+      })
+    }
+
     if (!this.credentials) {
       throw new Error('No credentials configured for Amadeus')
     }
