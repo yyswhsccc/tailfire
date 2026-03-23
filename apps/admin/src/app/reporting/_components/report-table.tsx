@@ -201,7 +201,7 @@ export function ReportTable({
                       className={`${alignClass} ${monoClass}`}
                     >
                       {i === 0
-                        ? 'Subtotal'
+                        ? 'Page Total'
                         : pageTotals[col.key] != null
                           ? formatCellValue(col.key, pageTotals[col.key])
                           : ''}
