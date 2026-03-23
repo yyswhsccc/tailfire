@@ -11,6 +11,18 @@
 
 import type { ActivityBookingStatus } from './activities.types'
 
+// Booking Validation
+
+export interface BookingValidationError {
+  message: string
+  code: string
+}
+
+export interface BookingValidationResult {
+  valid: boolean
+  errors: BookingValidationError[]
+}
+
 // Request DTOs
 
 export type MarkActivityBookedDto = {
