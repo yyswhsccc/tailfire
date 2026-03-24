@@ -1,5 +1,5 @@
 import { Processor, WorkerHost, InjectQueue } from '@nestjs/bullmq'
-import { HttpException, Logger } from '@nestjs/common'
+import { HttpException, Logger, NotFoundException } from '@nestjs/common'
 import { Job, Queue } from 'bullmq'
 import { QUEUES, type EmailSyncJobData } from '../automation/automation.types'
 import { ImapSyncService } from './imap-sync.service'
@@ -31,6 +31,11 @@ export class EmailSyncProcessor extends WorkerHost {
           this.logger.warn(`Sync completed with errors: ${result.errors.join('; ')}`)
         }
       } catch (err: any) {
+        // Deleted account — skip silently (account removed while sync was queued)
+        if (err instanceof NotFoundException) {
+          this.logger.warn(`Email account ${job.data.emailAccountId} not found — skipping sync (likely deleted)`)
+          return
+        }
         // Auth failures are expected when credentials change — log and skip, don't retry
         const resp = err instanceof HttpException ? err.getResponse() : null
         if (typeof resp === 'object' && resp && (resp as any).code === 'IMAP_AUTH_FAILED') {
