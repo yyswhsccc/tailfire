@@ -37,12 +37,15 @@ interface BookingDetailsSectionProps {
   onUpdate: (updates: Partial<PricingData>) => void
   /** Callback when supplier defaults are applied (for commission rate) */
   onSupplierDefaultsApplied?: (defaults: SupplierDefaults) => void
+  /** Navigate to a tab in the parent form (e.g., 'documents') */
+  onNavigateToTab?: (tab: string) => void
 }
 
 export function BookingDetailsSection({
   pricingData,
   onUpdate,
   onSupplierDefaultsApplied,
+  onNavigateToTab,
 }: BookingDetailsSectionProps) {
   /**
    * Handle supplier selection with defaults application
@@ -145,9 +148,14 @@ export function BookingDetailsSection({
           />
         </div>
 
-        {/* Upload Receipt Button */}
+        {/* Document Actions */}
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" type="button">
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={() => onNavigateToTab?.('documents')}
+          >
             Upload Receipt
           </Button>
           <Button variant="ghost" size="sm" type="button">

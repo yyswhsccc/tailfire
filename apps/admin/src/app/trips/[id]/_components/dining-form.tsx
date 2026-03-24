@@ -1027,6 +1027,7 @@ export function DiningForm({
               })
             }}
             onSupplierDefaultsApplied={(defaults: SupplierDefaults) => {
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
               setSupplierCommissionRate(defaults.commissionRate)
             }}
           />

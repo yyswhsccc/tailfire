@@ -1482,6 +1482,7 @@ export function LodgingForm({
             pricingData={pricingData}
             onUpdate={handlePricingUpdate}
             onSupplierDefaultsApplied={handleSupplierDefaultsApplied}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
           />
 
           <Separator />
