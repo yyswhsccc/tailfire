@@ -868,7 +868,8 @@ export class ActivitiesService {
     // Cascade booking status to children when a package booking status changes
     if (beforeActivity.activityType === 'package' && dto.bookingStatus !== undefined) {
       if (dto.bookingStatus === 'booked') {
-        // Mark non-cancelled children as booked
+        // Mark non-cancelled, non-already-booked children as booked
+        // Skip children that were independently booked (preserves their booking date/metadata)
         await this.db.client
           .update(this.db.schema.itineraryActivities)
           .set({
@@ -880,7 +881,8 @@ export class ActivitiesService {
           .where(
             and(
               eq(this.db.schema.itineraryActivities.parentActivityId, id),
-              ne(this.db.schema.itineraryActivities.proposalStatus, 'cancelled')
+              ne(this.db.schema.itineraryActivities.proposalStatus, 'cancelled'),
+              ne(this.db.schema.itineraryActivities.bookingStatus, 'booked')
             )
           )
       } else if (dto.bookingStatus === 'unbooked') {
