@@ -40,6 +40,7 @@ import { useTrip, useDeleteTrip, useUncancelTrip, usePublishTripSnapshot, useUnp
 import { useUser } from '@/hooks/use-user'
 import { MoveToGroupDialog } from '@/components/trips/MoveToGroupDialog'
 import { TripOverview } from './_components/trip-overview'
+import { TripTasks } from './_components/trip-tasks'
 import { TripItinerary } from './_components/trip-itinerary'
 import { TripMediaTab } from './_components/trip-media-tab'
 import { TripPackages } from './_components/trip-packages'
@@ -612,6 +613,7 @@ export default function TripDetailPage() {
       case 'notes':
         return <NotesSection tripId={trip.id} />
       case 'tasks':
+        return <TripTasks trip={trip} />
       case 'documents':
       case 'emails':
       case 'forms':

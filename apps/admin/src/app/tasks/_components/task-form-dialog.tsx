@@ -55,6 +55,7 @@ const taskFormSchema = z.object({
   assigneeType: z.enum(['user', 'contact', 'admin_pool']),
   assigneeUserId: z.string().optional().nullable(),
   assigneeContactId: z.string().optional().nullable(),
+  phase: z.enum(['auto', 'pre_booking', 'pre_departure', 'during_travel', 'post_return']).optional().nullable(),
 })
 
 type TaskFormValues = z.infer<typeof taskFormSchema>
@@ -65,9 +66,11 @@ interface TaskFormDialogProps {
   task?: TaskResponseDto | null
   contactId?: string
   contactName?: string
+  tripId?: string
+  phase?: string
 }
 
-export function TaskFormDialog({ open, onOpenChange, task, contactId, contactName }: TaskFormDialogProps) {
+export function TaskFormDialog({ open, onOpenChange, task, contactId, contactName, tripId, phase }: TaskFormDialogProps) {
   const { toast } = useToast()
   const createTask = useCreateTask()
   const updateTask = useUpdateTask()
@@ -96,6 +99,7 @@ export function TaskFormDialog({ open, onOpenChange, task, contactId, contactNam
       assigneeType: 'user',
       assigneeUserId: null,
       assigneeContactId: null,
+      phase: null,
     },
   })
 
@@ -115,6 +119,7 @@ export function TaskFormDialog({ open, onOpenChange, task, contactId, contactNam
         assigneeType: task.assigneeType || 'user',
         assigneeUserId: task.assigneeUserId || null,
         assigneeContactId: task.assigneeContactId || null,
+        phase: task.phase || null,
       })
     } else {
       form.reset({
@@ -128,9 +133,10 @@ export function TaskFormDialog({ open, onOpenChange, task, contactId, contactNam
         assigneeType: contactId ? 'contact' : 'user',
         assigneeUserId: null,
         assigneeContactId: contactId || null,
+        phase: (phase as TaskFormValues['phase']) || null,
       })
     }
-  }, [task, form, contactId])
+  }, [task, form, contactId, phase])
 
   // Clear irrelevant assignee fields when type changes
   useEffect(() => {
@@ -149,11 +155,14 @@ export function TaskFormDialog({ open, onOpenChange, task, contactId, contactNam
 
   const onSubmit = async (values: TaskFormValues) => {
     try {
+      const phaseValue = values.phase === 'auto' || !values.phase ? undefined : values.phase
       const data = {
         ...values,
         dueDate: values.dueDate ? format(values.dueDate, 'yyyy-MM-dd') : undefined,
         assigneeUserId: values.assigneeType === 'user' ? values.assigneeUserId || undefined : undefined,
         assigneeContactId: values.assigneeType === 'contact' ? values.assigneeContactId || undefined : undefined,
+        phase: phaseValue,
+        ...(tripId ? { tripId } : {}),
       }
 
       if (isEditing && task) {
@@ -436,6 +445,36 @@ export function TaskFormDialog({ open, onOpenChange, task, contactId, contactNam
                 </FormItem>
               )}
             />
+
+            {tripId && (
+              <FormField
+                control={form.control}
+                name="phase"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Trip Phase</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || 'auto'}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Auto (from due date)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto (from due date)</SelectItem>
+                        <SelectItem value="pre_booking">Pre-Booking</SelectItem>
+                        <SelectItem value="pre_departure">Pre-Departure</SelectItem>
+                        <SelectItem value="during_travel">During Travel</SelectItem>
+                        <SelectItem value="post_return">Post-Return</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <DialogFooter>
               <Button
