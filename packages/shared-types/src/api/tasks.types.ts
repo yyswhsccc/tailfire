@@ -56,6 +56,7 @@ export interface CreateTaskDto {
   status?: TaskStatus
   priority?: TaskPriority
   taskType?: TaskType
+  phase?: 'pre_booking' | 'pre_departure' | 'during_travel' | 'post_return'
 
   // Dates
   dueDate?: string // ISO date (YYYY-MM-DD)
@@ -162,6 +163,7 @@ export interface TaskResponseDto {
   status: TaskStatus
   priority: TaskPriority
   taskType: TaskType
+  phase?: 'pre_booking' | 'pre_departure' | 'during_travel' | 'post_return' | null
 
   // Dates
   dueDate?: string

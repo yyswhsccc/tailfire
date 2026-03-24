@@ -70,6 +70,7 @@ export class TasksService {
         status: dto.status || 'pending',
         priority: dto.priority || 'medium',
         taskType: dto.taskType || 'manual',
+        phase: dto.phase,
         dueDate: dto.dueDate,
         dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
         startDate: dto.startDate,
@@ -337,6 +338,7 @@ export class TasksService {
     if (dto.status !== undefined) updateData.status = dto.status
     if (dto.priority !== undefined) updateData.priority = dto.priority
     if (dto.taskType !== undefined) updateData.taskType = dto.taskType
+    if (dto.phase !== undefined) updateData.phase = dto.phase
     if (dto.dueDate !== undefined) updateData.dueDate = dto.dueDate
     if (dto.dueAt !== undefined) updateData.dueAt = dto.dueAt ? new Date(dto.dueAt) : null
     if (dto.startDate !== undefined) updateData.startDate = dto.startDate
@@ -682,6 +684,7 @@ export class TasksService {
       status: task.status,
       priority: task.priority,
       taskType: task.taskType,
+      phase: (task.phase as 'pre_booking' | 'pre_departure' | 'during_travel' | 'post_return' | null) ?? null,
       dueDate: task.dueDate ?? undefined,
       dueAt: task.dueAt?.toISOString() ?? undefined,
       startDate: task.startDate ?? undefined,

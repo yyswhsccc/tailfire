@@ -92,6 +92,10 @@ export class CreateTaskDto {
   @IsEnum(['manual', 'automatic', 'reminder', 'milestone'])
   taskType?: 'manual' | 'automatic' | 'reminder' | 'milestone'
 
+  @IsOptional()
+  @IsEnum(['pre_booking', 'pre_departure', 'during_travel', 'post_return'])
+  phase?: 'pre_booking' | 'pre_departure' | 'during_travel' | 'post_return'
+
   // Dates
   @IsOptional()
   @IsDateString()
