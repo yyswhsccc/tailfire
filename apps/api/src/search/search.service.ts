@@ -53,7 +53,7 @@ export class SearchService {
       type: 'trip' as const,
       title: trip.name,
       subtitle: trip.referenceNumber || undefined,
-      status: trip.status,
+      status: trip.status as TripSearchResult['status'],
       url: `/trips/${trip.id}`,
       referenceNumber: trip.referenceNumber || undefined,
       startDate: trip.startDate || undefined,

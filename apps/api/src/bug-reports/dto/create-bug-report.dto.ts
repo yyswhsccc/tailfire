@@ -9,22 +9,22 @@ export enum BugReportType {
 export class CreateBugReportDto {
   @IsString()
   @MaxLength(200)
-  title: string
+  title!: string
 
   @IsString()
   @MaxLength(5000)
-  description: string
+  description!: string
 
   @IsEnum(BugReportType)
-  type: BugReportType
+  type!: BugReportType
 
   @IsString()
   @MaxLength(2000)
-  pageUrl: string
+  pageUrl!: string
 
   @IsString()
   @MaxLength(500)
-  userAgent: string
+  userAgent!: string
 
   @IsOptional()
   @IsString()

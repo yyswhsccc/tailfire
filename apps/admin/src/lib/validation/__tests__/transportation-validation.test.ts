@@ -22,7 +22,7 @@ describe('transportationFormSchema', () => {
       componentType: 'transportation' as const,
       name: 'Airport Transfer',
       description: 'Transfer from airport to hotel',
-      status: 'confirmed' as const,
+      proposalStatus: 'approved' as const,
       transportationDetails: {
         subtype: 'transfer' as const,
         providerName: 'SuperShuttle',
@@ -223,14 +223,14 @@ describe('transportationFormSchema', () => {
   // ============================================================================
 
   it('accepts valid statuses', () => {
-    const statuses = ['proposed', 'confirmed', 'cancelled', 'optional']
+    const statuses = ['draft', 'proposing', 'approved', 'cancelled']
 
     for (const status of statuses) {
       const result = transportationFormSchema.safeParse({
         itineraryDayId: 'day-123',
         name: 'Test Transportation',
         transportationDetails: {},
-        status,
+        proposalStatus: status,
       })
       expect(result.success).toBe(true)
     }
@@ -241,7 +241,7 @@ describe('transportationFormSchema', () => {
       itineraryDayId: 'day-123',
       name: 'Test Transportation',
       transportationDetails: {},
-      status: 'invalid_status',
+      proposalStatus: 'invalid_status',
     })
 
     expect(result.success).toBe(false)
@@ -259,7 +259,7 @@ describe('toTransportationDefaults', () => {
     expect(defaults.itineraryDayId).toBe('')
     expect(defaults.componentType).toBe('transportation')
     expect(defaults.name).toBe('New Transportation')
-    expect(defaults.status).toBe('proposed')
+    expect(defaults.proposalStatus).toBe('draft')
     expect(defaults.transportationDetails.subtype).toBeNull()
     expect(defaults.currency).toBe('CAD')
   })
@@ -282,7 +282,7 @@ describe('toTransportationDefaults', () => {
       itineraryDayId: 'day-456',
       name: 'Airport Shuttle',
       description: 'From server',
-      status: 'confirmed' as const,
+      proposalStatus: 'approved' as const,
       transportationDetails: {
         subtype: 'shuttle' as const,
         providerName: 'SuperShuttle',
@@ -298,7 +298,7 @@ describe('toTransportationDefaults', () => {
 
     expect(defaults.itineraryDayId).toBe('day-456')
     expect(defaults.name).toBe('Airport Shuttle')
-    expect(defaults.status).toBe('confirmed')
+    expect(defaults.proposalStatus).toBe('approved')
     expect(defaults.transportationDetails.subtype).toBe('shuttle')
     expect(defaults.transportationDetails.providerName).toBe('SuperShuttle')
     expect(defaults.transportationDetails.features).toEqual(['WiFi', 'Luggage Space'])
@@ -321,7 +321,7 @@ describe('toTransportationApiPayload', () => {
       componentType: 'transportation' as const,
       name: 'Airport Transfer',
       description: 'Transfer to hotel',
-      status: 'confirmed' as const,
+      proposalStatus: 'approved' as const,
       notes: 'VIP service',
       confirmationNumber: 'TRN123',
       transportationDetails: {
@@ -338,17 +338,31 @@ describe('toTransportationApiPayload', () => {
         pickupTimezone: 'America/New_York',
         pickupAddress: '123 Airport Rd',
         pickupNotes: 'Terminal 4',
+        pickupName: null,
+        pickupLat: null,
+        pickupLng: null,
+        pickupPlaceId: null,
         dropoffDate: '2025-01-15',
         dropoffTime: '15:30',
         dropoffTimezone: 'America/New_York',
         dropoffAddress: '456 Hotel St',
         dropoffNotes: 'Main entrance',
+        dropoffName: null,
+        dropoffLat: null,
+        dropoffLng: null,
+        dropoffPlaceId: null,
         driverName: 'John Driver',
         driverPhone: '555-5678',
         rentalPickupLocation: '',
         rentalDropoffLocation: '',
         rentalInsuranceType: '',
         rentalMileageLimit: '',
+        rentalCompany: '',
+        rentalBookingRef: '',
+        rentalCarClass: '',
+        rentalFuelPolicy: '',
+        departureStation: '',
+        arrivalStation: '',
         features: ['WiFi', 'Air Conditioning'],
         specialRequests: 'Child seat needed',
         flightNumber: 'AA123',
@@ -384,7 +398,7 @@ describe('toTransportationApiPayload', () => {
       componentType: 'transportation' as const,
       name: 'Basic Transfer',
       description: '',
-      status: 'proposed' as const,
+      proposalStatus: 'draft' as const,
       notes: '',
       confirmationNumber: '',
       transportationDetails: {
@@ -401,17 +415,31 @@ describe('toTransportationApiPayload', () => {
         pickupTimezone: '',
         pickupAddress: '',
         pickupNotes: '',
+        pickupName: null,
+        pickupLat: null,
+        pickupLng: null,
+        pickupPlaceId: null,
         dropoffDate: null,
         dropoffTime: '',
         dropoffTimezone: '',
         dropoffAddress: '',
         dropoffNotes: '',
+        dropoffName: null,
+        dropoffLat: null,
+        dropoffLng: null,
+        dropoffPlaceId: null,
         driverName: '',
         driverPhone: '',
         rentalPickupLocation: '',
         rentalDropoffLocation: '',
         rentalInsuranceType: '',
         rentalMileageLimit: '',
+        rentalCompany: '',
+        rentalBookingRef: '',
+        rentalCarClass: '',
+        rentalFuelPolicy: '',
+        departureStation: '',
+        arrivalStation: '',
         features: [],
         specialRequests: '',
         flightNumber: '',
