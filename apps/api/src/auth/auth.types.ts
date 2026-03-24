@@ -24,6 +24,7 @@ export interface PortalAuthContext {
 export interface PortalJwtPayload {
   sub: string
   email: string
+  role?: string
   user_id?: string
   portal_user?: boolean
   contact_id?: string

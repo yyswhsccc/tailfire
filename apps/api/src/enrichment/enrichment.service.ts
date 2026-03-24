@@ -10,7 +10,7 @@ import type { AuthContext } from '../auth/auth.types'
 
 const { itineraryActivities, customCruiseDetails, flightDetails, lodgingDetails, itineraryDays, itineraries, trips } = schema
 
-interface BackfillResult {
+export interface BackfillResult {
   totalTrips: number
   enrichedTrips: number
   publishedTrips: number

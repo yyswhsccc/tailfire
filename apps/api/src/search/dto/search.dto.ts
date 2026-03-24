@@ -4,7 +4,7 @@ import { Type } from 'class-transformer'
 export class SearchQueryDto {
   @IsString()
   @MinLength(2)
-  q: string
+  q!: string
 
   @IsOptional()
   @Type(() => Number)

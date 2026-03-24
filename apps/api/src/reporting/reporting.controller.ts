@@ -670,7 +670,7 @@ export class ReportingController {
 
     for (const col of columns) {
       if (summaryByColumn[col.key] != null) {
-        grandTotals[col.key] = summaryByColumn[col.key]
+        grandTotals[col.key] = summaryByColumn[col.key] ?? null
       } else if (this.isSummableColumn(col.key) || this.isAverageableColumn(col.key)) {
         // No summary data available for this column — set null to indicate unknown
         grandTotals[col.key] = null
@@ -686,9 +686,9 @@ export class ReportingController {
    * Build structured summary items for frontend summary cards.
    */
   private buildSummaryItems(
-    data: any[],
-    columns: ColumnDef[],
-    totalRows: number,
+    _data: any[],
+    _columns: ColumnDef[],
+    _totalRows: number,
     existingSummary?: Record<string, number | string>,
   ): { label: string; value: string; format?: 'currency' | 'number' | 'percent' | 'text' }[] {
     const items: { label: string; value: string; format?: 'currency' | 'number' | 'percent' | 'text' }[] = []
