@@ -347,8 +347,8 @@ Only admins can restore soft-deleted trips via `POST /trips/:id/restore`.
 ### Payment Schedule Locking
 
 Payment schedules are locked based on trip status:
-- **Editable:** `draft`, `quoted`, `booked` — agents can freely modify
-- **Locked:** `in_progress`, `completed`, `cancelled` — blocked with error message
+- **Editable:** `inbound`, `planning`, `active` — non-admin users can still modify the schedule
+- **Locked:** `travelling`, `travelled`, `cancelled` — blocked with error message
 - **Admin override:** admins can edit regardless of status
 - **Transaction recording:** always allowed (payments should always be recordable)
 

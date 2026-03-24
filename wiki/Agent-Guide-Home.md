@@ -7,6 +7,7 @@ Use these pages to learn how to use the platform in day-to-day work:
 - [Create A Trip](./Agent-Guide-Create-A-Trip.md)
 - [Build And Propose An Itinerary](./Agent-Guide-Build-And-Propose-An-Itinerary.md)
 - [Record Supplier Bookings](./Agent-Guide-Record-Supplier-Bookings.md)
+- [Flight Activities](./Agent-Guide-Flight-Activities.md)
 - [Payment Schedules](./Agent-Guide-Payment-Schedules.md)
 - [Service Fees](./Agent-Guide-Service-Fees.md)
 - [Email Troubleshooting](./Agent-Guide-Email-Troubleshooting.md)
@@ -22,6 +23,7 @@ Use these pages to learn how to use the platform in day-to-day work:
 - [Create A Trip](./Agent-Guide-Create-A-Trip.md)
 - [Build And Propose An Itinerary](./Agent-Guide-Build-And-Propose-An-Itinerary.md)
 - [Record Supplier Bookings](./Agent-Guide-Record-Supplier-Bookings.md)
+- [Flight Activities](./Agent-Guide-Flight-Activities.md)
 - [Payment Schedules](./Agent-Guide-Payment-Schedules.md)
 - [Service Fees](./Agent-Guide-Service-Fees.md)
 - [Email Troubleshooting](./Agent-Guide-Email-Troubleshooting.md)
@@ -30,6 +32,7 @@ Use these pages to learn how to use the platform in day-to-day work:
 
 - [Libraries](./Agent-Guide-Libraries.md)
 - [Trip Components](./Agent-Guide-Trip-Components.md)
+- [Flight Activities](./Agent-Guide-Flight-Activities.md)
 - [Template System](./Agent-Guide-Template-System.md)
 - [Loyalty Programs](./Agent-Guide-Loyalty-Programs.md)
 - [Tags](./Agent-Guide-Tags.md)
@@ -51,15 +54,17 @@ Use these pages to learn how to use the platform in day-to-day work:
 5. [Payment Schedules](./Agent-Guide-Payment-Schedules.md)
 6. [Service Fees](./Agent-Guide-Service-Fees.md)
 7. [Trip Components](./Agent-Guide-Trip-Components.md)
-8. [Template System](./Agent-Guide-Template-System.md)
-9. [Loyalty Programs](./Agent-Guide-Loyalty-Programs.md)
-10. [Tags](./Agent-Guide-Tags.md)
-11. [Email System](./Agent-Guide-Email-System.md)
-12. [Email Troubleshooting](./Agent-Guide-Email-Troubleshooting.md)
+8. [Flight Activities](./Agent-Guide-Flight-Activities.md)
+9. [Template System](./Agent-Guide-Template-System.md)
+10. [Loyalty Programs](./Agent-Guide-Loyalty-Programs.md)
+11. [Tags](./Agent-Guide-Tags.md)
+12. [Email System](./Agent-Guide-Email-System.md)
+13. [Email Troubleshooting](./Agent-Guide-Email-Troubleshooting.md)
 
 ## Important Context
 
 - Tailfire separates trip stage, itinerary status, and supplier booking state.
+- Client proposal responses are version-aware and are separate from supplier booking state.
 - Not every library area is the same kind of tool. Some are reference catalogs, some are reusable templates, and some are communication or organization systems.
 - Some areas are still evolving, so use the help center together with the current workflow docs when a process touches proposals or booking capture.
 

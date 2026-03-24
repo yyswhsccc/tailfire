@@ -7,6 +7,7 @@ This article explains how agents create itinerary options, prepare them for clie
 - A trip can have more than one itinerary option.
 - An itinerary has its own workflow status: `Draft`, `Proposing`, `Approved`, or `Archived`.
 - Publishing creates a client-facing snapshot. That snapshot is separate from your live working edits.
+- Trip stage is separate from itinerary status. A trip can remain `Planning` even after an itinerary is approved.
 
 ## Typical Workflow
 
@@ -17,7 +18,7 @@ This article explains how agents create itinerary options, prepare them for clie
 5. Save strong reusable versions as templates when they may help future trips.
 6. Move the itinerary to `Proposing` when it is ready for client review.
 7. Use `Publish to Client` to create the proposal version the client will actually see.
-8. When the client selects an option, move the winning itinerary to `Approved`.
+8. When the client selects and approves an option, the winning itinerary should be the one that moves to `Approved`.
 9. Archive retired options so the working set stays clean.
 
 ## Building Good Itinerary Options
@@ -49,6 +50,7 @@ After you publish:
 - `Proposing` is for options you are actively sending or presenting to the client.
 - `Approved` is for the client-selected option.
 - `Archived` is for options you no longer want in the active set.
+- Client approval does not mean the supplier has been booked yet.
 
 ## Common Mistakes To Avoid
 

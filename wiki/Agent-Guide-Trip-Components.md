@@ -53,10 +53,20 @@ These usually support supplier and pricing workflows:
 - custom tour
 - insurance
 
+### Flight Activities
+
+Flights now support both segment-level search and route-level offer shopping:
+
+- use the segment `Search` action when you already know the specific flight leg
+- use `More Results (Amadeus)` when you want extra provider results for that segment
+- use `Search Flight Offers` when you want route-based price shopping that can replace the segment list
+- switch to manual mode when you need to edit or enter the leg details directly
+
 ### Informational Components
 
 - `Port Info` is primarily informational and should not be treated like a supplier booking.
 - `Tour Day` is generally part of a broader tour structure rather than a standalone supplier booking item.
+- Informational components do not represent proof that a trip should move forward in lifecycle stages.
 
 ### Packages
 
@@ -65,6 +75,7 @@ Packages are especially important:
 - a package groups related child activities
 - package children should be managed as part of the package workflow
 - the package acts as the booking authority for its children
+- package children should not be marked booked independently through the normal workflow
 
 ## Library Items Vs Trip Components
 
@@ -86,5 +97,6 @@ Use library items when you want to start from reusable or reference content. Use
 ## Related Articles
 
 - [Libraries](./Agent-Guide-Libraries.md)
+- [Flight Activities](./Agent-Guide-Flight-Activities.md)
 - [Template System](./Agent-Guide-Template-System.md)
 - [Trip Workflow](./Trip-Workflow.md)

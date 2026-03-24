@@ -13,6 +13,7 @@
 - [Create A Trip](./Agent-Guide-Create-A-Trip.md)
 - [Build And Propose An Itinerary](./Agent-Guide-Build-And-Propose-An-Itinerary.md)
 - [Record Supplier Bookings](./Agent-Guide-Record-Supplier-Bookings.md)
+- [Flight Activities](./Agent-Guide-Flight-Activities.md)
 - [Payment Schedules](./Agent-Guide-Payment-Schedules.md)
 - [Service Fees](./Agent-Guide-Service-Fees.md)
 - [Email Troubleshooting](./Agent-Guide-Email-Troubleshooting.md)
@@ -27,6 +28,7 @@
 
 - [Docs Index](https://github.com/Systemsaholic/tailfire/blob/main/docs/README.md)
 - [Architecture](https://github.com/Systemsaholic/tailfire/blob/main/docs/ARCHITECTURE.md)
+- [Trip Workflow](https://github.com/Systemsaholic/tailfire/blob/main/docs/TRIP_WORKFLOW.md)
 - [Local Dev](https://github.com/Systemsaholic/tailfire/blob/main/docs/LOCAL_DEV.md)
 - [Testing](https://github.com/Systemsaholic/tailfire/blob/main/docs/TESTING.md)
 - [CI/CD](https://github.com/Systemsaholic/tailfire/blob/main/docs/CI_CD.md)

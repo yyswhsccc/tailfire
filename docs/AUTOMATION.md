@@ -1,348 +1,158 @@
 # Automation System
 
-This document describes the centralized job queue system for scheduled and delayed tasks in Tailfire.
+This document describes the current BullMQ + Redis automation runtime in Tailfire.
 
-## Overview
+## What The Automation Layer Handles Today
 
-The Automation System uses **BullMQ + Redis** to handle:
-- Trip status auto-transitions (booked → in_progress → completed)
-- Client care automations (welcome emails, follow-ups)
-- Notification delivery (push, email; SMS not yet implemented)
+- scheduled trip stage transitions
+- post-trip client-care follow-up
+- notification delivery
+- email sync and enrichment background work
+- OCR and document-processing jobs
 
-## Architecture
+Important lifecycle distinction:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         NestJS API                               │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌──────────────────┐    ┌─────────────────────────────────┐   │
-│  │  Business Logic  │───▶│      AutomationModule           │   │
-│  │  (TripsService)  │    │                                 │   │
-│  └──────────────────┘    │  ┌─────────────────────────┐   │   │
-│                          │  │   AutomationService     │   │   │
-│  ┌──────────────────┐    │  │   - schedule()          │   │   │
-│  │  EventEmitter2   │───▶│  │   - scheduleAt()        │   │   │
-│  │  (sync events)   │    │  │   - cancel()            │   │   │
-│  └──────────────────┘    │  └─────────────────────────┘   │   │
-│                          │                                 │   │
-│  ┌──────────────────┐    │  Queues:                       │   │
-│  │  Cron (EXCLUDED) │    │  - trip-automation (high)      │   │
-│  │  - Cruise sync   │    │  - client-care (normal)        │   │
-│  │  - Tour sync     │    │  - notifications (normal)      │   │
-│  └──────────────────┘    └─────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-                          ┌─────────────────┐
-                          │  Redis (Railway) │
-                          │  - Job persistence│
-                          │  - Distributed locks│
-                          └─────────────────┘
+- `TripLifecycleService` handles synchronous booking-driven `planning <-> active` evaluation in application code.
+- BullMQ handles scheduled/date-driven transitions such as `active -> travelling -> travelled`.
+
+## Current Lifecycle Model In Automation
+
+The current runtime uses:
+
+```text
+planning --(first qualifying booking)--> active --(start date)--> travelling --(end date)--> travelled
 ```
 
-## Technology Choice
+### What happens synchronously
 
-| Criteria | BullMQ | pg-boss | Why BullMQ |
-|----------|--------|---------|------------|
-| NestJS integration | Excellent | Good | `@nestjs/bullmq` is mature |
-| Delayed jobs | Native | Native | Both good |
-| Monitoring | Bull Board | Basic | Bull Board is excellent |
-| Infrastructure | Redis | PostgreSQL | Railway has Redis built-in |
+`apps/api/src/trips/trip-lifecycle.service.ts` currently:
 
----
+- promotes `planning -> active` when a trip has at least one booked activity
+- archives non-approved itineraries when that promotion happens
+- emits `trip.active`
+- currently demotes `active -> planning` again if booked-count falls back to zero
+
+That last behavior is still an open workflow issue, not a settled business rule.
+
+### What happens on the queue
+
+`apps/api/src/automation/processors/trip-automation.processor.ts` currently schedules and processes:
+
+- `active -> travelling`
+- `travelling -> travelled`
+- reminders
+- backfill jobs
+
+The scheduled processor is idempotent and re-checks the trip state before applying the transition.
 
 ## Queues
 
-| Queue | Purpose | Priority |
-|-------|---------|----------|
-| `trip-automation` | Status transitions, reminders | High |
-| `email-sync` | IMAP email sync for agent email accounts | Normal |
-| `enrichment` | Activity enrichment (geocoding, catalog match, hotel photos) | Normal |
-| `document-render` | PDF generation via Puppeteer | Normal |
-| `ocr-processing` | OCR document import processing | Normal |
-| `client-care` | Emails, follow-ups | Normal |
-| `notifications` | Push, email, SMS delivery | Normal |
-
----
+| Queue | Purpose |
+| --- | --- |
+| `trip-automation` | scheduled trip stage transitions, reminders, backfill |
+| `email-sync` | IMAP sync for agent email accounts |
+| `enrichment` | activity enrichment, geocoding, media fetches |
+| `document-render` | PDF generation |
+| `ocr-processing` | OCR import work |
+| `client-care` | follow-up emails and reminder jobs |
+| `notifications` | push/email notification delivery |
 
 ## Job Types
 
-### Trip Automation
+### Trip automation
 
-| Job Type | Description |
-|----------|-------------|
-| `trip.status.transition` | Auto-transition trip status based on dates |
-| `trip.reminder` | Departure/payment reminders |
-| `trip.backfill` | Backfill existing trips on deployment |
+- `trip.status.transition`
+- `trip.reminder`
+- `trip.backfill`
 
-### Client Care
+### Client care
 
-| Job Type | Description |
-|----------|-------------|
-| `client.welcome` | Welcome email for new clients |
-| `client.post_trip` | Post-trip follow-up |
-| `client.birthday` | Birthday greetings |
-| `client.follow_up` | General follow-ups |
-| `payment.reminder` | Payment due date reminders |
-| `departure.reminder` | Upcoming departure reminders |
-| `post_trip.thank_you` | Post-trip thank you message |
-| `post_trip.feedback` | Post-trip feedback request |
-| `client_care.recurring_scan` | Periodic scan for due client care jobs |
+- `payment.reminder`
+- `departure.reminder`
+- `post_trip.thank_you`
+- `post_trip.feedback`
+- other recurring client-care jobs
 
-### Notifications
+## Scheduled Trip Transitions
 
-| Job Type | Description |
-|----------|-------------|
-| `notification.push` | Push notifications |
-| `notification.email` | Email delivery |
-| `notification.sms` | SMS delivery |
+The current scheduled path is:
 
----
-
-## Trip Status Auto-Transitions
-
-When a trip is booked with dates, the system automatically schedules status transitions:
-
-```
-┌─────────┐     Start Date     ┌─────────────┐     Day After End     ┌───────────┐
-│ booked  │ ─────────────────▶ │ in_progress │ ─────────────────────▶ │ completed │
-└─────────┘                    └─────────────┘                        └───────────┘
+```text
+active --(trip start)--> travelling --(day after trip end)--> travelled
 ```
 
-### How It Works
+Deterministic job IDs are used to prevent duplicate scheduling. Current examples:
 
-1. **Trip Booked**: When a trip transitions to `booked` status with dates:
-   - Schedules `in_progress` transition at midnight of `startDate`
-   - Schedules `completed` transition at midnight of day after `endDate`
-
-2. **Dates Changed**: If trip dates are updated:
-   - Cancels existing scheduled jobs
-   - Schedules new jobs with updated dates
-
-3. **Trip Cancelled**: If trip is cancelled:
-   - Cancels all scheduled transitions
-
-4. **Idempotent Processing**: Processors check current status before applying changes
-
-### Timezone-Aware Scheduling
-
-Jobs are scheduled based on the trip's timezone (with fallback to UTC):
-
-```typescript
-// Midnight in trip's timezone
-const inProgressAt = computeLocalMidnight(trip.startDate, trip.timezone)
+```text
+trip:{tripId}:travelling
+trip:{tripId}:travelled
 ```
 
-### Deterministic Job IDs
+## Post-Trip Automation
 
-Job IDs are deterministic to prevent duplicates:
+`apps/api/src/automation/listeners/trip-lifecycle.listener.ts` currently listens for `trip.travelled` and schedules:
 
-```typescript
-// Format: trip:{tripId}:{status}
-const jobId = `trip:abc123:in_progress`
-```
+- thank-you email one day later
+- feedback request two days later
 
----
+## Bull Board And Admin Access
 
-## Bull Board Dashboard
+- Queue dashboard path: `/admin/queues`
+- Production exposure is controlled by `ENABLE_BULL_BOARD`
+- Admin automation endpoints exist under `/admin/automation/*`
 
-### Access
+Current admin routes include:
 
-- **URL**: `/admin/queues`
-- **Auth**: Admin JWT required (HS256 or ES256)
-- **Production**: Disabled by default (set `ENABLE_BULL_BOARD=true`)
+- `GET /admin/automation/queues`
+- `GET /admin/automation/queues/:name/delayed`
+- `GET /admin/automation/jobs/:id`
+- `DELETE /admin/automation/jobs/:id`
+- `POST /admin/automation/jobs/schedule`
+- `POST /admin/automation/trips/backfill`
+- `DELETE /admin/automation/jobs/pattern`
 
-### Features
+## Redis Configuration
 
-- View queue status and job counts
-- Inspect delayed/waiting/active jobs
-- Retry failed jobs
-- Monitor job history
+| Environment | Current source | Notes |
+| --- | --- | --- |
+| Local | local Redis or explicit `REDIS_URL` | API supports `REDIS_URL`, root `pnpm dev` still assumes local Redis tooling |
+| Preview | Railway Redis | injected at runtime |
+| Production | Railway Redis | injected at runtime |
 
----
+Relevant env vars:
 
-## Admin API
+| Variable | Purpose |
+| --- | --- |
+| `REDIS_URL` | Redis connection string |
+| `ENABLE_BULL_BOARD` | Bull Board exposure toggle |
 
-### Endpoints
+## Local Development Notes
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/admin/automation/queues` | Get all queue counts |
-| GET | `/admin/automation/queues/:name/delayed` | Get delayed jobs |
-| GET | `/admin/automation/jobs/:id` | Get job status |
-| DELETE | `/admin/automation/jobs/:id` | Cancel a job |
-| POST | `/admin/automation/jobs/schedule` | Manually schedule a job |
-| POST | `/admin/automation/trips/backfill` | Trigger trip backfill |
-| DELETE | `/admin/automation/jobs/pattern` | Cancel jobs by pattern |
+The repo currently supports two practical local Redis patterns.
 
-### Example: Check Queue Status
+### Local Redis on the machine
 
 ```bash
-curl https://api.tailfire.ca/api/v1/admin/automation/queues \
-  -H "Authorization: Bearer $TOKEN"
+redis-cli ping
+redis-server --daemonize yes
 ```
 
-### Example: Trigger Backfill
+### External Redis via `REDIS_URL`
 
-```bash
-curl -X POST https://api.tailfire.ca/api/v1/admin/automation/trips/backfill \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"batchSize": 100}'
-```
+Start the API with filtered commands rather than root `pnpm dev` if you want to avoid the local Redis probe.
 
----
+## Current Drift To Be Aware Of
 
-## Job History
+Some comments, examples, and admin-facing text in the codebase still refer to the legacy lifecycle names `booked`, `in_progress`, and `completed`. The live runtime and shared trip status types now use:
 
-Jobs are logged to `automation_job_history` table for permanent audit trail:
+- `active`
+- `travelling`
+- `travelled`
 
-```sql
-CREATE TABLE automation_job_history (
-  id UUID PRIMARY KEY,
-  queue_name VARCHAR(50) NOT NULL,
-  job_id VARCHAR(100) NOT NULL,
-  job_type VARCHAR(100) NOT NULL,
-  job_data JSONB NOT NULL,
-  status automation_job_status NOT NULL, -- queued, processing, completed, failed
-  error_message TEXT,
-  scheduled_for TIMESTAMPTZ,
-  started_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ
-);
-```
+Treat the runtime names above as the source of truth.
 
----
+## Related Docs
 
-## Environment Configuration
-
-### Redis Setup
-
-| Environment | Redis Source | URL Variable |
-|-------------|--------------|--------------|
-| Local Dev | Docker (`docker-compose up -d redis`) | `REDIS_URL=redis://localhost:6379` |
-| Preview | Railway Redis | Auto-injected by Railway |
-| Production | Railway Redis | Auto-injected by Railway |
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
-| `ENABLE_BULL_BOARD` | Enable Bull Board in production | `false` |
-
----
-
-## Local Development
-
-### Start Redis
-
-```bash
-# Using Docker
-docker run -d --name tailfire-redis -p 6379:6379 redis:7-alpine
-
-# Or with docker-compose
-docker-compose up -d redis
-```
-
-### Verify Connection
-
-```bash
-# Check Redis is running
-docker ps | grep redis
-
-# Test connection
-redis-cli ping  # Should return PONG
-```
-
-### Monitor Jobs
-
-1. Start the dev server: `turbo dev`
-2. Navigate to `http://localhost:3101/admin/queues`
-3. Authenticate with admin JWT token
-
----
-
-## Best Practices
-
-### 1. Idempotent Processors
-
-Always check current state before applying changes:
-
-```typescript
-// Good - check status first
-if (trip.status === toStatus) {
-  logger.log('Trip already in target status - skipping')
-  return
-}
-
-// Then apply transition
-await updateTripStatus(tripId, toStatus)
-```
-
-### 2. Deterministic Job IDs
-
-Use predictable IDs for deduplication:
-
-```typescript
-// Good - deterministic
-const jobId = `trip:${tripId}:in_progress`
-
-// Bad - random
-const jobId = `${Date.now()}-${Math.random()}`
-```
-
-### 3. Cancel Before Reschedule
-
-When dates change, cancel existing jobs first:
-
-```typescript
-await cancelScheduledTransitions(tripId)
-await scheduleStatusTransitions(tripId, newStartDate, newEndDate)
-```
-
-### 4. Timezone Awareness
-
-Always use trip's timezone for scheduling:
-
-```typescript
-const runAt = computeLocalMidnight(date, trip.timezone || 'UTC')
-```
-
----
-
-## Troubleshooting
-
-### Jobs Not Processing
-
-1. Check Redis connection: `redis-cli ping`
-2. Verify `REDIS_URL` is set correctly
-3. Check worker logs for errors
-4. Verify queue is registered in `AutomationModule`
-
-### Bull Board 401 Error
-
-1. Ensure JWT token has admin role (`app_metadata.role = 'admin'`)
-2. For ES256 tokens (newer Supabase projects), JWKS is used
-3. Check `SUPABASE_URL` and `SUPABASE_JWT_SECRET` are set
-
-### Duplicate Jobs
-
-1. Use deterministic job IDs
-2. Cancel existing jobs before scheduling new ones
-3. Check job history for duplicates
-
-### Jobs Running Multiple Times
-
-1. Verify processor is idempotent
-2. Check for retry configuration
-3. Review failed job attempts in Bull Board
-
----
-
-## Related Documentation
-
-- [Architecture Overview](./ARCHITECTURE.md) - System architecture
-- [Database Architecture](./DATABASE_ARCHITECTURE.md) - Schema details
-- [Security](./SECURITY.md) - Authentication & authorization
+- [TRIP_WORKFLOW.md](./TRIP_WORKFLOW.md)
+- [LOCAL_DEV.md](./LOCAL_DEV.md)
+- [REPOSITORY_REVIEW_ISSUES.md](./REPOSITORY_REVIEW_ISSUES.md)

@@ -1,4 +1,4 @@
-# Tailfire Beta - Admin Dashboard
+# Tailfire - Admin Dashboard
 
 B2B admin dashboard for the Tailfire travel agency management system, built with Next.js 15, shadcn/ui, and TanStack Query.
 
@@ -209,7 +209,7 @@ Next.js App Router with file-based routing:
 
 - `/` - Landing page (redirects to dashboard)
 - `/dashboard` - Main dashboard with KPI cards, sidebar (quick create, recent emails, calendar)
-- `/trips` - Trip management (list, detail, itinerary builder)
+- `/trips` - Trip management (list, detail, itinerary builder, flight segment search, flight-offers shopping)
 - `/trips/groups/[groupId]` - Group booking detail (notes, documents, media tabs)
 - `/contacts` - Contact management (CRM)
 - `/contacts/[id]` - Contact detail (activity timeline, emails tab, recent emails card)

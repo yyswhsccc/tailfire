@@ -20,17 +20,19 @@ describe('activityTypeSchema', () => {
   })
 })
 
-describe('activityStatusSchema', () => {
-  it('should accept valid statuses', () => {
-    expect(activityStatusSchema.safeParse('proposed').success).toBe(true)
-    expect(activityStatusSchema.safeParse('confirmed').success).toBe(true)
+describe('activityStatusSchema (proposalStatus)', () => {
+  it('should accept valid proposal statuses', () => {
+    expect(activityStatusSchema.safeParse('draft').success).toBe(true)
+    expect(activityStatusSchema.safeParse('proposing').success).toBe(true)
+    expect(activityStatusSchema.safeParse('approved').success).toBe(true)
     expect(activityStatusSchema.safeParse('cancelled').success).toBe(true)
-    expect(activityStatusSchema.safeParse('optional').success).toBe(true)
   })
 
-  it('should reject invalid statuses', () => {
-    const result = activityStatusSchema.safeParse('pending')
-    expect(result.success).toBe(false)
+  it('should reject old/invalid statuses', () => {
+    expect(activityStatusSchema.safeParse('proposed').success).toBe(false)
+    expect(activityStatusSchema.safeParse('confirmed').success).toBe(false)
+    expect(activityStatusSchema.safeParse('optional').success).toBe(false)
+    expect(activityStatusSchema.safeParse('pending').success).toBe(false)
   })
 })
 

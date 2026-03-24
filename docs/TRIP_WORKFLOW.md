@@ -1,216 +1,212 @@
 # Trip Workflow And State Model
 
-This document is the canonical business workflow and lifecycle model for trips, itineraries, activities, proposal publishing, and booking capture.
+This document is the canonical workflow reference for trip stages, itinerary statuses, activity booking state, client proposal versioning, and the current booking-capture model.
 
-Status as of 2026-03-21: The canonical trip stage vocabulary (Inbound, Planning, Active, Travelling, Travelled, Cancelled) is fully implemented across the database, API, admin, and client surfaces. Activity booking uses explicit proposalStatus + bookingStatus fields. The TripLifecycleService manages system-driven stage transitions.
+Status as of 2026-03-24:
 
-This document is the canonical source of truth for the trip workflow. Use [TRIP_WORKFLOW_IMPLEMENTATION_PLAN.md](./TRIP_WORKFLOW_IMPLEMENTATION_PLAN.md) for the completed rollout record and [REPOSITORY_REVIEW_ISSUES.md](./REPOSITORY_REVIEW_ISSUES.md) for remaining implementation issues.
+- The stored trip-stage vocabulary is live in the database, shared types, API, and admin/client surfaces.
+- Itinerary stored statuses are `draft | proposing | approved | archived`.
+- Activities now store separate `proposalStatus` and `bookingStatus`.
+- Proposal publishing/versioning is live.
+- Lifecycle and booking guardrails are only partially normalized. Current caveats are called out explicitly below and in [REPOSITORY_REVIEW_ISSUES.md](./REPOSITORY_REVIEW_ISSUES.md).
 
-## Design Principles
+## Core Separation
 
-- `Trip Stage` is the lifecycle of the overall trip file. It is not a direct proxy for whether every supplier booking is complete.
-- `Itinerary Status` is the proposal workflow for a specific itinerary option.
-- `Activity Booking` is supplier fulfillment for a specific bookable component.
-- The system, not user memory, owns stage progression.
-- Intermediate operational signals should be derived where possible instead of adding more stored statuses.
-- Proposal publishing must remain versioned and immutable. Clients approve a published version, not a live draft.
-
-## Canonical State Model
-
-### 1. Trip Stage (stored)
-
-These are the only stored trip stages in the target model:
-
-| Stage | Meaning | Typical Entry Trigger |
+| Concern | What it means | Stored or derived |
 | --- | --- | --- |
-| `Inbound` | Lead or intake file that has not meaningfully entered active planning yet | New lead intake, imported lead, or explicit reset to intake |
-| `Planning` | Active planning, proposal drafting, proposal revision, and client review | Owner assigned, travelers added, or itinerary work begins |
-| `Active` | At least one required supplier booking has been recorded in Tailfire | First required bookable activity or package is marked booked |
-| `Travelling` | The trip is in progress | Start-date automation |
-| `Travelled` | The trip has finished | End-date automation |
-| `Cancelled` | The trip was cancelled and is terminal | Explicit cancel action |
+| Trip Stage | Overall lifecycle of the trip file | stored |
+| Derived Trip Condition | Operational summary such as proposal sent or fully booked | derived |
+| Itinerary Status | Lifecycle of a proposal option | stored |
+| Activity State | Supplier-booking and proposal state for a trip component | stored |
+| Client Activity Response | Client response to a published activity on a published version | stored separately from activity state |
 
-### 2. Derived Trip Conditions (not stored as trip stages)
+The main rule is simple:
 
-These are operational conditions that should be computed from itinerary and activity data:
+- trip stage is not the same thing as itinerary approval
+- itinerary approval is not the same thing as supplier booking
+- client activity response is not the same thing as activity booking
+
+## Trip Stage
+
+Current stored trip stages:
+
+| Stage | Meaning |
+| --- | --- |
+| `Inbound` | lead/intake file before active planning |
+| `Planning` | active planning, proposal work, revision, and client review |
+| `Active` | supplier fulfillment has started |
+| `Travelling` | trip is in progress |
+| `Travelled` | trip has completed |
+| `Cancelled` | trip was cancelled |
+
+Current implementation notes:
+
+- `planning -> active` is evaluated by `TripLifecycleService`.
+- `active -> travelling -> travelled` is handled by automation.
+- `cancelled` remains explicit.
+- The current lifecycle engine also demotes `active -> planning` if booked-count returns to zero. That is implementation reality today, not the preferred long-term guardrail.
+
+## Derived Trip Conditions
+
+These are useful operational signals, but they are not stored trip stages:
 
 | Condition | Meaning |
 | --- | --- |
-| `Proposal Sent` | At least one itinerary is in `Proposing` |
-| `Proposal Approved` | At least one itinerary is in `Approved` |
-| `Booking In Progress` | Some, but not all, required bookable components are booked |
-| `Fully Booked` | All required bookable components are booked |
+| `Proposal Sent` | at least one itinerary is `proposing` |
+| `Proposal Approved` | at least one itinerary is `approved` |
+| `Booking In Progress` | some qualifying bookable components are booked |
+| `Fully Booked` | all qualifying bookable components are booked |
 
-Important rule:
+Practical interpretation:
 
-- A trip can be `Planning` and also show `Proposal Sent` or `Proposal Approved`.
-- A trip does not become `Active` until real supplier fulfillment starts.
+- a trip can remain `Planning` while also showing `Proposal Sent` or `Proposal Approved`
+- a trip should only become `Active` once supplier fulfillment starts
 
-### 3. Itinerary Status (stored)
+## Itinerary Status
 
-The canonical itinerary status set is:
+Current stored itinerary statuses:
 
 | Status | Meaning |
 | --- | --- |
-| `Draft` | Internal working version |
-| `Proposing` | Published and actively presented to the client |
-| `Approved` | Client-selected itinerary option |
-| `Archived` | Retired option or superseded version |
+| `Draft` | internal working option |
+| `Proposing` | option being presented to the client |
+| `Approved` | client-selected option |
+| `Archived` | retired option |
 
 Rules:
 
-- Only one itinerary per trip can be `Approved`.
-- Multiple itineraries may be `Draft` or `Archived`.
-- Multiple itineraries may be `Proposing` only if the trip is intentionally offering multiple options at once.
-- When one itinerary becomes `Approved`, previously approved itineraries should become `Archived`.
+- only one itinerary per trip should be `Approved`
+- multiple itineraries may be `Draft` or `Archived`
+- multiple itineraries may be `Proposing` only if the trip is intentionally presenting multiple options
 
-Target simplification:
+Important distinction:
 
-- `Declined` is not part of the target canonical itinerary status set.
-- Client decline should be captured through feedback, comments, or an approval outcome record, then translated into staff action such as returning the itinerary to `Draft` or moving it to `Archived`.
+- `declined` is not an itinerary stored status
+- client rejection/decline is captured through comments, feedback, and response records tied to the published proposal version
 
-### 4. Activity State (logical model)
+## Activity State
 
-Activities should display a simple user-facing label, but the implementation should keep proposal state separate from supplier-booking state.
+Activities now use separate fields:
 
-Target logical fields:
-
-| Field | Allowed Values | Purpose |
+| Field | Allowed values | Meaning |
 | --- | --- | --- |
-| `proposalStatus` | `draft`, `proposing`, `approved`, `cancelled` | Client/proposal lifecycle |
-| `bookingStatus` | `unbooked`, `booked`, `cancelled` | Supplier fulfillment lifecycle |
+| `proposalStatus` | `draft`, `proposing`, `approved`, `cancelled` | proposal/client lifecycle |
+| `bookingStatus` | `unbooked`, `booked`, `cancelled` | supplier-booking lifecycle |
 
-Recommended display mapping:
+Typical user-facing interpretation:
 
-| Display Label | Logical State |
+| User-facing label | State |
 | --- | --- |
 | `Draft` | `proposalStatus=draft`, `bookingStatus=unbooked` |
 | `Proposing` | `proposalStatus=proposing`, `bookingStatus=unbooked` |
 | `Approved` | `proposalStatus=approved`, `bookingStatus=unbooked` |
-| `Booked` | `proposalStatus=approved`, `bookingStatus=booked` |
-| `Cancelled` | any cancelled state |
+| `Booked` | `bookingStatus=booked` |
+| `Cancelled` | any cancelled path |
 
-Rules:
+Current booking rules in code:
 
-- Packages are the booking authority for their child activities.
-- Child activities of a package inherit booking state and cannot be booked independently.
-- Informational rows such as `port_info` must not count toward `Booking In Progress`, `Fully Booked`, or `Active`.
-- Bookable items should normally only be marked booked after itinerary approval unless an explicit admin override exists.
-- Marking something booked must capture enough supplier-facing audit data to be useful later.
+- package parents are the booking authority for package children
+- child activities of a package cannot be booked directly through the normal booking endpoint
+- informational activity types such as `port_info` and `tour_day` are excluded from the current lifecycle booked-count
+
+Current caveat:
+
+- the package booking path and standalone booking path are still not fully normalized
+- the package booking mutation currently sets `proposalStatus: 'approved'` together with `bookingStatus: 'booked'`
+- the standalone booking endpoint updates booking state without that proposal-state side effect
+
+## Client Activity Responses
+
+The client proposal surface also stores per-activity responses on published proposals.
+
+Current response model:
+
+| Field | Values |
+| --- | --- |
+| `response` | `confirmed` or `declined` |
+| `versionNumber` | required published version binding |
+
+These records are separate from activity `proposalStatus` and `bookingStatus`.
 
 ## Proposal Versioning
 
-Proposal statuses and proposal versions are separate concepts.
+Proposal status and proposal version are separate concerns.
 
-Target rules:
+Current versioning contract:
 
-- The live itinerary is the editable working copy.
-- Publishing creates an immutable snapshot version.
-- Admin preview uses live draft data.
-- Client share pages, comments, selections, approvals, and activity responses must bind to a published version.
-- Republishing creates a new version. It does not rewrite an older approved or commented version.
-- Approval should record both the itinerary id and the published version number the client actually approved.
+- the live itinerary is editable working data
+- publishing creates an immutable `itinerary_versions` snapshot
+- itineraries track `publishedVersion`
+- admin preview uses live draft data
+- shared/public proposal views resolve to published snapshots
+- client comments, selections, approvals, and activity responses are bound to a published `versionNumber`
 
-This model already exists in part in the current codebase through `itinerary_versions`, `publishedVersion`, admin live preview, and public snapshot serving. The plan is to make the workflow contract explicit and consistent.
+This is the core rule:
 
-## Canonical Booking Flow
+- the client approves a published version, not an unpublished working draft
+
+## Current Booking Flow
 
 1. Create the trip.
-   The trip starts in `Inbound` or `Planning` depending on the intake path. If there is no owner and no active planning work, it stays `Inbound`.
+   The trip starts in `Inbound` or `Planning` depending on intake and early workflow.
 
-2. Add travelers and primary contact context.
-   Travelers are required before the trip can progress into real fulfillment.
+2. Add travelers and trip context.
+   This is still separate from itinerary and booking state.
 
-3. Create one or more itinerary drafts.
-   Each itinerary is an option inside the trip. Agents compose activities, pricing, notes, and media in `Draft`.
+3. Build one or more itinerary options.
+   Activities and packages are composed inside itinerary days or as floating trip-level components.
 
-4. Publish a proposal version.
-   The itinerary moves to `Proposing`, a snapshot is created, and the client reviews that published version rather than the live draft.
+4. Publish the proposal.
+   Publishing creates a versioned snapshot for the client-facing share flow.
 
-5. Client reviews, comments, selects, and approves.
-   The approved itinerary moves to `Approved`. The trip itself remains in `Planning`. The trip should now surface the derived condition `Proposal Approved`.
+5. Client reviews and approves.
+   The itinerary becomes `Approved`. The trip normally remains `Planning` at this point.
 
 6. Agent books suppliers off-platform.
-   Tailfire remains the internal system of record even when supplier booking happens externally.
+   Tailfire remains the system of record, but the actual supplier booking is still frequently done outside the platform.
 
 7. Agent records the booking in Tailfire.
-   The booking record should capture:
-   - supplier
-   - confirmation number
-   - booking date
-   - booking authority (standalone activity or package)
-   - payment schedule status
-   - any supplier-facing payment or deposit context needed operationally
+   Current entry paths:
+   - standalone activity booking: `POST /bookings/activities/:activityId/mark`
+   - package booking: `PATCH /activities/:id` via the package booking UI path
 
-8. The first required booking moves the trip to `Active`.
-   This should happen automatically when the first required bookable activity or package is recorded as booked.
+8. First qualifying booking promotes the trip.
+   Current implementation promotes `planning -> active` once the lifecycle service sees at least one qualifying booked activity.
 
-9. Additional bookings continue until the trip is fully booked.
-   `Booking In Progress` and `Fully Booked` remain derived conditions, not trip stages.
-
-10. Payment schedules and supplier payments are tracked separately from stage changes.
-   Booking capture, expected supplier payments, and actual supplier payment transactions are related but not identical actions.
-
-11. Service fees remain a separate trip-level financial workflow.
-   Service fee creation, sending, collection, refund, and Stripe invoicing should not be conflated with supplier booking fulfillment.
-
-12. Date-based automation moves the trip forward.
-   - `Active -> Travelling` on trip start date
-   - `Travelling -> Travelled` after trip end date
-
-13. Post-trip automations run from `Travelled`.
-   Welcome-home emails, feedback requests, and post-trip follow-up should key off the `Travelled` stage.
+9. Date-based automation moves the trip forward.
+   - `active -> travelling`
+   - `travelling -> travelled`
 
 ## Guardrails
 
-### Stage Transition Guardrails
+### Canonical guardrails
 
-- `Inbound -> Planning` should happen from real planning activity, not from an arbitrary manual click alone.
-- `Planning -> Active` should happen when the first required supplier booking is recorded.
-- `Active -> Travelling` and `Travelling -> Travelled` should be date-driven.
-- `Cancelled` must remain explicit and terminal.
+- itinerary approval should not be treated as proof of supplier booking
+- service-fee collection should not be treated as supplier booking
+- package children should not be booked independently
+- proposal comments and approvals must remain tied to the version the client actually saw
 
-### Non-Rules
+### Current implementation caveats
 
-- Itinerary approval does not mean supplier booked.
-- Activity booking does not change itinerary approval.
-- Service-fee payment does not mean supplier booked.
-- Fully booked does not need to be a trip stage.
+- `TripLifecycleService` currently counts booked activities rather than a richer explicit allowlist of required bookable components
+- the same service currently auto-demotes `active -> planning` when all counted bookings are removed
+- package booking and standalone booking still use different command paths and different side effects
+- the package booking modal exposes `paymentStatus`, but the current package booking mutation does not send it
 
-### Stability Guardrails
+## Historical Status Mapping
 
-- The system should not silently move a trip backward if an activity is later unbooked or edited.
-- Backward movement should require explicit staff action to avoid automation flapping.
-- Proposal comments, selections, approvals, and declines must stay attached to the version the client actually saw.
+The legacy stored trip vocabulary was migrated to the current stage set as follows:
 
-### Booking Guardrails
-
-- Package children cannot be booked directly.
-- Required booking fields should be validated consistently for standalone activities and packages.
-- The platform should maintain an explicit allowlist of activity types that count toward booking progress.
-
-## Legacy-to-Canonical Mapping (Historical Reference)
-
-The following legacy trip statuses were migrated to the canonical model as part of the trip lifecycle refactoring (completed 2026-03-21):
-
-| Legacy Stored Status | Canonical Stage |
+| Legacy status | Current stage |
 | --- | --- |
-| `inbound` | `Inbound` |
-| `draft` | `Planning` |
-| `quoted` | `Planning` |
-| `booked` | `Active` |
-| `in_progress` | `Travelling` |
-| `completed` | `Travelled` |
-| `cancelled` | `Cancelled` |
-
-All of the following have been resolved:
-
-- Activity rows now use explicit `proposalStatus` and `bookingStatus` fields. The legacy `status` + `isBooked` pattern has been retired.
-- Itinerary `declined` has been removed from all API paths and admin/client flows. Decline outcomes are captured through comments and archive actions.
-- Automation and lifecycle events now use the canonical names: `trip.active`, `trip.travelling`, `trip.travelled`.
+| `draft` | `planning` |
+| `quoted` | `planning` |
+| `booked` | `active` |
+| `in_progress` | `travelling` |
+| `completed` | `travelled` |
 
 ## References
 
-- Implementation plan: [TRIP_WORKFLOW_IMPLEMENTATION_PLAN.md](./TRIP_WORKFLOW_IMPLEMENTATION_PLAN.md)
-- Current implementation issues: [REPOSITORY_REVIEW_ISSUES.md](./REPOSITORY_REVIEW_ISSUES.md)
-- Current automation runtime: [AUTOMATION.md](./AUTOMATION.md)
+- [TRIP_WORKFLOW_IMPLEMENTATION_PLAN.md](./TRIP_WORKFLOW_IMPLEMENTATION_PLAN.md)
+- [AUTOMATION.md](./AUTOMATION.md)
+- [REPOSITORY_REVIEW_ISSUES.md](./REPOSITORY_REVIEW_ISSUES.md)
