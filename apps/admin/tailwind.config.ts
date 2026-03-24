@@ -1,5 +1,6 @@
 import type { Config } from 'tailwindcss'
 import tailwindcssAnimate from 'tailwindcss-animate'
+import typography from '@tailwindcss/typography'
 import { tripProposalPreset } from '@tailfire/trip-proposal-ui/tailwind.preset'
 
 const config: Config = {
@@ -189,7 +190,7 @@ const config: Config = {
   		}
   	}
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [tailwindcssAnimate, typography],
 }
 
 export default config
