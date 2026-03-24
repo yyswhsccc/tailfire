@@ -63,8 +63,9 @@ export class CalendarService {
       'activity',
     ]
 
-    // Fetch events from all sources in parallel
-    const [tasks, trips, payments, birthdays, scheduledEmails, calendarEvents, activityEvents] = await Promise.all([
+    // Fetch events in batches of 3 to avoid connection pool exhaustion
+    // (Supabase PgBouncer session mode has a limited pool size)
+    const [tasks, trips, payments] = await Promise.all([
       enabledTypes.includes('task')
         ? this.getTaskEvents(query, auth)
         : [],
@@ -74,6 +75,9 @@ export class CalendarService {
       enabledTypes.some((t) => t === 'payment_deposit' || t === 'payment_final')
         ? this.getPaymentEvents(query, auth, enabledTypes)
         : [],
+    ])
+
+    const [birthdays, scheduledEmails, calendarEvents] = await Promise.all([
       enabledTypes.includes('birthday')
         ? this.getBirthdayEvents(query, auth)
         : [],
@@ -83,10 +87,11 @@ export class CalendarService {
       enabledTypes.includes('event')
         ? this.getCalendarEventEvents(query, auth)
         : [],
-      enabledTypes.includes('activity')
-        ? this.getActivityCalendarEvents(query, auth)
-        : [],
     ])
+
+    const activityEvents = enabledTypes.includes('activity')
+      ? await this.getActivityCalendarEvents(query, auth)
+      : []
 
     // Combine and sort events
     const events = [...tasks, ...trips, ...payments, ...birthdays, ...scheduledEmails, ...calendarEvents, ...activityEvents].sort(

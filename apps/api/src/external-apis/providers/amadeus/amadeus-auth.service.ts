@@ -63,6 +63,15 @@ export class AmadeusAuthService {
   constructor(private readonly httpService: HttpService) {}
 
   /**
+   * Invalidate the cached token, forcing a fresh fetch on the next request.
+   * Call this when a 401 Unauthorized is received to clear a stale token.
+   */
+  invalidateToken(): void {
+    this.tokenCache = null
+    this.logger.debug('Amadeus token cache invalidated')
+  }
+
+  /**
    * Get a valid OAuth2 access token, using cache when possible.
    * Uses mutex to prevent concurrent token requests.
    * Refreshes token 60 seconds before expiry.
