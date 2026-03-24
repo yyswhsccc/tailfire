@@ -1382,9 +1382,9 @@ export function TourForm({
               })
             }}
             onSupplierDefaultsApplied={(defaults: SupplierDefaults) => {
-            onNavigateToTab={(tab) => setActiveTab(tab as any)}
               setSupplierCommissionRate(defaults.commissionRate)
             }}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
           />
 
           <Separator />
