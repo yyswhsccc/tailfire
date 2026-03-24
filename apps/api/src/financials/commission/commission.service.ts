@@ -14,6 +14,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common'
 import { eq, and, desc, sql, between, inArray, count } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
@@ -44,6 +45,8 @@ import type {
 
 @Injectable()
 export class CommissionService {
+  private readonly logger = new Logger(CommissionService.name)
+
   constructor(private readonly db: DatabaseService) {}
 
   // ============================================================================
@@ -63,6 +66,20 @@ export class CommissionService {
       throw new BadRequestException('Paid checks must have a recipient (recipientName or recipientUserId)')
     }
 
+    // Validate senderSupplierId exists before inserting (FK constraint protection)
+    let validSupplierId = dto.senderSupplierId ?? null
+    if (validSupplierId) {
+      const [supplier] = await this.db.client
+        .select({ id: this.db.schema.suppliers.id })
+        .from(this.db.schema.suppliers)
+        .where(eq(this.db.schema.suppliers.id, validSupplierId))
+        .limit(1)
+      if (!supplier) {
+        this.logger.warn(`Supplier ${validSupplierId} not found — clearing senderSupplierId, keeping senderName`)
+        validSupplierId = null
+      }
+    }
+
     const [check] = await this.db.client
       .insert(this.db.schema.commissionChecks)
       .values({
@@ -73,7 +90,7 @@ export class CommissionService {
         checkAmountCents: dto.checkAmountCents,
         currency: dto.currency ?? 'CAD',
         senderName: dto.senderName,
-        senderSupplierId: dto.senderSupplierId,
+        senderSupplierId: validSupplierId,
         recipientName: dto.recipientName,
         recipientUserId: dto.recipientUserId,
         groupCheck: dto.groupCheck ?? false,
