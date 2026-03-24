@@ -77,7 +77,8 @@ export class AmadeusFlightOffersProvider
 
   private async makeAuthenticatedRequest<T>(
     endpoint: string,
-    method: 'GET' | 'POST' = 'GET'
+    method: 'GET' | 'POST' = 'GET',
+    isRetry = false
   ): Promise<ExternalApiResponse<T>> {
     const requestId = `amadeus_offers_${Date.now()}`
     const startTime = Date.now()
@@ -112,22 +113,48 @@ export class AmadeusFlightOffersProvider
       }
     } catch (error: any) {
       const latencyMs = Date.now() - startTime
+      const status = error.response?.status
+
+      // On 401, clear the stale token and retry once with a fresh one
+      if (status === 401 && !isRetry) {
+        this.logger.warn('Amadeus 401 — invalidating token cache and retrying', { requestId, endpoint })
+        this.authService.invalidateToken()
+        return this.makeAuthenticatedRequest<T>(endpoint, method, true)
+      }
+
+      // After a retry also 401s, give a clear error
+      if (status === 401 && isRetry) {
+        this.logger.error('Amadeus 401 on retry — credentials may be invalid', { requestId, endpoint })
+        return {
+          success: false,
+          error: 'Authentication failed: unable to obtain a valid Amadeus token. Please check your API credentials.',
+          metadata: { provider: this.config.provider, timestamp: new Date().toISOString(), requestId },
+        }
+      }
+
       this.logger.error('Amadeus Flight Offers API error', {
         requestId,
         latencyMs,
         error: error.message,
-        status: error.response?.status,
+        status,
       })
 
       Sentry.captureException(error, {
         tags: { service: 'amadeus_offers', operation: 'authenticated-request' },
-        extra: { endpoint, requestId, latencyMs, status: error.response?.status },
+        extra: { endpoint, requestId, latencyMs, status },
       })
 
-      const errorDetail = error.response?.data?.errors?.[0]
-      const errorMessage = errorDetail
-        ? `${errorDetail.title}: ${errorDetail.detail || ''}`
-        : error.message
+      // Surface the Amadeus error detail for 400s so the frontend gets useful feedback
+      const amadeusErrors: Array<{ title?: string; detail?: string; code?: number }> =
+        error.response?.data?.errors ?? []
+      let errorMessage: string
+      if (amadeusErrors.length > 0) {
+        errorMessage = amadeusErrors
+          .map(e => [e.title, e.detail].filter(Boolean).join(': '))
+          .join('; ')
+      } else {
+        errorMessage = error.message
+      }
 
       return {
         success: false,
@@ -192,11 +219,44 @@ export class AmadeusFlightOffersProvider
 
   validateParams(params: FlightOfferSearchParams): { valid: boolean; errors: string[] } {
     const errors: string[] = []
+
     if (!params.origin || !/^[A-Z]{3}$/i.test(params.origin)) errors.push('Origin must be a 3-letter IATA code')
     if (!params.destination || !/^[A-Z]{3}$/i.test(params.destination)) errors.push('Destination must be a 3-letter IATA code')
-    if (!params.departureDate || !/^\d{4}-\d{2}-\d{2}$/.test(params.departureDate)) errors.push('Departure date required (YYYY-MM-DD)')
+
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+    if (!params.departureDate || !dateRegex.test(params.departureDate)) {
+      errors.push('Departure date required (YYYY-MM-DD)')
+    } else {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const departure = new Date(params.departureDate)
+      if (departure < today) errors.push('Departure date must not be in the past')
+
+      if (params.returnDate) {
+        if (!dateRegex.test(params.returnDate)) {
+          errors.push('Return date must be YYYY-MM-DD')
+        } else {
+          const returnDate = new Date(params.returnDate)
+          if (returnDate < departure) errors.push('Return date must be on or after the departure date')
+        }
+      }
+    }
+
     if (!params.adults || params.adults < 1) errors.push('At least 1 adult required')
-    if (params.returnDate && !/^\d{4}-\d{2}-\d{2}$/.test(params.returnDate)) errors.push('Return date must be YYYY-MM-DD')
+
+    const validTravelClasses = ['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST']
+    if (params.travelClass && !validTravelClasses.includes(params.travelClass)) {
+      errors.push(`Travel class must be one of: ${validTravelClasses.join(', ')}`)
+    }
+
+    if (params.maxPrice !== undefined && params.maxPrice !== null && params.maxPrice <= 0) {
+      errors.push('Max price must be a positive number')
+    }
+
+    if (params.currencyCode && !/^[A-Z]{3}$/.test(params.currencyCode)) {
+      errors.push('Currency code must be 3 uppercase letters (e.g. USD, CAD, EUR)')
+    }
+
     return { valid: errors.length === 0, errors }
   }
 
