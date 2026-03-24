@@ -1573,6 +1573,7 @@ export function TransportationForm({
             pricingData={pricingData}
             onUpdate={handlePricingUpdate}
             onSupplierDefaultsApplied={handleSupplierDefaultsApplied}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
           />
 
           <Separator />

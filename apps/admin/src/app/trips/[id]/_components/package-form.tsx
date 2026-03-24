@@ -800,6 +800,7 @@ export function PackageForm({
             pricingData={pricingData}
             onUpdate={handlePricingUpdate}
             onSupplierDefaultsApplied={handleSupplierDefaultsApplied}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
           />
 
           <Separator />
