@@ -35,6 +35,7 @@ Use these pages for task-based help on how advisors and operations staff use the
 - [Create A Trip](./Agent-Guide-Create-A-Trip.md)
 - [Build And Propose An Itinerary](./Agent-Guide-Build-And-Propose-An-Itinerary.md)
 - [Record Supplier Bookings](./Agent-Guide-Record-Supplier-Bookings.md)
+- [Flight Activities](./Agent-Guide-Flight-Activities.md)
 - [Payment Schedules](./Agent-Guide-Payment-Schedules.md)
 - [Service Fees](./Agent-Guide-Service-Fees.md)
 - [Libraries](./Agent-Guide-Libraries.md)
@@ -54,11 +55,12 @@ Use these pages for task-based help on how advisors and operations staff use the
 
 ## Current Canonical Focus
 
-The most important current workflow work is the trip lifecycle and booking model:
+The most important current workflow area is the trip lifecycle and booking model:
 
-- trip stage should stay separate from itinerary approval and supplier booking completeness
-- itinerary approval should remain version-aware
-- supplier booking capture needs to be normalized across standalone activities and packages
+- trip stage stays separate from itinerary approval and supplier booking
+- itinerary approval and client responses remain version-aware
+- the current codebase already stores the new trip stages and activity state fields
+- the remaining open work is mostly lifecycle guardrails and booking-path normalization
 
 See:
 

@@ -1,263 +1,190 @@
 # Local Development
 
-This document describes how to run Tailfire locally, including port assignments and startup commands.
+This document describes the current local-dev paths that actually work in the repo today.
 
 ## Prerequisites
 
-- **Node.js** 20.0.0 or higher
-- **pnpm** 10.0.0 or higher
-- Access to Supabase development project credentials
+- Node.js 20+
+- pnpm 10+
+- Supabase development credentials
+- Redis access for BullMQ automation
 
-## Quick Start
+## Important Redis Caveat
 
-### Option A: With Doppler (Recommended)
-
-Doppler provides centralized secrets management with all credentials pre-configured:
+The root `pnpm dev` flow currently runs:
 
 ```bash
-# 1. Install dependencies
+redis-cli ping > /dev/null 2>&1 || redis-server --daemonize yes
+```
+
+That means:
+
+- `pnpm dev` assumes local `redis-cli` and `redis-server` binaries exist.
+- The API runtime also supports `REDIS_URL`, but the root `predev` script does not honor that variable before probing localhost.
+- If you do not have local Redis tooling installed, prefer filtered commands such as `pnpm --filter @tailfire/api dev` and `pnpm --filter @tailfire/admin dev`.
+
+## Recommended Setup Paths
+
+### Option A: Doppler-backed local dev
+
+```bash
 pnpm install
 
-# 2. Install and authenticate Doppler CLI
 brew install dopplerhq/cli/doppler
 doppler login
-
-# 3. Setup Doppler for local dev
 doppler setup --project tailfire --config dev
 
-# 4. Run database migrations (first time only)
 doppler run -- pnpm --filter @tailfire/api db:migrate
-
-# 5. Start all apps with Doppler-injected secrets
 doppler run -- pnpm dev
 ```
 
-> **Benefits:** Full access to R2 storage, email services, and all third-party integrations without managing `.env` files.
+Use this when you want the broadest access to provider-backed features.
 
-### Option B: Manual `.env` Files
-
-If you don't have Doppler access, use manual environment files:
+### Option B: Manual `.env` files
 
 ```bash
-# 1. Install dependencies
 pnpm install
 
-# 2. Copy environment files
 cp apps/api/.env.example apps/api/.env
 cp apps/admin/.env.example apps/admin/.env.local
-cp apps/ota/.env.example apps/ota/.env.local
 cp apps/client/.env.example apps/client/.env.local
+cp apps/ota/.env.example apps/ota/.env.local
 
-# 3. Edit .env files with your Supabase credentials
-
-# 4. Run database migrations (first time only)
 cd apps/api && pnpm db:migrate && cd ../..
 
-# 5. Start all apps
 pnpm dev
 ```
 
-> **Note:** Without Doppler, some features (R2 storage, email) will use fallback providers or be unavailable.
+Use this when you have local credentials but not Doppler access.
 
----
+### Option C: Filtered app startup
 
-## Port Assignments
-
-Ports are defined in `packages/config/ports.js`:
-
-| App | Port | URL | Purpose |
-|-----|------|-----|---------|
-| **Admin** | 3100 | `http://localhost:3100` | B2B admin dashboard |
-| **API** | 3101 | `http://localhost:3101/api/v1` | NestJS backend |
-| **OTA** | 3102 | `http://localhost:3102` | OTA booking platform |
-| **Client** | 3103 | `http://localhost:3103` | Customer-facing app |
-
-### Rationale
-
-- **3100** for Admin: Primary development interface, easy to remember
-- **3101** for API: Adjacent to Admin for easy mental mapping
-- **3102-3103** for secondary frontends: Follow sequentially
-- **All in 31xx range**: Avoids conflicts with common ports (3000, 8080, etc.)
-
----
-
-## Startup Commands
-
-### Start All Apps (Turborepo)
+Use this when the root Redis preflight is a problem or when you only need a subset of the stack.
 
 ```bash
-# From monorepo root
-pnpm dev
-```
-
-This runs `turbo dev` which starts all apps concurrently with proper dependency ordering.
-
-### Start Individual Apps
-
-```bash
-# API only
 pnpm --filter @tailfire/api dev
-
-# Admin only
 pnpm --filter @tailfire/admin dev
-
-# OTA only
-pnpm --filter @tailfire/ota dev
-
-# Client only
 pnpm --filter @tailfire/client dev
+pnpm --filter @tailfire/ota dev
 ```
 
-### Start Specific Combinations
+## Ports
 
-```bash
-# API + Admin (most common for development)
-pnpm --filter @tailfire/api --filter @tailfire/admin dev
+Ports are defined in `packages/config/ports.js`.
 
-# All frontends (requires API running separately or in production)
-pnpm --filter @tailfire/admin --filter @tailfire/ota --filter @tailfire/client dev
-```
-
----
+| App | Port | URL |
+| --- | --- | --- |
+| Admin | `3100` | `http://localhost:3100` |
+| API | `3101` | `http://localhost:3101/api/v1` |
+| OTA | `3102` | `http://localhost:3102` |
+| Client | `3103` | `http://localhost:3103` |
 
 ## Database Commands
 
-All database commands run from the **API app directory** (`apps/api`):
+Run database commands from `apps/api`:
 
 ```bash
 cd apps/api
 
-# Generate migration from schema changes
 pnpm db:generate
-
-# Run pending migrations
 pnpm db:migrate
-
-# Open Drizzle Studio (GUI)
 pnpm db:studio
-
-# Reset database (interactive confirmation)
 pnpm db:reset
-
-# Reset + seed with test data
 pnpm db:seed
-
-# Preview what reset would do (no changes)
 pnpm db:reset:dry-run
 pnpm db:seed:dry-run
-
-# Force reset (no confirmation, for scripts)
 pnpm db:reset:force
 pnpm db:seed:force
 ```
 
-### Database Reset Safety
+Reset/seed safety:
 
-Reset commands are protected by:
-- `ALLOW_DATABASE_RESET=true` must be set in `.env`
-- `NODE_ENV` cannot be `production`
-- Interactive confirmation required (unless `--force`)
-
----
+- `ALLOW_DATABASE_RESET=true` must be set
+- `NODE_ENV=production` is blocked
+- interactive confirmation is required unless `--force` is used
 
 ## Environment Files
 
-### API (`apps/api/.env`)
+### API
 
-Required variables for local development:
+Typical local minimum in `apps/api/.env`:
 
 ```bash
 NODE_ENV=development
 PORT=3101
 API_PREFIX=api/v1
 
-# Supabase
-DATABASE_URL=postgresql://postgres.[ref]:[password]@...
-SUPABASE_URL=https://[ref].supabase.co
-SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
-SUPABASE_JWT_SECRET=your-jwt-secret
+DATABASE_URL=postgresql://...
+SUPABASE_URL=https://...
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+SUPABASE_JWT_SECRET=...
 
-# Auth
-JWT_SECRET=dev-secret-key
+JWT_SECRET=...
 ADMIN_URL=http://localhost:3100
-
-# Database reset (dev only)
 ALLOW_DATABASE_RESET=true
-
-# Features
 ENABLE_SWAGGER_DOCS=true
+
+# BullMQ / automation
+REDIS_URL=redis://localhost:6379
 ```
 
-### Frontend Apps (`apps/*/\env.local`)
+### Frontends
+
+Typical local minimum in `apps/*/.env.local`:
 
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:3101/api/v1
-NEXT_PUBLIC_SUPABASE_URL=https://[ref].supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+NEXT_PUBLIC_SUPABASE_URL=https://...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ```
 
----
+Important provider note:
 
-## Build Commands
+- `apps/api/.env.example` is not a complete reference for every current external-provider secret.
+- Use [EXTERNAL_APIS.md](./EXTERNAL_APIS.md) as the current integration inventory.
+
+## Daily Commands
 
 ```bash
-# Build all packages and apps
 pnpm build
-
-# Build specific app
+pnpm lint
+pnpm typecheck
+pnpm test
 pnpm --filter @tailfire/api build
 pnpm --filter @tailfire/admin build
-
-# Type check all
-pnpm typecheck
-
-# Lint all
-pnpm lint
-
-# Run tests
-pnpm test
 ```
 
----
+## Swagger
 
-## API Documentation
+When `ENABLE_SWAGGER_DOCS=true`:
 
-When running locally with `ENABLE_SWAGGER_DOCS=true`:
+- `http://localhost:3101/api/v1/docs`
 
-**Swagger UI:** `http://localhost:3101/api/v1/docs`
+## Common Local Patterns
 
----
-
-## Common Development Scenarios
-
-### Scenario: Working on Admin + API
+### API + Admin only
 
 ```bash
-# Terminal 1: Start API
 pnpm --filter @tailfire/api dev
-
-# Terminal 2: Start Admin
 pnpm --filter @tailfire/admin dev
 ```
 
-Or use the combined command:
+### Schema change
+
+```bash
+cd apps/api
+pnpm db:generate
+pnpm db:migrate
+```
+
+### Full stack from root
+
 ```bash
 pnpm dev
 ```
 
-### Scenario: Testing Database Changes
-
-```bash
-# 1. Modify schema in packages/database/src/schema/
-# 2. Generate migration
-cd apps/api && pnpm db:generate
-
-# 3. Review migration SQL
-cat ../../packages/database/src/migrations/*.sql | tail -50
-
-# 4. Apply migration
-pnpm db:migrate
+Use this only when the local Redis preflight behavior matches your machine setup.
 ```
 
 ### Scenario: Fresh Database Setup

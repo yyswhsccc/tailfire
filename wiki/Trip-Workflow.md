@@ -4,11 +4,12 @@ This page summarizes the canonical trip lifecycle and booking model. The full de
 
 ## Core Separation
 
-Tailfire now documents three different concerns explicitly:
+Tailfire documents these concerns separately:
 
 - `Trip Stage`: overall trip file lifecycle
 - `Itinerary Status`: proposal lifecycle for a specific itinerary option
-- `Activity Booking`: supplier fulfillment for a specific component
+- `Activity State`: proposal state and supplier-booking state for a specific component
+- `Client Activity Response`: client feedback on a published activity/version
 
 These must not be treated as the same thing.
 
@@ -27,6 +28,7 @@ Key rule:
 
 - A trip stays `Planning` while proposals are drafted, sent, revised, and approved.
 - A trip becomes `Active` only when the first required supplier booking is actually recorded.
+- Date automation then moves `Active -> Travelling -> Travelled`.
 
 ## Itinerary Status
 
@@ -40,6 +42,15 @@ Stored itinerary statuses:
 Key rule:
 
 - only one itinerary per trip can be `Approved`
+
+## Activity State
+
+Current stored activity state is split into:
+
+- `proposalStatus`
+- `bookingStatus`
+
+That means client approval and supplier booking do not share the same field.
 
 ## Derived Trip Conditions
 
@@ -60,7 +71,7 @@ Publishing and status are separate:
 
 ## Booking Capture
 
-The intended booking flow is:
+The current intended flow is:
 
 1. trip is created and planned
 2. itinerary is proposed and approved
@@ -78,7 +89,11 @@ Required booking capture should include:
 
 ## Current Focus
 
-The current codebase still has legacy trip statuses and inconsistent package vs standalone booking behavior, so use the implementation plan alongside the canonical model.
+The repo already uses the new trip-stage vocabulary and separate activity state fields. The main remaining gaps are:
+
+- lifecycle guardrails still allow automatic `active -> planning` demotion
+- package booking and standalone booking are still not fully normalized
+- some shared proposal rendering is still split across two UI implementations
 
 ## Canonical References
 

@@ -35,12 +35,16 @@ This directory contains both canonical runbooks and historical design material. 
 - [`../packages/trip-proposal-ui/README.md`](../packages/trip-proposal-ui/README.md)
 - [`../packages/config/README.md`](../packages/config/README.md)
 
-## Wiki Seed
+## Local Wiki And User Guide
 
-The local source pages for the GitHub Wiki seed live under:
+The local reference wiki and agent help-center source live under:
 
 - [`../wiki/Home.md`](../wiki/Home.md)
 - [`../wiki/_Sidebar.md`](../wiki/_Sidebar.md)
+- [`../wiki/Agent-Guide-Home.md`](../wiki/Agent-Guide-Home.md)
+- [`../wiki/Trip-Workflow.md`](../wiki/Trip-Workflow.md)
+
+Use `docs/` for the canonical technical contract and `wiki/` for quick-reference orientation plus agent-facing usage guides.
 
 ## Historical Design Material
 

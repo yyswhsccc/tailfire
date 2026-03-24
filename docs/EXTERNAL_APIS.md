@@ -191,6 +191,13 @@ Operational detail:
 - `AmadeusAuthService` performs OAuth client-credentials token exchange and token caching.
 - The hotel stack composes Amadeus with Google Places rather than exposing it as the only hotel provider.
 - Flight status is secondary to AeroDataBox in the provider fallback chain, but Amadeus is still used directly for airport keyword search and offer shopping.
+- In the admin trip builder, flight activity search now uses Amadeus in two distinct ways:
+  - `More Results (Amadeus)` in the per-segment search panel reruns `GET /external-apis/flights/search` with a provider override
+  - `Search Flight Offers` uses `GET /external-apis/flights/offers/search` for route-level price shopping and can replace the segment list in the flight form
+- Primary admin consumers:
+  - `apps/admin/src/app/trips/[id]/_components/flight-form.tsx`
+  - `apps/admin/src/components/flight-offers-search-panel.tsx`
+  - `apps/admin/src/hooks/use-external-apis.ts`
 
 ### AeroDataBox
 
@@ -199,10 +206,13 @@ Operational detail:
 - Routes:
   - `GET /external-apis/flights/search`
   - `GET /external-apis/flights/airports/:code`
-  - `GET /external-apis/flights/:flightNumber`
-  - `GET /external-apis/flights/health/check`
+- `GET /external-apis/flights/:flightNumber`
+- `GET /external-apis/flights/health/check`
 - Auth model: `@AdminOnly()`
-- Operational detail: the provider registers in the `flights` category and can be selected explicitly or through the registry fallback chain
+- Operational detail:
+  - the provider registers in the `flights` category and can be selected explicitly or through the registry fallback chain
+  - the admin flight form's segment-level `Search` action uses this route family first, with the selected segment's flight date, airline/code, and flight number
+  - applying a result hydrates the segment with airports, dates, times, terminals, gates, timezones, and aircraft metadata
 
 ### Google Places
 

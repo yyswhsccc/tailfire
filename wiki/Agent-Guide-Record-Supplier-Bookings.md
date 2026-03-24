@@ -25,7 +25,7 @@ If an activity belongs to a package, the child booking section becomes read-only
 1. Confirm the final itinerary option internally.
 2. Book the activity or package with the supplier outside Tailfire.
 3. Return to Tailfire and open the correct record.
-4. Record supplier-facing details already supported by that form, such as confirmation number or booking notes.
+4. Record supplier-facing details already supported by that form, such as confirmation number, booking date, or notes.
 5. Mark the item as booked using the correct path.
 6. Add or review the payment schedule for that booked item.
 7. Record any payments separately.
@@ -45,7 +45,7 @@ For standalone activities, the current booked action is mainly a booking flag pl
 2. Use the package `Mark as Booked` action.
 3. Enter the supplier confirmation number.
 4. Confirm the booking date.
-5. Optionally update the payment status if that field is relevant to your workflow.
+5. The package modal also shows an optional payment-status field, but payment schedules and actual payments are still separate follow-up workflows.
 6. Save the package booking.
 
 Package-linked child activities inherit that package booking context and should be managed from the parent package.
