@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Search, HelpCircle, Settings, Bug } from 'lucide-react'
+import { Search, HelpCircle, Settings, Bug, BookOpen, Keyboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
 import { useAuth } from '@/providers/auth-provider'
@@ -24,6 +24,7 @@ import { CalendarNavbarPopover } from '@/components/calendar'
 import { useUnreadEmailCount } from '@/hooks/use-emails'
 import { BugReportDialog } from '@/components/bug-report/bug-report-dialog'
 import { SuperSearchDialog } from '@/components/layout/super-search-dialog'
+import { HelpGuideSheet } from '@/components/help/help-guide-sheet'
 
 const navigation = [
   { name: 'Trips', href: '/trips' },
@@ -45,6 +46,8 @@ export function TopNav() {
   const unreadEmailCount = useUnreadEmailCount()
   const [searchOpen, setSearchOpen] = useState(false)
   const [bugReportOpen, setBugReportOpen] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const [guideInitialTopic, setGuideInitialTopic] = useState<string | undefined>()
   const [autoScreenshot, setAutoScreenshot] = useState<Blob | null>(null)
 
   const handleReportBug = async () => {
@@ -178,9 +181,17 @@ export function TopNav() {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Help</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Documentation</DropdownMenuItem>
-              <DropdownMenuItem>Support</DropdownMenuItem>
-              <DropdownMenuItem>Keyboard Shortcuts</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setGuideInitialTopic(undefined); setGuideOpen(true) }}>
+                <BookOpen className="mr-2 h-4 w-4" />
+                Documentation
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                Support
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setGuideInitialTopic('shortcuts'); setGuideOpen(true) }}>
+                <Keyboard className="mr-2 h-4 w-4" />
+                Keyboard Shortcuts
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleReportBug}>
                 <Bug className="mr-2 h-4 w-4" />
@@ -244,6 +255,11 @@ export function TopNav() {
           if (!open) setAutoScreenshot(null)
         }}
         autoScreenshot={autoScreenshot}
+      />
+      <HelpGuideSheet
+        open={guideOpen}
+        onOpenChange={setGuideOpen}
+        initialTopic={guideInitialTopic}
       />
       <SuperSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
     </header>
