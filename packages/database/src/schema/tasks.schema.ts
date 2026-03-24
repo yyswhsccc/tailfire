@@ -111,6 +111,7 @@ export const tasks = pgTable('tasks', {
   status: taskStatusEnum('status').notNull().default('pending'),
   priority: taskPriorityEnum('priority').notNull().default('medium'),
   taskType: taskTypeEnum('task_type').notNull().default('manual'),
+  phase: varchar('phase', { length: 20 }),
 
   // Dates
   dueDate: date('due_date'),
