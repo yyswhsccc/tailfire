@@ -42,6 +42,7 @@ import { MoveToGroupDialog } from '@/components/trips/MoveToGroupDialog'
 import { TripOverview } from './_components/trip-overview'
 import { TripTasks } from './_components/trip-tasks'
 import { TripItinerary } from './_components/trip-itinerary'
+import { TripAutomations } from './_components/trip-automations'
 import { TripMediaTab } from './_components/trip-media-tab'
 import { TripPackages } from './_components/trip-packages'
 import { TripPayments } from './_components/trip-payments'
@@ -614,10 +615,11 @@ export default function TripDetailPage() {
         return <NotesSection tripId={trip.id} />
       case 'tasks':
         return <TripTasks trip={trip} />
+      case 'automations':
+        return <TripAutomations trip={trip} />
       case 'documents':
       case 'emails':
       case 'forms':
-      case 'automations':
         return (
           <EmptyState
             title={`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace(/-/g, ' ')}`}

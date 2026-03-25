@@ -29,6 +29,7 @@ import {
   type DepartureReminderJobData,
   type PostTripJobData,
   type RecurringJobData,
+  type InsuranceProposalEmailData,
 } from '../automation.types'
 
 /** Escape HTML special characters to prevent markup breakage in email templates */
@@ -43,6 +44,7 @@ type ClientCareJobUnion =
   | DepartureReminderJobData
   | PostTripJobData
   | RecurringJobData
+  | InsuranceProposalEmailData
 
 @Processor(QUEUES.CLIENT_CARE)
 @Injectable()
@@ -139,6 +141,13 @@ export class ClientCareProcessor extends WorkerHost {
 
       case 'recurring.task_due_reminder': {
         await this.handleTaskDueReminder()
+        break
+      }
+
+      // Insurance proposal emails
+      case 'insurance.proposal.email': {
+        const data = job.data as InsuranceProposalEmailData
+        await this.handleInsuranceProposalEmail(data)
         break
       }
 
@@ -898,6 +907,137 @@ ${removedTasks.map((t) => `<tr><td style="font-size:14px;color:#27272a;border-bo
   // ============================================================================
   // Helpers
   // ============================================================================
+
+  // ============================================================================
+  // Insurance Proposal Email Handler
+  // ============================================================================
+
+  private async handleInsuranceProposalEmail(data: InsuranceProposalEmailData): Promise<void> {
+    const { recipientEmail, recipientName, tripId, tripName, formToken, agencyId, dependentTravelerIds } = data
+
+    if (!recipientEmail) {
+      this.logger.warn(`No email for insurance proposal recipient ${data.recipientTravelerId} - skipping`)
+      return
+    }
+
+    // Get agency name for branding
+    const [agency] = await this.db.client
+      .select({ name: this.db.schema.agencies.name })
+      .from(this.db.schema.agencies)
+      .where(eq(this.db.schema.agencies.id, agencyId))
+      .limit(1)
+
+    const agencyName = agency?.name || 'Your Travel Agency'
+
+    // Build waiver form URL
+    const clientPortalUrl = process.env.CLIENT_PORTAL_URL || 'https://client.phoenixvoyages.ca'
+    const waiverUrl = `${clientPortalUrl}/forms/${formToken}`
+
+    const html = this.buildInsuranceEmailHtml({
+      recipientName,
+      tripName,
+      agencyName,
+      waiverUrl,
+      hasDependents: dependentTravelerIds.length > 0,
+      dependentCount: dependentTravelerIds.length,
+    })
+
+    await this.emailService.sendEmail({
+      to: [recipientEmail],
+      subject: `Insurance Coverage — ${tripName}`,
+      html,
+      agencyId,
+      tripId,
+      templateSlug: 'insurance-proposal',
+    })
+
+    this.logger.log(`Sent insurance proposal email to ${recipientEmail} for trip "${tripName}"`)
+  }
+
+  private buildInsuranceEmailHtml(params: {
+    recipientName: string
+    tripName: string
+    agencyName: string
+    waiverUrl: string
+    hasDependents: boolean
+    dependentCount: number
+  }): string {
+    const { recipientName, tripName, agencyName, waiverUrl, hasDependents, dependentCount } = params
+
+    const dependentNote = hasDependents
+      ? `<p style="margin:0 0 16px;font-size:14px;color:#52525b;">
+          This form also covers <strong>${dependentCount} dependent traveler${dependentCount > 1 ? 's' : ''}</strong> on your trip.
+        </p>`
+      : ''
+
+    return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" /></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background-color:#ffffff;">
+    <!-- Header -->
+    <tr>
+      <td style="padding:32px 32px 24px;background-color:#18181b;text-align:center;">
+        <h1 style="margin:0;font-size:20px;color:#ffffff;font-weight:600;">${escapeHtml(agencyName)}</h1>
+      </td>
+    </tr>
+
+    <!-- Body -->
+    <tr>
+      <td style="padding:32px;">
+        <p style="margin:0 0 16px;font-size:16px;color:#27272a;">
+          Dear ${escapeHtml(recipientName || 'Traveler')},
+        </p>
+
+        <p style="margin:0 0 16px;font-size:14px;color:#52525b;">
+          As part of your upcoming trip <strong>${escapeHtml(tripName)}</strong>, we want to ensure you have
+          appropriate travel insurance coverage. Please review the available insurance options and make your selection.
+        </p>
+
+        ${dependentNote}
+
+        <p style="margin:0 0 24px;font-size:14px;color:#52525b;">
+          You can choose to purchase one of our recommended insurance packages or decline coverage.
+          If you decline, you will be asked to acknowledge the waiver.
+        </p>
+
+        <!-- CTA Button -->
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="text-align:center;padding:8px 0 24px;">
+              <a href="${waiverUrl}"
+                 style="display:inline-block;padding:14px 32px;background-color:#2563eb;color:#ffffff;
+                        text-decoration:none;font-size:16px;font-weight:600;border-radius:8px;">
+                Review Insurance Options
+              </a>
+            </td>
+          </tr>
+        </table>
+
+        <p style="margin:0 0 8px;font-size:13px;color:#a1a1aa;">
+          This link will expire in 30 days. If you have any questions, please contact your travel advisor.
+        </p>
+
+        <p style="margin:0;font-size:13px;color:#a1a1aa;">
+          If the button above doesn't work, copy and paste this URL into your browser:<br />
+          <a href="${waiverUrl}" style="color:#2563eb;word-break:break-all;">${waiverUrl}</a>
+        </p>
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td style="padding:24px 32px;background-color:#f4f4f5;text-align:center;">
+        <p style="margin:0;font-size:12px;color:#a1a1aa;">
+          &copy; ${new Date().getFullYear()} ${escapeHtml(agencyName)}. All rights reserved.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+  }
 
   private async getAgencyIdForContact(contactId: string): Promise<string> {
     const [result] = await this.db.client
