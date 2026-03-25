@@ -91,6 +91,7 @@ export interface UpdateDocumentTemplateData {
   variables?: Record<string, unknown>
   outputTypes?: string[]
   status?: TemplateStatus
+  formJson?: Record<string, unknown> | null
 }
 
 export interface RenderPdfParams {
