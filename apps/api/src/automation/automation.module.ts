@@ -33,6 +33,7 @@ import { AutomationController } from './admin/automation.controller'
 import { GooglePlacesModule } from '../external-apis/providers/google-places/google-places.module'
 import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
 import { CatalogMatcherModule } from '../catalog-matcher/catalog-matcher.module'
+import { DocumentTemplatesModule } from '../document-templates/document-templates.module'
 import { QUEUES } from './automation.types'
 
 @Module({
@@ -130,6 +131,7 @@ import { QUEUES } from './automation.types'
     GooglePlacesModule,
     ApiCredentialsModule,
     CatalogMatcherModule,
+    DocumentTemplatesModule,
   ],
   controllers: [AutomationController],
   providers: [

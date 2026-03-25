@@ -58,6 +58,13 @@ export const documentTemplates = pgTable('document_templates', {
   version: integer('version').notNull().default(1),
   isActive: boolean('is_active').notNull().default(true),
 
+  // Unified Template System: multi-channel + forking support
+  userId: uuid('user_id'),
+  channel: varchar('channel', { length: 20 }),
+  formJson: jsonb('form_json').$type<Record<string, unknown>>(),
+  smsTemplate: text('sms_template'),
+  isSystem: boolean('is_system').notNull().default(false),
+
   // Audit Fields
   createdBy: uuid('created_by'),
   updatedBy: uuid('updated_by'),

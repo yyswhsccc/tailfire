@@ -12,6 +12,7 @@ import {
   Upload,
   Lock,
   Eye,
+  RotateCcw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -44,15 +45,19 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { confirmDialog } from '@/components/ui/confirmation-dialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   useDocumentTemplates,
   useTemplatePreview,
   useForkDocumentTemplate,
+  useForkTemplate,
+  useDeleteFork,
   usePublishDocumentTemplate,
   useDeleteDocumentTemplate,
   type DocumentTemplate,
   type DocumentTemplateFilters,
   type TemplateCategory,
+  type TemplateChannel,
 } from '@/hooks/use-document-templates'
 
 // ============================================================================
@@ -104,6 +109,7 @@ function groupByCategory(templates: DocumentTemplate[]): Record<TemplateCategory
 
 export default function TemplatesLibraryPage() {
   const [categoryFilter, setCategoryFilter] = useState<TemplateCategory | 'all'>('all')
+  const [channelFilter, setChannelFilter] = useState<TemplateChannel | 'all'>('all')
   const [previewSlug, setPreviewSlug] = useState<string | null>(null)
   const [previewMode, setPreviewMode] = useState<'pdf' | 'email'>('pdf')
   const { toast } = useToast()
@@ -111,12 +117,15 @@ export default function TemplatesLibraryPage() {
   // Build filters
   const filters: DocumentTemplateFilters = {}
   if (categoryFilter !== 'all') filters.category = categoryFilter
+  if (channelFilter !== 'all') filters.channel = channelFilter
 
   // Fetch templates
   const { data: templates, isLoading, error } = useDocumentTemplates(filters)
 
   // Mutations
   const forkMutation = useForkDocumentTemplate()
+  const userForkMutation = useForkTemplate()
+  const deleteForkMutation = useDeleteFork()
   const publishMutation = usePublishDocumentTemplate()
   const deleteMutation = useDeleteDocumentTemplate()
 
@@ -141,6 +150,47 @@ export default function TemplatesLibraryPage() {
     } catch (err) {
       toast({
         title: 'Failed to customize template',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleUserFork = async (template: DocumentTemplate) => {
+    try {
+      await userForkMutation.mutateAsync(template.id)
+      toast({
+        title: 'Template customized',
+        description: `Created your personal copy of "${template.name}"`,
+      })
+    } catch (err) {
+      toast({
+        title: 'Failed to customize template',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleDeleteFork = async (template: DocumentTemplate) => {
+    const confirmed = await confirmDialog({
+      title: 'Reset to default?',
+      description: `This will remove your customizations to "${template.name}" and revert to the default template.`,
+      confirmLabel: 'Reset',
+      variant: 'destructive',
+    })
+
+    if (!confirmed) return
+
+    try {
+      await deleteForkMutation.mutateAsync(template.id)
+      toast({
+        title: 'Template reset',
+        description: `"${template.name}" reverted to default`,
+      })
+    } catch (err) {
+      toast({
+        title: 'Failed to reset template',
         description: err instanceof Error ? err.message : 'Unknown error',
         variant: 'destructive',
       })
@@ -214,6 +264,17 @@ export default function TemplatesLibraryPage() {
         </div>
       </div>
 
+      {/* Channel Tabs */}
+      <Tabs value={channelFilter} onValueChange={(v) => setChannelFilter(v as TemplateChannel | 'all')} className="mb-0">
+        <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="email">Email</TabsTrigger>
+          <TabsTrigger value="pdf">PDF</TabsTrigger>
+          <TabsTrigger value="form">Forms</TabsTrigger>
+          <TabsTrigger value="sms">SMS</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
         <Select
@@ -250,11 +311,11 @@ export default function TemplatesLibraryPage() {
         <div className="text-center py-12 border-2 border-dashed border-ash-200 rounded-lg">
           <FileText className="mx-auto h-12 w-12 text-ash-400" />
           <h3 className="mt-2 text-sm font-medium text-ash-900">
-            {categoryFilter !== 'all' ? 'No templates found' : 'No templates yet'}
+            {categoryFilter !== 'all' || channelFilter !== 'all' ? 'No templates found' : 'No templates yet'}
           </h3>
           <p className="mt-1 text-sm text-ash-500">
-            {categoryFilter !== 'all'
-              ? 'Try adjusting your filter'
+            {categoryFilter !== 'all' || channelFilter !== 'all'
+              ? 'Try adjusting your filters'
               : 'Document templates will appear here once configured'}
           </p>
         </div>
@@ -289,9 +350,13 @@ export default function TemplatesLibraryPage() {
                           template={template}
                           onPreview={(t) => setPreviewSlug(t.slug)}
                           onFork={handleFork}
+                          onUserFork={handleUserFork}
+                          onDeleteFork={handleDeleteFork}
                           onPublish={handlePublish}
                           onDelete={handleDelete}
                           isForking={forkMutation.isPending}
+                          isUserForking={userForkMutation.isPending}
+                          isDeletingFork={deleteForkMutation.isPending}
                           isPublishing={publishMutation.isPending}
                           isDeleting={deleteMutation.isPending}
                         />
@@ -371,9 +436,13 @@ interface TemplateRowProps {
   template: DocumentTemplate
   onPreview: (template: DocumentTemplate) => void
   onFork: (template: DocumentTemplate) => void
+  onUserFork: (template: DocumentTemplate) => void
+  onDeleteFork: (template: DocumentTemplate) => void
   onPublish: (template: DocumentTemplate) => void
   onDelete: (template: DocumentTemplate) => void
   isForking: boolean
+  isUserForking: boolean
+  isDeletingFork: boolean
   isPublishing: boolean
   isDeleting: boolean
 }
@@ -382,13 +451,18 @@ function TemplateRow({
   template,
   onPreview,
   onFork,
+  onUserFork,
+  onDeleteFork,
   onPublish,
   onDelete,
   isForking,
+  isUserForking,
+  isDeletingFork,
   isPublishing,
   isDeleting,
 }: TemplateRowProps) {
   const system = isSystemTemplate(template)
+  const isUserFork = !!template.userId
 
   return (
     <TableRow>
@@ -451,14 +525,21 @@ function TemplateRow({
         </div>
       </TableCell>
 
-      {/* System / Agency Badge */}
+      {/* Origin Badge */}
       <TableCell>
-        <Badge
-          variant="secondary"
-          className={system ? 'bg-gray-100 text-gray-600' : 'bg-blue-100 text-blue-800'}
-        >
-          {system ? 'System' : 'Customized'}
-        </Badge>
+        {isUserFork ? (
+          <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+            Custom
+          </Badge>
+        ) : system ? (
+          <Badge variant="secondary" className="bg-gray-100 text-gray-600">
+            System
+          </Badge>
+        ) : (
+          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+            Agency
+          </Badge>
+        )}
       </TableCell>
 
       {/* Actions */}
@@ -482,7 +563,64 @@ function TemplateRow({
             </Tooltip>
           </TooltipProvider>
 
-          {system ? (
+          {isUserFork ? (
+            /* User fork: Edit, Reset to Default */
+            <>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/library/templates/${template.id}/edit`}>
+                        <Pencil className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Edit template</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              {template.status === 'draft' && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onPublish(template)}
+                        disabled={isPublishing}
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Publish template</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDeleteFork(template)}
+                      disabled={isDeletingFork}
+                      className="text-orange-600 hover:text-orange-700"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Reset to default</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </>
+          ) : system ? (
             /* System template: Edit + Customize (fork) buttons */
             <>
               <TooltipProvider>
@@ -512,13 +650,30 @@ function TemplateRow({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Customize template</p>
+                    <p>Customize for agency</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onUserFork(template)}
+                      disabled={isUserForking}
+                    >
+                      <GitFork className="h-4 w-4 text-amber-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Customize for me</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </>
           ) : (
-            /* Agency template: Edit, Publish, Delete */
+            /* Agency template: Edit, Customize, Publish, Delete */
             <>
               <TooltipProvider>
                 <Tooltip>
@@ -531,6 +686,24 @@ function TemplateRow({
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Edit template</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onUserFork(template)}
+                      disabled={isUserForking}
+                    >
+                      <GitFork className="h-4 w-4 text-amber-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Customize for me</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
