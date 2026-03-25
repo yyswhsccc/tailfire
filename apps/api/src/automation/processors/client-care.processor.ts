@@ -19,6 +19,7 @@ import { DatabaseService } from '../../db/database.service'
 import { AutomationService } from '../automation.service'
 import { NotificationService } from '../../notifications/notification.service'
 import { EmailService } from '../../email/email.service'
+import { EmailTemplatesService } from '../../email/email-templates.service'
 import { getClientWelcomeTemplate } from '../../email/templates/client-welcome.template'
 import { getClientFollowUpTemplate } from '../../email/templates/client-follow-up.template'
 import { getClientPostTripTemplate } from '../../email/templates/client-post-trip.template'
@@ -57,6 +58,7 @@ export class ClientCareProcessor extends WorkerHost {
     private readonly automationService: AutomationService,
     private readonly notificationService: NotificationService,
     private readonly emailService: EmailService,
+    private readonly emailTemplatesService: EmailTemplatesService,
   ) {
     super()
   }
@@ -933,18 +935,46 @@ ${removedTasks.map((t) => `<tr><td style="font-size:14px;color:#27272a;border-bo
     const clientPortalUrl = process.env.CLIENT_PORTAL_URL || 'https://client.phoenixvoyages.ca'
     const waiverUrl = `${clientPortalUrl}/forms/${formToken}`
 
-    const html = this.buildInsuranceEmailHtml({
-      recipientName,
-      tripName,
-      agencyName,
-      waiverUrl,
-      hasDependents: dependentTravelerIds.length > 0,
-      dependentCount: dependentTravelerIds.length,
-    })
+    // Try to render the DB-stored template (agents can customize it in Library)
+    // Fall back to hardcoded HTML if the template doesn't exist yet
+    let html: string
+    let subject = `Insurance Coverage — ${tripName}`
+
+    const additionalVariables: Record<string, string> = {
+      agency_name: agencyName,
+      traveler_name: data.recipientName,
+      trip_name: data.tripName,
+      trip_dates: '',
+      waiver_url: waiverUrl,
+      expires_date: '30 days from now',
+      has_dependents: dependentTravelerIds.length > 0 ? 'true' : '',
+      dependent_names: '',
+    }
+
+    try {
+      const rendered = await this.emailTemplatesService.renderTemplate(
+        'insurance-proposal',
+        { agencyId },
+        additionalVariables,
+      )
+      html = rendered.html
+      subject = rendered.subject
+    } catch {
+      // Template not found — fall back to hardcoded HTML
+      this.logger.debug('insurance-proposal template not found in DB, using hardcoded fallback')
+      html = this.buildInsuranceEmailHtml({
+        recipientName,
+        tripName,
+        agencyName,
+        waiverUrl,
+        hasDependents: dependentTravelerIds.length > 0,
+        dependentCount: dependentTravelerIds.length,
+      })
+    }
 
     await this.emailService.sendEmail({
       to: [recipientEmail],
-      subject: `Insurance Coverage — ${tripName}`,
+      subject,
       html,
       agencyId,
       tripId,
