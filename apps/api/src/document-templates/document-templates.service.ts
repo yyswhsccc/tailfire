@@ -681,10 +681,18 @@ export class DocumentTemplatesService {
     }
 
     // Sample data so the template renders with meaningful content
+    const agencyName = (agency as any)?.name || 'Phoenix Voyages'
     const sampleData: Record<string, unknown> = {
       agency,
       business: agency,
       businessConfig: bc,
+      // Form template variables (flat, used by insurance/intake forms)
+      agency_name: agencyName,
+      traveler_name: 'Jane Smith',
+      trip_name: 'Mediterranean Cruise Getaway',
+      trip_dates: 'Jun 15, 2026 – Jun 29, 2026',
+      waiver_url: 'https://client.phoenixvoyages.ca/forms/sample-token',
+      expires_date: 'Jul 15, 2026',
       contact: {
         full_name: 'Jane & John Smith',
         first_name: 'Jane',
@@ -732,7 +740,76 @@ export class DocumentTemplatesService {
       ],
     }
 
+    // For form templates: generate sample form HTML from form_json
+    const template = await this.resolveTemplate(slug, agencyId)
+    if (template?.formJson) {
+      sampleData.form_fields = this.generateFormFieldsHtml(template.formJson as any)
+    }
+
     return this.renderTemplateWithContext(slug, agencyId, sampleData)
+  }
+
+  /**
+   * Generate preview HTML for form fields from form_json schema
+   */
+  private generateFormFieldsHtml(formJson: { fields?: any[]; settings?: any }): string {
+    if (!formJson?.fields) return '<p style="color:#a1a1aa;">No form fields defined</p>'
+
+    const fields = formJson.fields
+    const lines: string[] = ['<div style="margin:24px 0;">']
+
+    for (const field of fields) {
+      if (field.type === 'heading') {
+        lines.push(`<h3 style="margin:20px 0 8px;color:#18181b;font-size:16px;font-weight:600;">${field.label}</h3>`)
+        continue
+      }
+      if (field.type === 'paragraph') {
+        lines.push(`<p style="margin:8px 0;color:#3f3f46;font-size:14px;">${field.label}</p>`)
+        continue
+      }
+
+      const required = field.required ? ' <span style="color:#ef4444;">*</span>' : ''
+      lines.push(`<div style="margin:12px 0;">`)
+      lines.push(`  <label style="display:block;margin-bottom:4px;font-size:13px;font-weight:500;color:#3f3f46;">${field.label}${required}</label>`)
+
+      switch (field.type) {
+        case 'text':
+        case 'email':
+        case 'phone':
+        case 'date':
+          lines.push(`  <input type="${field.type}" placeholder="${field.placeholder || ''}" style="width:100%;padding:8px 12px;border:1px solid #d4d4d8;border-radius:6px;font-size:14px;" disabled />`)
+          break
+        case 'textarea':
+          lines.push(`  <textarea placeholder="${field.placeholder || ''}" rows="3" style="width:100%;padding:8px 12px;border:1px solid #d4d4d8;border-radius:6px;font-size:14px;resize:vertical;" disabled></textarea>`)
+          break
+        case 'select':
+          lines.push(`  <select style="width:100%;padding:8px 12px;border:1px solid #d4d4d8;border-radius:6px;font-size:14px;" disabled>`)
+          lines.push(`    <option>Select...</option>`)
+          for (const opt of field.options ?? []) {
+            lines.push(`    <option>${opt}</option>`)
+          }
+          lines.push(`  </select>`)
+          break
+        case 'radio':
+          for (const opt of field.options ?? []) {
+            lines.push(`  <div style="margin:4px 0;"><input type="radio" disabled /> <span style="font-size:14px;">${opt}</span></div>`)
+          }
+          break
+        case 'checkbox':
+          lines.push(`  <div style="display:flex;gap:8px;align-items:flex-start;"><input type="checkbox" disabled style="margin-top:3px;" /> <span style="font-size:13px;color:#3f3f46;">${field.label}</span></div>`)
+          break
+        default:
+          lines.push(`  <input type="text" style="width:100%;padding:8px 12px;border:1px solid #d4d4d8;border-radius:6px;" disabled />`)
+      }
+
+      lines.push(`</div>`)
+    }
+
+    const submitText = formJson.settings?.submitButtonText ?? 'Submit'
+    lines.push(`<div style="margin:24px 0;text-align:center;"><button style="background:#c59746;color:white;padding:12px 32px;border:none;border-radius:6px;font-size:16px;font-weight:600;cursor:pointer;" disabled>${submitText}</button></div>`)
+    lines.push('</div>')
+
+    return lines.join('\n')
   }
 
   // -------------------------------------------------------------------------
