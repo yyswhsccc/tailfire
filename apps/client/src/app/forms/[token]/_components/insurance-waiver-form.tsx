@@ -1,13 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, Check, Shield } from 'lucide-react'
+import { AlertTriangle, Check, Download, Shield } from 'lucide-react'
 import {
   Button,
   Card,
   CardContent,
   Checkbox,
+  Input,
   Label,
+  RadioGroup,
+  RadioGroupItem,
+  Separator,
   Textarea,
   cn,
 } from '@tailfire/ui-public'
@@ -50,7 +54,13 @@ interface WaiverFormProps {
   formTemplate?: FormTemplateData | null
 }
 
-type FormPath = 'choose' | 'purchase' | 'decline'
+interface SubmissionResult {
+  success: boolean
+  referenceNumber: string
+  signedAt: string
+  pdfBase64: string
+  travelerEmail: string | null
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -80,65 +90,28 @@ function formatPolicyType(type: string) {
     .join(' ')
 }
 
+function todayFormatted() {
+  return new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+function nowFormatted() {
+  return new Date().toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  })
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ──────────────────────────────────────────────────────────────────────────────
-
-function FormHeader({
-  agencyName,
-  tripName,
-  tripStartDate,
-  tripEndDate,
-  travelerNames,
-}: {
-  agencyName: string
-  tripName: string
-  tripStartDate: string | null
-  tripEndDate: string | null
-  travelerNames: string[]
-}) {
-  const start = formatDate(tripStartDate)
-  const end = formatDate(tripEndDate)
-
-  return (
-    <div className="text-center mb-8">
-      <p className="text-sm text-muted-foreground mb-1">{agencyName}</p>
-      <h1 className="font-display text-2xl font-bold text-foreground mb-1">{tripName}</h1>
-      {(start || end) && (
-        <p className="text-sm text-muted-foreground mb-3">
-          {start}
-          {start && end && ' – '}
-          {end}
-        </p>
-      )}
-      <div className="inline-flex items-center gap-2 bg-primary/10 rounded-full px-4 py-1.5 mb-4">
-        <Shield className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium text-primary">Insurance Coverage Decision</span>
-      </div>
-      <div className="text-sm text-muted-foreground">
-        {travelerNames.length === 1 ? (
-          <p>
-            This form is for: <strong className="text-foreground">{travelerNames[0]}</strong>
-          </p>
-        ) : (
-          <div>
-            <p className="mb-1">This form covers:</p>
-            <ul className="space-y-0.5">
-              {travelerNames.map((name, i) => (
-                <li key={i} className="font-medium text-foreground">
-                  {name}
-                  {i === 0 && travelerNames.length > 1 && (
-                    <span className="text-muted-foreground font-normal"> (decision-maker)</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 function PackageCard({
   pkg,
@@ -154,57 +127,53 @@ function PackageCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        'w-full text-left rounded-xl border-2 p-4 transition-all duration-200',
+        'w-full text-left rounded-lg border-2 p-4 transition-all duration-200',
         selected
-          ? 'border-primary bg-primary/5'
-          : 'border-border bg-card hover:border-primary/40 hover:bg-primary/5',
+          ? 'border-[#c59746] bg-[#c59746]/5'
+          : 'border-gray-200 bg-white hover:border-[#c59746]/40',
       )}
     >
       <div className="flex items-start gap-3">
-        {/* Selection indicator */}
         <div
           className={cn(
             'mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors',
-            selected ? 'border-primary bg-primary' : 'border-muted-foreground',
+            selected ? 'border-[#c59746] bg-[#c59746]' : 'border-gray-400',
           )}
         >
           {selected && <div className="h-2 w-2 rounded-full bg-white" />}
         </div>
-
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 flex-wrap">
             <div>
-              <p className="font-semibold text-foreground">{pkg.packageName}</p>
-              <p className="text-sm text-muted-foreground">{pkg.providerName}</p>
+              <p className="font-semibold text-gray-900">{pkg.packageName}</p>
+              <p className="text-sm text-gray-500">{pkg.providerName}</p>
             </div>
             <div className="text-right shrink-0">
-              <p className="font-bold text-foreground text-lg">
+              <p className="font-bold text-gray-900 text-lg">
                 {formatCents(pkg.premiumCents, pkg.currency)}
               </p>
-              <p className="text-xs text-muted-foreground">per person</p>
+              <p className="text-xs text-gray-500">per person</p>
             </div>
           </div>
-
           <div className="mt-2 flex flex-wrap gap-2">
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+            <span className="inline-flex items-center rounded-full bg-[#c59746]/10 px-2.5 py-0.5 text-xs font-medium text-[#c59746]">
               {formatPolicyType(pkg.policyType)}
             </span>
             {pkg.coverageAmountCents && (
-              <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+              <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500">
                 Up to {formatCents(pkg.coverageAmountCents, pkg.currency)} coverage
               </span>
             )}
           </div>
-
           {pkg.termsUrl && (
             <a
               href={pkg.termsUrl}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="mt-2 inline-block text-xs text-primary hover:underline"
+              className="mt-2 inline-block text-xs text-[#c59746] hover:underline"
             >
-              View policy terms →
+              View policy terms
             </a>
           )}
         </div>
@@ -226,292 +195,482 @@ export function InsuranceWaiverForm({
   travelerIds,
   travelerNames,
   packages,
-  formTemplate,
 }: WaiverFormProps) {
-  const [path, setPath] = useState<FormPath>('choose')
+  // Form state
+  const [decision, setDecision] = useState<'purchase' | 'decline' | null>(null)
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
   const [declineAcknowledged, setDeclineAcknowledged] = useState(false)
   const [declineReason, setDeclineReason] = useState('')
+  const [signatureName, setSignatureName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [submitted, setSubmitted] = useState(false)
+  const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null)
 
-  // ── Template-driven labels (fall back to hardcoded defaults) ──
-  const fields = formTemplate?.formJson?.fields ?? []
-  const decisionField = fields.find((f) => f.id === 'decision')
-  const acknowledgeField = fields.find((f) => f.id === 'acknowledge')
-  const reasonField = fields.find((f) => f.id === 'reason')
-  const submitText = formTemplate?.formJson?.settings?.submitButtonText ?? 'Submit Decision'
+  const start = formatDate(tripStartDate)
+  const end = formatDate(tripEndDate)
+  const today = todayFormatted()
 
-  const purchaseLabel = decisionField?.options?.[0] ?? 'I want to purchase insurance'
-  const declineLabel = decisionField?.options?.[1] ?? 'I decline insurance coverage'
-  const acknowledgeText =
-    acknowledgeField?.label ??
-    'I understand that by declining insurance, I assume all financial risk for trip cancellation, medical emergencies, and other travel-related losses.'
-  const reasonLabel = reasonField?.label ?? 'Reason for declining (optional)'
+  // Validate signature: non-empty after trimming
+  const isSignatureValid = signatureName.trim().length >= 2
 
-  const handlePurchaseSubmit = async () => {
-    if (!selectedPackageId) return
+  const canSubmitPurchase = decision === 'purchase' && selectedPackageId !== null
+  const canSubmitDecline =
+    decision === 'decline' && declineAcknowledged && isSignatureValid
+
+  const handleSubmit = async () => {
+    if (decision === 'purchase' && !selectedPackageId) return
+    if (decision === 'decline' && (!declineAcknowledged || !isSignatureValid)) return
+
     setIsSubmitting(true)
     setError(null)
 
     try {
       const decisions = travelerIds.map((travelerId) => ({
         travelerId,
-        action: 'purchase' as const,
-        packageId: selectedPackageId,
+        action: decision as 'purchase' | 'decline',
+        ...(decision === 'purchase' ? { packageId: selectedPackageId } : {}),
+        ...(decision === 'decline' && declineReason.trim()
+          ? { reason: declineReason.trim() }
+          : {}),
       }))
+
+      const body: Record<string, unknown> = { decisions }
+
+      // Include signature data for decline path
+      if (decision === 'decline') {
+        body.signature = {
+          fullName: signatureName.trim(),
+          date: new Date().toISOString(),
+        }
+      }
 
       const res = await fetch(`${API_URL}/forms/${token}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decisions }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error((data as { message?: string }).message || 'Submission failed')
+        throw new Error(
+          (data as { message?: string }).message || 'Submission failed',
+        )
       }
 
-      setSubmitted(true)
+      const result = await res.json()
+      setSubmissionResult(result as SubmissionResult)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Something went wrong. Please try again.',
+      )
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleDeclineSubmit = async () => {
-    if (!declineAcknowledged) return
-    setIsSubmitting(true)
-    setError(null)
-
-    try {
-      const decisions = travelerIds.map((travelerId) => ({
-        travelerId,
-        action: 'decline' as const,
-        reason: declineReason.trim() || undefined,
-      }))
-
-      const res = await fetch(`${API_URL}/forms/${token}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decisions }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error((data as { message?: string }).message || 'Submission failed')
-      }
-
-      setSubmitted(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
-    } finally {
-      setIsSubmitting(false)
+  const handleDownloadPdf = () => {
+    if (!submissionResult?.pdfBase64) return
+    const byteCharacters = atob(submissionResult.pdfBase64)
+    const byteNumbers = new Array(byteCharacters.length)
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i)
     }
+    const byteArray = new Uint8Array(byteNumbers)
+    const blob = new Blob([byteArray], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `insurance-waiver-${submissionResult.referenceNumber}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   // ── Confirmation screen ──
-  if (submitted) {
+  if (submissionResult) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-[600px]">
-          <Card className="bg-card border-border shadow-lg">
-            <CardContent className="p-8 text-center">
-              <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-green-500/15 flex items-center justify-center">
-                <Check className="h-8 w-8 text-green-500" />
-              </div>
-              <h2 className="font-display text-2xl font-bold text-foreground mb-2">
-                Decision Recorded
-              </h2>
-              <p className="text-muted-foreground mb-1">
-                Your insurance decision has been recorded.
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-[700px] bg-white shadow-sm border border-gray-200 rounded-lg">
+          <div className="p-8 md:p-12 text-center">
+            {/* Agency Header */}
+            <p className="text-sm font-medium tracking-widest uppercase text-[#c59746] mb-6">
+              {agencyName}
+            </p>
+
+            <div className="mx-auto mb-6 h-16 w-16 rounded-full bg-green-50 border-2 border-green-200 flex items-center justify-center">
+              <Check className="h-8 w-8 text-green-600" />
+            </div>
+
+            <h1
+              className="text-2xl font-bold text-gray-900 mb-2"
+              style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+            >
+              {submissionResult.pdfBase64
+                ? 'Insurance Waiver Signed Successfully'
+                : 'Insurance Decision Recorded'}
+            </h1>
+
+            <div className="mt-6 space-y-2 text-sm text-gray-600">
+              <p>
+                <span className="text-gray-400">Reference:</span>{' '}
+                <span className="font-mono font-medium text-gray-900">
+                  {submissionResult.referenceNumber}
+                </span>
               </p>
-              <p className="text-muted-foreground text-sm">
-                Your travel advisor will be in touch if there is anything further required.
+              <p>
+                <span className="text-gray-400">Signed:</span>{' '}
+                {nowFormatted()}
               </p>
-              <p className="mt-6 text-xs text-muted-foreground">You may close this page.</p>
-            </CardContent>
-          </Card>
+            </div>
+
+            {submissionResult.pdfBase64 && (
+              <>
+                <Separator className="my-6" />
+                <div className="text-sm text-gray-600 space-y-1 mb-6">
+                  <p>A copy of this signed waiver has been:</p>
+                  {submissionResult.travelerEmail && (
+                    <p>
+                      Emailed to{' '}
+                      <span className="font-medium text-gray-900">
+                        {submissionResult.travelerEmail}
+                      </span>
+                    </p>
+                  )}
+                  <p>Added to your trip documents</p>
+                </div>
+
+                <Button
+                  onClick={handleDownloadPdf}
+                  className="bg-[#c59746] hover:bg-[#b08636] text-white"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF Copy
+                </Button>
+              </>
+            )}
+
+            <p className="mt-8 text-xs text-gray-400">
+              You may close this page.
+            </p>
+          </div>
         </div>
       </div>
     )
   }
 
+  // ── Main form ──
   return (
-    <div className="min-h-screen bg-background flex items-start justify-center p-4 pt-10 pb-16">
-      <div className="w-full max-w-[600px]">
-        <FormHeader
-          agencyName={agencyName}
-          tripName={tripName}
-          tripStartDate={tripStartDate}
-          tripEndDate={tripEndDate}
-          travelerNames={travelerNames}
-        />
+    <div className="min-h-screen bg-gray-50 flex items-start justify-center p-4 pt-8 pb-16">
+      <div className="w-full max-w-[700px] bg-white shadow-sm border border-gray-200 rounded-lg">
+        {/* ── Document Header ── */}
+        <div className="p-8 md:p-12 pb-0">
+          <div className="text-center mb-8">
+            <p className="text-sm font-medium tracking-widest uppercase text-[#c59746] mb-4">
+              {agencyName}
+            </p>
+            <h1
+              className="text-2xl md:text-[1.65rem] font-bold text-gray-900 tracking-tight"
+              style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+            >
+              TRAVEL INSURANCE WAIVER & ACKNOWLEDGMENT
+            </h1>
+          </div>
 
-        {/* ── Path: Choose ── */}
-        {path === 'choose' && (
-          <Card className="bg-card border-border shadow-lg">
-            <CardContent className="p-6 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Please review the insurance options below and let us know your decision.
-              </p>
-              <div className="flex flex-col gap-3">
-                {packages.length > 0 && (
-                  <Button
-                    className="h-auto py-4 flex-col gap-1"
-                    onClick={() => setPath('purchase')}
-                  >
-                    <span className="font-display text-base tracking-wide">{purchaseLabel}</span>
-                    <span className="text-xs font-normal opacity-80">
-                      Choose a coverage plan for your trip
-                    </span>
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  className="h-auto py-4 flex-col gap-1"
-                  onClick={() => setPath('decline')}
-                >
-                  <span className="font-display text-base tracking-wide">{declineLabel}</span>
-                  <span className="text-xs font-normal opacity-70">
-                    I will travel without insurance coverage
-                  </span>
-                </Button>
+          {/* Trip Details Block */}
+          <div className="bg-gray-50 rounded-lg p-4 mb-6 text-sm space-y-1.5">
+            <div className="flex justify-between flex-wrap gap-1">
+              <span className="text-gray-500">Date:</span>
+              <span className="text-gray-900 font-medium">{today}</span>
+            </div>
+            <div className="flex justify-between flex-wrap gap-1">
+              <span className="text-gray-500">Trip:</span>
+              <span className="text-gray-900 font-medium">{tripName}</span>
+            </div>
+            {(start || end) && (
+              <div className="flex justify-between flex-wrap gap-1">
+                <span className="text-gray-500">Travel Dates:</span>
+                <span className="text-gray-900 font-medium">
+                  {start}
+                  {start && end && ' \u2013 '}
+                  {end}
+                </span>
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ── Path: Purchase ── */}
-        {path === 'purchase' && (
-          <div className="space-y-4">
-            <Card className="bg-card border-border shadow-lg">
-              <CardContent className="p-6 space-y-4">
-                <div>
-                  <h2 className="font-display text-lg font-bold text-foreground mb-1">
-                    Select a Coverage Plan
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Choose the insurance plan that best suits your needs.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  {packages.map((pkg) => (
-                    <PackageCard
-                      key={pkg.id}
-                      pkg={pkg}
-                      selected={selectedPackageId === pkg.id}
-                      onSelect={() => setSelectedPackageId(pkg.id)}
-                    />
-                  ))}
-                </div>
-
-                {error && (
-                  <p className="text-sm text-destructive flex items-center gap-1.5">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    {error}
-                  </p>
-                )}
-
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    onClick={handlePurchaseSubmit}
-                    disabled={!selectedPackageId || isSubmitting}
-                    className="flex-1"
-                  >
-                    {isSubmitting ? 'Submitting…' : submitText}
-                  </Button>
-                  <Button variant="ghost" onClick={() => setPath('choose')}>
-                    Back
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            )}
+            <div className="flex justify-between flex-wrap gap-1">
+              <span className="text-gray-500">
+                Traveler{travelerNames.length > 1 ? 's' : ''}:
+              </span>
+              <span className="text-gray-900 font-medium text-right">
+                {travelerNames.join(', ')}
+              </span>
+            </div>
           </div>
-        )}
+        </div>
 
-        {/* ── Path: Decline ── */}
-        {path === 'decline' && (
-          <div className="space-y-4">
-            <Card className="bg-destructive/10 border-destructive/30 shadow-lg">
-              <CardContent className="p-6 space-y-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                  <div>
-                    <h2 className="font-display text-lg font-bold text-foreground mb-1">
-                      Decline Insurance Coverage
-                    </h2>
-                    <p className="text-sm text-foreground leading-relaxed">
-                      {acknowledgeText} This decision applies to{' '}
-                      {travelerNames.length === 1 ? (
-                        <strong>{travelerNames[0]}</strong>
-                      ) : (
-                        <>
-                          all travelers:{' '}
-                          <strong>{travelerNames.join(', ')}</strong>
-                        </>
-                      )}
-                      .
-                    </p>
-                  </div>
-                </div>
+        <div className="px-8 md:px-12">
+          <Separator />
+        </div>
 
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-start gap-2">
-                    <Checkbox
-                      id="acknowledge"
-                      checked={declineAcknowledged}
-                      onCheckedChange={(checked) => setDeclineAcknowledged(checked === true)}
-                      className="mt-0.5"
-                    />
-                    <Label htmlFor="acknowledge" className="text-sm leading-relaxed cursor-pointer">
-                      I have read and understand the above statement, and I am choosing to decline
-                      insurance coverage.
-                    </Label>
-                  </div>
+        {/* ── Section 1: Insurance Coverage Decision ── */}
+        <div className="p-8 md:p-12 pb-0">
+          <h2
+            className="text-base font-bold text-gray-900 mb-4 tracking-wide"
+            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+          >
+            SECTION 1: INSURANCE COVERAGE DECISION
+          </h2>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="reason" className="text-sm text-muted-foreground">
-                      {reasonLabel}
-                    </Label>
-                    <Textarea
-                      id="reason"
-                      value={declineReason}
-                      onChange={(e) => setDeclineReason(e.target.value)}
-                      placeholder="e.g. I have coverage through my credit card, employer, or another policy"
-                      className="resize-none"
-                      rows={3}
-                    />
-                  </div>
-                </div>
-
-                {error && (
-                  <p className="text-sm text-destructive flex items-center gap-1.5">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    {error}
-                  </p>
+          <RadioGroup
+            value={decision ?? ''}
+            onValueChange={(value) => {
+              setDecision(value as 'purchase' | 'decline')
+              setError(null)
+            }}
+            className="space-y-3"
+          >
+            {packages.length > 0 && (
+              <div
+                className={cn(
+                  'flex items-center gap-3 rounded-lg border-2 p-4 cursor-pointer transition-colors',
+                  decision === 'purchase'
+                    ? 'border-[#c59746] bg-[#c59746]/5'
+                    : 'border-gray-200 hover:border-gray-300',
                 )}
+                onClick={() => {
+                  setDecision('purchase')
+                  setError(null)
+                }}
+              >
+                <RadioGroupItem value="purchase" id="purchase" />
+                <Label
+                  htmlFor="purchase"
+                  className="cursor-pointer text-gray-900 font-medium"
+                >
+                  I wish to PURCHASE travel insurance
+                </Label>
+              </div>
+            )}
+            <div
+              className={cn(
+                'flex items-center gap-3 rounded-lg border-2 p-4 cursor-pointer transition-colors',
+                decision === 'decline'
+                  ? 'border-red-300 bg-red-50/50'
+                  : 'border-gray-200 hover:border-gray-300',
+              )}
+              onClick={() => {
+                setDecision('decline')
+                setError(null)
+              }}
+            >
+              <RadioGroupItem value="decline" id="decline" />
+              <Label
+                htmlFor="decline"
+                className="cursor-pointer text-gray-900 font-medium"
+              >
+                I DECLINE travel insurance coverage
+              </Label>
+            </div>
+          </RadioGroup>
 
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    variant="destructive"
-                    onClick={handleDeclineSubmit}
-                    disabled={!declineAcknowledged || isSubmitting}
-                    className="flex-1"
+          {/* Package selection (purchase path) */}
+          {decision === 'purchase' && packages.length > 0 && (
+            <div className="mt-6 space-y-3">
+              <p className="text-sm text-gray-600 mb-3">
+                Select a coverage plan:
+              </p>
+              {packages.map((pkg) => (
+                <PackageCard
+                  key={pkg.id}
+                  pkg={pkg}
+                  selected={selectedPackageId === pkg.id}
+                  onSelect={() => setSelectedPackageId(pkg.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Section 2: Acknowledgment & Waiver (decline only) ── */}
+        {decision === 'decline' && (
+          <>
+            <div className="px-8 md:px-12 pt-6">
+              <Separator />
+            </div>
+
+            <div className="p-8 md:p-12 pb-0">
+              <h2
+                className="text-base font-bold text-gray-900 mb-4 tracking-wide"
+                style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+              >
+                SECTION 2: ACKNOWLEDGMENT & WAIVER
+              </h2>
+
+              <div
+                className="text-sm text-gray-700 leading-relaxed space-y-3"
+                style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+              >
+                <p>I, the undersigned, acknowledge that:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>
+                    Travel insurance has been offered to me by{' '}
+                    <strong>{agencyName}</strong>.
+                  </li>
+                  <li>
+                    I understand the risks of travelling without insurance
+                    including but not limited to medical emergencies, trip
+                    cancellation, lost baggage, and travel delays.
+                  </li>
+                  <li>
+                    I voluntarily decline insurance coverage and assume all
+                    financial responsibility for any losses or expenses incurred.
+                  </li>
+                  <li>
+                    I release {agencyName} and its agents from any liability
+                    arising from my decision to decline coverage.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="mt-6 flex items-start gap-3">
+                <Checkbox
+                  id="acknowledge"
+                  checked={declineAcknowledged}
+                  onCheckedChange={(checked) =>
+                    setDeclineAcknowledged(checked === true)
+                  }
+                  className="mt-0.5"
+                />
+                <Label
+                  htmlFor="acknowledge"
+                  className="text-sm leading-relaxed cursor-pointer text-gray-700"
+                  style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+                >
+                  I have read and understood the above acknowledgment and waiver.
+                </Label>
+              </div>
+
+              {/* Optional reason */}
+              <div className="mt-4 space-y-1.5">
+                <Label
+                  htmlFor="reason"
+                  className="text-sm text-gray-500"
+                >
+                  Reason for declining (optional)
+                </Label>
+                <Textarea
+                  id="reason"
+                  value={declineReason}
+                  onChange={(e) => setDeclineReason(e.target.value)}
+                  placeholder="e.g. I have coverage through my credit card, employer, or another policy"
+                  className="resize-none bg-white"
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            {/* ── Section 3: Digital Signature ── */}
+            <div className="px-8 md:px-12 pt-6">
+              <Separator />
+            </div>
+
+            <div className="p-8 md:p-12 pb-0">
+              <h2
+                className="text-base font-bold text-gray-900 mb-4 tracking-wide"
+                style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+              >
+                SECTION 3: DIGITAL SIGNATURE
+              </h2>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="signatureName"
+                    className="text-sm font-medium text-gray-700"
                   >
-                    {isSubmitting ? 'Submitting…' : declineLabel}
-                  </Button>
-                  <Button variant="ghost" onClick={() => setPath('choose')}>
-                    Back
-                  </Button>
+                    Full Legal Name
+                  </Label>
+                  <Input
+                    id="signatureName"
+                    type="text"
+                    value={signatureName}
+                    onChange={(e) => setSignatureName(e.target.value)}
+                    placeholder="Type your full legal name"
+                    className="bg-white text-lg"
+                    style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+                    autoComplete="off"
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>Date:</span>
+                  <span className="text-gray-900 font-medium">{today}</span>
+                </div>
+
+                <p
+                  className="text-xs text-gray-400 leading-relaxed"
+                  style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+                >
+                  By typing my full name above, I acknowledge that this
+                  constitutes my legal electronic signature pursuant to
+                  applicable electronic signature laws.
+                </p>
+              </div>
+            </div>
+          </>
         )}
+
+        {/* ── Submit Section ── */}
+        <div className="px-8 md:px-12 pt-6">
+          <Separator />
+        </div>
+
+        <div className="p-8 md:p-12">
+          {error && (
+            <p className="text-sm text-red-600 flex items-center gap-1.5 mb-4">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              {error}
+            </p>
+          )}
+
+          {decision && (
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                isSubmitting ||
+                (decision === 'purchase' && !canSubmitPurchase) ||
+                (decision === 'decline' && !canSubmitDecline)
+              }
+              className={cn(
+                'w-full h-12 text-base font-medium',
+                decision === 'decline'
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : 'bg-[#c59746] hover:bg-[#b08636] text-white',
+              )}
+            >
+              {isSubmitting
+                ? 'Submitting...'
+                : decision === 'purchase'
+                  ? 'Submit Insurance Selection'
+                  : 'Submit Signed Waiver'}
+            </Button>
+          )}
+
+          {!decision && (
+            <p className="text-center text-sm text-gray-400">
+              Please select an option above to continue.
+            </p>
+          )}
+        </div>
+
+        {/* ── Document Footer ── */}
+        <div className="border-t border-gray-100 px-8 md:px-12 py-4">
+          <p className="text-xs text-gray-400 text-center">
+            This document was generated by Tailfire on behalf of {agencyName}.
+          </p>
+        </div>
       </div>
     </div>
   )

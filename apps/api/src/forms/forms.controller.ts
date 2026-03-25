@@ -5,8 +5,9 @@
  * NO auth guard — these are accessed by clients via emailed links.
  */
 
-import { Controller, Get, Post, Param, Body } from '@nestjs/common'
+import { Controller, Get, Post, Param, Body, Req } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
+import { Request } from 'express'
 import { Public } from '../auth/decorators/public.decorator'
 import { FormsService } from './forms.service'
 
@@ -52,11 +53,24 @@ export class FormsController {
   async submitForm(
     @Param('token') token: string,
     @Body() body: Record<string, unknown>,
+    @Req() req: Request,
   ) {
     const form = await this.formsService.resolveToken(token)
 
+    // Capture IP address server-side
+    const ipAddress =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      req.ip ||
+      'unknown'
+
     if (form.formType === 'insurance_waiver') {
-      await this.formsService.handleInsuranceWaiverSubmission(form, body)
+      const result = await this.formsService.handleInsuranceWaiverSubmission(
+        form,
+        body,
+        ipAddress,
+      )
+      await this.formsService.markCompleted(token)
+      return result
     }
 
     await this.formsService.markCompleted(token)
