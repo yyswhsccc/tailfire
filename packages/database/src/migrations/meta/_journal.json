@@ -1219,6 +1219,13 @@
       "when": 1774820245000,
       "tag": "20260325001725_create_form_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 174,
+      "version": "7",
+      "when": 1774857600000,
+      "tag": "20260325120000_seed_insurance_proposal_email_template",
+      "breakpoints": true
     }
   ]
 }
