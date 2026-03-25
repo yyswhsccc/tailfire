@@ -19,6 +19,25 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1
 // Types
 // ──────────────────────────────────────────────────────────────────────────────
 
+interface FormTemplateData {
+  formJson: {
+    fields?: Array<{
+      id: string
+      type: string
+      label: string
+      required?: boolean
+      options?: string[]
+      showWhen?: { field: string; value: string }
+    }>
+    settings?: {
+      submitButtonText?: string
+    }
+  } | null
+  emailHtml: string | null
+  name: string
+  variables: unknown
+}
+
 interface WaiverFormProps {
   token: string
   tripName: string
@@ -28,6 +47,7 @@ interface WaiverFormProps {
   travelerIds: string[]
   travelerNames: string[] // primary traveler + dependent names
   packages: TripInsurancePackageDto[]
+  formTemplate?: FormTemplateData | null
 }
 
 type FormPath = 'choose' | 'purchase' | 'decline'
@@ -206,6 +226,7 @@ export function InsuranceWaiverForm({
   travelerIds,
   travelerNames,
   packages,
+  formTemplate,
 }: WaiverFormProps) {
   const [path, setPath] = useState<FormPath>('choose')
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
@@ -214,6 +235,20 @@ export function InsuranceWaiverForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
+
+  // ── Template-driven labels (fall back to hardcoded defaults) ──
+  const fields = formTemplate?.formJson?.fields ?? []
+  const decisionField = fields.find((f) => f.id === 'decision')
+  const acknowledgeField = fields.find((f) => f.id === 'acknowledge')
+  const reasonField = fields.find((f) => f.id === 'reason')
+  const submitText = formTemplate?.formJson?.settings?.submitButtonText ?? 'Submit Decision'
+
+  const purchaseLabel = decisionField?.options?.[0] ?? 'I want to purchase insurance'
+  const declineLabel = decisionField?.options?.[1] ?? 'I decline insurance coverage'
+  const acknowledgeText =
+    acknowledgeField?.label ??
+    'I understand that by declining insurance, I assume all financial risk for trip cancellation, medical emergencies, and other travel-related losses.'
+  const reasonLabel = reasonField?.label ?? 'Reason for declining (optional)'
 
   const handlePurchaseSubmit = async () => {
     if (!selectedPackageId) return
@@ -328,7 +363,7 @@ export function InsuranceWaiverForm({
                     className="h-auto py-4 flex-col gap-1"
                     onClick={() => setPath('purchase')}
                   >
-                    <span className="font-display text-base tracking-wide">Purchase Insurance</span>
+                    <span className="font-display text-base tracking-wide">{purchaseLabel}</span>
                     <span className="text-xs font-normal opacity-80">
                       Choose a coverage plan for your trip
                     </span>
@@ -339,7 +374,7 @@ export function InsuranceWaiverForm({
                   className="h-auto py-4 flex-col gap-1"
                   onClick={() => setPath('decline')}
                 >
-                  <span className="font-display text-base tracking-wide">Decline Coverage</span>
+                  <span className="font-display text-base tracking-wide">{declineLabel}</span>
                   <span className="text-xs font-normal opacity-70">
                     I will travel without insurance coverage
                   </span>
@@ -387,7 +422,7 @@ export function InsuranceWaiverForm({
                     disabled={!selectedPackageId || isSubmitting}
                     className="flex-1"
                   >
-                    {isSubmitting ? 'Submitting…' : 'Confirm Selection'}
+                    {isSubmitting ? 'Submitting…' : submitText}
                   </Button>
                   <Button variant="ghost" onClick={() => setPath('choose')}>
                     Back
@@ -410,9 +445,7 @@ export function InsuranceWaiverForm({
                       Decline Insurance Coverage
                     </h2>
                     <p className="text-sm text-foreground leading-relaxed">
-                      By declining insurance coverage, you acknowledge that you are assuming all
-                      financial risk for trip cancellation, medical emergencies, and other
-                      travel-related losses. This decision applies to{' '}
+                      {acknowledgeText} This decision applies to{' '}
                       {travelerNames.length === 1 ? (
                         <strong>{travelerNames[0]}</strong>
                       ) : (
@@ -435,14 +468,14 @@ export function InsuranceWaiverForm({
                       className="mt-0.5"
                     />
                     <Label htmlFor="acknowledge" className="text-sm leading-relaxed cursor-pointer">
-                      I have read and understand the above statement, and I am choosing to travel
-                      without insurance coverage.
+                      I have read and understand the above statement, and I am choosing to decline
+                      insurance coverage.
                     </Label>
                   </div>
 
                   <div className="space-y-1.5">
                     <Label htmlFor="reason" className="text-sm text-muted-foreground">
-                      Reason for declining (optional)
+                      {reasonLabel}
                     </Label>
                     <Textarea
                       id="reason"
@@ -469,7 +502,7 @@ export function InsuranceWaiverForm({
                     disabled={!declineAcknowledged || isSubmitting}
                     className="flex-1"
                   >
-                    {isSubmitting ? 'Submitting…' : 'Decline Coverage'}
+                    {isSubmitting ? 'Submitting…' : declineLabel}
                   </Button>
                   <Button variant="ghost" onClick={() => setPath('choose')}>
                     Back

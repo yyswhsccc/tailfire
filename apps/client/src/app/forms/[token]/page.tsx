@@ -27,6 +27,13 @@ interface PackageSnapshot {
   isActive: boolean
 }
 
+interface FormTemplate {
+  formJson: Record<string, unknown> | null
+  emailHtml: string | null
+  name: string
+  variables: unknown
+}
+
 interface FormContext {
   formType: string
   tripId: string | null
@@ -41,6 +48,7 @@ interface FormContext {
     packages?: PackageSnapshot[]
     [key: string]: unknown
   } | null
+  template: FormTemplate | null
 }
 
 type FormError = 'not_found' | 'expired' | 'completed' | 'unknown'
@@ -207,6 +215,7 @@ export default async function FormPage({
         travelerIds={form.travelerIds ?? []}
         travelerNames={travelerNames}
         packages={packages}
+        formTemplate={form.template}
       />
     )
   }

@@ -9,12 +9,16 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { eq, and } from 'drizzle-orm'
 import { randomBytes } from 'crypto'
 import { DatabaseService } from '../db/database.service'
+import { DocumentTemplatesService } from '../document-templates/document-templates.service'
 
 @Injectable()
 export class FormsService {
   private readonly logger = new Logger(FormsService.name)
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly documentTemplatesService: DocumentTemplatesService,
+  ) {}
 
   /**
    * Create a secure form token for public access
@@ -67,6 +71,46 @@ export class FormsService {
     if (new Date() > new Date(row.expiresAt)) throw new BadRequestException('This form has expired')
 
     return row
+  }
+
+  /**
+   * Resolve a form token and load the matching document template (if any).
+   * The template provides customizable form_json fields and email_html.
+   */
+  async resolveTokenWithTemplate(token: string) {
+    const form = await this.resolveToken(token)
+
+    // Map form types to document template slugs
+    let template = null
+    const templateSlugMap: Record<string, string> = {
+      'insurance_waiver': 'insurance-waiver-form',
+      'client_intake': 'client-intake-form',
+    }
+
+    const templateSlug = templateSlugMap[form.formType]
+    if (templateSlug && form.agencyId) {
+      try {
+        template = await this.documentTemplatesService.resolvePublishedTemplate(
+          templateSlug,
+          form.agencyId,
+        )
+      } catch {
+        // Template not found — form will use hardcoded fallback
+        this.logger.warn(`Template "${templateSlug}" not found for agency ${form.agencyId}, using defaults`)
+      }
+    }
+
+    return {
+      ...form,
+      template: template
+        ? {
+            formJson: template.formJson,
+            emailHtml: template.emailHtml,
+            name: template.name,
+            variables: template.variables,
+          }
+        : null,
+    }
   }
 
   /**
