@@ -29,6 +29,7 @@ import type { UpdateDocumentTemplateDto } from './dto/update-document-template.d
 export interface ListTemplatesFilters {
   category?: string
   status?: string
+  channel?: string
 }
 
 export interface RenderedDocumentTemplate {
@@ -197,6 +198,10 @@ export class DocumentTemplatesService {
 
     if (filters.status) {
       conditions.push(eq(documentTemplates.status, filters.status))
+    }
+
+    if (filters.channel) {
+      conditions.push(eq(documentTemplates.channel, filters.channel))
     }
 
     return this.db.client

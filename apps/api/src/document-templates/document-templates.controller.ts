@@ -6,13 +6,15 @@
  * Route structure (static routes BEFORE dynamic):
  * - GET    /document-templates/variables       - Available template variables & helpers
  * - GET    /document-templates/categories      - Template category list
- * - GET    /document-templates                 - List templates (filtered)
+ * - GET    /document-templates                 - List templates (filtered by category, status, channel)
  * - GET    /document-templates/:idOrSlug       - Get by UUID or slug
  * - GET    /document-templates/:slug/preview   - Preview with sample context
  * - POST   /document-templates                 - Create template
  * - PATCH  /document-templates/:id             - Update template
  * - DELETE /document-templates/:id             - Soft delete
- * - POST   /document-templates/:id/fork        - Fork system template
+ * - POST   /document-templates/:id/fork        - Fork system template for agency
+ * - POST   /document-templates/:id/fork-user   - Fork template for current user
+ * - DELETE /document-templates/:id/fork        - Delete user fork (revert to parent)
  * - POST   /document-templates/:id/publish     - Publish template
  */
 
@@ -154,13 +156,15 @@ export class DocumentTemplatesController {
   @ApiOperation({ summary: 'List document templates' })
   @ApiQuery({ name: 'category', required: false, description: 'Filter by category' })
   @ApiQuery({ name: 'status', required: false, description: 'Filter by status' })
+  @ApiQuery({ name: 'channel', required: false, description: 'Filter by channel (email, pdf, form, sms)' })
   @ApiResponse({ status: 200, description: 'Templates list' })
   async list(
     @GetAuthContext() auth: AuthContext,
     @Query('category') category?: string,
     @Query('status') status?: string,
+    @Query('channel') channel?: string,
   ) {
-    return this.templatesService.list(auth.agencyId, { category, status })
+    return this.templatesService.list(auth.agencyId, { category, status, channel })
   }
 
   // -----------------------------------------------------------------------
@@ -275,6 +279,42 @@ export class DocumentTemplatesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.templatesService.fork(id, auth.agencyId, auth.userId)
+  }
+
+  // -----------------------------------------------------------------------
+  // POST /:id/fork-user — fork template for the current user
+  // -----------------------------------------------------------------------
+
+  @Post(':id/fork-user')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Fork a template for the current user' })
+  @ApiParam({ name: 'id', description: 'Template UUID to fork' })
+  @ApiResponse({ status: 201, description: 'Template forked for user' })
+  @ApiResponse({ status: 404, description: 'Source template not found' })
+  @ApiResponse({ status: 409, description: 'User fork already exists for this slug' })
+  async forkTemplate(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.templatesService.forkTemplate(id, auth.userId, auth.agencyId)
+  }
+
+  // -----------------------------------------------------------------------
+  // DELETE /:id/fork — delete user fork, reverting to parent template
+  // -----------------------------------------------------------------------
+
+  @Delete(':id/fork')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete user fork, reverting to parent template' })
+  @ApiParam({ name: 'id', description: 'User fork template UUID' })
+  @ApiResponse({ status: 204, description: 'Fork deleted' })
+  @ApiResponse({ status: 403, description: 'Not a user fork or not owned by user' })
+  @ApiResponse({ status: 404, description: 'Template not found' })
+  async deleteFork(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.templatesService.deleteFork(id, auth.userId)
   }
 
   // -----------------------------------------------------------------------

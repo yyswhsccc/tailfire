@@ -19,6 +19,8 @@ import { api } from '@/lib/api'
 export type TemplateCategory = 'trip_order' | 'payment' | 'email' | 'proposal'
 export type TemplateStatus = 'draft' | 'published' | 'archived'
 
+export type TemplateChannel = 'email' | 'pdf' | 'form' | 'sms'
+
 export interface DocumentTemplate {
   id: string
   agencyId: string | null
@@ -41,6 +43,11 @@ export interface DocumentTemplate {
   publishedAt: string | null
   version: number
   isActive: boolean
+  userId: string | null
+  channel: TemplateChannel | null
+  isSystem: boolean
+  formJson: Record<string, unknown> | null
+  smsTemplate: string | null
   createdBy: string | null
   updatedBy: string | null
   createdAt: string
@@ -50,6 +57,7 @@ export interface DocumentTemplate {
 export interface DocumentTemplateFilters {
   category?: TemplateCategory
   status?: TemplateStatus
+  channel?: TemplateChannel
 }
 
 export interface CreateDocumentTemplateData {
@@ -150,6 +158,7 @@ export function useDocumentTemplates(
   const searchParams = new URLSearchParams()
   if (filters.category) searchParams.set('category', filters.category)
   if (filters.status) searchParams.set('status', filters.status)
+  if (filters.channel) searchParams.set('channel', filters.channel)
 
   const queryString = searchParams.toString()
   const endpoint = `/document-templates${queryString ? `?${queryString}` : ''}`
@@ -298,6 +307,38 @@ export function useDeleteDocumentTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: documentTemplateKeys.lists() })
+    },
+  })
+}
+
+/**
+ * Fork a template for the current user (user-level customization).
+ */
+export function useForkTemplate() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (templateId: string) => {
+      return api.post<DocumentTemplate>(`/document-templates/${templateId}/fork-user`, {})
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: documentTemplateKeys.all })
+    },
+  })
+}
+
+/**
+ * Delete a user fork, reverting to the parent template.
+ */
+export function useDeleteFork() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (templateId: string) => {
+      return api.delete(`/document-templates/${templateId}/fork`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: documentTemplateKeys.all })
     },
   })
 }
