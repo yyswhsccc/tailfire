@@ -63,17 +63,28 @@ export class FormsController {
       req.ip ||
       'unknown'
 
+    // Build signature data for audit trail
+    const signature = (body as any).signature
+    const signatureData = signature ? {
+      fullName: signature.fullName || '',
+      date: signature.date || new Date().toISOString(),
+      ipAddress,
+      userAgent: req.headers['user-agent'] || undefined,
+      decision: Array.isArray((body as any).decisions) ? (body as any).decisions[0]?.action || '' : '',
+      acknowledgedItems: signature.acknowledgedItems,
+    } : undefined
+
     if (form.formType === 'insurance_waiver') {
       const result = await this.formsService.handleInsuranceWaiverSubmission(
         form,
         body,
         ipAddress,
       )
-      await this.formsService.markCompleted(token)
+      await this.formsService.markCompleted(token, signatureData, { decisions: (body as any).decisions })
       return result
     }
 
-    await this.formsService.markCompleted(token)
+    await this.formsService.markCompleted(token, signatureData, body)
     return { success: true }
   }
 }

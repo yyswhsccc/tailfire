@@ -11,6 +11,15 @@ export const formTokens = pgTable('form_tokens', {
   contextData: jsonb('context_data').$type<Record<string, unknown>>(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
+  signatureData: jsonb('signature_data').$type<{
+    fullName: string
+    date: string
+    ipAddress: string
+    userAgent?: string
+    decision: string
+    acknowledgedItems?: string[]
+  }>(),
+  submissionData: jsonb('submission_data').$type<Record<string, unknown>>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
