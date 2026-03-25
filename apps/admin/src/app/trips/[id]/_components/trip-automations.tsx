@@ -16,7 +16,8 @@ interface TripAutomationsProps {
 }
 
 export function TripAutomations({ trip }: TripAutomationsProps) {
-  const { data: jobs = [], isLoading } = useTripAutomations(trip.id)
+  const { data: response, isLoading } = useTripAutomations(trip.id)
+  const jobs = Array.isArray(response) ? response : (response as any)?.jobs ?? []
   const pauseJob = usePauseAutomation(trip.id)
   const resumeJob = useResumeAutomation(trip.id)
   const cancelJob = useCancelAutomation(trip.id)
