@@ -88,31 +88,68 @@ export class DocumentTemplatesService {
 
   /**
    * Resolve a template for production rendering (Trip Orders, queue jobs).
-   * Agency overrides must be published; system templates are always eligible.
+   *
+   * 3-tier resolution order (most specific first):
+   *  1. User-level override:  slug + userId + status='published'
+   *  2. Agency-level override: slug + agencyId + userId IS NULL + status='published'
+   *  3. System default:        slug + agencyId IS NULL + userId IS NULL (any status)
+   *
+   * The userId parameter is optional — existing callers that pass only slug + agencyId
+   * continue to receive the existing 2-tier (agency → system) behaviour.
    */
-  async resolvePublishedTemplate(slug: string, agencyId: string) {
+  async resolvePublishedTemplate(slug: string, agencyId: string, userId?: string) {
     const { documentTemplates } = this.db.schema
 
-    const results = await this.db.client
+    // Tier 1 — user-level published override
+    if (userId) {
+      const [userRow] = await this.db.client
+        .select()
+        .from(documentTemplates)
+        .where(
+          and(
+            eq(documentTemplates.slug, slug),
+            eq(documentTemplates.isActive, true),
+            eq(documentTemplates.userId, userId),
+            eq(documentTemplates.status, 'published'),
+          ),
+        )
+        .limit(1)
+
+      if (userRow) return userRow
+    }
+
+    // Tier 2 — agency-level published override (userId must be null)
+    const [agencyRow] = await this.db.client
       .select()
       .from(documentTemplates)
       .where(
         and(
           eq(documentTemplates.slug, slug),
           eq(documentTemplates.isActive, true),
-          or(
-            and(
-              eq(documentTemplates.agencyId, agencyId),
-              eq(documentTemplates.status, 'published'),
-            ),
-            isNull(documentTemplates.agencyId),
-          ),
+          eq(documentTemplates.agencyId, agencyId),
+          isNull(documentTemplates.userId),
+          eq(documentTemplates.status, 'published'),
         ),
       )
-      .orderBy(sql`${documentTemplates.agencyId} DESC NULLS LAST`)
       .limit(1)
 
-    return results[0] ?? null
+    if (agencyRow) return agencyRow
+
+    // Tier 3 — system default (agencyId IS NULL, userId IS NULL, any status)
+    const [systemRow] = await this.db.client
+      .select()
+      .from(documentTemplates)
+      .where(
+        and(
+          eq(documentTemplates.slug, slug),
+          eq(documentTemplates.isActive, true),
+          isNull(documentTemplates.agencyId),
+          isNull(documentTemplates.userId),
+        ),
+      )
+      .limit(1)
+
+    return systemRow ?? null
   }
 
   // -------------------------------------------------------------------------
@@ -406,6 +443,157 @@ export class DocumentTemplatesService {
       `Forked document template: ${forked!.slug} (${forked!.id}) from parent ${source.id} v${source.version}`,
     )
     return forked!
+  }
+
+  // -------------------------------------------------------------------------
+  // forkTemplate — deep-copy a template as a user-level draft
+  // -------------------------------------------------------------------------
+
+  /**
+   * Fork a template for a specific user.
+   * Creates a copy in 'draft' status with user_id set.
+   * The user must publish the fork for it to be picked up by resolvePublishedTemplate.
+   */
+  async forkTemplate(templateId: string, userId: string, agencyId: string): Promise<any> {
+    const { documentTemplates } = this.db.schema
+
+    // 1. Load source template by ID
+    const [source] = await this.db.client
+      .select()
+      .from(documentTemplates)
+      .where(eq(documentTemplates.id, templateId))
+      .limit(1)
+
+    // 2. Check it exists
+    if (!source) {
+      throw new NotFoundException(`Template ${templateId} not found`)
+    }
+
+    // 3. Check no existing active fork for this user + slug
+    const [existingFork] = await this.db.client
+      .select()
+      .from(documentTemplates)
+      .where(
+        and(
+          eq(documentTemplates.slug, source.slug),
+          eq(documentTemplates.userId, userId),
+          eq(documentTemplates.isActive, true),
+        ),
+      )
+      .limit(1)
+
+    if (existingFork) {
+      throw new ConflictException(
+        `User already has an active template with slug "${source.slug}". Edit the existing fork instead.`,
+      )
+    }
+
+    // 4. Clone: insert new row with user_id=userId, parent_id, status='draft'
+    const [forked] = await this.db.client
+      .insert(documentTemplates)
+      .values({
+        agencyId,
+        userId,
+        parentId: source.id,
+        parentVersion: source.version,
+        slug: source.slug,
+        name: source.name,
+        description: source.description,
+        category: source.category,
+        channel: source.channel,
+        blocksJson: source.blocksJson,
+        emailHtml: source.emailHtml,
+        emailCss: source.emailCss,
+        pdfHtml: source.pdfHtml,
+        pdfCss: source.pdfCss,
+        subjectTemplate: source.subjectTemplate,
+        textTemplate: source.textTemplate,
+        smsTemplate: source.smsTemplate,
+        formJson: source.formJson,
+        variables: source.variables,
+        outputTypes: source.outputTypes,
+        status: 'draft',
+        version: 1,
+        createdBy: userId,
+      })
+      .returning()
+
+    this.logger.log(
+      `User fork created: ${forked!.slug} (${forked!.id}) by user ${userId} from parent ${source.id} v${source.version}`,
+    )
+
+    // 5. Return the fork
+    return forked!
+  }
+
+  // -------------------------------------------------------------------------
+  // deleteFork — hard-delete a user's own fork
+  // -------------------------------------------------------------------------
+
+  /**
+   * Delete a user-owned fork (user_id must match).
+   * Throws if the template has no user_id (i.e. is not a user fork).
+   */
+  async deleteFork(templateId: string, userId: string): Promise<void> {
+    const { documentTemplates } = this.db.schema
+
+    const [existing] = await this.db.client
+      .select()
+      .from(documentTemplates)
+      .where(eq(documentTemplates.id, templateId))
+      .limit(1)
+
+    if (!existing) {
+      throw new NotFoundException(`Template ${templateId} not found`)
+    }
+
+    // Only user forks can be deleted via this method
+    if (!existing.userId) {
+      throw new ForbiddenException('Template is not a user fork — use softDelete for agency templates')
+    }
+
+    if (existing.userId !== userId) {
+      throw new ForbiddenException('Cannot delete another user\'s fork')
+    }
+
+    await this.db.client
+      .update(documentTemplates)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(documentTemplates.id, templateId))
+
+    this.logger.log(`Deleted user fork: ${existing.slug} (${templateId}) by user ${userId}`)
+  }
+
+  // -------------------------------------------------------------------------
+  // listByChannel — list templates filtered by channel (and optionally user)
+  // -------------------------------------------------------------------------
+
+  /**
+   * List templates visible to the agency filtered by channel.
+   * Includes system templates (agencyId IS NULL) and agency-owned templates.
+   * Optionally include user-level templates when userId is provided.
+   */
+  async listByChannel(agencyId: string, channel?: string, userId?: string) {
+    const { documentTemplates } = this.db.schema
+
+    const conditions = [
+      eq(documentTemplates.isActive, true),
+      or(
+        eq(documentTemplates.agencyId, agencyId),
+        isNull(documentTemplates.agencyId),
+        ...(userId ? [eq(documentTemplates.userId, userId)] : []),
+      ),
+    ]
+
+    if (channel) {
+      conditions.push(eq(documentTemplates.channel, channel))
+    }
+
+    return this.db.client
+      .select()
+      .from(documentTemplates)
+      .where(and(...conditions))
+      .orderBy(desc(documentTemplates.updatedAt))
   }
 
   // -------------------------------------------------------------------------

@@ -19,7 +19,7 @@ import { DatabaseService } from '../../db/database.service'
 import { AutomationService } from '../automation.service'
 import { NotificationService } from '../../notifications/notification.service'
 import { EmailService } from '../../email/email.service'
-import { EmailTemplatesService } from '../../email/email-templates.service'
+import { DocumentTemplatesService } from '../../document-templates/document-templates.service'
 import { getClientWelcomeTemplate } from '../../email/templates/client-welcome.template'
 import { getClientFollowUpTemplate } from '../../email/templates/client-follow-up.template'
 import { getClientPostTripTemplate } from '../../email/templates/client-post-trip.template'
@@ -58,7 +58,7 @@ export class ClientCareProcessor extends WorkerHost {
     private readonly automationService: AutomationService,
     private readonly notificationService: NotificationService,
     private readonly emailService: EmailService,
-    private readonly emailTemplatesService: EmailTemplatesService,
+    private readonly documentTemplatesService: DocumentTemplatesService,
   ) {
     super()
   }
@@ -935,9 +935,19 @@ ${removedTasks.map((t) => `<tr><td style="font-size:14px;color:#27272a;border-bo
     const clientPortalUrl = process.env.CLIENT_PORTAL_URL || 'https://client.phoenixvoyages.ca'
     const waiverUrl = `${clientPortalUrl}/forms/${formToken}`
 
+    // Build hardcoded fallback HTML up front — used when no DB template is found
+    const fallbackHtml = this.buildInsuranceEmailHtml({
+      recipientName,
+      tripName,
+      agencyName,
+      waiverUrl,
+      hasDependents: dependentTravelerIds.length > 0,
+      dependentCount: dependentTravelerIds.length,
+    })
+
     // Try to render the DB-stored template (agents can customize it in Library)
     // Fall back to hardcoded HTML if the template doesn't exist yet
-    let html: string
+    let html: string = fallbackHtml
     let subject = `Insurance Coverage — ${tripName}`
 
     const additionalVariables: Record<string, string> = {
@@ -952,24 +962,32 @@ ${removedTasks.map((t) => `<tr><td style="font-size:14px;color:#27272a;border-bo
     }
 
     try {
-      const rendered = await this.emailTemplatesService.renderTemplate(
-        'insurance-proposal',
-        { agencyId },
-        additionalVariables,
+      const template = await this.documentTemplatesService.resolvePublishedTemplate(
+        'insurance-proposal-email',
+        agencyId,
       )
-      html = rendered.html
-      subject = rendered.subject
+
+      if (template) {
+        // Render subject and body via simple {{variable}} substitution
+        const renderStr = (tpl: string | null): string => {
+          if (!tpl) return ''
+          return tpl.replace(/\{\{(\w+)\}\}/g, (_, key) => String(additionalVariables[key] ?? ''))
+        }
+
+        const renderedHtml = renderStr(template.emailHtml)
+        const renderedSubject = renderStr(template.subjectTemplate)
+
+        if (renderedHtml) html = renderedHtml
+        if (renderedSubject) subject = renderedSubject
+
+        this.logger.debug(`Using DocumentTemplate 'insurance-proposal-email' (${template.id}) for insurance email`)
+      } else {
+        // Template not in DB yet — fallbackHtml already assigned
+        this.logger.debug('insurance-proposal-email template not found in DB, using hardcoded fallback')
+      }
     } catch {
-      // Template not found — fall back to hardcoded HTML
-      this.logger.debug('insurance-proposal template not found in DB, using hardcoded fallback')
-      html = this.buildInsuranceEmailHtml({
-        recipientName,
-        tripName,
-        agencyName,
-        waiverUrl,
-        hasDependents: dependentTravelerIds.length > 0,
-        dependentCount: dependentTravelerIds.length,
-      })
+      // Unexpected error — fallbackHtml already assigned, just warn
+      this.logger.warn('Error resolving insurance-proposal-email template, using hardcoded fallback')
     }
 
     await this.emailService.sendEmail({
