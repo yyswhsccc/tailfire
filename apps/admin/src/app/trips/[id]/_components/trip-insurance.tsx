@@ -37,7 +37,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
-import { Plus, Pencil, Trash2, Shield, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Shield, CheckCircle2, XCircle, Clock, AlertTriangle, Send } from 'lucide-react'
 import {
   useInsurancePackages,
   useCreateInsurancePackage,
@@ -55,6 +55,7 @@ import type {
   InsurancePolicyType,
 } from '@tailfire/shared-types/api'
 import { formatCurrency } from '@/lib/pricing/currency-helpers'
+import { InsuranceProposalDialog } from '@/components/insurance/insurance-proposal-dialog'
 
 interface TripInsuranceProps {
   trip: TripResponseDto
@@ -101,6 +102,7 @@ export function TripInsurance({ trip }: TripInsuranceProps) {
   const [editingPackage, setEditingPackage] = useState<TripInsurancePackageDto | null>(null)
   const [showTravelerDialog, setShowTravelerDialog] = useState(false)
   const [selectedTravelerId, setSelectedTravelerId] = useState<string | null>(null)
+  const [showProposalDialog, setShowProposalDialog] = useState(false)
 
   // Data hooks
   const { data: packagesData, isLoading: loadingPackages } = useInsurancePackages(trip.id)
@@ -297,6 +299,16 @@ export function TripInsurance({ trip }: TripInsuranceProps) {
             <h2 className="text-lg font-semibold text-ash-900">Traveler Insurance Status</h2>
             <p className="text-sm text-ash-500">Track insurance compliance for each traveler</p>
           </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowProposalDialog(true)}
+              className="gap-1.5"
+            >
+              <Send className="h-4 w-4" />
+              Send Proposals
+            </Button>
           {summary && (
             <div className="flex gap-4 text-sm">
               <span className="text-ash-500">
@@ -310,6 +322,7 @@ export function TripInsurance({ trip }: TripInsuranceProps) {
               </span>
             </div>
           )}
+          </div>
         </div>
 
         {travelers.length === 0 ? (
@@ -477,6 +490,13 @@ export function TripInsurance({ trip }: TripInsuranceProps) {
         form={travelerForm}
         setForm={setTravelerForm}
         travelerName={selectedTravelerId ? getTravelerName(selectedTravelerId) : ''}
+      />
+
+      {/* Insurance Proposal Dialog */}
+      <InsuranceProposalDialog
+        open={showProposalDialog}
+        onOpenChange={setShowProposalDialog}
+        tripId={trip.id}
       />
     </div>
   )
