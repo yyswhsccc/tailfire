@@ -31,6 +31,7 @@ export const createDocumentTemplateSchema = z.object({
   textTemplate: z.string().optional(),
   variables: z.record(z.unknown()).optional(),
   outputTypes: z.array(z.enum(['email', 'pdf'])).default(['email']),
+  formJson: z.record(z.unknown()).optional(),
 })
 
 export type CreateDocumentTemplateDto = z.infer<typeof createDocumentTemplateSchema>

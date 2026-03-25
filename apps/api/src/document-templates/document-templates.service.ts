@@ -296,6 +296,7 @@ export class DocumentTemplatesService {
     if (dto.textTemplate !== undefined) updateData.textTemplate = dto.textTemplate
     if (dto.variables !== undefined) updateData.variables = dto.variables
     if (dto.outputTypes !== undefined) updateData.outputTypes = dto.outputTypes
+    if ((dto as any).formJson !== undefined) updateData.formJson = (dto as any).formJson
 
     // Set publishedAt when status becomes 'published'
     if (dto.status !== undefined) {

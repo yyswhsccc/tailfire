@@ -20,6 +20,10 @@ import {
   useUpdateDocumentTemplate,
   useTemplateVariables,
 } from '@/hooks/use-document-templates'
+import {
+  FormFieldEditor,
+  type FormSchema,
+} from '@/components/templates/form-field-editor'
 
 // ============================================================================
 // Types
@@ -90,6 +94,11 @@ export default function TemplateEditorContent({
   const [showVariables, setShowVariables] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
 
+  // Form JSON state (for form-channel templates)
+  const [formJson, setFormJson] = useState<FormSchema | null>(null)
+  const savedFormJsonRef = useRef<string>('null')
+  const isFormChannel = template?.channel === 'form'
+
   // Resizable splitter state (editor width as percentage)
   const [editorWidthPct, setEditorWidthPct] = useState(50)
   const isDraggingRef = useRef(false)
@@ -149,6 +158,12 @@ export default function TemplateEditorContent({
       }
       setFields(initial)
       savedFieldsRef.current = { ...initial }
+
+      // Initialize formJson for form-channel templates
+      const initialFormJson = (template.formJson as FormSchema | null) ?? null
+      setFormJson(initialFormJson)
+      savedFormJsonRef.current = JSON.stringify(initialFormJson)
+
       setInitialized(true)
     }
   }, [template, initialized])
@@ -205,15 +220,30 @@ export default function TemplateEditorContent({
     (value: string | undefined) => {
       setFields((prev) => {
         const next = { ...prev, [activeTab]: value ?? '' }
-        // Check if dirty
-        const dirty = (Object.keys(next) as TabKey[]).some(
+        // Check if dirty (include formJson in dirty check)
+        const textDirty = (Object.keys(next) as TabKey[]).some(
           (k) => next[k] !== savedFieldsRef.current[k]
         )
-        setIsDirty(dirty)
+        const formDirty = JSON.stringify(formJson) !== savedFormJsonRef.current
+        setIsDirty(textDirty || formDirty)
         return next
       })
     },
-    [activeTab]
+    [activeTab, formJson]
+  )
+
+  // Handle form JSON changes (for form-channel templates)
+  const handleFormJsonChange = useCallback(
+    (schema: FormSchema) => {
+      setFormJson(schema)
+      // Check dirty state
+      const formDirty = JSON.stringify(schema) !== savedFormJsonRef.current
+      const textDirty = (Object.keys(fields) as TabKey[]).some(
+        (k) => fields[k] !== savedFieldsRef.current[k]
+      )
+      setIsDirty(textDirty || formDirty)
+    },
+    [fields]
   )
 
   // Save handler
@@ -222,20 +252,28 @@ export default function TemplateEditorContent({
 
     setIsSaving(true)
     try {
+      const saveData: Record<string, unknown> = {
+        pdfHtml: fields.pdfHtml,
+        pdfCss: fields.pdfCss,
+        emailHtml: fields.emailHtml,
+        emailCss: fields.emailCss,
+        subjectTemplate: fields.subjectTemplate,
+        textTemplate: fields.textTemplate,
+      }
+
+      // Include formJson for form-channel templates
+      if (isFormChannel) {
+        saveData.formJson = formJson
+      }
+
       await updateMutation.mutateAsync({
         id: template.id,
-        data: {
-          pdfHtml: fields.pdfHtml,
-          pdfCss: fields.pdfCss,
-          emailHtml: fields.emailHtml,
-          emailCss: fields.emailCss,
-          subjectTemplate: fields.subjectTemplate,
-          textTemplate: fields.textTemplate,
-        },
+        data: saveData,
       })
 
       // Update saved snapshot and clear dirty state
       savedFieldsRef.current = { ...fields }
+      savedFormJsonRef.current = JSON.stringify(formJson)
       setIsDirty(false)
 
       toast({
@@ -251,7 +289,7 @@ export default function TemplateEditorContent({
     } finally {
       setIsSaving(false)
     }
-  }, [template, fields, updateMutation, toast])
+  }, [template, fields, formJson, isFormChannel, updateMutation, toast])
 
   // Keyboard shortcut: Cmd/Ctrl+S to save
   useEffect(() => {
@@ -376,8 +414,18 @@ export default function TemplateEditorContent({
 
       {/* Main content area */}
       <div ref={containerRef} className="flex flex-1 min-h-0">
-        {/* Left panel: Tabs + Editor */}
+        {/* Left panel: Form Field Editor (form channel) + Tabs + Code Editor */}
         <div className="flex flex-col min-w-0" style={{ width: `${editorWidthPct}%` }}>
+          {/* Form Field Editor — shown for form-channel templates */}
+          {isFormChannel && (
+            <div className="flex-1 min-h-0 border-b border-ash-200 overflow-hidden">
+              <FormFieldEditor
+                value={formJson}
+                onChange={handleFormJsonChange}
+              />
+            </div>
+          )}
+
           {/* Tab bar */}
           <div className="flex border-b border-ash-200 bg-ash-50 shrink-0">
             {TABS.map((tab) => (
@@ -396,7 +444,7 @@ export default function TemplateEditorContent({
           </div>
 
           {/* Monaco editor */}
-          <div className="flex-1 min-h-0">
+          <div className={isFormChannel ? 'h-[300px] shrink-0' : 'flex-1 min-h-0'}>
             <Editor
               language={activeTabConfig.language}
               value={fields[activeTab]}
