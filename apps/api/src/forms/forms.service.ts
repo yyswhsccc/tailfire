@@ -120,10 +120,25 @@ export class FormsService {
   /**
    * Mark a form token as completed
    */
-  async markCompleted(token: string) {
+  async markCompleted(
+    token: string,
+    signatureData?: {
+      fullName: string
+      date: string
+      ipAddress: string
+      userAgent?: string
+      decision: string
+      acknowledgedItems?: string[]
+    },
+    submissionData?: Record<string, unknown>,
+  ) {
     await this.db.client
       .update(this.db.schema.formTokens)
-      .set({ completedAt: new Date() })
+      .set({
+        completedAt: new Date(),
+        signatureData: signatureData ?? null,
+        submissionData: submissionData ?? null,
+      })
       .where(eq(this.db.schema.formTokens.token, token))
   }
 
