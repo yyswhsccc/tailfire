@@ -27,7 +27,7 @@ export class FormsController {
   @ApiResponse({ status: 404, description: 'Form not found' })
   @ApiResponse({ status: 400, description: 'Form expired or already submitted' })
   async resolveForm(@Param('token') token: string) {
-    const form = await this.formsService.resolveToken(token)
+    const form = await this.formsService.resolveTokenWithTemplate(token)
 
     return {
       formType: form.formType,
@@ -35,6 +35,7 @@ export class FormsController {
       travelerIds: form.travelerIds,
       contextData: form.contextData,
       agencyId: form.agencyId,
+      template: form.template,
     }
   }
 
