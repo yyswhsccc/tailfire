@@ -1,13 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, Check, Download, Shield } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import {
   Button,
-  Card,
-  CardContent,
-  Checkbox,
-  Input,
   Label,
   RadioGroup,
   RadioGroupItem,
@@ -16,6 +12,9 @@ import {
   cn,
 } from '@tailfire/ui-public'
 import type { TripInsurancePackageDto } from '@tailfire/shared-types'
+import { SigningDocument } from '@/components/signing-document'
+import { SigningConfirmation } from '@/components/signing-confirmation'
+import type { SigningDocumentSubmitPayload } from '@/components/signing-document'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
 
@@ -95,17 +94,6 @@ function todayFormatted() {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-  })
-}
-
-function nowFormatted() {
-  return new Date().toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
   })
 }
 
@@ -199,9 +187,7 @@ export function InsuranceWaiverForm({
   // Form state
   const [decision, setDecision] = useState<'purchase' | 'decline' | null>(null)
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
-  const [declineAcknowledged, setDeclineAcknowledged] = useState(false)
   const [declineReason, setDeclineReason] = useState('')
-  const [signatureName, setSignatureName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null)
@@ -210,17 +196,10 @@ export function InsuranceWaiverForm({
   const end = formatDate(tripEndDate)
   const today = todayFormatted()
 
-  // Validate signature: non-empty after trimming
-  const isSignatureValid = signatureName.trim().length >= 2
-
   const canSubmitPurchase = decision === 'purchase' && selectedPackageId !== null
-  const canSubmitDecline =
-    decision === 'decline' && declineAcknowledged && isSignatureValid
 
-  const handleSubmit = async () => {
-    if (decision === 'purchase' && !selectedPackageId) return
-    if (decision === 'decline' && (!declineAcknowledged || !isSignatureValid)) return
-
+  // ── Shared submission logic ──
+  const submitForm = async (payload?: SigningDocumentSubmitPayload) => {
     setIsSubmitting(true)
     setError(null)
 
@@ -237,10 +216,10 @@ export function InsuranceWaiverForm({
       const body: Record<string, unknown> = { decisions }
 
       // Include signature data for decline path
-      if (decision === 'decline') {
+      if (decision === 'decline' && payload) {
         body.signature = {
-          fullName: signatureName.trim(),
-          date: new Date().toISOString(),
+          fullName: payload.fullName,
+          date: payload.date,
         }
       }
 
@@ -265,103 +244,133 @@ export function InsuranceWaiverForm({
           ? err.message
           : 'Something went wrong. Please try again.',
       )
+      // Re-throw so SigningDocument can stay in its submitting=false state
+      throw err
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleDownloadPdf = () => {
-    if (!submissionResult?.pdfBase64) return
-    const byteCharacters = atob(submissionResult.pdfBase64)
-    const byteNumbers = new Array(byteCharacters.length)
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i)
-    }
-    const byteArray = new Uint8Array(byteNumbers)
-    const blob = new Blob([byteArray], { type: 'application/pdf' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `insurance-waiver-${submissionResult.referenceNumber}.pdf`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
   // ── Confirmation screen ──
   if (submissionResult) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-[700px] bg-white shadow-sm border border-gray-200 rounded-lg">
-          <div className="p-8 md:p-12 text-center">
-            {/* Agency Header */}
-            <p className="text-sm font-medium tracking-widest uppercase text-[#c59746] mb-6">
-              {agencyName}
-            </p>
-
-            <div className="mx-auto mb-6 h-16 w-16 rounded-full bg-green-50 border-2 border-green-200 flex items-center justify-center">
-              <Check className="h-8 w-8 text-green-600" />
-            </div>
-
-            <h1
-              className="text-2xl font-bold text-gray-900 mb-2"
-              style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-            >
-              {submissionResult.pdfBase64
-                ? 'Insurance Waiver Signed Successfully'
-                : 'Insurance Decision Recorded'}
-            </h1>
-
-            <div className="mt-6 space-y-2 text-sm text-gray-600">
-              <p>
-                <span className="text-gray-400">Reference:</span>{' '}
-                <span className="font-mono font-medium text-gray-900">
-                  {submissionResult.referenceNumber}
-                </span>
-              </p>
-              <p>
-                <span className="text-gray-400">Signed:</span>{' '}
-                {nowFormatted()}
-              </p>
-            </div>
-
-            {submissionResult.pdfBase64 && (
-              <>
-                <Separator className="my-6" />
-                <div className="text-sm text-gray-600 space-y-1 mb-6">
-                  <p>A copy of this signed waiver has been:</p>
-                  {submissionResult.travelerEmail && (
-                    <p>
-                      Emailed to{' '}
-                      <span className="font-medium text-gray-900">
-                        {submissionResult.travelerEmail}
-                      </span>
-                    </p>
-                  )}
-                  <p>Added to your trip documents</p>
-                </div>
-
-                <Button
-                  onClick={handleDownloadPdf}
-                  className="bg-[#c59746] hover:bg-[#b08636] text-white"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF Copy
-                </Button>
-              </>
-            )}
-
-            <p className="mt-8 text-xs text-gray-400">
-              You may close this page.
-            </p>
-          </div>
-        </div>
-      </div>
+      <SigningConfirmation
+        agencyName={agencyName}
+        documentTitle={
+          submissionResult.pdfBase64
+            ? 'Insurance Waiver Signed Successfully'
+            : 'Insurance Decision Recorded'
+        }
+        referenceNumber={submissionResult.referenceNumber}
+        signedAt={submissionResult.signedAt}
+        recipientEmail={submissionResult.travelerEmail}
+        pdfBase64={submissionResult.pdfBase64}
+        pdfFilename={`insurance-waiver-${submissionResult.referenceNumber}`}
+      />
     )
   }
 
-  // ── Main form ──
+  // ── Decline path: render as SigningDocument ──
+  if (decision === 'decline') {
+    return (
+      <SigningDocument
+        agencyName={agencyName}
+        documentTitle="TRAVEL INSURANCE WAIVER & ACKNOWLEDGMENT"
+        metadata={[
+          { label: 'Trip', value: tripName },
+          ...(start || end
+            ? [
+                {
+                  label: 'Travel Dates',
+                  value: [start, end].filter(Boolean).join(' \u2013 '),
+                },
+              ]
+            : []),
+          {
+            label: travelerNames.length > 1 ? 'Travelers' : 'Traveler',
+            value: travelerNames.join(', '),
+          },
+        ]}
+        sections={[
+          {
+            title: 'SECTION 1: INSURANCE COVERAGE DECISION',
+            content: (
+              <div
+                className={cn(
+                  'flex items-center gap-3 rounded-lg border-2 p-4',
+                  'border-red-300 bg-red-50/50',
+                )}
+              >
+                <div className="h-5 w-5 shrink-0 rounded-full border-2 border-red-400 bg-red-400 flex items-center justify-center">
+                  <div className="h-2 w-2 rounded-full bg-white" />
+                </div>
+                <span className="text-gray-900 font-medium">
+                  I DECLINE travel insurance coverage
+                </span>
+              </div>
+            ),
+          },
+          {
+            title: 'SECTION 2: ACKNOWLEDGMENT & WAIVER',
+            content: (
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <p>I, the undersigned, acknowledge that:</p>
+                  <ul className="list-disc pl-6 space-y-2">
+                    <li>
+                      Travel insurance has been offered to me by{' '}
+                      <strong>{agencyName}</strong>.
+                    </li>
+                    <li>
+                      I understand the risks of travelling without insurance
+                      including but not limited to medical emergencies, trip
+                      cancellation, lost baggage, and travel delays.
+                    </li>
+                    <li>
+                      I voluntarily decline insurance coverage and assume all
+                      financial responsibility for any losses or expenses incurred.
+                    </li>
+                    <li>
+                      I release {agencyName} and its agents from any liability
+                      arising from my decision to decline coverage.
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Optional reason */}
+                <div className="mt-2 space-y-1.5">
+                  <Label htmlFor="reason" className="text-sm text-gray-500">
+                    Reason for declining (optional)
+                  </Label>
+                  <Textarea
+                    id="reason"
+                    value={declineReason}
+                    onChange={(e) => setDeclineReason(e.target.value)}
+                    placeholder="e.g. I have coverage through my credit card, employer, or another policy"
+                    className="resize-none bg-white"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            ),
+          },
+        ]}
+        acknowledgments={[
+          {
+            id: 'decline-acknowledged',
+            text: 'I have read and understood the above acknowledgment and waiver.',
+            required: true,
+          },
+        ]}
+        submitLabel="Submit Signed Waiver"
+        onSubmit={submitForm}
+        isSubmitting={isSubmitting}
+        submitError={error}
+      />
+    )
+  }
+
+  // ── Purchase path + initial decision screen ──
   return (
     <div className="min-h-screen bg-gray-50 flex items-start justify-center p-4 pt-8 pb-16">
       <div className="w-full max-w-[700px] bg-white shadow-sm border border-gray-200 rounded-lg">
@@ -456,7 +465,7 @@ export function InsuranceWaiverForm({
             <div
               className={cn(
                 'flex items-center gap-3 rounded-lg border-2 p-4 cursor-pointer transition-colors',
-                decision === 'decline'
+                (decision as string) === 'decline'
                   ? 'border-red-300 bg-red-50/50'
                   : 'border-gray-200 hover:border-gray-300',
               )}
@@ -493,135 +502,6 @@ export function InsuranceWaiverForm({
           )}
         </div>
 
-        {/* ── Section 2: Acknowledgment & Waiver (decline only) ── */}
-        {decision === 'decline' && (
-          <>
-            <div className="px-8 md:px-12 pt-6">
-              <Separator />
-            </div>
-
-            <div className="p-8 md:p-12 pb-0">
-              <h2
-                className="text-base font-bold text-gray-900 mb-4 tracking-wide"
-                style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-              >
-                SECTION 2: ACKNOWLEDGMENT & WAIVER
-              </h2>
-
-              <div
-                className="text-sm text-gray-700 leading-relaxed space-y-3"
-                style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-              >
-                <p>I, the undersigned, acknowledge that:</p>
-                <ul className="list-disc pl-6 space-y-2">
-                  <li>
-                    Travel insurance has been offered to me by{' '}
-                    <strong>{agencyName}</strong>.
-                  </li>
-                  <li>
-                    I understand the risks of travelling without insurance
-                    including but not limited to medical emergencies, trip
-                    cancellation, lost baggage, and travel delays.
-                  </li>
-                  <li>
-                    I voluntarily decline insurance coverage and assume all
-                    financial responsibility for any losses or expenses incurred.
-                  </li>
-                  <li>
-                    I release {agencyName} and its agents from any liability
-                    arising from my decision to decline coverage.
-                  </li>
-                </ul>
-              </div>
-
-              <div className="mt-6 flex items-start gap-3">
-                <Checkbox
-                  id="acknowledge"
-                  checked={declineAcknowledged}
-                  onCheckedChange={(checked) =>
-                    setDeclineAcknowledged(checked === true)
-                  }
-                  className="mt-0.5"
-                />
-                <Label
-                  htmlFor="acknowledge"
-                  className="text-sm leading-relaxed cursor-pointer text-gray-700"
-                  style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-                >
-                  I have read and understood the above acknowledgment and waiver.
-                </Label>
-              </div>
-
-              {/* Optional reason */}
-              <div className="mt-4 space-y-1.5">
-                <Label
-                  htmlFor="reason"
-                  className="text-sm text-gray-500"
-                >
-                  Reason for declining (optional)
-                </Label>
-                <Textarea
-                  id="reason"
-                  value={declineReason}
-                  onChange={(e) => setDeclineReason(e.target.value)}
-                  placeholder="e.g. I have coverage through my credit card, employer, or another policy"
-                  className="resize-none bg-white"
-                  rows={2}
-                />
-              </div>
-            </div>
-
-            {/* ── Section 3: Digital Signature ── */}
-            <div className="px-8 md:px-12 pt-6">
-              <Separator />
-            </div>
-
-            <div className="p-8 md:p-12 pb-0">
-              <h2
-                className="text-base font-bold text-gray-900 mb-4 tracking-wide"
-                style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-              >
-                SECTION 3: DIGITAL SIGNATURE
-              </h2>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="signatureName"
-                    className="text-sm font-medium text-gray-700"
-                  >
-                    Full Legal Name
-                  </Label>
-                  <Input
-                    id="signatureName"
-                    type="text"
-                    value={signatureName}
-                    onChange={(e) => setSignatureName(e.target.value)}
-                    placeholder="Type your full legal name"
-                    className="bg-white text-lg"
-                    style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-                    autoComplete="off"
-                  />
-                </div>
-
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>Date:</span>
-                  <span className="text-gray-900 font-medium">{today}</span>
-                </div>
-
-                <p
-                  className="text-xs text-gray-400 leading-relaxed"
-                  style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-                >
-                  By typing my full name above, I acknowledge that this
-                  constitutes my legal electronic signature pursuant to
-                  applicable electronic signature laws.
-                </p>
-              </div>
-            </div>
-          </>
-        )}
-
         {/* ── Submit Section ── */}
         <div className="px-8 md:px-12 pt-6">
           <Separator />
@@ -635,26 +515,16 @@ export function InsuranceWaiverForm({
             </p>
           )}
 
-          {decision && (
+          {decision === 'purchase' && (
             <Button
-              onClick={handleSubmit}
-              disabled={
-                isSubmitting ||
-                (decision === 'purchase' && !canSubmitPurchase) ||
-                (decision === 'decline' && !canSubmitDecline)
-              }
+              onClick={() => submitForm()}
+              disabled={isSubmitting || !canSubmitPurchase}
               className={cn(
                 'w-full h-12 text-base font-medium',
-                decision === 'decline'
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : 'bg-[#c59746] hover:bg-[#b08636] text-white',
+                'bg-[#c59746] hover:bg-[#b08636] text-white',
               )}
             >
-              {isSubmitting
-                ? 'Submitting...'
-                : decision === 'purchase'
-                  ? 'Submit Insurance Selection'
-                  : 'Submit Signed Waiver'}
+              {isSubmitting ? 'Submitting...' : 'Submit Insurance Selection'}
             </Button>
           )}
 
