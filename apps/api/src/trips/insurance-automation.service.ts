@@ -219,9 +219,11 @@ export class InsuranceAutomationService {
   ): Promise<{ queuedCount: number; jobIds: string[] }> {
     const { trips } = this.db.schema
 
+    const { tripInsurancePackages } = this.db.schema
+
     // Get trip info
     const [trip] = await this.db.client
-      .select({ id: trips.id, name: trips.name })
+      .select({ id: trips.id, name: trips.name, startDate: trips.startDate, endDate: trips.endDate })
       .from(trips)
       .where(eq(trips.id, tripId))
       .limit(1)
@@ -229,6 +231,18 @@ export class InsuranceAutomationService {
     if (!trip) {
       throw new NotFoundException(`Trip ${tripId} not found`)
     }
+
+    // Fetch active insurance packages to embed in form token contextData
+    const activePackages = await this.db.client
+      .select()
+      .from(tripInsurancePackages)
+      .where(
+        and(
+          eq(tripInsurancePackages.tripId, tripId),
+          eq(tripInsurancePackages.isActive, true),
+        ),
+      )
+      .orderBy(tripInsurancePackages.displayOrder)
 
     // Get the full preview to understand who's a minor
     const preview = await this.getProposalPreview(tripId)
@@ -285,7 +299,28 @@ export class InsuranceAutomationService {
         contextData: {
           recipientName: `${traveler.firstName || ''} ${traveler.lastName || ''}`.trim(),
           tripName: trip.name,
+          tripStartDate: trip.startDate ?? null,
+          tripEndDate: trip.endDate ?? null,
           dependentNames: dependents.map((d) => `${d.firstName || ''} ${d.lastName || ''}`.trim()),
+          // Snapshot of active packages at time of token creation — used by the public form page
+          packages: activePackages.map((p) => ({
+            id: p.id,
+            tripId: p.tripId,
+            providerName: p.providerName,
+            packageName: p.packageName,
+            policyType: p.policyType,
+            coverageAmountCents: p.coverageAmountCents,
+            premiumCents: p.premiumCents,
+            deductibleCents: p.deductibleCents,
+            currency: p.currency,
+            coverageStartDate: p.coverageStartDate,
+            coverageEndDate: p.coverageEndDate,
+            termsUrl: p.termsUrl,
+            isFromCatalog: p.isFromCatalog,
+            displayOrder: p.displayOrder,
+            activityId: p.activityId,
+            isActive: p.isActive,
+          })),
         },
         expiresInDays: 30,
       })
