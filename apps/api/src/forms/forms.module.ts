@@ -9,9 +9,11 @@ import { FormsService } from './forms.service'
 import { FormsController } from './forms.controller'
 import { DatabaseModule } from '../db/database.module'
 import { DocumentTemplatesModule } from '../document-templates/document-templates.module'
+import { DocumentRenderModule } from '../document-render/document-render.module'
+import { EmailModule } from '../email/email.module'
 
 @Module({
-  imports: [DatabaseModule, DocumentTemplatesModule],
+  imports: [DatabaseModule, DocumentTemplatesModule, DocumentRenderModule, EmailModule],
   providers: [FormsService],
   controllers: [FormsController],
   exports: [FormsService],
