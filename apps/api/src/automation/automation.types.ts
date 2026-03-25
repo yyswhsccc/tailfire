@@ -76,6 +76,9 @@ export const JOB_TYPES = {
   // Document render jobs
   DOCUMENT_RENDER_PDF: 'document.render_pdf',
 
+  // Insurance automation jobs
+  INSURANCE_PROPOSAL_EMAIL: 'insurance.proposal.email',
+
   // Email sync jobs (queue registered in EmailAccountsModule, NOT here)
   EMAIL_SYNC: 'email.sync',
   EMAIL_DISPATCH_SYNC: 'email.dispatch_sync',
@@ -270,6 +273,26 @@ export interface ActivityGeocodingJobData {
 }
 
 // ============================================================================
+// Insurance Automation Job Types
+// ============================================================================
+
+/**
+ * Insurance proposal email job data
+ * Sends a waiver form link to a traveler (and their dependents if any)
+ */
+export interface InsuranceProposalEmailData {
+  type: 'insurance.proposal.email'
+  tripId: string
+  recipientTravelerId: string
+  recipientName: string
+  recipientEmail: string
+  dependentTravelerIds: string[]
+  formToken: string
+  agencyId: string
+  tripName: string
+}
+
+// ============================================================================
 // Document Render Job Types
 // ============================================================================
 
@@ -385,4 +408,11 @@ export function getDepartureReminderJobId(tripId: string, daysBeforeDeparture: n
  */
 export function getPostTripJobId(tripId: string, type: 'thank_you' | 'feedback'): string {
   return `trip:${tripId}:${type}`
+}
+
+/**
+ * Generate deterministic job ID for insurance proposal emails
+ */
+export function getInsuranceProposalJobId(tripId: string, travelerId: string): string {
+  return `insurance:${tripId}:${travelerId}`
 }

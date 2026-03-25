@@ -58,6 +58,7 @@ import { ImpersonationModule } from './impersonation/impersonation.module'
 import { ApiHealthModule } from './api-health/api-health.module'
 import { SearchModule } from './search/search.module'
 import { ReportingModule } from './reporting/reporting.module'
+import { FormsModule } from './forms/forms.module'
 
 @Module({
   imports: [
@@ -210,6 +211,9 @@ import { ReportingModule } from './reporting/reporting.module'
 
     // Reporting system (catalog, query execution, PDF/CSV export)
     ReportingModule,
+
+    // Token-based public forms (insurance waivers, intake forms)
+    FormsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -23,6 +23,7 @@ import { AutomationModule } from '../automation/automation.module'
 import { EmailModule } from '../email/email.module'
 import { TemplatesModule } from '../templates/templates.module'
 import { TasksModule } from '../tasks/tasks.module'
+import { FormsModule } from '../forms/forms.module'
 
 // Services
 import { TripsService } from './trips.service'
@@ -55,6 +56,7 @@ import { BookingValidationService } from './booking-validation.service'
 import { TripLifecycleService } from './trip-lifecycle.service'
 import { TravelerBookingsService } from './traveler-bookings.service'
 import { InsuranceService } from './insurance.service'
+import { InsuranceAutomationService } from './insurance-automation.service'
 import { StorageService } from './storage.service'
 import { ActivityDocumentsService } from './activity-documents.service'
 import { ActivityMediaService } from './activity-media.service'
@@ -90,6 +92,7 @@ import { TripSharesService } from './trip-shares.service'
 import { TripGroupAccessService } from './trip-group-access.service'
 import { TripGroupSharesService } from './trip-group-shares.service'
 import { TripGroupSharesController } from './trip-group-shares.controller'
+import { TripAutomationsController } from './trip-automations.controller'
 
 @Module({
   imports: [
@@ -103,6 +106,7 @@ import { TripGroupSharesController } from './trip-group-shares.controller'
     forwardRef(() => AutomationModule), // For trip status auto-transitions
     forwardRef(() => TemplatesModule), // For ItineraryCloneService (duplication)
     forwardRef(() => TasksModule), // For ActivityBookingsService insurance task creation
+    FormsModule, // For InsuranceAutomationService (form token generation)
   ],
   controllers: [
     TripsController,
@@ -126,6 +130,7 @@ import { TripGroupSharesController } from './trip-group-shares.controller'
     TripMediaController,
     ActivityBookingsController, // Booking status management for activities
     TravelerBookingsController, // Per-traveler booking records
+    TripAutomationsController, // Trip-scoped automation + insurance endpoints
   ],
   providers: [
     StorageProviderFactory,
@@ -165,6 +170,7 @@ import { TripGroupSharesController } from './trip-group-shares.controller'
     TripLifecycleService,
     TravelerBookingsService,
     InsuranceService,
+    InsuranceAutomationService,
     StorageService,
     ActivityDocumentsService,
     ActivityMediaService,
