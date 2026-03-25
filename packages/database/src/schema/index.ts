@@ -198,3 +198,6 @@ export * from './impersonation-sessions.schema'
 
 // API Health Checks (periodic external API health monitoring)
 export * from './api-health-checks.schema'
+
+// Form tokens (token-based public forms: insurance waivers, intake forms)
+export * from './form-tokens.schema'
