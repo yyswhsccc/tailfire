@@ -16,7 +16,7 @@ import { api } from '@/lib/api'
 // Types
 // ============================================================================
 
-export type TemplateCategory = 'trip_order' | 'payment' | 'email' | 'proposal'
+export type TemplateCategory = 'trip_order' | 'payment' | 'email' | 'proposal' | 'form' | 'notification' | 'system' | 'client_care'
 export type TemplateStatus = 'draft' | 'published' | 'archived'
 
 export type TemplateChannel = 'email' | 'pdf' | 'form' | 'sms'

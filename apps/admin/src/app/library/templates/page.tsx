@@ -69,6 +69,10 @@ const CATEGORY_LABELS: Record<TemplateCategory, string> = {
   payment: 'Payment',
   email: 'Email',
   proposal: 'Proposal',
+  form: 'Form',
+  notification: 'Notification',
+  system: 'System',
+  client_care: 'Client Care',
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -91,6 +95,10 @@ function groupByCategory(templates: DocumentTemplate[]): Record<TemplateCategory
     payment: [],
     email: [],
     proposal: [],
+    form: [],
+    notification: [],
+    system: [],
+    client_care: [],
   }
 
   for (const template of templates) {
@@ -245,7 +253,7 @@ export default function TemplatesLibraryPage() {
   const categoriesToShow: TemplateCategory[] =
     categoryFilter !== 'all'
       ? [categoryFilter]
-      : (['trip_order', 'payment', 'email', 'proposal'] as const).filter(
+      : (['trip_order', 'payment', 'email', 'proposal', 'form', 'notification', 'system', 'client_care'] as const).filter(
           (cat) => grouped && grouped[cat].length > 0
         )
 
@@ -290,6 +298,9 @@ export default function TemplatesLibraryPage() {
             <SelectItem value="payment">Payment</SelectItem>
             <SelectItem value="email">Email</SelectItem>
             <SelectItem value="proposal">Proposal</SelectItem>
+            <SelectItem value="form">Form</SelectItem>
+            <SelectItem value="notification">Notification</SelectItem>
+            <SelectItem value="client_care">Client Care</SelectItem>
           </SelectContent>
         </Select>
       </div>
