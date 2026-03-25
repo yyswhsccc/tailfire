@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const TEMPLATE_CATEGORIES = ['trip_order', 'payment', 'email', 'proposal'] as const
+export const TEMPLATE_CATEGORIES = ['trip_order', 'payment', 'email', 'proposal', 'form', 'notification', 'system', 'client_care'] as const
 export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number]
 export const BLOCK_PERMISSIONS = ['editable', 'branding', 'locked'] as const
 
@@ -23,15 +23,15 @@ export const createDocumentTemplateSchema = z.object({
   blocksJson: z
     .object({ blocks: z.array(blockSchema) })
     .default({ blocks: [] }),
-  emailHtml: z.string().optional(),
-  emailCss: z.string().optional(),
-  pdfHtml: z.string().optional(),
-  pdfCss: z.string().optional(),
-  subjectTemplate: z.string().optional(),
-  textTemplate: z.string().optional(),
-  variables: z.record(z.unknown()).optional(),
-  outputTypes: z.array(z.enum(['email', 'pdf'])).default(['email']),
-  formJson: z.record(z.unknown()).optional(),
+  emailHtml: z.string().nullable().optional(),
+  emailCss: z.string().nullable().optional(),
+  pdfHtml: z.string().nullable().optional(),
+  pdfCss: z.string().nullable().optional(),
+  subjectTemplate: z.string().nullable().optional(),
+  textTemplate: z.string().nullable().optional(),
+  variables: z.record(z.unknown()).nullable().optional(),
+  outputTypes: z.array(z.enum(['email', 'pdf', 'form', 'sms'])).default(['email']),
+  formJson: z.record(z.unknown()).nullable().optional(),
 })
 
 export type CreateDocumentTemplateDto = z.infer<typeof createDocumentTemplateSchema>
