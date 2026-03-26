@@ -115,10 +115,12 @@ export interface DashboardOverview {
 
 // -- Query Keys --
 
+export type DashboardView = 'personal' | 'agency' | 'all'
+
 export const dashboardKeys = {
   all: ['dashboard'] as const,
-  overview: (period: string, chartYear: number, includeYoy: boolean) =>
-    [...dashboardKeys.all, 'overview', { period, chartYear, includeYoy }] as const,
+  overview: (period: string, chartYear: number, includeYoy: boolean, view: DashboardView) =>
+    [...dashboardKeys.all, 'overview', { period, chartYear, includeYoy, view }] as const,
 }
 
 // -- Hook --
@@ -127,6 +129,7 @@ interface UseDashboardOverviewOptions {
   period?: 'mtd' | 'ytd' | 'lifetime'
   chartYear?: number
   includeYoy?: boolean
+  view?: DashboardView
 }
 
 export function useDashboardOverview(options: UseDashboardOverviewOptions = {}) {
@@ -134,15 +137,17 @@ export function useDashboardOverview(options: UseDashboardOverviewOptions = {}) 
     period = 'mtd',
     chartYear = new Date().getFullYear(),
     includeYoy = false,
+    view = 'all',
   } = options
 
   return useQuery({
-    queryKey: dashboardKeys.overview(period, chartYear, includeYoy),
+    queryKey: dashboardKeys.overview(period, chartYear, includeYoy, view),
     queryFn: () => {
       const params = new URLSearchParams({
         period,
         chartYear: String(chartYear),
         includeYoy: String(includeYoy),
+        view,
       })
       return api.get<DashboardOverview>(`/dashboard/overview?${params}`)
     },
