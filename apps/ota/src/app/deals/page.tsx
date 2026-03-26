@@ -28,7 +28,7 @@ interface DealsPageProps {
 
 async function fetchDeals(productType?: string): Promise<{ deals: Deal[]; total: number }> {
   try {
-    const params = new URLSearchParams({ isPublished: "true", limit: "20" });
+    const params = new URLSearchParams({ limit: "20" });
     if (productType) {
       params.set("productType", productType);
     }

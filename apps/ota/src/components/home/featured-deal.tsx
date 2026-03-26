@@ -14,7 +14,7 @@ function formatPrice(deal: Deal): string {
 
 function buildSubtitle(deal: Deal): string {
   const parts: string[] = [];
-  if (deal.destinations?.length) parts.push(deal.destinations[0]);
+  if (deal.destinations?.[0]) parts.push(deal.destinations[0]);
   if (deal.supplierName) parts.push(deal.supplierName);
   return parts.join(" · ");
 }

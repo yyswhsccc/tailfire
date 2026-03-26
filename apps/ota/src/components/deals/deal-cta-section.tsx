@@ -5,7 +5,7 @@ export function DealCtaSection() {
     <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
       {/* AI concierge CTA */}
       <Link
-        href="/#ai-concierge"
+        href="/contact"
         className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#1A1A1A] px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#333]"
       >
         <svg

@@ -11,7 +11,7 @@ const FILTER_OPTIONS = [
   { label: "Flights", value: "flight" },
   { label: "Tours", value: "tour" },
   { label: "Hotels", value: "hotel" },
-  { label: "All-Inclusive", value: "all-inclusive" },
+  { label: "Packages", value: "package" },
 ] as const;
 
 export function DealFilters() {

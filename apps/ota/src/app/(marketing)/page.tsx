@@ -17,7 +17,7 @@ export default async function HomePage() {
   let featuredDeal: Deal | null = null;
   try {
     const response = await publicFetch<{ deals: Deal[]; total: number }>(
-      "/deals?isPublished=true&limit=1",
+      "/deals?limit=1",
       { next: { tags: ["deals"] } },
     );
     featuredDeal = response.deals?.[0] ?? null;
