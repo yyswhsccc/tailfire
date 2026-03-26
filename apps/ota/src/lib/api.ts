@@ -12,24 +12,39 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Extended options that include Next.js-specific fetch extensions.
+ * `next.tags` enables on-demand ISR revalidation via `revalidateTag()`.
+ * `next.revalidate` sets time-based revalidation (seconds) or `false` to opt out.
+ */
+type FetchOptions = RequestInit & {
+  headers?: Record<string, string>
+  next?: { tags?: string[]; revalidate?: number | false }
+}
+
 async function fetchWithTimeout<T>(
   path: string,
-  options: RequestInit & { headers?: Record<string, string> } = {},
+  options: FetchOptions = {},
 ): Promise<T> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 30_000)
 
   const url = `${API_URL}${path}`
 
+  // Extract Next.js-specific options (not part of standard RequestInit)
+  const { next: nextOptions, ...restOptions } = options
+
   try {
     const res = await fetch(url, {
-      ...options,
+      ...restOptions,
       headers: {
         'Content-Type': 'application/json',
-        ...options.headers,
+        ...restOptions.headers,
       },
       signal: controller.signal,
-    })
+      // Pass Next.js cache tags/revalidation options through
+      ...(nextOptions ? { next: nextOptions } : {}),
+    } as RequestInit)
 
     if (!res.ok) {
       let body: unknown
@@ -78,8 +93,11 @@ export async function serviceFetch<T>(path: string, options: RequestInit = {}): 
 /**
  * Public fetch — no auth, for fully public endpoints.
  * Used by: deals listing, advisor profiles.
+ *
+ * Supports Next.js `next` options for ISR cache tagging:
+ *   publicFetch('/deals', { next: { tags: ['deals'] } })
  */
-export async function publicFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function publicFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
   return fetchWithTimeout<T>(path, {
     ...options,
     headers: options.headers as Record<string, string>,

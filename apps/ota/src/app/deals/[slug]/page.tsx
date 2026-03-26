@@ -17,7 +17,9 @@ interface DealPageProps {
 
 async function fetchDeal(slug: string): Promise<Deal | null> {
   try {
-    return await publicFetch<Deal>(`/deals/by-slug/${slug}`);
+    return await publicFetch<Deal>(`/deals/by-slug/${slug}`, {
+      next: { tags: ["deals", `deal-${slug}`] },
+    });
   } catch {
     return null;
   }

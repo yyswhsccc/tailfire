@@ -18,7 +18,9 @@ export default async function OgImage({
 
   let deal: Deal | null = null;
   try {
-    deal = await publicFetch<Deal>(`/deals/by-slug/${slug}`);
+    deal = await publicFetch<Deal>(`/deals/by-slug/${slug}`, {
+      next: { tags: ["deals", `deal-${slug}`] },
+    });
   } catch {
     // Fall through to default OG image
   }

@@ -34,6 +34,7 @@ async function fetchDeals(productType?: string): Promise<{ deals: Deal[]; total:
     }
     const response = await publicFetch<{ deals: Deal[]; total: number }>(
       `/deals?${params.toString()}`,
+      { next: { tags: ["deals"] } },
     );
     return response;
   } catch (error) {
