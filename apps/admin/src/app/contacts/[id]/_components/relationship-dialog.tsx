@@ -268,7 +268,7 @@ export function RelationshipDialog({
                         .map((contact) => (
                           <CommandItem
                             key={contact.id}
-                            value={contact.id}
+                            value={`${contact.firstName} ${contact.lastName} ${contact.email || ''} ${contact.id}`}
                             onSelect={() => {
                               setSelectedContactId(contact.id)
                               setSelectedContactDisplay(null) // Clear — will use contactsData lookup
