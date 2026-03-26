@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { PanelRight, AlertCircle, RefreshCw, Loader2 } from 'lucide-react'
 import { useUser } from '@/hooks/use-user'
 import { useMyProfile } from '@/hooks/use-user-profile'
-import { useDashboardOverview } from '@/hooks/use-dashboard'
+import { useDashboardOverview, type DashboardView } from '@/hooks/use-dashboard'
 import { KpiCards, SalesKpiCards } from './_components/kpi-cards'
 import { TripCardRow } from './_components/trip-card-row'
 import { TasksDueWidget } from './_components/tasks-due-widget'
@@ -17,6 +17,7 @@ import { CommissionChart } from './_components/commission-chart'
 import { DashboardSidebar } from './_components/dashboard-sidebar'
 
 const SIDEBAR_KEY = 'dashboard-sidebar-open'
+const VIEW_KEY = 'dashboard-view'
 
 function useSidebarState() {
   const [isOpen, setIsOpen] = useState(false)
@@ -49,12 +50,27 @@ export default function DashboardPage() {
   const [chartYear, setChartYear] = useState(new Date().getFullYear())
   const [includeYoy, setIncludeYoy] = useState(false)
   const [showProjection, setShowProjection] = useState(false)
+  const [view, setViewState] = useState<DashboardView>('all')
   const sidebar = useSidebarState()
+
+  // Persist view toggle to localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(VIEW_KEY) as DashboardView | null
+    if (stored && ['personal', 'agency', 'all'].includes(stored)) {
+      setViewState(stored)
+    }
+  }, [])
+
+  const setView = useCallback((v: DashboardView) => {
+    setViewState(v)
+    localStorage.setItem(VIEW_KEY, v)
+  }, [])
 
   const { data, isPending, isFetching, isError, refetch } = useDashboardOverview({
     period,
     chartYear,
     includeYoy,
+    view: isAdmin ? view : 'personal',
   })
 
   const periodLabel = period === 'mtd' ? 'Month to Date' : period === 'ytd' ? 'Year to Date' : 'Lifetime'
@@ -119,6 +135,35 @@ export default function DashboardPage() {
               {isFetching && (
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               )}
+              {/* View Toggle (admin only) */}
+              {isAdmin && (
+                <div className="flex rounded-md border">
+                  <button
+                    className={`px-3 py-1.5 text-xs font-medium rounded-l-md transition-colors ${
+                      view === 'personal' ? 'bg-phoenix-gold-600 text-white' : 'hover:bg-muted'
+                    }`}
+                    onClick={() => setView('personal')}
+                  >
+                    Agent
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      view === 'agency' ? 'bg-phoenix-gold-600 text-white' : 'hover:bg-muted'
+                    }`}
+                    onClick={() => setView('agency')}
+                  >
+                    Agency
+                  </button>
+                  <button
+                    className={`px-3 py-1.5 text-xs font-medium rounded-r-md transition-colors ${
+                      view === 'all' ? 'bg-phoenix-gold-600 text-white' : 'hover:bg-muted'
+                    }`}
+                    onClick={() => setView('all')}
+                  >
+                    Both
+                  </button>
+                </div>
+              )}
               {/* Period Toggle */}
               <div className="flex rounded-md border">
                 <button
@@ -153,23 +198,23 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Personal KPI Cards */}
-          <KpiCards metrics={data.personal} periodLabel={periodLabel} />
-
-          {/* Agency KPI Row (admin only) */}
-          {isAdmin && data.agency && (
+          {/* KPI Cards — controlled by view toggle */}
+          {(view === 'personal' || view === 'all') && (
+            <KpiCards metrics={data.personal} periodLabel={periodLabel} />
+          )}
+          {(view === 'agency' || view === 'all') && isAdmin && data.agency && (
             <KpiCards metrics={data.agency} periodLabel={periodLabel} variant="agency" />
           )}
 
-          {/* Booked Sales, Departed Sales, Insurance Attach Rate */}
-          <SalesKpiCards
-            salesKpi={data.personalSalesKpi}
-            insuranceKpi={data.personalInsuranceKpi}
-            periodLabel={periodLabel}
-          />
-
-          {/* Agency Sales KPIs (admin only) */}
-          {isAdmin && data.agencySalesKpi && data.agencyInsuranceKpi && (
+          {/* Sales KPIs — controlled by view toggle */}
+          {(view === 'personal' || view === 'all') && (
+            <SalesKpiCards
+              salesKpi={data.personalSalesKpi}
+              insuranceKpi={data.personalInsuranceKpi}
+              periodLabel={periodLabel}
+            />
+          )}
+          {(view === 'agency' || view === 'all') && isAdmin && data.agencySalesKpi && data.agencyInsuranceKpi && (
             <SalesKpiCards
               salesKpi={data.agencySalesKpi}
               insuranceKpi={data.agencyInsuranceKpi}
@@ -226,7 +271,7 @@ export default function DashboardPage() {
           onToggle={sidebar.toggle}
           isAdmin={isAdmin}
           tasks={data.tasksDue}
-          leaderboard={data.agentLeaderboard}
+          leaderboard={view !== 'personal' ? data.agentLeaderboard : null}
         />
       </div>
     </DashboardLayout>

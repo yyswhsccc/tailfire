@@ -27,6 +27,11 @@ export class DashboardOverviewQueryDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   includeYoy?: boolean = false
+
+  @ApiPropertyOptional({ enum: ['personal', 'agency', 'all'], default: 'all' })
+  @IsOptional()
+  @IsEnum(['personal', 'agency', 'all'])
+  view?: 'personal' | 'agency' | 'all' = 'all'
 }
 
 // -- Response Types --

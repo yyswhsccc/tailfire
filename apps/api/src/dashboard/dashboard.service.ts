@@ -162,6 +162,7 @@ export class DashboardService {
   async getOverview(auth: AuthContext, query: DashboardOverviewQueryDto): Promise<DashboardOverview> {
     const tripIds = await this.tripAccessService.getAccessibleTripIds(auth)
     const isAdmin = auth.role === 'admin'
+    const view = query.view || 'all'
 
     // For admin personal KPIs, scope to trips they own (not all agency trips)
     let personalTripIds: string[] | 'all' = tripIds
@@ -172,9 +173,17 @@ export class DashboardService {
       personalTripIds = (ownedResult as any[]).map((r: any) => r.id)
     }
 
+    // Determine which trip scope to use for charts/widgets based on view
+    // personal = user's own trips only, agency = all agency trips, all = all agency trips (default)
+    const widgetTripIds = (isAdmin && view === 'personal') ? personalTripIds : tripIds
+
     // Calculate date ranges
     const now = new Date()
     const { startDate, endDate, priorStartDate, priorEndDate } = this.getDateRanges(query.period || 'mtd', now)
+
+    // Determine which KPI queries to run based on view
+    const needsPersonal = view === 'personal' || view === 'all'
+    const needsAgency = isAdmin && (view === 'agency' || view === 'all')
 
     // Run all queries in parallel
     const [
@@ -191,45 +200,55 @@ export class DashboardService {
       agencyInsuranceCurrent, agencyInsurancePrior,
     ] = await Promise.all([
       // Personal KPIs (scoped to user's own trips)
-      this.getKpiMetrics(auth.agencyId, personalTripIds, startDate, endDate),
-      this.getKpiMetrics(auth.agencyId, personalTripIds, priorStartDate, priorEndDate),
+      needsPersonal ? this.getKpiMetrics(auth.agencyId, personalTripIds, startDate, endDate) : Promise.resolve(null),
+      needsPersonal ? this.getKpiMetrics(auth.agencyId, personalTripIds, priorStartDate, priorEndDate) : Promise.resolve(null),
       // Agency KPIs (admin only, all agency trips)
-      isAdmin ? this.getKpiMetrics(auth.agencyId, 'all', startDate, endDate) : Promise.resolve(null),
-      isAdmin ? this.getKpiMetrics(auth.agencyId, 'all', priorStartDate, priorEndDate) : Promise.resolve(null),
-      // Widgets
-      this.getRecentTrips(auth, tripIds),
-      this.getLeavingSoon(auth, tripIds),
+      needsAgency ? this.getKpiMetrics(auth.agencyId, 'all', startDate, endDate) : Promise.resolve(null),
+      needsAgency ? this.getKpiMetrics(auth.agencyId, 'all', priorStartDate, priorEndDate) : Promise.resolve(null),
+      // Widgets — scoped based on view
+      this.getRecentTrips(auth, widgetTripIds),
+      this.getLeavingSoon(auth, widgetTripIds),
       this.getTasksDue(auth),
-      this.getPaymentsDue(auth.agencyId, tripIds),
-      this.getMonthlySales(auth.agencyId, tripIds, query.chartYear || now.getFullYear(), query.includeYoy || false),
-      this.getMonthlyCommission(auth.agencyId, tripIds, query.chartYear || now.getFullYear(), query.includeYoy || false),
-      this.getProjection(auth.agencyId, tripIds),
-      isAdmin ? this.getAgentLeaderboard(auth.agencyId, startDate, endDate) : Promise.resolve(null),
+      this.getPaymentsDue(auth.agencyId, widgetTripIds),
+      this.getMonthlySales(auth.agencyId, widgetTripIds, query.chartYear || now.getFullYear(), query.includeYoy || false),
+      this.getMonthlyCommission(auth.agencyId, widgetTripIds, query.chartYear || now.getFullYear(), query.includeYoy || false),
+      this.getProjection(auth.agencyId, widgetTripIds),
+      needsAgency ? this.getAgentLeaderboard(auth.agencyId, startDate, endDate) : Promise.resolve(null),
       // New KPIs — Booked Sales & Departed Sales (personal)
-      this.getSalesKpi(auth.agencyId, personalTripIds, startDate, endDate),
-      this.getSalesKpi(auth.agencyId, personalTripIds, priorStartDate, priorEndDate),
+      needsPersonal ? this.getSalesKpi(auth.agencyId, personalTripIds, startDate, endDate) : Promise.resolve(null),
+      needsPersonal ? this.getSalesKpi(auth.agencyId, personalTripIds, priorStartDate, priorEndDate) : Promise.resolve(null),
       // New KPIs — Booked Sales & Departed Sales (agency, admin only)
-      isAdmin ? this.getSalesKpi(auth.agencyId, 'all', startDate, endDate) : Promise.resolve(null),
-      isAdmin ? this.getSalesKpi(auth.agencyId, 'all', priorStartDate, priorEndDate) : Promise.resolve(null),
+      needsAgency ? this.getSalesKpi(auth.agencyId, 'all', startDate, endDate) : Promise.resolve(null),
+      needsAgency ? this.getSalesKpi(auth.agencyId, 'all', priorStartDate, priorEndDate) : Promise.resolve(null),
       // New KPIs — Insurance Attach Rate (personal)
-      this.getInsuranceKpi(auth.agencyId, personalTripIds, startDate, endDate),
-      this.getInsuranceKpi(auth.agencyId, personalTripIds, priorStartDate, priorEndDate),
+      needsPersonal ? this.getInsuranceKpi(auth.agencyId, personalTripIds, startDate, endDate) : Promise.resolve(null),
+      needsPersonal ? this.getInsuranceKpi(auth.agencyId, personalTripIds, priorStartDate, priorEndDate) : Promise.resolve(null),
       // New KPIs — Insurance Attach Rate (agency, admin only)
-      isAdmin ? this.getInsuranceKpi(auth.agencyId, 'all', startDate, endDate) : Promise.resolve(null),
-      isAdmin ? this.getInsuranceKpi(auth.agencyId, 'all', priorStartDate, priorEndDate) : Promise.resolve(null),
+      needsAgency ? this.getInsuranceKpi(auth.agencyId, 'all', startDate, endDate) : Promise.resolve(null),
+      needsAgency ? this.getInsuranceKpi(auth.agencyId, 'all', priorStartDate, priorEndDate) : Promise.resolve(null),
     ])
 
+    const emptyKpi: KpiMetrics = { bookings: 0, salesVolumeCents: 0, commissionReceivedDollars: 0, bookingsTrend: null, salesTrend: null, commissionTrend: null }
+    const emptySalesKpi: SalesKpiMetrics = { bookedSalesCents: 0, departedSalesCents: 0, bookedSalesTrend: null, departedSalesTrend: null }
+    const emptyInsuranceKpi: InsuranceKpiMetrics = { totalTravelers: 0, coveredTravelers: 0, attachRate: 0, attachRateTrend: null }
+
     return {
-      personal: this.computeKpiWithTrends(personalCurrent, personalPrior),
-      agency: isAdmin && agencyCurrent && agencyPrior
+      personal: personalCurrent && personalPrior
+        ? this.computeKpiWithTrends(personalCurrent, personalPrior)
+        : emptyKpi,
+      agency: agencyCurrent && agencyPrior
         ? this.computeKpiWithTrends(agencyCurrent, agencyPrior)
         : null,
-      personalSalesKpi: this.computeSalesKpiWithTrends(personalSalesCurrent, personalSalesPrior),
-      agencySalesKpi: isAdmin && agencySalesCurrent && agencySalesPrior
+      personalSalesKpi: personalSalesCurrent && personalSalesPrior
+        ? this.computeSalesKpiWithTrends(personalSalesCurrent, personalSalesPrior)
+        : emptySalesKpi,
+      agencySalesKpi: agencySalesCurrent && agencySalesPrior
         ? this.computeSalesKpiWithTrends(agencySalesCurrent, agencySalesPrior)
         : null,
-      personalInsuranceKpi: this.computeInsuranceKpiWithTrends(personalInsuranceCurrent, personalInsurancePrior),
-      agencyInsuranceKpi: isAdmin && agencyInsuranceCurrent && agencyInsurancePrior
+      personalInsuranceKpi: personalInsuranceCurrent && personalInsurancePrior
+        ? this.computeInsuranceKpiWithTrends(personalInsuranceCurrent, personalInsurancePrior)
+        : emptyInsuranceKpi,
+      agencyInsuranceKpi: agencyInsuranceCurrent && agencyInsurancePrior
         ? this.computeInsuranceKpiWithTrends(agencyInsuranceCurrent, agencyInsurancePrior)
         : null,
       recentTrips,
