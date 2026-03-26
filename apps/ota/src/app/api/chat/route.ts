@@ -2,13 +2,14 @@ import { streamText, stepCountIs } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { cookies } from 'next/headers'
 import { createTools } from '@/lib/ai/tools'
+import { chatRateLimit } from '@/lib/rate-limit'
 
 // ---------------------------------------------------------------------------
 // Model selection — defaults to Haiku for cost efficiency, override via env
 // ---------------------------------------------------------------------------
 
 function resolveModel() {
-  const modelId = process.env.AI_MODEL_ID ?? 'claude-haiku-4-20250514'
+  const modelId = process.env.AI_MODEL_ID ?? 'claude-haiku-4.5'
   return anthropic(modelId)
 }
 
@@ -44,6 +45,31 @@ You are part of Phoenix Voyages, a Canadian travel agency based in Ontario. All 
 
 export async function POST(request: Request) {
   try {
+    // ---------------------------------------------------------------------------
+    // Rate limiting — no-op when Upstash is not configured (local dev)
+    // ---------------------------------------------------------------------------
+    if (chatRateLimit) {
+      const ip =
+        request.headers.get('x-forwarded-for') ??
+        request.headers.get('x-real-ip') ??
+        'unknown'
+      const { success, limit, remaining, reset } = await chatRateLimit.limit(ip)
+      if (!success) {
+        return Response.json(
+          { error: 'Too many messages. Please wait a moment before trying again.' },
+          {
+            status: 429,
+            headers: {
+              'X-RateLimit-Limit': String(limit),
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': String(reset),
+            },
+          },
+        )
+      }
+      console.log('[api/chat] rate-limit ok', { ip, remaining, limit })
+    }
+
     const { messages } = await request.json()
 
     // Read the referral cookie for advisor attribution

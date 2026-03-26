@@ -1,6 +1,25 @@
+"use client";
+
+import { useState } from "react";
 import { Send } from "lucide-react";
+import { openChat } from "@/components/chat/chat-widget";
 
 export function HeroSection() {
+  const [inputValue, setInputValue] = useState("");
+
+  function handleSubmit() {
+    const text = inputValue.trim();
+    if (!text) return;
+    openChat(text);
+    setInputValue("");
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      handleSubmit();
+    }
+  }
+
   return (
     <section className="px-4 py-16 text-center md:py-24">
       <div className="mx-auto max-w-2xl">
@@ -19,7 +38,7 @@ export function HeroSection() {
           AI-powered travel planning backed by expert advisors
         </p>
 
-        {/* AI chat input mock */}
+        {/* AI chat input */}
         <div className="mt-10">
           <div className="mx-auto flex max-w-xl items-center gap-3 rounded-2xl bg-[#1A1A1A] px-5 py-4">
             {/* Pulsing gold dot */}
@@ -28,15 +47,26 @@ export function HeroSection() {
               <span className="relative inline-flex size-3 rounded-full bg-[#C59746]" />
             </span>
 
-            {/* Placeholder text */}
-            <span className="flex-1 text-left text-sm text-gray-400 md:text-base">
-              Tell me about your dream trip...
-            </span>
+            {/* Input */}
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Tell me about your dream trip..."
+              className="flex-1 bg-transparent text-left text-sm text-white placeholder:text-gray-400 focus:outline-none md:text-base"
+              aria-label="Describe your dream trip"
+            />
 
             {/* Send button */}
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#C59746] text-white">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              aria-label="Start planning"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#C59746] text-white transition-colors hover:bg-[#B08638] active:scale-95"
+            >
               <Send className="size-4" />
-            </span>
+            </button>
           </div>
         </div>
       </div>
