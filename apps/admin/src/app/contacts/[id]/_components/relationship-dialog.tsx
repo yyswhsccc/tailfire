@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
-import { Loader2, Search, ExternalLink, Plus, UserPlus } from 'lucide-react'
+import { Loader2, Search, ExternalLink, Plus, UserPlus, Copy } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -24,9 +24,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useContacts, useCreateContact } from '@/hooks/use-contacts'
+import { useContacts, useContact, useCreateContact } from '@/hooks/use-contacts'
 import { useCreateRelationship, useUpdateRelationship } from '@/hooks/use-relationships'
 import { useToast } from '@/hooks/use-toast'
 import { RELATIONSHIP_CATEGORIES } from '@/lib/relationship-constants'
@@ -69,22 +70,39 @@ export function RelationshipDialog({
   const [newFirstName, setNewFirstName] = useState('')
   const [newLastName, setNewLastName] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+  const [newDob, setNewDob] = useState('')
+  const [sameAddress, setSameAddress] = useState(false)
 
   const { data: contactsData } = useContacts({
     search: searchQuery,
     limit: 50,
     isActive: true,
   })
+  const { data: parentContact } = useContact(contactId)
   const createContact = useCreateContact()
+
+  const parentHasAddress = !!(parentContact?.addressLine1 || parentContact?.city || parentContact?.postalCode)
 
   const handleCreateAndSelect = useCallback(async () => {
     if (!newFirstName.trim()) return
     try {
-      const newContact = await createContact.mutateAsync({
+      const contactData: Parameters<typeof createContact.mutateAsync>[0] = {
         firstName: newFirstName.trim(),
         lastName: newLastName.trim() || undefined,
         email: newEmail.trim() || undefined,
-      } as Parameters<typeof createContact.mutateAsync>[0])
+        phone: newPhone.trim() || undefined,
+        dateOfBirth: newDob || undefined,
+        ...(sameAddress && parentContact ? {
+          addressLine1: parentContact.addressLine1 || undefined,
+          addressLine2: parentContact.addressLine2 || undefined,
+          city: parentContact.city || undefined,
+          province: parentContact.province || undefined,
+          postalCode: parentContact.postalCode || undefined,
+          country: parentContact.country || undefined,
+        } : {}),
+      }
+      const newContact = await createContact.mutateAsync(contactData)
       const displayName = newContact.displayName || `${newFirstName.trim()} ${newLastName.trim()}`.trim()
       setSelectedContactId(newContact.id)
       setSelectedContactDisplay({
@@ -95,6 +113,9 @@ export function RelationshipDialog({
       setNewFirstName('')
       setNewLastName('')
       setNewEmail('')
+      setNewPhone('')
+      setNewDob('')
+      setSameAddress(false)
       toast({
         title: 'Contact created',
         description: `${newContact.displayName || newFirstName} has been created and selected.`,
@@ -106,7 +127,7 @@ export function RelationshipDialog({
         variant: 'destructive',
       })
     }
-  }, [newFirstName, newLastName, newEmail, createContact, toast])
+  }, [newFirstName, newLastName, newEmail, newPhone, newDob, sameAddress, parentContact, createContact, toast])
 
   const {
     register,
@@ -151,6 +172,9 @@ export function RelationshipDialog({
       setNewFirstName('')
       setNewLastName('')
       setNewEmail('')
+      setNewPhone('')
+      setNewDob('')
+      setSameAddress(false)
     }
   }, [open, relationship, reset])
 
@@ -323,12 +347,42 @@ export function RelationshipDialog({
                       onChange={(e) => setNewLastName(e.target.value)}
                     />
                   </div>
-                  <Input
-                    placeholder="Email (optional)"
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Email (optional)"
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                    />
+                    <Input
+                      placeholder="Phone (optional)"
+                      type="tel"
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-ash-500 mb-1 block">Date of birth (optional)</label>
+                    <Input
+                      type="date"
+                      value={newDob}
+                      onChange={(e) => setNewDob(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+                  {parentHasAddress && (
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="sameAddress"
+                        checked={sameAddress}
+                        onCheckedChange={(checked) => setSameAddress(checked === true)}
+                      />
+                      <label htmlFor="sameAddress" className="text-xs text-ash-700 cursor-pointer flex items-center gap-1">
+                        <Copy className="h-3 w-3" />
+                        Same address as {parentContact?.displayName || 'this contact'}
+                      </label>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button
                       type="button"
