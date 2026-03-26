@@ -64,6 +64,12 @@ app/
 │
 ├── advisors/page.tsx                   # Advisor directory (search/filter)
 │
+├── join/                               # Agent recruitment (replaces join.phoenixvoyages.ca + WP pages)
+│   ├── page.tsx                        # Landing page (benefits, testimonials, CTA)
+│   ├── register/page.tsx               # Registration form (Stripe integration)
+│   ├── learn-more/page.tsx             # Detailed benefits page
+│   └── [slug]/page.tsx                 # SEO content pages (become-a-travel-agent, tico-certification, etc.)
+│
 ├── api/                                # OTA-side API routes
 │   ├── chat/route.ts                   # AI Concierge endpoint
 │   └── lead/route.ts                   # Lead capture endpoint

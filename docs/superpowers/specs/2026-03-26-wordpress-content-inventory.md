@@ -58,34 +58,42 @@ These are **high-value SEO pages** with long-form optimized content. Must preser
 | `/cruise-planning-guide` | Cruise Planning Guide | Educational content page |
 | `/cruise-ports-canada` | Cruise Ports Canada | Info page |
 
-### 4. Agent Recruitment Pages (keep on WordPress OR migrate)
+### 4. Agent Recruitment Pages (migrate to OTA under /join)
 
-These target "become a travel agent" keywords — a separate business function from the OTA.
+These target "become a travel agent" keywords. Moving to OTA under `/join/*` route group. Replaces both WordPress pages AND the separate `join.phoenixvoyages.ca` Next.js app.
 
-| WordPress URL | SEO Title | Decision |
-|--------------|-----------|----------|
-| `/become-a-travel-agent` | Become a Travel Agent in Canada | Keep on WP or separate subdomain |
-| `/host-travel-agency-canada` | Host Travel Agency Canada | Keep on WP or separate subdomain |
-| `/host-agency-comparison-canada` | Host Agency Comparison Canada | Keep on WP (SEO content) |
-| `/home-based-travel-agent-canada` | Home-Based Travel Agent Canada | Keep on WP (SEO content) |
-| `/tico-certification` | TICO Certification | Keep on WP (SEO content) |
-| `/travel-agents-ottawa` | Travel Agents Ottawa | Geo-targeted, keep or redirect |
-| `/travel-agency-ontario` | Travel Agency Ontario | Geo-targeted, keep or redirect |
-| `/how-much-do-travel-agents-make` | How Much Do Travel Agents Make | Keep on WP (SEO content) |
-| `/travel-agent-training-canada` | Travel Agent Training Canada | Keep on WP (SEO content) |
-| `/travel-agency-franchise-canada` | Travel Agency Franchise Canada | Keep on WP (SEO content) |
-| `/canada-travel-statistics` | Canada Travel Statistics | Keep on WP (SEO content) |
-| `/tico-travel-protection` | TICO Travel Protection | Keep on WP (SEO content) |
-| `/join-us` | Join Us | Keep on WP |
+| WordPress URL | SEO Title | OTA Destination |
+|--------------|-----------|-----------------|
+| `/become-a-travel-agent` | Become a Travel Agent in Canada | `/join/become-a-travel-agent` |
+| `/host-travel-agency-canada` | Host Travel Agency Canada | `/join/host-travel-agency` |
+| `/host-agency-comparison-canada` | Host Agency Comparison Canada | `/join/host-agency-comparison` |
+| `/home-based-travel-agent-canada` | Home-Based Travel Agent Canada | `/join/home-based-travel-agent` |
+| `/tico-certification` | TICO Certification | `/join/tico-certification` |
+| `/travel-agents-ottawa` | Travel Agents Ottawa | `/join/travel-agents-ottawa` |
+| `/travel-agency-ontario` | Travel Agency Ontario | `/join/travel-agency-ontario` |
+| `/how-much-do-travel-agents-make` | How Much Do Travel Agents Make | `/join/travel-agent-salary` |
+| `/travel-agent-training-canada` | Travel Agent Training Canada | `/join/training` |
+| `/travel-agency-franchise-canada` | Travel Agency Franchise Canada | `/join/franchise` |
+| `/canada-travel-statistics` | Canada Travel Statistics | `/join/canada-travel-statistics` |
+| `/tico-travel-protection` | TICO Travel Protection | `/join/tico-protection` |
+| `/join-us` | Join Us | `/join` |
 
-### 5. Competitor Comparison Pages (keep on WordPress)
+**From `join.phoenixvoyages.ca` (existing Next.js app, will be retired):**
 
-| WordPress URL | SEO Title |
-|--------------|-----------|
-| `/phoenix-voyages-vs-travelonly` | Phoenix Voyages vs TravelOnly |
-| `/phoenix-voyages-vs-ttand` | Phoenix Voyages vs TTAND |
-| `/phoenix-voyages-vs-trevello` | Phoenix Voyages vs Trevello |
-| `/phoenix-voyages-vs-nexion` | Phoenix Voyages vs Nexion |
+| join.phoenixvoyages.ca URL | OTA Destination |
+|---------------------------|-----------------|
+| `/` | `/join` (landing page) |
+| `/register` | `/join/register` (registration form) |
+| `/learn-more` | `/join/learn-more` |
+
+### 5. Competitor Comparison Pages (migrate to OTA under /join)
+
+| WordPress URL | SEO Title | OTA Destination |
+|--------------|-----------|-----------------|
+| `/phoenix-voyages-vs-travelonly` | Phoenix Voyages vs TravelOnly | `/join/vs-travelonly` |
+| `/phoenix-voyages-vs-ttand` | Phoenix Voyages vs TTAND | `/join/vs-ttand` |
+| `/phoenix-voyages-vs-trevello` | Phoenix Voyages vs Trevello | `/join/vs-trevello` |
+| `/phoenix-voyages-vs-nexion` | Phoenix Voyages vs Nexion | `/join/vs-nexion` |
 
 ### 6. Promotional Deal Pages (migrate to OTA deals system)
 
@@ -200,7 +208,7 @@ The OTA must include a redirect configuration (in `next.config.ts` or `middlewar
 /promo/* → /deals
 ```
 
-**Decision needed:** Will the OTA run on the same domain (`phoenixvoyages.ca`) or a subdomain (`ota.phoenixvoyages.ca`)? If same domain, WordPress pages that aren't migrated need to be handled (reverse proxy, or migrate all content). If subdomain, redirects go cross-domain.
+**Decision: OTA runs on `phoenixvoyages.ca` (primary domain).** WordPress is fully retired. All content migrates to the OTA. The `join.phoenixvoyages.ca` Next.js app is also retired — its registration flow moves to `/join/register` in the OTA. `join.phoenixvoyages.ca/*` gets 301 redirected to `phoenixvoyages.ca/join/*`.
 
 ---
 
@@ -219,10 +227,18 @@ The OTA must include a redirect configuration (in `next.config.ts` or `middlewar
 | Transactional pages | 2 | Recreate | Low |
 | **Total** | **~160** | | |
 
-### What stays on WordPress
+### Nothing stays on WordPress
 
-Agent recruitment content, competitor comparisons, and the blog (`/travel-reads`) should stay on WordPress for now. These serve a different audience (prospective agents vs. travelers) and have their own SEO ranking. They can be migrated in a future phase or kept on a subdomain.
+WordPress is fully retired. ALL content moves to the OTA on `phoenixvoyages.ca`:
+- Consumer travel pages → OTA core routes
+- Agent recruitment pages → `/join/*` route group
+- Competitor comparisons → `/join/vs-*`
+- Blog/travel reads → Phase 2 (`/blog`)
 
-### What must be migrated
+### `join.phoenixvoyages.ca` retirement
 
-The ~50 consumer-facing travel content pages (core, SEO, cruise lines, supplier deals) should move to the OTA to provide a unified experience. The deals system handles the supplier pages automatically.
+The existing Next.js app at `join.phoenixvoyages.ca` is retired. Its functionality (landing page, registration form, learn-more page) moves to `/join/*` routes in the OTA. The Stripe integration for agent registration fees carries over. Domain gets 301 redirected: `join.phoenixvoyages.ca/* → phoenixvoyages.ca/join/*`.
+
+### Total migration scope
+
+All ~160 WordPress pages + 3 join app pages migrate to the OTA. The deals system auto-generates supplier pages. The recruitment content is mostly static markdown — low effort to migrate as ISR pages.
