@@ -6,9 +6,11 @@ import { formatPrice } from "@/lib/format";
 
 interface DealCardProps {
   deal: Deal;
+  /** If set, shows "[Name]'s Pick" badge and personalises the AI CTA label */
+  advisorName?: string;
 }
 
-export function DealCard({ deal }: DealCardProps) {
+export function DealCard({ deal, advisorName }: DealCardProps) {
   const hasPrice = deal.pricing.fromPriceCents != null;
   const validUntil = deal.validUntil
     ? new Date(deal.validUntil).toLocaleDateString("en-CA", {
@@ -37,6 +39,25 @@ export function DealCard({ deal }: DealCardProps) {
           <div className="flex h-full items-center justify-center">
             <span className="text-3xl text-gray-600">
               {deal.productType === "cruise" ? "\u26F5" : deal.productType === "flight" ? "\u2708\uFE0F" : deal.productType === "tour" ? "\uD83C\uDF0D" : deal.productType === "hotel" ? "\uD83C\uDFE8" : "\u2728"}
+            </span>
+          </div>
+        )}
+
+        {/* Advisor pick badge */}
+        {advisorName && (
+          <div className="absolute left-3 top-3 z-10">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#C59746] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white shadow-sm">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+              {advisorName}&apos;s Pick
             </span>
           </div>
         )}
@@ -89,6 +110,16 @@ export function DealCard({ deal }: DealCardProps) {
             View &rarr;
           </span>
         </div>
+
+        {advisorName && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Ask{" "}
+            <span className="font-medium text-[#C59746]">
+              {advisorName}&apos;s AI
+            </span>{" "}
+            about this deal
+          </p>
+        )}
       </div>
     </Link>
   );
