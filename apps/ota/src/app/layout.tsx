@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { cinzel, lato } from "@/lib/fonts";
+import { Nav } from "@/components/layout/nav";
+import { Footer } from "@/components/layout/footer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +15,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${cinzel.variable} ${lato.variable}`}>
       <body className="font-sans antialiased bg-background text-foreground">
-        {children}
+        <Nav />
+        <main>{children}</main>
+        <Footer />
       </body>
     </html>
   );
