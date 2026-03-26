@@ -447,55 +447,59 @@ export class ImportBookingService {
       const dob = rawDob && /^\d{4}-\d{2}-\d{2}$/.test(rawDob) && !isNaN(Date.parse(rawDob))
         ? rawDob
         : null
-      // Case-insensitive match: existing contacts may have different casing than
-      // the title-cased import data (e.g. "gaetan" vs "Gaetan")
-      const existing = await this.db.client
-        .select({ id: this.db.schema.contacts.id })
+      // Match by name first (case-insensitive), then disambiguate with DOB if needed.
+      // We do NOT require DOB in the WHERE clause because existing contacts may not
+      // have a DOB yet — requiring it would cause duplicates.
+      const nameMatches = await this.db.client
+        .select({
+          id: this.db.schema.contacts.id,
+          dateOfBirth: this.db.schema.contacts.dateOfBirth,
+        })
         .from(this.db.schema.contacts)
         .where(
           and(
             eq(this.db.schema.contacts.agencyId, auth.agencyId),
             sql`LOWER(${this.db.schema.contacts.firstName}) = LOWER(${firstName})`,
             sql`LOWER(${this.db.schema.contacts.lastName}) = LOWER(${lastName})`,
-            ...(dob ? [eq(this.db.schema.contacts.dateOfBirth, dob)] : []),
           ),
         )
-        .limit(1)
+        .limit(10)
 
-      if (existing[0]) {
-        const isHighConfidence = !!dob // DOB was part of the match query
+      // Disambiguate: prefer DOB match, then any name match
+      let matched = nameMatches[0] || null
+      if (dob && nameMatches.length > 1) {
+        const dobMatch = nameMatches.find((c) => c.dateOfBirth === dob)
+        if (dobMatch) matched = dobMatch
+      }
 
-        if (isHighConfidence) {
-          // Additively update empty fields on the matched contact
-          const fullContact = await this.db.client
-            .select()
-            .from(this.db.schema.contacts)
-            .where(eq(this.db.schema.contacts.id, existing[0].id))
-            .limit(1)
+      if (matched) {
+        // Additively update empty fields on the matched contact
+        const fullContact = await this.db.client
+          .select()
+          .from(this.db.schema.contacts)
+          .where(eq(this.db.schema.contacts.id, matched.id))
+          .limit(1)
 
-          const contact = fullContact[0]
-          if (contact) {
-            const updates: Record<string, any> = {}
-            if (!contact.gender && pax.gender) updates.gender = this.normalizeGender(pax.gender)
-            if (!contact.nationality && pax.nationality) updates.nationality = this.sanitizeNationality(pax.nationality)
-            if (!contact.dateOfBirth && dob) updates.dateOfBirth = dob
-            if (!contact.middleName && pax.middlename) updates.middleName = this.titleCase(pax.middlename)
-            if (!contact.prefix && pax.title) updates.prefix = this.normalizePrefix(pax.title)
+        const contact = fullContact[0]
+        if (contact) {
+          const updates: Record<string, any> = {}
+          if (!contact.gender && pax.gender) updates.gender = this.normalizeGender(pax.gender)
+          if (!contact.nationality && pax.nationality) updates.nationality = this.sanitizeNationality(pax.nationality)
+          if (!contact.dateOfBirth && dob) updates.dateOfBirth = dob
+          if (!contact.middleName && pax.middlename) updates.middleName = this.titleCase(pax.middlename)
+          if (!contact.prefix && pax.title) updates.prefix = this.normalizePrefix(pax.title)
 
-            if (Object.keys(updates).length > 0) {
-              try {
-                await this.contactsService.update(existing[0].id, updates, auth.agencyId, auth.userId)
-                this.logger.log(`Updated contact ${existing[0].id} with ${Object.keys(updates).join(', ')}`)
-              } catch (e) {
-                this.logger.warn(`Failed to update contact ${existing[0].id}: ${(e as Error).message}`)
-              }
+          if (Object.keys(updates).length > 0) {
+            try {
+              await this.contactsService.update(matched.id, updates, auth.agencyId, auth.userId)
+              this.logger.log(`Updated contact ${matched.id} with ${Object.keys(updates).join(', ')}`)
+            } catch (e) {
+              this.logger.warn(`Failed to update contact ${matched.id}: ${(e as Error).message}`)
             }
           }
-        } else {
-          this.logger.debug(`Skipping additive update for ${firstName} ${lastName} — low confidence match (no DOB)`)
         }
 
-        map.set(pax.paxno, existing[0].id)
+        map.set(pax.paxno, matched.id)
       } else {
         // Create new contact
         const contact = await this.contactsService.create(

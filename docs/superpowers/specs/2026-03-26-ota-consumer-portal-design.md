@@ -64,6 +64,12 @@ app/
 │
 ├── advisors/page.tsx                   # Advisor directory (search/filter)
 │
+├── join/                               # Agent recruitment (replaces join.phoenixvoyages.ca + WP pages)
+│   ├── page.tsx                        # Landing page (benefits, testimonials, CTA)
+│   ├── register/page.tsx               # Registration form (Stripe integration)
+│   ├── learn-more/page.tsx             # Detailed benefits page
+│   └── [slug]/page.tsx                 # SEO content pages (become-a-travel-agent, tico-certification, etc.)
+│
 ├── api/                                # OTA-side API routes
 │   ├── chat/route.ts                   # AI Concierge endpoint
 │   └── lead/route.ts                   # Lead capture endpoint
@@ -504,8 +510,67 @@ The `app/api/chat/route.ts` endpoint streams AI responses to unauthenticated use
 
 ---
 
-## 10. Technology Decisions
+## 10. UI Design Decisions
 
+**Design approach:** Mobile-first, light background, Phoenix Voyages brand system.
+
+### Brand Palette (from Brand Guidelines PDF)
+
+| Token | Hex | Usage |
+|-------|-----|-------|
+| Phoenix Gold | `#C59746` | Primary accent, CTAs, supplier labels, links |
+| Deep Charcoal | `#1A1A1A` | Text, headers, dark card headers, nav elements |
+| Ember Red | `#B33939` | Urgency badges (HOT DEAL), savings callouts |
+| Ash Gray | `#E0E0E0` | Borders, dividers |
+| Pure White | `#FFFFFF` | Page backgrounds |
+| Warm Ivory | `#faf6f0` | Callout cards, bio sections, warm emphasis |
+| Golden Hour Orange | `#E89E4A` | Warm overlays, gradient accents |
+
+### Typography
+
+| Style | Font | Usage |
+|-------|------|-------|
+| Titles | Cinzel Bold (ALL CAPS) | Page titles, section headers, hero text |
+| Subtitles | Cinzel Decorative | Taglines, sub-headings |
+| Body | Lato | All body text, descriptions, UI labels |
+
+### Screen-by-Screen Decisions
+
+**Homepage (Mobile):** Hybrid AI-first layout. Light background. AI chat input ("Tell me about your dream trip...") as primary CTA. Below: "or search directly" divider with 2x2 product category grid (Flights, Cruises, Hotels, Tours). Featured deal teaser card at bottom. Tagline: "Discover, Soar, Repeat". Trust bar: "AI-Powered / Advisor-Backed / TICO Licensed".
+
+**AI Concierge Chat:** Clean minimal, light background (consistent with homepage). Full-screen mobile overlay. Dark header bar with Phoenix AI branding. White chat bubbles on light gray (`#fafafa`). Product results as inline cards within conversation flow. Suggestion chips for quick starts. Input bar anchored at bottom.
+
+**Search Results (Cruises/Flights/Hotels):** Two-tone cruise cards — branded dark gradient header (cruise line, ship name, price) + white detail section (dates, ports as pills). Compact, info-dense — maximizes results per scroll. Sort chips (horizontal scroll). Floating AI button bottom-right. No hero images on result cards.
+
+**Advisor Micro-Site Profile:** Full light, scrolling sections. Profile card (avatar, name, title, stars, specialties). Warm bio card (`#faf6f0` background). Horizontal scrolling destination expertise cards. Sections for deals, trips, reviews. Dual CTAs: "Contact [Name]" + "Ask AI". Consistent with homepage — feels like a natural extension.
+
+**Deals Listing (`/deals`):** Magazine-style grid. Featured deal large at top (hero image area, HOT DEAL badge in Ember Red, strikethrough price, save percentage). Below: 2-column compact tile grid. Filter chips (All, Cruises, Flights, Tours, Hotels). Deep Charcoal placeholders where real destination photos will go.
+
+**Deal Landing Page (`/deals/[slug]`):** Marketing-optimized. Golden hour hero gradient with title overlay. Floating price card overlapping hero (price + savings + Inquire CTA). Quick fact pills (duration, dates, departure port). Description, port pills, dual CTAs ("Ask AI About This" + "Talk to Advisor"). Validity notice at bottom. Optimized for social sharing (OG image generation).
+
+**Advisor Deals (`/advisor/[slug]/deals`):** Same `DealCard` component as main `/deals`, but with advisor personalization wrapper: context bar (avatar + "[Name]'s Picks"), "Jane's Pick" badge on cards, "Ask Jane's AI" instead of generic AI CTA, advisor contact CTA at bottom.
+
+### Reusable Components
+
+| Component | Used On |
+|-----------|---------|
+| `DealCard` | `/deals`, `/advisor/[slug]/deals`, homepage featured deal |
+| `CruiseResultCard` | `/search/cruises`, AI chat inline results |
+| `FlightResultCard` | `/search/flights`, AI chat inline results |
+| `HotelResultCard` | `/search/hotels`, AI chat inline results |
+| `AdvisorCard` | `/advisors` directory, advisor context bars |
+| `ChatWidget` | All pages (floating button), full-screen on tap |
+| `ProductGrid` | Homepage (2x2 category grid) |
+| `FilterChips` | Search results, deals listing |
+| `PortPills` | Cruise results, deal pages |
+
+### Mockups Reference
+
+HTML mockups saved in `.superpowers/brainstorm/` directories for implementation reference.
+
+---
+
+## 11. Technology Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
@@ -513,7 +578,7 @@ The `app/api/chat/route.ts` endpoint streams AI responses to unauthenticated use
 | Deployment | Vercel | CDN-optimized for public traffic, ISR support |
 | AI | AI SDK v6 + AI Gateway (OIDC) | Unified provider routing, cost tracking, no API keys |
 | AI Model | `anthropic/claude-sonnet-4.6` | Strong reasoning for travel recommendations |
-| UI | shadcn/ui + Tailwind + Geist | Consistent with existing apps, dark mode for AI surfaces |
+| UI | shadcn/ui + Tailwind CSS | Component primitives, theming via CSS variables |
 | Chat UI | AI Elements | Production-ready message rendering, handles streaming |
 | State | TanStack React Query | Consistent with admin/client apps |
 | Auth (Phase 2) | Supabase (portal-style) | Consistent with existing client portal auth |
@@ -522,7 +587,7 @@ The `app/api/chat/route.ts` endpoint streams AI responses to unauthenticated use
 
 ---
 
-## 11. Phase 2 Roadmap (Deferred)
+## 12. Phase 2 Roadmap (Deferred)
 
 - **Self-serve booking:** Consumer completes purchase through supplier payment flows (Traveltek for cruises, Amadeus for flights/hotels)
 - **Car rental search:** Build Amadeus car rental provider and `/search/cars` page
@@ -535,7 +600,7 @@ The `app/api/chat/route.ts` endpoint streams AI responses to unauthenticated use
 
 ---
 
-## 12. Cross-Cutting Concerns
+## 13. Cross-Cutting Concerns
 
 ### SEO
 - All deal and advisor pages generate `metadata` via `generateMetadata()` with dynamic title, description, and canonical URL

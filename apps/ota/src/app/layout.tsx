@@ -1,23 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Cinzel, Lato } from "next/font/google";
 
+import { cinzel, lato } from "@/lib/fonts";
+import { Nav } from "@/components/layout/nav";
+import { Footer } from "@/components/layout/footer";
 import "./globals.css";
-import { Providers } from "./providers";
-import { LayoutWrapper } from "@/components/LayoutWrapper";
-
-const cinzel = Cinzel({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-const lato = Lato({
-  subsets: ["latin"],
-  weight: ["300", "400", "700"],
-  variable: "--font-sans",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Phoenix Voyages",
@@ -27,10 +14,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${cinzel.variable} ${lato.variable}`}>
-      <body className="bg-background text-foreground antialiased font-sans" suppressHydrationWarning>
-        <Providers>
-          <LayoutWrapper>{children}</LayoutWrapper>
-        </Providers>
+      <body className="font-sans antialiased bg-background text-foreground">
+        <Nav />
+        <main>{children}</main>
+        <Footer />
       </body>
     </html>
   );
