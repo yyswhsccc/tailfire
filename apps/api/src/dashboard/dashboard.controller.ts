@@ -34,6 +34,7 @@ export class DashboardController {
   @ApiQuery({ name: 'period', enum: ['mtd', 'ytd', 'lifetime'], required: false })
   @ApiQuery({ name: 'chartYear', type: Number, required: false })
   @ApiQuery({ name: 'includeYoy', type: Boolean, required: false })
+  @ApiQuery({ name: 'view', enum: ['personal', 'agency', 'all'], required: false })
   async getOverview(
     @GetAuthContext() auth: AuthContext,
     @Query() query: DashboardOverviewQueryDto,
