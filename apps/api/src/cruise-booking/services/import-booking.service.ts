@@ -15,7 +15,7 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, sql } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
 import { schema } from '@tailfire/database'
 import { FusionApiService } from './fusion-api.service'
@@ -447,14 +447,16 @@ export class ImportBookingService {
       const dob = rawDob && /^\d{4}-\d{2}-\d{2}$/.test(rawDob) && !isNaN(Date.parse(rawDob))
         ? rawDob
         : null
+      // Case-insensitive match: existing contacts may have different casing than
+      // the title-cased import data (e.g. "gaetan" vs "Gaetan")
       const existing = await this.db.client
         .select({ id: this.db.schema.contacts.id })
         .from(this.db.schema.contacts)
         .where(
           and(
             eq(this.db.schema.contacts.agencyId, auth.agencyId),
-            eq(this.db.schema.contacts.firstName, firstName),
-            eq(this.db.schema.contacts.lastName, lastName),
+            sql`LOWER(${this.db.schema.contacts.firstName}) = LOWER(${firstName})`,
+            sql`LOWER(${this.db.schema.contacts.lastName}) = LOWER(${lastName})`,
             ...(dob ? [eq(this.db.schema.contacts.dateOfBirth, dob)] : []),
           ),
         )
