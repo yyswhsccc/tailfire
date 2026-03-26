@@ -1451,6 +1451,134 @@ export class ActivitiesService {
    * - Activity must belong to the specified dayId
    * - Throws BadRequestException if validation fails
    */
+
+  /**
+   * Transfer (move or copy) an activity to a different itinerary day.
+   *
+   * - mode='move': updates itineraryDayId, adjusts datetimes to target day, clears splits if cross-trip
+   * - mode='copy': deep-copies the activity (with detail table + pricing) to target day
+   *
+   * Both modes verify target day exists and verify both source/target belong to the same trip.
+   */
+  async transferActivity(
+    activityId: string,
+    targetDayId: string,
+    mode: 'move' | 'copy',
+    actorId?: string | null,
+  ): Promise<ActivityResponseDto> {
+    // 1. Fetch the source activity (validates existence)
+    const sourceActivity = await this.findOne(activityId)
+
+    // 2. Verify target day exists
+    await this.verifyDayExists(targetDayId)
+
+    // 3. Verify both source and target belong to the same trip
+    const sourceTripId = sourceActivity.itineraryDayId
+      ? await this.getTripIdFromDayId(sourceActivity.itineraryDayId)
+      : null
+    const targetTripId = await this.getTripIdFromDayId(targetDayId)
+
+    if (!targetTripId) {
+      throw new BadRequestException('Target day is not associated with a trip')
+    }
+    if (sourceTripId && sourceTripId !== targetTripId) {
+      throw new BadRequestException('Cannot transfer activities between different trips')
+    }
+
+    if (mode === 'move') {
+      // Delegate to existing move logic which handles datetime adjustment,
+      // split cleanup, day location recalculation, and itinerary change marking
+      return this.move(activityId, { targetDayId })
+    }
+
+    // mode === 'copy': deep-copy the activity to the target day
+    const newActivityId = await this.db.client.transaction(async (tx) => {
+      // Lock the target day row to serialize concurrent operations
+      await tx.execute(
+        sql`SELECT id FROM itinerary_days WHERE id = ${targetDayId} FOR UPDATE`
+      )
+
+      // Get max sequence order for the target day
+      const [maxSeqResult] = await tx.execute(
+        sql`SELECT COALESCE(MAX(sequence_order), -1) as max_seq
+            FROM itinerary_activities
+            WHERE itinerary_day_id = ${targetDayId}`
+      ) as unknown as [{ max_seq: number }]
+      const newSequenceOrder = (maxSeqResult?.max_seq ?? -1) + 1
+
+      // Create the copied activity row
+      const [newActivity] = await tx
+        .insert(this.db.schema.itineraryActivities)
+        .values({
+          agencyId: (sourceActivity as any).agencyId,
+          tripId: (sourceActivity as any).tripId || null,
+          itineraryDayId: targetDayId,
+          activityType: sourceActivity.activityType,
+          componentType: sourceActivity.componentType,
+          name: `${sourceActivity.name} (Copy)`,
+          description: sourceActivity.description || null,
+          sequenceOrder: newSequenceOrder,
+          startDatetime: sourceActivity.startDatetime ? new Date(sourceActivity.startDatetime) : null,
+          endDatetime: sourceActivity.endDatetime ? new Date(sourceActivity.endDatetime) : null,
+          timezone: sourceActivity.timezone || null,
+          location: sourceActivity.location || null,
+          address: sourceActivity.address || null,
+          coordinates: sourceActivity.coordinates || null,
+          notes: sourceActivity.notes || null,
+          confirmationNumber: sourceActivity.confirmationNumber || null,
+          proposalStatus: sourceActivity.proposalStatus,
+          bookingStatus: sourceActivity.bookingStatus,
+          pricingType: sourceActivity.pricingType || null,
+          currency: sourceActivity.currency || 'USD',
+          photos: sourceActivity.photos || null,
+        })
+        .returning({ id: this.db.schema.itineraryActivities.id })
+
+      if (!newActivity) {
+        throw new Error('Failed to create transferred activity copy')
+      }
+
+      const newId = newActivity.id
+
+      // Copy type-specific detail table
+      await this.copyDetailTable(tx, activityId, newId, sourceActivity.activityType)
+
+      // Copy activity pricing
+      await this.copyActivityPricing(tx, activityId, newId)
+
+      return newId
+    })
+
+    this.logger.log(`Transferred (copy) activity ${activityId} -> ${newActivityId}`)
+
+    // Mark target itinerary as having unpublished changes
+    await this.markItineraryChanged(targetDayId)
+
+    // Emit audit event
+    if (targetTripId) {
+      const newActivity = await this.findOne(newActivityId)
+      this.eventEmitter.emit(
+        'audit.created',
+        new AuditEvent(
+          'activity',
+          newActivityId,
+          'created',
+          targetTripId,
+          actorId ?? null,
+          `${newActivity.activityType} - ${newActivity.name} (transferred copy)`,
+          {
+            after: sanitizeForAudit('activity', newActivity),
+            subType: newActivity.activityType,
+            sourceId: activityId,
+          }
+        )
+      )
+      return newActivity
+    }
+
+    return this.findOne(newActivityId)
+  }
+
   async duplicate(
     dayId: string,
     activityId: string,
