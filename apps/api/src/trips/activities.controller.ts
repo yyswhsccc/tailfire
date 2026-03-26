@@ -368,6 +368,29 @@ export class ActivitiesGlobalController {
     return this.activitiesService.remove(id, getActorId(req))
   }
 
+  /**
+   * Transfer (move or copy) an activity to a different itinerary day
+   * POST /activities/:id/transfer
+   *
+   * Move: relocates the activity to the target day (removes from source)
+   * Copy: creates a deep copy of the activity on the target day
+   *
+   * Both source and target must belong to the same trip.
+   */
+  @Post(':id/transfer')
+  @HttpCode(HttpStatus.OK)
+  async transferActivity(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: { targetDayId: string; mode: 'move' | 'copy' },
+    @Req() req: Request,
+  ): Promise<ActivityResponseDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(id, auth, true)
+    // Also verify write access to the target day
+    await this.activitiesService.verifyTripAccessFromDayId(dto.targetDayId, auth, true)
+    return this.activitiesService.transferActivity(id, dto.targetDayId, dto.mode, getActorId(req))
+  }
+
   // ============================================================================
   // Package Children Endpoints
   // ============================================================================

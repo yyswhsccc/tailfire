@@ -493,3 +493,35 @@ export function useDuplicateActivity(itineraryId: string) {
     },
   })
 }
+
+/**
+ * Transfer (move or copy) an activity to a different itinerary day.
+ * Uses the global /activities/:id/transfer endpoint.
+ *
+ * - mode='move': relocates the activity (removes from source day)
+ * - mode='copy': deep-copies the activity with details + pricing
+ */
+export function useTransferActivity() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      activityId,
+      targetDayId,
+      mode,
+    }: {
+      activityId: string
+      targetDayId: string
+      mode: 'move' | 'copy'
+    }) =>
+      api.post<ActivityResponseDto>(`/activities/${activityId}/transfer`, {
+        targetDayId,
+        mode,
+      }),
+    onSuccess: () => {
+      // Broadly invalidate since we may not know source/target itinerary IDs here
+      queryClient.invalidateQueries({ queryKey: activityKeys.all })
+      queryClient.invalidateQueries({ queryKey: itineraryDayKeys.all })
+    },
+  })
+}

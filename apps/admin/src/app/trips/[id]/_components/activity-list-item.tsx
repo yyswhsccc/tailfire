@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { GripVertical, Pencil, Trash2, MoreHorizontal, Package, Check, X, MessageSquare, CalendarDays } from 'lucide-react'
+import { GripVertical, Pencil, Trash2, MoreHorizontal, Package, Check, X, MessageSquare, CalendarDays, ArrowRightLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
@@ -19,6 +19,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -40,6 +41,7 @@ import { ActivityIconBadge } from '@/components/ui/activity-icon-badge'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import type { CruiseColorSet } from '@/lib/cruise-color-utils'
 import type { ClientActivityResponseType } from '@tailfire/shared-types/api'
+import { TransferActivityDialog } from '@/components/activities/transfer-activity-dialog'
 
 interface ActivityListItemProps {
   itineraryId: string
@@ -57,6 +59,7 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
   const params = useParams<{ id: string }>()
   const { toast } = useToast()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showTransferDialog, setShowTransferDialog] = useState(false)
   const { storeReturnContext } = useActivityNavigation()
 
   const deleteActivity = useDeleteActivity(itineraryId)
@@ -276,11 +279,16 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
                   <MoreHorizontal className="h-3.5 w-3.5 text-ash-500" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-32">
+              <DropdownMenuContent align="end" className="w-36">
                 <DropdownMenuItem onClick={handleEdit}>
                   <Pencil className="h-3.5 w-3.5 mr-2" />
                   Edit
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowTransferDialog(true)}>
+                  <ArrowRightLeft className="h-3.5 w-3.5 mr-2" />
+                  Transfer
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => setShowDeleteDialog(true)}
                   className="text-destructive focus:text-destructive"
@@ -314,6 +322,17 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Transfer Activity Dialog */}
+      <TransferActivityDialog
+        open={showTransferDialog}
+        onOpenChange={setShowTransferDialog}
+        activityId={activity.id}
+        activityName={activity.name}
+        tripId={params.id}
+        currentItineraryId={itineraryId}
+        currentDayId={dayId}
+      />
     </>
   )
 }
