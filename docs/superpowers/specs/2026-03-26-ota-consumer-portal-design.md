@@ -104,9 +104,9 @@ app/
 | Tool | API Source | Data Quality | Consumer Action |
 |------|-----------|-------------|-----------------|
 | `searchFlights` | Amadeus | Real-time | "Inquire" (Phase 1), Book (Phase 2) |
-| `searchHotels` | Amadeus | Real-time | "Inquire" (Phase 1), Book (Phase 2) |
+| `searchHotels` | Composite (Google Places + Amadeus + Booking.com) | Real-time | "Inquire" (Phase 1), Book (Phase 2) |
 | `searchCars` | Amadeus (NEW: provider must be built) | Real-time | "Inquire" (Phase 1), Book (Phase 2) |
-| `searchCruises` | Traveltek FusionAPI | Real-time | "Inquire" (Phase 1), Book (Phase 2) |
+| `searchCruises` | cruise-repository (DB catalog, already public via x-catalog-api-key) | Catalog data | "Inquire" (Phase 1), FusionAPI booking (Phase 2) |
 | `browseTours` | Globus catalog (DB) | Catalog data | "Request Quote from Advisor" |
 | `assemblePackage` | Amadeus flights + hotels | Estimated pricing | "Connect with Advisor to finalize" |
 | `lookupDestination` | DB + enrichment APIs | Library data | Informational |
@@ -292,11 +292,11 @@ Each product type gets a dedicated search page wrapping the real API:
 
 | Route | API | Filters |
 |-------|-----|---------|
-| `/search/cruises` | Traveltek FusionAPI | Destination, dates, cabin type, cruise line |
-| `/search/flights` | Amadeus | Origin, destination, dates, passengers, class |
-| `/search/hotels` | Amadeus | Destination, dates, guests, star rating |
-| `/search/cars` | Amadeus (NEW: car rental provider must be built) | Pickup location, dates, car type |
-| `/search/tours` | Globus catalog (DB) | Destination, dates, tour type, duration |
+| `/search/cruises` | cruise-repository (DB catalog, already public) | Text, line, ship, region, ports, dates, nights, price, cabin category |
+| `/search/flights` | Amadeus (needs public facade + airport-lookup endpoint) | Origin, destination, dates, passengers, class |
+| `/search/hotels` | Composite: Google Places + Amadeus + Booking.com (needs public facade) | Destination, dates, guests |
+| `/search/cars` | Amadeus (NEW: car rental provider must be built — may defer to Phase 2) | Pickup location, dates, car type |
+| `/search/tours` | tour-repository (DB catalog, already public) + Globus live proxy | Keyword, operator, season, duration |
 | `/search/all-inclusives` | Softvoyage iframe | Embedded widget as-is |
 
 ### Search UX
@@ -392,17 +392,32 @@ createdAt             TIMESTAMP
 
 ### Existing Table Modifications
 
-**`itinerary_templates` (additions for OTA publishing)**
+**`ota_published_trips`** (NEW — separate publication table, not columns on `itinerary_templates`)
 
-Note: The existing table is `itinerary_templates` (defined in `packages/database/src/schema/itinerary-templates.schema.ts`), referred to as "templates" in the Library UI. New columns:
+`itinerary_templates` stores templates as a JSON payload blob, not a relational graph of itinerary_days/activity_pricing. Adding OTA columns directly onto it would conflate template storage with publication metadata, and prevent multiple advisors from publishing the same template.
+
+Instead, a separate publication table references the template and stores a rendered snapshot + OTA metadata. This follows the same pattern as the existing trip sharing system (`trips.controller.ts` share tokens).
+
 ```
-+ isPublishedToOta       BOOLEAN DEFAULT false
-+ otaSlug                TEXT — URL-friendly slug for the trip showcase page
-+ otaPublishType         TEXT — "hosted" | "featured" | "recommended" | "custom"
-+ otaHeadline            TEXT — advisor-written tagline
-+ otaCallToAction        TEXT — custom CTA label (default: "Inquire About This Trip")
-+ publishedByAdvisorId   UUID FK → advisor_profiles
+id                    UUID PK
+agencyId              UUID FK → agencies
+templateId            UUID FK → itinerary_templates
+advisorProfileId      UUID FK → advisor_profiles
+slug                  TEXT UNIQUE — URL-friendly slug for the trip showcase page
+publishType           TEXT — "hosted" | "featured" | "recommended" | "custom"
+headline              TEXT — advisor-written tagline
+callToAction          TEXT — custom CTA label (default: "Inquire About This Trip")
+renderedSnapshot      JSONB — snapshot of template data at publish time (itinerary, activities, pricing)
+heroImageUrl          TEXT
+isPublished           BOOLEAN DEFAULT true
+createdAt             TIMESTAMP
+updatedAt             TIMESTAMP
 ```
+
+This allows:
+- Multiple advisors publishing the same template with different headlines/types
+- Snapshot isolation (published view doesn't change when template is edited, until re-published)
+- Clean separation of Library concerns from OTA concerns
 
 ---
 
@@ -428,9 +443,12 @@ Note: The existing table is `itinerary_templates` (defined in `packages/database
 - `POST /api/v1/ota/leads` — create or match Contact, apply attribution logic
 - `POST /api/v1/ota/referrals` — log referral visit
 
-### Template Publishing
-- `PUT /api/v1/templates/:id/publish-ota` — publish template to advisor's micro-site
-- `PUT /api/v1/templates/:id/unpublish-ota` — unpublish from OTA
+### OTA Published Trips
+- `POST /api/v1/ota/published-trips` — publish a template to advisor's micro-site (creates snapshot)
+- `PUT /api/v1/ota/published-trips/:id` — update publication metadata (headline, type, CTA)
+- `POST /api/v1/ota/published-trips/:id/refresh` — re-snapshot from current template data
+- `DELETE /api/v1/ota/published-trips/:id` — unpublish
+- `GET /api/v1/ota/published-trips/:slug` — public: get published trip by slug
 
 ---
 
@@ -440,15 +458,22 @@ The OTA has no consumer authentication in Phase 1. API access uses a tiered mode
 
 ### Public Endpoints (no auth required)
 
-New endpoints that the OTA Server Components call directly (server-to-server, no CORS needed):
-- `GET /api/v1/deals` and `GET /api/v1/deals/:slug`
-- `GET /api/v1/advisor-profiles` and `GET /api/v1/advisor-profiles/:slug`
-- `GET /api/v1/advisor-profiles/:slug/deals`
-- `GET /api/v1/advisor-profiles/:slug/trips`
-- `GET /api/v1/cruise-repository/*` (already supports API key auth)
-- Search endpoints (flights, hotels, cruises, tours) — new public variants
+The OTA Server Components call the NestJS API server-to-server. Some endpoints already exist with public access:
 
-These endpoints are read-only and return only published/public data. They use a new `@Public()` decorator in NestJS to bypass JWT auth.
+**Already public (via `x-catalog-api-key` or dual JWT/key auth):**
+- `GET /api/v1/cruise-repository/*` — full cruise catalog search/filter (sailing-search DTO)
+- `GET /api/v1/tour-repository/*` — tour catalog browse/search/detail/departures
+- `GET /api/v1/globus/*` — live Globus proxy (keyword search, departures, pricing, travel styles)
+
+**New endpoints needed (read-only, `@Public()` or service-key auth):**
+- `GET /api/v1/deals` and `GET /api/v1/deals/:slug` — deals library
+- `GET /api/v1/advisor-profiles` and `GET /api/v1/advisor-profiles/:slug` — advisor directory
+- `GET /api/v1/advisor-profiles/:slug/deals` — advisor's curated deals
+- `GET /api/v1/advisor-profiles/:slug/trips` — advisor's published trip templates
+- `GET /api/v1/ota/flights/search` — public facade wrapping existing Amadeus flight provider
+- `GET /api/v1/ota/flights/airports` — public airport lookup (AeroDataBox data, currently admin-only)
+- `GET /api/v1/ota/hotels/search` — public facade wrapping composite hotel provider
+- `GET /api/v1/ota/published-trips/:slug` — single published trip snapshot
 
 ### Service-to-Service Endpoints (internal API key)
 
