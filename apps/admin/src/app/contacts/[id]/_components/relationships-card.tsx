@@ -2,10 +2,15 @@
 
 import { useRouter } from 'next/navigation'
 import { Plus, Users, ArrowRight, Pencil, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useRelationships, useDeleteRelationship } from '@/hooks/use-relationships'
 import { useToast } from '@/hooks/use-toast'
 import { getRelationshipCategoryColor, getRelationshipCategoryLabel } from '@/lib/relationship-constants'
@@ -38,6 +43,7 @@ export function RelationshipsCard({
   const { toast } = useToast()
   const { data: relationships, isLoading } = useRelationships(contactId)
   const deleteRelationship = useDeleteRelationship()
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
 
   const displayRelationships = relationships?.slice(0, 3) || []
   const hasMore = (relationships?.length || 0) > 3
@@ -135,15 +141,9 @@ export function RelationshipsCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={async (e) => {
+                      onClick={(e) => {
                         e.stopPropagation()
-                        if (!confirm(`Remove relationship with ${displayName}?`)) return
-                        try {
-                          await deleteRelationship.mutateAsync({ contactId, relationshipId: relationship.id })
-                          toast({ title: 'Relationship removed' })
-                        } catch {
-                          toast({ title: 'Failed to remove relationship', variant: 'destructive' })
-                        }
+                        setDeleteTarget({ id: relationship.id, name: displayName })
                       }}
                       className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                       aria-label={`Remove relationship with ${displayName}`}
@@ -172,6 +172,36 @@ export function RelationshipsCard({
           </>
         )}
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Relationship</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove the relationship with <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={async () => {
+                if (!deleteTarget) return
+                try {
+                  await deleteRelationship.mutateAsync({ contactId, relationshipId: deleteTarget.id })
+                  toast({ title: 'Relationship removed' })
+                } catch {
+                  toast({ title: 'Failed to remove relationship', variant: 'destructive' })
+                }
+                setDeleteTarget(null)
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
