@@ -65,8 +65,12 @@ async function bootstrap() {
       if (/^https:\/\/tailfire-[\w-]+-systemsaholic-[\w]+\.vercel\.app$/.test(origin)) {
         return callback(null, true)
       }
-      // Allow tf-demo subdomain
-      if (origin === 'https://tf-demo.phoenixvoyages.ca') {
+      // Allow all phoenixvoyages.ca subdomains (admin, client, ota, tf-demo, etc.)
+      if (/^https:\/\/[\w-]+\.phoenixvoyages\.ca$/.test(origin)) {
+        return callback(null, true)
+      }
+      // Allow tailfire.ca subdomains (api-dev, etc.)
+      if (/^https:\/\/[\w-]+\.tailfire\.ca$/.test(origin)) {
         return callback(null, true)
       }
       callback(new Error('Not allowed by CORS'))
