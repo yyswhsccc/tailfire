@@ -201,3 +201,10 @@ export * from './api-health-checks.schema'
 
 // Form tokens (token-based public forms: insurance waivers, intake forms)
 export * from './form-tokens.schema'
+
+// OTA Consumer Portal (advisor profiles, deals, referrals, published trips)
+export * from './advisor-profiles.schema'
+export * from './deals.schema'
+export * from './advisor-featured-deals.schema'
+export * from './ota-referrals.schema'
+export * from './ota-published-trips.schema'

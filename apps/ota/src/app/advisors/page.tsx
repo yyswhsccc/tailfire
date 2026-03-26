@@ -1,122 +1,94 @@
-"use client";
+import type { Metadata } from "next";
+import { Suspense } from "react";
 
-import Image from "next/image";
-import { Mail, Phone, UserCircle2 } from "lucide-react";
+import { publicFetch } from "@/lib/api";
+import type { AdvisorProfile } from "@/types/advisor";
+import { AdvisorDirectoryCard } from "@/components/advisor/advisor-directory-card";
+import { AdvisorDirectoryFilters } from "@/components/advisor/advisor-directory-filters";
 
-import { Button, Card, CardContent } from "@tailfire/ui-public";
-import { consultants, defaultConsultantId } from "@/data/consultants";
-import { useMockAuth } from "@/lib/mock-auth";
+export const revalidate = 3600; // ISR: revalidate every hour
 
-const advisors = Object.values(consultants)
-  .filter((consultant) => consultant.id !== defaultConsultantId)
-  .sort((a, b) => a.name.localeCompare(b.name));
-
-export default function AdvisorsPage() {
-  const { user, assignConsultant } = useMockAuth();
-
-  const handleSelect = (consultantId: string) => {
-    if (!user || user.associatedConsultantId === consultantId) return;
-    assignConsultant(consultantId);
+export function generateMetadata(): Metadata {
+  return {
+    title: "Our Travel Advisors | Phoenix Voyages",
+    description:
+      "Browse our team of expert travel advisors. Filter by specialty or language to find the perfect advisor to craft your next journey.",
+    openGraph: {
+      title: "Our Travel Advisors | Phoenix Voyages",
+      description:
+        "Browse our team of expert travel advisors. Filter by specialty or language to find the perfect advisor to craft your next journey.",
+    },
   };
+}
+
+interface AdvisorsPageProps {
+  searchParams: Promise<{ specialty?: string; language?: string }>;
+}
+
+async function fetchAdvisors(
+  specialty?: string,
+  language?: string,
+): Promise<AdvisorProfile[]> {
+  try {
+    const params = new URLSearchParams();
+    if (specialty) params.set("specialty", specialty);
+    if (language) params.set("language", language);
+    const qs = params.toString();
+
+    return await publicFetch<AdvisorProfile[]>(
+      `/advisor-profiles${qs ? `?${qs}` : ""}`,
+      { next: { tags: ["advisors"] } },
+    );
+  } catch (error) {
+    console.error("Failed to fetch advisors:", error);
+    return [];
+  }
+}
+
+export default async function AdvisorsPage({ searchParams }: AdvisorsPageProps) {
+  const { specialty, language } = await searchParams;
+  const advisors = await fetchAdvisors(specialty, language);
+
+  const hasActiveFilters = Boolean(specialty || language);
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.3em] text-secondary-foreground">Advisor Network</p>
-        <h1 className="text-3xl font-display font-semibold text-white">Find your advisor</h1>
-        <p className="text-sm text-secondary-foreground">
-          Select a dedicated advisor to guide your itinerary, concierge requests, and traveler communications.
+    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      {/* Page header */}
+      <div className="mb-8">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
+          OUR TRAVEL ADVISORS
+        </h1>
+        <p className="mt-2 text-base text-muted-foreground">
+          Expert advisors ready to craft your perfect journey
         </p>
-        {!user && (
-          <p className="text-sm text-secondary-foreground/70">
-            Sign in through the Client Portal to save your selection and keep working with the advisor you choose.
-          </p>
-        )}
-      </header>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {advisors.map((advisor) => {
-          const isCurrent = user?.associatedConsultantId === advisor.id;
-
-          return (
-            <Card
-              key={advisor.id}
-              className="bg-secondary/60 border border-primary/20 text-white shadow-lg shadow-primary/30"
-            >
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative h-14 w-14 overflow-hidden rounded-full border border-primary/20 bg-secondary/80">
-                    <Image
-                      src={advisor.avatar}
-                      alt={advisor.name}
-                      width={56}
-                      height={56}
-                      className="h-full w-full object-cover"
-                      priority
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <p className="text-lg font-semibold truncate">{advisor.name}</p>
-                    {advisor.title ? (
-                      <p className="text-sm text-secondary-foreground truncate">{advisor.title}</p>
-                    ) : null}
-                    {advisor.specialties ? (
-                      <p className="text-xs uppercase tracking-wider text-secondary-foreground/70 truncate">
-                        {advisor.specialties.join(" · ")}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3 text-xs text-secondary-foreground">
-                  {advisor.email ? (
-                    <a
-                      href={`mailto:${advisor.email}`}
-                      className="inline-flex items-center gap-1 hover:text-primary transition-colors"
-                    >
-                      <Mail size={14} />
-                      Email
-                    </a>
-                  ) : null}
-                  {advisor.phone ? (
-                    <a
-                      href={`tel:${advisor.phone}`}
-                      className="inline-flex items-center gap-1 hover:text-primary transition-colors"
-                    >
-                      <Phone size={14} />
-                      Call
-                    </a>
-                  ) : null}
-                  {advisor.bioUrl ? (
-                    <a
-                      href={advisor.bioUrl}
-                      className="inline-flex items-center gap-1 hover:text-primary transition-colors"
-                    >
-                      <UserCircle2 size={14} />
-                      Profile
-                    </a>
-                  ) : null}
-                </div>
-
-                <div className="space-y-1">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="w-full font-display tracking-wide uppercase"
-                    disabled={!user || isCurrent}
-                    onClick={() => handleSelect(advisor.id)}
-                  >
-                    Select as My Advisor
-                  </Button>
-                  {isCurrent && (
-                    <p className="text-xs text-secondary-foreground/70">Currently assigned</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
       </div>
+
+      {/* Filters */}
+      <div className="mb-8">
+        <Suspense fallback={null}>
+          <AdvisorDirectoryFilters />
+        </Suspense>
+      </div>
+
+      {advisors.length === 0 ? (
+        /* Empty state */
+        <div className="rounded-2xl border border-border bg-muted/30 px-6 py-16 text-center">
+          <p className="text-lg font-medium text-[#1A1A1A]">
+            No advisors found
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {hasActiveFilters
+              ? "Try adjusting your filters — we may have the perfect advisor for you."
+              : "Check back soon — our team is growing."}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          {advisors.map((advisor) => (
+            <AdvisorDirectoryCard key={advisor.id} advisor={advisor} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
