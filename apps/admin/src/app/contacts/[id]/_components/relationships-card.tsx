@@ -1,12 +1,13 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Plus, Users, ArrowRight, Pencil } from 'lucide-react'
+import { Plus, Users, ArrowRight, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { useRelationships } from '@/hooks/use-relationships'
+import { useRelationships, useDeleteRelationship } from '@/hooks/use-relationships'
+import { useToast } from '@/hooks/use-toast'
 import { getRelationshipCategoryColor, getRelationshipCategoryLabel } from '@/lib/relationship-constants'
 import type { ContactRelationshipResponseDto } from '@tailfire/shared-types/api'
 
@@ -34,7 +35,9 @@ export function RelationshipsCard({
   onViewAll,
 }: RelationshipsCardProps) {
   const router = useRouter()
+  const { toast } = useToast()
   const { data: relationships, isLoading } = useRelationships(contactId)
+  const deleteRelationship = useDeleteRelationship()
 
   const displayRelationships = relationships?.slice(0, 3) || []
   const hasMore = (relationships?.length || 0) > 3
@@ -128,6 +131,24 @@ export function RelationshipsCard({
                       aria-label={`Edit relationship with ${displayName}`}
                     >
                       <Pencil className="h-3.5 w-3.5 text-ash-600" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (!confirm(`Remove relationship with ${displayName}?`)) return
+                        try {
+                          await deleteRelationship.mutateAsync({ contactId, relationshipId: relationship.id })
+                          toast({ title: 'Relationship removed' })
+                        } catch {
+                          toast({ title: 'Failed to remove relationship', variant: 'destructive' })
+                        }
+                      }}
+                      className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      aria-label={`Remove relationship with ${displayName}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                     <ArrowRight className="h-4 w-4 text-ash-400 flex-shrink-0" />
                   </div>
