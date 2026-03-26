@@ -66,7 +66,7 @@ async function fetchWithTimeout<T>(
  * Catalog fetch — for catalog endpoints that use x-catalog-api-key.
  * Used by: cruise search, tour search.
  */
-export async function catalogFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function catalogFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
   return fetchWithTimeout<T>(path, {
     ...options,
     headers: {
