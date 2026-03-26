@@ -8,7 +8,7 @@
 
 A consumer-facing Online Travel Agency (OTA) where customers can browse travel products, interact with an AI concierge, and connect with Travel Advisors. The OTA leverages existing Tailfire API capabilities (Amadeus, Traveltek, Globus), the TravelLeaders Network advisor profiles, and an AI-powered discovery experience.
 
-**Business model:** Hybrid self-serve + agent-assisted. Consumers can search and discover travel products. For API-backed products (cruises, flights, hotels, cars), self-serve booking will be added in Phase 2. Tours and assembled packages route to an advisor. Phoenix Voyages is rarely the merchant of record — suppliers process payments.
+**Business model:** Hybrid self-serve + agent-assisted. Consumers can search and discover travel products. For API-backed products (cruises, flights, hotels), self-serve booking will be added in Phase 2. Tours and assembled packages route to an advisor. Phoenix Voyages is rarely the merchant of record — suppliers process payments.
 
 **Phase 1 (MVP) scope:**
 - Search & browse all product types
@@ -50,7 +50,7 @@ app/
 ├── search/                             # Product search pages
 │   ├── flights/page.tsx                # Amadeus flight search
 │   ├── hotels/page.tsx                 # Amadeus hotel search
-│   ├── cars/page.tsx                   # Amadeus car rental search (NEW: requires building Amadeus car provider)
+│   ├── cars/page.tsx                   # DEFERRED to Phase 2 (no Amadeus car provider exists)
 │   ├── cruises/page.tsx                # Traveltek cruise search
 │   ├── tours/page.tsx                  # Globus tour catalog browse
 │   └── all-inclusives/page.tsx         # Softvoyage iframe embed
@@ -104,9 +104,9 @@ app/
 | Tool | API Source | Data Quality | Consumer Action |
 |------|-----------|-------------|-----------------|
 | `searchFlights` | Amadeus | Real-time | "Inquire" (Phase 1), Book (Phase 2) |
-| `searchHotels` | Composite (Google Places + Amadeus + Booking.com) | Real-time | "Inquire" (Phase 1), Book (Phase 2) |
-| `searchCars` | Amadeus (NEW: provider must be built) | Real-time | "Inquire" (Phase 1), Book (Phase 2) |
-| `searchCruises` | cruise-repository (DB catalog, already public via x-catalog-api-key) | Catalog data | "Inquire" (Phase 1), FusionAPI booking (Phase 2) |
+| `searchHotels` | Amadeus | Real-time | "Inquire" (Phase 1), Book (Phase 2) |
+| `searchCars` | DEFERRED — no Amadeus car provider exists | — | Phase 2 |
+| `searchCruises` | cruise-repository (DB catalog) + FusionAPI (live pricing/availability) | Real-time pricing | "Inquire" (Phase 1), FusionAPI booking (Phase 2) |
 | `browseTours` | Globus catalog (DB) | Catalog data | "Request Quote from Advisor" |
 | `assemblePackage` | Amadeus flights + hotels | Estimated pricing | "Connect with Advisor to finalize" |
 | `lookupDestination` | DB + enrichment APIs | Library data | Informational |
@@ -292,11 +292,13 @@ Each product type gets a dedicated search page wrapping the real API:
 
 | Route | API | Filters |
 |-------|-----|---------|
-| `/search/cruises` | cruise-repository (DB catalog, already public) | Text, line, ship, region, ports, dates, nights, price, cabin category |
+| `/search/cruises` | cruise-repository (DB catalog) + FusionAPI (live pricing) | Text, line, ship, region, ports, dates, nights, price, cabin category |
 | `/search/flights` | Amadeus (needs public facade + airport-lookup endpoint) | Origin, destination, dates, passengers, class |
-| `/search/hotels` | Composite: Google Places + Amadeus + Booking.com (needs public facade) | Destination, dates, guests |
-| `/search/cars` | Amadeus (NEW: car rental provider must be built — may defer to Phase 2) | Pickup location, dates, car type |
+| `/search/hotels` | Amadeus (needs public facade) | Destination, dates, guests |
 | `/search/tours` | tour-repository (DB catalog, already public) + Globus live proxy | Keyword, operator, season, duration |
+| `/search/all-inclusives` | Softvoyage iframe | Embedded widget as-is |
+
+**Deferred to Phase 2:** `/search/cars` — no Amadeus car rental provider exists, must be built.
 | `/search/all-inclusives` | Softvoyage iframe | Embedded widget as-is |
 
 ### Search UX
@@ -472,7 +474,7 @@ The OTA Server Components call the NestJS API server-to-server. Some endpoints a
 - `GET /api/v1/advisor-profiles/:slug/trips` — advisor's published trip templates
 - `GET /api/v1/ota/flights/search` — public facade wrapping existing Amadeus flight provider
 - `GET /api/v1/ota/flights/airports` — public airport lookup (AeroDataBox data, currently admin-only)
-- `GET /api/v1/ota/hotels/search` — public facade wrapping composite hotel provider
+- `GET /api/v1/ota/hotels/search` — public facade wrapping Amadeus hotel provider
 - `GET /api/v1/ota/published-trips/:slug` — single published trip snapshot
 
 ### Service-to-Service Endpoints (internal API key)
@@ -522,7 +524,8 @@ The `app/api/chat/route.ts` endpoint streams AI responses to unauthenticated use
 
 ## 11. Phase 2 Roadmap (Deferred)
 
-- **Self-serve booking:** Consumer completes purchase through supplier payment flows (Traveltek for cruises, Amadeus for flights/hotels/cars)
+- **Self-serve booking:** Consumer completes purchase through supplier payment flows (Traveltek for cruises, Amadeus for flights/hotels)
+- **Car rental search:** Build Amadeus car rental provider and `/search/cars` page
 - **Consumer auth:** Sign up / sign in, creates Contact in Tailfire
 - **My Trips:** After booking, consumer accesses trip in the client portal
 - **All-inclusives catalog:** Build DB catalog by scraping/importing package providers (like cruises/tours)
@@ -564,7 +567,9 @@ The `app/api/chat/route.ts` endpoint streams AI responses to unauthenticated use
 - **Fallback:** Time-based revalidation (`revalidate: 3600`) as safety net if webhook fails
 
 ### New API Provider Work
-- **Amadeus Car Rental Provider:** No car rental provider exists in the codebase. A new `amadeus-cars.provider.ts` must be built in `apps/api/src/external-apis/` following the pattern of `amadeus-flights.provider.ts` and `amadeus-hotels.provider.ts`. This is a prerequisite for `/search/cars`.
+- **Amadeus Car Rental Provider:** Deferred to Phase 2. No car rental provider exists in the codebase.
+- **FusionAPI Public Facade:** cruise-repository provides catalog search, but FusionAPI is needed for live pricing and availability. A public-facing facade (service-key auth, not JWT) must wrap the existing FusionAPI search capabilities for the OTA cruise search page.
+- **Amadeus Public Facades:** Flight and hotel search controllers exist but are JWT-gated. New `/api/v1/ota/flights/search` and `/api/v1/ota/hotels/search` endpoints needed with service-key auth. Also need a public airport-lookup endpoint (currently admin-only via AeroDataBox).
 
 ### Softvoyage Widget
 - The `/search/all-inclusives` page embeds the existing Softvoyage widget via iframe
