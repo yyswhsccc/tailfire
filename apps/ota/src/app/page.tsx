@@ -1,15 +1,12 @@
-import { FeaturedDestinations } from "@/components/FeaturedDestinations";
-import { HeroSection } from "@/components/HeroSection";
-import { PackagesSection } from "@/components/PackagesSection";
-import { ServicesSection } from "@/components/ServicesSection";
-
 export default function HomePage() {
   return (
-    <>
-      <HeroSection id="hero" />
-      <FeaturedDestinations id="destinations" />
-      <PackagesSection id="packages" />
-      <ServicesSection id="about" />
-    </>
+    <main className="flex min-h-screen flex-col items-center justify-center">
+      <h1 className="font-display text-4xl font-bold tracking-tight">
+        Phoenix Voyages OTA
+      </h1>
+      <p className="mt-4 text-muted-foreground">
+        Consumer travel portal — coming soon.
+      </p>
+    </main>
   );
 }

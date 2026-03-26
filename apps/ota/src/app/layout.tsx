@@ -3,8 +3,6 @@ import type { ReactNode } from "react";
 import { Cinzel, Lato } from "next/font/google";
 
 import "./globals.css";
-import { Providers } from "./providers";
-import { LayoutWrapper } from "@/components/LayoutWrapper";
 
 const cinzel = Cinzel({
   subsets: ["latin"],
@@ -27,10 +25,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${cinzel.variable} ${lato.variable}`}>
-      <body className="bg-background text-foreground antialiased font-sans" suppressHydrationWarning>
-        <Providers>
-          <LayoutWrapper>{children}</LayoutWrapper>
-        </Providers>
+      <body className="bg-background text-foreground antialiased font-sans">
+        {children}
       </body>
     </html>
   );

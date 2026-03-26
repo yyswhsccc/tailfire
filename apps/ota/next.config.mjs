@@ -4,7 +4,7 @@
 const CLIENT_PORTAL_URL = process.env.CLIENT_PORTAL_URL || 'https://portal.yourdomain.com';
 
 const nextConfig = {
-  transpilePackages: ['@tailfire/ui-public', '@tailfire/api-client'],
+  transpilePackages: ['@tailfire/ui-public'],
   experimental: {
     optimizePackageImports: ['@tailfire/ui-public'],
   },
