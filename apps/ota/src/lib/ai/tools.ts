@@ -224,36 +224,49 @@ export function createTools(ctx: ToolContext = {}) {
       cruiseLine: z.string().optional().describe('Cruise line name (e.g. Royal Caribbean, Celebrity)'),
       passengers: z.number().optional().describe('Number of passengers'),
     }),
-    execute: async ({ destination, departureDate, returnDate, cruiseLine, passengers }) => {
+    execute: async ({ destination, departureDate, returnDate, cruiseLine }) => {
       try {
-        // OTA search controller uses /ota/search/cruises with FusionAPI-style params
+        // Use the cruise-repository catalog endpoint (already public via catalog API key)
         const qs = buildQuery({
-          destination,
-          departureDate,
-          returnDate,
-          cruiseLine,
-          passengers,
-          pagesize: 10,
+          ...(departureDate && { sailDateFrom: departureDate }),
+          ...(returnDate && { sailDateTo: returnDate }),
+          ...(cruiseLine && { text: cruiseLine }),
+          ...(destination && { text: destination }),
+          page: 1,
+          pageSize: 5,
         })
-        const data = await serviceFetch<{
-          sessionKey: string
-          results: CruiseSearchResult[]
-          meta: { totalResults: number; page: number; pageSize: number }
-        }>(`/ota/search/cruises${qs}`)
-        const top5 = (data.results ?? []).slice(0, 5)
+        const data = await catalogFetch<{
+          items: Array<{
+            id: string
+            name: string
+            sailDate: string
+            endDate: string
+            nights: number
+            ship: { name: string }
+            cruiseLine: { name: string }
+            embarkPort: { name: string }
+            disembarkPort: { name: string }
+            prices: { inside: number | null; oceanview: number | null; balcony: number | null; suite: number | null }
+          }>
+          pagination: { totalItems: number }
+        }>(`/cruise-repository/sailings${qs}`)
+        const items = data.items ?? []
         return {
-          cruises: top5.map((c) => ({
-            cruiseLine: c.cruiselinename,
-            ship: c.shipname,
-            departurePort: c.departureport,
-            itinerary: c.itineraryname,
-            departureDate: c.departuredate,
+          cruises: items.map((c) => ({
+            cruiseLine: c.cruiseLine?.name ?? 'Unknown',
+            ship: c.ship?.name ?? 'Unknown',
+            departurePort: c.embarkPort?.name ?? '',
+            itinerary: c.name,
+            departureDate: c.sailDate,
+            endDate: c.endDate,
             nights: c.nights,
-            region: c.regionname,
-            pricePerPerson: c.insideprice ? formatCents(c.insideprice * 100, 'CAD') : 'Contact for pricing',
+            insidePrice: c.prices?.inside ? `$${c.prices.inside.toLocaleString()}` : null,
+            balconyPrice: c.prices?.balcony ? `$${c.prices.balcony.toLocaleString()}` : null,
+            suitePrice: c.prices?.suite ? `$${c.prices.suite.toLocaleString()}` : null,
           })),
-          resultCount: top5.length,
-          totalResults: data.meta?.totalResults ?? top5.length,
+          resultCount: items.length,
+          totalResults: data.pagination?.totalItems ?? items.length,
+          note: 'Prices shown are starting from per person. Connect with an advisor to get the best rate.',
         }
       } catch {
         return { error: 'Unable to search cruises right now. Please try again or ask me about something else.' }

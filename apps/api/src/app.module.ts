@@ -59,6 +59,9 @@ import { ApiHealthModule } from './api-health/api-health.module'
 import { SearchModule } from './search/search.module'
 import { ReportingModule } from './reporting/reporting.module'
 import { FormsModule } from './forms/forms.module'
+import { DealsModule } from './deals/deals.module'
+import { AdvisorProfilesModule } from './advisor-profiles/advisor-profiles.module'
+import { OtaModule } from './ota/ota.module'
 
 @Module({
   imports: [
@@ -214,6 +217,11 @@ import { FormsModule } from './forms/forms.module'
 
     // Token-based public forms (insurance waivers, intake forms)
     FormsModule,
+
+    // OTA Consumer Portal modules
+    DealsModule,
+    AdvisorProfilesModule,
+    OtaModule,
   ],
   controllers: [AppController],
   providers: [
