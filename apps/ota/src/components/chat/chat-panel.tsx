@@ -5,6 +5,7 @@ import { X, Sparkles, Send, Loader2 } from "lucide-react";
 import type { UIMessage } from "@ai-sdk/react";
 
 import { ChatSuggestionChips } from "./chat-suggestion-chips";
+import { ChatProductCards } from "./chat-product-cards";
 
 // ---------------------------------------------------------------------------
 // Friendly tool-name mapping
@@ -13,10 +14,18 @@ const TOOL_LABELS: Record<string, string> = {
   searchFlights: "flights",
   searchHotels: "hotels",
   searchCruises: "cruises",
-  searchTours: "tours",
+  browseTours: "tours",
   captureContact: "contact info",
   requestAdvisor: "advisor request",
 };
+
+/** Tool names that render as rich product cards */
+const SEARCH_TOOLS = new Set([
+  "searchCruises",
+  "searchFlights",
+  "searchHotels",
+  "browseTours",
+]);
 
 function toolLabel(partType: string): string {
   // part.type is "tool-searchFlights", strip "tool-" prefix
@@ -118,71 +127,121 @@ export function ChatPanel({ messages, status, onSend, onClose }: ChatPanelProps)
         )}
 
         {/* Messages */}
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            {/* AI avatar */}
-            {message.role === "assistant" && (
-              <span className="mr-2 mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-[#C59746]">
-                <Sparkles className="size-3.5 text-white" />
-              </span>
-            )}
+        {messages.map((message) => {
+          // Split parts into inline (text, non-search tool states) and
+          // product card parts (search tool output) which render full-width.
+          const inlineParts: Array<{ part: (typeof message.parts)[number]; idx: number }> = [];
+          const cardParts: Array<{ part: (typeof message.parts)[number]; idx: number }> = [];
 
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                message.role === "user"
-                  ? "bg-[#1A1A1A] text-white"
-                  : "border border-border bg-white text-[#1A1A1A]"
-              }`}
-            >
-              {message.parts.map((part, i) => {
-                if (part.type === "text" && part.text.trim()) {
-                  return (
-                    <div key={`${message.id}-${i}`} className="whitespace-pre-wrap">
-                      {part.text}
-                    </div>
-                  );
-                }
-                if (part.type.startsWith("tool-")) {
-                  const label = toolLabel(part.type);
-                  const state = (part as { state?: string }).state;
-                  if (state === "output-available") {
-                    return (
-                      <div
-                        key={`${message.id}-${i}`}
-                        className="mt-1 text-xs text-muted-foreground"
-                      >
-                        Found {label} results
-                      </div>
-                    );
-                  }
-                  if (state === "output-error") {
-                    return (
-                      <div
-                        key={`${message.id}-${i}`}
-                        className="mt-1 text-xs text-destructive"
-                      >
-                        Error searching {label}
-                      </div>
-                    );
-                  }
-                  return (
-                    <div
-                      key={`${message.id}-${i}`}
-                      className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"
-                    >
-                      <Loader2 className="size-3 animate-spin" />
-                      Searching {label}...
-                    </div>
-                  );
-                }
-                return null;
+          message.parts.forEach((part, idx) => {
+            if (part.type.startsWith("tool-")) {
+              const toolName = part.type.replace(/^tool-/, "");
+              const state = (part as { state?: string }).state;
+              const output = (part as { output?: unknown }).output;
+              if (
+                state === "output-available" &&
+                output &&
+                SEARCH_TOOLS.has(toolName)
+              ) {
+                cardParts.push({ part, idx });
+                return;
+              }
+            }
+            inlineParts.push({ part, idx });
+          });
+
+          // Check if inline parts have any visible content (to avoid empty bubbles)
+          const hasInlineContent = inlineParts.some(({ part }) => {
+            if (part.type === "text" && part.text.trim()) return true;
+            if (part.type.startsWith("tool-")) return true;
+            return false;
+          });
+
+          return (
+            <div key={message.id}>
+              {/* Standard message bubble — only render if there's inline content */}
+              {hasInlineContent && (
+              <div
+                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                {/* AI avatar */}
+                {message.role === "assistant" && (
+                  <span className="mr-2 mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-[#C59746]">
+                    <Sparkles className="size-3.5 text-white" />
+                  </span>
+                )}
+
+                <div
+                  className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                    message.role === "user"
+                      ? "bg-[#1A1A1A] text-white"
+                      : "border border-border bg-white text-[#1A1A1A]"
+                  }`}
+                >
+                  {inlineParts.map(({ part, idx: i }) => {
+                    if (part.type === "text" && part.text.trim()) {
+                      return (
+                        <div key={`${message.id}-${i}`} className="whitespace-pre-wrap">
+                          {part.text}
+                        </div>
+                      );
+                    }
+                    if (part.type.startsWith("tool-")) {
+                      const label = toolLabel(part.type);
+                      const toolName = part.type.replace(/^tool-/, "");
+                      const state = (part as { state?: string }).state;
+                      if (state === "output-available") {
+                        // Non-search tool completed (captureContact, requestAdvisor, etc.)
+                        return (
+                          <div
+                            key={`${message.id}-${i}`}
+                            className="mt-1 text-xs text-green-600"
+                          >
+                            {toolName === "captureContact" || toolName === "requestAdvisor"
+                              ? `Done`
+                              : `Found ${label} results`}
+                          </div>
+                        );
+                      }
+                      if (state === "output-error") {
+                        return (
+                          <div
+                            key={`${message.id}-${i}`}
+                            className="mt-1 text-xs text-destructive"
+                          >
+                            Error searching {label}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div
+                          key={`${message.id}-${i}`}
+                          className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                          <Loader2 className="size-3 animate-spin" />
+                          Searching {label}...
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              </div>
+              )}
+
+              {/* Product cards rendered full-width below the bubble */}
+              {cardParts.map(({ part, idx: i }) => {
+                const toolName = part.type.replace(/^tool-/, "");
+                const output = (part as { output?: unknown }).output;
+                return (
+                  <div key={`${message.id}-card-${i}`} className="ml-9 mt-1">
+                    <ChatProductCards toolName={toolName} output={output} />
+                  </div>
+                );
               })}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Typing indicator when submitted (before streaming starts) */}
         {status === "submitted" && (
