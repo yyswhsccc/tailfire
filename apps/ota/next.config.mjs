@@ -11,6 +11,8 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.unsplash.com' },
       { protocol: 'https', hostname: 'agentprofiler.travelleaders.com' },
       { protocol: 'https', hostname: '**.r2.dev' },
+      { protocol: 'https', hostname: 'static.traveltek.net' },
+      { protocol: 'https', hostname: 'images.globusfamily.com' },
     ],
   },
   experimental: {

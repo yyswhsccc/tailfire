@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   Plane,
@@ -9,6 +10,8 @@ import {
   Clock,
   Star,
   ArrowRight,
+  Ship,
+  ImageIcon,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -109,6 +112,8 @@ interface CruiseOutput {
   cruises?: Array<{
     cruiseLine: string;
     ship: string;
+    shipImage?: string | null;
+    cruiseLineLogo?: string | null;
     departurePort: string;
     itinerary: string;
     departureDate: string;
@@ -136,38 +141,57 @@ function CruiseResults({ data }: { data: unknown }) {
           c.insidePrice ?? c.balconyPrice ?? c.suitePrice ?? null;
         return (
           <CardShell key={i} href="/search/cruises" accentColor="#1A1A1A">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-[#C59746]">
-                  {c.cruiseLine}
-                </div>
-                <div className="truncate text-sm font-semibold text-[#1A1A1A]">
-                  {c.ship}
-                </div>
-                <div className="mt-0.5 truncate text-xs text-gray-500">
-                  {c.itinerary}
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-400">
-                  <span className="flex items-center gap-0.5">
-                    <MapPin className="size-3" />
-                    {c.departurePort}
-                  </span>
-                  <span className="flex items-center gap-0.5">
-                    <Calendar className="size-3" />
-                    {formatDate(c.departureDate)}
-                  </span>
-                  <span className="flex items-center gap-0.5">
-                    <Clock className="size-3" />
-                    {c.nights} nights
-                  </span>
-                </div>
-              </div>
-              <div className="shrink-0">
-                {displayPrice ? (
-                  <PriceBadge label="from" price={displayPrice} />
+            <div className="flex items-start gap-2.5">
+              {/* Ship thumbnail */}
+              <div className="relative h-[60px] w-[80px] shrink-0 overflow-hidden rounded-md bg-gray-100">
+                {c.shipImage ? (
+                  <Image
+                    src={c.shipImage}
+                    alt={c.ship}
+                    fill
+                    className="object-cover"
+                    sizes="80px"
+                  />
                 ) : (
-                  <div className="text-xs text-gray-400">Contact for pricing</div>
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Ship className="size-5 text-gray-300" />
+                  </div>
                 )}
+              </div>
+              {/* Details */}
+              <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#C59746]">
+                    {c.cruiseLine}
+                  </div>
+                  <div className="truncate text-sm font-semibold text-[#1A1A1A]">
+                    {c.ship}
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-gray-500">
+                    {c.itinerary}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-400">
+                    <span className="flex items-center gap-0.5">
+                      <MapPin className="size-3" />
+                      {c.departurePort}
+                    </span>
+                    <span className="flex items-center gap-0.5">
+                      <Calendar className="size-3" />
+                      {formatDate(c.departureDate)}
+                    </span>
+                    <span className="flex items-center gap-0.5">
+                      <Clock className="size-3" />
+                      {c.nights} nights
+                    </span>
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  {displayPrice ? (
+                    <PriceBadge label="from" price={displayPrice} />
+                  ) : (
+                    <div className="text-xs text-gray-400">Contact for pricing</div>
+                  )}
+                </div>
               </div>
             </div>
           </CardShell>
@@ -329,6 +353,7 @@ interface TourOutput {
     operator: string;
     duration: string;
     description: string;
+    imageUrl?: string | null;
     priceFrom: string;
   }>;
   resultCount?: number;
@@ -346,22 +371,41 @@ function TourResults({ data }: { data: unknown }) {
     <div className="mt-2 space-y-2">
       {tours.map((t, i) => (
         <CardShell key={i} href="/search/tours" accentColor="#7c3aed">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-[#1A1A1A]">
-                {t.name}
-              </div>
-              <div className="mt-0.5 text-xs text-gray-500">
-                {t.operator}
-                {t.duration ? ` \u00b7 ${t.duration}` : ""}
-              </div>
-              {t.description && (
-                <div className="mt-0.5 line-clamp-2 text-[11px] text-gray-400">
-                  {t.description}
+          <div className="flex items-start gap-2.5">
+            {/* Tour thumbnail */}
+            <div className="relative h-[60px] w-[80px] shrink-0 overflow-hidden rounded-md bg-gray-100">
+              {t.imageUrl ? (
+                <Image
+                  src={t.imageUrl}
+                  alt={t.name}
+                  fill
+                  className="object-cover"
+                  sizes="80px"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <ImageIcon className="size-5 text-gray-300" />
                 </div>
               )}
             </div>
-            <PriceBadge label="from" price={t.priceFrom} />
+            {/* Details */}
+            <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-[#1A1A1A]">
+                  {t.name}
+                </div>
+                <div className="mt-0.5 text-xs text-gray-500">
+                  {t.operator}
+                  {t.duration ? ` \u00b7 ${t.duration}` : ""}
+                </div>
+                {t.description && (
+                  <div className="mt-0.5 line-clamp-2 text-[11px] text-gray-400">
+                    {t.description}
+                  </div>
+                )}
+              </div>
+              <PriceBadge label="from" price={t.priceFrom} />
+            </div>
           </div>
         </CardShell>
       ))}

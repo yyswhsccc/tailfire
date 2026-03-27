@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Ship, Calendar, MapPin, Clock } from "lucide-react";
 
 import { formatPrice } from "@/lib/format";
@@ -93,42 +94,64 @@ export function CruiseResultCard({ sailing }: CruiseResultCardProps) {
   const colors = getLineColors(sailing.cruiseLine.name);
   const cheapest = getCheapestPrice(sailing.prices);
 
+  const shipImageUrl = sailing.ship.imageUrl;
+
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
-      {/* Dark gradient header */}
-      <div className={`bg-gradient-to-r ${colors.from} ${colors.to} px-5 py-4`}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            {/* Cruise line name */}
-            <p className={`text-[10px] font-bold uppercase tracking-[0.15em] ${colors.accent}`}>
-              {sailing.cruiseLine.name}
-            </p>
-            {/* Sailing title */}
-            <h3 className="mt-1 truncate text-base font-semibold leading-tight text-white sm:text-lg">
-              {sailing.name}
-            </h3>
-            {/* Ship name */}
-            <div className="mt-1.5 flex items-center gap-1.5">
-              <Ship className="size-3.5 shrink-0 text-white/60" />
-              <p className="truncate text-xs text-white/70">
-                {sailing.ship.name}
+      {/* Ship image header with overlay */}
+      <div className="relative h-40 overflow-hidden">
+        {shipImageUrl ? (
+          <Image
+            src={shipImageUrl}
+            alt={sailing.ship.name}
+            fill
+            className="object-cover"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
+        ) : null}
+        {/* Gradient overlay — uses line colors as fallback when no image */}
+        <div
+          className={`absolute inset-0 ${
+            shipImageUrl
+              ? "bg-gradient-to-t from-black/80 via-black/40 to-black/10"
+              : `bg-gradient-to-r ${colors.from} ${colors.to}`
+          }`}
+        />
+        {/* Text content pinned to bottom */}
+        <div className="absolute bottom-0 left-0 right-0 px-5 py-4">
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              {/* Cruise line name */}
+              <p className={`text-[10px] font-bold uppercase tracking-[0.15em] ${shipImageUrl ? "text-white/80" : colors.accent}`}>
+                {sailing.cruiseLine.name}
               </p>
+              {/* Sailing title */}
+              <h3 className="mt-1 truncate text-base font-semibold leading-tight text-white sm:text-lg">
+                {sailing.name}
+              </h3>
+              {/* Ship name */}
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <Ship className="size-3.5 shrink-0 text-white/60" />
+                <p className="truncate text-xs text-white/70">
+                  {sailing.ship.name}
+                </p>
+              </div>
             </div>
-          </div>
 
-          {/* Price */}
-          {cheapest != null ? (
-            <div className="shrink-0 text-right">
-              <p className="text-xl font-bold text-white sm:text-2xl">
-                {formatPrice(cheapest)}
-              </p>
-              <p className="text-[10px] text-white/60">/person</p>
-            </div>
-          ) : (
-            <div className="shrink-0 text-right">
-              <p className="text-sm font-medium text-white/70">Contact for pricing</p>
-            </div>
-          )}
+            {/* Price */}
+            {cheapest != null ? (
+              <div className="shrink-0 text-right">
+                <p className="text-xl font-bold text-white sm:text-2xl">
+                  {formatPrice(cheapest)}
+                </p>
+                <p className="text-[10px] text-white/60">/person</p>
+              </div>
+            ) : (
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-medium text-white/70">Contact for pricing</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

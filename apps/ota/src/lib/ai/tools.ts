@@ -244,8 +244,8 @@ export function createTools(ctx: ToolContext = {}) {
             sailDate: string
             endDate: string
             nights: number
-            ship: { name: string }
-            cruiseLine: { name: string }
+            ship: { name: string; imageUrl?: string | null }
+            cruiseLine: { name: string; logoUrl?: string | null }
             embarkPort: { name: string }
             disembarkPort: { name: string }
             prices: { inside: number | null; oceanview: number | null; balcony: number | null; suite: number | null }
@@ -257,6 +257,8 @@ export function createTools(ctx: ToolContext = {}) {
           cruises: items.map((c) => ({
             cruiseLine: c.cruiseLine?.name ?? 'Unknown',
             ship: c.ship?.name ?? 'Unknown',
+            shipImage: c.ship?.imageUrl ?? null,
+            cruiseLineLogo: c.cruiseLine?.logoUrl ?? null,
             departurePort: c.embarkPort?.name ?? '',
             itinerary: c.name,
             departureDate: c.sailDate,
@@ -304,6 +306,7 @@ export function createTools(ctx: ToolContext = {}) {
             operator: t.operatorCode,
             duration: t.days ? `${t.days} days` : 'varies',
             description: t.description ?? '',
+            imageUrl: t.imageUrl ?? null,
             priceFrom: t.lowestPriceCents ? formatCents(t.lowestPriceCents, 'CAD') : 'Contact for pricing',
           })),
           resultCount: top5.length,
