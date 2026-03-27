@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import dynamic from "next/dynamic";
 
 import { cinzel, lato } from "@/lib/fonts";
 import { Nav } from "@/components/layout/nav";
 import { Footer } from "@/components/layout/footer";
+import { ChatWidgetLoader } from "@/components/chat/chat-widget-loader";
 import "./globals.css";
-
-const ChatWidget = dynamic(() => import("@/components/chat/chat-widget"), {
-  ssr: false,
-});
 
 export const metadata: Metadata = {
   title: "Phoenix Voyages",
@@ -23,7 +19,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <Nav />
         <main>{children}</main>
         <Footer />
-        <ChatWidget />
+        <ChatWidgetLoader />
       </body>
     </html>
   );
