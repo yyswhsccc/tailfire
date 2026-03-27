@@ -1,5 +1,4 @@
-import { streamText, stepCountIs } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
+import { streamText, stepCountIs, convertToModelMessages, type UIMessage } from 'ai'
 import { cookies } from 'next/headers'
 import { createTools } from '@/lib/ai/tools'
 import { chatRateLimit } from '@/lib/rate-limit'
@@ -10,7 +9,16 @@ import { chatRateLimit } from '@/lib/rate-limit'
 
 function resolveModel() {
   const modelId = process.env.AI_MODEL_ID ?? 'claude-haiku-4.5'
-  return anthropic(modelId)
+
+  // If ANTHROPIC_API_KEY is set, use the direct Anthropic provider
+  if (process.env.ANTHROPIC_API_KEY) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { anthropic } = require('@ai-sdk/anthropic')
+    return anthropic(modelId)
+  }
+
+  // Otherwise use AI Gateway — plain string model ID
+  return process.env.AI_GATEWAY_MODEL ?? `anthropic/${modelId}`
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +78,7 @@ export async function POST(request: Request) {
       console.log('[api/chat] rate-limit ok', { ip, remaining, limit })
     }
 
-    const { messages } = await request.json()
+    const { messages }: { messages: UIMessage[] } = await request.json()
 
     // Read the referral cookie for advisor attribution
     const cookieStore = await cookies()
@@ -79,10 +87,13 @@ export async function POST(request: Request) {
     // Create tools with context (advisor slug for lead attribution)
     const tools = createTools({ advisorSlug: refCookie })
 
+    // Convert UI messages to model messages (strips UI metadata, extracts tool results)
+    const modelMessages = await convertToModelMessages(messages)
+
     const result = streamText({
       model: resolveModel(),
       system: systemPrompt,
-      messages,
+      messages: modelMessages,
       tools,
       stopWhen: stepCountIs(5),
     })

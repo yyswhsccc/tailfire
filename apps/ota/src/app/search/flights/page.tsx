@@ -24,11 +24,8 @@ export const metadata: Metadata = {
 // ============================================================================
 
 interface FlightSearchResponse {
-  data: FlightOffer[];
-  meta?: {
-    count: number;
-    links?: Record<string, string>;
-  };
+  results: FlightOffer[];
+  warning?: string;
 }
 
 // ============================================================================
@@ -124,9 +121,9 @@ export default async function FlightsPage({ searchParams }: FlightsPageProps) {
 // ============================================================================
 
 function FlightResults({ flights }: { flights: FlightSearchResponse }) {
-  const { data } = flights;
+  const { results } = flights;
 
-  if (data.length === 0) {
+  if (results.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-muted/30 px-6 py-16 text-center">
         <p className="text-lg font-medium text-[#1A1A1A]">No flights found for this route</p>
@@ -141,7 +138,7 @@ function FlightResults({ flights }: { flights: FlightSearchResponse }) {
     <>
       {/* Results count */}
       <div className="mb-4">
-        <SearchResultsHeader count={data.length} noun="flights" />
+        <SearchResultsHeader count={results.length} noun="flights" />
       </div>
 
       {/* Amadeus latency notice */}
@@ -155,7 +152,7 @@ function FlightResults({ flights }: { flights: FlightSearchResponse }) {
 
       {/* Result cards */}
       <div className="space-y-4">
-        {data.map((offer) => (
+        {results.map((offer) => (
           <FlightResultCard key={offer.id} offer={offer} />
         ))}
       </div>

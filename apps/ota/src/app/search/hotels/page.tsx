@@ -24,7 +24,8 @@ export const metadata: Metadata = {
 // ============================================================================
 
 interface HotelSearchResponse {
-  data: HotelOffer[];
+  results: HotelOffer[];
+  warning?: string;
 }
 
 // ============================================================================
@@ -116,9 +117,9 @@ export default async function HotelsPage({ searchParams }: HotelsPageProps) {
 // ============================================================================
 
 function HotelResults({ hotels }: { hotels: HotelSearchResponse }) {
-  const { data } = hotels;
+  const { results } = hotels;
 
-  if (data.length === 0) {
+  if (results.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-muted/30 px-6 py-16 text-center">
         <p className="text-lg font-medium text-[#1A1A1A]">No hotels found for this destination</p>
@@ -133,13 +134,13 @@ function HotelResults({ hotels }: { hotels: HotelSearchResponse }) {
     <>
       {/* Results count */}
       <div className="mb-4">
-        <SearchResultsHeader count={data.length} noun="hotels" />
+        <SearchResultsHeader count={results.length} noun="hotels" />
       </div>
 
       {/* Result cards */}
       <div className="space-y-4">
-        {data.map((hotel) => (
-          <HotelResultCard key={hotel.hotel.hotelId} hotel={hotel} />
+        {results.map((hotel) => (
+          <HotelResultCard key={hotel.id} hotel={hotel} />
         ))}
       </div>
     </>

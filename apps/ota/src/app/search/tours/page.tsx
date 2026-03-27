@@ -23,14 +23,11 @@ export const metadata: Metadata = {
 // ============================================================================
 
 interface TourSearchResponse {
-  items: Tour[];
-  pagination?: {
-    page: number;
-    pageSize: number;
-    totalItems: number;
-    totalPages: number;
-    hasMore: boolean;
-  };
+  tours: Tour[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 // ============================================================================
@@ -50,7 +47,7 @@ function buildSearchQuery(params: SearchParams): string {
   const qs = new URLSearchParams();
   if (params.q) qs.set("q", params.q);
   if (params.page) qs.set("page", params.page);
-  qs.set("limit", "20");
+  qs.set("pageSize", "20");
   return qs.toString();
 }
 
@@ -158,7 +155,7 @@ function TourSearchForm({ currentQ }: { currentQ: string }) {
 // ============================================================================
 
 function TourResults({
-  tours,
+  tours: response,
   hasFilters,
   currentPage,
   searchParams,
@@ -168,7 +165,7 @@ function TourResults({
   currentPage: number;
   searchParams: SearchParams;
 }) {
-  const { items, pagination } = tours;
+  const { tours: items, total, totalPages } = response;
 
   if (items.length === 0 && hasFilters) {
     return (
@@ -201,7 +198,7 @@ function TourResults({
       {/* Results count */}
       <div className="mb-4">
         <SearchResultsHeader
-          count={pagination?.totalItems ?? items.length}
+          count={total ?? items.length}
           noun="tours"
         />
       </div>
@@ -214,10 +211,10 @@ function TourResults({
       </div>
 
       {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
+      {totalPages > 1 && (
         <TourPagination
           currentPage={currentPage}
-          totalPages={pagination.totalPages}
+          totalPages={totalPages}
           searchParams={searchParams}
         />
       )}
