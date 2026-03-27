@@ -4,7 +4,6 @@ import Link from "next/link";
 
 import { joinArticles } from "@/content/join/articles";
 import { ContentPage } from "@/components/layout/content-page";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 interface Props {
@@ -82,12 +81,18 @@ export default async function JoinArticlePage({ params }: Props) {
 
       {/* CTA */}
       <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-        <Button asChild size="lg" className="bg-[#C59746] text-white hover:bg-[#B08638]">
-          <Link href="/join/register">Start Your Application</Link>
-        </Button>
-        <Button asChild variant="outline" size="lg">
-          <Link href="/join">Back to Join</Link>
-        </Button>
+        <Link
+          href="/join/register"
+          className="inline-flex items-center justify-center rounded-md px-6 py-3 text-sm font-medium bg-[#C59746] text-white hover:bg-[#B08638] transition-colors"
+        >
+          Start Your Application
+        </Link>
+        <Link
+          href="/join"
+          className="inline-flex items-center justify-center rounded-md border border-input px-6 py-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+        >
+          Back to Join
+        </Link>
       </div>
     </ContentPage>
   );

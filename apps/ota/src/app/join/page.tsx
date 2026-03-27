@@ -72,21 +72,18 @@ export default function JoinPage() {
             schedule, from wherever you are.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Button
-              asChild
-              size="lg"
-              className="min-w-44 bg-[#C59746] text-white hover:bg-[#B08638]"
+            <Link
+              href="/join/register"
+              className="inline-flex min-w-44 items-center justify-center rounded-md px-6 py-3 text-sm font-medium bg-[#C59746] text-white hover:bg-[#B08638] transition-colors"
             >
-              <Link href="/join/register">Start Your Application</Link>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="min-w-44 border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              Start Your Application
+            </Link>
+            <Link
+              href="/join/learn-more"
+              className="inline-flex min-w-44 items-center justify-center rounded-md border border-white/30 bg-transparent px-6 py-3 text-sm font-medium text-white hover:bg-white/10 hover:text-white transition-colors"
             >
-              <Link href="/join/learn-more">Learn More</Link>
-            </Button>
+              Learn More
+            </Link>
           </div>
         </div>
       </section>
@@ -192,21 +189,18 @@ export default function JoinPage() {
             Voyages.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Button
-              asChild
-              size="lg"
-              className="min-w-44 bg-white text-[#C59746] hover:bg-white/90"
+            <Link
+              href="/join/register"
+              className="inline-flex min-w-44 items-center justify-center rounded-md px-6 py-3 text-sm font-medium bg-white text-[#C59746] hover:bg-white/90 transition-colors"
             >
-              <Link href="/join/register">Apply Now</Link>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="min-w-44 border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              Apply Now
+            </Link>
+            <Link
+              href="/join/learn-more"
+              className="inline-flex min-w-44 items-center justify-center rounded-md border border-white/40 bg-transparent px-6 py-3 text-sm font-medium text-white hover:bg-white/10 hover:text-white transition-colors"
             >
-              <Link href="/join/learn-more">Learn More</Link>
-            </Button>
+              Learn More
+            </Link>
           </div>
         </div>
       </section>

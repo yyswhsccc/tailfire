@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
@@ -238,21 +237,18 @@ export default function LearnMorePage() {
             application personally within 2 business days.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Button
-              asChild
-              size="lg"
-              className="min-w-44 bg-white text-[#C59746] hover:bg-white/90"
+            <Link
+              href="/join/register"
+              className="inline-flex min-w-44 items-center justify-center rounded-md px-6 py-3 text-sm font-medium bg-white text-[#C59746] hover:bg-white/90 transition-colors"
             >
-              <Link href="/join/register">Start Your Application</Link>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="min-w-44 border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              Start Your Application
+            </Link>
+            <Link
+              href="/join"
+              className="inline-flex min-w-44 items-center justify-center rounded-md border border-white/40 bg-transparent px-6 py-3 text-sm font-medium text-white hover:bg-white/10 hover:text-white transition-colors"
             >
-              <Link href="/join">Back to Join</Link>
-            </Button>
+              Back to Join
+            </Link>
           </div>
         </div>
       </section>
