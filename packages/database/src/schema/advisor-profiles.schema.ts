@@ -5,7 +5,7 @@
  * Each profile is linked to a user_profile and agency.
  */
 
-import { pgTable, uuid, text, boolean, timestamp, jsonb, unique } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, boolean, timestamp, jsonb } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { agencies } from './agencies.schema'
 import { userProfiles } from './user-profiles.schema'
@@ -18,9 +18,10 @@ export const advisorProfiles = pgTable('advisor_profiles', {
   // Primary Key
   id: uuid('id').primaryKey().defaultRandom(),
 
-  // User Association (matches auth.users / user_profiles PK)
+  // User Association (matches auth.users / user_profiles PK) — one profile per user
   userId: uuid('user_id')
     .notNull()
+    .unique()
     .references(() => userProfiles.id, { onDelete: 'restrict' }),
 
   // Agency Association
