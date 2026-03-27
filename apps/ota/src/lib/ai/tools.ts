@@ -227,11 +227,13 @@ export function createTools(ctx: ToolContext = {}) {
     execute: async ({ destination, departureDate, returnDate, cruiseLine }) => {
       try {
         // Use the cruise-repository catalog endpoint (already public via catalog API key)
+        // The catalog uses `q` for text search (ship, port, cruise names) — not region names
+        // For best results, combine destination + cruise line into q param
+        const searchTerms = [destination, cruiseLine].filter(Boolean).join(' ')
         const qs = buildQuery({
           ...(departureDate && { sailDateFrom: departureDate }),
           ...(returnDate && { sailDateTo: returnDate }),
-          ...(cruiseLine && { text: cruiseLine }),
-          ...(destination && { text: destination }),
+          ...(searchTerms && { q: searchTerms }),
           page: 1,
           pageSize: 5,
         })
@@ -260,9 +262,9 @@ export function createTools(ctx: ToolContext = {}) {
             departureDate: c.sailDate,
             endDate: c.endDate,
             nights: c.nights,
-            insidePrice: c.prices?.inside ? `$${c.prices.inside.toLocaleString()}` : null,
-            balconyPrice: c.prices?.balcony ? `$${c.prices.balcony.toLocaleString()}` : null,
-            suitePrice: c.prices?.suite ? `$${c.prices.suite.toLocaleString()}` : null,
+            insidePrice: c.prices?.inside ? formatCents(c.prices.inside, 'CAD') : null,
+            balconyPrice: c.prices?.balcony ? formatCents(c.prices.balcony, 'CAD') : null,
+            suitePrice: c.prices?.suite ? formatCents(c.prices.suite, 'CAD') : null,
           })),
           resultCount: items.length,
           totalResults: data.pagination?.totalItems ?? items.length,
