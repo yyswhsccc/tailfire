@@ -1,24 +1,16 @@
 import { streamText, stepCountIs, convertToModelMessages, type UIMessage } from 'ai'
 import { cookies } from 'next/headers'
+import { openai } from '@ai-sdk/openai'
 import { createTools } from '@/lib/ai/tools'
 import { chatRateLimit } from '@/lib/rate-limit'
 
 // ---------------------------------------------------------------------------
-// Model selection — defaults to Haiku for cost efficiency, override via env
+// Model selection
 // ---------------------------------------------------------------------------
 
 function resolveModel() {
-  const modelId = process.env.AI_MODEL_ID ?? 'claude-haiku-4.5'
-
-  // If ANTHROPIC_API_KEY is set, use the direct Anthropic provider
-  if (process.env.ANTHROPIC_API_KEY) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { anthropic } = require('@ai-sdk/anthropic')
-    return anthropic(modelId)
-  }
-
-  // Otherwise use AI Gateway — plain string model ID
-  return process.env.AI_GATEWAY_MODEL ?? `anthropic/${modelId}`
+  const modelId = process.env.AI_MODEL_ID ?? 'gpt-4o-mini'
+  return openai(modelId)
 }
 
 // ---------------------------------------------------------------------------

@@ -66,13 +66,13 @@ export default function ChatWidget() {
         <>
           {/* Mobile backdrop */}
           <div
-            className="fixed inset-0 z-50 bg-black/40 md:hidden"
+            className="fixed inset-0 z-40 bg-black/40 md:hidden"
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
 
-          {/* Panel */}
-          <div className="fixed inset-0 z-50 flex flex-col md:inset-auto md:bottom-0 md:right-0 md:top-0 md:w-[400px] md:shadow-2xl">
+          {/* Panel — starts below navbar (57px) on desktop */}
+          <div className="fixed inset-0 z-40 flex flex-col md:inset-auto md:bottom-0 md:right-0 md:top-[57px] md:w-[400px] md:shadow-2xl">
             <ChatPanel
               messages={messages}
               status={status}
