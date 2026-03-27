@@ -1,0 +1,209 @@
+<h2>Deals Pages — Mobile</h2>
+<p class="subtitle">Two views: the deals listing (/deals) and the individual deal landing page (/deals/[slug]). Pick a style for each.</p>
+
+<div class="cards">
+
+  <!-- Option A: Magazine-Style Listing + Rich Landing -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background: #FFFFFF; padding: 0; border-radius: 8px; min-height: 640px; position: relative; overflow: hidden;">
+
+        <!-- Nav -->
+        <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f0f0f0;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 24px; height: 24px; background: linear-gradient(135deg, #C59746, #E89E4A); border-radius: 50%;"></div>
+            <span style="color: #1A1A1A; font-family: serif; font-size: 12px; font-weight: bold; letter-spacing: 1px;">PHOENIX VOYAGES</span>
+          </div>
+          <div style="color: #1A1A1A; font-size: 16px;">&#9776;</div>
+        </div>
+
+        <!-- Page header -->
+        <div style="padding: 16px 16px 12px;">
+          <h1 style="font-family: serif; font-size: 22px; color: #1A1A1A; margin: 0 0 4px; letter-spacing: 0.5px;">TRAVEL DEALS</h1>
+          <p style="font-size: 12px; color: #888; margin: 0;">Handpicked offers from our advisors and partners</p>
+        </div>
+
+        <!-- Filter chips -->
+        <div style="padding: 0 16px 12px; display: flex; gap: 6px; overflow-x: auto;">
+          <span style="background: #1A1A1A; color: #fff; font-size: 10px; padding: 6px 12px; border-radius: 16px; white-space: nowrap;">All Deals</span>
+          <span style="background: #f5f5f5; color: #888; font-size: 10px; padding: 6px 12px; border-radius: 16px; white-space: nowrap;">Cruises</span>
+          <span style="background: #f5f5f5; color: #888; font-size: 10px; padding: 6px 12px; border-radius: 16px; white-space: nowrap;">Flights</span>
+          <span style="background: #f5f5f5; color: #888; font-size: 10px; padding: 6px 12px; border-radius: 16px; white-space: nowrap;">Tours</span>
+          <span style="background: #f5f5f5; color: #888; font-size: 10px; padding: 6px 12px; border-radius: 16px; white-space: nowrap;">Hotels</span>
+        </div>
+
+        <!-- Featured deal (large) -->
+        <div style="margin: 0 16px 12px; border-radius: 14px; overflow: hidden; border: 1px solid #E0E0E0;">
+          <div style="background: linear-gradient(135deg, #E89E4A 0%, #C59746 40%, #1a3a5c 100%); height: 140px; position: relative; padding: 14px;">
+            <div style="position: absolute; top: 10px; left: 10px; background: #B33939; color: #fff; font-size: 9px; padding: 3px 10px; border-radius: 10px; font-weight: 700; letter-spacing: 0.5px;">HOT DEAL</div>
+            <div style="position: absolute; bottom: 12px; left: 14px; right: 14px;">
+              <div style="color: rgba(255,255,255,0.7); font-size: 9px; letter-spacing: 1px; text-transform: uppercase;">ROYAL CARIBBEAN</div>
+              <div style="color: #fff; font-size: 18px; font-weight: 700; font-family: serif;">7-Night Caribbean Cruise</div>
+            </div>
+          </div>
+          <div style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 11px; color: #888;">Apr - Jun 2026 &bull; Ft. Lauderdale</div>
+              <div style="font-size: 10px; color: #C59746; margin-top: 2px;">Save up to 40%</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 11px; color: #888; text-decoration: line-through;">$2,099</div>
+              <div style="font-size: 20px; font-weight: 700; color: #1A1A1A;">$1,259</div>
+              <div style="font-size: 10px; color: #888;">/person</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Regular deal cards (compact grid) -->
+        <div style="padding: 0 16px; display: flex; flex-direction: column; gap: 10px;">
+          <!-- Deal row 1 -->
+          <div style="display: flex; gap: 10px;">
+            <div style="flex: 1; border: 1px solid #E0E0E0; border-radius: 12px; overflow: hidden;">
+              <div style="background: linear-gradient(135deg, #2d4a2a, #4a7a46); height: 70px; position: relative; padding: 8px;">
+                <div style="position: absolute; bottom: 6px; left: 8px; color: #fff; font-size: 11px; font-weight: 600;">Alaska Tour</div>
+              </div>
+              <div style="padding: 8px 10px;">
+                <div style="font-size: 10px; color: #888;">10 days &bull; Globus</div>
+                <div style="font-size: 14px; font-weight: 700; color: #1A1A1A;">$3,499</div>
+              </div>
+            </div>
+            <div style="flex: 1; border: 1px solid #E0E0E0; border-radius: 12px; overflow: hidden;">
+              <div style="background: linear-gradient(135deg, #5c3a1a, #8c6a3a); height: 70px; position: relative; padding: 8px;">
+                <div style="position: absolute; bottom: 6px; left: 8px; color: #fff; font-size: 11px; font-weight: 600;">Cancun Resort</div>
+              </div>
+              <div style="padding: 8px 10px;">
+                <div style="font-size: 10px; color: #888;">7 nights &bull; All-Inclusive</div>
+                <div style="font-size: 14px; font-weight: 700; color: #1A1A1A;">$1,899</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deal row 2 -->
+          <div style="display: flex; gap: 10px;">
+            <div style="flex: 1; border: 1px solid #E0E0E0; border-radius: 12px; overflow: hidden;">
+              <div style="background: linear-gradient(135deg, #1a1a3c, #3a3a6c); height: 70px; position: relative; padding: 8px;">
+                <div style="position: absolute; bottom: 6px; left: 8px; color: #fff; font-size: 11px; font-weight: 600;">Med Cruise</div>
+              </div>
+              <div style="padding: 8px 10px;">
+                <div style="font-size: 10px; color: #888;">10 nights &bull; MSC</div>
+                <div style="font-size: 14px; font-weight: 700; color: #1A1A1A;">$1,599</div>
+              </div>
+            </div>
+            <div style="flex: 1; border: 1px solid #E0E0E0; border-radius: 12px; overflow: hidden;">
+              <div style="background: linear-gradient(135deg, #3a1a1a, #6c3a3a); height: 70px; position: relative; padding: 8px;">
+                <div style="position: absolute; bottom: 6px; left: 8px; color: #fff; font-size: 11px; font-weight: 600;">London Flights</div>
+              </div>
+              <div style="padding: 8px 10px;">
+                <div style="font-size: 10px; color: #888;">Round trip &bull; Direct</div>
+                <div style="font-size: 14px; font-weight: 700; color: #1A1A1A;">$649</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A: Magazine Grid</h3>
+      <p>Featured deal at top (large card with hero gradient, price comparison, "HOT DEAL" badge, save percentage). Below: 2-column grid of compact deal tiles with small gradient images. Filter chips at top. Scannable, visual, shows lots of deals per scroll. Good for browsing.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Deal Landing Page (/deals/[slug]) -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background: #FFFFFF; padding: 0; border-radius: 8px; min-height: 640px; position: relative; overflow: hidden;">
+
+        <!-- Hero -->
+        <div style="background: linear-gradient(180deg, #E89E4A 0%, #C59746 40%, #1a3a5c 100%); height: 200px; position: relative; padding: 16px;">
+          <!-- Back + share -->
+          <div style="display: flex; justify-content: space-between;">
+            <div style="background: rgba(0,0,0,0.3); color: #fff; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">&#8592;</div>
+            <div style="background: rgba(0,0,0,0.3); color: #fff; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">&#8599;</div>
+          </div>
+          <!-- Badge -->
+          <div style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: #B33939; color: #fff; font-size: 10px; padding: 4px 12px; border-radius: 12px; font-weight: 700;">LIMITED TIME</div>
+          <!-- Title overlay -->
+          <div style="position: absolute; bottom: 16px; left: 16px; right: 16px;">
+            <div style="color: rgba(255,255,255,0.8); font-size: 10px; letter-spacing: 1px; text-transform: uppercase;">ROYAL CARIBBEAN</div>
+            <h1 style="color: #fff; font-family: serif; font-size: 22px; margin: 4px 0 0; line-height: 1.2;">7-Night Eastern Caribbean Cruise</h1>
+          </div>
+        </div>
+
+        <!-- Price card (overlapping hero) -->
+        <div style="margin: -20px 16px 16px; background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 11px; color: #888;">Starting from</div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span style="font-size: 28px; font-weight: 700; color: #1A1A1A;">$1,259</span>
+              <span style="font-size: 12px; color: #888;">/person</span>
+            </div>
+            <div style="font-size: 11px; color: #B33939; font-weight: 600;">Save $840 (40% off)</div>
+          </div>
+          <div style="background: #C59746; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 600;">Inquire</div>
+        </div>
+
+        <!-- Details -->
+        <div style="padding: 0 16px;">
+          <!-- Quick facts -->
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <div style="flex: 1; background: #faf6f0; border-radius: 10px; padding: 10px; text-align: center;">
+              <div style="font-size: 16px; margin-bottom: 2px;">&#128674;</div>
+              <div style="font-size: 10px; color: #888;">Cruise</div>
+              <div style="font-size: 11px; color: #1A1A1A; font-weight: 600;">7 Nights</div>
+            </div>
+            <div style="flex: 1; background: #faf6f0; border-radius: 10px; padding: 10px; text-align: center;">
+              <div style="font-size: 16px; margin-bottom: 2px;">&#128197;</div>
+              <div style="font-size: 10px; color: #888;">Dates</div>
+              <div style="font-size: 11px; color: #1A1A1A; font-weight: 600;">Apr-Jun '26</div>
+            </div>
+            <div style="flex: 1; background: #faf6f0; border-radius: 10px; padding: 10px; text-align: center;">
+              <div style="font-size: 16px; margin-bottom: 2px;">&#9875;</div>
+              <div style="font-size: 10px; color: #888;">Departs</div>
+              <div style="font-size: 11px; color: #1A1A1A; font-weight: 600;">Ft. Lauderdale</div>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div style="margin-bottom: 16px;">
+            <h3 style="font-family: serif; font-size: 14px; color: #1A1A1A; margin: 0 0 6px; letter-spacing: 0.5px;">ABOUT THIS DEAL</h3>
+            <p style="font-size: 12px; color: #666; line-height: 1.6; margin: 0;">Explore the stunning Eastern Caribbean aboard Royal Caribbean's Harmony of the Seas. Visit Cozumel, Grand Cayman, and Jamaica with all onboard dining and entertainment included.</p>
+          </div>
+
+          <!-- Ports -->
+          <div style="margin-bottom: 16px;">
+            <h3 style="font-family: serif; font-size: 14px; color: #1A1A1A; margin: 0 0 8px; letter-spacing: 0.5px;">PORTS OF CALL</h3>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <span style="background: #f5f5f5; font-size: 11px; padding: 5px 12px; border-radius: 16px; color: #666;">Fort Lauderdale</span>
+              <span style="background: #f5f5f5; font-size: 11px; padding: 5px 12px; border-radius: 16px; color: #666;">Cozumel</span>
+              <span style="background: #f5f5f5; font-size: 11px; padding: 5px 12px; border-radius: 16px; color: #666;">Grand Cayman</span>
+              <span style="background: #f5f5f5; font-size: 11px; padding: 5px 12px; border-radius: 16px; color: #666;">Jamaica</span>
+              <span style="background: #f5f5f5; font-size: 11px; padding: 5px 12px; border-radius: 16px; color: #666;">Labadee</span>
+            </div>
+          </div>
+
+          <!-- AI + Advisor CTAs -->
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <div style="flex: 1; background: #1A1A1A; color: #fff; text-align: center; padding: 12px; border-radius: 10px; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">&#10024; Ask AI About This</div>
+            <div style="flex: 1; background: #f5f5f5; border: 1px solid #E0E0E0; color: #1A1A1A; text-align: center; padding: 12px; border-radius: 10px; font-size: 12px;">Talk to Advisor</div>
+          </div>
+
+          <!-- Validity notice -->
+          <div style="background: #faf6f0; border-radius: 10px; padding: 10px 14px; text-align: center;">
+            <span style="font-size: 11px; color: #888;">Deal valid until <strong style="color: #1A1A1A;">March 31, 2026</strong> &bull; Subject to availability</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B: Individual Deal Landing Page</h3>
+      <p>This is /deals/caribbean-cruise-spring-2026. Golden hour hero with title overlay. Floating price card overlapping hero. Quick fact pills (duration, dates, departure). Description, ports as pills, dual CTAs (Ask AI + Talk to Advisor). Validity notice at bottom. Marketing-optimized for social sharing.</p>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top: 24px; padding: 16px; background: rgba(197,151,70,0.08); border: 1px solid rgba(197,151,70,0.2); border-radius: 12px;">
+  <p style="margin: 0; font-size: 13px; color: #888;">
+    <strong style="color: #C59746;">Note:</strong> These are two different pages — A is the listing (/deals) and B is the detail (/deals/[slug]). You can approve both or suggest changes to either.
+  </p>
+</div>
