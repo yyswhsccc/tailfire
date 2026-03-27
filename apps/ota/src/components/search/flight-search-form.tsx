@@ -5,6 +5,7 @@ import { useCallback, type FormEvent } from "react";
 import { Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { AirportAutocomplete } from "./airport-autocomplete";
 
 interface FlightSearchFormProps {
   compact?: boolean;
@@ -81,42 +82,24 @@ export function FlightSearchForm({ compact = false, className }: FlightSearchFor
         )}
       >
         {/* Origin */}
-        <div>
-          <label
-            htmlFor="flight-origin"
-            className="mb-1 block text-xs font-medium text-muted-foreground"
-          >
-            From (city or airport)
-          </label>
-          <input
-            id="flight-origin"
-            name="origin"
-            type="text"
-            defaultValue={currentOrigin}
-            placeholder="YYZ, Toronto..."
-            required
-            className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm uppercase outline-none placeholder:normal-case placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-        </div>
+        <AirportAutocomplete
+          id="flight-origin"
+          name="origin"
+          label="From (city or airport)"
+          placeholder="Type a city or airport..."
+          defaultValue={currentOrigin}
+          required
+        />
 
         {/* Destination */}
-        <div>
-          <label
-            htmlFor="flight-destination"
-            className="mb-1 block text-xs font-medium text-muted-foreground"
-          >
-            To (city or airport)
-          </label>
-          <input
-            id="flight-destination"
-            name="destination"
-            type="text"
-            defaultValue={currentDestination}
-            placeholder="CUN, Cancun..."
-            required
-            className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm uppercase outline-none placeholder:normal-case placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-        </div>
+        <AirportAutocomplete
+          id="flight-destination"
+          name="destination"
+          label="To (city or airport)"
+          placeholder="Type a city or airport..."
+          defaultValue={currentDestination}
+          required
+        />
 
         {/* Departure Date */}
         <div>
