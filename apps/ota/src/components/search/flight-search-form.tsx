@@ -2,7 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, type FormEvent } from "react";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
+
+import { useSearch } from "./search-page-shell";
 
 import { cn } from "@/lib/utils";
 import { AirportAutocomplete } from "./airport-autocomplete";
@@ -22,6 +24,7 @@ const TRAVEL_CLASS_OPTIONS = [
 export function FlightSearchForm({ compact = false, className }: FlightSearchFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isPending, startSearch } = useSearch();
 
   const currentOrigin = searchParams.get("origin") ?? "";
   const currentDestination = searchParams.get("destination") ?? "";
@@ -59,9 +62,11 @@ export function FlightSearchForm({ compact = false, className }: FlightSearchFor
       if (travelClass) params.set("travelClass", travelClass);
 
       const qs = params.toString();
-      router.push(`/search/flights${qs ? `?${qs}` : ""}`, { scroll: false });
+      startSearch(() => {
+        router.push(`/search/flights${qs ? `?${qs}` : ""}`, { scroll: false });
+      });
     },
-    [router],
+    [router, startSearch],
   );
 
   return (
@@ -207,12 +212,23 @@ export function FlightSearchForm({ compact = false, className }: FlightSearchFor
       <div className={cn("mt-4", compact && "mt-3")}>
         <button
           type="submit"
+          disabled={isPending}
           className={cn(
             "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#C59746] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#B08638] focus-visible:ring-3 focus-visible:ring-[#C59746]/50",
+            isPending && "cursor-not-allowed opacity-70",
           )}
         >
-          <Search className="size-4" />
-          Search Flights
+          {isPending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Searching...
+            </>
+          ) : (
+            <>
+              <Search className="size-4" />
+              Search Flights
+            </>
+          )}
         </button>
       </div>
     </form>

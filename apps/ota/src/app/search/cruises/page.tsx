@@ -7,6 +7,7 @@ import { CruiseSearchForm } from "@/components/search/cruise-search-form";
 import { CruiseResultCard, type CruiseSailing } from "@/components/search/cruise-result-card";
 import { FilterChips, type FilterChipOption } from "@/components/search/filter-chips";
 import { SearchResultsHeader } from "@/components/search/search-results-header";
+import { SearchPageShell } from "@/components/search/search-page-shell";
 import CruisesLoading from "./loading";
 
 export const metadata: Metadata = {
@@ -146,42 +147,44 @@ export default async function CruisesPage({ searchParams }: CruisesPageProps) {
   ]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Page heading */}
-      <div className="mb-6">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
-          {hasFilters ? "CRUISE RESULTS" : "SEARCH CRUISES"}
-        </h1>
-        <p className="mt-2 text-base text-muted-foreground">
-          {hasFilters
-            ? "Browse sailings matching your criteria"
-            : "Find your perfect cruise from hundreds of sailings worldwide"}
-        </p>
-      </div>
+    <SearchPageShell productType="cruises">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Page heading */}
+        <div className="mb-6">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
+            {hasFilters ? "CRUISE RESULTS" : "SEARCH CRUISES"}
+          </h1>
+          <p className="mt-2 text-base text-muted-foreground">
+            {hasFilters
+              ? "Browse sailings matching your criteria"
+              : "Find your perfect cruise from hundreds of sailings worldwide"}
+          </p>
+        </div>
 
-      {/* Search form */}
-      <div className={hasFilters ? "mb-6" : "mb-12"}>
-        <CruiseSearchForm
-          cruiseLines={filters?.cruiseLines ?? []}
-          regions={filters?.regions ?? []}
-          compact={hasFilters}
-        />
-      </div>
-
-      {/* Results section */}
-      {sailings === null ? (
-        <ErrorState />
-      ) : (
-        <Suspense fallback={<CruisesLoading />}>
-          <CruiseResults
-            sailings={sailings}
-            hasFilters={hasFilters}
-            currentPage={Number(params.page) || 1}
-            searchParams={params}
+        {/* Search form */}
+        <div className={hasFilters ? "mb-6" : "mb-12"}>
+          <CruiseSearchForm
+            cruiseLines={filters?.cruiseLines ?? []}
+            regions={filters?.regions ?? []}
+            compact={hasFilters}
           />
-        </Suspense>
-      )}
-    </div>
+        </div>
+
+        {/* Results section */}
+        {sailings === null ? (
+          <ErrorState />
+        ) : (
+          <Suspense fallback={<CruisesLoading />}>
+            <CruiseResults
+              sailings={sailings}
+              hasFilters={hasFilters}
+              currentPage={Number(params.page) || 1}
+              searchParams={params}
+            />
+          </Suspense>
+        )}
+      </div>
+    </SearchPageShell>
   );
 }
 

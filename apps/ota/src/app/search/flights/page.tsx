@@ -6,6 +6,7 @@ import { serviceFetch } from "@/lib/api";
 import { FlightSearchForm } from "@/components/search/flight-search-form";
 import { FlightResultCard, type FlightOffer } from "@/components/search/flight-result-card";
 import { SearchResultsHeader } from "@/components/search/search-results-header";
+import { SearchPageShell } from "@/components/search/search-page-shell";
 import FlightsLoading from "./loading";
 
 export const metadata: Metadata = {
@@ -84,35 +85,37 @@ export default async function FlightsPage({ searchParams }: FlightsPageProps) {
   const fetchFailed = hasFilters && flights === null;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Page heading */}
-      <div className="mb-6">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
-          {hasFilters ? "FLIGHT RESULTS" : "SEARCH FLIGHTS"}
-        </h1>
-        <p className="mt-2 text-base text-muted-foreground">
-          {hasFilters
-            ? "Comparing fares for your route"
-            : "Find the best fares from hundreds of airlines worldwide"}
-        </p>
-      </div>
+    <SearchPageShell productType="flights">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Page heading */}
+        <div className="mb-6">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
+            {hasFilters ? "FLIGHT RESULTS" : "SEARCH FLIGHTS"}
+          </h1>
+          <p className="mt-2 text-base text-muted-foreground">
+            {hasFilters
+              ? "Comparing fares for your route"
+              : "Find the best fares from hundreds of airlines worldwide"}
+          </p>
+        </div>
 
-      {/* Search form */}
-      <div className={hasFilters ? "mb-6" : "mb-12"}>
-        <FlightSearchForm compact={hasFilters} />
-      </div>
+        {/* Search form */}
+        <div className={hasFilters ? "mb-6" : "mb-12"}>
+          <FlightSearchForm compact={hasFilters} />
+        </div>
 
-      {/* Results section */}
-      {fetchFailed ? (
-        <ErrorState />
-      ) : flights ? (
-        <Suspense fallback={<FlightsLoading />}>
-          <FlightResults flights={flights} />
-        </Suspense>
-      ) : (
-        <EmptyPrompt />
-      )}
-    </div>
+        {/* Results section */}
+        {fetchFailed ? (
+          <ErrorState />
+        ) : flights ? (
+          <Suspense fallback={<FlightsLoading />}>
+            <FlightResults flights={flights} />
+          </Suspense>
+        ) : (
+          <EmptyPrompt />
+        )}
+      </div>
+    </SearchPageShell>
   );
 }
 

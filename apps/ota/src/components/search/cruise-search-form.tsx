@@ -2,7 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, type FormEvent } from "react";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
+
+import { useSearch } from "./search-page-shell";
 
 import { cn } from "@/lib/utils";
 
@@ -47,6 +49,7 @@ export function CruiseSearchForm({
 }: CruiseSearchFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isPending, startSearch } = useSearch();
 
   const currentQ = searchParams.get("q") ?? "";
   const currentCruiseLine = searchParams.get("cruiseLineId") ?? "";
@@ -88,9 +91,11 @@ export function CruiseSearchForm({
       if (sortDir) params.set("sortDir", sortDir);
 
       const qs = params.toString();
-      router.push(`/search/cruises${qs ? `?${qs}` : ""}`, { scroll: false });
+      startSearch(() => {
+        router.push(`/search/cruises${qs ? `?${qs}` : ""}`, { scroll: false });
+      });
     },
-    [router, searchParams],
+    [router, searchParams, startSearch],
   );
 
   return (
@@ -195,13 +200,24 @@ export function CruiseSearchForm({
       <div className={cn("mt-4", compact && "mt-3")}>
         <button
           type="submit"
+          disabled={isPending}
           className={cn(
             "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#C59746] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#B08638] focus-visible:ring-3 focus-visible:ring-[#C59746]/50",
             compact ? "w-full sm:w-auto" : "w-full sm:w-auto",
+            isPending && "cursor-not-allowed opacity-70",
           )}
         >
-          <Search className="size-4" />
-          Search Cruises
+          {isPending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Searching...
+            </>
+          ) : (
+            <>
+              <Search className="size-4" />
+              Search Cruises
+            </>
+          )}
         </button>
       </div>
     </form>
