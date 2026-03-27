@@ -144,12 +144,11 @@ function FlightResults({ flights }: { flights: FlightSearchResponse }) {
         <SearchResultsHeader count={results.length} noun="flights" />
       </div>
 
-      {/* Amadeus latency notice */}
+      {/* Live pricing notice */}
       <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         <AlertCircle className="mt-0.5 size-4 shrink-0" />
         <p>
-          Flight availability is live from Amadeus — prices and seats may change.
-          Our advisors can lock in the best fare for you.
+          Prices and seat availability may change. Our advisors can lock in the best fare for you.
         </p>
       </div>
 
