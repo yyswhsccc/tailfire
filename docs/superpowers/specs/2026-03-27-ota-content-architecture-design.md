@@ -1,7 +1,7 @@
 # OTA Content Architecture & AI Companion Platform — Design Specification
 
 **Date:** 2026-03-27
-**Status:** Draft
+**Status:** Reviewed (Codex-validated 2026-03-27)
 **Author:** Claude + Alex Guertin
 **Tagline:** Empowered Consumers, Informed Advisors, Happy Travelers
 
@@ -423,28 +423,32 @@ Family chats with AI about family-friendly options. AI gathers preferences (budg
 
 This spec covers **Phase A (Content Architecture)** which is the first of four phases:
 
-### Phase A: Content Architecture (this spec)
-- Entity pages: destinations, cruise lines, ships, sailings, tours
-- Cache-on-demand enrichment via SerpAPI
-- AI companion panel redesign (journey tracker + insights + chat)
-- Content push layout (desktop side panel, mobile bottom sheet)
-- Planning session data model
-- Page context awareness for AI
+### Phase A: Content Architecture & AI Companion (this spec)
+- Entity pages: destinations, regions, cruise lines, ships, sailings, tours
+- Destinations normalization layer (seed from ports + tour cities)
+- Destination cache with SerpAPI enrichment (stale-while-revalidate)
+- AI companion panel redesign (Zustand store, journey tracker, insights, chat)
+- Content-push layout (desktop side panel, mobile bottom sheet)
+- Anonymous planning sessions with auto-save
+- Optional magic-link auth with Supabase (minimal — Phase A)
+- Contact creation and advisor handoff
+- Planning session → inbound Trip conversion
+- `public_id` slugs for sailings and tours
+- Page context awareness for AI proactive insights
 
-### Phase B: Wishlist & Consumer Accounts (future spec)
-- Consumer authentication
-- Heart/save items to wishlist
-- Planning session persistence across visits
-- Resume from client portal
+### Phase B: Full Consumer Accounts & Wishlist UX (future spec)
+- Full consumer account dashboard
+- Self-serve booking, deposit, and payment
+- Multi-device saved travel library
+- Sharing and collaboration
+- Advanced personalization and recommendation feeds
 
 ### Phase C: Self-Serve Booking (future spec)
-- Deposit payments via supplier APIs
-- Booking → Tailfire Trip with auto-assignment
-- Payment integration
+- Deposit payments via supplier APIs (Traveltek, Amadeus)
+- Booking → Tailfire Trip with auto-assignment and payment
 
 ### Phase D: Client Portal Redesign (future spec)
 - Rebuild with Phoenix Voyages OTA brand
-- Planning sessions view
 - "Continue Planning" → OTA handoff
 - Seamless advisor collaboration UX
 
@@ -471,3 +475,419 @@ This spec covers **Phase A (Content Architecture)** which is the first of four p
 | Amadeus API | Airports | 7,000+ | IATA codes, names, cities |
 | SerpAPI/TripAdvisor | Destinations | On-demand | Photos, reviews, ratings, activities, restaurants |
 | SerpAPI/TripAdvisor | Place types | Restaurants, hotels, attractions, destinations | Full place detail |
+
+---
+
+## 10. Database Schema — Destinations Normalization Layer
+
+The core architectural addition: a normalized `destinations` table that unifies cruise ports, tour cities, hotel cities, and enrichment data into a single addressable entity.
+
+### Destinations Table
+
+```sql
+CREATE TABLE destinations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  normalized_name TEXT NOT NULL,
+  destination_type TEXT NOT NULL CHECK (
+    destination_type IN ('city','port_city','island','region','country','resort_area')
+  ),
+  country_code CHAR(2),
+  admin_area TEXT,
+  latitude NUMERIC(9,6),
+  longitude NUMERIC(9,6),
+  parent_destination_id UUID REFERENCES destinations(id),
+  source_status TEXT NOT NULL DEFAULT 'seeded' CHECK (
+    source_status IN ('seeded','matched','reviewed','hidden')
+  ),
+  content_status TEXT NOT NULL DEFAULT 'seeded' CHECK (
+    content_status IN ('seeded','enriched','reviewed','published')
+  ),
+  summary TEXT,
+  hero_image_url TEXT,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX destinations_name_idx ON destinations(normalized_name, country_code);
+```
+
+### Destination Aliases (multiple names per destination)
+
+```sql
+CREATE TABLE destination_aliases (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  destination_id UUID NOT NULL REFERENCES destinations(id) ON DELETE CASCADE,
+  alias TEXT NOT NULL,
+  normalized_alias TEXT NOT NULL,
+  locale TEXT NOT NULL DEFAULT 'en',
+  source TEXT NOT NULL,
+  is_primary BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### Mapping Tables
+
+```sql
+-- Cruise ports → Destinations
+CREATE TABLE destination_ports (
+  destination_id UUID NOT NULL REFERENCES destinations(id) ON DELETE CASCADE,
+  port_id UUID NOT NULL REFERENCES catalog.cruise_ports(id) ON DELETE CASCADE,
+  match_method TEXT NOT NULL CHECK (match_method IN ('seed','exact','geo','manual')),
+  confidence NUMERIC(5,4) NOT NULL DEFAULT 1.0,
+  is_primary BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (destination_id, port_id),
+  UNIQUE (port_id)
+);
+
+-- Tour cities → Destinations
+CREATE TABLE tour_cities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  normalized_name TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  country_code CHAR(2),
+  latitude NUMERIC(9,6),
+  longitude NUMERIC(9,6),
+  source_hash TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE destination_tour_cities (
+  destination_id UUID NOT NULL REFERENCES destinations(id) ON DELETE CASCADE,
+  tour_city_id UUID NOT NULL REFERENCES tour_cities(id) ON DELETE CASCADE,
+  match_method TEXT NOT NULL CHECK (match_method IN ('exact','geo','manual')),
+  confidence NUMERIC(5,4) NOT NULL DEFAULT 1.0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (destination_id, tour_city_id),
+  UNIQUE (tour_city_id)
+);
+
+-- Regions → Destinations
+CREATE TABLE destination_regions (
+  destination_id UUID NOT NULL REFERENCES destinations(id) ON DELETE CASCADE,
+  cruise_region_id UUID NOT NULL REFERENCES catalog.cruise_regions(id) ON DELETE CASCADE,
+  is_primary BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (destination_id, cruise_region_id)
+);
+```
+
+### Bootstrap Strategy
+
+1. **Seed** one destination per `cruise_ports` entry (7,203 ports → destinations)
+2. **Extract** distinct tour-city candidates from `tours.startCity`, `tours.endCity`, and `tour_itinerary_days.overnightCity` into `tour_cities`
+3. **Match** tour cities to seeded destinations by normalized name + country, then by geo distance (<50km)
+4. **Create** new destinations only for unmatched tour cities
+5. **Admin workflow** for ambiguous matches (manual override)
+
+---
+
+## 11. Enhanced Destination Cache
+
+Stale-while-revalidate with explicit status tracking, error handling, and cost monitoring.
+
+```sql
+CREATE TABLE destination_cache (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  destination_id UUID NOT NULL REFERENCES destinations(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,               -- 'tripadvisor', 'amadeus_activities', 'google_places'
+  locale TEXT NOT NULL DEFAULT 'en',
+  status TEXT NOT NULL DEFAULT 'fresh' CHECK (
+    status IN ('fresh','stale','refreshing','failed','disabled')
+  ),
+  cache_key TEXT NOT NULL,
+  raw_payload JSONB,                  -- original SerpAPI response
+  normalized_payload JSONB,           -- processed/cleaned data
+  summary_md TEXT,                    -- markdown summary for AI
+  source_urls JSONB NOT NULL DEFAULT '[]'::jsonb,
+  fetched_at TIMESTAMPTZ,
+  last_success_at TIMESTAMPTZ,
+  refresh_after_at TIMESTAMPTZ,       -- when to re-fetch
+  expires_at TIMESTAMPTZ,             -- hard expiry
+  last_http_status INTEGER,
+  last_error_code TEXT,
+  last_error_message TEXT,
+  consecutive_failures INTEGER NOT NULL DEFAULT 0,
+  fetch_count INTEGER NOT NULL DEFAULT 0,
+  payload_hash TEXT,                  -- detect if content changed
+  version INTEGER NOT NULL DEFAULT 1,
+  lock_token UUID,                    -- prevent concurrent fetches
+  lock_expires_at TIMESTAMPTZ,
+  cost_units NUMERIC(10,4) NOT NULL DEFAULT 0,  -- SerpAPI credit tracking
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (destination_id, source, locale)
+);
+```
+
+### Operational Rules
+- Serve cached content if `status IN ('fresh', 'stale')`
+- If stale and unlocked → enqueue background refresh
+- Never block page render on live SerpAPI fetch (unless cache is completely missing for first visit)
+- Backoff on failures: 1h → 6h → 24h → 72h
+- Track `cost_units` for SerpAPI budget monitoring
+- `payload_hash` detects if enrichment data actually changed (avoid unnecessary cache updates)
+
+---
+
+## 12. Identity & Authentication Model
+
+### Auth Strategy
+Use **Supabase Auth** — same system as the existing client portal. Do NOT introduce a second auth provider.
+
+### Anonymous → Authenticated Flow
+
+```
+1. Anonymous visitor arrives
+   → Middleware sets ota_vid (visitor ID) + ota_sid (session ID) cookies
+   → Anonymous planning session created tied to ota_vid
+
+2. Consumer provides email (AI lead capture, contact form, newsletter)
+   → Upsert Contact in Tailfire (existing contacts table)
+   → Link planning_session.contact_id to the Contact
+   → Status: "claimed"
+
+3. Consumer signs in (magic link via Supabase Auth)
+   → Upsert client_portal_users record
+   → Merge: reassign ALL planning_sessions from ota_vid to authenticated user
+   → Deduplicate saved items by (session_id, item_type, entity_key)
+   → Consumer can now resume sessions from Client Portal
+
+4. Consumer submits wishlist to advisor
+   → planning_session.status = "converted"
+   → Create Trip in Tailfire with activities from wishlist
+   → Assign advisor (attribution chain or round-robin)
+   → Agent notified
+```
+
+### Merge Rules
+- Match Contact by normalized email + agencyId
+- Reassign all `planning_sessions`, `planning_session_items`, and `ota_referrals` from `ota_vid` to `contact_id` and `client_portal_user_id`
+- Deduplicate saved items by `(session_id, item_type, entity_key)`
+
+### Phase Boundary
+- **Phase A:** Anonymous sessions + email capture + magic-link auth + session→trip conversion
+- **Phase B:** Full consumer account dashboard, multi-device sync, sharing
+
+---
+
+## 13. Planning Sessions — Hybrid Data Model
+
+JSONB for AI transcript/context. Relational tables for saved entities (queryable, dedupable).
+
+### Main Session Table
+
+```sql
+CREATE TABLE planning_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agency_id UUID NOT NULL REFERENCES agencies(id),
+  visitor_token TEXT,                           -- anonymous ota_vid
+  contact_id UUID REFERENCES contacts(id),      -- after email capture
+  client_portal_user_id UUID REFERENCES client_portal_users(id),  -- after sign-in
+  status TEXT NOT NULL DEFAULT 'active' CHECK (
+    status IN ('active','claimed','converted','archived')
+  ),
+  title TEXT,                                   -- auto-generated or consumer-named
+  summary TEXT,                                 -- AI-generated trip summary
+  source_channel TEXT NOT NULL DEFAULT 'ota',
+  preferences JSONB NOT NULL DEFAULT '{}'::jsonb,   -- budget, dates, travelers, mobility
+  session_context JSONB NOT NULL DEFAULT '{}'::jsonb, -- current page, last interaction
+  ai_memory JSONB NOT NULL DEFAULT '{}'::jsonb,      -- AI's accumulated understanding
+  converted_trip_id UUID REFERENCES trips(id),
+  last_activity_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### AI Message History (relational — queryable, token-tracked)
+
+```sql
+CREATE TABLE planning_session_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES planning_sessions(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('system','user','assistant','tool')),
+  content JSONB NOT NULL,
+  tool_name TEXT,
+  model_id TEXT,
+  prompt_tokens INTEGER,
+  completion_tokens INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### Saved Entities (relational — queryable, dedupable, ordered)
+
+```sql
+CREATE TABLE planning_session_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES planning_sessions(id) ON DELETE CASCADE,
+  item_type TEXT NOT NULL CHECK (
+    item_type IN ('destination','region','sailing','tour','hotel','flight','deal','activity','published_trip')
+  ),
+  entity_table TEXT,                    -- e.g., 'cruise_sailings', 'tours'
+  entity_id UUID,                       -- FK to the entity (not enforced — cross-table)
+  entity_public_id TEXT,                -- slug or public ID for URL
+  display_name TEXT NOT NULL,
+  thumbnail_url TEXT,
+  state TEXT NOT NULL DEFAULT 'saved' CHECK (
+    state IN ('suggested','saved','dismissed','selected')
+  ),
+  rank INTEGER NOT NULL DEFAULT 0,      -- display order
+  notes TEXT,                           -- consumer's notes
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,  -- price, dates, etc.
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+---
+
+## 14. AI Companion Panel — Technical Architecture
+
+### State Management: Zustand Store
+
+Use Zustand (not React Context) for cross-route panel state. Keeps the layout server-rendered while the panel is a thin client shell.
+
+```typescript
+type AiPanelState = {
+  isOpen: boolean
+  sessionId?: string
+  prefill?: string
+  pageContext?: {
+    type: string          // 'destination', 'sailing', 'ship', 'tour', etc.
+    slug: string
+    name: string
+    parentContext?: { type: string; slug: string; name: string }
+  }
+  journeyItems: JourneyItem[]
+  open: (opts?: { prefill?: string }) => void
+  close: () => void
+  setPageContext: (ctx: PageContext) => void
+  addJourneyItem: (item: JourneyItem) => void
+  toggleHeart: (itemId: string) => void
+}
+```
+
+### Component Architecture
+
+```
+app/layout.tsx (Server Component — unchanged)
+  └── AiPanelShell (Client Component — thin wrapper)
+      ├── Reads Zustand store for isOpen, sessionId, pageContext
+      ├── Renders panel UI (journey tracker + insights + chat)
+      ├── useChat lives HERE (not app-wide)
+      └── Manages bottom sheet on mobile, side panel on desktop
+
+Detail pages (Server Components):
+  └── PageContextBridge (tiny Client Component)
+      └── useEffect → store.setPageContext({ type, slug, name })
+      └── No UI — just pushes context into Zustand on mount
+```
+
+### Content Push Layout
+
+```tsx
+// In layout.tsx or a layout wrapper:
+<div className="flex min-h-screen">
+  <main className={cn(
+    "flex-1 transition-all duration-300 ease-in-out",
+    panelOpen && "lg:mr-[400px]"
+  )}>
+    {children}
+  </main>
+  <AiPanelShell />
+</div>
+```
+
+The panel is `fixed right-0` with width 400px. When open, `main` gets `margin-right: 400px` so content reflows. Transition is smooth (300ms ease-in-out).
+
+---
+
+## 15. URL Structure — Refined (Codex-validated)
+
+### Slug Strategy
+
+**Sailings and tours use `slug--publicId` pattern:**
+- `public_id`: 8-12 char ULID/Crockford string, created once, immutable
+- `slug_base`: auto-generated from name + date + ship/operator
+- URL: `/sailings/harmony-of-the-seas-2026-11-14-7n-from-miami--7K2M4Q9D`
+- **Resolver:** parse `publicId` from URL, fetch by `public_id`, ignore slug for lookup, 301 redirect if slug changed
+
+**New columns needed:**
+```sql
+ALTER TABLE cruise_sailings ADD COLUMN public_id TEXT UNIQUE;
+ALTER TABLE cruise_sailings ADD COLUMN slug_base TEXT;
+CREATE INDEX cruise_sailings_public_id_idx ON cruise_sailings(public_id);
+```
+
+### Complete Route Map (Revised)
+
+```
+# Search pages
+/search/cruises                    → Search cruise sailings
+/search/flights                    → Search flights
+/search/hotels                     → Search hotels
+/search/tours                      → Search tours
+/search/destinations               → Search/browse destinations (NEW)
+/search/ports                      → Search/browse cruise ports of call
+/search/all-inclusives             → Softvoyage iframe
+
+# Entity detail pages
+/destinations/[slug]               → Destination detail (universal hub)
+/destinations/[slug]/cruises       → Cruises at this destination
+/destinations/[slug]/activities    → Things to do
+/destinations/[slug]/hotels        → Hotels
+/destinations/[slug]/restaurants   → Where to eat
+/destinations/[slug]/tours         → Tours including this destination
+/destinations/[slug]/ports         → Cruise port info
+
+/regions/[slug]                    → Region detail (separate from destinations)
+/cruise-lines/[slug]               → Cruise line detail
+/ships/[slug]                      → Ship detail
+/sailings/[slug]--[publicId]       → Sailing detail (itinerary, cabins, pricing)
+/tours/[slug]--[publicId]          → Tour detail (itinerary, departures)
+
+# Existing pages (unchanged)
+/deals, /deals/[slug]              → Deals
+/advisor/[slug]                    → Advisor micro-site
+/advisors                          → Advisor directory
+/join                              → Agent recruitment
+```
+
+---
+
+## 16. Phase Boundaries (Codex-validated)
+
+### Phase A: Content Architecture & AI Companion (this spec)
+- Entity pages: destinations, regions, cruise lines, ships, sailings, tours
+- Destinations normalization layer (seed from ports + tour cities)
+- Destination cache with SerpAPI enrichment
+- AI companion panel redesign (Zustand store, journey tracker, insights, chat)
+- Content-push layout (desktop side panel, mobile bottom sheet)
+- Anonymous planning sessions with auto-save
+- Optional magic-link auth with Supabase
+- Contact creation and advisor handoff
+- Planning session → inbound Trip conversion
+- `public_id` slugs for sailings and tours
+- Page context awareness for AI proactive insights
+
+### Phase B: Full Consumer Accounts & Wishlist UX (future spec)
+- Full consumer account dashboard
+- Self-serve booking, deposit, and payment
+- Multi-device saved travel library
+- Sharing and collaboration
+- Advanced personalization and recommendation feeds
+
+### Phase C: Self-Serve Booking (future spec)
+- Deposit payments via supplier APIs (Traveltek, Amadeus)
+- Booking → Tailfire Trip with auto-assignment and payment
+
+### Phase D: Client Portal Redesign (future spec)
+- Rebuild with Phoenix Voyages OTA brand
+- "Continue Planning" → OTA handoff
+- Seamless advisor collaboration UX
