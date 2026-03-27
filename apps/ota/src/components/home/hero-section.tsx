@@ -4,6 +4,15 @@ import { useState } from "react";
 import { Send } from "lucide-react";
 import { openChat } from "@/components/chat/chat-widget";
 
+const QUICK_PROMPTS = [
+  { icon: "🚢", label: "Caribbean Cruise", text: "I'm looking for a Caribbean cruise. What are the best options for 2 adults?" },
+  { icon: "🏔️", label: "European Tour", text: "I'd love a guided tour through Europe. What Globus or similar tours do you recommend?" },
+  { icon: "🏖️", label: "All-Inclusive Resort", text: "Find me an all-inclusive beach resort in Mexico or the Dominican Republic" },
+  { icon: "🌊", label: "Alaska Adventure", text: "I want to experience Alaska — cruise or land tour, what are my options?" },
+  { icon: "🍷", label: "River Cruise", text: "I'm interested in a European river cruise — Rhine, Danube, or Douro. What's available?" },
+  { icon: "✈️", label: "Fly & Stay Deal", text: "Help me find a flight and hotel package for a warm destination in winter" },
+];
+
 export function HeroSection() {
   const [inputValue, setInputValue] = useState("");
 
@@ -67,6 +76,20 @@ export function HeroSection() {
             >
               <Send className="size-4" />
             </button>
+          </div>
+
+          {/* Quick-start prompts */}
+          <div className="mx-auto mt-4 flex max-w-2xl flex-wrap items-center justify-center gap-2">
+            {QUICK_PROMPTS.map((prompt) => (
+              <button
+                key={prompt.label}
+                type="button"
+                onClick={() => openChat(prompt.text)}
+                className="rounded-full border border-[#C59746]/30 bg-[#C59746]/5 px-3.5 py-1.5 text-xs font-medium text-[#C59746] transition-all hover:border-[#C59746]/60 hover:bg-[#C59746]/10 active:scale-95"
+              >
+                {prompt.icon} {prompt.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
