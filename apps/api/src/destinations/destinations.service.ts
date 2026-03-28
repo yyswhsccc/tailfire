@@ -166,7 +166,7 @@ export class DestinationsService {
         summary: cacheEntry.summaryMd ?? (payload?.summary as string | null) ?? null,
         photos: (payload?.photos as Array<{ url: string; caption?: string }>) ?? [],
         topAttractions:
-          (payload?.topAttractions as Array<{ title: string; rating: number; description: string }>) ?? [],
+          (payload?.topResults as Array<{ title: string; rating: number; description: string }>) ?? [],
         averageRating: (payload?.averageRating as number | null) ?? null,
         totalReviewCount: (payload?.totalReviewCount as number | null) ?? null,
         lastEnrichedAt: cacheEntry.fetchedAt ? cacheEntry.fetchedAt.toISOString() : null,
