@@ -30,7 +30,7 @@ export class SoftvoyageService {
     private readonly configService: ConfigService,
   ) {
     this.cacheTtl = parseInt(
-      this.configService.get<string>('VACATION_SEARCH_CACHE_TTL', `${DEFAULT_CACHE_TTL}`),
+      this.configService.get<string>('VACATION_PRICING_CACHE_TTL', `${DEFAULT_CACHE_TTL}`),
       10,
     )
 
@@ -68,7 +68,7 @@ export class SoftvoyageService {
   async submitSearch(
     dto: VacationLiveSearchDto,
   ): Promise<
-    | { cached: true; results: VacationSearchResult[] }
+    | { cached: true; results: VacationSearchResult[]; fetchedAt: string }
     | { cached: false; jobId: string }
   > {
     const nbAdults = dto.nbAdults ?? 2
@@ -98,7 +98,8 @@ export class SoftvoyageService {
         const cached = await this.redis.get(cacheKey)
         if (cached) {
           this.logger.debug(`Cache hit for ${cacheKey}`)
-          return { cached: true, results: JSON.parse(cached) as VacationSearchResult[] }
+          const parsed = JSON.parse(cached) as { results: VacationSearchResult[]; fetchedAt: string }
+          return { cached: true, results: parsed.results, fetchedAt: parsed.fetchedAt }
         }
       } catch (err) {
         this.logger.warn(`Redis cache lookup failed: ${err}`)
@@ -140,7 +141,7 @@ export class SoftvoyageService {
       jobId,
       attempts: 2,
       backoff: { type: 'exponential', delay: 5000 },
-      removeOnComplete: { age: 3600 }, // Keep completed jobs for 1 hour
+      removeOnComplete: { age: 900 }, // Align with cache TTL (15 min)
       removeOnFail: { age: 3600 },
     })
 
@@ -160,6 +161,7 @@ export class SoftvoyageService {
   ): Promise<{
     status: 'processing' | 'completed' | 'failed'
     results?: VacationSearchResult[]
+    fetchedAt?: string
   }> {
     const job = await this.queue.getJob(jobId)
     if (!job) {
@@ -175,9 +177,11 @@ export class SoftvoyageService {
         try {
           const cached = await this.redis.get(returnValue.cacheKey)
           if (cached) {
+            const parsed = JSON.parse(cached) as { results: VacationSearchResult[]; fetchedAt: string }
             return {
               status: 'completed',
-              results: JSON.parse(cached) as VacationSearchResult[],
+              results: parsed.results,
+              fetchedAt: parsed.fetchedAt,
             }
           }
         } catch (err) {

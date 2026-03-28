@@ -21,7 +21,7 @@ import { SoftvoyageResultParserService } from './softvoyage-result-parser.servic
 // Default cache TTL: 15 minutes
 const DEFAULT_CACHE_TTL = 900
 
-@Processor(QUEUES.VACATION_SEARCH)
+@Processor(QUEUES.VACATION_SEARCH, { concurrency: 2 })
 @Injectable()
 export class SoftvoyageSearchProcessor extends WorkerHost {
   private readonly logger = new Logger(SoftvoyageSearchProcessor.name)
@@ -45,7 +45,7 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
     this.codeAg = this.configService.get<string>('SOFTVOYAGE_VCO_CODE_AG', 'VCO')
     this.alias = this.configService.get<string>('SOFTVOYAGE_VCO_ALIAS', 'YAQ')
     this.cacheTtl = parseInt(
-      this.configService.get<string>('VACATION_SEARCH_CACHE_TTL', `${DEFAULT_CACHE_TTL}`),
+      this.configService.get<string>('VACATION_PRICING_CACHE_TTL', `${DEFAULT_CACHE_TTL}`),
       10,
     )
 
@@ -157,10 +157,16 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
         `Parsed ${results.length} hotel results for ${gatewayCode} -> ${destDep} [${job.id}]`,
       )
 
-      // 8. Cache results in Redis
+      // 8. Cache results in Redis (with fetchedAt timestamp)
+      const fetchedAt = new Date().toISOString()
       if (this.redis && results.length > 0) {
         try {
-          await this.redis.set(cacheKey, JSON.stringify(results), 'EX', this.cacheTtl)
+          await this.redis.set(
+            cacheKey,
+            JSON.stringify({ results, fetchedAt }),
+            'EX',
+            this.cacheTtl,
+          )
           this.logger.debug(`Cached ${results.length} results at key ${cacheKey} (TTL: ${this.cacheTtl}s)`)
         } catch (err) {
           this.logger.warn(`Failed to cache results: ${err}`)

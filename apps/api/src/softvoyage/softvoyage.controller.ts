@@ -12,10 +12,11 @@ import {
   Get,
   Body,
   Param,
-  HttpCode,
+  Res,
   HttpStatus,
   UseGuards,
 } from '@nestjs/common'
+import type { Response } from 'express'
 import { ApiTags, ApiHeader, ApiSecurity, ApiResponse } from '@nestjs/swagger'
 import { Public } from '../auth/decorators/public.decorator'
 import { CatalogAuthGuard, CatalogThrottleGuard } from '../common/guards'
@@ -40,25 +41,24 @@ export class SoftvoyageController {
    * Returns cached results immediately (200) or a jobId for polling (202).
    */
   @Post('search')
-  @HttpCode(HttpStatus.OK) // Default; overridden to 202 when queued
   @ApiResponse({ status: 200, description: 'Cached results returned immediately' })
   @ApiResponse({ status: 202, description: 'Search queued — poll with jobId' })
   async submitSearch(
     @Body() dto: VacationLiveSearchDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.softvoyageService.submitSearch(dto)
 
     if (result.cached) {
+      res.status(HttpStatus.OK)
       return {
         cached: true,
         results: result.results,
-        fetchedAt: new Date().toISOString(),
+        fetchedAt: result.fetchedAt,
       }
     }
 
-    // Return 202 Accepted for queued searches
-    // NestJS doesn't support dynamic status codes natively from @HttpCode,
-    // so we embed the status hint in the response body for the client.
+    res.status(HttpStatus.ACCEPTED)
     return {
       cached: false,
       jobId: result.jobId,
@@ -72,21 +72,27 @@ export class SoftvoyageController {
   @Get('search/:jobId')
   @ApiResponse({ status: 200, description: 'Search completed or failed' })
   @ApiResponse({ status: 202, description: 'Search still processing' })
-  async getSearchResults(@Param('jobId') jobId: string) {
+  async getSearchResults(
+    @Param('jobId') jobId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const result = await this.softvoyageService.getSearchResults(jobId)
 
     if (result.status === 'completed') {
+      res.status(HttpStatus.OK)
       return {
         status: 'completed',
         results: result.results,
-        fetchedAt: new Date().toISOString(),
+        fetchedAt: result.fetchedAt,
       }
     }
 
     if (result.status === 'processing') {
+      res.status(HttpStatus.ACCEPTED)
       return { status: 'processing' }
     }
 
+    res.status(HttpStatus.OK)
     return { status: 'failed' }
   }
 }
