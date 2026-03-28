@@ -21,11 +21,12 @@ export function DestinationHero({ destination }: { destination: DestinationDetai
       <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A] via-[#1A1A1A]/50 to-transparent" />
 
       <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-24 sm:px-6 lg:px-8 lg:pb-14 lg:pt-32">
-        <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-[#C59746]">
-          <MapPin className="size-3" />
-          {destination.destinationType.replace('_', ' ')}
-          {destination.countryCode && ` \u00b7 ${destination.countryCode}`}
-        </p>
+        {destination.countryCode && (
+          <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-[#C59746]">
+            <MapPin className="size-3" />
+            {destination.countryCode}
+          </p>
+        )}
 
         <h1 className="font-display text-3xl font-bold tracking-tight text-white md:text-5xl">
           {destination.name}

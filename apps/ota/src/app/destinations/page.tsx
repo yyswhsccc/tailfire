@@ -7,7 +7,7 @@ export const revalidate = 3600
 
 export const metadata: Metadata = {
   title: 'Destinations',
-  description: 'Explore cruise destinations worldwide. Browse ports of call, discover things to do, and plan your perfect cruise.',
+  description: 'Explore travel destinations worldwide. Discover things to do, find cruises, tours, hotels, and plan your perfect trip.',
 }
 
 interface DestinationsPageProps {
@@ -16,9 +16,10 @@ interface DestinationsPageProps {
 
 export default async function DestinationsPage({ searchParams }: DestinationsPageProps) {
   const { search, type, page } = await searchParams
+  // Show all destination types by default — this is travel discovery, not a cruise port directory
   const data = await fetchDestinations({
     search,
-    type: type || 'port_city',
+    type: type || undefined,
     page: page ? parseInt(page) : 1,
     pageSize: 24,
   })
@@ -30,7 +31,7 @@ export default async function DestinationsPage({ searchParams }: DestinationsPag
           DESTINATIONS
         </h1>
         <p className="mt-2 text-base text-muted-foreground">
-          Explore {data.total.toLocaleString()} cruise destinations worldwide
+          Explore {data.total.toLocaleString()} destinations worldwide
         </p>
       </div>
 
