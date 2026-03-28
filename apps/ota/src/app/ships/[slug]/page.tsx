@@ -2,7 +2,6 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { fetchShipBySlug, fetchShipImages, fetchShipSailings, fetchShipCabinSummary, fetchShipDestinations, fetchShipDecks } from '@/lib/fetchers/ships'
-import { SafeImage } from '@/components/hub/safe-image'
 import { DeckPlanViewer } from '@/components/hub/deck-plan-viewer'
 import { HubHero } from '@/components/hub/hub-hero'
 import { HubHeroMeta } from '@/components/hub/hub-hero-meta'
@@ -113,20 +112,18 @@ export default async function ShipHubPage({ params }: Props) {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {cabinSummary.map((cabin) => (
                 <div key={cabin.category} className="overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm">
-                  <div className="relative h-32 overflow-hidden">
+                  <div className="h-32 overflow-hidden bg-[#f5f5f0]">
+                    {/* Raw <img> — Traveltek cabin images are 15MB+, too large for Next.js image proxy */}
                     {cabin.imageUrl ? (
-                      <SafeImage
+                      <img
                         src={cabin.imageUrl}
                         alt={cabin.category}
-                        fill
-                        className="object-cover"
-                        sizes="25vw"
-                        fallback={
-                          <div className="flex h-full w-full items-center justify-center bg-[#f5f5f0] text-2xl">🛏️</div>
-                        }
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center bg-[#f5f5f0] text-2xl">🛏️</div>
+                      <div className="flex h-full items-center justify-center text-2xl">🛏️</div>
                     )}
                   </div>
                   <div className="p-4 text-center">
