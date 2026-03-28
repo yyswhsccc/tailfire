@@ -112,16 +112,44 @@ export class DestinationsService {
       throw new NotFoundException(`Destination with slug "${slug}" not found`)
     }
 
-    // Get port mappings with port names (join destinationPorts → cruisePorts)
-    const portMappings = await this.db.client
-      .select({
-        portId: destinationPorts.portId,
-        isPrimary: destinationPorts.isPrimary,
-        portName: cruisePorts.name,
-      })
-      .from(destinationPorts)
-      .leftJoin(cruisePorts, eq(destinationPorts.portId, cruisePorts.id))
-      .where(eq(destinationPorts.destinationId, destination.id))
+    // Run all independent queries in parallel (ports, aliases, cache)
+    // The cruise count is EXPENSIVE (FDW cross-join) so we skip it here
+    // and let the frontend fetch it lazily via the /cruises facet endpoint.
+    const [portMappings, aliasRows, cacheEntries] = await Promise.all([
+      // Port mappings with port names
+      this.db.client
+        .select({
+          portId: destinationPorts.portId,
+          isPrimary: destinationPorts.isPrimary,
+          portName: cruisePorts.name,
+        })
+        .from(destinationPorts)
+        .leftJoin(cruisePorts, eq(destinationPorts.portId, cruisePorts.id))
+        .where(eq(destinationPorts.destinationId, destination.id)),
+
+      // Aliases
+      this.db.client
+        .select({ alias: destinationAliases.alias })
+        .from(destinationAliases)
+        .where(eq(destinationAliases.destinationId, destination.id)),
+
+      // Enrichment cache
+      this.db.client
+        .select({
+          normalizedPayload: destinationCache.normalizedPayload,
+          summaryMd: destinationCache.summaryMd,
+          fetchedAt: destinationCache.fetchedAt,
+        })
+        .from(destinationCache)
+        .where(
+          and(
+            eq(destinationCache.destinationId, destination.id),
+            eq(destinationCache.source, 'tripadvisor'),
+            eq(destinationCache.status, 'fresh'),
+          ),
+        )
+        .limit(1),
+    ])
 
     const ports = portMappings.map((p) => ({
       portId: p.portId,
@@ -129,32 +157,10 @@ export class DestinationsService {
       isPrimary: p.isPrimary,
     }))
 
-    // Get aliases — flatten to string[]
-    const aliasRows = await this.db.client
-      .select({ alias: destinationAliases.alias })
-      .from(destinationAliases)
-      .where(eq(destinationAliases.destinationId, destination.id))
-
     const aliases = aliasRows.map((r) => r.alias)
 
-    // Get enrichment cache (tripadvisor, fresh only)
-    const [cacheEntry] = await this.db.client
-      .select({
-        normalizedPayload: destinationCache.normalizedPayload,
-        summaryMd: destinationCache.summaryMd,
-        fetchedAt: destinationCache.fetchedAt,
-      })
-      .from(destinationCache)
-      .where(
-        and(
-          eq(destinationCache.destinationId, destination.id),
-          eq(destinationCache.source, 'tripadvisor'),
-          eq(destinationCache.status, 'fresh'),
-        ),
-      )
-      .limit(1)
-
-    // Parse enrichment from normalizedPayload
+    // Parse enrichment from cache
+    const cacheEntry = cacheEntries[0]
     let enrichment: {
       summary: string | null
       photos: Array<{ url: string; caption?: string }>
@@ -177,28 +183,8 @@ export class DestinationsService {
       }
     }
 
-    // Count active future sailings that stop at this destination's ports
-    let cruiseCount = 0
-    const portIds = ports.map((p) => p.portId)
-
-    if (portIds.length > 0) {
-      const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
-
-      const [countRow] = await this.db.client
-        .select({ count: sql<number>`count(distinct ${cruiseSailingStops.sailingId})::int` })
-        .from(cruiseSailingStops)
-        .innerJoin(
-          cruiseSailings,
-          and(
-            eq(cruiseSailingStops.sailingId, cruiseSailings.id),
-            eq(cruiseSailings.isActive, true),
-            gt(cruiseSailings.sailDate, today),
-          ),
-        )
-        .where(inArray(cruiseSailingStops.portId, portIds))
-
-      cruiseCount = countRow?.count ?? 0
-    }
+    // Skip expensive FDW cruise count — frontend fetches this lazily via /cruises facet
+    const cruiseCount = 0
 
     return {
       ...destination,
