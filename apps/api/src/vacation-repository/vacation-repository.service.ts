@@ -10,7 +10,7 @@
  * - Filter option helpers for UI dropdowns
  */
 
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { eq, and, gte, lte, ilike, asc, desc, sql, count, exists } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import {
@@ -20,6 +20,7 @@ import {
   vacationGatewayDestinations,
   vacationHotelEnrichment,
 } from '@tailfire/database'
+import { EnrichmentDispatcherService } from '../vacation-enrichment/services/enrichment-dispatcher.service'
 import type {
   VacationHotelSearchDto,
   VacationHotelSearchResponseDto,
@@ -30,10 +31,14 @@ import type {
 
 @Injectable()
 export class VacationRepositoryService {
+  private readonly logger = new Logger(VacationRepositoryService.name)
   private readonly DEFAULT_PAGE_SIZE = 20
   private readonly MAX_PAGE_SIZE = 50
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly enrichmentDispatcher: EnrichmentDispatcherService,
+  ) {}
 
   // ============================================================================
   // LIST GATEWAYS
@@ -282,6 +287,20 @@ export class VacationRepositoryService {
     // Determine enrichment staleness
     const hasEnrichment = row.enrichedAt !== null
     const isStale = hasEnrichment && row.expiresAt !== null && row.expiresAt < new Date()
+
+    // Dispatch enrichment if missing or stale (async, non-blocking)
+    if (!hasEnrichment || isStale) {
+      const destination = row.destinationName ?? ''
+      this.enrichmentDispatcher
+        .dispatchEnrichment(row.id, row.name, destination)
+        .catch((err) => {
+          this.logger.warn({
+            message: 'Failed to dispatch enrichment',
+            hotelId: row.id,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        })
+    }
 
     const enrichment: VacationEnrichmentData | null = hasEnrichment
       ? {
