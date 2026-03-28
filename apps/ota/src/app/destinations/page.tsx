@@ -17,12 +17,15 @@ interface DestinationsPageProps {
 export default async function DestinationsPage({ searchParams }: DestinationsPageProps) {
   const { search, type, page } = await searchParams
   // Show all destination types by default — this is travel discovery, not a cruise port directory
-  const data = await fetchDestinations({
-    search,
-    type: type || undefined,
-    page: page ? parseInt(page) : 1,
-    pageSize: 24,
-  })
+  let data = { destinations: [], total: 0, page: 1, totalPages: 0 }
+  try {
+    data = await fetchDestinations({
+      search,
+      type: type || undefined,
+      page: page ? parseInt(page) : 1,
+      pageSize: 24,
+    })
+  } catch { /* API unavailable at build time — ISR fills on first request */ }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
