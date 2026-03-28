@@ -5,7 +5,7 @@ import type { Region } from '@/types/entities'
 export function RegionCard({ region }: { region: Region }) {
   return (
     <Link
-      href={`/search/cruises?regionId=${region.id}`}
+      href={`/regions/${region.slug}`}
       className="group flex items-center gap-4 rounded-xl border border-border bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
     >
       <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#C59746]/10">
