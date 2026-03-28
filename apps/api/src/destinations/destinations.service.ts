@@ -276,7 +276,10 @@ export class DestinationsService {
 
     // 4. Get paginated sailing IDs via a subquery approach: get distinct sailing IDs first
     const sailingIdRows = await this.db.client
-      .selectDistinct({ sailingId: cruiseSailingStops.sailingId })
+      .selectDistinct({
+        sailingId: cruiseSailingStops.sailingId,
+        sailDate: cruiseSailings.sailDate,
+      })
       .from(cruiseSailingStops)
       .innerJoin(
         cruiseSailings,
