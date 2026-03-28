@@ -1,4 +1,4 @@
-import Image from 'next/image'
+import { SafeImage } from './safe-image'
 import { HubBackButton } from './hub-back-button'
 
 interface HubHeroProps {
@@ -14,7 +14,7 @@ export function HubHero({ title, badge, subtitle, imageUrl, children, urgencyBad
   return (
     <div className="relative overflow-hidden bg-[#1A1A1A]">
       {imageUrl && (
-        <Image src={imageUrl} alt={title} fill className="object-cover" sizes="100vw" priority />
+        <SafeImage src={imageUrl} alt={title} fill className="object-cover" sizes="100vw" priority hideOnError />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/15" />
       <div className="absolute left-0 right-0 top-0 z-10 px-4 pt-4 sm:px-10 sm:pt-5">

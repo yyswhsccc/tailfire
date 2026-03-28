@@ -141,8 +141,8 @@ export interface RegionDetail extends Region {
   description: string | null
   upcomingSailingCount: number
   destinations: Array<{
-    portId: string
-    portName: string
+    id: string
+    name: string
     country: string | null
   }>
 }

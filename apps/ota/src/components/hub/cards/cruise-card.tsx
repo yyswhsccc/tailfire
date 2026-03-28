@@ -38,7 +38,9 @@ export function CruiseCard({
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          hideOnError
+          fallback={
+            <div className="flex h-full w-full items-center justify-center bg-[#1A1A1A] text-2xl text-[#C59746]">🚢</div>
+          }
         />
         <span className="absolute right-2.5 top-2.5 rounded-lg bg-white/92 px-2.5 py-1 text-[10px] font-semibold text-[#C59746] backdrop-blur">
           🚢 {nights} Nights

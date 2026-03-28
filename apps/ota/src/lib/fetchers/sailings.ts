@@ -1,9 +1,36 @@
 import { catalogFetch } from '@/lib/api'
 import type { SailingDetail } from '@/types/entities'
 
+interface RawSailingResponse {
+  id: string
+  name: string
+  sailDate: string
+  endDate: string
+  nights: number
+  metadata?: { cruise_code?: string }
+  ship?: { id: string; name: string; slug: string; imageUrl: string | null; shipClass: string | null }
+  cruiseLine?: { id: string; name: string; slug: string; logoUrl: string | null }
+  embarkPort?: { id: string; name: string }
+  embarkPortName?: string
+  disembarkPort?: { id: string; name: string }
+  disembarkPortName?: string
+  priceSummary?: {
+    cheapestInside: number | null
+    cheapestOceanview: number | null
+    cheapestBalcony: number | null
+    cheapestSuite: number | null
+  }
+  itinerary?: Array<{
+    dayNumber: number
+    portName: string
+    isSeaDay: boolean
+    arrivalTime: string | null
+    departureTime: string | null
+  }>
+}
+
 export async function fetchSailingById(id: string): Promise<SailingDetail> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const raw = await catalogFetch<any>(`/cruise-repository/sailings/${id}`, {
+  const raw = await catalogFetch<RawSailingResponse>(`/cruise-repository/sailings/${id}`, {
     next: { revalidate: 1800, tags: ['sailings', `sailing-${id}`] },
   })
 
@@ -41,7 +68,7 @@ export async function fetchSailingById(id: string): Promise<SailingDetail> {
       balcony: raw.priceSummary?.cheapestBalcony ?? null,
       suite: raw.priceSummary?.cheapestSuite ?? null,
     },
-    itinerary: (raw.itinerary || []).map((stop: any) => ({
+    itinerary: (raw.itinerary || []).map((stop) => ({
       dayNumber: stop.dayNumber,
       portName: stop.portName,
       isSeaDay: stop.isSeaDay,

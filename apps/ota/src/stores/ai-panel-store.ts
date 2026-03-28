@@ -57,17 +57,23 @@ export const useAiPanelStore = create<AiPanelState>((set) => ({
   setSessionId: (id) => set({ sessionId: id }),
 
   addJourneyItem: (item) =>
-    set((s) => ({
-      journeyItems: [
-        ...s.journeyItems,
-        {
-          ...item,
-          id: crypto.randomUUID(),
-          hearted: false,
-          addedAt: new Date().toISOString(),
-        },
-      ],
-    })),
+    set((s) => {
+      const exists = s.journeyItems.some(
+        (i) => i.type === item.type && i.slug === item.slug,
+      )
+      if (exists) return s
+      return {
+        journeyItems: [
+          ...s.journeyItems,
+          {
+            ...item,
+            id: crypto.randomUUID(),
+            hearted: false,
+            addedAt: new Date().toISOString(),
+          },
+        ],
+      }
+    }),
 
   toggleHeart: (itemId) =>
     set((s) => ({

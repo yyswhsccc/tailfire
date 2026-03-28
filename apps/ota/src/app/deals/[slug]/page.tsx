@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 
 import { publicFetch } from '@/lib/api'
 import type { Deal } from '@/types/deal'
@@ -171,18 +172,18 @@ export default async function DealPage({ params }: DealPageProps) {
 
       <FeedSection title="📞 Book This Deal">
         <div className="flex flex-col gap-3 sm:flex-row">
-          <a
+          <Link
             href="/contact"
             className="inline-flex items-center justify-center rounded-[10px] bg-[#C59746] px-7 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#B08638]"
           >
             Inquire Now
-          </a>
-          <a
+          </Link>
+          <Link
             href="/search/cruises"
             className="inline-flex items-center justify-center rounded-[10px] border border-[#e0e0e0] bg-white px-7 py-3 text-sm font-semibold text-[#1A1A1A] transition-colors hover:bg-[#f9f9f9]"
           >
             Browse All Cruises
-          </a>
+          </Link>
         </div>
         {validUntil && (
           <p className="mt-4 text-xs text-[#aaa]">

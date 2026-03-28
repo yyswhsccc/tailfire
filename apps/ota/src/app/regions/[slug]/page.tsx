@@ -59,9 +59,9 @@ export default async function RegionHubPage({ params }: Props) {
       {region.destinations.length > 0 && (
         <FeedSection title={`📍 Destinations in the ${region.name}`}>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {region.destinations.map((dest: any, i: number) => (
+            {region.destinations.map((dest, i) => (
               <div key={i} className="rounded-2xl border border-[#f0f0f0] bg-white p-4">
-                <p className="text-sm font-semibold text-[#1A1A1A]">{dest.portName || dest.name || 'Unknown'}</p>
+                <p className="text-sm font-semibold text-[#1A1A1A]">{dest.name}</p>
                 {dest.country && <p className="mt-0.5 text-xs text-[#888]">{dest.country}</p>}
               </div>
             ))}
