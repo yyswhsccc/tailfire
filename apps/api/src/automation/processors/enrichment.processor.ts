@@ -22,6 +22,7 @@ import { StorageService } from '../../trips/storage.service'
 import { GeocodingService } from '../../trips/geocoding.service'
 import { CatalogMatcherService } from '../../catalog-matcher/catalog-matcher.service'
 import { DatabaseService } from '../../db/database.service'
+import { AutomationService } from '../automation.service'
 import { QUEUES, JOB_TYPES } from '../automation.types'
 import type {
   HotelPhotoEnrichmentJobData,
@@ -47,6 +48,7 @@ export class EnrichmentProcessor extends WorkerHost {
     private readonly catalogMatcher: CatalogMatcherService,
     private readonly geocodingService: GeocodingService,
     private readonly db: DatabaseService,
+    private readonly automationService: AutomationService,
   ) {
     super()
   }
@@ -356,8 +358,24 @@ export class EnrichmentProcessor extends WorkerHost {
     }
   }
 
+  @OnWorkerEvent('active')
+  async onActive(job: Job) {
+    this.logger.debug(`Enrichment job ${job.id} started processing`)
+    if (job.id) {
+      await this.automationService.updateJobHistory(QUEUES.ENRICHMENT, job.id, 'processing')
+    }
+  }
+
+  @OnWorkerEvent('completed')
+  async onCompleted(job: Job) {
+    this.logger.debug(`Enrichment job ${job.id} completed`)
+    if (job.id) {
+      await this.automationService.updateJobHistory(QUEUES.ENRICHMENT, job.id, 'completed')
+    }
+  }
+
   @OnWorkerEvent('failed')
-  onFailed(job: Job, error: Error): void {
+  async onFailed(job: Job, error: Error) {
     this.logger.error({
       message: 'Enrichment job failed',
       jobId: job.id,
@@ -365,5 +383,8 @@ export class EnrichmentProcessor extends WorkerHost {
       error: error.message,
       attemptsMade: job.attemptsMade,
     })
+    if (job.id) {
+      await this.automationService.updateJobHistory(QUEUES.ENRICHMENT, job.id, 'failed', error.message)
+    }
   }
 }
