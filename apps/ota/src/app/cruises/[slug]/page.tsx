@@ -8,7 +8,7 @@ import { CtaBar } from '@/components/entity/cta-bar'
 import { ItineraryTimeline } from '@/components/cruises/itinerary-timeline'
 import { CabinPriceGrid } from '@/components/cruises/cabin-price-grid'
 import { PageContextBridge } from '@/components/page-context-bridge'
-import { Calendar, Moon, Ship } from 'lucide-react'
+import { Moon, Ship } from 'lucide-react'
 
 export const revalidate = 1800
 
