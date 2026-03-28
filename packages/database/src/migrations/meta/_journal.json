@@ -1261,6 +1261,13 @@
       "when": 1774915200000,
       "tag": "20260327120000_destinations_normalization",
       "breakpoints": true
+    },
+    {
+      "idx": 180,
+      "version": "7",
+      "when": 1774918600000,
+      "tag": "20260327130000_destination_cache",
+      "breakpoints": true
     }
   ]
 }
