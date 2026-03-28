@@ -215,3 +215,8 @@ export * from './destination-aliases.schema'
 export * from './destination-ports.schema'
 export * from './destination-regions.schema'
 export * from './destination-cache.schema'
+
+// Planning sessions (AI Concierge journey tracking)
+export * from './planning-sessions.schema'
+export * from './planning-session-messages.schema'
+export * from './planning-session-items.schema'
