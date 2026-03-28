@@ -224,6 +224,10 @@ export * from './destination-ports.schema'
 export * from './destination-regions.schema'
 export * from './destination-cache.schema'
 
+// Vacation enrichment and bridging (public schema)
+export * from './vacation-hotel-enrichment.schema'
+export * from './destination-vacation-destinations.schema'
+
 // Planning sessions (AI Concierge journey tracking)
 export * from './planning-sessions.schema'
 export * from './planning-session-messages.schema'
