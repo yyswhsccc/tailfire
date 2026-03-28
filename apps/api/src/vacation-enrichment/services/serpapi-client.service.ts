@@ -5,7 +5,7 @@
  * Provides Google Maps and Google Search endpoints for hotel enrichment.
  *
  * SerpAPI base: https://serpapi.com/search.json
- * API key env: SERPAPI_KEY
+ * API key env: SERPAPI_API_KEY
  */
 
 import { Injectable, Logger } from '@nestjs/common'
@@ -74,9 +74,9 @@ export class SerpApiClientService {
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
   ) {
-    this.apiKey = this.configService.get<string>('SERPAPI_KEY', '')
+    this.apiKey = this.configService.get<string>('SERPAPI_API_KEY', '')
     if (!this.apiKey) {
-      this.logger.warn('SERPAPI_KEY not configured — SerpAPI calls will fail')
+      this.logger.warn('SERPAPI_API_KEY not configured — SerpAPI calls will fail')
     }
   }
 
