@@ -1254,6 +1254,13 @@
       "when": 1774872600000,
       "tag": "20260326173303_add_ota_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 179,
+      "version": "7",
+      "when": 1774915200000,
+      "tag": "20260327120000_destinations_normalization",
+      "breakpoints": true
     }
   ]
 }

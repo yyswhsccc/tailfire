@@ -208,3 +208,9 @@ export * from './deals.schema'
 export * from './advisor-featured-deals.schema'
 export * from './ota-referrals.schema'
 export * from './ota-published-trips.schema'
+
+// Destinations normalization (unified hub for ports, cities, regions)
+export * from './destinations.schema'
+export * from './destination-aliases.schema'
+export * from './destination-ports.schema'
+export * from './destination-regions.schema'
