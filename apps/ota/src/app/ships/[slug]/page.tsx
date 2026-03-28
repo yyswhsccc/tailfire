@@ -120,7 +120,6 @@ export default async function ShipHubPage({ params }: Props) {
                         alt={cabin.category}
                         className="h-full w-full object-cover"
                         loading="lazy"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center text-2xl">🛏️</div>
