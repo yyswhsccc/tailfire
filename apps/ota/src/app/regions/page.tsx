@@ -10,7 +10,8 @@ export const metadata: Metadata = {
 }
 
 export default async function RegionsPage() {
-  const regions = await fetchRegions()
+  let regions: Awaited<ReturnType<typeof fetchRegions>> = []
+  try { regions = await fetchRegions() } catch { /* API unavailable at build time — ISR fills on first request */ }
   const sorted = [...regions].sort((a, b) => b.sailingCount - a.sailingCount)
 
   return (

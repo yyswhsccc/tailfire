@@ -10,7 +10,8 @@ export const metadata: Metadata = {
 }
 
 export default async function CruiseLinesPage() {
-  const lines = await fetchCruiseLines()
+  let lines: Awaited<ReturnType<typeof fetchCruiseLines>> = []
+  try { lines = await fetchCruiseLines() } catch { /* API unavailable at build time */ }
   const sorted = [...lines].sort((a, b) => b.sailingCount - a.sailingCount)
   const featured = sorted.filter((l) => l.sailingCount > 0)
   const other = sorted.filter((l) => l.sailingCount === 0)
