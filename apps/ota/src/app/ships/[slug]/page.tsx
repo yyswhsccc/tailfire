@@ -79,21 +79,6 @@ export default async function ShipHubPage({ params }: Props) {
 
       <FeedDivider />
 
-      {deckPlans.filter(d => d.deckPlanUrl).length > 0 && (
-        <>
-          <FeedSection title="🗺️ Deck Plans">
-            <DeckPlanViewer decks={deckPlans} shipName={ship.name} />
-          </FeedSection>
-          <FeedDivider />
-        </>
-      )}
-
-      {images.images.length > 0 && (
-        <FeedSection title="📸 Ship Gallery">
-          <ShipGallery images={images.images} />
-        </FeedSection>
-      )}
-
       {shipSailings.sailings.length > 0 && (
         <>
           <FeedSection
@@ -170,6 +155,21 @@ export default async function ShipHubPage({ params }: Props) {
           </FeedSection>
           <FeedDivider />
         </>
+      )}
+
+      {deckPlans.filter(d => d.deckPlanUrl).length > 0 && (
+        <>
+          <FeedSection title="🗺️ Deck Plans">
+            <DeckPlanViewer decks={deckPlans} shipName={ship.name} />
+          </FeedSection>
+          <FeedDivider />
+        </>
+      )}
+
+      {images.images.length > 0 && (
+        <FeedSection title="📸 Ship Gallery">
+          <ShipGallery images={images.images} />
+        </FeedSection>
       )}
     </>
   )
