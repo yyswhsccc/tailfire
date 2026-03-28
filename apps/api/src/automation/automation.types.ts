@@ -344,6 +344,15 @@ export interface VacationSearchJobData {
   cacheKey: string
 }
 
+/**
+ * Vacation hotel enrichment job — enriches a hotel with Google Places and TripAdvisor data
+ */
+export interface VacationHotelEnrichmentJobData {
+  hotelId: string
+  hotelName: string
+  destination: string
+}
+
 // ============================================================================
 // Job Options
 // ============================================================================
