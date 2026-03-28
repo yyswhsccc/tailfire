@@ -607,7 +607,7 @@ export function NearbyScroll({ title, viewAllHref, items }: NearbyScrollProps) {
 - Create: `apps/ota/src/app/destinations/[slug]/sections/activities-section.tsx`
 - Create: `apps/ota/src/app/destinations/[slug]/sections/photos-section.tsx`
 
-- [ ] **Step 1:** Rewrite the destination page as a streaming hub. Hero + context render instantly. Cruises and activities stream via Suspense. Flights are client-fetched:
+- [ ] **Step 1:** Rewrite the destination page as a streaming hub. Hero + context render instantly. Cruises stream via Suspense. Activities + photos render from cached enrichment:
 
 ```tsx
 // page.tsx
@@ -793,7 +793,7 @@ export function DestinationPhotosSection({ photos }: Props) {
 - [ ] **Step 3:** Start `turbo dev`, test `/destinations/miami-florida`:
   - Hero with image + 3-layer text contrast
   - Description + pills
-  - Flights section (client-side, with input for origin)
+  - No flights section in 3A (deferred to 3B)
   - Cruise cards streaming in via Suspense
   - Activity cards from enrichment
   - Photo mosaic
@@ -806,7 +806,7 @@ export function DestinationPhotosSection({ photos }: Props) {
 - [ ] Both type checks pass
 - [ ] Hero text readable on bright AND dark images
 - [ ] Cards with no image don't render (SafeImage + null return)
-- [ ] Flights section works as client component (no SSR hydration errors)
+- [ ] No stale flight references in rendered page
 - [ ] Cruise section streams in via Suspense (skeleton → cards)
 - [ ] Mobile layout tested at 375px
 - [ ] PageContextBridge fires on page load
