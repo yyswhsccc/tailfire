@@ -7,7 +7,7 @@
 
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { DatabaseService } from '../db/database.service'
-import { eq, and, ilike, sql, or } from 'drizzle-orm'
+import { eq, and, ilike, sql, or, inArray, gt } from 'drizzle-orm'
 
 export interface DestinationFilters {
   type?: string
@@ -87,7 +87,15 @@ export class DestinationsService {
   // ============================================================================
 
   async findBySlug(slug: string) {
-    const { destinations, destinationPorts, destinationAliases } = this.db.schema
+    const {
+      destinations,
+      destinationPorts,
+      destinationAliases,
+      destinationCache,
+      cruisePorts,
+      cruiseSailingStops,
+      cruiseSailings,
+    } = this.db.schema
 
     // Get the destination
     const [destination] = await this.db.client
@@ -100,22 +108,103 @@ export class DestinationsService {
       throw new NotFoundException(`Destination with slug "${slug}" not found`)
     }
 
-    // Get port mappings
-    const ports = await this.db.client
-      .select()
+    // Get port mappings with port names (join destinationPorts → cruisePorts)
+    const portMappings = await this.db.client
+      .select({
+        portId: destinationPorts.portId,
+        isPrimary: destinationPorts.isPrimary,
+        portName: cruisePorts.name,
+      })
       .from(destinationPorts)
+      .leftJoin(cruisePorts, eq(destinationPorts.portId, cruisePorts.id))
       .where(eq(destinationPorts.destinationId, destination.id))
 
-    // Get aliases
-    const aliases = await this.db.client
-      .select()
+    const ports = portMappings.map((p) => ({
+      portId: p.portId,
+      portName: p.portName ?? null,
+      isPrimary: p.isPrimary,
+    }))
+
+    // Get aliases — flatten to string[]
+    const aliasRows = await this.db.client
+      .select({ alias: destinationAliases.alias })
       .from(destinationAliases)
       .where(eq(destinationAliases.destinationId, destination.id))
+
+    const aliases = aliasRows.map((r) => r.alias)
+
+    // Get enrichment cache (tripadvisor, fresh only)
+    const [cacheEntry] = await this.db.client
+      .select({
+        normalizedPayload: destinationCache.normalizedPayload,
+        summaryMd: destinationCache.summaryMd,
+        fetchedAt: destinationCache.fetchedAt,
+      })
+      .from(destinationCache)
+      .where(
+        and(
+          eq(destinationCache.destinationId, destination.id),
+          eq(destinationCache.source, 'tripadvisor'),
+          eq(destinationCache.status, 'fresh'),
+        ),
+      )
+      .limit(1)
+
+    // Parse enrichment from normalizedPayload
+    let enrichment: {
+      summary: string | null
+      photos: Array<{ url: string; caption?: string }>
+      topAttractions: Array<{ title: string; rating: number; description: string }>
+      averageRating: number | null
+      totalReviewCount: number | null
+      lastEnrichedAt: string | null
+    } | null = null
+
+    if (cacheEntry) {
+      const payload = cacheEntry.normalizedPayload as Record<string, unknown> | null
+      enrichment = {
+        summary: cacheEntry.summaryMd ?? (payload?.summary as string | null) ?? null,
+        photos: (payload?.photos as Array<{ url: string; caption?: string }>) ?? [],
+        topAttractions:
+          (payload?.topAttractions as Array<{ title: string; rating: number; description: string }>) ?? [],
+        averageRating: (payload?.averageRating as number | null) ?? null,
+        totalReviewCount: (payload?.totalReviewCount as number | null) ?? null,
+        lastEnrichedAt: cacheEntry.fetchedAt ? cacheEntry.fetchedAt.toISOString() : null,
+      }
+    }
+
+    // Count active future sailings that stop at this destination's ports
+    let cruiseCount = 0
+    const portIds = ports.map((p) => p.portId)
+
+    if (portIds.length > 0) {
+      const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+
+      const [countRow] = await this.db.client
+        .select({ count: sql<number>`count(distinct ${cruiseSailingStops.sailingId})::int` })
+        .from(cruiseSailingStops)
+        .innerJoin(
+          cruiseSailings,
+          and(
+            eq(cruiseSailingStops.sailingId, cruiseSailings.id),
+            eq(cruiseSailings.isActive, true),
+            gt(cruiseSailings.sailDate, today),
+          ),
+        )
+        .where(inArray(cruiseSailingStops.portId, portIds))
+
+      cruiseCount = countRow?.count ?? 0
+    }
 
     return {
       ...destination,
       ports,
       aliases,
+      enrichment,
+      stats: {
+        cruiseCount,
+        tourCount: 0,
+      },
     }
   }
 
