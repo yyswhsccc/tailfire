@@ -54,7 +54,8 @@ function dollarsToCents(raw: string): number {
 @Injectable()
 export class SoftvoyageResultParserService {
   /**
-   * Parse Softvoyage VCM HTML results page into structured data.
+   * Parse Softvoyage HTML results page into structured data.
+   * Works with both VCO (public widget) and VCM (agent portal) output.
    * Expects the HTML to contain `table[id^="hotel-"]` elements.
    */
   parseResults(html: string): VacationSearchResult[] {
