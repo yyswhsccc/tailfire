@@ -39,6 +39,25 @@ export async function fetchShipImages(
   }
 }
 
+export async function fetchShipCabinSummary(shipId: string): Promise<Array<{
+  category: string
+  count: number
+  imageUrl: string | null
+}>> {
+  return catalogFetch(`/cruise-repository/ships/${shipId}/cabins/summary`, {
+    next: { revalidate: 86400, tags: ['ship-cabins', `ship-cabins-${shipId}`] },
+  })
+}
+
+export async function fetchShipDestinations(shipId: string): Promise<Array<{
+  portName: string
+  sailingCount: number
+}>> {
+  return catalogFetch(`/cruise-repository/ships/${shipId}/destinations`, {
+    next: { revalidate: 3600, tags: ['ship-destinations', `ship-destinations-${shipId}`] },
+  })
+}
+
 export async function fetchShipSailings(shipId: string, pageSize = 4): Promise<{
   sailings: Array<{
     id: string; name: string; sailDate: string; nights: number;

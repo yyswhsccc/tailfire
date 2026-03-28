@@ -242,6 +242,42 @@ export class CruiseRepositoryController {
   }
 
   // ============================================================================
+  // SHIP CABIN SUMMARY
+  // ============================================================================
+
+  /**
+   * Get cabin category summary for a ship.
+   * GET /cruise-repository/ships/:shipId/cabins/summary
+   */
+  @Get('ships/:shipId/cabins/summary')
+  @ApiOperation({ summary: 'Get cabin category summary for a ship' })
+  @ApiParam({ name: 'shipId', description: 'Ship UUID' })
+  @ApiResponse({ status: 200, description: 'Cabin category summary' })
+  async getShipCabinSummary(@Param('shipId', ParseUUIDPipe) shipId: string) {
+    return this.cruiseRepository.getShipCabinSummary(shipId)
+  }
+
+  // ============================================================================
+  // SHIP DESTINATIONS
+  // ============================================================================
+
+  /**
+   * Get destinations this ship visits.
+   * GET /cruise-repository/ships/:shipId/destinations
+   */
+  @Get('ships/:shipId/destinations')
+  @ApiOperation({ summary: 'Get destinations this ship visits' })
+  @ApiParam({ name: 'shipId', description: 'Ship UUID' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Max destinations to return (default: 12)' })
+  @ApiResponse({ status: 200, description: 'List of destinations with sailing counts' })
+  async getShipDestinations(
+    @Param('shipId', ParseUUIDPipe) shipId: string,
+    @Query('limit', new DefaultValuePipe(12), ParseIntPipe) limit: number,
+  ) {
+    return this.cruiseRepository.getShipDestinations(shipId, limit)
+  }
+
+  // ============================================================================
   // SAILING BY PUBLIC ID (MUST be before sailings/:id)
   // ============================================================================
 

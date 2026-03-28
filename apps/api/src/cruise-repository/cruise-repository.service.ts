@@ -966,6 +966,75 @@ export class CruiseRepositoryService {
   }
 
   // ============================================================================
+  // SHIP CABIN SUMMARY
+  // ============================================================================
+
+  async getShipCabinSummary(shipId: string): Promise<Array<{
+    category: string
+    count: number
+    imageUrl: string | null
+  }>> {
+    const { cruiseShipCabinTypes } = this.db.schema
+
+    const rows = await this.db.db
+      .select({
+        category: cruiseShipCabinTypes.cabinCategory,
+        count: sql<number>`count(*)::int`,
+        imageUrl: sql<string>`min(${cruiseShipCabinTypes.imageUrl})`,
+      })
+      .from(cruiseShipCabinTypes)
+      .where(eq(cruiseShipCabinTypes.shipId, shipId))
+      .groupBy(cruiseShipCabinTypes.cabinCategory)
+      .orderBy(sql`CASE ${cruiseShipCabinTypes.cabinCategory}
+        WHEN 'inside' THEN 1
+        WHEN 'oceanview' THEN 2
+        WHEN 'balcony' THEN 3
+        WHEN 'suite' THEN 4
+        ELSE 5
+      END`)
+
+    return rows.map((r) => ({
+      category: r.category,
+      count: Number(r.count),
+      imageUrl: r.imageUrl || null,
+    }))
+  }
+
+  // ============================================================================
+  // SHIP DESTINATIONS
+  // ============================================================================
+
+  async getShipDestinations(shipId: string, limit = 12): Promise<Array<{
+    portName: string
+    sailingCount: number
+  }>> {
+    const { cruiseSailings, cruiseSailingStops } = this.db.schema
+
+    const rows = await this.db.db
+      .select({
+        portName: cruiseSailingStops.portName,
+        count: sql<number>`count(distinct ${cruiseSailingStops.sailingId})::int`,
+      })
+      .from(cruiseSailingStops)
+      .innerJoin(cruiseSailings, eq(cruiseSailingStops.sailingId, cruiseSailings.id))
+      .where(
+        and(
+          eq(cruiseSailings.shipId, shipId),
+          eq(cruiseSailings.isActive, true),
+          eq(cruiseSailingStops.isSeaDay, false),
+        ),
+      )
+      .groupBy(cruiseSailingStops.portName)
+      .orderBy(sql`count(distinct ${cruiseSailingStops.sailingId}) desc`)
+      .limit(limit)
+
+    return rows.map((r) => ({
+      portName: r.portName,
+      sailingCount: Number(r.count),
+    }))
+  }
+
+  // ============================================================================
   // HELPERS
   // ============================================================================
 

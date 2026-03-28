@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { fetchShipBySlug, fetchShipImages, fetchShipSailings } from '@/lib/fetchers/ships'
+import { fetchShipBySlug, fetchShipImages, fetchShipSailings, fetchShipCabinSummary, fetchShipDestinations } from '@/lib/fetchers/ships'
+import { SafeImage } from '@/components/hub/safe-image'
 import { HubHero } from '@/components/hub/hub-hero'
 import { HubHeroMeta } from '@/components/hub/hub-hero-meta'
 import { HubHeroCta } from '@/components/hub/hub-hero-cta'
@@ -30,11 +31,12 @@ export default async function ShipHubPage({ params }: Props) {
   let ship
   try { ship = await fetchShipBySlug(slug) } catch { notFound() }
 
-  let images: { images: ShipImage[] } = { images: [] }
-  try { images = await fetchShipImages(ship.id, 1, 12) } catch {}
-
-  let shipSailings = { sailings: [] as any[], total: 0 }
-  try { shipSailings = await fetchShipSailings(ship.id, 4) } catch {}
+  const [images, shipSailings, cabinSummary, shipDestinations] = await Promise.all([
+    fetchShipImages(ship.id, 1, 12).catch(() => ({ images: [] as ShipImage[] })),
+    fetchShipSailings(ship.id, 4).catch(() => ({ sailings: [] as any[], total: 0 })),
+    fetchShipCabinSummary(ship.id).catch(() => [] as Array<{ category: string; count: number; imageUrl: string | null }>),
+    fetchShipDestinations(ship.id).catch(() => [] as Array<{ portName: string; sailingCount: number }>),
+  ])
 
   const metaItems: Array<{ label: string }> = []
   if (ship.passengerCapacity) metaItems.push({ label: `👥 ${ship.passengerCapacity.toLocaleString()} guests` })
@@ -102,6 +104,45 @@ export default async function ShipHubPage({ params }: Props) {
                   nights={s.nights}
                   cheapestPriceCents={s.cheapestInsideCents}
                 />
+              ))}
+            </div>
+          </FeedSection>
+          <FeedDivider />
+        </>
+      )}
+
+      {cabinSummary.length > 0 && (
+        <>
+          <FeedSection title="🛏️ Cabin Categories">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {cabinSummary.map((cabin) => (
+                <div key={cabin.category} className="overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm">
+                  {cabin.imageUrl && (
+                    <div className="relative h-32 overflow-hidden">
+                      <SafeImage src={cabin.imageUrl} alt={cabin.category} fill className="object-cover" sizes="25vw" hideOnError />
+                    </div>
+                  )}
+                  <div className="p-4 text-center">
+                    <p className="text-sm font-semibold capitalize text-[#1A1A1A]">{cabin.category}</p>
+                    <p className="mt-0.5 text-xs text-[#888]">{cabin.count} room type{cabin.count !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </FeedSection>
+          <FeedDivider />
+        </>
+      )}
+
+      {shipDestinations.length > 0 && (
+        <>
+          <FeedSection title={`📍 Destinations ${ship.name} Visits`}>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {shipDestinations.map((dest, i) => (
+                <div key={i} className="rounded-2xl border border-[#f0f0f0] bg-white p-4">
+                  <p className="text-sm font-semibold text-[#1A1A1A]">{dest.portName}</p>
+                  <p className="mt-0.5 text-xs text-[#888]">{dest.sailingCount} sailing{dest.sailingCount !== 1 ? 's' : ''}</p>
+                </div>
               ))}
             </div>
           </FeedSection>
