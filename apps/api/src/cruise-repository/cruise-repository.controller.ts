@@ -85,6 +85,19 @@ export class CruiseRepositoryController {
   }
 
   /**
+   * Get a single cruise line by slug.
+   * GET /cruise-repository/lines/by-slug/:slug
+   */
+  @Get('lines/by-slug/:slug')
+  @ApiOperation({ summary: 'Get cruise line detail by slug' })
+  @ApiParam({ name: 'slug', description: 'Cruise line slug' })
+  @ApiResponse({ status: 200, description: 'Cruise line detail' })
+  @ApiResponse({ status: 404, description: 'Cruise line not found' })
+  async getLineBySlug(@Param('slug') slug: string) {
+    return this.cruiseRepository.getLineBySlug(slug)
+  }
+
+  /**
    * Get a single cruise line with ships list and upcoming sailing count.
    * GET /cruise-repository/lines/:id
    */
@@ -110,6 +123,19 @@ export class CruiseRepositoryController {
   @ApiResponse({ status: 200, description: 'List of regions' })
   async getRegions() {
     return this.cruiseRepository.getRegions()
+  }
+
+  /**
+   * Get a single region by slug.
+   * GET /cruise-repository/regions/by-slug/:slug
+   */
+  @Get('regions/by-slug/:slug')
+  @ApiOperation({ summary: 'Get region detail by slug' })
+  @ApiParam({ name: 'slug', description: 'Region slug' })
+  @ApiResponse({ status: 200, description: 'Region detail with destinations' })
+  @ApiResponse({ status: 404, description: 'Region not found' })
+  async getRegionBySlug(@Param('slug') slug: string) {
+    return this.cruiseRepository.getRegionBySlug(slug)
   }
 
   /**
@@ -140,6 +166,19 @@ export class CruiseRepositoryController {
   @ApiResponse({ status: 200, description: 'List of ships' })
   async getShips(@Query('lineId') lineId?: string) {
     return this.cruiseRepository.getShips(lineId)
+  }
+
+  /**
+   * Get a single ship by slug.
+   * GET /cruise-repository/ships/by-slug/:slug
+   */
+  @Get('ships/by-slug/:slug')
+  @ApiOperation({ summary: 'Get ship detail by slug' })
+  @ApiParam({ name: 'slug', description: 'Ship slug' })
+  @ApiResponse({ status: 200, description: 'Ship detail' })
+  @ApiResponse({ status: 404, description: 'Ship not found' })
+  async getShipBySlug(@Param('slug') slug: string) {
+    return this.cruiseRepository.getShipBySlug(slug)
   }
 
   /**

@@ -1120,6 +1120,17 @@ export class CruiseRepositoryService {
     }
   }
 
+  async getLineBySlug(slug: string) {
+    const { cruiseLines } = this.db.schema
+    const [line] = await this.db.db
+      .select({ id: cruiseLines.id })
+      .from(cruiseLines)
+      .where(eq(cruiseLines.slug, slug))
+      .limit(1)
+    if (!line) throw new NotFoundException(`Cruise line with slug "${slug}" not found`)
+    return this.getLineDetail(line.id)
+  }
+
   // ============================================================================
   // SHIPS
   // ============================================================================
@@ -1259,6 +1270,17 @@ export class CruiseRepositoryService {
         : null,
       upcomingSailingCount: Number(countResult?.count ?? 0),
     }
+  }
+
+  async getShipBySlug(slug: string) {
+    const { cruiseShips } = this.db.schema
+    const [ship] = await this.db.db
+      .select({ id: cruiseShips.id })
+      .from(cruiseShips)
+      .where(eq(cruiseShips.slug, slug))
+      .limit(1)
+    if (!ship) throw new NotFoundException(`Ship with slug "${slug}" not found`)
+    return this.getShipDetail(ship.id)
   }
 
   // ============================================================================
@@ -1411,5 +1433,16 @@ export class CruiseRepositoryService {
         }
       }),
     }
+  }
+
+  async getRegionBySlug(slug: string) {
+    const { cruiseRegions } = this.db.schema
+    const [region] = await this.db.db
+      .select({ id: cruiseRegions.id })
+      .from(cruiseRegions)
+      .where(eq(cruiseRegions.slug, slug))
+      .limit(1)
+    if (!region) throw new NotFoundException(`Region with slug "${slug}" not found`)
+    return this.getRegionDetail(region.id)
   }
 }
