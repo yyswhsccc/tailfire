@@ -17,7 +17,7 @@ interface DestinationsPageProps {
 export default async function DestinationsPage({ searchParams }: DestinationsPageProps) {
   const { search, type, page } = await searchParams
   // Show all destination types by default — this is travel discovery, not a cruise port directory
-  let data = { destinations: [], total: 0, page: 1, totalPages: 0 }
+  let data: Awaited<ReturnType<typeof fetchDestinations>> = { destinations: [], total: 0, page: 1, pageSize: 24, totalPages: 0 }
   try {
     data = await fetchDestinations({
       search,
