@@ -11,7 +11,7 @@ export class VacationHotelSearchDto {
   sortDir?: 'asc' | 'desc'
 }
 
-export class VacationHotelSearchResponseDto {
+export interface VacationHotelSearchResponseDto {
   items: VacationHotelSummary[]
   total: number
   page: number
