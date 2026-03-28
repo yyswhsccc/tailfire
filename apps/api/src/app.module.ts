@@ -32,6 +32,7 @@ import { GlobusModule } from './globus/globus.module'
 import { TourImportModule } from './tour-import/tour-import.module'
 import { VacationImportModule } from './vacation-import/vacation-import.module'
 import { TourRepositoryModule } from './tour-repository/tour-repository.module'
+import { VacationRepositoryModule } from './vacation-repository/vacation-repository.module'
 import { TemplatesModule } from './templates/templates.module'
 import { UserProfilesModule } from './user-profiles/user-profiles.module'
 import { UsersModule } from './users/users.module'
@@ -138,6 +139,9 @@ import { DestinationsModule } from './destinations/destinations.module'
 
     // Tour repository (search/detail API)
     TourRepositoryModule,
+
+    // Vacation package catalog browse
+    VacationRepositoryModule,
 
     // Itinerary & Package Templates (Library)
     TemplatesModule,
