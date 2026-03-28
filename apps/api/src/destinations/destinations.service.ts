@@ -97,8 +97,6 @@ export class DestinationsService {
       destinationAliases,
       destinationCache,
       cruisePorts,
-      cruiseSailingStops,
-      cruiseSailings,
     } = this.db.schema
 
     // Get the destination
