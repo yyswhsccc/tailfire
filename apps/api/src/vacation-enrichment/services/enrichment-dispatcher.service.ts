@@ -41,11 +41,16 @@ export class EnrichmentDispatcherService {
   ): Promise<string | null> {
     const jobId = `vacation-enrich-${hotelId}`
 
-    // Check if a job with this ID already exists (any state)
+    // Only dedup if an active/waiting job exists — allow re-enrichment for completed/failed
     const existing = await this.queue.getJob(jobId)
     if (existing) {
-      this.logger.debug(`Enrichment job already exists for hotel ${hotelId} (${hotelName})`)
-      return null
+      const state = await existing.getState()
+      if (state === 'active' || state === 'waiting' || state === 'delayed') {
+        this.logger.debug(`Enrichment job already ${state} for hotel ${hotelId} (${hotelName})`)
+        return null
+      }
+      // Remove completed/failed job so we can dispatch a fresh one
+      await existing.remove()
     }
 
     const data: VacationHotelEnrichmentJobData = {

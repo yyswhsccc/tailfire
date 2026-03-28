@@ -12,7 +12,7 @@ import { InternalApiKeyGuard } from '../cruise-import/guards/internal-api-key.gu
 import { DatabaseService } from '../db/database.service'
 import { EnrichmentDispatcherService } from './services'
 import { vacationHotels, vacationHotelEnrichment } from '@tailfire/database'
-import { eq, count, lt } from 'drizzle-orm'
+import { eq, and, count, lt } from 'drizzle-orm'
 
 // ============================================================================
 // CONTROLLER
@@ -64,29 +64,33 @@ export class VacationEnrichmentController {
   @Get('stats')
   async getStats() {
     // Total active hotels
-    const [{ total }] = await this.db.client
+    const totalResult = await this.db.client
       .select({ total: count(vacationHotels.id) })
       .from(vacationHotels)
       .where(eq(vacationHotels.isActive, true))
+    const total = Number(totalResult[0]?.total ?? 0)
 
-    // Enriched count
-    const [{ enriched }] = await this.db.client
+    // Enriched count (only for active hotels)
+    const enrichedResult = await this.db.client
       .select({ enriched: count(vacationHotelEnrichment.id) })
       .from(vacationHotelEnrichment)
+      .innerJoin(vacationHotels, eq(vacationHotelEnrichment.hotelId, vacationHotels.id))
+      .where(eq(vacationHotels.isActive, true))
+    const enriched = Number(enrichedResult[0]?.enriched ?? 0)
 
-    // Stale count (expiresAt < now)
-    const [{ stale }] = await this.db.client
+    // Stale count (expiresAt < now, active hotels only)
+    const staleResult = await this.db.client
       .select({ stale: count(vacationHotelEnrichment.id) })
       .from(vacationHotelEnrichment)
-      .where(lt(vacationHotelEnrichment.expiresAt, new Date()))
-
-    const unenriched = total - enriched
+      .innerJoin(vacationHotels, eq(vacationHotelEnrichment.hotelId, vacationHotels.id))
+      .where(and(eq(vacationHotels.isActive, true), lt(vacationHotelEnrichment.expiresAt, new Date())))
+    const stale = Number(staleResult[0]?.stale ?? 0)
 
     return {
       total,
       enriched,
       stale,
-      unenriched,
+      unenriched: total - enriched,
     }
   }
 }

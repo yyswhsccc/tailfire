@@ -425,45 +425,34 @@ export class EnrichmentProcessor extends WorkerHost {
       r2PhotoUrls = uploadedUrls
     }
 
+    // Build rawData for debugging (full SerpAPI responses)
+    const rawData = { googlePlaces, tripadvisor }
+
     // Upsert into vacationHotelEnrichment table
+    const enrichmentFields = {
+      googlePlaceId: googlePlaces?.placeId ?? null,
+      latitude: googlePlaces?.latitude?.toString() ?? null,
+      longitude: googlePlaces?.longitude?.toString() ?? null,
+      formattedAddress: googlePlaces?.address ?? null,
+      googleRating: googlePlaces?.rating?.toString() ?? null,
+      googleReviewCount: googlePlaces?.reviewCount ?? null,
+      tripadvisorRating: tripadvisor?.rating?.toString() ?? null,
+      tripadvisorReviewCount: tripadvisor?.reviewCount ?? null,
+      tripadvisorLink: tripadvisor?.link ?? null,
+      website: googlePlaces?.website ?? null,
+      phone: googlePlaces?.phone ?? null,
+      photos: r2PhotoUrls,
+      rawData,
+      enrichedAt: new Date(),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+    }
+
     await this.db.client
       .insert(vacationHotelEnrichment)
-      .values({
-        hotelId,
-        googlePlaceId: googlePlaces?.placeId ?? null,
-        latitude: googlePlaces?.latitude?.toString() ?? null,
-        longitude: googlePlaces?.longitude?.toString() ?? null,
-        formattedAddress: googlePlaces?.address ?? null,
-        googleRating: googlePlaces?.rating?.toString() ?? null,
-        googleReviewCount: googlePlaces?.reviewCount ?? null,
-        tripadvisorRating: tripadvisor?.rating?.toString() ?? null,
-        tripadvisorReviewCount: tripadvisor?.reviewCount ?? null,
-        tripadvisorLink: tripadvisor?.link ?? null,
-        website: googlePlaces?.website ?? null,
-        phone: googlePlaces?.phone ?? null,
-        photos: r2PhotoUrls,
-        enrichedAt: new Date(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      })
+      .values({ hotelId, ...enrichmentFields })
       .onConflictDoUpdate({
         target: vacationHotelEnrichment.hotelId,
-        set: {
-          googlePlaceId: googlePlaces?.placeId ?? null,
-          latitude: googlePlaces?.latitude?.toString() ?? null,
-          longitude: googlePlaces?.longitude?.toString() ?? null,
-          formattedAddress: googlePlaces?.address ?? null,
-          googleRating: googlePlaces?.rating?.toString() ?? null,
-          googleReviewCount: googlePlaces?.reviewCount ?? null,
-          tripadvisorRating: tripadvisor?.rating?.toString() ?? null,
-          tripadvisorReviewCount: tripadvisor?.reviewCount ?? null,
-          tripadvisorLink: tripadvisor?.link ?? null,
-          website: googlePlaces?.website ?? null,
-          phone: googlePlaces?.phone ?? null,
-          photos: r2PhotoUrls,
-          enrichedAt: new Date(),
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          updatedAt: new Date(),
-        },
+        set: { ...enrichmentFields, updatedAt: new Date() },
       })
 
     this.logger.log({
