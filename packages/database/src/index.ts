@@ -46,3 +46,11 @@ export { tourMedia, type TourMedia, type NewTourMedia } from './schema/tour-medi
 export { tourInclusions, type TourInclusion, type NewTourInclusion } from './schema/tour-inclusions.schema'
 export { tourSyncHistory, type TourSyncHistory, type NewTourSyncHistory } from './schema/tour-sync-history.schema'
 export { geocodingCache, type GeocodingCache, type NewGeocodingCache } from './schema/geocoding-cache.schema'
+
+// Vacation catalog schema exports
+export { vacationGateways, type VacationGateway, type NewVacationGateway } from './schema/vacation-gateways.schema'
+export { vacationDestinations, type VacationDestination, type NewVacationDestination } from './schema/vacation-destinations.schema'
+export { vacationHotels, type VacationHotel, type NewVacationHotel } from './schema/vacation-hotels.schema'
+export { vacationGatewayDestinations } from './schema/vacation-gateway-destinations.schema'
+export { vacationTourOperators, type VacationTourOperator, type NewVacationTourOperator } from './schema/vacation-tour-operators.schema'
+export { vacationSyncHistory, type VacationSyncHistoryRecord } from './schema/vacation-sync-history.schema'
