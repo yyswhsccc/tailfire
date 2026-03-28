@@ -71,7 +71,7 @@ export async function fetchShipSailings(shipId: string, pageSize = 4): Promise<{
       next: { revalidate: 1800, tags: ['ship-sailings', `ship-sailings-${shipId}`] },
     })
     return {
-      sailings: (data.sailings || []).map((s: any) => ({
+      sailings: (data.sailings || data.items || []).map((s: any) => ({
         id: s.id,
         name: s.name,
         sailDate: s.sailDate,
@@ -81,7 +81,7 @@ export async function fetchShipSailings(shipId: string, pageSize = 4): Promise<{
         cruiseLineName: s.cruiseLine?.name || '',
         cheapestInsideCents: s.prices?.inside ?? s.priceSummary?.cheapestInside ?? null,
       })),
-      total: data.total || 0,
+      total: data.total || data.pagination?.totalItems || 0,
     }
   } catch {
     return { sailings: [], total: 0 }
