@@ -12,7 +12,7 @@
 
 import { Injectable, Logger } from '@nestjs/common'
 import { DatabaseService } from '../db/database.service'
-import { sql } from 'drizzle-orm'
+import { sql, eq } from 'drizzle-orm'
 
 // ============================================================================
 // Helpers
@@ -341,5 +341,126 @@ export class DestinationsBootstrapService {
       skipped,
       totalPorts: allPorts.length,
     }
+  }
+
+  /**
+   * Seed destinations from tour catalog cities.
+   *
+   * Collects DISTINCT city names from:
+   * - tours.start_city
+   * - tours.end_city
+   * - tour_itinerary_days.overnight_city
+   *
+   * For each unique city:
+   * - If a destination already exists with the same normalized name → log match, skip
+   * - Otherwise → create a new destination with destinationType: 'city'
+   *
+   * Returns stats: { created, matched, totalCities }
+   */
+  async seedFromTourCities(): Promise<{
+    created: number
+    matched: number
+    totalCities: number
+  }> {
+    const { tours, tourItineraryDays, destinations } = this.db.schema
+
+    this.logger.log('Collecting distinct city names from tour catalog...')
+
+    // Collect city names from start_city, end_city, overnight_city using raw SQL
+    // (UNION deduplicates, DISTINCT within each leg removes intra-column dupes)
+    const cityRows = await this.db.client.execute<{ city: string }>(sql`
+      SELECT DISTINCT city FROM (
+        SELECT start_city  AS city FROM ${tours}  WHERE start_city  IS NOT NULL AND start_city  <> ''
+        UNION
+        SELECT end_city    AS city FROM ${tours}  WHERE end_city    IS NOT NULL AND end_city    <> ''
+        UNION
+        SELECT overnight_city AS city FROM ${tourItineraryDays} WHERE overnight_city IS NOT NULL AND overnight_city <> ''
+      ) t
+      ORDER BY city
+    `)
+
+    const cityNames: string[] = (cityRows as any[]).map((r: any) => r.city)
+    const totalCities = cityNames.length
+
+    this.logger.log(`Found ${totalCities} distinct tour cities`)
+
+    if (totalCities === 0) {
+      return { created: 0, matched: 0, totalCities: 0 }
+    }
+
+    // Load existing destinations for normalized-name matching
+    // (only need normalized_name + id to check for matches)
+    const existingRows = await this.db.client
+      .select({
+        id: destinations.id,
+        normalizedName: destinations.normalizedName,
+        name: destinations.name,
+      })
+      .from(destinations)
+
+    const existingByNorm = new Map<string, { id: string; name: string }>()
+    for (const row of existingRows) {
+      existingByNorm.set(row.normalizedName, { id: row.id, name: row.name })
+    }
+
+    let created = 0
+    let matched = 0
+
+    for (const cityName of cityNames) {
+      const norm = normalizeName(cityName)
+
+      // Check for existing destination with same normalized name
+      const existing = existingByNorm.get(norm)
+      if (existing) {
+        this.logger.debug(
+          `Tour city "${cityName}" matches existing destination "${existing.name}" (normalized: "${norm}") — skipping`,
+        )
+        matched++
+        continue
+      }
+
+      // No match — create a new destination
+      const slug = generateSlug(cityName)
+
+      // Handle slug collision by appending a suffix
+      let finalSlug = slug
+      let suffix = 2
+      while (
+        await this.db.client
+          .select({ id: destinations.id })
+          .from(destinations)
+          .where(eq(destinations.slug, finalSlug))
+          .limit(1)
+          .then((r) => r.length > 0)
+      ) {
+        finalSlug = `${slug}-${suffix}`
+        suffix++
+      }
+
+      await this.db.client
+        .insert(destinations)
+        .values({
+          slug: finalSlug,
+          name: cityName,
+          normalizedName: norm,
+          destinationType: 'city',
+          sourceStatus: 'seeded',
+          contentStatus: 'seeded',
+          metadata: {},
+        })
+        .onConflictDoNothing({ target: destinations.slug })
+
+      // Register in our local map to catch intra-batch duplicates on subsequent iterations
+      existingByNorm.set(norm, { id: 'pending', name: cityName })
+
+      this.logger.debug(`Created destination for tour city "${cityName}" (slug: "${finalSlug}")`)
+      created++
+    }
+
+    this.logger.log(
+      `Tour city bootstrap complete: ${created} created, ${matched} matched existing, ${totalCities} total cities`,
+    )
+
+    return { created, matched, totalCities }
   }
 }

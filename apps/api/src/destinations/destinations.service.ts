@@ -7,7 +7,7 @@
 
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { DatabaseService } from '../db/database.service'
-import { eq, and, ilike, sql, or, inArray, gt } from 'drizzle-orm'
+import { eq, and, ilike, sql, or, inArray, gt, asc } from 'drizzle-orm'
 
 export interface DestinationFilters {
   type?: string
@@ -205,6 +205,167 @@ export class DestinationsService {
         cruiseCount,
         tourCount: 0,
       },
+    }
+  }
+
+  // ============================================================================
+  // PUBLIC — Paginated sailings at a destination
+  // ============================================================================
+
+  async findCruisesAtDestination(slug: string, page = 1, pageSize = 20) {
+    const {
+      destinations,
+      destinationPorts,
+      cruiseSailingStops,
+      cruiseSailings,
+      cruiseShips,
+      cruiseLines,
+    } = this.db.schema
+
+    // 1. Get destination by slug
+    const [destination] = await this.db.client
+      .select({ id: destinations.id, name: destinations.name })
+      .from(destinations)
+      .where(eq(destinations.slug, slug))
+      .limit(1)
+
+    if (!destination) {
+      throw new NotFoundException(`Destination with slug "${slug}" not found`)
+    }
+
+    // 2. Get port IDs from destination_ports
+    const portRows = await this.db.client
+      .select({ portId: destinationPorts.portId })
+      .from(destinationPorts)
+      .where(eq(destinationPorts.destinationId, destination.id))
+
+    const portIds = portRows.map((r) => r.portId)
+
+    if (portIds.length === 0) {
+      return {
+        destination: { id: destination.id, name: destination.name, slug },
+        sailings: [],
+        total: 0,
+        page,
+        pageSize,
+        totalPages: 0,
+      }
+    }
+
+    const normalizedPage = Math.max(1, page)
+    const normalizedPageSize = Math.min(Math.max(1, pageSize), 100)
+    const offset = (normalizedPage - 1) * normalizedPageSize
+
+    const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+
+    // 3. Count distinct sailings at these ports (active, future)
+    const [countRow] = await this.db.client
+      .select({ count: sql<number>`count(distinct ${cruiseSailingStops.sailingId})::int` })
+      .from(cruiseSailingStops)
+      .innerJoin(
+        cruiseSailings,
+        and(
+          eq(cruiseSailingStops.sailingId, cruiseSailings.id),
+          eq(cruiseSailings.isActive, true),
+          gt(cruiseSailings.sailDate, today),
+        ),
+      )
+      .where(inArray(cruiseSailingStops.portId, portIds))
+
+    const total = countRow?.count ?? 0
+
+    // 4. Get paginated sailing IDs via a subquery approach: get distinct sailing IDs first
+    const sailingIdRows = await this.db.client
+      .selectDistinct({ sailingId: cruiseSailingStops.sailingId })
+      .from(cruiseSailingStops)
+      .innerJoin(
+        cruiseSailings,
+        and(
+          eq(cruiseSailingStops.sailingId, cruiseSailings.id),
+          eq(cruiseSailings.isActive, true),
+          gt(cruiseSailings.sailDate, today),
+        ),
+      )
+      .where(inArray(cruiseSailingStops.portId, portIds))
+      .orderBy(asc(cruiseSailings.sailDate))
+      .limit(normalizedPageSize)
+      .offset(offset)
+
+    const sailingIds = sailingIdRows.map((r) => r.sailingId)
+
+    if (sailingIds.length === 0) {
+      return {
+        destination: { id: destination.id, name: destination.name, slug },
+        sailings: [],
+        total,
+        page: normalizedPage,
+        pageSize: normalizedPageSize,
+        totalPages: Math.ceil(total / normalizedPageSize),
+      }
+    }
+
+    // 5. Fetch full sailing data with ship + line
+    const sailings = await this.db.client
+      .select({
+        id: cruiseSailings.id,
+        name: cruiseSailings.name,
+        sailDate: cruiseSailings.sailDate,
+        endDate: cruiseSailings.endDate,
+        nights: cruiseSailings.nights,
+        voyageCode: cruiseSailings.voyageCode,
+        cheapestInsideCents: cruiseSailings.cheapestInsideCents,
+        cheapestBalconyCents: cruiseSailings.cheapestBalconyCents,
+        shipId: cruiseSailings.shipId,
+        shipName: cruiseShips.name,
+        shipImageUrl: cruiseShips.imageUrl,
+        cruiseLineId: cruiseSailings.cruiseLineId,
+        cruiseLineName: cruiseLines.name,
+        cruiseLineSlug: cruiseLines.slug,
+      })
+      .from(cruiseSailings)
+      .leftJoin(cruiseShips, eq(cruiseSailings.shipId, cruiseShips.id))
+      .leftJoin(cruiseLines, eq(cruiseSailings.cruiseLineId, cruiseLines.id))
+      .where(inArray(cruiseSailings.id, sailingIds))
+      .orderBy(asc(cruiseSailings.sailDate))
+
+    return {
+      destination: { id: destination.id, name: destination.name, slug },
+      sailings,
+      total,
+      page: normalizedPage,
+      pageSize: normalizedPageSize,
+      totalPages: Math.ceil(total / normalizedPageSize),
+    }
+  }
+
+  // ============================================================================
+  // PUBLIC — Tours at a destination (placeholder — linkage coming later)
+  // ============================================================================
+
+  async findToursAtDestination(slug: string, page = 1, pageSize = 20) {
+    const { destinations } = this.db.schema
+
+    // Verify destination exists
+    const [destination] = await this.db.client
+      .select({ id: destinations.id, name: destinations.name })
+      .from(destinations)
+      .where(eq(destinations.slug, slug))
+      .limit(1)
+
+    if (!destination) {
+      throw new NotFoundException(`Destination with slug "${slug}" not found`)
+    }
+
+    // Tour ↔ destination linkage is not yet implemented.
+    // Returning empty results with a note for now.
+    return {
+      destination: { id: destination.id, name: destination.name, slug },
+      tours: [],
+      total: 0,
+      page,
+      pageSize,
+      totalPages: 0,
+      note: 'Tour linkage to destinations is coming in a future update.',
     }
   }
 

@@ -80,6 +80,57 @@ export class DestinationsController {
     return this.destinationsService.findBySlug(slug)
   }
 
+  /**
+   * Get paginated cruise sailings at a destination.
+   * GET /destinations/by-slug/:slug/cruises
+   *
+   * Resolves the destination's linked ports and returns active future sailings
+   * that stop at any of those ports.
+   */
+  @Get('by-slug/:slug/cruises')
+  @Public()
+  @ApiOperation({ summary: 'Get paginated cruise sailings at a destination' })
+  @ApiParam({ name: 'slug', description: 'Destination URL slug (e.g., miami-fl-us)' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'pageSize', required: false, description: 'Items per page (default: 20, max: 100)' })
+  @ApiResponse({ status: 200, description: 'Paginated sailings at this destination' })
+  @ApiResponse({ status: 404, description: 'Destination not found' })
+  async getCruisesAtDestination(
+    @Param('slug') slug: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.destinationsService.findCruisesAtDestination(
+      slug,
+      page ? parseInt(page, 10) : 1,
+      pageSize ? parseInt(pageSize, 10) : 20,
+    )
+  }
+
+  /**
+   * Get tours at a destination (placeholder — tour linkage coming later).
+   * GET /destinations/by-slug/:slug/tours
+   */
+  @Get('by-slug/:slug/tours')
+  @Public()
+  @ApiOperation({ summary: 'Get tours at a destination (placeholder)' })
+  @ApiParam({ name: 'slug', description: 'Destination URL slug' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'pageSize', required: false, description: 'Items per page (default: 20, max: 100)' })
+  @ApiResponse({ status: 200, description: 'Tours at this destination (currently empty — linkage coming soon)' })
+  @ApiResponse({ status: 404, description: 'Destination not found' })
+  async getToursAtDestination(
+    @Param('slug') slug: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.destinationsService.findToursAtDestination(
+      slug,
+      page ? parseInt(page, 10) : 1,
+      pageSize ? parseInt(pageSize, 10) : 20,
+    )
+  }
+
   // ============================================================================
   // ADMIN ENDPOINTS (JWT auth — requires admin role)
   // ============================================================================
@@ -96,6 +147,22 @@ export class DestinationsController {
   @ApiResponse({ status: 200, description: 'Bootstrap results with counts' })
   async bootstrapFromCruisePorts() {
     return this.bootstrapService.seedFromCruisePorts()
+  }
+
+  /**
+   * Seed destinations from tour catalog cities.
+   * POST /destinations/bootstrap/tour-cities
+   *
+   * Collects distinct city names from tours.start_city, tours.end_city,
+   * and tour_itinerary_days.overnight_city. Skips cities that already match
+   * an existing destination (by normalized name). Idempotent.
+   */
+  @Post('bootstrap/tour-cities')
+  @AdminOnly()
+  @ApiOperation({ summary: 'Seed destinations from tour catalog cities (admin)' })
+  @ApiResponse({ status: 200, description: 'Bootstrap results with counts: { created, matched, totalCities }' })
+  async bootstrapFromTourCities() {
+    return this.bootstrapService.seedFromTourCities()
   }
 
   /**
