@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { fetchShipBySlug, fetchShipImages, fetchShipSailings, fetchShipCabinSummary, fetchShipDestinations, fetchShipDecks } from '@/lib/fetchers/ships'
 import { SafeImage } from '@/components/hub/safe-image'
+import { DeckPlanViewer } from '@/components/hub/deck-plan-viewer'
 import { HubHero } from '@/components/hub/hub-hero'
 import { HubHeroMeta } from '@/components/hub/hub-hero-meta'
 import { HubHeroCta } from '@/components/hub/hub-hero-cta'
@@ -81,23 +82,7 @@ export default async function ShipHubPage({ params }: Props) {
       {deckPlans.filter(d => d.deckPlanUrl).length > 0 && (
         <>
           <FeedSection title="🗺️ Deck Plans">
-            <div className="space-y-4">
-              {deckPlans.filter(d => d.deckPlanUrl).map((deck, i) => (
-                <div key={i} className="overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white">
-                  <div className="border-b border-[#f0f0f0] px-4 py-3">
-                    <p className="text-sm font-semibold text-[#1A1A1A]">{deck.name}</p>
-                  </div>
-                  <div className="p-2">
-                    <img
-                      src={deck.deckPlanUrl!}
-                      alt={`${deck.name} deck plan`}
-                      className="w-full"
-                      loading="lazy"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <DeckPlanViewer decks={deckPlans} shipName={ship.name} />
           </FeedSection>
           <FeedDivider />
         </>
