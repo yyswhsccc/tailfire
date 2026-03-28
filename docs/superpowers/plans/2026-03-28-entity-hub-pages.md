@@ -131,7 +131,7 @@ export default async function CruiseLineHubPage({ params }: Props) {
 
       <HubContext description={null} pills={[
         { emoji: '🚢', label: `${line.shipCount} ships in fleet` },
-        { emoji: '📅', label: `${line.upcomingSailingCount} upcoming sailings` },
+        { emoji: '📅', label: `${line.sailingCount.toLocaleString()} sailings` },
       ]} />
 
       <FeedSection title={`🚢 ${line.name} Fleet`}>
@@ -419,7 +419,7 @@ export default async function SailingHubPage({ params }: Props) {
 Key data:
 - `name`, `slug`, `sailingCount`
 - `description`, `upcomingSailingCount`
-- `destinations: [{ portId, portName, country }]`
+- `destinations: [{ id, name, country }]`
 
 Hub zones:
 - **Hero:** No image for now (regions don't have hero images yet). Use brand gradient.
@@ -474,7 +474,7 @@ export default async function RegionHubPage({ params }: Props) {
       <HubContext
         description={region.description}
         pills={[
-          { emoji: '🚢', label: `${region.upcomingSailingCount} upcoming sailings` },
+          { emoji: '🚢', label: `${region.sailingCount} upcoming sailings` },
           { emoji: '📍', label: `${region.destinations.length} destinations` },
         ]}
       />
@@ -484,7 +484,7 @@ export default async function RegionHubPage({ params }: Props) {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {region.destinations.map((dest, i) => (
               <div key={i} className="rounded-2xl border border-[#f0f0f0] bg-white p-4">
-                <p className="text-sm font-semibold text-[#1A1A1A]">{dest.portName}</p>
+                <p className="text-sm font-semibold text-[#1A1A1A]">{dest.name}</p>
                 {dest.country && <p className="mt-0.5 text-xs text-[#888]">{dest.country}</p>}
               </div>
             ))}
