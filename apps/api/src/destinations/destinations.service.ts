@@ -64,14 +64,14 @@ export class DestinationsService {
 
     const total = countRow?.count ?? 0
 
-    // Get paginated results — enriched destinations first (they have images/content),
-    // then alphabetical. This ensures the browse page shows the best content up front.
+    // Get paginated results — destinations with hero images sort first,
+    // then alphabetical. This ensures the browse page shows rich content up front.
     const rows = await this.db.client
       .select()
       .from(destinations)
       .where(whereClause)
       .orderBy(
-        sql`CASE WHEN ${destinations.contentStatus} = 'enriched' THEN 0 WHEN ${destinations.contentStatus} = 'published' THEN 0 ELSE 1 END`,
+        sql`CASE WHEN hero_image_url IS NOT NULL THEN 0 ELSE 1 END`,
         destinations.name,
       )
       .limit(pageSize)
