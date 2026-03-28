@@ -24,7 +24,7 @@ import { ConfigService } from '@nestjs/config'
 import { Cron } from '@nestjs/schedule'
 import { sql, eq, and, lt, desc } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
-import { SoftvoyageCatalogClientService, type VcoGateway, type VcoDestination, type VcoHotel } from './softvoyage-catalog-client.service'
+import { SoftvoyageCatalogClientService, type VcoHotel } from './softvoyage-catalog-client.service'
 import { ChangeDetectorService } from './change-detector.service'
 import {
   vacationGateways,
@@ -220,23 +220,6 @@ export class VacationImportOrchestratorService {
         const destinationIdByProviderId = new Map<string, string>()
 
         if (!dryRun) {
-          // Fetch existing destinations for change detection
-          const existingDestinations = await this.db.db
-            .select({
-              id: vacationDestinations.id,
-              providerIdentifier: vacationDestinations.providerIdentifier,
-              contentHash: vacationDestinations.contentHash,
-            })
-            .from(vacationDestinations)
-            .where(eq(vacationDestinations.provider, 'softvoyage'))
-
-          const existingDestMap = new Map(
-            existingDestinations.map((d) => [
-              d.providerIdentifier,
-              { id: d.id, contentHash: d.contentHash ?? '' },
-            ])
-          )
-
           for (const dest of individualDestinations) {
             // Parse primary country code (take first if comma-separated)
             const primaryCountryCode = dest.countryCodes
@@ -435,7 +418,7 @@ export class VacationImportOrchestratorService {
       // ======================================================================
       if (!dryRun) {
         // Soft-delete gateways not seen in this sync
-        const staleGatewaysResult = await this.db.db
+        await this.db.db
           .update(vacationGateways)
           .set({ isActive: false, updatedAt: syncStartedAt })
           .where(
