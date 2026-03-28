@@ -83,10 +83,10 @@ export class SerpApiService {
         return null
       }
 
-      const data = await response.json()
+      const data = (await response.json()) as Record<string, any>
 
       // Parse TripAdvisor results — SerpAPI returns `places` array
-      const places = data.places || data.results || data.data || []
+      const places: any[] = data.places || data.results || data.data || []
 
       this.logger.log(`SerpAPI returned ${places.length} places for "${query}"`)
 

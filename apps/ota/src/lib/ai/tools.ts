@@ -48,22 +48,6 @@ interface NormalizedHotelResult {
   }[]
 }
 
-/** CruiseSearchResult from apps/api/src/cruise-booking/types/fusion-api.types.ts */
-interface CruiseSearchResult {
-  cruiselinename: string
-  shipname: string
-  departureport: string
-  arrivalport: string
-  itineraryname: string
-  departuredate: string
-  nights: number
-  insideprice?: number
-  oceanviewprice?: number
-  balconyprice?: number
-  suiteprice?: number
-  regionname: string
-}
-
 /** TourSummaryDto from apps/api/src/tour-repository/dto/tour-search.dto.ts */
 interface TourSummary {
   id: string

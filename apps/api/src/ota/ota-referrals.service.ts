@@ -25,18 +25,16 @@ export class OtaReferralsService {
   async logReferral(dto: CreateReferralDto): Promise<{ id: string }> {
     const { otaReferrals, advisorProfiles } = this.db.schema
 
-    // Resolve advisor's agencyId and profileId from the slug (if the advisor exists)
+    // Resolve advisor's agencyId from the slug (if the advisor exists)
     let agencyId: string | null = null
-    let advisorProfileId: string | null = null
     const [advisor] = await this.db.client
-      .select({ id: advisorProfiles.id, agencyId: advisorProfiles.agencyId })
+      .select({ agencyId: advisorProfiles.agencyId })
       .from(advisorProfiles)
       .where(eq(advisorProfiles.slug, dto.advisorSlug))
       .limit(1)
 
     if (advisor) {
       agencyId = advisor.agencyId
-      advisorProfileId = advisor.id
     }
 
     // Calculate cookie expiry (30 days from now)
@@ -48,7 +46,6 @@ export class OtaReferralsService {
       .values({
         sessionId: dto.sessionId,
         advisorSlug: dto.advisorSlug,
-        advisorProfileId,
         landingUrl: dto.landingUrl ?? null,
         referralSource: dto.referralSource,
         agencyId,

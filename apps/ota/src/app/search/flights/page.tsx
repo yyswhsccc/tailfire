@@ -144,7 +144,7 @@ function FlightResults({ flights }: { flights: FlightSearchResponse }) {
         <SearchResultsHeader
           count={results.length}
           noun="flights"
-          searchContext={`Searching flights from ${origin} to ${destination} on ${departureDate}${returnDate ? ` returning ${returnDate}` : ""} for ${adults} adult(s)`}
+          searchContext={`${results.length} flight${results.length !== 1 ? "s" : ""} found`}
         />
       </div>
 
