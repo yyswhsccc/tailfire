@@ -120,6 +120,13 @@ import { QUEUES } from './automation.types'
           removeOnFail: { age: 7 * 24 * 3600 },
         },
       },
+      {
+        name: QUEUES.VACATION_SEARCH,
+        defaultJobOptions: {
+          removeOnComplete: { age: 900 }, // 15 min, aligned with cache TTL
+          removeOnFail: { age: 3600 },    // 1 hour
+        },
+      },
     ),
 
     DatabaseModule,
