@@ -30,6 +30,7 @@ import { CruiseRepositoryModule } from './cruise-repository/cruise-repository.mo
 import { CruiseBookingModule } from './cruise-booking/cruise-booking.module'
 import { GlobusModule } from './globus/globus.module'
 import { TourImportModule } from './tour-import/tour-import.module'
+import { VacationImportModule } from './vacation-import/vacation-import.module'
 import { TourRepositoryModule } from './tour-repository/tour-repository.module'
 import { TemplatesModule } from './templates/templates.module'
 import { UserProfilesModule } from './user-profiles/user-profiles.module'
@@ -131,6 +132,9 @@ import { DestinationsModule } from './destinations/destinations.module'
 
     // Tour data import (Globus Family of Brands catalog sync)
     TourImportModule,
+
+    // Vacation package catalog sync (Softvoyage VCO)
+    VacationImportModule,
 
     // Tour repository (search/detail API)
     TourRepositoryModule,
