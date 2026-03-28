@@ -14,6 +14,7 @@ import { DestinationsService } from './destinations.service'
 import { DestinationsBootstrapService } from './destinations-bootstrap.service'
 import { SerpApiService } from './serpapi.service'
 import { DestinationEnrichmentService } from './destination-enrichment.service'
+import { UnsplashService } from './unsplash.service'
 
 @Module({
   controllers: [DestinationsController],
@@ -22,6 +23,7 @@ import { DestinationEnrichmentService } from './destination-enrichment.service'
     DestinationsBootstrapService,
     SerpApiService,
     DestinationEnrichmentService,
+    UnsplashService,
   ],
   exports: [DestinationsService],
 })

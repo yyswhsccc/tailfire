@@ -185,6 +185,22 @@ export class DestinationsController {
   }
 
   /**
+   * Backfill hero images from Unsplash for destinations without images.
+   * POST /destinations/backfill-hero-images
+   *
+   * Lightweight fallback for destinations that don't have TripAdvisor enrichment.
+   * Stores Unsplash attribution in destination metadata JSONB.
+   */
+  @Post('backfill-hero-images')
+  @AdminOnly()
+  @ApiOperation({ summary: 'Backfill hero images from Unsplash for destinations without images' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Max destinations to process (default: 500)' })
+  @ApiResponse({ status: 200, description: 'Backfill results with counts' })
+  async backfillHeroImages(@Query('limit') limit?: string) {
+    return this.enrichmentService.backfillHeroImages(limit ? parseInt(limit, 10) : 500)
+  }
+
+  /**
    * Trigger enrichment for a single destination.
    * POST /destinations/:id/enrich
    *

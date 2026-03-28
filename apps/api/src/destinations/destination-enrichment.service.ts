@@ -9,6 +9,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { DatabaseService } from '../db/database.service'
 import { SerpApiService } from './serpapi.service'
+import { UnsplashService } from './unsplash.service'
 import { eq, and, lte, sql } from 'drizzle-orm'
 
 @Injectable()
@@ -18,6 +19,7 @@ export class DestinationEnrichmentService {
   constructor(
     private readonly db: DatabaseService,
     private readonly serpApi: SerpApiService,
+    private readonly unsplash: UnsplashService,
   ) {}
 
   /**
@@ -233,5 +235,69 @@ export class DestinationEnrichmentService {
       `Stale refresh: ${refreshed} refreshed, ${failed} failed out of ${staleEntries.length}`,
     )
     return { refreshed, failed }
+  }
+
+  /**
+   * Backfill hero images for destinations that don't have one.
+   * Uses Unsplash as a lightweight fallback (no full TripAdvisor enrichment).
+   */
+  async backfillHeroImages(limit = 500): Promise<{ updated: number; skipped: number; failed: number }> {
+    if (!this.unsplash.isConfigured()) {
+      this.logger.warn('Unsplash not configured — cannot backfill hero images')
+      return { updated: 0, skipped: 0, failed: 0 }
+    }
+
+    const { destinations } = this.db.schema
+
+    // Find destinations without hero images
+    const missing = await this.db.client
+      .select({ id: destinations.id, name: destinations.name })
+      .from(destinations)
+      .where(sql`hero_image_url IS NULL`)
+      .orderBy(destinations.name)
+      .limit(limit)
+
+    this.logger.log(`Found ${missing.length} destinations without hero images (limit: ${limit})`)
+
+    let updated = 0
+    let skipped = 0
+    let failed = 0
+
+    for (let i = 0; i < missing.length; i++) {
+      const dest = missing[i]!
+
+      // Search Unsplash for this destination
+      const result = await this.unsplash.searchPhoto(dest.name)
+
+      if (!result) {
+        skipped++
+        continue
+      }
+
+      try {
+        await this.db.client
+          .update(destinations)
+          .set({
+            heroImageUrl: result.imageUrl,
+            // Store attribution in metadata
+            metadata: sql`jsonb_set(COALESCE(metadata, '{}'::jsonb), '{unsplash_attribution}', ${JSON.stringify(result.attribution)}::jsonb)`,
+          })
+          .where(eq(destinations.id, dest.id))
+
+        updated++
+      } catch (error) {
+        failed++
+        if (failed <= 5) {
+          this.logger.error(`Failed to update hero image for "${dest.name}": ${error}`)
+        }
+      }
+
+      if ((i + 1) % 50 === 0) {
+        this.logger.log(`Hero image backfill progress: ${i + 1}/${missing.length} (${updated} updated, ${skipped} skipped, ${failed} failed)`)
+      }
+    }
+
+    this.logger.log(`Hero image backfill complete: ${updated} updated, ${skipped} skipped, ${failed} failed`)
+    return { updated, skipped, failed }
   }
 }
