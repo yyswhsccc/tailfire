@@ -126,7 +126,7 @@ describe('SoftvoyageCatalogClientService', () => {
   // ============================================================================
 
   describe('fetchDestinations', () => {
-    it('should parse individual (non-group) destinations', async () => {
+    it('should split composite IDs into individual destination entries', async () => {
       const rawResponse = [
         {
           destinations: [
@@ -138,13 +138,15 @@ describe('SoftvoyageCatalogClientService', () => {
 
       const result = await service.fetchDestinations('YYZ')
 
-      expect(result).toHaveLength(1)
-      const dest = result[0]!
-      expect(dest.name).toBe('Cancun')
-      expect(dest.id).toBe('101,102')
-      expect(dest.countryCodes).toBe('MX')
-      expect(dest.durations).toEqual([7, 14])
-      expect(dest.isGroup).toBe(false)
+      // Composite ID "101,102" should produce 2 individual entries
+      expect(result).toHaveLength(2)
+      expect(result[0]!.name).toBe('Cancun')
+      expect(result[0]!.id).toBe('101')
+      expect(result[0]!.countryCodes).toBe('MX')
+      expect(result[0]!.durations).toEqual([7, 14])
+      expect(result[0]!.isGroup).toBe(false)
+      expect(result[1]!.name).toBe('Cancun')
+      expect(result[1]!.id).toBe('102')
     })
 
     it('should mark destinations starting with "All " as groups', async () => {
@@ -267,11 +269,17 @@ describe('SoftvoyageCatalogClientService', () => {
 
       const result = await service.fetchDestinations('YYZ')
 
-      expect(result).toHaveLength(4)
-      expect(result[0]!.isGroup).toBe(true)  // "All Caribbean"
-      expect(result[1]!.isGroup).toBe(true)  // "- Cancun"
-      expect(result[2]!.isGroup).toBe(false) // "Punta Cana"
-      expect(result[3]!.isGroup).toBe(false) // "Havana"
+      // "All Caribbean" has composite ID 601,602,603 → 3 group entries
+      // "- Cancun" has single ID → 1 group entry
+      // "Punta Cana" and "Havana" have single IDs → 1 each
+      expect(result).toHaveLength(6)
+      expect(result[0]!.isGroup).toBe(true)   // "All Caribbean" id=601
+      expect(result[0]!.id).toBe('601')
+      expect(result[1]!.isGroup).toBe(true)   // "All Caribbean" id=602
+      expect(result[2]!.isGroup).toBe(true)   // "All Caribbean" id=603
+      expect(result[3]!.isGroup).toBe(true)   // "- Cancun" id=601
+      expect(result[4]!.isGroup).toBe(false)  // "Punta Cana" id=602
+      expect(result[5]!.isGroup).toBe(false)  // "Havana" id=603
     })
   })
 

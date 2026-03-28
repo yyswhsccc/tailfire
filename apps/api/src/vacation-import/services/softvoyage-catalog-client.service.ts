@@ -212,11 +212,16 @@ export class SoftvoyageCatalogClientService {
    *
    * Examples:
    *   "Cancun--xx--Cancun xxx101,102xxxMX--xx--7,14"
-   *     → { name: "Cancun", id: "101,102", countryCodes: "MX", durations: [7, 14], isGroup: false }
+   *     → Two entries with individual IDs:
+   *       { name: "Cancun", id: "101", countryCodes: "MX", durations: [7, 14], isGroup: false }
+   *       { name: "Cancun", id: "102", countryCodes: "MX", durations: [7, 14], isGroup: false }
    *   "All Mexico--xx--..."
    *     → isGroup: true (starts with "All ")
    *   "- Beach Resorts--xx--..."
    *     → isGroup: true (starts with "- ")
+   *
+   * Per spec: providerIdentifier stores individual destination IDs only, not
+   * combined/composite strings. Comma-separated IDs are split into separate entries.
    */
   private parseDestinations(raw: string[]): VcoDestination[] {
     const destinations: VcoDestination[] = []
@@ -241,7 +246,7 @@ export class SoftvoyageCatalogClientService {
 
       // Extract IDs between first pair of xxx markers: xxx<IDS>xxx
       const xxxMatch = rest.match(/xxx(.+?)xxx/)
-      const id = xxxMatch ? xxxMatch[1]! : ''
+      const rawIds = xxxMatch ? xxxMatch[1]! : ''
 
       // Extract country codes: uppercase letters+commas between xxx markers and --xx--
       const ccMatch = rest.match(/xxx([A-Z,]+)--xx--/)
@@ -254,7 +259,18 @@ export class SoftvoyageCatalogClientService {
         ? durationsRaw.split(',').map((s) => parseInt(s, 10)).filter((n) => !isNaN(n))
         : []
 
-      destinations.push({ name, id, countryCodes, durations, isGroup })
+      // Split composite IDs into individual destination entries
+      // Per spec: "providerIdentifier stores individual destination IDs only"
+      const individualIds = rawIds.split(',').map((s) => s.trim()).filter(Boolean)
+
+      if (individualIds.length === 0) {
+        // No valid ID — store with empty id (groups, etc.)
+        destinations.push({ name, id: '', countryCodes, durations, isGroup })
+      } else {
+        for (const id of individualIds) {
+          destinations.push({ name, id, countryCodes, durations, isGroup })
+        }
+      }
     }
 
     return destinations

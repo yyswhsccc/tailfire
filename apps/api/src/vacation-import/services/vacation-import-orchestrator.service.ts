@@ -19,7 +19,7 @@
  * See CLAUDE.md "Critical Rule #3" for details.
  */
 
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, ConflictException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Cron } from '@nestjs/schedule'
 import { sql, eq, and, lt, desc } from 'drizzle-orm'
@@ -96,16 +96,8 @@ export class VacationImportOrchestratorService {
     const lockAcquired = lockRow?.acquired === true
 
     if (!lockAcquired) {
-      this.logger.warn('Vacation catalog sync already in progress — advisory lock not acquired, skipping run')
-      return {
-        gatewaysFound: 0,
-        destinationsFound: 0,
-        hotelsFound: 0,
-        hotelsInserted: 0,
-        hotelsUpdated: 0,
-        hotelsUnchanged: 0,
-        hotelsSoftDeleted: 0,
-      }
+      this.logger.warn('Vacation catalog sync already in progress — advisory lock not acquired')
+      throw new ConflictException('Vacation catalog sync already in progress')
     }
 
     const syncStartedAt = new Date()
@@ -389,26 +381,28 @@ export class VacationImportOrchestratorService {
         // ====================================================================
         if (!dryRun) {
           const gatewayId = gatewayIdByAirportCode.get(gateway.airportCode)
-          if (gatewayId && gatewayDestinationIds.length > 0) {
-            // Delete existing links for this gateway
+          if (gatewayId) {
+            // Always delete existing links for this gateway (full replace per spec)
             await this.db.db
               .delete(vacationGatewayDestinations)
               .where(eq(vacationGatewayDestinations.gatewayId, gatewayId))
 
-            // Re-insert current links
-            const junctionRows = gatewayDestinationIds.map((destinationId) => ({
-              gatewayId,
-              destinationId,
-              lastSyncedAt: syncStartedAt,
-            }))
+            // Re-insert current links (if any)
+            if (gatewayDestinationIds.length > 0) {
+              const junctionRows = gatewayDestinationIds.map((destinationId) => ({
+                gatewayId,
+                destinationId,
+                lastSyncedAt: syncStartedAt,
+              }))
 
-            await this.db.db
-              .insert(vacationGatewayDestinations)
-              .values(junctionRows)
-              .onConflictDoUpdate({
-                target: [vacationGatewayDestinations.gatewayId, vacationGatewayDestinations.destinationId],
-                set: { lastSyncedAt: syncStartedAt },
-              })
+              await this.db.db
+                .insert(vacationGatewayDestinations)
+                .values(junctionRows)
+                .onConflictDoUpdate({
+                  target: [vacationGatewayDestinations.gatewayId, vacationGatewayDestinations.destinationId],
+                  set: { lastSyncedAt: syncStartedAt },
+                })
+            }
           }
         }
       }
