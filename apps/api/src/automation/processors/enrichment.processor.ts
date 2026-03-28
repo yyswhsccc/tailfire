@@ -28,9 +28,12 @@ import type {
   HotelPhotoEnrichmentJobData,
   CruiseCatalogEnrichmentJobData,
   ActivityGeocodingJobData,
+  VacationHotelEnrichmentJobData,
 } from '../automation.types'
+import { GooglePlacesEnricherService } from '../../vacation-enrichment/services/google-places-enricher.service'
+import { TripadvisorEnricherService } from '../../vacation-enrichment/services/tripadvisor-enricher.service'
 
-const { customCruiseDetails, itineraryActivities } = schema
+const { customCruiseDetails, itineraryActivities, vacationHotelEnrichment } = schema
 
 const DEFAULT_MAX_PHOTOS = 3
 
@@ -49,6 +52,8 @@ export class EnrichmentProcessor extends WorkerHost {
     private readonly geocodingService: GeocodingService,
     private readonly db: DatabaseService,
     private readonly automationService: AutomationService,
+    private readonly googlePlacesEnricher: GooglePlacesEnricherService,
+    private readonly tripadvisorEnricher: TripadvisorEnricherService,
   ) {
     super()
   }
@@ -63,6 +68,9 @@ export class EnrichmentProcessor extends WorkerHost {
         break
       case JOB_TYPES.ACTIVITY_GEOCODING:
         await this.handleActivityGeocoding(job as Job<ActivityGeocodingJobData>)
+        break
+      case JOB_TYPES.VACATION_HOTEL_ENRICHMENT:
+        await this.handleVacationHotelEnrichment(job as Job<VacationHotelEnrichmentJobData>)
         break
       default:
         this.logger.warn(`Unknown enrichment job type: ${job.name}`)
@@ -356,6 +364,116 @@ export class EnrichmentProcessor extends WorkerHost {
     } else {
       this.logger.log({ message: 'Geocoding returned no result — skipping', activityId, activityType })
     }
+  }
+
+  private async handleVacationHotelEnrichment(job: Job<VacationHotelEnrichmentJobData>): Promise<void> {
+    const { hotelId, hotelName, destination } = job.data
+
+    this.logger.log({ message: 'Starting vacation hotel enrichment', hotelId, hotelName, destination })
+
+    // Run Google Places and TripAdvisor enrichment in parallel
+    const [googlePlaces, tripadvisor] = await Promise.all([
+      this.googlePlacesEnricher.enrich(hotelName, destination),
+      this.tripadvisorEnricher.enrich(hotelName, destination),
+    ])
+
+    if (!googlePlaces && !tripadvisor) {
+      this.logger.log({ message: 'No enrichment data found — skipping', hotelId, hotelName })
+      return
+    }
+
+    // Upload top 5 photos from Google Places to R2 (fall back to original URLs if storage unavailable)
+    let r2PhotoUrls: string[] = googlePlaces?.photoUrls?.slice(0, 5) ?? []
+
+    if (r2PhotoUrls.length > 0 && this.storageService.isMediaAvailable()) {
+      const uploadedUrls: string[] = []
+
+      for (let i = 0; i < r2PhotoUrls.length; i++) {
+        const photoUrl = r2PhotoUrls[i]!
+        try {
+          const response = await firstValueFrom(
+            this.httpService.get(photoUrl, {
+              responseType: 'arraybuffer',
+              timeout: 15000,
+            }),
+          )
+
+          const buffer = Buffer.from(response.data)
+          const contentType = (response.headers['content-type'] as string) || 'image/jpeg'
+          const extension = contentType.includes('png') ? 'png' : 'jpg'
+          const photoHash = createHash('md5').update(`${hotelId}-${i}`).digest('hex')
+          const fileName = `vacation-hotel-${photoHash}.${extension}`
+
+          const { url: fileUrl } = await this.storageService.uploadMediaFile(
+            buffer,
+            `vacation-hotels/${hotelId}`,
+            fileName,
+            contentType,
+          )
+
+          uploadedUrls.push(fileUrl)
+        } catch (error) {
+          this.logger.warn({
+            message: `Failed to upload photo ${i + 1} to R2 — keeping original URL`,
+            hotelId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          uploadedUrls.push(photoUrl) // Keep the original SerpAPI URL as fallback
+        }
+      }
+
+      r2PhotoUrls = uploadedUrls
+    }
+
+    // Upsert into vacationHotelEnrichment table
+    await this.db.client
+      .insert(vacationHotelEnrichment)
+      .values({
+        hotelId,
+        googlePlaceId: googlePlaces?.placeId ?? null,
+        latitude: googlePlaces?.latitude?.toString() ?? null,
+        longitude: googlePlaces?.longitude?.toString() ?? null,
+        formattedAddress: googlePlaces?.address ?? null,
+        googleRating: googlePlaces?.rating?.toString() ?? null,
+        googleReviewCount: googlePlaces?.reviewCount ?? null,
+        tripadvisorRating: tripadvisor?.rating?.toString() ?? null,
+        tripadvisorReviewCount: tripadvisor?.reviewCount ?? null,
+        tripadvisorLink: tripadvisor?.link ?? null,
+        website: googlePlaces?.website ?? null,
+        phone: googlePlaces?.phone ?? null,
+        photos: r2PhotoUrls,
+        enrichedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      })
+      .onConflictDoUpdate({
+        target: vacationHotelEnrichment.hotelId,
+        set: {
+          googlePlaceId: googlePlaces?.placeId ?? null,
+          latitude: googlePlaces?.latitude?.toString() ?? null,
+          longitude: googlePlaces?.longitude?.toString() ?? null,
+          formattedAddress: googlePlaces?.address ?? null,
+          googleRating: googlePlaces?.rating?.toString() ?? null,
+          googleReviewCount: googlePlaces?.reviewCount ?? null,
+          tripadvisorRating: tripadvisor?.rating?.toString() ?? null,
+          tripadvisorReviewCount: tripadvisor?.reviewCount ?? null,
+          tripadvisorLink: tripadvisor?.link ?? null,
+          website: googlePlaces?.website ?? null,
+          phone: googlePlaces?.phone ?? null,
+          photos: r2PhotoUrls,
+          enrichedAt: new Date(),
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          updatedAt: new Date(),
+        },
+      })
+
+    this.logger.log({
+      message: 'Vacation hotel enrichment complete',
+      hotelId,
+      hotelName,
+      hasGooglePlaces: !!googlePlaces,
+      hasTripAdvisor: !!tripadvisor,
+      photoCount: r2PhotoUrls.length,
+    })
   }
 
   @OnWorkerEvent('active')

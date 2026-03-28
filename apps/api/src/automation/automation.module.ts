@@ -34,6 +34,9 @@ import { GooglePlacesModule } from '../external-apis/providers/google-places/goo
 import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
 import { CatalogMatcherModule } from '../catalog-matcher/catalog-matcher.module'
 import { DocumentTemplatesModule } from '../document-templates/document-templates.module'
+import { GooglePlacesEnricherService } from '../vacation-enrichment/services/google-places-enricher.service'
+import { TripadvisorEnricherService } from '../vacation-enrichment/services/tripadvisor-enricher.service'
+import { SerpApiClientService } from '../vacation-enrichment/services/serpapi-client.service'
 import { QUEUES } from './automation.types'
 
 @Module({
@@ -149,6 +152,9 @@ import { QUEUES } from './automation.types'
     OcrProcessingProcessor,
     EnrichmentProcessor,
     TripLifecycleListener,
+    SerpApiClientService,
+    GooglePlacesEnricherService,
+    TripadvisorEnricherService,
   ],
   exports: [AutomationService],
 })
