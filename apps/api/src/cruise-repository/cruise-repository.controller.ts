@@ -7,11 +7,14 @@
  * - API key auth (OTA public) - aggressive rate limiting
  */
 
-import { Controller, Get, Query, Param, ParseUUIDPipe, ParseIntPipe, DefaultValuePipe, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Query, Param, ParseUUIDPipe, ParseIntPipe, DefaultValuePipe, UseGuards } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiHeader, ApiSecurity } from '@nestjs/swagger'
 import { Public } from '../auth/decorators/public.decorator'
 import { CatalogAuthGuard, CatalogThrottleGuard } from '../common/guards'
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { AdminRoleGuard } from '../auth/guards/admin-role.guard'
 import { CruiseRepositoryService } from './cruise-repository.service'
+import { SailingSlugService } from './sailing-slugs.service'
 import {
   SailingSearchDto,
   SailingSearchResponseDto,
@@ -36,7 +39,10 @@ import {
   required: false,
 })
 export class CruiseRepositoryController {
-  constructor(private readonly cruiseRepository: CruiseRepositoryService) {}
+  constructor(
+    private readonly cruiseRepository: CruiseRepositoryService,
+    private readonly sailingSlugService: SailingSlugService,
+  ) {}
 
   // ============================================================================
   // SEARCH
@@ -309,5 +315,22 @@ export class CruiseRepositoryController {
     @Param('id', ParseUUIDPipe) id: string
   ): Promise<CabinImagesResponseDto> {
     return this.cruiseRepository.getCabinImages(id)
+  }
+
+  // ============================================================================
+  // ADMIN — SLUG GENERATION (production-only)
+  // ============================================================================
+
+  /**
+   * Generate public_ids and slug_bases for all sailings that don't have them.
+   * Only works on Production where catalog tables have the columns (not FDW).
+   * POST /cruise-repository/generate-slugs
+   */
+  @Post('generate-slugs')
+  @UseGuards(JwtAuthGuard, AdminRoleGuard)
+  @ApiOperation({ summary: 'Generate public_ids for sailings without them (production only)' })
+  @ApiResponse({ status: 200, description: 'Slug generation result' })
+  async generateSlugs(): Promise<{ updated: number; errors: number }> {
+    return this.sailingSlugService.generatePublicIds()
   }
 }
