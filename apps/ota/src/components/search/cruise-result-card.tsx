@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Ship, Calendar, MapPin, Clock } from "lucide-react";
 
 import { formatPrice } from "@/lib/format";
@@ -84,7 +85,7 @@ export function CruiseResultCard({ sailing }: CruiseResultCardProps) {
   const shipImageUrl = sailing.ship.imageUrl;
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
+    <Link href={`/cruises/${sailing.id}`} className="group block overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
       {/* ================================================================
           RESPONSIVE LAYOUT:
           - Mobile: stacked (image on top, details below)
@@ -232,6 +233,6 @@ export function CruiseResultCard({ sailing }: CruiseResultCardProps) {
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

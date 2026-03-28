@@ -140,10 +140,11 @@ export default async function CruisesPage({ searchParams }: CruisesPageProps) {
   const params = await searchParams;
   const hasFilters = hasSearchFilters(params);
 
-  // Fetch filters always (for the form dropdowns), sailings only when searching
+  // Fetch filters always (for the form dropdowns), sailings ONLY when filters are applied
+  // Without filters, the unfiltered query scans 49K+ sailings via FDW and takes 20+ seconds
   const [filters, sailings] = await Promise.all([
     fetchFilters(),
-    hasFilters ? fetchSailings(params) : fetchSailings({}),
+    hasFilters ? fetchSailings(params) : Promise.resolve(null),
   ]);
 
   return (
@@ -171,8 +172,10 @@ export default async function CruisesPage({ searchParams }: CruisesPageProps) {
         </div>
 
         {/* Results section */}
-        {sailings === null ? (
+        {sailings === null && hasFilters ? (
           <ErrorState />
+        ) : sailings === null ? (
+          <EmptyPrompt />
         ) : (
           <Suspense fallback={<CruisesLoading />}>
             <CruiseResults
@@ -322,6 +325,24 @@ function Pagination({
         </a>
       )}
     </nav>
+  );
+}
+
+// ============================================================================
+// EMPTY PROMPT — shown when no filters are applied
+// ============================================================================
+
+function EmptyPrompt() {
+  return (
+    <div className="rounded-2xl border border-border bg-muted/30 px-6 py-16 text-center">
+      <p className="text-3xl">🚢</p>
+      <p className="mt-4 text-lg font-medium text-[#1A1A1A]">
+        Start your cruise search
+      </p>
+      <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+        Use the filters above to search by cruise line, region, or departure date. We have over 49,000 sailings from 52 cruise lines worldwide.
+      </p>
+    </div>
   );
 }
 
