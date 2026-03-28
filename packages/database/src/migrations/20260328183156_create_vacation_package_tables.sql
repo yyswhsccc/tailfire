@@ -137,10 +137,10 @@ CREATE TABLE IF NOT EXISTS vacation_hotel_enrichment (
 
 -- destination_vacation_destinations: bridges Tailfire destinations to Softvoyage vacation destinations
 CREATE TABLE IF NOT EXISTS destination_vacation_destinations (
-  destination_id UUID NOT NULL REFERENCES destinations(id),
+  destination_id UUID NOT NULL REFERENCES destinations(id) ON DELETE CASCADE,
   vacation_destination_id UUID NOT NULL,
-  match_method VARCHAR(50) NOT NULL,
-  confidence NUMERIC(5,4) DEFAULT 1.0,
-  is_primary BOOLEAN DEFAULT true,
+  match_method VARCHAR(50) NOT NULL CHECK (match_method IN ('exact', 'geo', 'manual')),
+  confidence NUMERIC(5,4) NOT NULL DEFAULT 1.0,
+  is_primary BOOLEAN NOT NULL DEFAULT true,
   PRIMARY KEY (destination_id, vacation_destination_id)
 );
