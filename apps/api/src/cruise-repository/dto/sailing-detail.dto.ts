@@ -29,6 +29,9 @@ export class ItineraryStopDto {
 
   @ApiPropertyOptional({ description: 'Departure time (HH:mm)' })
   departureTime!: string | null
+
+  @ApiPropertyOptional({ description: 'Destination slug for port drill-down links' })
+  destinationSlug?: string | null
 }
 
 // ============================================================================

@@ -58,6 +58,27 @@ export async function fetchShipDestinations(shipId: string): Promise<Array<{
   })
 }
 
+export async function fetchShipDecks(shipId: string): Promise<Array<{
+  name: string
+  deckNumber: number | null
+  deckPlanUrl: string | null
+  description: string | null
+}>> {
+  try {
+    const data = await catalogFetch<any>(`/cruise-repository/ships/${shipId}/decks`, {
+      next: { revalidate: 86400, tags: ['ship-decks', `ship-decks-${shipId}`] },
+    })
+    return (data.decks || data || []).map((d: any) => ({
+      name: d.name || d.deckName,
+      deckNumber: d.deckNumber || d.deck_number || null,
+      deckPlanUrl: d.deckPlanUrl || d.deck_plan_url || null,
+      description: d.description || null,
+    }))
+  } catch {
+    return []
+  }
+}
+
 export async function fetchShipSailings(shipId: string, pageSize = 4): Promise<{
   sailings: Array<{
     id: string; name: string; sailDate: string; nights: number;

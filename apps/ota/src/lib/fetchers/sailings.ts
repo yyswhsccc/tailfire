@@ -26,6 +26,7 @@ interface RawSailingResponse {
     isSeaDay: boolean
     arrivalTime: string | null
     departureTime: string | null
+    destinationSlug?: string | null
   }>
 }
 
@@ -74,7 +75,7 @@ export async function fetchSailingById(id: string): Promise<SailingDetail> {
       isSeaDay: stop.isSeaDay,
       arrivalTime: stop.arrivalTime || null,
       departureTime: stop.departureTime || null,
-      destinationSlug: null, // Not yet available from API
+      destinationSlug: stop.destinationSlug || null,
     })),
   }
 }

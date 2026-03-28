@@ -644,6 +644,26 @@ export class CruiseRepositoryService {
       .where(eq(cruiseSailingStops.sailingId, id))
       .orderBy(cruiseSailingStops.sequenceOrder)
 
+    // Resolve destination slugs for port links
+    const portIds = stops.filter(s => s.portId && !s.isSeaDay).map(s => s.portId!)
+    let portSlugMap = new Map<string, string>()
+
+    if (portIds.length > 0) {
+      const { destinationPorts, destinations } = this.db.schema
+      const portDestinations = await this.db.db
+        .select({
+          portId: destinationPorts.portId,
+          slug: destinations.slug,
+        })
+        .from(destinationPorts)
+        .innerJoin(destinations, eq(destinationPorts.destinationId, destinations.id))
+        .where(inArray(destinationPorts.portId, portIds))
+
+      for (const pd of portDestinations) {
+        portSlugMap.set(pd.portId, pd.slug)
+      }
+    }
+
     const itinerary: ItineraryStopDto[] = stops.map((stop) => ({
       dayNumber: stop.dayNumber,
       portName: stop.portName || 'Unknown',
@@ -651,6 +671,7 @@ export class CruiseRepositoryService {
       isSeaDay: stop.isSeaDay,
       arrivalTime: stop.arrivalTime,
       departureTime: stop.departureTime,
+      destinationSlug: stop.portId ? (portSlugMap.get(stop.portId) || null) : null,
     }))
 
     // Get cabin prices

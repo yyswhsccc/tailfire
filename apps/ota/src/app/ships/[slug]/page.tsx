@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { fetchShipBySlug, fetchShipImages, fetchShipSailings, fetchShipCabinSummary, fetchShipDestinations } from '@/lib/fetchers/ships'
+import { fetchShipBySlug, fetchShipImages, fetchShipSailings, fetchShipCabinSummary, fetchShipDestinations, fetchShipDecks } from '@/lib/fetchers/ships'
 import { SafeImage } from '@/components/hub/safe-image'
 import { HubHero } from '@/components/hub/hub-hero'
 import { HubHeroMeta } from '@/components/hub/hub-hero-meta'
@@ -31,11 +31,12 @@ export default async function ShipHubPage({ params }: Props) {
   let ship
   try { ship = await fetchShipBySlug(slug) } catch { notFound() }
 
-  const [images, shipSailings, cabinSummary, shipDestinations] = await Promise.all([
+  const [images, shipSailings, cabinSummary, shipDestinations, deckPlans] = await Promise.all([
     fetchShipImages(ship.id, 1, 12).catch(() => ({ images: [] as ShipImage[] })),
     fetchShipSailings(ship.id, 4).catch(() => ({ sailings: [] as any[], total: 0 })),
     fetchShipCabinSummary(ship.id).catch(() => [] as Array<{ category: string; count: number; imageUrl: string | null }>),
     fetchShipDestinations(ship.id).catch(() => [] as Array<{ portName: string; sailingCount: number }>),
+    fetchShipDecks(ship.id).catch(() => [] as Array<{ name: string; deckNumber: number | null; deckPlanUrl: string | null; description: string | null }>),
   ])
 
   const metaItems: Array<{ label: string }> = []
@@ -76,6 +77,31 @@ export default async function ShipHubPage({ params }: Props) {
       </div>
 
       <FeedDivider />
+
+      {deckPlans.filter(d => d.deckPlanUrl).length > 0 && (
+        <>
+          <FeedSection title="🗺️ Deck Plans">
+            <div className="space-y-4">
+              {deckPlans.filter(d => d.deckPlanUrl).map((deck, i) => (
+                <div key={i} className="overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white">
+                  <div className="border-b border-[#f0f0f0] px-4 py-3">
+                    <p className="text-sm font-semibold text-[#1A1A1A]">{deck.name}</p>
+                  </div>
+                  <div className="p-2">
+                    <img
+                      src={deck.deckPlanUrl!}
+                      alt={`${deck.name} deck plan`}
+                      className="w-full"
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </FeedSection>
+          <FeedDivider />
+        </>
+      )}
 
       {images.images.length > 0 && (
         <FeedSection title="📸 Ship Gallery">
