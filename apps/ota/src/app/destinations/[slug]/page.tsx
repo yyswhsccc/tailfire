@@ -1,33 +1,39 @@
-import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
-import Image from 'next/image'
-import Link from 'next/link'
-import { fetchDestinationBySlug, fetchDestinationCruises } from '@/lib/fetchers/destinations'
-import { DestinationHero } from '@/components/destinations/destination-hero'
-import { CtaBar } from '@/components/entity/cta-bar'
+import type { Metadata } from 'next'
+import { fetchDestinationBySlug } from '@/lib/fetchers/destinations'
+import { HubHero } from '@/components/hub/hub-hero'
+import { HubHeroMeta } from '@/components/hub/hub-hero-meta'
+import { HubHeroCta } from '@/components/hub/hub-hero-cta'
+import { HubContext } from '@/components/hub/hub-context'
+import { FeedDivider } from '@/components/hub/feed-divider'
+import { SectionSkeleton } from '@/components/hub/section-skeleton'
 import { PageContextBridge } from '@/components/page-context-bridge'
-import { formatPrice } from '@/lib/format'
+import { CruisesSection } from './sections/cruises-section'
+import { ActivitiesSection } from './sections/activities-section'
+import { PhotosSection } from './sections/photos-section'
 
 export const revalidate = 3600
 
-interface DestinationPageProps {
+interface Props {
   params: Promise<{ slug: string }>
 }
 
-export async function generateMetadata({ params }: DestinationPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   try {
     const dest = await fetchDestinationBySlug(slug)
     return {
       title: dest.name,
-      description: dest.enrichment?.summary || dest.summary || `Explore ${dest.name} — cruises, tours, and things to do.`,
+      description:
+        dest.enrichment?.summary || dest.summary || `Explore ${dest.name}`,
     }
   } catch {
     return { title: 'Destination Not Found' }
   }
 }
 
-export default async function DestinationDetailPage({ params }: DestinationPageProps) {
+export default async function DestinationHubPage({ params }: Props) {
   const { slug } = await params
   let destination
   try {
@@ -36,105 +42,67 @@ export default async function DestinationDetailPage({ params }: DestinationPageP
     notFound()
   }
 
-  let cruises = { sailings: [] as any[], total: 0 }
-  try {
-    cruises = await fetchDestinationCruises(slug, 1, 6)
-  } catch { /* cruises optional */ }
-
   const enrichment = destination.enrichment
   const description = enrichment?.summary || destination.summary
+  const heroImage = destination.heroImageUrl || enrichment?.photos?.[0]?.url
+
+  const pills: Array<{ emoji: string; label: string }> = []
+  if (destination.countryCode)
+    pills.push({ emoji: '\u{1F4CD}', label: destination.countryCode })
+
+  const metaItems: Array<{ label: string }> = []
+  if (enrichment?.averageRating)
+    metaItems.push({ label: `\u2B50 ${enrichment.averageRating.toFixed(1)}` })
+  if (enrichment?.totalReviewCount)
+    metaItems.push({
+      label: `${enrichment.totalReviewCount.toLocaleString()} reviews`,
+    })
 
   return (
     <>
-      <PageContextBridge type="destination" slug={slug} name={destination.name} />
+      <PageContextBridge
+        type="destination"
+        slug={slug}
+        name={destination.name}
+      />
 
-      <DestinationHero destination={destination} />
+      <HubHero
+        title={destination.name}
+        badge={destination.countryCode || undefined}
+        imageUrl={heroImage}
+      >
+        {metaItems.length > 0 && <HubHeroMeta items={metaItems} />}
+        <HubHeroCta
+          primaryLabel={`Plan a Trip to ${destination.name}`}
+          primaryPrompt={`Help me plan a trip to ${destination.name}`}
+          entityType="destination"
+          entitySlug={slug}
+          entityName={destination.name}
+        />
+      </HubHero>
 
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <CtaBar
-            entityType="destination"
-            entitySlug={slug}
-            entityName={destination.name}
-            inquirePrompt={`Help me plan a trip to ${destination.name}`}
-          />
-        </div>
+      <HubContext
+        description={description}
+        pills={pills.length > 0 ? pills : undefined}
+      />
 
-        {description && (
-          <div className="mb-10">
-            <h2 className="mb-3 text-xl font-bold text-[#1A1A1A]">About {destination.name}</h2>
-            <p className="max-w-3xl text-base leading-relaxed text-muted-foreground">{description}</p>
-          </div>
-        )}
+      {/* Cruises — SSR streamed via Suspense */}
+      <Suspense fallback={<SectionSkeleton cardCount={2} />}>
+        <CruisesSection slug={slug} destinationName={destination.name} />
+      </Suspense>
 
-        {enrichment?.topAttractions && enrichment.topAttractions.length > 0 && (
-          <div className="mb-10">
-            <h2 className="mb-4 text-xl font-bold text-[#1A1A1A]">Things to Do</h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {enrichment.topAttractions.slice(0, 6).map((attraction, i) => (
-                <div key={i} className="rounded-xl border border-border bg-white p-4">
-                  <h3 className="text-sm font-semibold text-[#1A1A1A]">{attraction.title}</h3>
-                  {attraction.rating > 0 && (
-                    <p className="mt-1 text-xs text-[#C59746]">{'\u2605'.repeat(Math.round(attraction.rating))} {attraction.rating.toFixed(1)}</p>
-                  )}
-                  {attraction.description && (
-                    <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">{attraction.description}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      <FeedDivider />
 
-        {enrichment?.photos && enrichment.photos.length > 0 && (
-          <div className="mb-10">
-            <h2 className="mb-4 text-xl font-bold text-[#1A1A1A]">Photos</h2>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-              {enrichment.photos.slice(0, 8).map((photo, i) => (
-                <div key={i} className="relative aspect-square overflow-hidden rounded-lg">
-                  <Image src={photo.url} alt={photo.caption || destination.name} fill className="object-cover" sizes="25vw" />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* Activities — text-only from enrichment cache */}
+      <ActivitiesSection
+        destinationName={destination.name}
+        enrichment={enrichment}
+      />
 
-        {cruises.total > 0 && (
-          <div className="mb-10">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-[#1A1A1A]">Cruises Visiting {destination.name}</h2>
-              {cruises.total > 3 && (
-                <Link href={`/destinations/${slug}/cruises`} className="text-sm font-medium text-[#C59746] hover:underline">
-                  View all {cruises.total} →
-                </Link>
-              )}
-            </div>
-            <div className="space-y-4">
-              {cruises.sailings.slice(0, 3).map((s: any) => (
-                <Link key={s.id} href={`/cruises/${s.id}`} className="block">
-                  <div className="rounded-xl border border-border bg-white p-4 transition-shadow hover:shadow-md">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-muted-foreground">{s.cruiseLineName}</p>
-                        <p className="text-sm font-semibold text-[#1A1A1A]">{s.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {s.shipName} · {s.nights} nights · {new Date(s.sailDate + 'T00:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
-                      </div>
-                      {s.cheapestInsideCents && (
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">from</p>
-                          <p className="text-lg font-bold text-[#C59746]">{formatPrice(s.cheapestInsideCents)}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <FeedDivider />
+
+      {/* Photos — from enrichment cache */}
+      <PhotosSection photos={enrichment?.photos || []} />
     </>
   )
 }
