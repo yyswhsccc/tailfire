@@ -4,21 +4,20 @@
 
 **Goal:** Build the reusable card library, hub shell components, image safety system, and the Destination hub page as the first working entity type — validating the entire Universal Trip Hub pattern.
 
-**Architecture:** Mobile-first magazine-feed layout with Suspense streaming. Cruises and activities stream in as async Server Components. Flights are a client component that fetches after hydration (avoids SSR/geo cookie timing issues). All image-bearing cards use SafeImage with error fallback. No tabs — one continuous scroll journey.
+**Architecture:** Mobile-first magazine-feed layout with Suspense streaming. Cruises stream in as async Server Components. Activities render text-only from cached enrichment (no image-by-index pairing). All image-bearing cards use SafeImage with error fallback. No tabs — one continuous scroll journey.
 
 **Tech Stack:** Next.js 15 (App Router, Server Components, Suspense), Tailwind CSS, Zustand, next/image, Lucide icons
 
 **Spec:** `docs/superpowers/specs/2026-03-28-entity-trip-hub-design.md`
 
-**Scope:** This plan covers the foundation (Plan 3A). Plans 3B (remaining 5 entity types + geolocation auto-detect + hotels + tours + nearby) and 3C (deal integration) follow.
+**Scope:** This plan covers the foundation (Plan 3A). Plans 3B (remaining 5 entity types + flights + geolocation + hotels + tours + nearby) and 3C (deal integration) follow.
 
-**Codex-validated fixes applied:**
+**Codex-validated (2 passes):**
 - HubHero back button extracted to client child (no `window` in Server Component)
-- Flights section is client-fetched after hydration (not SSR — geo cookie not available on first render)
-- SafeImage threaded through ALL card components
-- Hotels, tours, nearby deferred to 3B (missing destination→airport/city code mapping)
-- Geolocation auto-detect deferred to 3B (needs real reverse-geocode backend)
-- Flights section uses airport autocomplete for manual origin input (no reverse-geocode dependency)
+- SafeImage threaded through ALL image-bearing card components
+- Flights, hotels, tours, nearby, geolocation ALL deferred to 3B (needs destination→airport mapping + reverse-geocode backend)
+- Activity cards render text-only for 3A (no image-by-index pairing — violates image safety rule)
+- Suspense pattern validated for Next.js 15 async Server Components
 
 ---
 
@@ -28,9 +27,8 @@
 |-------|-----------------|------------|
 | **1. Hub Shell** | HubHero, HubBackButton, HubContext, FeedSection, FeedDivider, SectionSkeleton | Nothing |
 | **2. Image Safety** | SafeImage wrapper with onError fallback | Nothing (parallel) |
-| **3. Card Library** | 6 reusable card components using SafeImage | Phases 1-2 |
-| **4. Flights Client Section** | Client-fetched flights with airport autocomplete | Phase 3 |
-| **5. Destination Hub Page** | Complete `/destinations/[slug]` rewrite using all new components | Phases 1-4 |
+| **3. Card Library** | 5 reusable card components using SafeImage | Phases 1-2 |
+| **4. Destination Hub Page** | Complete `/destinations/[slug]` rewrite using all new components | Phases 1-3 |
 
 ---
 
@@ -460,40 +458,25 @@ export function FlightCard({ airline, origin, destination, duration, stops, freq
 }
 ```
 
-- [ ] **Step 2:** Create ActivityCard (uses SafeImage, returns null if no image):
+- [ ] **Step 2:** Create ActivityCard — TEXT-ONLY for 3A (no images, avoids image-by-index pairing that violates image safety rules). Images will be added in 3B when we have verified per-attraction images:
 
 ```tsx
-import { SafeImage } from '@/components/hub/safe-image'
-
 interface ActivityCardProps {
   title: string
-  imageUrl: string | null
   rating?: number
-  reviewCount?: string
+  description?: string
 }
 
-export function ActivityCard({ title, imageUrl, rating, reviewCount }: ActivityCardProps) {
-  if (!imageUrl) return null
-
+export function ActivityCard({ title, rating, description }: ActivityCardProps) {
   return (
-    <div className="group overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="relative h-24 overflow-hidden sm:h-28">
-        <SafeImage
-          src={imageUrl}
-          alt={title}
-          fill
-          className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-          sizes="(max-width: 640px) 50vw, 25vw"
-          hideOnError
-        />
-        <span className="absolute right-2 top-2 rounded-md bg-white/92 px-2 py-0.5 text-[9px] font-semibold text-[#C59746] backdrop-blur">🎯 Activity</span>
-      </div>
-      <div className="p-2.5 sm:p-3">
-        <h3 className="line-clamp-1 text-xs font-semibold text-[#1A1A1A] sm:text-sm">{title}</h3>
-        {rating && (
-          <p className="mt-0.5 text-[11px] text-[#888]">⭐ {rating.toFixed(1)}{reviewCount ? ` · ${reviewCount}` : ''}</p>
-        )}
-      </div>
+    <div className="rounded-2xl border border-[#f0f0f0] bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
+      <h3 className="text-sm font-semibold text-[#1A1A1A]">{title}</h3>
+      {rating != null && rating > 0 && (
+        <p className="mt-1 text-xs text-[#C59746]">{'★'.repeat(Math.round(rating))} {rating.toFixed(1)}</p>
+      )}
+      {description && (
+        <p className="mt-1.5 line-clamp-2 text-xs text-[#888]">{description}</p>
+      )}
     </div>
   )
 }
@@ -614,166 +597,9 @@ export function NearbyScroll({ title, viewAllHref, items }: NearbyScrollProps) {
 
 ---
 
-## Phase 4: Flights Client Section
+## Phase 4: Destination Hub Page (Full Rewrite)
 
-### Task 4.1: Client-side flights section with airport autocomplete
-
-**Files:**
-- Create: `apps/ota/src/components/hub/sections/flights-section-client.tsx` (Client Component)
-
-- [ ] **Step 1:** Create a client component that renders a compact flight search. Uses the existing airport autocomplete component. Fetches flights client-side after the user enters (or has cached) an origin:
-
-```tsx
-// flights-section-client.tsx
-'use client'
-
-import { useState, useEffect } from 'react'
-import { FlightCard } from '@/components/hub/cards/flight-card'
-import type { FlightOffer } from '@/components/search/flight-result-card'
-
-interface FlightsSectionClientProps {
-  destinationName: string
-  destinationAirportCode?: string  // If known, pre-fill destination
-}
-
-export function FlightsSectionClient({ destinationName, destinationAirportCode }: FlightsSectionClientProps) {
-  const [origin, setOrigin] = useState('')
-  const [flights, setFlights] = useState<FlightOffer[] | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [originCity, setOriginCity] = useState<string | null>(null)
-
-  // Check for geo cookie on mount
-  useEffect(() => {
-    try {
-      const cookie = document.cookie.split('; ').find((c) => c.startsWith('ota_geo='))
-      if (cookie) {
-        const geo = JSON.parse(decodeURIComponent(cookie.split('=')[1]!))
-        if (geo.airportCode) {
-          setOrigin(geo.airportCode)
-          setOriginCity(geo.city)
-        }
-      }
-    } catch {}
-  }, [])
-
-  // Auto-fetch when origin is available
-  useEffect(() => {
-    if (!origin || !destinationAirportCode) return
-
-    setLoading(true)
-    const nextMonth = new Date()
-    nextMonth.setMonth(nextMonth.getMonth() + 1)
-    const date = nextMonth.toISOString().slice(0, 10)
-
-    fetch(`/api/flights-proxy?origin=${origin}&destination=${destinationAirportCode}&departureDate=${date}`)
-      .then((res) => res.json())
-      .then((data) => setFlights(data.results || []))
-      .catch(() => setFlights([]))
-      .finally(() => setLoading(false))
-  }, [origin, destinationAirportCode])
-
-  // If no destination airport code, don't render this section
-  if (!destinationAirportCode) return null
-
-  return (
-    <div className="mx-auto max-w-[1280px] px-4 sm:px-10 lg:px-[60px]">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-bold text-[#1A1A1A] sm:text-xl">✈️ Flights to {destinationName}</h2>
-        <a href={`/search/flights?destination=${destinationAirportCode}${origin ? `&origin=${origin}` : ''}`} className="text-sm font-medium text-[#C59746] hover:underline">
-          Search all flights →
-        </a>
-      </div>
-      {originCity ? (
-        <p className="mt-1 text-xs text-[#888] sm:text-sm">From {originCity} ({origin})</p>
-      ) : (
-        <div className="mt-2 flex max-w-xs items-center gap-2">
-          <input
-            type="text"
-            placeholder="Enter your city or airport code..."
-            className="h-9 flex-1 rounded-lg border border-[#eee] bg-white px-3 text-sm outline-none focus:border-[#C59746]"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const val = (e.target as HTMLInputElement).value.trim().toUpperCase()
-                if (val.length >= 3) setOrigin(val)
-              }
-            }}
-          />
-          <span className="text-xs text-[#aaa]">Press Enter</span>
-        </div>
-      )}
-
-      {loading && (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-32 animate-pulse rounded-2xl bg-[#f0f0f0]" />
-          ))}
-        </div>
-      )}
-
-      {flights && flights.length > 0 && (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {flights.slice(0, 3).map((offer, i) => {
-            const seg = offer.segments[0]!
-            const totalStops = offer.segments.reduce((s, seg) => s + seg.stops, 0) + (offer.segments.length - 1)
-            return (
-              <FlightCard
-                key={i}
-                airline={seg.carrierName || seg.carrier}
-                origin={seg.departure.iataCode}
-                destination={offer.segments[offer.segments.length - 1]!.arrival.iataCode}
-                duration={seg.duration.replace('PT', '').replace('H', 'h ').replace('M', 'm')}
-                stops={totalStops}
-                priceCad={`$${parseFloat(offer.price.total).toFixed(0)}`}
-                priceLabel="roundtrip from"
-              />
-            )
-          })}
-        </div>
-      )}
-
-      {flights && flights.length === 0 && origin && (
-        <p className="mt-4 text-sm text-[#888]">No flights found from {origin}. Try a different origin.</p>
-      )}
-    </div>
-  )
-}
-```
-
-- [ ] **Step 2:** Create the flights proxy API route (avoids exposing OTA service key to client):
-
-```tsx
-// apps/ota/src/app/api/flights-proxy/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { serviceFetch } from '@/lib/api'
-
-export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl
-  const origin = searchParams.get('origin')
-  const destination = searchParams.get('destination')
-  const departureDate = searchParams.get('departureDate')
-
-  if (!origin || !destination || !departureDate) {
-    return NextResponse.json({ results: [] })
-  }
-
-  try {
-    const data = await serviceFetch<{ results: any[] }>(
-      `/ota/search/flights?origin=${origin}&destination=${destination}&departureDate=${departureDate}&adults=1`,
-    )
-    return NextResponse.json(data)
-  } catch {
-    return NextResponse.json({ results: [] })
-  }
-}
-```
-
-- [ ] **Step 3:** Commit: `feat(ota): client-side flights section with proxy route`
-
----
-
-## Phase 5: Destination Hub Page (Full Rewrite)
-
-### Task 5.1: Destination hub — hero + context + streaming feed
+### Task 4.1: Destination hub — hero + context + streaming feed
 
 **Files:**
 - Rewrite: `apps/ota/src/app/destinations/[slug]/page.tsx`
@@ -796,7 +622,6 @@ import { HubContext } from '@/components/hub/hub-context'
 import { FeedDivider } from '@/components/hub/feed-divider'
 import { SectionSkeleton } from '@/components/hub/section-skeleton'
 import { PageContextBridge } from '@/components/page-context-bridge'
-import { FlightsSectionClient } from '@/components/hub/sections/flights-section-client'
 import { DestinationCruisesSection } from './sections/cruises-section'
 import { DestinationActivitiesSection } from './sections/activities-section'
 import { DestinationPhotosSection } from './sections/photos-section'
@@ -848,11 +673,6 @@ export default async function DestinationHubPage({ params }: Props) {
       </HubHero>
 
       <HubContext description={description} pills={pills.length > 0 ? pills : undefined} />
-
-      {/* Flights — client-fetched after hydration */}
-      <FlightsSectionClient destinationName={destination.name} />
-
-      <FeedDivider />
 
       {/* Cruises — SSR streamed via Suspense */}
       <Suspense fallback={<SectionSkeleton cardCount={2} />}>
@@ -939,8 +759,8 @@ export function DestinationActivitiesSection({ destinationName, enrichment }: Pr
           <ActivityCard
             key={i}
             title={activity.title}
-            imageUrl={enrichment?.photos?.[i]?.url || null}
             rating={activity.rating}
+            description={activity.description}
           />
         ))}
       </div>
@@ -994,9 +814,11 @@ export function DestinationPhotosSection({ photos }: Props) {
 
 ## Deferred to Plan 3B
 
-- Geolocation auto-detect (reverse geocoding backend)
-- Hotels section (needs destination → Amadeus city code mapping)
-- Tours section (needs tour-destination linkage)
-- Nearby destinations section (needs geo proximity query)
-- Remaining 5 entity types (Ship, Cruise Line, Sailing, Region, Deal)
-- Deal matching + banners
+- **Flights section** (needs destination → airport IATA code mapping + geolocation)
+- **Geolocation auto-detect** (reverse geocoding backend — reuse existing `apps/api/src/geocoding/geocoding.service.ts`)
+- **Hotels section** (needs destination → Amadeus city code mapping)
+- **Tours section** (needs tour-destination linkage)
+- **Nearby destinations section** (needs geo proximity query)
+- **Activity card images** (need verified per-attraction image URLs, not index-based pairing)
+- **Remaining 5 entity types** (Ship, Cruise Line, Sailing, Region, Deal)
+- **Deal matching + banners**
