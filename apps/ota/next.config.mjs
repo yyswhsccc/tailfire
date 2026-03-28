@@ -13,6 +13,7 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.r2.dev' },
       { protocol: 'https', hostname: 'static.traveltek.net' },
       { protocol: 'https', hostname: 'images.globusfamily.com' },
+      { protocol: 'https', hostname: 'dynamic-media-cdn.tripadvisor.com', pathname: '/**' },
     ],
   },
   experimental: {

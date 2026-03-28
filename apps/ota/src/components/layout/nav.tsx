@@ -13,6 +13,9 @@ import phoenixLogo from "@/assets/phoenix-logo.svg";
 const NAV_LINKS = [
   { label: "Deals", href: "/deals" },
   { label: "Cruises", href: "/search/cruises" },
+  { label: "Cruise Lines", href: "/cruise-lines" },
+  { label: "Destinations", href: "/destinations" },
+  { label: "Regions", href: "/regions" },
   { label: "Flights", href: "/search/flights" },
   { label: "Hotels", href: "/search/hotels" },
   { label: "Tours", href: "/search/tours" },
