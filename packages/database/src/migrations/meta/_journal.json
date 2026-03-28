@@ -1275,6 +1275,13 @@
       "when": 1774922400000,
       "tag": "20260327140000_planning_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 182,
+      "version": "7",
+      "when": 1774926000000,
+      "tag": "20260327150000_sailing_public_ids",
+      "breakpoints": true
     }
   ]
 }

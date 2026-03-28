@@ -86,6 +86,10 @@ export const cruiseSailings = catalogSchema.table(
     // Audit fields
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+
+    // OTA stable URL identifiers
+    publicId: varchar('public_id', { length: 20 }),
+    slugBase: varchar('slug_base', { length: 255 }),
   },
   (table) => ({
     // Provider uniqueness (one sailing per provider+identifier)
