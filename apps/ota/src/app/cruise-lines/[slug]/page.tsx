@@ -1,57 +1,55 @@
-import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import type { Metadata } from 'next'
 import { fetchCruiseLineBySlug } from '@/lib/fetchers/cruise-lines'
-import { EntityHero } from '@/components/entity/entity-hero'
-import { StatCard } from '@/components/entity/stat-card'
-import { ShipCard } from '@/components/ships/ship-card'
+import { HubHero } from '@/components/hub/hub-hero'
+import { HubHeroMeta } from '@/components/hub/hub-hero-meta'
+import { HubHeroCta } from '@/components/hub/hub-hero-cta'
+import { HubContext } from '@/components/hub/hub-context'
+import { FeedSection } from '@/components/hub/feed-section'
 import { PageContextBridge } from '@/components/page-context-bridge'
-import { Ship, Calendar } from 'lucide-react'
+import { ShipCard } from '@/components/ships/ship-card'
 
 export const revalidate = 3600
 
-interface CruiseLinePageProps {
-  params: Promise<{ slug: string }>
-}
+interface Props { params: Promise<{ slug: string }> }
 
-export async function generateMetadata({ params }: CruiseLinePageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   try {
     const line = await fetchCruiseLineBySlug(slug)
-    return {
-      title: line.name,
-      description: `Explore ${line.name} — ${line.shipCount} ships, ${line.sailingCount.toLocaleString()} upcoming sailings.`,
-    }
-  } catch {
-    return { title: 'Cruise Line Not Found' }
-  }
+    return { title: line.name, description: `Explore ${line.name} — ${line.shipCount} ships, ${line.sailingCount.toLocaleString()} sailings.` }
+  } catch { return { title: 'Cruise Line Not Found' } }
 }
 
-export default async function CruiseLineDetailPage({ params }: CruiseLinePageProps) {
+export default async function CruiseLineHubPage({ params }: Props) {
   const { slug } = await params
   let line
-  try {
-    line = await fetchCruiseLineBySlug(slug)
-  } catch {
-    notFound()
-  }
+  try { line = await fetchCruiseLineBySlug(slug) } catch { notFound() }
+
+  const heroImage = line.ships[0]?.imageUrl || null
 
   return (
     <>
       <PageContextBridge type="cruise_line" slug={slug} name={line.name} />
 
-      <EntityHero
-        title={line.name}
-        badge="Cruise Line"
-        imageUrl={line.ships[0]?.imageUrl}
-      >
-        <div className="flex flex-wrap gap-3">
-          <StatCard label="ships" value={line.shipCount} icon={<Ship className="size-3.5" />} />
-          <StatCard label="sailings" value={line.sailingCount.toLocaleString()} icon={<Calendar className="size-3.5" />} />
-        </div>
-      </EntityHero>
+      <HubHero title={line.name} badge="Cruise Line" imageUrl={heroImage}>
+        <HubHeroMeta items={[
+          { label: `🚢 ${line.shipCount} ships` },
+          { label: `📅 ${line.sailingCount.toLocaleString()} sailings` },
+        ]} />
+        <HubHeroCta
+          primaryLabel={`Explore ${line.name}`}
+          primaryPrompt={`Tell me about ${line.name} cruises`}
+          entityType="cruise_line" entitySlug={slug} entityName={line.name}
+        />
+      </HubHero>
 
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <h2 className="mb-6 text-xl font-bold text-[#1A1A1A]">Fleet</h2>
+      <HubContext description={null} pills={[
+        { emoji: '🚢', label: `${line.shipCount} ships in fleet` },
+        { emoji: '📅', label: `${line.sailingCount.toLocaleString()} sailings` },
+      ]} />
+
+      <FeedSection title={`🚢 ${line.name} Fleet`}>
         {line.ships.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {line.ships.map((ship) => (
@@ -59,11 +57,9 @@ export default async function CruiseLineDetailPage({ params }: CruiseLinePagePro
             ))}
           </div>
         ) : (
-          <p className="rounded-xl border border-border bg-muted/30 px-6 py-12 text-center text-muted-foreground">
-            No ships listed for {line.name} yet.
-          </p>
+          <p className="py-12 text-center text-sm text-[#888]">No ships listed yet.</p>
         )}
-      </div>
+      </FeedSection>
     </>
   )
 }

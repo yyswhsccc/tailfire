@@ -1,101 +1,81 @@
-import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { fetchShipBySlug, fetchShipImages } from '@/lib/fetchers/ships'
-import { EntityHero } from '@/components/entity/entity-hero'
-import { StatCard } from '@/components/entity/stat-card'
-import { CtaBar } from '@/components/entity/cta-bar'
-import { ShipGallery } from '@/components/ships/ship-gallery'
+import { HubHero } from '@/components/hub/hub-hero'
+import { HubHeroMeta } from '@/components/hub/hub-hero-meta'
+import { HubHeroCta } from '@/components/hub/hub-hero-cta'
+import { HubContext } from '@/components/hub/hub-context'
+import { FeedSection } from '@/components/hub/feed-section'
+import { FeedDivider } from '@/components/hub/feed-divider'
 import { PageContextBridge } from '@/components/page-context-bridge'
-import { Users, Calendar, Anchor } from 'lucide-react'
+import { ShipGallery } from '@/components/ships/ship-gallery'
 import type { ShipImage } from '@/types/entities'
 
 export const revalidate = 3600
 
-interface ShipPageProps {
-  params: Promise<{ slug: string }>
-}
+interface Props { params: Promise<{ slug: string }> }
 
-export async function generateMetadata({ params }: ShipPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   try {
     const ship = await fetchShipBySlug(slug)
-    return {
-      title: `${ship.name} — ${ship.cruiseLine.name}`,
-      description: `Explore ${ship.name} by ${ship.cruiseLine.name}. ${ship.upcomingSailingCount} upcoming sailings. Photos, cabin types, and deck plans.`,
-    }
-  } catch {
-    return { title: 'Ship Not Found' }
-  }
+    return { title: `${ship.name} — ${ship.cruiseLine.name}`, description: `Explore ${ship.name}. ${ship.upcomingSailingCount} upcoming sailings.` }
+  } catch { return { title: 'Ship Not Found' } }
 }
 
-export default async function ShipDetailPage({ params }: ShipPageProps) {
+export default async function ShipHubPage({ params }: Props) {
   const { slug } = await params
   let ship
-  try {
-    ship = await fetchShipBySlug(slug)
-  } catch {
-    notFound()
-  }
+  try { ship = await fetchShipBySlug(slug) } catch { notFound() }
 
-  let images: { images: ShipImage[]; total: number } = { images: [], total: 0 }
-  try {
-    images = await fetchShipImages(ship.id, 1, 12)
-  } catch { /* images optional */ }
+  let images: { images: ShipImage[] } = { images: [] }
+  try { images = await fetchShipImages(ship.id, 1, 12) } catch {}
+
+  const metaItems: Array<{ label: string }> = []
+  if (ship.passengerCapacity) metaItems.push({ label: `👥 ${ship.passengerCapacity.toLocaleString()} guests` })
+  metaItems.push({ label: `📅 ${ship.upcomingSailingCount} sailings` })
+  if (ship.tonnage) metaItems.push({ label: `⚓ ${Math.round(ship.tonnage / 1000)}K GT` })
+
+  const pills: Array<{ emoji: string; label: string }> = []
+  if (ship.yearBuilt) pills.push({ emoji: '🏗️', label: `Built ${ship.yearBuilt}` })
+  if (ship.shipClass) pills.push({ emoji: '🚢', label: `${ship.shipClass} Class` })
+  if (ship.crewCount) pills.push({ emoji: '👨‍✈️', label: `${ship.crewCount.toLocaleString()} crew` })
+  if (ship.tonnage) pills.push({ emoji: '⚓', label: `${ship.tonnage.toLocaleString()} GT` })
 
   return (
     <>
-      <PageContextBridge
-        type="ship"
-        slug={slug}
-        name={ship.name}
-        parentContext={{ type: 'cruise_line', slug: ship.cruiseLine.slug, name: ship.cruiseLine.name }}
-      />
+      <PageContextBridge type="ship" slug={slug} name={ship.name}
+        parentContext={{ type: 'cruise_line', slug: ship.cruiseLine.slug, name: ship.cruiseLine.name }} />
 
-      <EntityHero title={ship.name} badge={ship.cruiseLine.name} imageUrl={ship.imageUrl}>
-        <div className="flex flex-wrap gap-3">
-          {ship.passengerCapacity && (
-            <StatCard label="guests" value={ship.passengerCapacity.toLocaleString()} icon={<Users className="size-3.5" />} />
-          )}
-          <StatCard label="sailings" value={ship.upcomingSailingCount} icon={<Calendar className="size-3.5" />} />
-          {ship.tonnage && <StatCard label="GT" value={`${Math.round(ship.tonnage / 1000)}K`} icon={<Anchor className="size-3.5" />} />}
-        </div>
-        <div className="mt-4">
-          <CtaBar entityType="ship" entitySlug={slug} entityName={ship.name} inquirePrompt={`Tell me about the ${ship.name}`} />
-        </div>
-      </EntityHero>
+      <HubHero title={ship.name} badge={ship.cruiseLine.name} imageUrl={ship.imageUrl}>
+        <HubHeroMeta items={metaItems} />
+        <HubHeroCta
+          primaryLabel={`Explore Sailings on ${ship.name}`}
+          primaryPrompt={`Tell me about the ${ship.name}`}
+          entityType="ship" entitySlug={slug} entityName={ship.name}
+        />
+      </HubHero>
 
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid gap-10 lg:grid-cols-5">
-          <div className="lg:col-span-3">
-            <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {ship.yearBuilt && <InfoItem label="Built" value={String(ship.yearBuilt)} />}
-              {ship.shipClass && <InfoItem label="Class" value={ship.shipClass} />}
-              {ship.crewCount && <InfoItem label="Crew" value={ship.crewCount.toLocaleString()} />}
-              {ship.tonnage && <InfoItem label="Tonnage" value={`${ship.tonnage.toLocaleString()} GT`} />}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Part of the{' '}
-              <Link href={`/cruise-lines/${ship.cruiseLine.slug}`} className="font-medium text-[#C59746] hover:underline">
-                {ship.cruiseLine.name}
-              </Link>{' '}
-              fleet.
-            </p>
-          </div>
-          <div className="lg:col-span-2">
-            <ShipGallery images={images.images} />
-          </div>
-        </div>
+      <HubContext description={null} pills={pills.length > 0 ? pills : undefined} />
+
+      <div className="mx-auto max-w-[1280px] px-4 pb-4 sm:px-10 lg:px-[60px]">
+        <p className="text-sm text-[#888]">
+          Part of the{' '}
+          <Link href={`/cruise-lines/${ship.cruiseLine.slug}`} className="font-medium text-[#C59746] hover:underline">
+            {ship.cruiseLine.name}
+          </Link>{' '}
+          fleet.
+        </p>
       </div>
-    </>
-  )
-}
 
-function InfoItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm font-semibold text-[#1A1A1A]">{value}</p>
-    </div>
+      <FeedDivider />
+
+      {images.images.length > 0 && (
+        <FeedSection title="📸 Ship Gallery">
+          <ShipGallery images={images.images} />
+        </FeedSection>
+      )}
+    </>
   )
 }
