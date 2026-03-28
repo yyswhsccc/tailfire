@@ -18,7 +18,7 @@ interface DeckPlanViewerProps {
 export function DeckPlanViewer({ decks, shipName }: DeckPlanViewerProps) {
   const viewable = decks.filter((d) => d.deckPlanUrl)
   const [activeIndex, setActiveIndex] = useState(0)
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(0.75)
   const viewportRef = useRef<HTMLDivElement>(null)
 
   if (viewable.length === 0) return null
@@ -26,7 +26,7 @@ export function DeckPlanViewer({ decks, shipName }: DeckPlanViewerProps) {
 
   const handleDeckChange = useCallback((i: number) => {
     setActiveIndex(i)
-    setZoom(1)
+    setZoom(0.75)
     // Scroll viewport back to top when switching decks
     viewportRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
@@ -108,9 +108,9 @@ export function DeckPlanViewer({ decks, shipName }: DeckPlanViewerProps) {
             >
               <Plus className="size-3.5" />
             </button>
-            {zoom !== 1 && (
+            {zoom !== 0.75 && (
               <button
-                onClick={() => setZoom(1)}
+                onClick={() => setZoom(0.75)}
                 className="flex size-7 items-center justify-center rounded-md text-[#888] hover:bg-[#f5f5f0] hover:text-[#1A1A1A]"
                 aria-label="Reset zoom"
               >
@@ -129,7 +129,7 @@ export function DeckPlanViewer({ decks, shipName }: DeckPlanViewerProps) {
           <img
             src={active.deckPlanUrl!}
             alt={`${shipName} — ${active.name}`}
-            className="block"
+            className="block mx-auto"
             style={{
               width: `${zoom * 100}%`,
               maxWidth: 'none',
