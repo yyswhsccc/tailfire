@@ -38,3 +38,33 @@ export async function fetchShipImages(
     totalPages: raw.pagination.totalPages,
   }
 }
+
+export async function fetchShipSailings(shipId: string, pageSize = 4): Promise<{
+  sailings: Array<{
+    id: string; name: string; sailDate: string; nights: number;
+    shipName: string; shipImageUrl: string | null;
+    cruiseLineName: string; cheapestInsideCents: number | null;
+  }>
+  total: number
+}> {
+  try {
+    const data = await catalogFetch<any>(`/cruise-repository/sailings?shipId=${shipId}&pageSize=${pageSize}&sortBy=sailDate&sortDir=asc`, {
+      next: { revalidate: 1800, tags: ['ship-sailings', `ship-sailings-${shipId}`] },
+    })
+    return {
+      sailings: (data.sailings || []).map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        sailDate: s.sailDate,
+        nights: s.nights,
+        shipName: s.ship?.name || '',
+        shipImageUrl: s.ship?.imageUrl || null,
+        cruiseLineName: s.cruiseLine?.name || '',
+        cheapestInsideCents: s.prices?.inside ?? s.priceSummary?.cheapestInside ?? null,
+      })),
+      total: data.total || 0,
+    }
+  } catch {
+    return { sailings: [], total: 0 }
+  }
+}

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { fetchShipBySlug, fetchShipImages } from '@/lib/fetchers/ships'
+import { fetchShipBySlug, fetchShipImages, fetchShipSailings } from '@/lib/fetchers/ships'
 import { HubHero } from '@/components/hub/hub-hero'
 import { HubHeroMeta } from '@/components/hub/hub-hero-meta'
 import { HubHeroCta } from '@/components/hub/hub-hero-cta'
@@ -10,6 +10,7 @@ import { FeedSection } from '@/components/hub/feed-section'
 import { FeedDivider } from '@/components/hub/feed-divider'
 import { PageContextBridge } from '@/components/page-context-bridge'
 import { ShipGallery } from '@/components/ships/ship-gallery'
+import { CruiseCard } from '@/components/hub/cards/cruise-card'
 import type { ShipImage } from '@/types/entities'
 
 export const revalidate = 3600
@@ -31,6 +32,9 @@ export default async function ShipHubPage({ params }: Props) {
 
   let images: { images: ShipImage[] } = { images: [] }
   try { images = await fetchShipImages(ship.id, 1, 12) } catch {}
+
+  let shipSailings = { sailings: [] as any[], total: 0 }
+  try { shipSailings = await fetchShipSailings(ship.id, 4) } catch {}
 
   const metaItems: Array<{ label: string }> = []
   if (ship.passengerCapacity) metaItems.push({ label: `👥 ${ship.passengerCapacity.toLocaleString()} guests` })
@@ -75,6 +79,34 @@ export default async function ShipHubPage({ params }: Props) {
         <FeedSection title="📸 Ship Gallery">
           <ShipGallery images={images.images} />
         </FeedSection>
+      )}
+
+      {shipSailings.sailings.length > 0 && (
+        <>
+          <FeedSection
+            title={`🚢 Upcoming Sailings on ${ship.name}`}
+            subtitle={`${shipSailings.total} sailings available`}
+            viewAllHref={`/search/cruises?q=${encodeURIComponent(ship.name)}`}
+            viewAllLabel="Search all sailings →"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              {shipSailings.sailings.map((s) => (
+                <CruiseCard
+                  key={s.id}
+                  id={s.id}
+                  name={s.name}
+                  shipName={s.shipName}
+                  shipImageUrl={s.shipImageUrl}
+                  cruiseLineName={s.cruiseLineName}
+                  sailDate={s.sailDate}
+                  nights={s.nights}
+                  cheapestPriceCents={s.cheapestInsideCents}
+                />
+              ))}
+            </div>
+          </FeedSection>
+          <FeedDivider />
+        </>
       )}
     </>
   )
