@@ -1,13 +1,73 @@
+import { IsOptional, IsString, IsInt, Min, Max, IsArray, IsIn } from 'class-validator'
+import { Type, Transform } from 'class-transformer'
+import { ApiPropertyOptional } from '@nestjs/swagger'
+
 export class VacationHotelSearchDto {
+  @ApiPropertyOptional({ description: 'Search text (hotel name)' })
+  @IsOptional()
+  @IsString()
   q?: string
-  page?: number // default 1
-  pageSize?: number // max 50
+
+  @ApiPropertyOptional({ description: 'Page number', default: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  page?: number
+
+  @ApiPropertyOptional({ description: 'Page size (max 50)', default: 20 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  @Type(() => Number)
+  pageSize?: number
+
+  @ApiPropertyOptional({ description: 'Filter by departure gateway airport code (e.g., YYZ)' })
+  @IsOptional()
+  @IsString()
   gatewayCode?: string
+
+  @ApiPropertyOptional({ description: 'Filter by destination ID' })
+  @IsOptional()
+  @IsString()
   destinationId?: string
+
+  @ApiPropertyOptional({ description: 'Minimum star rating' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  @Type(() => Number)
   minStars?: number
+
+  @ApiPropertyOptional({ description: 'Maximum star rating' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  @Type(() => Number)
   maxStars?: number
-  amenities?: string[] // e.g., ['beach', 'spa']
+
+  @ApiPropertyOptional({ description: 'Filter by amenities (e.g., beach,spa)', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => {
+    if (!value) return undefined
+    if (Array.isArray(value)) return value
+    return typeof value === 'string' ? value.split(',').map((s: string) => s.trim()) : [value]
+  })
+  amenities?: string[]
+
+  @ApiPropertyOptional({ description: 'Sort field', enum: ['name', 'starRating', 'monarcRating'] })
+  @IsOptional()
+  @IsIn(['name', 'starRating', 'monarcRating'])
   sortBy?: 'name' | 'starRating' | 'monarcRating'
+
+  @ApiPropertyOptional({ description: 'Sort direction', enum: ['asc', 'desc'] })
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
   sortDir?: 'asc' | 'desc'
 }
 

@@ -11,7 +11,7 @@
  */
 
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { eq, and, gte, lte, ilike, asc, desc, sql, count } from 'drizzle-orm'
+import { eq, and, gte, lte, ilike, asc, desc, sql, count, exists } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import {
   vacationGateways,
@@ -134,12 +134,39 @@ export class VacationRepositoryService {
       conditions.push(eq(vacationHotels.destinationId, dto.destinationId) as any)
     }
 
+    // Gateway filter: find hotels in destinations available from this gateway
+    if (dto.gatewayCode) {
+      conditions.push(
+        exists(
+          this.db.db
+            .select({ one: sql`1` })
+            .from(vacationGatewayDestinations)
+            .innerJoin(vacationGateways, eq(vacationGatewayDestinations.gatewayId, vacationGateways.id))
+            .where(
+              and(
+                eq(vacationGatewayDestinations.destinationId, vacationHotels.destinationId),
+                eq(vacationGateways.airportCode, dto.gatewayCode),
+              )
+            )
+        ) as any
+      )
+    }
+
     // Star rating filters
     if (dto.minStars !== undefined) {
       conditions.push(gte(vacationHotels.starRating, dto.minStars) as any)
     }
     if (dto.maxStars !== undefined) {
       conditions.push(lte(vacationHotels.starRating, dto.maxStars) as any)
+    }
+
+    // Amenity filters: hotel.amenities JSONB must contain all requested keys as true
+    if (dto.amenities && dto.amenities.length > 0) {
+      for (const amenity of dto.amenities) {
+        conditions.push(
+          sql`${vacationHotels.amenities}->>${sql.raw(`'${amenity.replace(/'/g, "''")}'`)} = 'true'` as any
+        )
+      }
     }
 
     // Build sort column
@@ -244,7 +271,7 @@ export class VacationRepositoryService {
         eq(vacationHotelEnrichment.hotelId, vacationHotels.id)
       )
       .leftJoin(vacationDestinations, eq(vacationHotels.destinationId, vacationDestinations.id))
-      .where(eq(vacationHotels.id, id))
+      .where(and(eq(vacationHotels.id, id), eq(vacationHotels.isActive, true)))
       .limit(1)
 
     const row = results[0]
