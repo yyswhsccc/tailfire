@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { fetchDestinations } from '@/lib/fetchers/destinations'
 import { DestinationCard } from '@/components/destinations/destination-card'
 
@@ -65,7 +66,7 @@ export default async function DestinationsPage({ searchParams }: DestinationsPag
       {data.totalPages > 1 && (
         <div className="mt-8 flex justify-center gap-2">
           {Array.from({ length: Math.min(data.totalPages, 10) }, (_, i) => i + 1).map((p) => (
-            <a
+            <Link
               key={p}
               href={`/destinations?${new URLSearchParams({ ...(search ? { search } : {}), page: String(p) }).toString()}`}
               className={`inline-flex size-10 items-center justify-center rounded-lg text-sm font-medium ${
@@ -73,7 +74,7 @@ export default async function DestinationsPage({ searchParams }: DestinationsPag
               }`}
             >
               {p}
-            </a>
+            </Link>
           ))}
         </div>
       )}

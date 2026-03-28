@@ -128,6 +128,9 @@ export class ShipDetailDto {
   @ApiProperty({ description: 'Ship name' })
   name!: string
 
+  @ApiPropertyOptional({ description: 'Ship slug' })
+  slug!: string
+
   @ApiPropertyOptional({ description: 'Ship class' })
   shipClass!: string | null
 
@@ -166,6 +169,9 @@ export class CruiseLineDetailDto {
 
   @ApiProperty({ description: 'Cruise line name' })
   name!: string
+
+  @ApiPropertyOptional({ description: 'Cruise line slug' })
+  slug!: string
 
   @ApiPropertyOptional({ description: 'Logo URL' })
   logoUrl!: string | null

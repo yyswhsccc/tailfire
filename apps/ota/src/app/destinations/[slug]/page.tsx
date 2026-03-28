@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { fetchDestinationBySlug, fetchDestinationCruises } from '@/lib/fetchers/destinations'
 import { DestinationHero } from '@/components/destinations/destination-hero'
 import { CtaBar } from '@/components/entity/cta-bar'
@@ -103,14 +104,14 @@ export default async function DestinationDetailPage({ params }: DestinationPageP
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-[#1A1A1A]">Cruises Visiting {destination.name}</h2>
               {cruises.total > 3 && (
-                <a href={`/destinations/${slug}/cruises`} className="text-sm font-medium text-[#C59746] hover:underline">
+                <Link href={`/destinations/${slug}/cruises`} className="text-sm font-medium text-[#C59746] hover:underline">
                   View all {cruises.total} →
-                </a>
+                </Link>
               )}
             </div>
             <div className="space-y-4">
               {cruises.sailings.slice(0, 3).map((s: any) => (
-                <a key={s.id} href={`/cruises/${s.id}`} className="block">
+                <Link key={s.id} href={`/cruises/${s.id}`} className="block">
                   <div className="rounded-xl border border-border bg-white p-4 transition-shadow hover:shadow-md">
                     <div className="flex items-center justify-between">
                       <div>
@@ -128,7 +129,7 @@ export default async function DestinationDetailPage({ params }: DestinationPageP
                       )}
                     </div>
                   </div>
-                </a>
+                </Link>
               ))}
             </div>
           </div>

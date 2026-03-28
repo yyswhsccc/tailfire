@@ -19,7 +19,22 @@ export async function fetchShipImages(
   page = 1,
   pageSize = 12,
 ): Promise<{ images: ShipImage[]; total: number; page: number; totalPages: number }> {
-  return catalogFetch(`/cruise-repository/ships/${shipId}/images?page=${page}&pageSize=${pageSize}`, {
+  const raw = await catalogFetch<{
+    images: Array<{ id: string; url: string; thumbnailUrl: string | null; altText: string | null; imageType: string | null; isHero: boolean }>
+    pagination: { page: number; pageSize: number; totalItems: number; totalPages: number; hasMore: boolean }
+  }>(`/cruise-repository/ships/${shipId}/images?page=${page}&pageSize=${pageSize}`, {
     next: { revalidate: 86400, tags: ['ship-images', `ship-images-${shipId}`] },
   })
+
+  return {
+    images: raw.images.map((img) => ({
+      id: img.id,
+      imageUrl: img.url,
+      caption: img.altText,
+      imageType: img.imageType,
+    })),
+    total: raw.pagination.totalItems,
+    page: raw.pagination.page,
+    totalPages: raw.pagination.totalPages,
+  }
 }

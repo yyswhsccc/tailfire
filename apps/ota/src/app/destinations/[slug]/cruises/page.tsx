@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import { fetchDestinationBySlug, fetchDestinationCruises } from '@/lib/fetchers/destinations'
 import { PageContextBridge } from '@/components/page-context-bridge'
 import { formatPrice } from '@/lib/format'
@@ -45,7 +46,7 @@ export default async function DestinationCruisesPage({ params, searchParams }: P
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="mb-8">
           <p className="text-sm text-muted-foreground">
-            <a href={`/destinations/${slug}`} className="text-[#C59746] hover:underline">{destination.name}</a> › Cruises
+            <Link href={`/destinations/${slug}`} className="text-[#C59746] hover:underline">{destination.name}</Link> › Cruises
           </p>
           <h1 className="mt-2 font-display text-2xl font-bold text-[#1A1A1A] md:text-3xl">
             Cruises Visiting {destination.name}
@@ -57,7 +58,7 @@ export default async function DestinationCruisesPage({ params, searchParams }: P
 
         <div className="space-y-4">
           {data.sailings.map((s) => (
-            <a key={s.id} href={`/cruises/${s.id}`} className="block rounded-xl border border-border bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+            <Link key={s.id} href={`/cruises/${s.id}`} className="block rounded-xl border border-border bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs font-medium text-[#C59746]">{s.cruiseLineName}</p>
@@ -74,14 +75,14 @@ export default async function DestinationCruisesPage({ params, searchParams }: P
                   </div>
                 )}
               </div>
-            </a>
+            </Link>
           ))}
         </div>
 
         {data.totalPages > 1 && (
           <div className="mt-8 flex justify-center gap-2">
             {Array.from({ length: Math.min(data.totalPages, 10) }, (_, i) => i + 1).map((p) => (
-              <a
+              <Link
                 key={p}
                 href={`/destinations/${slug}/cruises?page=${p}`}
                 className={`inline-flex size-10 items-center justify-center rounded-lg text-sm font-medium ${
@@ -89,7 +90,7 @@ export default async function DestinationCruisesPage({ params, searchParams }: P
                 }`}
               >
                 {p}
-              </a>
+              </Link>
             ))}
           </div>
         )}

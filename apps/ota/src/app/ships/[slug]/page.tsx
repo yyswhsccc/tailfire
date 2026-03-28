@@ -43,8 +43,6 @@ export default async function ShipDetailPage({ params }: ShipPageProps) {
     images = await fetchShipImages(ship.id, 1, 12)
   } catch { /* images optional */ }
 
-  const meta = ship.metadata || {}
-
   return (
     <>
       <PageContextBridge
@@ -56,11 +54,11 @@ export default async function ShipDetailPage({ params }: ShipPageProps) {
 
       <EntityHero title={ship.name} badge={ship.cruiseLine.name} imageUrl={ship.imageUrl}>
         <div className="flex flex-wrap gap-3">
-          {meta.passengerCapacity && (
-            <StatCard label="guests" value={meta.passengerCapacity.toLocaleString()} icon={<Users className="size-3.5" />} />
+          {ship.passengerCapacity && (
+            <StatCard label="guests" value={ship.passengerCapacity.toLocaleString()} icon={<Users className="size-3.5" />} />
           )}
           <StatCard label="sailings" value={ship.upcomingSailingCount} icon={<Calendar className="size-3.5" />} />
-          {meta.tonnage && <StatCard label="GT" value={`${Math.round(meta.tonnage / 1000)}K`} icon={<Anchor className="size-3.5" />} />}
+          {ship.tonnage && <StatCard label="GT" value={`${Math.round(ship.tonnage / 1000)}K`} icon={<Anchor className="size-3.5" />} />}
         </div>
         <div className="mt-4">
           <CtaBar entityType="ship" entitySlug={slug} entityName={ship.name} inquirePrompt={`Tell me about the ${ship.name}`} />
@@ -71,10 +69,10 @@ export default async function ShipDetailPage({ params }: ShipPageProps) {
         <div className="grid gap-10 lg:grid-cols-5">
           <div className="lg:col-span-3">
             <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {meta.yearBuilt && <InfoItem label="Built" value={String(meta.yearBuilt)} />}
+              {ship.yearBuilt && <InfoItem label="Built" value={String(ship.yearBuilt)} />}
               {ship.shipClass && <InfoItem label="Class" value={ship.shipClass} />}
-              {meta.crewCount && <InfoItem label="Crew" value={meta.crewCount.toLocaleString()} />}
-              {meta.tonnage && <InfoItem label="Tonnage" value={`${meta.tonnage.toLocaleString()} GT`} />}
+              {ship.crewCount && <InfoItem label="Crew" value={ship.crewCount.toLocaleString()} />}
+              {ship.tonnage && <InfoItem label="Tonnage" value={`${ship.tonnage.toLocaleString()} GT`} />}
             </div>
             <p className="text-sm text-muted-foreground">
               Part of the{' '}

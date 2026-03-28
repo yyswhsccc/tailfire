@@ -566,12 +566,14 @@ export class CruiseRepositoryService {
         // Ship fields
         shipId: cruiseShips.id,
         shipName: cruiseShips.name,
+        shipSlug: cruiseShips.slug,
         shipClass: cruiseShips.shipClass,
         shipImageUrl: cruiseShips.imageUrl,
         shipMetadata: cruiseShips.metadata,
         // Line fields
         lineId: cruiseLines.id,
         lineName: cruiseLines.name,
+        lineSlug: cruiseLines.slug,
         lineMetadata: cruiseLines.metadata, // logoUrl and websiteUrl are in metadata
       })
       .from(cruiseSailings)
@@ -702,6 +704,7 @@ export class CruiseRepositoryService {
       ship: {
         id: sailing.shipId || '',
         name: sailing.shipName || 'Unknown Ship',
+        slug: sailing.shipSlug || '',
         shipClass: sailing.shipClass,
         imageUrl: sailing.shipImageUrl,
         yearBuilt: shipMeta.year_built ?? null,
@@ -722,6 +725,7 @@ export class CruiseRepositoryService {
       cruiseLine: {
         id: sailing.lineId || '',
         name: sailing.lineName || 'Unknown Line',
+        slug: sailing.lineSlug || '',
         logoUrl: lineMeta.logo_url || null,
         websiteUrl: lineMeta.website || null,
       },
@@ -1062,7 +1066,9 @@ export class CruiseRepositoryService {
     logoUrl: string | null
     websiteUrl: string | null
     description: string | null
-    ships: Array<{ id: string; name: string; imageUrl: string | null }>
+    shipCount: number
+    sailingCount: number
+    ships: Array<{ id: string; name: string; slug: string; imageUrl: string | null; shipClass: string | null }>
     upcomingSailingCount: number
   }> {
     const { cruiseLines, cruiseShips, cruiseSailings } = this.db.schema
@@ -1084,7 +1090,9 @@ export class CruiseRepositoryService {
       .select({
         id: cruiseShips.id,
         name: cruiseShips.name,
+        slug: cruiseShips.slug,
         imageUrl: cruiseShips.imageUrl,
+        shipClass: cruiseShips.shipClass,
       })
       .from(cruiseShips)
       .where(eq(cruiseShips.cruiseLineId, id))
@@ -1111,10 +1119,14 @@ export class CruiseRepositoryService {
       logoUrl: meta?.logo_url || null,
       websiteUrl: meta?.website || null,
       description: meta?.description || null,
+      shipCount: ships.length,
+      sailingCount: Number(countResult?.count ?? 0),
       ships: ships.map((s) => ({
         id: s.id,
         name: s.name,
+        slug: s.slug,
         imageUrl: s.imageUrl,
+        shipClass: s.shipClass,
       })),
       upcomingSailingCount: Number(countResult?.count ?? 0),
     }
@@ -1207,7 +1219,7 @@ export class CruiseRepositoryService {
     passengerCapacity: number | null
     crewCount: number | null
     amenities: string[] | null
-    cruiseLine: { id: string; name: string; logoUrl: string | null } | null
+    cruiseLine: { id: string; name: string; slug: string; logoUrl: string | null } | null
     upcomingSailingCount: number
   }> {
     const { cruiseShips, cruiseLines, cruiseSailings } = this.db.schema
@@ -1224,6 +1236,7 @@ export class CruiseRepositoryService {
         metadata: cruiseShips.metadata,
         lineId: cruiseLines.id,
         lineName: cruiseLines.name,
+        lineSlug: cruiseLines.slug,
         lineMetadata: cruiseLines.metadata,
       })
       .from(cruiseShips)
@@ -1265,6 +1278,7 @@ export class CruiseRepositoryService {
         ? {
             id: ship.lineId,
             name: ship.lineName || 'Unknown Line',
+            slug: ship.lineSlug || '',
             logoUrl: lineMeta?.logo_url || null,
           }
         : null,

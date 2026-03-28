@@ -32,13 +32,11 @@ export interface ShipSummary {
 }
 
 export interface ShipDetail extends ShipSummary {
-  metadata: {
-    yearBuilt?: number
-    tonnage?: number
-    passengerCapacity?: number
-    crewCount?: number
-    amenities?: string[]
-  }
+  yearBuilt: number | null
+  tonnage: number | null
+  passengerCapacity: number | null
+  crewCount: number | null
+  amenities: string[] | null
   cruiseLine: {
     id: string
     name: string
