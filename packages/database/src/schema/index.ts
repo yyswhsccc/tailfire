@@ -146,6 +146,14 @@ export * from './tour-inclusions.schema'
 export * from './tour-sync-history.schema'
 export * from './geocoding-cache.schema'
 
+// Vacation package catalog (in catalog schema)
+export * from './vacation-gateways.schema'
+export * from './vacation-destinations.schema'
+export * from './vacation-hotels.schema'
+export * from './vacation-gateway-destinations.schema'
+export * from './vacation-tour-operators.schema'
+export * from './vacation-sync-history.schema'
+
 // Automation system (job queue history)
 export * from './automation-job-history.schema'
 
