@@ -37,8 +37,8 @@ export default async function DestinationCruisesPage({ params, searchParams }: P
     notFound()
   }
 
-  let data = { sailings: [], total: 0, page: 1, totalPages: 0 }
-  try { data = await fetchDestinationCruises(slug, page, 20) } catch { /* API unavailable at build time — ISR fills on first request */ }
+  let data: Awaited<ReturnType<typeof fetchDestinationCruises>> = { destination: { id: '', name: '', slug }, sailings: [], total: 0, page: 1, pageSize: 20, totalPages: 0 }
+  try { data = await fetchDestinationCruises(slug, page, 20) } catch { /* API unavailable at build time */ }
 
   return (
     <>
