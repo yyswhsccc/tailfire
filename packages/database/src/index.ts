@@ -54,3 +54,8 @@ export { vacationHotels, type VacationHotel, type NewVacationHotel } from './sch
 export { vacationGatewayDestinations } from './schema/vacation-gateway-destinations.schema'
 export { vacationTourOperators, type VacationTourOperator, type NewVacationTourOperator } from './schema/vacation-tour-operators.schema'
 export { vacationSyncHistory, type VacationSyncHistoryRecord } from './schema/vacation-sync-history.schema'
+export {
+  vacationHotelEnrichment,
+  type VacationHotelEnrichmentRecord,
+  type NewVacationHotelEnrichmentRecord,
+} from './schema/vacation-hotel-enrichment.schema'
