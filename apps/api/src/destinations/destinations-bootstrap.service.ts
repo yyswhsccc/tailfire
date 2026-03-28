@@ -176,8 +176,11 @@ export class DestinationsBootstrapService {
       const portName = port.name
       const portNorm = normalizeName(portName)
       const countryCode = extractCountryCode(metadata)
-      const lat = typeof metadata.latitude === 'number' ? metadata.latitude : undefined
-      const lon = typeof metadata.longitude === 'number' ? metadata.longitude : undefined
+      const rawLat = typeof metadata.latitude === 'number' ? metadata.latitude : undefined
+      const rawLon = typeof metadata.longitude === 'number' ? metadata.longitude : undefined
+      // Validate coordinates (latitude: -90..90, longitude: -180..180)
+      const lat = rawLat != null && rawLat >= -90 && rawLat <= 90 ? rawLat : undefined
+      const lon = rawLon != null && rawLon >= -180 && rawLon <= 180 ? rawLon : undefined
 
       // Try to find an existing cluster with the same normalized name
       let matched = false

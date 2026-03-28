@@ -85,12 +85,12 @@ export class SerpApiService {
 
       const data = await response.json()
 
-      // Parse TripAdvisor results
-      const results: TripAdvisorSearchResult[] = (
-        data.results ||
-        data.data ||
-        []
-      )
+      // Parse TripAdvisor results — SerpAPI returns `places` array
+      const places = data.places || data.results || data.data || []
+
+      this.logger.log(`SerpAPI returned ${places.length} places for "${query}"`)
+
+      const results: TripAdvisorSearchResult[] = places
         .slice(0, options?.limit ?? 10)
         .map((item: any) => ({
           title: item.title || item.name || '',
@@ -108,7 +108,7 @@ export class SerpApiService {
           })),
           categories: item.categories || [],
           priceLevel: item.price_level || undefined,
-          address: item.address || undefined,
+          address: item.location || item.address || undefined,
           latitude: item.gps_coordinates?.latitude || undefined,
           longitude: item.gps_coordinates?.longitude || undefined,
         }))
