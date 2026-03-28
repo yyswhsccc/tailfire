@@ -119,9 +119,29 @@ async function fetchSailings(params: SearchParams): Promise<SailingSearchRespons
 
 async function fetchFilters(): Promise<FiltersResponse | null> {
   try {
-    return await catalogFetch<FiltersResponse>("/cruise-repository/filters", {
-      next: { revalidate: 3600 },
-    });
+    // Use the fast listing endpoints instead of the slow /filters endpoint
+    // /filters does COUNT per filter across 49K sailings via FDW = 143 seconds
+    // /lines and /regions are simple SELECTs = <1 second each
+    const [lines, regions] = await Promise.all([
+      catalogFetch<Array<{ id: string; name: string; sailingCount: number }>>("/cruise-repository/lines", {
+        next: { revalidate: 3600 },
+      }).catch(() => []),
+      catalogFetch<Array<{ id: string; name: string; sailingCount: number }>>("/cruise-repository/regions", {
+        next: { revalidate: 3600 },
+      }).catch(() => []),
+    ]);
+
+    return {
+      cruiseLines: lines.map((l) => ({ id: l.id, name: l.name, count: l.sailingCount })),
+      ships: [],
+      regions: regions.map((r) => ({ id: r.id, name: r.name, count: r.sailingCount })),
+      embarkPorts: [],
+      disembarkPorts: [],
+      portsOfCall: [],
+      dateRange: { min: null, max: null },
+      nightsRange: { min: null, max: null },
+      priceRange: { min: null, max: null },
+    };
   } catch (error) {
     console.error("Failed to fetch cruise filters:", error);
     return null;
