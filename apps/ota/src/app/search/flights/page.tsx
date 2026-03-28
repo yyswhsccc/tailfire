@@ -6,6 +6,7 @@ import { serviceFetch } from "@/lib/api";
 import { FlightSearchForm } from "@/components/search/flight-search-form";
 import { FlightResultCard, type FlightOffer } from "@/components/search/flight-result-card";
 import { SearchResultsHeader } from "@/components/search/search-results-header";
+import { SearchPageShell } from "@/components/search/search-page-shell";
 import FlightsLoading from "./loading";
 
 export const metadata: Metadata = {
@@ -24,11 +25,8 @@ export const metadata: Metadata = {
 // ============================================================================
 
 interface FlightSearchResponse {
-  data: FlightOffer[];
-  meta?: {
-    count: number;
-    links?: Record<string, string>;
-  };
+  results: FlightOffer[];
+  warning?: string;
 }
 
 // ============================================================================
@@ -87,35 +85,37 @@ export default async function FlightsPage({ searchParams }: FlightsPageProps) {
   const fetchFailed = hasFilters && flights === null;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Page heading */}
-      <div className="mb-6">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
-          {hasFilters ? "FLIGHT RESULTS" : "SEARCH FLIGHTS"}
-        </h1>
-        <p className="mt-2 text-base text-muted-foreground">
-          {hasFilters
-            ? "Comparing fares for your route"
-            : "Find the best fares from hundreds of airlines worldwide"}
-        </p>
-      </div>
+    <SearchPageShell productType="flights">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Page heading */}
+        <div className="mb-6">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
+            {hasFilters ? "FLIGHT RESULTS" : "SEARCH FLIGHTS"}
+          </h1>
+          <p className="mt-2 text-base text-muted-foreground">
+            {hasFilters
+              ? "Comparing fares for your route"
+              : "Find the best fares from hundreds of airlines worldwide"}
+          </p>
+        </div>
 
-      {/* Search form */}
-      <div className={hasFilters ? "mb-6" : "mb-12"}>
-        <FlightSearchForm compact={hasFilters} />
-      </div>
+        {/* Search form */}
+        <div className={hasFilters ? "mb-6" : "mb-12"}>
+          <FlightSearchForm compact={hasFilters} />
+        </div>
 
-      {/* Results section */}
-      {fetchFailed ? (
-        <ErrorState />
-      ) : flights ? (
-        <Suspense fallback={<FlightsLoading />}>
-          <FlightResults flights={flights} />
-        </Suspense>
-      ) : (
-        <EmptyPrompt />
-      )}
-    </div>
+        {/* Results section */}
+        {fetchFailed ? (
+          <ErrorState />
+        ) : flights ? (
+          <Suspense fallback={<FlightsLoading />}>
+            <FlightResults flights={flights} />
+          </Suspense>
+        ) : (
+          <EmptyPrompt />
+        )}
+      </div>
+    </SearchPageShell>
   );
 }
 
@@ -124,9 +124,9 @@ export default async function FlightsPage({ searchParams }: FlightsPageProps) {
 // ============================================================================
 
 function FlightResults({ flights }: { flights: FlightSearchResponse }) {
-  const { data } = flights;
+  const { results } = flights;
 
-  if (data.length === 0) {
+  if (results.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-muted/30 px-6 py-16 text-center">
         <p className="text-lg font-medium text-[#1A1A1A]">No flights found for this route</p>
@@ -141,21 +141,24 @@ function FlightResults({ flights }: { flights: FlightSearchResponse }) {
     <>
       {/* Results count */}
       <div className="mb-4">
-        <SearchResultsHeader count={data.length} noun="flights" />
+        <SearchResultsHeader
+          count={results.length}
+          noun="flights"
+          searchContext={`${results.length} flight${results.length !== 1 ? "s" : ""} found`}
+        />
       </div>
 
-      {/* Amadeus latency notice */}
+      {/* Live pricing notice */}
       <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         <AlertCircle className="mt-0.5 size-4 shrink-0" />
         <p>
-          Flight availability is live from Amadeus — prices and seats may change.
-          Our advisors can lock in the best fare for you.
+          Prices and seat availability may change. Our advisors can lock in the best fare for you.
         </p>
       </div>
 
       {/* Result cards */}
       <div className="space-y-4">
-        {data.map((offer) => (
+        {results.map((offer) => (
           <FlightResultCard key={offer.id} offer={offer} />
         ))}
       </div>

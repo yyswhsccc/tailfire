@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Search, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 import { catalogFetch } from "@/lib/api";
 import { TourResultCard, type Tour } from "@/components/search/tour-result-card";
 import { SearchResultsHeader } from "@/components/search/search-results-header";
+import { SearchPageShell } from "@/components/search/search-page-shell";
+import { TourSearchForm } from "@/components/search/tour-search-form";
 import ToursLoading from "./loading";
 
 export const metadata: Metadata = {
@@ -23,14 +25,11 @@ export const metadata: Metadata = {
 // ============================================================================
 
 interface TourSearchResponse {
-  items: Tour[];
-  pagination?: {
-    page: number;
-    pageSize: number;
-    totalItems: number;
-    totalPages: number;
-    hasMore: boolean;
-  };
+  tours: Tour[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 // ============================================================================
@@ -50,7 +49,7 @@ function buildSearchQuery(params: SearchParams): string {
   const qs = new URLSearchParams();
   if (params.q) qs.set("q", params.q);
   if (params.page) qs.set("page", params.page);
-  qs.set("limit", "20");
+  qs.set("pageSize", "20");
   return qs.toString();
 }
 
@@ -82,74 +81,44 @@ export default async function ToursPage({ searchParams }: ToursPageProps) {
   const tours = await fetchTours(params);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Page heading */}
-      <div className="mb-6">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
-          {hasFilters ? "TOUR RESULTS" : "BROWSE TOURS"}
-        </h1>
-        <p className="mt-2 text-base text-muted-foreground">
-          {hasFilters
-            ? `Showing tours matching "${params.q}"`
-            : "Guided tours and escorted travel packages — all quoted by a Phoenix Voyages advisor"}
-        </p>
+    <SearchPageShell productType="tours">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Page heading */}
+        <div className="mb-6">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
+            {hasFilters ? "TOUR RESULTS" : "BROWSE TOURS"}
+          </h1>
+          <p className="mt-2 text-base text-muted-foreground">
+            {hasFilters
+              ? `Showing tours matching "${params.q}"`
+              : "Guided tours and escorted travel packages — all quoted by a Phoenix Voyages advisor"}
+          </p>
+        </div>
+
+        {/* Simple keyword search form */}
+        <div className={hasFilters ? "mb-6" : "mb-12"}>
+          <TourSearchForm currentQ={params.q ?? ""} />
+        </div>
+
+        {/* Advisor routing notice */}
+        <div className="mb-6 rounded-2xl border border-[#C59746]/30 bg-[#C59746]/5 px-5 py-4 text-sm text-[#1A1A1A]">
+          <p className="font-semibold">Tours are advisor-quoted</p>
+          <p className="mt-0.5 text-muted-foreground">
+            We don't display tour prices online — they vary by departure date, group size, and
+            rooming. Our advisors provide accurate, no-surprise quotes.
+          </p>
+        </div>
+
+        {/* Results section */}
+        {tours === null ? (
+          <ErrorState />
+        ) : (
+          <Suspense fallback={<ToursLoading />}>
+            <TourResults tours={tours} hasFilters={hasFilters} currentPage={Number(params.page) || 1} searchParams={params} />
+          </Suspense>
+        )}
       </div>
-
-      {/* Simple keyword search form */}
-      <div className={hasFilters ? "mb-6" : "mb-12"}>
-        <TourSearchForm currentQ={params.q ?? ""} />
-      </div>
-
-      {/* Advisor routing notice */}
-      <div className="mb-6 rounded-2xl border border-[#C59746]/30 bg-[#C59746]/5 px-5 py-4 text-sm text-[#1A1A1A]">
-        <p className="font-semibold">Tours are advisor-quoted</p>
-        <p className="mt-0.5 text-muted-foreground">
-          We don't display tour prices online — they vary by departure date, group size, and
-          rooming. Our advisors provide accurate, no-surprise quotes.
-        </p>
-      </div>
-
-      {/* Results section */}
-      {tours === null ? (
-        <ErrorState />
-      ) : (
-        <Suspense fallback={<ToursLoading />}>
-          <TourResults tours={tours} hasFilters={hasFilters} currentPage={Number(params.page) || 1} searchParams={params} />
-        </Suspense>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// SEARCH FORM (inline, no client state needed — pure navigation)
-// ============================================================================
-
-function TourSearchForm({ currentQ }: { currentQ: string }) {
-  return (
-    <form
-      action="/search/tours"
-      method="GET"
-      className="flex gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm sm:p-6"
-    >
-      <div className="relative flex-1">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          name="q"
-          type="text"
-          defaultValue={currentQ}
-          placeholder="Search by destination, theme, or operator..."
-          className="h-10 w-full rounded-lg border border-input bg-transparent pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        />
-      </div>
-      <button
-        type="submit"
-        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#C59746] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#B08638] focus-visible:ring-3 focus-visible:ring-[#C59746]/50"
-      >
-        <Search className="size-4" />
-        Search
-      </button>
-    </form>
+    </SearchPageShell>
   );
 }
 
@@ -158,7 +127,7 @@ function TourSearchForm({ currentQ }: { currentQ: string }) {
 // ============================================================================
 
 function TourResults({
-  tours,
+  tours: response,
   hasFilters,
   currentPage,
   searchParams,
@@ -168,7 +137,7 @@ function TourResults({
   currentPage: number;
   searchParams: SearchParams;
 }) {
-  const { items, pagination } = tours;
+  const { tours: items, total, totalPages } = response;
 
   if (items.length === 0 && hasFilters) {
     return (
@@ -201,7 +170,7 @@ function TourResults({
       {/* Results count */}
       <div className="mb-4">
         <SearchResultsHeader
-          count={pagination?.totalItems ?? items.length}
+          count={total ?? items.length}
           noun="tours"
         />
       </div>
@@ -214,10 +183,10 @@ function TourResults({
       </div>
 
       {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
+      {totalPages > 1 && (
         <TourPagination
           currentPage={currentPage}
-          totalPages={pagination.totalPages}
+          totalPages={totalPages}
           searchParams={searchParams}
         />
       )}

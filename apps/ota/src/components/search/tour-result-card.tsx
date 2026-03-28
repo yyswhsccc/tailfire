@@ -1,21 +1,19 @@
 import { Calendar, MapPin, Users } from "lucide-react";
 
-// Matches tour-repository tour DTO
+// Matches TourSummaryDto from tour-repository API
 export interface Tour {
   id: string;
   name: string;
-  slug?: string;
-  durationDays: number;
-  operator?: {
-    id: string;
-    name: string;
-    logoUrl?: string | null;
-  };
-  destinations?: string[];
-  summary?: string;
-  maxGroupSize?: number;
-  coverImageUrl?: string | null;
-  tags?: string[];
+  provider?: string;
+  providerIdentifier?: string;
+  operatorCode: string;
+  season?: string;
+  days?: number;
+  nights?: number;
+  description?: string;
+  imageUrl?: string;
+  lowestPriceCents?: number;
+  departureCount?: number;
 }
 
 interface TourResultCardProps {
@@ -50,10 +48,9 @@ function getOperatorColors(operatorName: string) {
 }
 
 export function TourResultCard({ tour }: TourResultCardProps) {
-  const operatorName = tour.operator?.name ?? "Phoenix Voyages";
+  const operatorName = tour.operatorCode ?? "Phoenix Voyages";
   const colors = getOperatorColors(operatorName);
-
-  const destinationList = tour.destinations?.join(", ") ?? "";
+  const durationDays = tour.days ?? 0;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -69,57 +66,48 @@ export function TourResultCard({ tour }: TourResultCardProps) {
             <h3 className="mt-1 truncate text-base font-semibold leading-tight text-white sm:text-lg">
               {tour.name}
             </h3>
-            {/* Destinations */}
-            {destinationList && (
+            {/* Season */}
+            {tour.season && (
               <div className="mt-1.5 flex items-center gap-1.5">
                 <MapPin className="size-3.5 shrink-0 text-white/60" />
-                <p className="truncate text-xs text-white/70">{destinationList}</p>
+                <p className="truncate text-xs text-white/70">Season {tour.season}</p>
               </div>
             )}
           </div>
 
           {/* Duration badge */}
-          <div className="shrink-0 text-right">
-            <p className="text-xl font-bold text-white sm:text-2xl">{tour.durationDays}</p>
-            <p className="text-[10px] text-white/60">day{tour.durationDays !== 1 ? "s" : ""}</p>
-          </div>
+          {durationDays > 0 && (
+            <div className="shrink-0 text-right">
+              <p className="text-xl font-bold text-white sm:text-2xl">{durationDays}</p>
+              <p className="text-[10px] text-white/60">day{durationDays !== 1 ? "s" : ""}</p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* White body */}
       <div className="px-5 py-4">
-        {/* Summary */}
-        {tour.summary && (
-          <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">{tour.summary}</p>
+        {/* Description */}
+        {tour.description && (
+          <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">{tour.description}</p>
         )}
 
         {/* Meta row */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <Calendar className="size-3.5" />
-            {tour.durationDays} day{tour.durationDays !== 1 ? "s" : ""}
-          </span>
-          {tour.maxGroupSize != null && (
+          {durationDays > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <Calendar className="size-3.5" />
+              {durationDays} day{durationDays !== 1 ? "s" : ""}
+              {tour.nights != null && ` / ${tour.nights} night${tour.nights !== 1 ? "s" : ""}`}
+            </span>
+          )}
+          {tour.departureCount != null && tour.departureCount > 0 && (
             <span className="inline-flex items-center gap-1.5">
               <Users className="size-3.5" />
-              Up to {tour.maxGroupSize} guests
+              {tour.departureCount} departure{tour.departureCount !== 1 ? "s" : ""}
             </span>
           )}
         </div>
-
-        {/* Tags */}
-        {tour.tags && tour.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {tour.tags.slice(0, 5).map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
 
         {/* CTA — no price, routes to advisor */}
         <div className="mt-4 flex items-end justify-end">

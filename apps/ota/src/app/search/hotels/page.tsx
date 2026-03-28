@@ -6,6 +6,7 @@ import { serviceFetch } from "@/lib/api";
 import { HotelSearchForm } from "@/components/search/hotel-search-form";
 import { HotelResultCard, type HotelOffer } from "@/components/search/hotel-result-card";
 import { SearchResultsHeader } from "@/components/search/search-results-header";
+import { SearchPageShell } from "@/components/search/search-page-shell";
 import HotelsLoading from "./loading";
 
 export const metadata: Metadata = {
@@ -24,7 +25,8 @@ export const metadata: Metadata = {
 // ============================================================================
 
 interface HotelSearchResponse {
-  data: HotelOffer[];
+  results: HotelOffer[];
+  warning?: string;
 }
 
 // ============================================================================
@@ -79,35 +81,37 @@ export default async function HotelsPage({ searchParams }: HotelsPageProps) {
   const fetchFailed = hasFilters && hotels === null;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Page heading */}
-      <div className="mb-6">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
-          {hasFilters ? "HOTEL RESULTS" : "SEARCH HOTELS"}
-        </h1>
-        <p className="mt-2 text-base text-muted-foreground">
-          {hasFilters
-            ? "Browsing available properties for your stay"
-            : "Find the perfect hotel from thousands of properties worldwide"}
-        </p>
-      </div>
+    <SearchPageShell productType="hotels">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Page heading */}
+        <div className="mb-6">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
+            {hasFilters ? "HOTEL RESULTS" : "SEARCH HOTELS"}
+          </h1>
+          <p className="mt-2 text-base text-muted-foreground">
+            {hasFilters
+              ? "Browsing available properties for your stay"
+              : "Find the perfect hotel from thousands of properties worldwide"}
+          </p>
+        </div>
 
-      {/* Search form */}
-      <div className={hasFilters ? "mb-6" : "mb-12"}>
-        <HotelSearchForm compact={hasFilters} />
-      </div>
+        {/* Search form */}
+        <div className={hasFilters ? "mb-6" : "mb-12"}>
+          <HotelSearchForm compact={hasFilters} />
+        </div>
 
-      {/* Results section */}
-      {fetchFailed ? (
-        <ErrorState />
-      ) : hotels ? (
-        <Suspense fallback={<HotelsLoading />}>
-          <HotelResults hotels={hotels} />
-        </Suspense>
-      ) : (
-        <EmptyPrompt />
-      )}
-    </div>
+        {/* Results section */}
+        {fetchFailed ? (
+          <ErrorState />
+        ) : hotels ? (
+          <Suspense fallback={<HotelsLoading />}>
+            <HotelResults hotels={hotels} />
+          </Suspense>
+        ) : (
+          <EmptyPrompt />
+        )}
+      </div>
+    </SearchPageShell>
   );
 }
 
@@ -116,9 +120,9 @@ export default async function HotelsPage({ searchParams }: HotelsPageProps) {
 // ============================================================================
 
 function HotelResults({ hotels }: { hotels: HotelSearchResponse }) {
-  const { data } = hotels;
+  const { results } = hotels;
 
-  if (data.length === 0) {
+  if (results.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-muted/30 px-6 py-16 text-center">
         <p className="text-lg font-medium text-[#1A1A1A]">No hotels found for this destination</p>
@@ -133,13 +137,13 @@ function HotelResults({ hotels }: { hotels: HotelSearchResponse }) {
     <>
       {/* Results count */}
       <div className="mb-4">
-        <SearchResultsHeader count={data.length} noun="hotels" />
+        <SearchResultsHeader count={results.length} noun="hotels" />
       </div>
 
       {/* Result cards */}
       <div className="space-y-4">
-        {data.map((hotel) => (
-          <HotelResultCard key={hotel.hotel.hotelId} hotel={hotel} />
+        {results.map((hotel) => (
+          <HotelResultCard key={hotel.id} hotel={hotel} />
         ))}
       </div>
     </>

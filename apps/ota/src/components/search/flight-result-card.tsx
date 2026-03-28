@@ -1,35 +1,37 @@
 import { Plane, Clock, ArrowRight } from "lucide-react";
 
-import { formatPrice } from "@/lib/format";
-
-// Matches Amadeus flight offer DTO shape returned by the OTA search facade
+// Matches NormalizedFlightOffer from packages/shared-types/src/api/flights.types.ts
 export interface FlightOffer {
   id: string;
-  airline: {
-    code: string;
-    name: string;
-  };
-  price: {
-    total: number; // cents
-    currency: string;
-    perTraveler: number; // cents
-  };
-  itineraries: FlightItinerary[];
-  travelClass: string;
-  numberOfBookableSeats?: number;
-}
-
-export interface FlightItinerary {
-  duration: string; // e.g. "PT7H30M"
+  source: string;
   segments: FlightSegment[];
+  price: {
+    currency: string;
+    total: string; // dollar amount as string e.g. "1234.56"
+    perTraveler: string;
+    base?: string;
+  };
+  validatingAirline: string;
+  fareClass?: string;
+  fareFamily?: string;
+  cabin?: string; // ECONOMY, PREMIUM_ECONOMY, BUSINESS, FIRST
+  fareRules?: { exchangeable: boolean; refundable: boolean };
+  baggageAllowance?: {
+    checked?: { quantity: number; weight?: string };
+    cabin?: { quantity: number };
+  };
 }
 
 export interface FlightSegment {
-  departure: { iataCode: string; at: string };
-  arrival: { iataCode: string; at: string };
-  carrierCode: string;
+  departure: { iataCode: string; terminal?: string; at: string };
+  arrival: { iataCode: string; terminal?: string; at: string };
+  carrier: string;
+  carrierName?: string;
   flightNumber: string;
-  numberOfStops: number;
+  aircraft?: string;
+  duration: string; // ISO 8601 e.g. "PT7H30M"
+  stops: number;
+  cabin?: string;
 }
 
 interface FlightResultCardProps {
@@ -63,49 +65,69 @@ function getAirlineColors(code: string) {
   return AIRLINE_COLORS[key] ?? DEFAULT_COLORS;
 }
 
-/**
- * Parses ISO 8601 duration (PT7H30M) to human-readable "7h 30m".
- */
-function formatDuration(duration: string): string {
-  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
-  if (!match) return duration;
-  const hours = match[1] ? `${match[1]}h` : "";
-  const mins = match[2] ? `${match[2]}m` : "";
-  return [hours, mins].filter(Boolean).join(" ") || duration;
-}
-
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
   return d.toLocaleTimeString("en-CA", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
-function getStopsLabel(itinerary: FlightItinerary): string {
-  const totalStops = itinerary.segments.length - 1;
+function getSegmentStopsLabel(segments: FlightSegment[]): string {
+  const totalStops = segments.reduce((sum, s) => sum + s.stops, 0) + (segments.length - 1);
   if (totalStops === 0) return "Nonstop";
   if (totalStops === 1) return "1 stop";
   return `${totalStops} stops`;
 }
 
-function formatClassLabel(travelClass: string): string {
-  return travelClass
+function formatClassLabel(cabin: string | undefined): string {
+  if (!cabin) return "";
+  return cabin
     .toLowerCase()
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
 
+/**
+ * Format a dollar-amount string (e.g. "1234.56") as currency.
+ * Falls back to formatPrice(cents) if the value looks like cents.
+ */
+function formatDollarString(amount: string, currency: string): string {
+  const val = parseFloat(amount);
+  if (isNaN(val)) return amount;
+  return new Intl.NumberFormat("en-CA", { style: "currency", currency }).format(val);
+}
+
+/**
+ * Compute total duration across multiple segments by summing ISO 8601 durations.
+ */
+function totalDurationMinutes(segments: FlightSegment[]): number {
+  let total = 0;
+  for (const seg of segments) {
+    const match = seg.duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
+    if (match) {
+      total += (parseInt(match[1] ?? "0") * 60) + parseInt(match[2] ?? "0");
+    }
+  }
+  return total;
+}
+
+function formatMinutes(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return [h ? `${h}h` : "", m ? `${m}m` : ""].filter(Boolean).join(" ") || "0m";
+}
+
 export function FlightResultCard({ offer }: FlightResultCardProps) {
-  const colors = getAirlineColors(offer.airline.code);
-  const outbound = offer.itineraries[0];
-  const inbound = offer.itineraries[1];
+  const airlineCode = offer.segments[0]?.carrier ?? offer.validatingAirline;
+  const airlineName = offer.segments[0]?.carrierName ?? offer.validatingAirline;
+  const colors = getAirlineColors(airlineCode);
 
-  const firstSegmentOut = outbound?.segments[0];
-  const lastSegmentOut = outbound?.segments[outbound.segments.length - 1];
-  const firstSegmentIn = inbound?.segments[0];
-  const lastSegmentIn = inbound?.segments[inbound.segments.length - 1];
+  // All segments are in a flat array. For display, show first -> last as the route.
+  const firstSegment = offer.segments[0];
+  const lastSegment = offer.segments[offer.segments.length - 1];
 
-  const originCode = firstSegmentOut?.departure.iataCode ?? "";
-  const destinationCode = lastSegmentOut?.arrival.iataCode ?? "";
+  const originCode = firstSegment?.departure.iataCode ?? "";
+  const destinationCode = lastSegment?.arrival.iataCode ?? "";
+  const totalMins = totalDurationMinutes(offer.segments);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -115,7 +137,7 @@ export function FlightResultCard({ offer }: FlightResultCardProps) {
           <div className="min-w-0 flex-1">
             {/* Airline name */}
             <p className={`text-[10px] font-bold uppercase tracking-[0.15em] ${colors.accent}`}>
-              {offer.airline.name || offer.airline.code}
+              {airlineName}
             </p>
             {/* Route */}
             <div className="mt-1 flex items-center gap-2">
@@ -128,13 +150,15 @@ export function FlightResultCard({ offer }: FlightResultCardProps) {
               </h3>
             </div>
             {/* Class */}
-            <p className="mt-1 text-xs text-white/60">{formatClassLabel(offer.travelClass)}</p>
+            {offer.cabin && (
+              <p className="mt-1 text-xs text-white/60">{formatClassLabel(offer.cabin)}</p>
+            )}
           </div>
 
           {/* Price */}
           <div className="shrink-0 text-right">
             <p className="text-xl font-bold text-white sm:text-2xl">
-              {formatPrice(offer.price.total, offer.price.currency)}
+              {formatDollarString(offer.price.perTraveler, offer.price.currency)}
             </p>
             <p className="text-[10px] text-white/60">/person</p>
           </div>
@@ -144,48 +168,40 @@ export function FlightResultCard({ offer }: FlightResultCardProps) {
       {/* White body */}
       <div className="px-5 py-4">
         <div className="space-y-3">
-          {/* Outbound leg */}
-          {outbound && firstSegmentOut && lastSegmentOut && (
+          {/* Flight segments summary */}
+          {firstSegment && lastSegment && (
             <ItineraryRow
-              label={inbound ? "Outbound" : undefined}
-              departure={firstSegmentOut.departure.iataCode}
-              arrival={lastSegmentOut.arrival.iataCode}
-              departureTime={formatTime(firstSegmentOut.departure.at)}
-              arrivalTime={formatTime(lastSegmentOut.arrival.at)}
-              duration={formatDuration(outbound.duration)}
-              stops={getStopsLabel(outbound)}
-            />
-          )}
-
-          {/* Return leg */}
-          {inbound && firstSegmentIn && lastSegmentIn && (
-            <ItineraryRow
-              label="Return"
-              departure={firstSegmentIn.departure.iataCode}
-              arrival={lastSegmentIn.arrival.iataCode}
-              departureTime={formatTime(firstSegmentIn.departure.at)}
-              arrivalTime={formatTime(lastSegmentIn.arrival.at)}
-              duration={formatDuration(inbound.duration)}
-              stops={getStopsLabel(inbound)}
+              departure={firstSegment.departure.iataCode}
+              arrival={lastSegment.arrival.iataCode}
+              departureTime={formatTime(firstSegment.departure.at)}
+              arrivalTime={formatTime(lastSegment.arrival.at)}
+              duration={formatMinutes(totalMins)}
+              stops={getSegmentStopsLabel(offer.segments)}
             />
           )}
         </div>
 
-        {/* CTA row */}
-        <div className="mt-4 flex items-center justify-between gap-3">
-          {offer.numberOfBookableSeats != null && offer.numberOfBookableSeats <= 5 && (
-            <p className="text-xs font-medium text-amber-600">
-              Only {offer.numberOfBookableSeats} seat{offer.numberOfBookableSeats === 1 ? "" : "s"} left
-            </p>
+        {/* Extra info row */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+          {offer.fareFamily && (
+            <span className="rounded-full bg-muted px-2 py-0.5 font-medium">{offer.fareFamily}</span>
           )}
-          <div className="ml-auto">
-            <a
-              href="/contact"
-              className="inline-flex h-9 items-center rounded-lg bg-[#C59746] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#B08638]"
-            >
-              Inquire
-            </a>
-          </div>
+          {offer.fareRules?.refundable && (
+            <span className="text-emerald-600 font-medium">Refundable</span>
+          )}
+          {offer.baggageAllowance?.checked && (
+            <span>{offer.baggageAllowance.checked.quantity} checked bag{offer.baggageAllowance.checked.quantity !== 1 ? "s" : ""}</span>
+          )}
+        </div>
+
+        {/* CTA row */}
+        <div className="mt-4 flex items-center justify-end gap-3">
+          <a
+            href="/contact"
+            className="inline-flex h-9 items-center rounded-lg bg-[#C59746] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#B08638]"
+          >
+            Inquire
+          </a>
         </div>
       </div>
     </div>

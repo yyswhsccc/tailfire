@@ -2,36 +2,48 @@ import { MapPin } from "lucide-react";
 
 import { formatPrice } from "@/lib/format";
 
-// Matches Amadeus hotel offer DTO shape returned by the OTA search facade
+// Matches NormalizedHotelResult from packages/shared-types/src/api/hotels.types.ts
 export interface HotelOffer {
-  hotel: {
-    hotelId: string;
-    name: string;
-    rating?: string; // "1"–"5"
-    address?: {
-      cityName?: string;
-      countryCode?: string;
-    };
+  id: string;
+  placeId?: string;
+  hotelId?: string;
+  name: string;
+  description?: string;
+  location: {
+    address: string;
+    city?: string;
+    country?: string;
+    postalCode?: string;
+    latitude?: number;
+    longitude?: number;
   };
-  offers: HotelOfferItem[];
+  phone?: string;
+  website?: string;
+  rating?: number;       // Google rating 1-5
+  reviewCount?: number;
+  starRating?: number;   // Hotel star rating 1-5
+  photos?: { url: string; thumbnailUrl?: string }[];
+  amenities?: string[];
+  offers?: HotelPriceOffer[];
+  provider: string;
 }
 
-export interface HotelOfferItem {
-  id: string;
-  checkInDate: string;
-  checkOutDate: string;
-  room?: {
-    type?: string;
-    description?: { text?: string };
-  };
-  boardType?: string; // e.g. "ROOM_ONLY", "BREAKFAST", "HALF_BOARD", "ALL_INCLUSIVE"
+export interface HotelPriceOffer {
+  checkIn: string;
+  checkOut: string;
+  roomType?: string;
   price: {
-    total: string; // Amadeus returns string
     currency: string;
-    variations?: {
-      average?: { base?: string };
-    };
+    total: string;     // dollar amount as string e.g. "234.56"
+    base?: string;
+    taxes?: string;
   };
+  cancellationPolicy?: {
+    deadline?: string;
+    refundable?: boolean;
+    description?: string;
+  };
+  boardType?: string;  // e.g. "ROOM_ONLY", "BREAKFAST", "HALF_BOARD", "ALL_INCLUSIVE"
 }
 
 interface HotelResultCardProps {
@@ -82,31 +94,24 @@ function formatBoardBasis(boardType: string | undefined): string {
   return map[boardType] ?? boardType;
 }
 
-function getPricePerNight(offer: HotelOfferItem): number | null {
-  const avgBase = offer.price.variations?.average?.base;
-  const base = avgBase ?? offer.price.total;
-  const val = parseFloat(base);
+function getPricePerNight(offer: HotelPriceOffer): number | null {
+  const val = parseFloat(offer.price.total);
   if (isNaN(val)) return null;
   // Amadeus prices are in the currency unit (e.g. dollars), multiply to cents
   return Math.round(val * 100);
 }
 
-function formatRoomType(room: HotelOfferItem["room"]): string {
-  if (!room) return "";
-  if (room.description?.text) return room.description.text;
-  return room.type ?? "";
-}
-
 export function HotelResultCard({ hotel }: HotelResultCardProps) {
-  const colors = getHotelColors(hotel.hotel.name);
-  const bestOffer = hotel.offers[0];
+  const colors = getHotelColors(hotel.name);
+  const bestOffer = hotel.offers?.[0];
 
   const locationParts = [
-    hotel.hotel.address?.cityName,
-    hotel.hotel.address?.countryCode,
+    hotel.location.city,
+    hotel.location.country,
   ].filter(Boolean);
   const locationLabel = locationParts.join(", ");
 
+  const starRatingStr = hotel.starRating ? String(hotel.starRating) : undefined;
   const pricePerNight = bestOffer ? getPricePerNight(bestOffer) : null;
 
   return (
@@ -116,14 +121,14 @@ export function HotelResultCard({ hotel }: HotelResultCardProps) {
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             {/* Star rating */}
-            {hotel.hotel.rating && (
+            {starRatingStr && (
               <p className="text-[10px] font-bold tracking-wider text-yellow-400">
-                {renderStars(hotel.hotel.rating)}
+                {renderStars(starRatingStr)}
               </p>
             )}
             {/* Hotel name */}
             <h3 className="mt-1 truncate text-base font-bold leading-tight text-white sm:text-lg">
-              {hotel.hotel.name}
+              {hotel.name}
             </h3>
             {/* Location */}
             {locationLabel && (
@@ -151,34 +156,38 @@ export function HotelResultCard({ hotel }: HotelResultCardProps) {
       </div>
 
       {/* White body */}
-      {bestOffer && (
-        <div className="px-5 py-4">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
-            {/* Board basis */}
-            {bestOffer.boardType && (
-              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                {formatBoardBasis(bestOffer.boardType)}
-              </span>
-            )}
-            {/* Room type */}
-            {bestOffer.room && (
-              <span className="text-xs text-muted-foreground">
-                {formatRoomType(bestOffer.room)}
-              </span>
-            )}
-          </div>
-
-          {/* CTA */}
-          <div className="mt-4 flex items-end justify-end">
-            <a
-              href="/contact"
-              className="inline-flex h-9 items-center rounded-lg bg-[#C59746] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#B08638]"
-            >
-              Inquire
-            </a>
-          </div>
+      <div className="px-5 py-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+          {/* Board basis */}
+          {bestOffer?.boardType && (
+            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+              {formatBoardBasis(bestOffer.boardType)}
+            </span>
+          )}
+          {/* Room type */}
+          {bestOffer?.roomType && (
+            <span className="text-xs text-muted-foreground">
+              {bestOffer.roomType}
+            </span>
+          )}
+          {/* Google rating */}
+          {hotel.rating != null && (
+            <span className="text-xs text-muted-foreground">
+              {hotel.rating}/5 ({hotel.reviewCount ?? 0} reviews)
+            </span>
+          )}
         </div>
-      )}
+
+        {/* CTA */}
+        <div className="mt-4 flex items-end justify-end">
+          <a
+            href="/contact"
+            className="inline-flex h-9 items-center rounded-lg bg-[#C59746] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#B08638]"
+          >
+            Inquire
+          </a>
+        </div>
+      </div>
     </div>
   );
 }

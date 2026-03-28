@@ -2,9 +2,12 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, type FormEvent } from "react";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
+
+import { useSearch } from "./search-page-shell";
 
 import { cn } from "@/lib/utils";
+import { AirportAutocomplete } from "./airport-autocomplete";
 
 interface FlightSearchFormProps {
   compact?: boolean;
@@ -21,6 +24,7 @@ const TRAVEL_CLASS_OPTIONS = [
 export function FlightSearchForm({ compact = false, className }: FlightSearchFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isPending, startSearch } = useSearch();
 
   const currentOrigin = searchParams.get("origin") ?? "";
   const currentDestination = searchParams.get("destination") ?? "";
@@ -58,9 +62,11 @@ export function FlightSearchForm({ compact = false, className }: FlightSearchFor
       if (travelClass) params.set("travelClass", travelClass);
 
       const qs = params.toString();
-      router.push(`/search/flights${qs ? `?${qs}` : ""}`, { scroll: false });
+      startSearch(() => {
+        router.push(`/search/flights${qs ? `?${qs}` : ""}`, { scroll: false });
+      });
     },
-    [router],
+    [router, startSearch],
   );
 
   return (
@@ -81,42 +87,24 @@ export function FlightSearchForm({ compact = false, className }: FlightSearchFor
         )}
       >
         {/* Origin */}
-        <div>
-          <label
-            htmlFor="flight-origin"
-            className="mb-1 block text-xs font-medium text-muted-foreground"
-          >
-            From (city or airport)
-          </label>
-          <input
-            id="flight-origin"
-            name="origin"
-            type="text"
-            defaultValue={currentOrigin}
-            placeholder="YYZ, Toronto..."
-            required
-            className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm uppercase outline-none placeholder:normal-case placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-        </div>
+        <AirportAutocomplete
+          id="flight-origin"
+          name="origin"
+          label="From (city or airport)"
+          placeholder="Type a city or airport..."
+          defaultValue={currentOrigin}
+          required
+        />
 
         {/* Destination */}
-        <div>
-          <label
-            htmlFor="flight-destination"
-            className="mb-1 block text-xs font-medium text-muted-foreground"
-          >
-            To (city or airport)
-          </label>
-          <input
-            id="flight-destination"
-            name="destination"
-            type="text"
-            defaultValue={currentDestination}
-            placeholder="CUN, Cancun..."
-            required
-            className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm uppercase outline-none placeholder:normal-case placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-        </div>
+        <AirportAutocomplete
+          id="flight-destination"
+          name="destination"
+          label="To (city or airport)"
+          placeholder="Type a city or airport..."
+          defaultValue={currentDestination}
+          required
+        />
 
         {/* Departure Date */}
         <div>
@@ -224,12 +212,23 @@ export function FlightSearchForm({ compact = false, className }: FlightSearchFor
       <div className={cn("mt-4", compact && "mt-3")}>
         <button
           type="submit"
+          disabled={isPending}
           className={cn(
             "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#C59746] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#B08638] focus-visible:ring-3 focus-visible:ring-[#C59746]/50",
+            isPending && "cursor-not-allowed opacity-70",
           )}
         >
-          <Search className="size-4" />
-          Search Flights
+          {isPending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Searching...
+            </>
+          ) : (
+            <>
+              <Search className="size-4" />
+              Search Flights
+            </>
+          )}
         </button>
       </div>
     </form>

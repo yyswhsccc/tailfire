@@ -2,7 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, type FormEvent } from "react";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
+
+import { useSearch } from "./search-page-shell";
 
 import { cn } from "@/lib/utils";
 
@@ -14,6 +16,7 @@ interface HotelSearchFormProps {
 export function HotelSearchForm({ compact = false, className }: HotelSearchFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isPending, startSearch } = useSearch();
 
   const currentDestination = searchParams.get("destination") ?? "";
   const currentCheckIn = searchParams.get("checkIn") ?? "";
@@ -43,9 +46,11 @@ export function HotelSearchForm({ compact = false, className }: HotelSearchFormP
       if (rooms) params.set("rooms", rooms);
 
       const qs = params.toString();
-      router.push(`/search/hotels${qs ? `?${qs}` : ""}`, { scroll: false });
+      startSearch(() => {
+        router.push(`/search/hotels${qs ? `?${qs}` : ""}`, { scroll: false });
+      });
     },
-    [router],
+    [router, startSearch],
   );
 
   return (
@@ -169,10 +174,23 @@ export function HotelSearchForm({ compact = false, className }: HotelSearchFormP
       <div className={cn("mt-4", compact && "mt-3")}>
         <button
           type="submit"
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#C59746] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#B08638] focus-visible:ring-3 focus-visible:ring-[#C59746]/50"
+          disabled={isPending}
+          className={cn(
+            "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#C59746] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#B08638] focus-visible:ring-3 focus-visible:ring-[#C59746]/50",
+            isPending && "cursor-not-allowed opacity-70",
+          )}
         >
-          <Search className="size-4" />
-          Search Hotels
+          {isPending ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Searching...
+            </>
+          ) : (
+            <>
+              <Search className="size-4" />
+              Search Hotels
+            </>
+          )}
         </button>
       </div>
     </form>

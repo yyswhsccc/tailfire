@@ -10,6 +10,7 @@
 import { Module } from '@nestjs/common'
 import { CruiseRepositoryController } from './cruise-repository.controller'
 import { CruiseRepositoryService } from './cruise-repository.service'
+import { SailingSlugService } from './sailing-slugs.service'
 import { CatalogAuthGuard, CatalogThrottleGuard } from '../common/guards'
 import { DatabaseModule } from '../db/database.module'
 import { CruiseImportModule } from '../cruise-import/cruise-import.module'
@@ -23,7 +24,7 @@ import { CruiseImportModule } from '../cruise-import/cruise-import.module'
     // CatalogThrottleGuard handles tiered rate limiting
   ],
   controllers: [CruiseRepositoryController],
-  providers: [CruiseRepositoryService, CatalogAuthGuard, CatalogThrottleGuard],
+  providers: [CruiseRepositoryService, SailingSlugService, CatalogAuthGuard, CatalogThrottleGuard],
   exports: [CruiseRepositoryService],
 })
 export class CruiseRepositoryModule {}
