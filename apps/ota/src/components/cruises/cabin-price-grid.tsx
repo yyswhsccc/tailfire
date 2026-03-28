@@ -23,12 +23,16 @@ export function CabinPriceGrid({ prices }: CabinPriceGridProps) {
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="flex flex-col gap-2.5">
       {available.map((tier) => (
-        <div key={tier.key} className={`rounded-xl border border-border p-4 ${tier.color}`}>
-          <p className="text-xs font-medium uppercase tracking-wide opacity-70">{tier.label}</p>
-          <p className="mt-1 text-xl font-bold">{formatPrice(prices[tier.key]!)}</p>
-          <p className="text-xs opacity-60">per person</p>
+        <div key={tier.key} className={`flex items-center justify-between rounded-xl border border-border p-3.5 ${tier.color}`}>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{tier.label}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-bold">{formatPrice(prices[tier.key]!)}</p>
+            <p className="text-[10px] opacity-60">per person</p>
+          </div>
         </div>
       ))}
     </div>

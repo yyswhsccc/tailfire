@@ -117,11 +117,22 @@ export default async function ShipHubPage({ params }: Props) {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {cabinSummary.map((cabin) => (
                 <div key={cabin.category} className="overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm">
-                  {cabin.imageUrl && (
-                    <div className="relative h-32 overflow-hidden">
-                      <SafeImage src={cabin.imageUrl} alt={cabin.category} fill className="object-cover" sizes="25vw" hideOnError />
-                    </div>
-                  )}
+                  <div className="relative h-32 overflow-hidden">
+                    {cabin.imageUrl ? (
+                      <SafeImage
+                        src={cabin.imageUrl}
+                        alt={cabin.category}
+                        fill
+                        className="object-cover"
+                        sizes="25vw"
+                        fallback={
+                          <div className="flex h-full w-full items-center justify-center bg-[#f5f5f0] text-2xl">🛏️</div>
+                        }
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center bg-[#f5f5f0] text-2xl">🛏️</div>
+                    )}
+                  </div>
                   <div className="p-4 text-center">
                     <p className="text-sm font-semibold capitalize text-[#1A1A1A]">{cabin.category}</p>
                     <p className="mt-0.5 text-xs text-[#888]">{cabin.count} room type{cabin.count !== 1 ? 's' : ''}</p>
