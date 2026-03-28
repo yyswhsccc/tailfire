@@ -33,6 +33,7 @@ import { TourImportModule } from './tour-import/tour-import.module'
 import { VacationImportModule } from './vacation-import/vacation-import.module'
 import { TourRepositoryModule } from './tour-repository/tour-repository.module'
 import { VacationRepositoryModule } from './vacation-repository/vacation-repository.module'
+import { SoftvoyageModule } from './softvoyage/softvoyage.module'
 import { TemplatesModule } from './templates/templates.module'
 import { UserProfilesModule } from './user-profiles/user-profiles.module'
 import { UsersModule } from './users/users.module'
@@ -142,6 +143,9 @@ import { DestinationsModule } from './destinations/destinations.module'
 
     // Vacation package catalog browse
     VacationRepositoryModule,
+
+    // Softvoyage live pricing (VCO browser-based search)
+    SoftvoyageModule,
 
     // Itinerary & Package Templates (Library)
     TemplatesModule,
