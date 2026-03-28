@@ -566,12 +566,14 @@ export class CruiseRepositoryService {
         // Ship fields
         shipId: cruiseShips.id,
         shipName: cruiseShips.name,
+        shipSlug: cruiseShips.slug,
         shipClass: cruiseShips.shipClass,
         shipImageUrl: cruiseShips.imageUrl,
         shipMetadata: cruiseShips.metadata,
         // Line fields
         lineId: cruiseLines.id,
         lineName: cruiseLines.name,
+        lineSlug: cruiseLines.slug,
         lineMetadata: cruiseLines.metadata, // logoUrl and websiteUrl are in metadata
       })
       .from(cruiseSailings)
@@ -642,6 +644,26 @@ export class CruiseRepositoryService {
       .where(eq(cruiseSailingStops.sailingId, id))
       .orderBy(cruiseSailingStops.sequenceOrder)
 
+    // Resolve destination slugs for port links
+    const portIds = stops.filter(s => s.portId && !s.isSeaDay).map(s => s.portId!)
+    let portSlugMap = new Map<string, string>()
+
+    if (portIds.length > 0) {
+      const { destinationPorts, destinations } = this.db.schema
+      const portDestinations = await this.db.db
+        .select({
+          portId: destinationPorts.portId,
+          slug: destinations.slug,
+        })
+        .from(destinationPorts)
+        .innerJoin(destinations, eq(destinationPorts.destinationId, destinations.id))
+        .where(inArray(destinationPorts.portId, portIds))
+
+      for (const pd of portDestinations) {
+        portSlugMap.set(pd.portId, pd.slug)
+      }
+    }
+
     const itinerary: ItineraryStopDto[] = stops.map((stop) => ({
       dayNumber: stop.dayNumber,
       portName: stop.portName || 'Unknown',
@@ -649,6 +671,7 @@ export class CruiseRepositoryService {
       isSeaDay: stop.isSeaDay,
       arrivalTime: stop.arrivalTime,
       departureTime: stop.departureTime,
+      destinationSlug: stop.portId ? (portSlugMap.get(stop.portId) || null) : null,
     }))
 
     // Get cabin prices
@@ -702,6 +725,7 @@ export class CruiseRepositoryService {
       ship: {
         id: sailing.shipId || '',
         name: sailing.shipName || 'Unknown Ship',
+        slug: sailing.shipSlug || '',
         shipClass: sailing.shipClass,
         imageUrl: sailing.shipImageUrl,
         yearBuilt: shipMeta.year_built ?? null,
@@ -722,6 +746,7 @@ export class CruiseRepositoryService {
       cruiseLine: {
         id: sailing.lineId || '',
         name: sailing.lineName || 'Unknown Line',
+        slug: sailing.lineSlug || '',
         logoUrl: lineMeta.logo_url || null,
         websiteUrl: lineMeta.website || null,
       },
@@ -962,6 +987,75 @@ export class CruiseRepositoryService {
   }
 
   // ============================================================================
+  // SHIP CABIN SUMMARY
+  // ============================================================================
+
+  async getShipCabinSummary(shipId: string): Promise<Array<{
+    category: string
+    count: number
+    imageUrl: string | null
+  }>> {
+    const { cruiseShipCabinTypes } = this.db.schema
+
+    const rows = await this.db.db
+      .select({
+        category: cruiseShipCabinTypes.cabinCategory,
+        count: sql<number>`count(*)::int`,
+        imageUrl: sql<string>`min(${cruiseShipCabinTypes.imageUrl})`,
+      })
+      .from(cruiseShipCabinTypes)
+      .where(eq(cruiseShipCabinTypes.shipId, shipId))
+      .groupBy(cruiseShipCabinTypes.cabinCategory)
+      .orderBy(sql`CASE ${cruiseShipCabinTypes.cabinCategory}
+        WHEN 'inside' THEN 1
+        WHEN 'oceanview' THEN 2
+        WHEN 'balcony' THEN 3
+        WHEN 'suite' THEN 4
+        ELSE 5
+      END`)
+
+    return rows.map((r) => ({
+      category: r.category,
+      count: Number(r.count),
+      imageUrl: r.imageUrl || null,
+    }))
+  }
+
+  // ============================================================================
+  // SHIP DESTINATIONS
+  // ============================================================================
+
+  async getShipDestinations(shipId: string, limit = 12): Promise<Array<{
+    portName: string
+    sailingCount: number
+  }>> {
+    const { cruiseSailings, cruiseSailingStops } = this.db.schema
+
+    const rows = await this.db.db
+      .select({
+        portName: cruiseSailingStops.portName,
+        count: sql<number>`count(distinct ${cruiseSailingStops.sailingId})::int`,
+      })
+      .from(cruiseSailingStops)
+      .innerJoin(cruiseSailings, eq(cruiseSailingStops.sailingId, cruiseSailings.id))
+      .where(
+        and(
+          eq(cruiseSailings.shipId, shipId),
+          eq(cruiseSailings.isActive, true),
+          eq(cruiseSailingStops.isSeaDay, false),
+        ),
+      )
+      .groupBy(cruiseSailingStops.portName)
+      .orderBy(sql`count(distinct ${cruiseSailingStops.sailingId}) desc`)
+      .limit(limit)
+
+    return rows.map((r) => ({
+      portName: r.portName,
+      sailingCount: Number(r.count),
+    }))
+  }
+
+  // ============================================================================
   // HELPERS
   // ============================================================================
 
@@ -1006,5 +1100,453 @@ export class CruiseRepositoryService {
     const now = Date.now()
     const syncTime = new Date(lastSyncedAt).getTime()
     return now - syncTime > this.STALE_THRESHOLD_MS
+  }
+
+  // ============================================================================
+  // CRUISE LINES
+  // ============================================================================
+
+  async getLines(): Promise<
+    Array<{
+      id: string
+      name: string
+      slug: string
+      logoUrl: string | null
+      websiteUrl: string | null
+      shipCount: number
+      sailingCount: number
+    }>
+  > {
+    const { cruiseLines, cruiseShips, cruiseSailings } = this.db.schema
+    const today = new Date().toISOString().split('T')[0]!
+
+    const results = await this.db.db
+      .select({
+        id: cruiseLines.id,
+        name: cruiseLines.name,
+        slug: cruiseLines.slug,
+        metadata: cruiseLines.metadata,
+        shipCount: sql<number>`COUNT(DISTINCT ${cruiseShips.id})`,
+        sailingCount: sql<number>`COUNT(DISTINCT CASE WHEN ${cruiseSailings.isActive} = true AND ${cruiseSailings.sailDate} >= ${today} THEN ${cruiseSailings.id} END)`,
+      })
+      .from(cruiseLines)
+      .leftJoin(cruiseShips, eq(cruiseShips.cruiseLineId, cruiseLines.id))
+      .leftJoin(cruiseSailings, eq(cruiseSailings.cruiseLineId, cruiseLines.id))
+      .groupBy(cruiseLines.id, cruiseLines.name, cruiseLines.slug, cruiseLines.metadata)
+      .orderBy(cruiseLines.name)
+
+    return results.map((r) => {
+      const meta = r.metadata as { logo_url?: string; website?: string } | null
+      return {
+        id: r.id,
+        name: r.name,
+        slug: r.slug,
+        logoUrl: meta?.logo_url || null,
+        websiteUrl: meta?.website || null,
+        shipCount: Number(r.shipCount),
+        sailingCount: Number(r.sailingCount),
+      }
+    })
+  }
+
+  async getLineDetail(id: string): Promise<{
+    id: string
+    name: string
+    slug: string
+    logoUrl: string | null
+    websiteUrl: string | null
+    description: string | null
+    shipCount: number
+    sailingCount: number
+    ships: Array<{ id: string; name: string; slug: string; imageUrl: string | null; shipClass: string | null }>
+    upcomingSailingCount: number
+  }> {
+    const { cruiseLines, cruiseShips, cruiseSailings } = this.db.schema
+    const today = new Date().toISOString().split('T')[0]!
+
+    // Get cruise line
+    const [line] = await this.db.db
+      .select()
+      .from(cruiseLines)
+      .where(eq(cruiseLines.id, id))
+      .limit(1)
+
+    if (!line) {
+      throw new NotFoundException(`Cruise line not found: ${id}`)
+    }
+
+    // Get ships for this line
+    const ships = await this.db.db
+      .select({
+        id: cruiseShips.id,
+        name: cruiseShips.name,
+        slug: cruiseShips.slug,
+        imageUrl: cruiseShips.imageUrl,
+        shipClass: cruiseShips.shipClass,
+      })
+      .from(cruiseShips)
+      .where(eq(cruiseShips.cruiseLineId, id))
+      .orderBy(cruiseShips.name)
+
+    // Get upcoming sailing count
+    const [countResult] = await this.db.db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(cruiseSailings)
+      .where(
+        and(
+          eq(cruiseSailings.cruiseLineId, id),
+          eq(cruiseSailings.isActive, true),
+          gte(cruiseSailings.sailDate, today)
+        )
+      )
+
+    const meta = line.metadata as { logo_url?: string; website?: string; description?: string } | null
+
+    return {
+      id: line.id,
+      name: line.name,
+      slug: line.slug,
+      logoUrl: meta?.logo_url || null,
+      websiteUrl: meta?.website || null,
+      description: meta?.description || null,
+      shipCount: ships.length,
+      sailingCount: Number(countResult?.count ?? 0),
+      ships: ships.map((s) => ({
+        id: s.id,
+        name: s.name,
+        slug: s.slug,
+        imageUrl: s.imageUrl,
+        shipClass: s.shipClass,
+      })),
+      upcomingSailingCount: Number(countResult?.count ?? 0),
+    }
+  }
+
+  async getLineBySlug(slug: string) {
+    const { cruiseLines } = this.db.schema
+    const [line] = await this.db.db
+      .select({ id: cruiseLines.id })
+      .from(cruiseLines)
+      .where(eq(cruiseLines.slug, slug))
+      .limit(1)
+    if (!line) throw new NotFoundException(`Cruise line with slug "${slug}" not found`)
+    return this.getLineDetail(line.id)
+  }
+
+  // ============================================================================
+  // SHIPS
+  // ============================================================================
+
+  async getShips(lineId?: string): Promise<
+    Array<{
+      id: string
+      name: string
+      slug: string
+      imageUrl: string | null
+      shipClass: string | null
+      cruiseLine: { id: string; name: string } | null
+      sailingCount: number
+    }>
+  > {
+    const { cruiseShips, cruiseLines, cruiseSailings } = this.db.schema
+    const today = new Date().toISOString().split('T')[0]!
+
+    const conditions: any[] = []
+    if (lineId) {
+      conditions.push(eq(cruiseShips.cruiseLineId, lineId))
+    }
+
+    const query = this.db.db
+      .select({
+        id: cruiseShips.id,
+        name: cruiseShips.name,
+        slug: cruiseShips.slug,
+        imageUrl: cruiseShips.imageUrl,
+        shipClass: cruiseShips.shipClass,
+        lineId: cruiseLines.id,
+        lineName: cruiseLines.name,
+        sailingCount: sql<number>`COUNT(DISTINCT CASE WHEN ${cruiseSailings.isActive} = true AND ${cruiseSailings.sailDate} >= ${today} THEN ${cruiseSailings.id} END)`,
+      })
+      .from(cruiseShips)
+      .leftJoin(cruiseLines, eq(cruiseShips.cruiseLineId, cruiseLines.id))
+      .leftJoin(cruiseSailings, eq(cruiseSailings.shipId, cruiseShips.id))
+      .groupBy(
+        cruiseShips.id,
+        cruiseShips.name,
+        cruiseShips.slug,
+        cruiseShips.imageUrl,
+        cruiseShips.shipClass,
+        cruiseLines.id,
+        cruiseLines.name
+      )
+      .orderBy(cruiseShips.name)
+
+    const results = conditions.length > 0
+      ? await query.where(and(...conditions))
+      : await query
+
+    return results.map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      imageUrl: r.imageUrl,
+      shipClass: r.shipClass,
+      cruiseLine: r.lineId
+        ? { id: r.lineId, name: r.lineName || 'Unknown Line' }
+        : null,
+      sailingCount: Number(r.sailingCount),
+    }))
+  }
+
+  async getShipDetail(id: string): Promise<{
+    id: string
+    name: string
+    slug: string
+    imageUrl: string | null
+    shipClass: string | null
+    yearBuilt: number | null
+    tonnage: number | null
+    passengerCapacity: number | null
+    crewCount: number | null
+    amenities: string[] | null
+    cruiseLine: { id: string; name: string; slug: string; logoUrl: string | null } | null
+    upcomingSailingCount: number
+  }> {
+    const { cruiseShips, cruiseLines, cruiseSailings } = this.db.schema
+    const today = new Date().toISOString().split('T')[0]!
+
+    // Get ship with cruise line
+    const [ship] = await this.db.db
+      .select({
+        id: cruiseShips.id,
+        name: cruiseShips.name,
+        slug: cruiseShips.slug,
+        imageUrl: cruiseShips.imageUrl,
+        shipClass: cruiseShips.shipClass,
+        metadata: cruiseShips.metadata,
+        lineId: cruiseLines.id,
+        lineName: cruiseLines.name,
+        lineSlug: cruiseLines.slug,
+        lineMetadata: cruiseLines.metadata,
+      })
+      .from(cruiseShips)
+      .leftJoin(cruiseLines, eq(cruiseShips.cruiseLineId, cruiseLines.id))
+      .where(eq(cruiseShips.id, id))
+      .limit(1)
+
+    if (!ship) {
+      throw new NotFoundException(`Ship not found: ${id}`)
+    }
+
+    // Get upcoming sailing count
+    const [countResult] = await this.db.db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(cruiseSailings)
+      .where(
+        and(
+          eq(cruiseSailings.shipId, id),
+          eq(cruiseSailings.isActive, true),
+          gte(cruiseSailings.sailDate, today)
+        )
+      )
+
+    const shipMeta = ship.metadata as { year_built?: number; tonnage?: number; passenger_capacity?: number; crew_count?: number; amenities?: string[] } | null
+    const lineMeta = ship.lineMetadata as { logo_url?: string } | null
+
+    return {
+      id: ship.id,
+      name: ship.name,
+      slug: ship.slug,
+      imageUrl: ship.imageUrl,
+      shipClass: ship.shipClass,
+      yearBuilt: shipMeta?.year_built ?? null,
+      tonnage: shipMeta?.tonnage ?? null,
+      passengerCapacity: shipMeta?.passenger_capacity ?? null,
+      crewCount: shipMeta?.crew_count ?? null,
+      amenities: shipMeta?.amenities ?? null,
+      cruiseLine: ship.lineId
+        ? {
+            id: ship.lineId,
+            name: ship.lineName || 'Unknown Line',
+            slug: ship.lineSlug || '',
+            logoUrl: lineMeta?.logo_url || null,
+          }
+        : null,
+      upcomingSailingCount: Number(countResult?.count ?? 0),
+    }
+  }
+
+  async getShipBySlug(slug: string) {
+    const { cruiseShips } = this.db.schema
+    const [ship] = await this.db.db
+      .select({ id: cruiseShips.id })
+      .from(cruiseShips)
+      .where(eq(cruiseShips.slug, slug))
+      .limit(1)
+    if (!ship) throw new NotFoundException(`Ship with slug "${slug}" not found`)
+    return this.getShipDetail(ship.id)
+  }
+
+  // ============================================================================
+  // SAILING BY PUBLIC ID
+  // ============================================================================
+
+  async getSailingByPublicId(publicId: string): Promise<SailingDetailResponseDto> {
+    const { cruiseSailings } = this.db.schema
+
+    // Look up sailing by public_id — this column may not exist on dev (FDW)
+    // Handle gracefully by catching errors
+    try {
+      const [result] = await this.db.db
+        .select({ id: cruiseSailings.id })
+        .from(cruiseSailings)
+        .where(eq(cruiseSailings.publicId, publicId))
+        .limit(1)
+
+      if (!result) {
+        throw new NotFoundException(`Sailing not found for public ID: ${publicId}`)
+      }
+
+      return this.getSailingDetail(result.id)
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error
+      }
+      // Column may not exist on dev/preview FDW — return 404
+      throw new NotFoundException(`Sailing not found for public ID: ${publicId}`)
+    }
+  }
+
+  // ============================================================================
+  // REGIONS
+  // ============================================================================
+
+  async getRegions(): Promise<
+    Array<{
+      id: string
+      name: string
+      slug: string
+      sailingCount: number
+    }>
+  > {
+    const { cruiseRegions, cruiseSailingRegions, cruiseSailings } = this.db.schema
+    const today = new Date().toISOString().split('T')[0]!
+
+    const results = await this.db.db
+      .select({
+        id: cruiseRegions.id,
+        name: cruiseRegions.name,
+        slug: cruiseRegions.slug,
+        sailingCount: sql<number>`COUNT(DISTINCT CASE WHEN ${cruiseSailings.isActive} = true AND ${cruiseSailings.sailDate} >= ${today} THEN ${cruiseSailings.id} END)`,
+      })
+      .from(cruiseRegions)
+      .leftJoin(cruiseSailingRegions, eq(cruiseSailingRegions.regionId, cruiseRegions.id))
+      .leftJoin(cruiseSailings, eq(cruiseSailings.id, cruiseSailingRegions.sailingId))
+      .groupBy(cruiseRegions.id, cruiseRegions.name, cruiseRegions.slug)
+      .orderBy(cruiseRegions.name)
+
+    return results.map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      sailingCount: Number(r.sailingCount),
+    }))
+  }
+
+  async getRegionDetail(id: string): Promise<{
+    id: string
+    name: string
+    slug: string
+    description: string | null
+    sailingCount: number
+    destinations: Array<{
+      id: string
+      name: string
+      country: string | null
+    }>
+  }> {
+    const { cruiseRegions, cruiseSailingRegions, cruiseSailings, cruiseSailingStops, cruisePorts } = this.db.schema
+    const today = new Date().toISOString().split('T')[0]!
+
+    // Get region
+    const [region] = await this.db.db
+      .select()
+      .from(cruiseRegions)
+      .where(eq(cruiseRegions.id, id))
+      .limit(1)
+
+    if (!region) {
+      throw new NotFoundException(`Region not found: ${id}`)
+    }
+
+    // Count upcoming sailings in this region
+    const [countResult] = await this.db.db
+      .select({ count: sql<number>`COUNT(DISTINCT ${cruiseSailings.id})` })
+      .from(cruiseSailingRegions)
+      .innerJoin(cruiseSailings, eq(cruiseSailings.id, cruiseSailingRegions.sailingId))
+      .where(
+        and(
+          eq(cruiseSailingRegions.regionId, id),
+          eq(cruiseSailings.isActive, true),
+          gte(cruiseSailings.sailDate, today)
+        )
+      )
+
+    // Get distinct ports (destinations) visited by sailings in this region
+    const destinations = await this.db.db
+      .select({
+        id: cruisePorts.id,
+        name: cruisePorts.name,
+        metadata: cruisePorts.metadata,
+      })
+      .from(cruisePorts)
+      .where(
+        exists(
+          this.db.db
+            .select({ one: sql`1` })
+            .from(cruiseSailingStops)
+            .innerJoin(cruiseSailingRegions, eq(cruiseSailingRegions.sailingId, cruiseSailingStops.sailingId))
+            .innerJoin(cruiseSailings, eq(cruiseSailings.id, cruiseSailingStops.sailingId))
+            .where(
+              and(
+                eq(cruiseSailingStops.portId, cruisePorts.id),
+                eq(cruiseSailingRegions.regionId, id),
+                eq(cruiseSailingStops.isSeaDay, false),
+                eq(cruiseSailings.isActive, true),
+                gte(cruiseSailings.sailDate, today)
+              )
+            )
+        )
+      )
+      .orderBy(cruisePorts.name)
+
+    const meta = region.metadata as { description?: string } | null
+
+    return {
+      id: region.id,
+      name: region.name,
+      slug: region.slug,
+      description: meta?.description || null,
+      sailingCount: Number(countResult?.count ?? 0),
+      destinations: destinations.map((d) => {
+        const portMeta = d.metadata as { country?: string } | null
+        return {
+          id: d.id,
+          name: d.name,
+          country: portMeta?.country || null,
+        }
+      }),
+    }
+  }
+
+  async getRegionBySlug(slug: string) {
+    const { cruiseRegions } = this.db.schema
+    const [region] = await this.db.db
+      .select({ id: cruiseRegions.id })
+      .from(cruiseRegions)
+      .where(eq(cruiseRegions.slug, slug))
+      .limit(1)
+    if (!region) throw new NotFoundException(`Region with slug "${slug}" not found`)
+    return this.getRegionDetail(region.id)
   }
 }

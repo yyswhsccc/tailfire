@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
+import { openChat } from "@/components/chat/chat-widget";
 import {
   Sheet,
   SheetContent,
@@ -67,7 +68,10 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
           <Button
             className="w-full bg-[#C59746] text-white hover:bg-[#B08638]"
             size="lg"
-            onClick={() => onOpenChange(false)}
+            onClick={() => {
+              onOpenChange(false);
+              openChat("Hi! I'm looking for help planning a trip.");
+            }}
           >
             Talk to AI
           </Button>

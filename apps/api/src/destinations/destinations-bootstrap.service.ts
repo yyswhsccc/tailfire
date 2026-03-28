@@ -1,0 +1,466 @@
+/**
+ * Destinations Bootstrap Service
+ *
+ * Seeds destination records from the cruise ports catalog (~7,203 ports).
+ * Handles:
+ * - Slug generation (URL-friendly, country-code suffixed)
+ * - Name normalization (ASCII-folded, lowercased)
+ * - Geographic deduplication (ports within 50km with similar names → same destination)
+ * - Batch inserts with ON CONFLICT DO NOTHING
+ * - destination_ports mapping records
+ */
+
+import { Injectable, Logger } from '@nestjs/common'
+import { DatabaseService } from '../db/database.service'
+import { sql, eq } from 'drizzle-orm'
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * ASCII-fold accented characters: Dubrovník → dubrovnik, São Paulo → sao paulo
+ */
+function asciiFold(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x00-\x7F]/g, '')
+}
+
+/**
+ * Normalize a name for dedup matching:
+ * lowercase, ASCII-fold, strip non-alphanumeric (except spaces)
+ */
+function normalizeName(name: string): string {
+  return asciiFold(name)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Generate a URL-friendly slug from a port name + country code.
+ *
+ * Rules:
+ * - Remove parenthetical clarifiers: "Cozumel (Mexico)" → "cozumel"
+ * - Handle commas: "Miami, FL" → "miami-fl"
+ * - Append country code if available: "miami-fl-us"
+ * - ASCII-fold accented chars: "Dubrovník" → "dubrovnik"
+ * - Collapse multiple hyphens, trim leading/trailing hyphens
+ */
+function generateSlug(name: string, countryCode?: string): string {
+  let slug = asciiFold(name)
+    .toLowerCase()
+    // Remove parenthetical clarifiers
+    .replace(/\s*\(.*?\)\s*/g, '')
+    // Replace non-alphanumeric with hyphens
+    .replace(/[^a-z0-9]+/g, '-')
+    // Collapse multiple hyphens
+    .replace(/-{2,}/g, '-')
+    // Trim leading/trailing hyphens
+    .replace(/^-|-$/g, '')
+
+  // Append country code if available and not already in slug
+  if (countryCode) {
+    const cc = countryCode.toLowerCase()
+    if (!slug.endsWith(`-${cc}`)) {
+      slug = `${slug}-${cc}`
+    }
+  }
+
+  return slug
+}
+
+/**
+ * Haversine distance between two lat/lng points, in kilometers.
+ */
+function haversineKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6371 // Earth radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lon2 - lon1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+/**
+ * Extract a 2-letter country code from cruise port metadata.
+ * The metadata.country field may be a full name, 2-letter code, or 3-letter code.
+ * We only accept 2-letter codes directly; otherwise return undefined.
+ */
+function extractCountryCode(metadata: Record<string, unknown> | null): string | undefined {
+  if (!metadata) return undefined
+
+  // Check country_code field first (most reliable)
+  if (typeof metadata.country_code === 'string' && metadata.country_code.length === 2) {
+    return metadata.country_code.toUpperCase()
+  }
+
+  // Check country field — only if it's a 2-letter ISO code
+  if (typeof metadata.country === 'string' && /^[a-zA-Z]{2}$/.test(metadata.country)) {
+    return metadata.country.toUpperCase()
+  }
+
+  return undefined
+}
+
+// ============================================================================
+// Service
+// ============================================================================
+
+@Injectable()
+export class DestinationsBootstrapService {
+  private readonly logger = new Logger(DestinationsBootstrapService.name)
+
+  constructor(private readonly db: DatabaseService) {}
+
+  /**
+   * Seed destinations from the cruise ports catalog.
+   *
+   * 1. Query ALL cruise_ports from catalog schema
+   * 2. Deduplicate: ports within 50km with similar normalized names → same destination
+   * 3. Insert destination records (ON CONFLICT DO NOTHING on slug)
+   * 4. Create destination_ports mapping records
+   */
+  async seedFromCruisePorts(): Promise<{
+    created: number
+    mapped: number
+    skipped: number
+    totalPorts: number
+  }> {
+    const { cruisePorts, destinations, destinationPorts } = this.db.schema
+
+    // Step 1: Fetch all cruise ports
+    this.logger.log('Fetching all cruise ports from catalog...')
+    const allPorts = await this.db.client.select().from(cruisePorts)
+    this.logger.log(`Found ${allPorts.length} cruise ports`)
+
+    if (allPorts.length === 0) {
+      return { created: 0, mapped: 0, skipped: 0, totalPorts: 0 }
+    }
+
+    // Step 2: Group ports into destination clusters (dedup by name + geography)
+    //
+    // Each cluster = one destination, potentially mapped to multiple ports.
+    // A port joins an existing cluster if:
+    //   - normalized names are identical AND
+    //   - either both lack coordinates, or they're within 50km
+    type PortRecord = typeof allPorts[number]
+    type Cluster = {
+      slug: string
+      name: string
+      normalizedName: string
+      countryCode?: string
+      latitude?: number
+      longitude?: number
+      ports: PortRecord[]
+    }
+
+    const clusters: Cluster[] = []
+
+    for (let i = 0; i < allPorts.length; i++) {
+      const port = allPorts[i]!
+      const metadata = (port.metadata ?? {}) as Record<string, unknown>
+      const portName = port.name
+      const portNorm = normalizeName(portName)
+      const countryCode = extractCountryCode(metadata)
+      const rawLat = typeof metadata.latitude === 'number' ? metadata.latitude : undefined
+      const rawLon = typeof metadata.longitude === 'number' ? metadata.longitude : undefined
+      // Validate coordinates (latitude: -90..90, longitude: -180..180)
+      const lat = rawLat != null && rawLat >= -90 && rawLat <= 90 ? rawLat : undefined
+      const lon = rawLon != null && rawLon >= -180 && rawLon <= 180 ? rawLon : undefined
+
+      // Try to find an existing cluster with the same normalized name
+      let matched = false
+      for (const cluster of clusters) {
+        if (cluster.normalizedName !== portNorm) continue
+
+        // Name matches — check geographic proximity if both have coordinates
+        if (lat != null && lon != null && cluster.latitude != null && cluster.longitude != null) {
+          const dist = haversineKm(lat, lon, cluster.latitude, cluster.longitude)
+          if (dist > 50) continue // Same name but too far apart — different destination
+        }
+
+        // Match! Add port to existing cluster
+        cluster.ports.push(port)
+        matched = true
+        break
+      }
+
+      if (!matched) {
+        // Create a new cluster
+        clusters.push({
+          slug: generateSlug(portName, countryCode),
+          name: portName,
+          normalizedName: portNorm,
+          countryCode,
+          latitude: lat,
+          longitude: lon,
+          ports: [port],
+        })
+      }
+
+      // Log progress every 500 ports
+      if ((i + 1) % 500 === 0) {
+        this.logger.log(`Processed ${i + 1}/${allPorts.length} ports → ${clusters.length} clusters so far`)
+      }
+    }
+
+    this.logger.log(
+      `Clustering complete: ${allPorts.length} ports → ${clusters.length} unique destinations`,
+    )
+
+    // Step 3: Insert destinations (batch, ON CONFLICT DO NOTHING on slug)
+    let created = 0
+    let mapped = 0
+    let skipped = 0
+
+    // Handle potential slug collisions within clusters (different names could generate same slug)
+    const slugSet = new Set<string>()
+    for (const cluster of clusters) {
+      if (slugSet.has(cluster.slug)) {
+        // Append a suffix to make slug unique
+        let suffix = 2
+        while (slugSet.has(`${cluster.slug}-${suffix}`)) {
+          suffix++
+        }
+        cluster.slug = `${cluster.slug}-${suffix}`
+      }
+      slugSet.add(cluster.slug)
+    }
+
+    // Process in batches of 200 clusters
+    const BATCH_SIZE = 200
+    for (let batchStart = 0; batchStart < clusters.length; batchStart += BATCH_SIZE) {
+      const batch = clusters.slice(batchStart, batchStart + BATCH_SIZE)
+
+      // Insert destinations
+      const destValues = batch.map((cluster) => ({
+        slug: cluster.slug,
+        name: cluster.name,
+        normalizedName: cluster.normalizedName,
+        destinationType: 'port_city' as const,
+        countryCode: cluster.countryCode ?? null,
+        latitude: cluster.latitude?.toString() ?? null,
+        longitude: cluster.longitude?.toString() ?? null,
+        sourceStatus: 'seeded' as const,
+        contentStatus: 'seeded' as const,
+        metadata: {},
+      }))
+
+      const inserted = await this.db.client
+        .insert(destinations)
+        .values(destValues)
+        .onConflictDoNothing({ target: destinations.slug })
+        .returning({ id: destinations.id, slug: destinations.slug })
+
+      created += inserted.length
+      skipped += batch.length - inserted.length
+
+      // Build a slug → id map for the inserted destinations
+      const slugToId = new Map<string, string>()
+      for (const row of inserted) {
+        slugToId.set(row.slug, row.id)
+      }
+
+      // For skipped (already existed) destinations, look up their IDs by slug
+      const missingSlugs = batch
+        .map((c) => c.slug)
+        .filter((s) => !slugToId.has(s))
+
+      if (missingSlugs.length > 0) {
+        const existing = await this.db.client
+          .select({ id: destinations.id, slug: destinations.slug })
+          .from(destinations)
+          .where(sql`${destinations.slug} = ANY(${missingSlugs})`)
+
+        for (const row of existing) {
+          slugToId.set(row.slug, row.id)
+        }
+      }
+
+      // Insert destination_ports mapping records
+      const portMappings: Array<{
+        destinationId: string
+        portId: string
+        matchMethod: string
+        confidence: string
+        isPrimary: boolean
+      }> = []
+
+      for (const cluster of batch) {
+        const destId = slugToId.get(cluster.slug)
+        if (!destId) continue
+
+        for (let j = 0; j < cluster.ports.length; j++) {
+          portMappings.push({
+            destinationId: destId,
+            portId: cluster.ports[j]!.id,
+            matchMethod: 'seed',
+            confidence: '1.0',
+            isPrimary: j === 0, // First port in cluster is primary
+          })
+        }
+      }
+
+      if (portMappings.length > 0) {
+        const mappingResult = await this.db.client
+          .insert(destinationPorts)
+          .values(portMappings)
+          .onConflictDoNothing()
+          .returning({ destinationId: destinationPorts.destinationId })
+
+        mapped += mappingResult.length
+      }
+
+      this.logger.log(
+        `Batch ${Math.floor(batchStart / BATCH_SIZE) + 1}: ` +
+          `${inserted.length} destinations created, ${portMappings.length} port mappings`,
+      )
+    }
+
+    this.logger.log(
+      `Bootstrap complete: ${created} destinations created, ${mapped} port mappings, ${skipped} skipped (already existed)`,
+    )
+
+    return {
+      created,
+      mapped,
+      skipped,
+      totalPorts: allPorts.length,
+    }
+  }
+
+  /**
+   * Seed destinations from tour catalog cities.
+   *
+   * Collects DISTINCT city names from:
+   * - tours.start_city
+   * - tours.end_city
+   * - tour_itinerary_days.overnight_city
+   *
+   * For each unique city:
+   * - If a destination already exists with the same normalized name → log match, skip
+   * - Otherwise → create a new destination with destinationType: 'city'
+   *
+   * Returns stats: { created, matched, totalCities }
+   */
+  async seedFromTourCities(): Promise<{
+    created: number
+    matched: number
+    totalCities: number
+  }> {
+    const { tours, tourItineraryDays, destinations } = this.db.schema
+
+    this.logger.log('Collecting distinct city names from tour catalog...')
+
+    // Collect city names from start_city, end_city, overnight_city using raw SQL
+    // (UNION deduplicates, DISTINCT within each leg removes intra-column dupes)
+    const cityRows = await this.db.client.execute<{ city: string }>(sql`
+      SELECT DISTINCT city FROM (
+        SELECT start_city  AS city FROM ${tours}  WHERE start_city  IS NOT NULL AND start_city  <> ''
+        UNION
+        SELECT end_city    AS city FROM ${tours}  WHERE end_city    IS NOT NULL AND end_city    <> ''
+        UNION
+        SELECT overnight_city AS city FROM ${tourItineraryDays} WHERE overnight_city IS NOT NULL AND overnight_city <> ''
+      ) t
+      ORDER BY city
+    `)
+
+    const cityNames: string[] = (cityRows as any[]).map((r: any) => r.city)
+    const totalCities = cityNames.length
+
+    this.logger.log(`Found ${totalCities} distinct tour cities`)
+
+    if (totalCities === 0) {
+      return { created: 0, matched: 0, totalCities: 0 }
+    }
+
+    // Load existing destinations for normalized-name matching
+    // (only need normalized_name + id to check for matches)
+    const existingRows = await this.db.client
+      .select({
+        id: destinations.id,
+        normalizedName: destinations.normalizedName,
+        name: destinations.name,
+      })
+      .from(destinations)
+
+    const existingByNorm = new Map<string, { id: string; name: string }>()
+    for (const row of existingRows) {
+      existingByNorm.set(row.normalizedName, { id: row.id, name: row.name })
+    }
+
+    let created = 0
+    let matched = 0
+
+    for (const cityName of cityNames) {
+      const norm = normalizeName(cityName)
+
+      // Check for existing destination with same normalized name
+      const existing = existingByNorm.get(norm)
+      if (existing) {
+        this.logger.debug(
+          `Tour city "${cityName}" matches existing destination "${existing.name}" (normalized: "${norm}") — skipping`,
+        )
+        matched++
+        continue
+      }
+
+      // No match — create a new destination
+      const slug = generateSlug(cityName)
+
+      // Handle slug collision by appending a suffix
+      let finalSlug = slug
+      let suffix = 2
+      while (
+        await this.db.client
+          .select({ id: destinations.id })
+          .from(destinations)
+          .where(eq(destinations.slug, finalSlug))
+          .limit(1)
+          .then((r) => r.length > 0)
+      ) {
+        finalSlug = `${slug}-${suffix}`
+        suffix++
+      }
+
+      await this.db.client
+        .insert(destinations)
+        .values({
+          slug: finalSlug,
+          name: cityName,
+          normalizedName: norm,
+          destinationType: 'city',
+          sourceStatus: 'seeded',
+          contentStatus: 'seeded',
+          metadata: {},
+        })
+        .onConflictDoNothing({ target: destinations.slug })
+
+      // Register in our local map to catch intra-batch duplicates on subsequent iterations
+      existingByNorm.set(norm, { id: 'pending', name: cityName })
+
+      this.logger.debug(`Created destination for tour city "${cityName}" (slug: "${finalSlug}")`)
+      created++
+    }
+
+    this.logger.log(
+      `Tour city bootstrap complete: ${created} created, ${matched} matched existing, ${totalCities} total cities`,
+    )
+
+    return { created, matched, totalCities }
+  }
+}

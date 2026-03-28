@@ -7,11 +7,15 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { openChat } from "@/components/chat/chat-widget";
 import phoenixLogo from "@/assets/phoenix-logo.svg";
 
 const NAV_LINKS = [
   { label: "Deals", href: "/deals" },
   { label: "Cruises", href: "/search/cruises" },
+  { label: "Cruise Lines", href: "/cruise-lines" },
+  { label: "Destinations", href: "/destinations" },
+  { label: "Regions", href: "/regions" },
   { label: "Flights", href: "/search/flights" },
   { label: "Hotels", href: "/search/hotels" },
   { label: "Tours", href: "/search/tours" },
@@ -57,6 +61,7 @@ export function Nav() {
           <Button
             className="bg-[#C59746] text-white hover:bg-[#B08638]"
             size="default"
+            onClick={() => openChat("Hi! I'm looking for help planning a trip.")}
           >
             Talk to AI
           </Button>

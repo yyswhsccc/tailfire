@@ -7,11 +7,14 @@
  * - API key auth (OTA public) - aggressive rate limiting
  */
 
-import { Controller, Get, Query, Param, ParseUUIDPipe, ParseIntPipe, DefaultValuePipe, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Query, Param, ParseUUIDPipe, ParseIntPipe, DefaultValuePipe, UseGuards } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiHeader, ApiSecurity } from '@nestjs/swagger'
 import { Public } from '../auth/decorators/public.decorator'
 import { CatalogAuthGuard, CatalogThrottleGuard } from '../common/guards'
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { AdminRoleGuard } from '../auth/guards/admin-role.guard'
 import { CruiseRepositoryService } from './cruise-repository.service'
+import { SailingSlugService } from './sailing-slugs.service'
 import {
   SailingSearchDto,
   SailingSearchResponseDto,
@@ -36,7 +39,10 @@ import {
   required: false,
 })
 export class CruiseRepositoryController {
-  constructor(private readonly cruiseRepository: CruiseRepositoryService) {}
+  constructor(
+    private readonly cruiseRepository: CruiseRepositoryService,
+    private readonly sailingSlugService: SailingSlugService,
+  ) {}
 
   // ============================================================================
   // SEARCH
@@ -70,22 +76,128 @@ export class CruiseRepositoryController {
   }
 
   // ============================================================================
-  // SAILING DETAIL
+  // CRUISE LINES
   // ============================================================================
 
   /**
-   * Get full sailing details including itinerary and prices.
-   * GET /cruise-repository/sailings/:id
+   * Get all cruise lines with ship and sailing counts.
+   * GET /cruise-repository/lines
    */
-  @Get('sailings/:id')
-  @ApiOperation({ summary: 'Get sailing details by ID' })
-  @ApiParam({ name: 'id', description: 'Sailing UUID' })
-  @ApiResponse({ status: 200, type: SailingDetailResponseDto })
-  @ApiResponse({ status: 404, description: 'Sailing not found' })
-  async getSailingDetail(
-    @Param('id', ParseUUIDPipe) id: string
-  ): Promise<SailingDetailResponseDto> {
-    return this.cruiseRepository.getSailingDetail(id)
+  @Get('lines')
+  @ApiOperation({ summary: 'List all cruise lines with ship and sailing counts' })
+  @ApiResponse({ status: 200, description: 'List of cruise lines' })
+  async getLines() {
+    return this.cruiseRepository.getLines()
+  }
+
+  /**
+   * Get a single cruise line by slug.
+   * GET /cruise-repository/lines/by-slug/:slug
+   */
+  @Get('lines/by-slug/:slug')
+  @ApiOperation({ summary: 'Get cruise line detail by slug' })
+  @ApiParam({ name: 'slug', description: 'Cruise line slug' })
+  @ApiResponse({ status: 200, description: 'Cruise line detail' })
+  @ApiResponse({ status: 404, description: 'Cruise line not found' })
+  async getLineBySlug(@Param('slug') slug: string) {
+    return this.cruiseRepository.getLineBySlug(slug)
+  }
+
+  /**
+   * Get a single cruise line with ships list and upcoming sailing count.
+   * GET /cruise-repository/lines/:id
+   */
+  @Get('lines/:id')
+  @ApiOperation({ summary: 'Get cruise line detail with ships' })
+  @ApiParam({ name: 'id', description: 'Cruise line UUID' })
+  @ApiResponse({ status: 200, description: 'Cruise line detail' })
+  @ApiResponse({ status: 404, description: 'Cruise line not found' })
+  async getLineDetail(@Param('id', ParseUUIDPipe) id: string) {
+    return this.cruiseRepository.getLineDetail(id)
+  }
+
+  // ============================================================================
+  // REGIONS
+  // ============================================================================
+
+  /**
+   * Get all regions with sailing counts.
+   * GET /cruise-repository/regions
+   */
+  @Get('regions')
+  @ApiOperation({ summary: 'List all cruise regions with sailing counts' })
+  @ApiResponse({ status: 200, description: 'List of regions' })
+  async getRegions() {
+    return this.cruiseRepository.getRegions()
+  }
+
+  /**
+   * Get a single region by slug.
+   * GET /cruise-repository/regions/by-slug/:slug
+   */
+  @Get('regions/by-slug/:slug')
+  @ApiOperation({ summary: 'Get region detail by slug' })
+  @ApiParam({ name: 'slug', description: 'Region slug' })
+  @ApiResponse({ status: 200, description: 'Region detail with destinations' })
+  @ApiResponse({ status: 404, description: 'Region not found' })
+  async getRegionBySlug(@Param('slug') slug: string) {
+    return this.cruiseRepository.getRegionBySlug(slug)
+  }
+
+  /**
+   * Get a single region with destinations that have sailings through it.
+   * GET /cruise-repository/regions/:id
+   */
+  @Get('regions/:id')
+  @ApiOperation({ summary: 'Get region detail with destinations' })
+  @ApiParam({ name: 'id', description: 'Region UUID' })
+  @ApiResponse({ status: 200, description: 'Region detail with destinations' })
+  @ApiResponse({ status: 404, description: 'Region not found' })
+  async getRegionDetail(@Param('id', ParseUUIDPipe) id: string) {
+    return this.cruiseRepository.getRegionDetail(id)
+  }
+
+  // ============================================================================
+  // SHIPS (listings BEFORE parameterized routes)
+  // ============================================================================
+
+  /**
+   * Get all ships with image URL, cruise line, and sailing count.
+   * Optional filter by cruise line ID.
+   * GET /cruise-repository/ships
+   */
+  @Get('ships')
+  @ApiOperation({ summary: 'List all ships with cruise line and sailing counts' })
+  @ApiQuery({ name: 'lineId', required: false, description: 'Filter by cruise line UUID' })
+  @ApiResponse({ status: 200, description: 'List of ships' })
+  async getShips(@Query('lineId') lineId?: string) {
+    return this.cruiseRepository.getShips(lineId)
+  }
+
+  /**
+   * Get a single ship by slug.
+   * GET /cruise-repository/ships/by-slug/:slug
+   */
+  @Get('ships/by-slug/:slug')
+  @ApiOperation({ summary: 'Get ship detail by slug' })
+  @ApiParam({ name: 'slug', description: 'Ship slug' })
+  @ApiResponse({ status: 200, description: 'Ship detail' })
+  @ApiResponse({ status: 404, description: 'Ship not found' })
+  async getShipBySlug(@Param('slug') slug: string) {
+    return this.cruiseRepository.getShipBySlug(slug)
+  }
+
+  /**
+   * Get a single ship with cruise line and upcoming sailing count.
+   * GET /cruise-repository/ships/:id
+   */
+  @Get('ships/:id')
+  @ApiOperation({ summary: 'Get ship detail' })
+  @ApiParam({ name: 'id', description: 'Ship UUID' })
+  @ApiResponse({ status: 200, description: 'Ship detail' })
+  @ApiResponse({ status: 404, description: 'Ship not found' })
+  async getShipDetailById(@Param('id', ParseUUIDPipe) id: string) {
+    return this.cruiseRepository.getShipDetail(id)
   }
 
   // ============================================================================
@@ -130,6 +242,80 @@ export class CruiseRepositoryController {
   }
 
   // ============================================================================
+  // SHIP CABIN SUMMARY
+  // ============================================================================
+
+  /**
+   * Get cabin category summary for a ship.
+   * GET /cruise-repository/ships/:shipId/cabins/summary
+   */
+  @Get('ships/:shipId/cabins/summary')
+  @ApiOperation({ summary: 'Get cabin category summary for a ship' })
+  @ApiParam({ name: 'shipId', description: 'Ship UUID' })
+  @ApiResponse({ status: 200, description: 'Cabin category summary' })
+  async getShipCabinSummary(@Param('shipId', ParseUUIDPipe) shipId: string) {
+    return this.cruiseRepository.getShipCabinSummary(shipId)
+  }
+
+  // ============================================================================
+  // SHIP DESTINATIONS
+  // ============================================================================
+
+  /**
+   * Get destinations this ship visits.
+   * GET /cruise-repository/ships/:shipId/destinations
+   */
+  @Get('ships/:shipId/destinations')
+  @ApiOperation({ summary: 'Get destinations this ship visits' })
+  @ApiParam({ name: 'shipId', description: 'Ship UUID' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Max destinations to return (default: 12)' })
+  @ApiResponse({ status: 200, description: 'List of destinations with sailing counts' })
+  async getShipDestinations(
+    @Param('shipId', ParseUUIDPipe) shipId: string,
+    @Query('limit', new DefaultValuePipe(12), ParseIntPipe) limit: number,
+  ) {
+    return this.cruiseRepository.getShipDestinations(shipId, limit)
+  }
+
+  // ============================================================================
+  // SAILING BY PUBLIC ID (MUST be before sailings/:id)
+  // ============================================================================
+
+  /**
+   * Get sailing details by stable public ID (for SEO-friendly URLs).
+   * GET /cruise-repository/sailings/by-public-id/:publicId
+   */
+  @Get('sailings/by-public-id/:publicId')
+  @ApiOperation({ summary: 'Get sailing details by public ID (stable URL lookup)' })
+  @ApiParam({ name: 'publicId', description: 'Sailing public ID (e.g., "CRU-ABC123")' })
+  @ApiResponse({ status: 200, type: SailingDetailResponseDto })
+  @ApiResponse({ status: 404, description: 'Sailing not found' })
+  async getSailingByPublicId(
+    @Param('publicId') publicId: string
+  ): Promise<SailingDetailResponseDto> {
+    return this.cruiseRepository.getSailingByPublicId(publicId)
+  }
+
+  // ============================================================================
+  // SAILING DETAIL
+  // ============================================================================
+
+  /**
+   * Get full sailing details including itinerary and prices.
+   * GET /cruise-repository/sailings/:id
+   */
+  @Get('sailings/:id')
+  @ApiOperation({ summary: 'Get sailing details by ID' })
+  @ApiParam({ name: 'id', description: 'Sailing UUID' })
+  @ApiResponse({ status: 200, type: SailingDetailResponseDto })
+  @ApiResponse({ status: 404, description: 'Sailing not found' })
+  async getSailingDetail(
+    @Param('id', ParseUUIDPipe) id: string
+  ): Promise<SailingDetailResponseDto> {
+    return this.cruiseRepository.getSailingDetail(id)
+  }
+
+  // ============================================================================
   // ALTERNATE SAILINGS
   // ============================================================================
 
@@ -165,5 +351,22 @@ export class CruiseRepositoryController {
     @Param('id', ParseUUIDPipe) id: string
   ): Promise<CabinImagesResponseDto> {
     return this.cruiseRepository.getCabinImages(id)
+  }
+
+  // ============================================================================
+  // ADMIN — SLUG GENERATION (production-only)
+  // ============================================================================
+
+  /**
+   * Generate public_ids and slug_bases for all sailings that don't have them.
+   * Only works on Production where catalog tables have the columns (not FDW).
+   * POST /cruise-repository/generate-slugs
+   */
+  @Post('generate-slugs')
+  @UseGuards(JwtAuthGuard, AdminRoleGuard)
+  @ApiOperation({ summary: 'Generate public_ids for sailings without them (production only)' })
+  @ApiResponse({ status: 200, description: 'Slug generation result' })
+  async generateSlugs(): Promise<{ updated: number; errors: number }> {
+    return this.sailingSlugService.generatePublicIds()
   }
 }
