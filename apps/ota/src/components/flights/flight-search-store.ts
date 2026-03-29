@@ -150,6 +150,15 @@ interface FlightSearchState {
   setShowRequestForm: (v: boolean) => void;
 
   // -- Actions: compound ----------------------------------------------------
+  setSearchParams: (params: {
+    origin: string;
+    destination: string;
+    departureDate: string;
+    returnDate: string;
+    adults: number;
+    children: number;
+    travelClass: string;
+  }) => void;
   swapAirports: () => void;
   selectOutbound: (offer: FlightOffer) => void;
   selectReturn: (offer: FlightOffer) => void;
@@ -237,6 +246,17 @@ export const useFlightSearch = create<FlightSearchState>((set) => ({
   setShowRequestForm: (v) => set({ showRequestForm: v }),
 
   // -- Actions: compound ----------------------------------------------------
+  setSearchParams: (params) =>
+    set({
+      origin: params.origin,
+      destination: params.destination,
+      departureDate: params.departureDate,
+      returnDate: params.returnDate,
+      adults: params.adults,
+      children: params.children,
+      travelClass: params.travelClass,
+    }),
+
   swapAirports: () =>
     set((s) => ({ origin: s.destination, destination: s.origin })),
 
