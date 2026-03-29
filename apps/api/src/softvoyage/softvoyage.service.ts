@@ -111,7 +111,7 @@ export class SoftvoyageService {
     const timestampBucket = Math.floor(Date.now() / cacheTtlMs)
     const jobId = `vco-search-${paramsHash}-${timestampBucket}`
 
-    // 4. Check if the job already exists and is active/waiting
+    // 4. Check if the job already exists
     try {
       const existingJob = await this.queue.getJob(jobId)
       if (existingJob) {
@@ -120,6 +120,9 @@ export class SoftvoyageService {
           this.logger.debug(`Job ${jobId} already ${state}, returning existing`)
           return { cached: false, jobId }
         }
+        // Remove completed/failed jobs so a fresh one can be created
+        await existingJob.remove()
+        this.logger.debug(`Removed ${state} job ${jobId} to allow fresh search`)
       }
     } catch (err) {
       this.logger.warn(`Failed to check existing job ${jobId}: ${err}`)
