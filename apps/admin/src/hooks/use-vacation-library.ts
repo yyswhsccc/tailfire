@@ -237,7 +237,6 @@ export function useAddVacationToItinerary(defaultItineraryId?: string) {
       pkg,
       searchDate,
       itineraryId,
-      tripId,
     }: {
       result: VacationSearchResult
       pkg: VacationPackageOption
