@@ -73,7 +73,7 @@ export class OtaSearchService {
       const { clientId, clientSecret } = creds as { clientId: string; clientSecret: string }
       const token = await this.amadeusAuthService.getAccessToken(baseUrl, { clientId, clientSecret })
 
-      const url = `${baseUrl}/v1/reference-data/locations?keyword=${encodeURIComponent(keyword.trim())}&subType=AIRPORT&page%5Blimit%5D=10`
+      const url = `${baseUrl}/v1/reference-data/locations?keyword=${encodeURIComponent(keyword.trim())}&subType=CITY,AIRPORT&page%5Blimit%5D=10`
       const response = await firstValueFrom(
         this.httpService.get(url, {
           headers: { Authorization: `Bearer ${token}` },

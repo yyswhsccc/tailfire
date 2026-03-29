@@ -56,7 +56,7 @@ export class OtaSearchController {
     @Query('departureDate') departureDate?: string,
     @Query('returnDate') returnDate?: string,
     @Query('adults') adults?: string,
-    @Query('children') _children?: string,
+    @Query('children') children?: string,
     @Query('travelClass') travelClass?: 'ECONOMY' | 'PREMIUM_ECONOMY' | 'BUSINESS' | 'FIRST',
   ) {
     if (!origin || !destination || !departureDate) {
@@ -71,6 +71,7 @@ export class OtaSearchController {
       departureDate,
       returnDate,
       adults: adults ? parseInt(adults, 10) : 1,
+      children: children ? parseInt(children, 10) : 0,
       travelClass,
       currencyCode: 'CAD',
     })

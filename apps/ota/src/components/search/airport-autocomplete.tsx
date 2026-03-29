@@ -39,7 +39,7 @@ export function AirportAutocomplete({
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   const search = useCallback(async (keyword: string) => {
-    if (keyword.length < 2) {
+    if (keyword.length < 3) {
       setResults([]);
       setIsOpen(false);
       return;
@@ -115,8 +115,12 @@ export function AirportAutocomplete({
         )}
       </div>
 
-      {/* Hidden input sends just the IATA code */}
-      <input type="hidden" name={name} value={selectedCode} />
+      {/* Hidden input sends just the IATA code — only when a valid 3-letter code is selected */}
+      <input
+        type="hidden"
+        name={name}
+        value={/^[A-Z]{3}$/.test(selectedCode) ? selectedCode : ""}
+      />
 
       {/* Dropdown */}
       {isOpen && results.length > 0 && (
