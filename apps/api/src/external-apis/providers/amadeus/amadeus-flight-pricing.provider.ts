@@ -1,10 +1,10 @@
 /**
- * Amadeus Price Metrics Provider
+ * Amadeus Flight Pricing Provider
  *
- * External API provider for historical price analysis via Amadeus Itinerary Price Metrics API.
- * Returns statistical price distribution (min, quartiles, max) for a route on a given date.
+ * External API provider for confirming live prices for selected flight offers
+ * via Amadeus Flight Offers Price API.
  *
- * @see https://developers.amadeus.com/self-service/category/flights/api-doc/flight-price-analysis
+ * @see https://developers.amadeus.com/self-service/category/flights/api-doc/flight-offers-price
  */
 
 import { Injectable, OnModuleInit } from '@nestjs/common'
@@ -27,46 +27,25 @@ import { AmadeusAuthService } from './amadeus-auth.service'
 // TYPES
 // ============================================================================
 
-export interface PriceMetricsSearchParams {
-  /** Origin airport IATA code (e.g., "YYZ") */
-  originIataCode: string
-  /** Destination airport IATA code (e.g., "CDG") */
-  destinationIataCode: string
-  /** Departure date (YYYY-MM-DD) */
-  departureDate: string
-  /** Currency code (default: "CAD") */
-  currencyCode?: string
+export interface FlightPricingParams {
+  /** Raw Amadeus flight offer objects from search results */
+  flightOffers: object[]
 }
 
-export interface NormalizedPriceMetrics {
-  /** Minimum observed price */
-  min: number
-  /** First quartile (25th percentile) price */
-  firstQuartile: number
-  /** Median (50th percentile) price */
-  median: number
-  /** Third quartile (75th percentile) price */
-  thirdQuartile: number
-  /** Maximum observed price */
-  max: number
-  /** Currency code */
-  currencyCode: string
+export interface NormalizedFlightPricing {
+  /** Confirmed flight offers with live pricing */
+  flightOffers: object[]
+  /** Payment info if available */
+  payment?: object
 }
 
-interface AmadeusPriceMetricsResponse {
-  meta?: { count?: number }
-  data: Array<{
+interface AmadeusFlightPricingResponse {
+  data: {
     type: string
-    origin: { iataCode: string }
-    destination: { iataCode: string }
-    departureDate: string
-    oneWay: boolean
-    currencyCode: string
-    priceMetrics: Array<{
-      quartileRanking: 'MINIMUM' | 'FIRST' | 'MEDIUM' | 'THIRD' | 'MAXIMUM'
-      amount: string
-    }>
-  }>
+    flightOffers: object[]
+    bookingRequirements?: object
+  }
+  dictionaries?: object
 }
 
 // ============================================================================
@@ -75,11 +54,11 @@ interface AmadeusPriceMetricsResponse {
 
 function buildConfig(): ExternalApiConfig {
   return {
-    provider: 'amadeus_price_metrics',
+    provider: 'amadeus_flight_pricing',
     category: ApiCategory.FLIGHTS,
     baseUrl: process.env.AMADEUS_API_URL || 'https://test.api.amadeus.com',
     rateLimit: {
-      requestsPerMinute: parseInt(process.env.AMADEUS_PRICE_METRICS_RATE_LIMIT_PER_MINUTE || '10', 10),
+      requestsPerMinute: parseInt(process.env.AMADEUS_FLIGHT_PRICING_RATE_LIMIT_PER_MINUTE || '10', 10),
       requestsPerHour: parseInt(process.env.AMADEUS_RATE_LIMIT_PER_HOUR || '100', 10),
     },
     authentication: { type: 'bearer' },
@@ -89,8 +68,8 @@ function buildConfig(): ExternalApiConfig {
 const PROVIDER_PRIORITY = 1
 
 @Injectable()
-export class AmadeusPriceMetricsProvider
-  extends BaseExternalApi<PriceMetricsSearchParams, NormalizedPriceMetrics>
+export class AmadeusFlightPricingProvider
+  extends BaseExternalApi<FlightPricingParams, NormalizedFlightPricing>
   implements OnModuleInit
 {
   constructor(
@@ -109,7 +88,7 @@ export class AmadeusPriceMetricsProvider
 
   private async getAccessToken(): Promise<string> {
     if (!this.credentials) {
-      throw new Error('No credentials configured for Amadeus Price Metrics')
+      throw new Error('No credentials configured for Amadeus Flight Pricing')
     }
     const { clientId, clientSecret } = this.credentials as { clientId: string; clientSecret: string }
     return this.authService.getAccessToken(this.config.baseUrl, { clientId, clientSecret })
@@ -118,9 +97,10 @@ export class AmadeusPriceMetricsProvider
   private async makeAuthenticatedRequest<T>(
     endpoint: string,
     method: 'GET' | 'POST' = 'GET',
+    body?: object,
     isRetry = false
   ): Promise<ExternalApiResponse<T>> {
-    const requestId = `amadeus_price_metrics_${Date.now()}`
+    const requestId = `amadeus_flight_pricing_${Date.now()}`
     const startTime = Date.now()
 
     if (!this.canMakeRequest()) {
@@ -139,13 +119,18 @@ export class AmadeusPriceMetricsProvider
         this.httpService.request<T>({
           url: endpoint,
           method,
-          headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          data: body,
           timeout: this.resilience.timeoutMs,
         })
       )
 
       this.recordRequest()
-      this.logger.log('Amadeus Price Metrics response', { requestId, latencyMs: Date.now() - startTime })
+      this.logger.log('Amadeus Flight Pricing response', { requestId, latencyMs: Date.now() - startTime })
 
       return {
         success: true,
@@ -156,12 +141,14 @@ export class AmadeusPriceMetricsProvider
       const latencyMs = Date.now() - startTime
       const status = error.response?.status
 
+      // On 401, clear the stale token and retry once with a fresh one
       if (status === 401 && !isRetry) {
         this.logger.warn('Amadeus 401 — invalidating token cache and retrying', { requestId, endpoint })
         this.authService.invalidateToken()
-        return this.makeAuthenticatedRequest<T>(endpoint, method, true)
+        return this.makeAuthenticatedRequest<T>(endpoint, method, body, true)
       }
 
+      // After a retry also 401s, give a clear error
       if (status === 401 && isRetry) {
         this.logger.error('Amadeus 401 on retry — credentials may be invalid', { requestId, endpoint })
         return {
@@ -171,7 +158,7 @@ export class AmadeusPriceMetricsProvider
         }
       }
 
-      this.logger.error('Amadeus Price Metrics API error', {
+      this.logger.error('Amadeus Flight Pricing API error', {
         requestId,
         latencyMs,
         error: error.message,
@@ -179,10 +166,11 @@ export class AmadeusPriceMetricsProvider
       })
 
       Sentry.captureException(error, {
-        tags: { service: 'amadeus_price_metrics', operation: 'authenticated-request' },
+        tags: { service: 'amadeus_flight_pricing', operation: 'authenticated-request' },
         extra: { endpoint, requestId, latencyMs, status },
       })
 
+      // Surface the Amadeus error detail for 400s so the frontend gets useful feedback
       const amadeusErrors: Array<{ title?: string; detail?: string; code?: number }> =
         error.response?.data?.errors ?? []
       let errorMessage: string
@@ -203,8 +191,8 @@ export class AmadeusPriceMetricsProvider
   }
 
   async search(
-    params: PriceMetricsSearchParams
-  ): Promise<ExternalApiResponse<NormalizedPriceMetrics[]>> {
+    params: FlightPricingParams
+  ): Promise<ExternalApiResponse<NormalizedFlightPricing[]>> {
     const validation = this.validateParams(params)
     if (!validation.valid) {
       return {
@@ -214,83 +202,59 @@ export class AmadeusPriceMetricsProvider
       }
     }
 
-    const queryParams = new URLSearchParams({
-      originIataCode: params.originIataCode.toUpperCase(),
-      destinationIataCode: params.destinationIataCode.toUpperCase(),
-      departureDate: params.departureDate,
-      currencyCode: params.currencyCode || 'CAD',
-    })
+    const endpoint = `${this.config.baseUrl}/v1/shopping/flight-offers/pricing`
+    const body = {
+      data: {
+        type: 'flight-offers-pricing',
+        flightOffers: params.flightOffers,
+      },
+    }
 
-    const endpoint = `${this.config.baseUrl}/v1/analytics/itinerary-price-metrics?${queryParams}`
-    const response = await this.makeAuthenticatedRequest<AmadeusPriceMetricsResponse>(endpoint)
+    const response = await this.makeAuthenticatedRequest<AmadeusFlightPricingResponse>(
+      endpoint, 'POST', body
+    )
 
     if (!response.success || !response.data) {
-      return { success: false, error: response.error || 'No price metrics returned', metadata: response.metadata }
+      return { success: false, error: response.error || 'No pricing data returned', metadata: response.metadata }
     }
 
-    const items = response.data.data || []
-    if (items.length === 0) {
-      return { success: false, error: 'No price metrics found for this route', metadata: response.metadata }
+    const pricedOffers = response.data.data?.flightOffers || []
+    if (pricedOffers.length === 0) {
+      return { success: false, error: 'No priced offers returned', metadata: response.metadata }
     }
 
-    const first = items[0]!
-    const normalized = this.normalizePriceMetrics(first.priceMetrics, first.currencyCode)
+    const normalized: NormalizedFlightPricing = {
+      flightOffers: pricedOffers,
+      payment: response.data.data?.bookingRequirements,
+    }
 
     return { success: true, data: [normalized], metadata: response.metadata }
   }
 
   async getDetails(
     _id: string
-  ): Promise<ExternalApiResponse<NormalizedPriceMetrics>> {
+  ): Promise<ExternalApiResponse<NormalizedFlightPricing>> {
     return {
       success: false,
-      error: 'Price metrics details not supported — use search instead',
+      error: 'Flight pricing details not supported — use search instead',
       metadata: { provider: this.config.provider, timestamp: new Date().toISOString() },
     }
   }
 
-  validateParams(params: PriceMetricsSearchParams): { valid: boolean; errors: string[] } {
+  validateParams(params: FlightPricingParams): { valid: boolean; errors: string[] } {
     const errors: string[] = []
 
-    if (!params.originIataCode || !/^[A-Z]{3}$/i.test(params.originIataCode)) {
-      errors.push('Origin must be a 3-letter IATA code')
-    }
-    if (!params.destinationIataCode || !/^[A-Z]{3}$/i.test(params.destinationIataCode)) {
-      errors.push('Destination must be a 3-letter IATA code')
-    }
-
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/
-    if (!params.departureDate || !dateRegex.test(params.departureDate)) {
-      errors.push('Departure date required (YYYY-MM-DD)')
-    }
-
-    if (params.currencyCode && !/^[A-Z]{3}$/.test(params.currencyCode)) {
-      errors.push('Currency code must be 3 uppercase letters (e.g. USD, CAD, EUR)')
+    if (!params.flightOffers || !Array.isArray(params.flightOffers) || params.flightOffers.length === 0) {
+      errors.push('flightOffers must be a non-empty array of Amadeus flight offer objects')
     }
 
     return { valid: errors.length === 0, errors }
   }
 
-  transformResponse(apiData: any): NormalizedPriceMetrics {
-    return this.normalizePriceMetrics(apiData.priceMetrics || [], apiData.currencyCode || 'CAD')
-  }
-
-  private normalizePriceMetrics(
-    priceMetrics: Array<{ quartileRanking: string; amount: string }>,
-    currencyCode: string
-  ): NormalizedPriceMetrics {
-    const getAmount = (ranking: string): number => {
-      const metric = priceMetrics.find(m => m.quartileRanking === ranking)
-      return metric ? parseFloat(metric.amount) : 0
-    }
-
+  transformResponse(apiData: any): NormalizedFlightPricing {
     return {
-      min: getAmount('MINIMUM'),
-      firstQuartile: getAmount('FIRST'),
-      median: getAmount('MEDIUM'),
-      thirdQuartile: getAmount('THIRD'),
-      max: getAmount('MAXIMUM'),
-      currencyCode,
+      flightOffers: apiData.data?.flightOffers || [],
+      payment: apiData.data?.bookingRequirements,
     }
   }
 

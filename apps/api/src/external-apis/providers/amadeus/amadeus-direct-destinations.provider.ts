@@ -125,6 +125,7 @@ export class AmadeusDirectDestinationsProvider
         })
       )
 
+      this.recordRequest()
       this.logger.log('Amadeus Direct Destinations response', { requestId, latencyMs: Date.now() - startTime })
 
       return {
@@ -136,14 +137,12 @@ export class AmadeusDirectDestinationsProvider
       const latencyMs = Date.now() - startTime
       const status = error.response?.status
 
-      // On 401, clear the stale token and retry once with a fresh one
       if (status === 401 && !isRetry) {
         this.logger.warn('Amadeus 401 — invalidating token cache and retrying', { requestId, endpoint })
         this.authService.invalidateToken()
         return this.makeAuthenticatedRequest<T>(endpoint, method, true)
       }
 
-      // After a retry also 401s, give a clear error
       if (status === 401 && isRetry) {
         this.logger.error('Amadeus 401 on retry — credentials may be invalid', { requestId, endpoint })
         return {
@@ -165,7 +164,6 @@ export class AmadeusDirectDestinationsProvider
         extra: { endpoint, requestId, latencyMs, status },
       })
 
-      // Surface the Amadeus error detail for 400s so the frontend gets useful feedback
       const amadeusErrors: Array<{ title?: string; detail?: string; code?: number }> =
         error.response?.data?.errors ?? []
       let errorMessage: string
@@ -221,7 +219,6 @@ export class AmadeusDirectDestinationsProvider
         destinationMap.set(dest, new Set())
       }
       // The API returns location entries; airline info may be in subType or name
-      // If no airline detail is available, we still list the destination
       if (item.subType) {
         destinationMap.get(dest)!.add(item.subType)
       }

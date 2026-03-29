@@ -21,6 +21,8 @@ import { AmadeusFlightDatesProvider } from './amadeus-flight-dates.provider'
 import { AmadeusPriceMetricsProvider } from './amadeus-price-metrics.provider'
 import { AmadeusDirectDestinationsProvider } from './amadeus-direct-destinations.provider'
 import { AmadeusFlightDelayProvider } from './amadeus-flight-delay.provider'
+import { AmadeusFlightPricingProvider } from './amadeus-flight-pricing.provider'
+import { AmadeusFlightUpsellProvider } from './amadeus-flight-upsell.provider'
 
 @Module({
   providers: [
@@ -34,6 +36,8 @@ import { AmadeusFlightDelayProvider } from './amadeus-flight-delay.provider'
     AmadeusPriceMetricsProvider,
     AmadeusDirectDestinationsProvider,
     AmadeusFlightDelayProvider,
+    AmadeusFlightPricingProvider,
+    AmadeusFlightUpsellProvider,
   ],
   exports: [
     AmadeusAuthService,
@@ -46,6 +50,8 @@ import { AmadeusFlightDelayProvider } from './amadeus-flight-delay.provider'
     AmadeusPriceMetricsProvider,
     AmadeusDirectDestinationsProvider,
     AmadeusFlightDelayProvider,
+    AmadeusFlightPricingProvider,
+    AmadeusFlightUpsellProvider,
   ],
 })
 export class AmadeusModule {}

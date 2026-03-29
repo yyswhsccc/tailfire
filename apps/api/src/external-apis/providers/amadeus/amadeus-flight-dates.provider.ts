@@ -134,6 +134,7 @@ export class AmadeusFlightDatesProvider
         })
       )
 
+      this.recordRequest()
       this.logger.log('Amadeus Flight Dates response', { requestId, latencyMs: Date.now() - startTime })
 
       return {

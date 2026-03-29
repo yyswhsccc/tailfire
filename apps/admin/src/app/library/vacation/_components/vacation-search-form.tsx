@@ -76,11 +76,23 @@ export function VacationSearchForm({ onSearch, isSearching, defaults }: Vacation
   )
 
   const destinationOptions = useMemo(
-    () =>
-      (destinations ?? []).map((d) => ({
-        value: d.providerIdentifier,
-        label: d.name,
-      })),
+    () => {
+      // Group by name to deduplicate (e.g., "Bahamas" with IDs 25 and 188)
+      // Join provider IDs with commas so VCO searches all sub-destinations
+      const byName = new Map<string, string[]>()
+      for (const d of destinations ?? []) {
+        const existing = byName.get(d.name)
+        if (existing) {
+          existing.push(d.providerIdentifier)
+        } else {
+          byName.set(d.name, [d.providerIdentifier])
+        }
+      }
+      return Array.from(byName.entries()).map(([name, ids]) => ({
+        value: ids.join(','),
+        label: name,
+      }))
+    },
     [destinations]
   )
 
