@@ -55,17 +55,21 @@ function dollarsToCents(raw: string): number {
 export class SoftvoyageResultParserService {
   /**
    * Parse Softvoyage HTML results page into structured data.
-   * Works with both VCO (public widget) and VCM (agent portal) output.
-   * Expects the HTML to contain `table[id^="hotel-"]` elements.
+   * Supports both VCO (div[id^="result-"]) and VCM (table[id^="hotel-"]) formats.
    */
   parseResults(html: string): VacationSearchResult[] {
     const $ = cheerio.load(html);
     const results: VacationSearchResult[] = [];
 
+    // Try VCO format first (div[id^="result-"]), fall back to VCM (table[id^="hotel-"])
+    const vcoResults = $('div[id^="result-"]');
+    const selector = vcoResults.length > 0 ? 'div[id^="result-"]' : 'table[id^="hotel-"]';
+    const idPrefix = vcoResults.length > 0 ? 'result-' : 'hotel-';
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    $('table[id^="hotel-"]').each((_: number, hotelEl: any) => {
+    $(selector).each((_: number, hotelEl: any) => {
       const $hotel = $(hotelEl);
-      const hotelId = $hotel.attr('id')?.replace('hotel-', '') ?? '';
+      const hotelId = $hotel.attr('id')?.replace(idPrefix, '') ?? '';
 
       // ── Hotel name ──────────────────────────────────────────────
       let hotelName = '';

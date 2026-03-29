@@ -138,8 +138,8 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
         { url: resultsUrl, params: formParams.toString() },
       )
 
-      // 4. Wait for results to load
-      await page.waitForSelector('table[id^="hotel-"]', { timeout: 20000 })
+      // 4. Wait for results to load (VCO uses div[id^="result-"], VCM uses table[id^="hotel-"])
+      await page.waitForSelector('div[id^="result-"], table[id^="hotel-"]', { timeout: 20000 })
 
       // 5. Get page HTML
       const html = await page.content()
