@@ -55,7 +55,7 @@ export class SoftvoyageController {
       await redis.quit()
       if (!html) return { error: 'No cached HTML — run a search first' }
       // Return first result div
-      const resultMatch = html.match(/<div[^>]*id="result-\d+"[^>]*>[\s\S]{0,5000}/)
+      const resultMatch = html.match(/<div[^>]*id="result-\d+"[^>]*>[\s\S]{0,15000}/)
       return {
         totalLength: html.length,
         hasDataDome: html.includes('captcha-delivery'),
