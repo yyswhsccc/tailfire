@@ -55,21 +55,37 @@ export class SoftvoyageController {
       await redis.quit()
       if (!html) return { error: 'No cached HTML — run a search first' }
       // Return first result div
-      const resultMatch = html.match(/<div[^>]*id="result-\d+"[^>]*>[\s\S]{0,15000}/)
+      // Find first result div with full content
+      const firstResultStart = html.indexOf('id="result-')
+      const firstResultId = firstResultStart >= 0
+        ? html.substring(firstResultStart + 11, html.indexOf('"', firstResultStart + 11))
+        : null
+
+      // Find the pricing/package table — look for table after the first result div
+      const tableMatch = html.match(/<table[\s\S]{0,10000}?<\/table>/)
+      const pricingSnippet = tableMatch ? tableMatch[0].substring(0, 3000) : 'no table found'
+
+      // Find "See all" / classExpand pattern
+      const expandMatch = html.match(/classExpand[\s\S]{0,500}/)
+
+      // Get a chunk from around the first pricing data
+      const priceIdx = html.indexOf('$')
+      const priceContext = priceIdx > 0 ? html.substring(Math.max(0, priceIdx - 200), priceIdx + 500) : 'no $ found'
+
       return {
         totalLength: html.length,
         hasDataDome: html.includes('captcha-delivery'),
         resultDivCount: (html.match(/id="result-/g) || []).length,
-        hotelTableCount: (html.match(/id="hotel-/g) || []).length,
-        firstResultDiv: resultMatch ? resultMatch[0].substring(0, 3000) : 'no result divs found',
-        // Also check what selectors exist
-        hasBoldColor: html.includes('color: #CC6633'),
-        hasFontSize17: html.includes('font-size: 17px'),
-        hasStarImg: html.includes('star1'),
-        hasSoftvoyageImg: html.includes('images.softvoyage.com'),
-        hasMonarc: html.includes('monarc'),
-        hasMoreres: html.includes('moreres-'),
+        firstResultId,
+        hasTables: (html.match(/<table/g) || []).length,
+        hasTbody: (html.match(/<tbody/g) || []).length,
         hasClassExpand: html.includes('classExpand'),
+        hasMoreres: html.includes('moreres-'),
+        hasDollarSign: html.includes('$'),
+        hasBackgroundColor: html.includes('background-color'),
+        pricingTableSnippet: pricingSnippet,
+        expandSnippet: expandMatch ? expandMatch[0].substring(0, 300) : 'none',
+        priceContext: priceContext.substring(0, 600),
       }
     } catch (err) {
       return { error: String(err) }
