@@ -215,7 +215,7 @@ export class OtaSearchService {
     const uncachedDates: string[] = []
 
     for (const date of dates) {
-      const cacheKey = `nearby-price:${origin}:${destination}:${date}`
+      const cacheKey = `nearby-price:${origin}:${destination}:${date}:${adults}:${travelClass}`
       const cached = this.cache.get<{ date: string; price: number; currency: string }>(cacheKey)
       if (cached) {
         results.push(cached)
@@ -246,7 +246,7 @@ export class OtaSearchService {
               currency: cheapest.price.currency,
             }
             // Cache individually for 1 hour
-            const cacheKey = `nearby-price:${origin}:${destination}:${date}`
+            const cacheKey = `nearby-price:${origin}:${destination}:${date}:${adults}:${travelClass}`
             this.cache.set(cacheKey, priceEntry, 3600)
             return priceEntry
           }

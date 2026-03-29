@@ -80,6 +80,7 @@ export function FlightSearchForm({ compact = false }: FlightSearchFormProps) {
       // IATA validation — hidden input is empty when invalid
       if (!origin || !/^[A-Z]{3}$/.test(origin)) return;
       if (!destination || !/^[A-Z]{3}$/.test(destination)) return;
+      if (isRoundTrip && !((form.get("returnDate") as string)?.trim())) return;
 
       params.set("origin", origin);
       params.set("destination", destination);
@@ -261,6 +262,7 @@ export function FlightSearchForm({ compact = false }: FlightSearchFormProps) {
               type="date"
               defaultValue={currentReturnDate}
               min={currentDepartureDate || today}
+              required
               className="h-10 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
           </div>

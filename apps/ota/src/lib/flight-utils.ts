@@ -48,6 +48,17 @@ export function formatIsoDuration(iso: string): string {
   return formatDuration(parseDuration(iso));
 }
 
+/** Compute total elapsed minutes from first departure to last arrival */
+export function computeElapsedMinutes(segments: Array<{ departure: { at: string }; arrival: { at: string } }>): number {
+  if (segments.length === 0) return 0;
+  const firstSeg = segments[0];
+  const lastSeg = segments[segments.length - 1];
+  if (!firstSeg || !lastSeg) return 0;
+  const first = new Date(firstSeg.departure.at).getTime();
+  const last = new Date(lastSeg.arrival.at).getTime();
+  return Math.round((last - first) / 60000);
+}
+
 // ---- Price formatting -----------------------------------------------------
 
 /** Format a price for display using Intl (defaults to CAD). Always rounds to whole dollars. */
@@ -125,7 +136,7 @@ export function extractAirlines(
 
 interface SortableOffer {
   price: { total: string };
-  segments: { duration: string; stops: number; departure: { at: string } }[];
+  segments: { duration: string; stops: number; departure: { at: string }; arrival: { at: string } }[];
 }
 
 /** Sort flight offers by the given strategy. Returns a new array. */
@@ -136,7 +147,7 @@ export function sortFlights<T extends SortableOffer>(
   const copy = [...flights];
 
   const totalDuration = (f: SortableOffer) =>
-    f.segments.reduce((sum, s) => sum + parseDuration(s.duration), 0);
+    computeElapsedMinutes(f.segments);
 
   const totalStops = (f: SortableOffer) => countStops(f.segments);
 
@@ -200,6 +211,7 @@ interface FilterableOffer {
     duration: string;
     stops: number;
     departure: { at: string };
+    arrival: { at: string };
   }[];
 }
 
@@ -239,10 +251,7 @@ export function applyFilters<T extends FilterableOffer>(
 
     // Max duration filter (0 = no limit)
     if (filters.maxDuration > 0) {
-      const total = f.segments.reduce(
-        (sum, s) => sum + parseDuration(s.duration),
-        0,
-      );
+      const total = computeElapsedMinutes(f.segments);
       if (total > filters.maxDuration) return false;
     }
 

@@ -9,7 +9,7 @@ import {
   type PriceMetrics,
   type DelayPrediction,
 } from "./flight-search-store";
-import { formatPrice, countStops, parseDuration, formatDuration, formatIsoDuration } from "@/lib/flight-utils";
+import { formatPrice, countStops, computeElapsedMinutes, formatDuration, formatIsoDuration } from "@/lib/flight-utils";
 import { Badge } from "@/components/ui/badge";
 /** Client-safe fetch via Next.js proxy routes */
 async function clientFetch<T>(path: string): Promise<T> {
@@ -108,8 +108,8 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
   const flightKey = `${carrier}${flightNumber}`;
   const stops = countStops(offer.segments);
 
-  // Total duration across all segments
-  const totalDuration = offer.segments.reduce((acc, s) => acc + parseDuration(s.duration), 0);
+  // Total elapsed time from first departure to last arrival (includes layovers)
+  const totalDuration = computeElapsedMinutes(offer.segments);
   const durationLabel = totalDuration > 0 ? formatDuration(totalDuration) : formatIsoDuration(firstSeg.duration);
 
   // Delay prediction

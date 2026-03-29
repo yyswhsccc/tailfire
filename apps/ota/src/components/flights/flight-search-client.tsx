@@ -114,7 +114,7 @@ export function FlightSearchClient({
   const selectedOutbound = useFlightSearch((s) => s.selectedOutbound);
   const tripType = useFlightSearch((s) => s.tripType);
   const showRequestForm = useFlightSearch((s) => s.showRequestForm);
-  const upsellOffers = useFlightSearch((s) => s.upsellOffers);
+  // upsellOffers selector removed — upsell rendering disabled (see Bug 5 TODO)
 
   // ---- Store setters ------------------------------------------------------
   const setSearchParams = useFlightSearch((s) => s.setSearchParams);
@@ -165,6 +165,15 @@ export function FlightSearchClient({
     setTripType(returnDate ? "round-trip" : "one-way");
     setOutboundResults(initialResults);
     setSearchError(searchError ?? null);
+
+    // Reset round-trip flow state on new search
+    useFlightSearch.setState({
+      showRequestForm: false,
+      selectedOutbound: null,
+      selectedReturn: null,
+      returnResults: [],
+      roundTripStep: 'outbound',
+    });
 
     // Reset enrichment tracking on URL change so enrichments re-fetch
     enrichmentFetchedRef.current = false;
@@ -244,28 +253,32 @@ export function FlightSearchClient({
       }
     })();
 
-    // Upsell offers (needs at least one result)
-    if (initialResults.length > 0) {
-      (async () => {
-        try {
-          setUpsellLoading(true);
-          const data = await clientFetch<{ alternatives: FlightOffer[] }>(
-            "/api/flights/upsell",
-            {
-              method: "POST",
-              body: JSON.stringify({
-                flightOffers: [initialResults[0]],
-              }),
-            },
-          );
-          setUpsellOffers(data.alternatives ?? []);
-        } catch {
-          // Non-critical
-        } finally {
-          setUpsellLoading(false);
-        }
-      })();
-    }
+    // TODO: Upsell needs a dedicated card component that handles the
+    // NormalizedFlightUpsell shape ({ cabinClass, price, currency, includedServices, rawOffer })
+    // instead of FlightOffer ({ segments, price, ... }). Passing upsell data to FlightCard
+    // crashes because FlightCard expects offer.segments[0]. Disabled until a dedicated
+    // UpsellCard component is built.
+    // if (initialResults.length > 0) {
+    //   (async () => {
+    //     try {
+    //       setUpsellLoading(true);
+    //       const data = await clientFetch<{ alternatives: FlightOffer[] }>(
+    //         "/api/flights/upsell",
+    //         {
+    //           method: "POST",
+    //           body: JSON.stringify({
+    //             flightOffers: [initialResults[0]],
+    //           }),
+    //         },
+    //       );
+    //       setUpsellOffers(data.alternatives ?? []);
+    //     } catch {
+    //       // Non-critical
+    //     } finally {
+    //       setUpsellLoading(false);
+    //     }
+    //   })();
+    // }
 
     // Nearby date prices (7-day strip)
     (async () => {
@@ -571,25 +584,14 @@ export function FlightSearchClient({
                 {/* Flight cards */}
                 {filteredResults.length > 0 ? (
                   <div className="space-y-4">
-                    {filteredResults.map((offer, index) => (
+                    {filteredResults.map((offer) => (
                       <div key={offer.id}>
                         <FlightCard
                           offer={offer}
                           onSelect={handleFlightSelect}
                         />
-
-                        {/* Upsell card after the 3rd result */}
-                        {index === 2 &&
-                          upsellOffers.length > 0 &&
-                          upsellOffers[0] && (
-                            <div className="mt-4">
-                              <FlightCard
-                                offer={upsellOffers[0]}
-                                onSelect={handleFlightSelect}
-                                isUpsell
-                              />
-                            </div>
-                          )}
+                        {/* TODO: Render UpsellCard here once a dedicated component
+                            that handles NormalizedFlightUpsell shape is built. */}
                       </div>
                     ))}
                   </div>
