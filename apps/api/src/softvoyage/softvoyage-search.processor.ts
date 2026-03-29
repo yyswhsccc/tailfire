@@ -151,6 +151,12 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
 
       this.logger.debug(`Got HTML response (${html.length} bytes), parsing results...`)
 
+      // Temporary: log a snippet of the first result div for debugging selectors
+      const resultDivMatch = html.match(/<div[^>]*id="result-\d+"[^>]*>[\s\S]{0,2000}/)
+      if (resultDivMatch) {
+        this.logger.log(`VCO result div sample (first 500 chars): ${resultDivMatch[0].substring(0, 500)}`)
+      }
+
       // 7. Parse HTML via result parser
       const results = this.resultParser.parseResults(html)
       this.logger.log(
