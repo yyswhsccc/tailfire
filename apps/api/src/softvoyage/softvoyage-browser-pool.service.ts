@@ -17,13 +17,21 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import type { Browser, Page } from 'puppeteer-core'
 
-// Use puppeteer-extra with stealth for DataDome bypass
-// Static import works with SWC; require() in BullMQ processors does not
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const puppeteer = require('puppeteer-extra')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const StealthPlugin = require('puppeteer-extra-plugin-stealth')
-puppeteer.use(StealthPlugin())
+// Try to use puppeteer-extra with stealth for DataDome bypass.
+// Falls back to plain puppeteer-core if puppeteer-extra is unavailable.
+let puppeteer: any
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  puppeteer = require('puppeteer-extra')
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const StealthPlugin = require('puppeteer-extra-plugin-stealth')
+  puppeteer.use(StealthPlugin())
+  console.log('[SoftvoyageBrowserPoolService] puppeteer-extra + stealth loaded')
+} catch {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  puppeteer = require('puppeteer-core')
+  console.log('[SoftvoyageBrowserPoolService] WARN: puppeteer-extra unavailable, using puppeteer-core (no stealth)')
+}
 
 // ---------------------------------------------------------------------------
 // Types
