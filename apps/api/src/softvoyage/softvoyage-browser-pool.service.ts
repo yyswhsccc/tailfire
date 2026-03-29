@@ -236,6 +236,19 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
 
     const page = await browser.newPage()
 
+    // Authenticate proxy if credentials provided
+    if (proxyUrl) {
+      try {
+        const parsed = new URL(proxyUrl)
+        if (parsed.username) {
+          await page.authenticate({
+            username: decodeURIComponent(parsed.username),
+            password: decodeURIComponent(parsed.password),
+          })
+        }
+      } catch { /* ignore auth errors */ }
+    }
+
     const entry: PoolEntry = {
       browser,
       page,
@@ -285,6 +298,19 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
     })
 
     const page = await browser.newPage()
+
+    // Authenticate proxy
+    if (proxyUrl) {
+      try {
+        const parsed = new URL(proxyUrl)
+        if (parsed.username) {
+          await page.authenticate({
+            username: decodeURIComponent(parsed.username),
+            password: decodeURIComponent(parsed.password),
+          })
+        }
+      } catch { /* ignore */ }
+    }
 
     entry.browser = browser
     entry.page = page
