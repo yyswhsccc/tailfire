@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, type FormEvent } from "react";
 import { Search, ArrowRightLeft } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { AirportAutocomplete } from "@/components/search/airport-autocomplete";
 import { useFlightSearch, type TripType } from "./flight-search-store";
 import { cn } from "@/lib/utils";
@@ -266,13 +267,14 @@ export function FlightSearchForm({ compact = false }: FlightSearchFormProps) {
         )}
 
         {/* Search button */}
-        <button
+        <Button
           type="submit"
-          className="flex h-10 items-center justify-center gap-2 rounded-lg bg-[#C59746] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#B08638] focus-visible:ring-3 focus-visible:ring-[#C59746]/50"
+          size="lg"
+          className="h-10 gap-2 bg-[#C59746] px-5 text-sm font-semibold text-white hover:bg-[#B08638] focus-visible:ring-[#C59746]/50"
         >
-          <Search className="size-4" />
-          <span className="sm:hidden">Search</span>
-        </button>
+          <Search className="size-4" data-icon="inline-start" />
+          Search
+        </Button>
       </div>
     </form>
   );

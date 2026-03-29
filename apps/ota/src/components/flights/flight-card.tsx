@@ -10,6 +10,7 @@ import {
   type DelayPrediction,
 } from "./flight-search-store";
 import { formatPrice, countStops, parseDuration, formatDuration, formatIsoDuration } from "@/lib/flight-utils";
+import { Badge } from "@/components/ui/badge";
 /** Client-safe fetch via Next.js proxy routes */
 async function clientFetch<T>(path: string): Promise<T> {
   const res = await fetch(path);
@@ -166,16 +167,16 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
       type="button"
       onClick={() => onSelect?.(offer)}
       className={cn(
-        "group flex w-full items-stretch rounded-xl border text-left transition-all",
-        "hover:shadow-md hover:border-primary/40",
+        "group flex w-full items-stretch overflow-hidden rounded-xl text-left transition-all",
+        "ring-1 ring-foreground/10 hover:shadow-md hover:ring-primary/40",
         isUpsell
-          ? "border-[#C59746] bg-[#C59746]/5"
-          : "border-border bg-card",
+          ? "ring-[#C59746] bg-[#C59746]/5"
+          : "bg-card",
       )}
     >
       {/* Zone 1 — Airline Badge */}
       <div
-        className="flex w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-l-xl px-2 py-4"
+        className="flex w-16 shrink-0 flex-col items-center justify-center gap-1 px-2 py-4"
         style={{ backgroundColor: getAirlineColor(carrier) }}
       >
         <span className="text-sm font-bold text-white">{carrier}</span>
@@ -229,22 +230,23 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
         {/* Badges row */}
         <div className="flex flex-wrap items-center gap-1">
           {offer.fareFamily && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+            <Badge variant="secondary" className="text-[10px]">
               {offer.fareFamily}
-            </span>
+            </Badge>
           )}
 
-          <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px]">
-            <Luggage className="h-3 w-3" />
+          <Badge variant="secondary" className="text-[10px]">
+            <Luggage className="h-3 w-3" data-icon="inline-start" />
             {offer.baggageAllowance?.checked
               ? `${offer.baggageAllowance.checked.quantity} bag${offer.baggageAllowance.checked.quantity > 1 ? "s" : ""}`
               : "1 bag"}
-          </span>
+          </Badge>
 
           {prediction && (
-            <span
+            <Badge
+              variant="secondary"
               className={cn(
-                "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                "text-[10px]",
                 prediction.onTimePercentage >= 80
                   ? "bg-emerald-100 text-emerald-800"
                   : "bg-amber-100 text-amber-800",
@@ -253,13 +255,13 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
               {prediction.onTimePercentage >= 80
                 ? `${prediction.onTimePercentage}% on time`
                 : "Often delayed"}
-            </span>
+            </Badge>
           )}
 
           {isUpsell && (
-            <span className="rounded bg-[#C59746]/20 px-1.5 py-0.5 text-[10px] font-medium text-[#C59746]">
+            <Badge variant="secondary" className="bg-[#C59746]/20 text-[10px] text-[#C59746]">
               Premium
-            </span>
+            </Badge>
           )}
         </div>
       </div>
@@ -271,14 +273,15 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
         </span>
         <span className="text-[10px] text-muted-foreground">per person</span>
         {priceIndicator && (
-          <span
+          <Badge
+            variant="secondary"
             className={cn(
-              "rounded px-1.5 py-0.5 text-[10px] font-medium",
+              "text-[10px]",
               priceIndicator.className,
             )}
           >
             {priceIndicator.label}
-          </span>
+          </Badge>
         )}
       </div>
     </button>

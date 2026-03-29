@@ -50,7 +50,7 @@ export function formatIsoDuration(iso: string): string {
 
 // ---- Price formatting -----------------------------------------------------
 
-/** Format a price for display using Intl (defaults to CAD). */
+/** Format a price for display using Intl (defaults to CAD). Always rounds to whole dollars. */
 export function formatPrice(
   amount: string | number,
   currency = 'CAD',
@@ -60,7 +60,7 @@ export function formatPrice(
     style: 'currency',
     currency,
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(value);
 }
 

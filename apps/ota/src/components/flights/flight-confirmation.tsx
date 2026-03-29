@@ -2,6 +2,9 @@
 
 import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { useFlightSearch, type FlightOffer } from "./flight-search-store";
 import { formatPrice, countStops, formatIsoDuration } from "@/lib/flight-utils";
 
@@ -56,64 +59,75 @@ function ConfirmSegment({
   const priceFormatted = formatPrice(offer.price.perTraveler, offer.price.currency);
 
   return (
-    <div className="rounded-xl border bg-white p-4">
-      {/* Label */}
-      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-        {label}
-      </p>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <span className="text-xs uppercase tracking-wider text-muted-foreground">
+            {label}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 space-y-2">
+            {/* Route */}
+            <div className="flex items-center gap-2 text-lg font-bold">
+              <span>{origin}</span>
+              <ArrowRight className="size-4 text-muted-foreground" />
+              <span>{dest}</span>
+            </div>
 
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 space-y-1">
-          {/* Route */}
-          <div className="flex items-center gap-2 text-lg font-bold">
-            <span>{origin}</span>
-            <ArrowRight className="size-4 text-muted-foreground" />
-            <span>{dest}</span>
+            {/* Date + times */}
+            <p className="text-sm text-muted-foreground">
+              {depDate} · {depTime} – {arrTime}
+              {totalDuration > 0 && (
+                <span className="ml-1">
+                  ({formatIsoDuration(`PT${Math.floor(totalDuration / 60)}H${totalDuration % 60}M`)})
+                </span>
+              )}
+            </p>
+
+            <Separator />
+
+            {/* Flight number + stops */}
+            <p className="text-sm text-muted-foreground">
+              {flightNumbers} · {stopsLabel}
+            </p>
+
+            {/* Badges */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {offer.fareFamily && (
+                <Badge variant="secondary">
+                  {offer.fareFamily}
+                </Badge>
+              )}
+              {offer.baggageAllowance?.checked && (
+                <Badge variant="secondary">
+                  {offer.baggageAllowance.checked.quantity} checked bag
+                  {offer.baggageAllowance.checked.quantity !== 1 ? "s" : ""}
+                </Badge>
+              )}
+              {stops === 0 && (
+                <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">
+                  Nonstop
+                </Badge>
+              )}
+              {offer.fareRules?.refundable && (
+                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  Refundable
+                </Badge>
+              )}
+            </div>
           </div>
 
-          {/* Date + times */}
-          <p className="text-sm text-muted-foreground">
-            {depDate} · {depTime} – {arrTime}
-            {totalDuration > 0 && (
-              <span className="ml-1">
-                ({formatIsoDuration(`PT${Math.floor(totalDuration / 60)}H${totalDuration % 60}M`)})
-              </span>
-            )}
-          </p>
-
-          {/* Flight number + stops */}
-          <p className="text-sm text-muted-foreground">
-            {flightNumbers} · {stopsLabel}
-          </p>
-
-          {/* Badges */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            {offer.fareFamily && (
-              <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-                {offer.fareFamily}
-              </span>
-            )}
-            {offer.baggageAllowance?.checked && (
-              <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-                {offer.baggageAllowance.checked.quantity} checked bag
-                {offer.baggageAllowance.checked.quantity !== 1 ? "s" : ""}
-              </span>
-            )}
-            {offer.fareRules?.refundable && (
-              <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-xs font-medium">
-                Refundable
-              </span>
-            )}
+          {/* Price */}
+          <div className="text-right shrink-0">
+            <p className="text-lg font-bold">{priceFormatted}</p>
+            <p className="text-xs text-muted-foreground">per person</p>
           </div>
         </div>
-
-        {/* Price */}
-        <div className="text-right shrink-0">
-          <p className="text-lg font-bold">{priceFormatted}</p>
-          <p className="text-xs text-muted-foreground">per person</p>
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -154,14 +168,16 @@ export function FlightConfirmation() {
       )}
 
       {/* Total card */}
-      <div className="rounded-xl border border-[#C59746]/30 bg-[#C59746]/5 p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Total for {travelerCount} traveler{travelerCount !== 1 ? "s" : ""}
-          </p>
-          <p className="text-2xl font-bold">{formatPrice(grandTotal, currency)}</p>
-        </div>
-      </div>
+      <Card className="border-[#C59746]/30 bg-[#C59746]/5">
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Total for {travelerCount} traveler{travelerCount !== 1 ? "s" : ""}
+            </p>
+            <p className="text-2xl font-bold">{formatPrice(grandTotal, currency)}</p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Action buttons */}
       <div className="flex gap-3">

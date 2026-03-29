@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Loader2, ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -139,91 +140,93 @@ export function FlightRequestForm() {
         Back to confirmation
       </button>
 
-      <div className="rounded-2xl border bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-gray-900">
-          Request This Flight
-        </h2>
-        <p className="mt-1 text-sm text-gray-500">
-          An advisor will confirm your booking within 2 hours.
-        </p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Request This Flight</CardTitle>
+          <CardDescription>
+            An advisor will confirm your booking within 2 hours.
+          </CardDescription>
+        </CardHeader>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          {/* Full Name */}
-          <div className="space-y-1.5">
-            <Label htmlFor="flight-req-name">Full Name</Label>
-            <Input
-              id="flight-req-name"
-              name="name"
-              required
-              placeholder="Jane Doe"
-              autoComplete="name"
-            />
-          </div>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Full Name */}
+            <div className="space-y-1.5">
+              <Label htmlFor="flight-req-name">Full Name</Label>
+              <Input
+                id="flight-req-name"
+                name="name"
+                required
+                placeholder="Jane Doe"
+                autoComplete="name"
+              />
+            </div>
 
-          {/* Email */}
-          <div className="space-y-1.5">
-            <Label htmlFor="flight-req-email">Email</Label>
-            <Input
-              id="flight-req-email"
-              name="email"
-              type="email"
-              required
-              placeholder="jane@example.com"
-              autoComplete="email"
-            />
-          </div>
+            {/* Email */}
+            <div className="space-y-1.5">
+              <Label htmlFor="flight-req-email">Email</Label>
+              <Input
+                id="flight-req-email"
+                name="email"
+                type="email"
+                required
+                placeholder="jane@example.com"
+                autoComplete="email"
+              />
+            </div>
 
-          {/* Phone */}
-          <div className="space-y-1.5">
-            <Label htmlFor="flight-req-phone">Phone</Label>
-            <Input
-              id="flight-req-phone"
-              name="phone"
-              type="tel"
-              required
-              placeholder="+1 (555) 123-4567"
-              autoComplete="tel"
-            />
-          </div>
+            {/* Phone */}
+            <div className="space-y-1.5">
+              <Label htmlFor="flight-req-phone">Phone</Label>
+              <Input
+                id="flight-req-phone"
+                name="phone"
+                type="tel"
+                required
+                placeholder="+1 (555) 123-4567"
+                autoComplete="tel"
+              />
+            </div>
 
-          {/* Special Requests */}
-          <div className="space-y-1.5">
-            <Label htmlFor="flight-req-special">
-              Special Requests{" "}
-              <span className="font-normal text-gray-400">(optional)</span>
-            </Label>
-            <Textarea
-              id="flight-req-special"
-              name="specialRequests"
-              placeholder="Wheelchair assistance, extra bags, seating preferences..."
-              rows={3}
-            />
-          </div>
+            {/* Special Requests */}
+            <div className="space-y-1.5">
+              <Label htmlFor="flight-req-special">
+                Special Requests{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <Textarea
+                id="flight-req-special"
+                name="specialRequests"
+                placeholder="Wheelchair assistance, extra bags, seating preferences..."
+                rows={3}
+              />
+            </div>
 
-          {/* Error */}
-          {error && (
-            <p className="text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          )}
-
-          {/* Submit */}
-          <Button
-            type="submit"
-            disabled={submitting}
-            className="w-full bg-[#C59746] text-white hover:bg-[#b38839]"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              "Submit Flight Request"
+            {/* Error */}
+            {error && (
+              <p className="text-sm text-red-600" role="alert">
+                {error}
+              </p>
             )}
-          </Button>
-        </form>
-      </div>
+
+            {/* Submit */}
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="w-full bg-[#C59746] text-white hover:bg-[#b38839]"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Flight Request"
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
