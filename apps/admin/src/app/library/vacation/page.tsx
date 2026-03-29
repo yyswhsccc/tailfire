@@ -9,10 +9,13 @@ import { Label } from '@/components/ui/label'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import {
   useVacationSearch,
+  useAddVacationToItinerary,
   type VacationSearchParams,
   type VacationSearchResult,
   type VacationPackageOption,
 } from '@/hooks/use-vacation-library'
+import { useToast } from '@/hooks/use-toast'
+import { AddToTripDialog } from '@/components/library/add-to-trip-dialog'
 import { VacationSearchForm } from './_components/vacation-search-form'
 import { VacationHotelCard } from './_components/vacation-hotel-card'
 import { VacationDetailModal } from './_components/vacation-detail-modal'
@@ -55,7 +58,14 @@ function VacationLibraryContent() {
   const [selectedResult, setSelectedResult] = useState<VacationSearchResult | null>(null)
   const [searchDate, setSearchDate] = useState<string | null>(null)
 
+  // Add-to-trip dialog state (no-context flow)
+  const [showAddToTripDialog, setShowAddToTripDialog] = useState(false)
+  const [pendingAddResult, setPendingAddResult] = useState<VacationSearchResult | null>(null)
+  const [pendingAddPkg, setPendingAddPkg] = useState<VacationPackageOption | null>(null)
+
   const searchMutation = useVacationSearch()
+  const addMutation = useAddVacationToItinerary(tripContext?.itineraryId)
+  const { toast } = useToast()
 
   // ---------------------------------------------------------------------------
   // Sorted results (cheapest first)
@@ -101,20 +111,87 @@ function VacationLibraryContent() {
     }
   }, [returnUrl, router])
 
-  // Stub: will be wired in Task 9
   const handleAddToTrip = useCallback(
-    (_result: VacationSearchResult, _pkg: VacationPackageOption) => {
+    async (result: VacationSearchResult, pkg: VacationPackageOption) => {
       setSelectedResult(null)
+
+      if (tripContext && searchDate) {
+        // With trip context: add directly
+        try {
+          await addMutation.mutateAsync({
+            result,
+            pkg,
+            searchDate,
+            itineraryId: tripContext.itineraryId,
+            tripId: tripContext.tripId,
+          })
+          toast({
+            title: 'Vacation added',
+            description: `${result.hotelName} has been added to the itinerary.`,
+          })
+          if (returnUrl) {
+            router.push(returnUrl)
+          }
+        } catch (err) {
+          toast({
+            title: 'Failed to add vacation',
+            description: err instanceof Error ? err.message : 'An unexpected error occurred.',
+            variant: 'destructive',
+          })
+        }
+      } else {
+        // No trip context: open AddToTripDialog
+        setPendingAddResult(result)
+        setPendingAddPkg(pkg)
+        setShowAddToTripDialog(true)
+      }
+    },
+    [tripContext, searchDate, addMutation, toast, returnUrl, router],
+  )
+
+  const handleCreateTrip = useCallback(
+    (result: VacationSearchResult, pkg: VacationPackageOption) => {
+      setSelectedResult(null)
+      setPendingAddResult(result)
+      setPendingAddPkg(pkg)
+      setShowAddToTripDialog(true)
     },
     [],
   )
 
-  // Stub: will be wired in Task 9
-  const handleCreateTrip = useCallback(
-    (_result: VacationSearchResult, _pkg: VacationPackageOption) => {
-      setSelectedResult(null)
+  const handleAddToTripDialogCallback = useCallback(
+    async (params: {
+      tripId: string
+      itineraryId: string
+      isNewTrip: boolean
+      isNewItinerary: boolean
+    }) => {
+      if (!pendingAddResult || !pendingAddPkg || !searchDate) return
+
+      try {
+        await addMutation.mutateAsync({
+          result: pendingAddResult,
+          pkg: pendingAddPkg,
+          searchDate,
+          itineraryId: params.itineraryId,
+          tripId: params.tripId,
+        })
+        toast({
+          title: 'Vacation added',
+          description: `${pendingAddResult.hotelName} has been added to the ${params.isNewTrip ? 'new ' : ''}trip.`,
+        })
+        setShowAddToTripDialog(false)
+        setPendingAddResult(null)
+        setPendingAddPkg(null)
+      } catch (err) {
+        toast({
+          title: 'Failed to add vacation',
+          description: err instanceof Error ? err.message : 'An unexpected error occurred.',
+          variant: 'destructive',
+        })
+      }
     },
-    [],
+    [pendingAddResult, pendingAddPkg, searchDate, addMutation, toast],
   )
 
   // ---------------------------------------------------------------------------
@@ -250,6 +327,22 @@ function VacationLibraryContent() {
           onAddToTrip={handleAddToTrip}
           onCreateTrip={handleCreateTrip}
         />
+
+        {/* Add to Trip Dialog (no-context flow) */}
+        {pendingAddResult && pendingAddPkg && (
+          <AddToTripDialog
+            isOpen={showAddToTripDialog}
+            onClose={() => {
+              setShowAddToTripDialog(false)
+              setPendingAddResult(null)
+              setPendingAddPkg(null)
+            }}
+            activityName={`${pendingAddResult.hotelName} - ${pendingAddPkg.nights}N ${pendingAddPkg.mealPlan}`}
+            activityDates={searchDate ? { start: searchDate } : undefined}
+            onTripAndItinerarySelected={handleAddToTripDialogCallback}
+            isProcessing={addMutation.isPending}
+          />
+        )}
       </div>
     </TooltipProvider>
   )

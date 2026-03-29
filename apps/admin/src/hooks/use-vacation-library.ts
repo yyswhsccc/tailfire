@@ -222,3 +222,63 @@ export function useVacationHotelDetail(providerIdentifier: string | null) {
     },
   })
 }
+
+// ============================================================================
+// Mutations
+// ============================================================================
+
+/** Add a vacation package to an itinerary (creates lodging activity with flight info) */
+export function useAddVacationToItinerary(defaultItineraryId?: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      result,
+      pkg,
+      searchDate,
+      itineraryId,
+      tripId,
+    }: {
+      result: VacationSearchResult
+      pkg: VacationPackageOption
+      searchDate: string  // ISO YYYY-MM-DD from search form
+      itineraryId?: string
+      tripId?: string
+    }) => {
+      const targetItineraryId = itineraryId ?? defaultItineraryId
+      if (!targetItineraryId) throw new Error('No itinerary ID provided')
+
+      // 1. Find or create day for departure date
+      const dayResp = await api.post<{ id: string }>(
+        `/itineraries/${targetItineraryId}/days/find-or-create-by-date`,
+        { date: searchDate }
+      )
+
+      // 2. Create lodging activity with flight info in notes
+      const activity = await api.post('/activities', {
+        itineraryDayId: dayResp.id,
+        activityType: 'lodging',
+        proposalStatus: 'draft',
+        name: `${result.hotelName} - ${pkg.nights}N ${pkg.mealPlan}`,
+        propertyName: result.hotelName,
+        locationName: result.destination,
+        startDate: searchDate,
+        nights: pkg.nights,
+        notes: [
+          `Tour Operator: ${pkg.tourOperator}`,
+          `Flight: ${pkg.flightNumber} (${pkg.departureTime} → ${pkg.arrivalTime})`,
+          `Room: ${pkg.roomType}`,
+          `Meal Plan: ${pkg.mealPlan}`,
+          `Baggage: ${pkg.baggage || 'Check with airline'}`,
+          `Price: $${(pkg.totalPrice / 100).toLocaleString()}/pp ($${(pkg.grandTotal / 100).toLocaleString()} total)`,
+        ].join('\n'),
+      })
+
+      return activity
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['itineraries'] })
+      void queryClient.invalidateQueries({ queryKey: ['trips'] })
+    },
+  })
+}
