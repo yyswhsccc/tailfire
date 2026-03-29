@@ -220,10 +220,25 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
   // Worker events
   // ---------------------------------------------------------------------------
 
+  @OnWorkerEvent('active')
+  onActive(job: Job<VacationSearchJobData>) {
+    this.logger.log(`Job ${job.id} active — processing vacation search`)
+  }
+
+  @OnWorkerEvent('completed')
+  onCompleted(job: Job<VacationSearchJobData>) {
+    this.logger.log(`Job ${job.id} completed`)
+  }
+
   @OnWorkerEvent('failed')
   onFailed(job: Job<VacationSearchJobData>, error: Error) {
     this.logger.error(
       `Job ${job.id} (${job.data.gatewayCode} -> ${job.data.destDep}) failed after ${job.attemptsMade} attempts: ${error.message}`,
     )
+  }
+
+  @OnWorkerEvent('error')
+  onError(error: Error) {
+    this.logger.error(`Worker error: ${error.message}`)
   }
 }
