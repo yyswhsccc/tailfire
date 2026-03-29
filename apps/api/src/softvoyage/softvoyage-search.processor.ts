@@ -96,13 +96,35 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
     let page: Awaited<ReturnType<typeof puppeteer.launch extends (...args: any) => Promise<infer R> ? R extends { newPage: () => Promise<infer P> } ? () => Promise<P> : never : never>> | null = null
 
     try {
+      // Build launch args — add residential proxy if configured
+      const proxyUrl = this.configService.get<string>('RESIDENTIAL_PROXY_URL')
+      const launchArgs = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-blink-features=AutomationControlled', '--window-size=1920,1080']
+      if (proxyUrl) {
+        // Format: http://user:pass@host:port
+        const proxyParsed = new URL(proxyUrl)
+        launchArgs.push(`--proxy-server=${proxyParsed.protocol}//${proxyParsed.hostname}:${proxyParsed.port}`)
+      }
+
       browser = await puppeteer.launch({
         executablePath,
         headless: 'shell' as any,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-blink-features=AutomationControlled', '--window-size=1920,1080'],
+        args: launchArgs,
       })
       page = await browser.newPage()
-      this.logger.log(`Fresh browser launched for search [${job.id}]`)
+
+      // Authenticate proxy if credentials provided
+      if (proxyUrl) {
+        const proxyParsed = new URL(proxyUrl)
+        if (proxyParsed.username) {
+          await page.authenticate({
+            username: decodeURIComponent(proxyParsed.username),
+            password: decodeURIComponent(proxyParsed.password),
+          })
+        }
+        this.logger.log(`Fresh browser launched with residential proxy for search [${job.id}]`)
+      } else {
+        this.logger.log(`Fresh browser launched (no proxy) for search [${job.id}]`)
+      }
 
       // 2. Navigate to query form page first to establish VCO session
       const queryUrl = `${this.vcoBaseUrl}/querypackage.cgi?code_ag=${this.codeAg}&alias=${this.alias}&language=en`
