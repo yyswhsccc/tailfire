@@ -129,7 +129,7 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
       // 2. Navigate to query form page first to establish VCO session
       const queryUrl = `${this.vcoBaseUrl}/querypackage.cgi?code_ag=${this.codeAg}&alias=${this.alias}&language=en`
       this.logger.debug(`Navigating to query form: ${queryUrl}`)
-      await page.goto(queryUrl, { waitUntil: 'domcontentloaded', timeout: 15000 })
+      await page.goto(queryUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
 
       // 3. Build the search URL with POST form data and navigate
       const resultsUrl = `${this.vcoBaseUrl}/resultspackage.cgi`
@@ -152,7 +152,7 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
       // Submit form via POST and wait for navigation
       const formBody = formParams.toString()
       await Promise.all([
-        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }),
+        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
         page.evaluate((url: string, body: string) => {
           const form = document.createElement('form')
           form.method = 'POST'
@@ -173,7 +173,7 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
 
       // 4. Wait for initial results page to load
       try {
-        await page.waitForSelector('div[id^="result-"], table[id^="hotel-"]', { timeout: 15000 })
+        await page.waitForSelector('div[id^="result-"], table[id^="hotel-"]', { timeout: 30000 })
       } catch {
         this.logger.warn('No result elements found on initial page')
       }
@@ -195,7 +195,7 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
         this.logger.debug(`Fetching AJAX results: ${ajaxUrl.substring(0, 80)}...`)
 
         try {
-          await page.goto(ajaxUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
+          await page.goto(ajaxUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
           html = await page.content()
           this.logger.debug(`AJAX results: ${html.length} bytes`)
         } catch (ajaxErr) {
