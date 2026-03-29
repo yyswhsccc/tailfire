@@ -38,7 +38,7 @@ interface PoolEntry {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_POOL_SIZE = 2
-const MAX_USE_COUNT = 50
+const MAX_USE_COUNT = 1  // Fresh browser per search — DataDome tracks session state
 const ACQUIRE_TIMEOUT_MS = 30_000
 
 // ---------------------------------------------------------------------------
