@@ -103,6 +103,14 @@ export class SoftvoyageController {
           const hotelMatches = resultsHtml.match(/id="hotel-/g)
           results.hotelsFound = String(hotelMatches?.length ?? 0)
           results.resultsHasSid = String(/sid=[a-f0-9]{32}/.test(resultsHtml))
+          // Check for alternative result selectors
+          const resultDivs = resultsHtml.match(/id="result-/g)
+          results.resultDivsFound = String(resultDivs?.length ?? 0)
+          // Check for AJAX loader pattern
+          results.hasAjaxLoader = String(resultsHtml.includes('action=results') || resultsHtml.includes('classExpand'))
+          // Capture a snippet around any hotel-related content
+          const snippetMatch = resultsHtml.match(/(hotel|resort|result|package).{0,200}/i)
+          results.htmlSnippet = snippetMatch ? snippetMatch[0].substring(0, 150) : 'no hotel/result patterns found'
         } catch (searchErr) {
           results.searchError = searchErr instanceof Error ? searchErr.message : String(searchErr)
         }
