@@ -65,6 +65,49 @@ export class SoftvoyageController {
       results.hasDataDome = String(html.includes('captcha-delivery'))
       results.hasSid = String(/sid=[a-f0-9]{32}/.test(html))
 
+      // If no DataDome, try submitting a search
+      if (!html.includes('captcha-delivery')) {
+        try {
+          // Submit search form via POST
+          const formParams = new URLSearchParams({
+            code_ag: 'VCO', alias: 'YAQ', language: 'en',
+            gateway_dep: 'YOW', dest_dep: '29', date_dep: '20260501',
+            duration: '7', nb_adult_forf: '2', nb_rooms: '1',
+            all_inclusive: 'Y', price_max: '99999',
+          })
+
+          await page.evaluate(
+            (params: { url: string; body: string }) => {
+              const form = document.createElement('form')
+              form.method = 'POST'
+              form.action = params.url
+              for (const [key, value] of new URLSearchParams(params.body).entries()) {
+                const input = document.createElement('input')
+                input.type = 'hidden'
+                input.name = key
+                input.value = value
+                form.appendChild(input)
+              }
+              document.body.appendChild(form)
+              form.submit()
+            },
+            { url: 'https://vco.sax.softvoyage.com/cgi-bin/resultspackage.cgi', body: formParams.toString() },
+          )
+          results.formSubmitted = 'true'
+
+          // Wait for results
+          await page.waitForSelector('table[id^="hotel-"], .no-results, body', { timeout: 20000 })
+          const resultsHtml = await page.content()
+          results.resultsHtmlLength = String(resultsHtml.length)
+          results.resultsHasDataDome = String(resultsHtml.includes('captcha-delivery'))
+          const hotelMatches = resultsHtml.match(/id="hotel-/g)
+          results.hotelsFound = String(hotelMatches?.length ?? 0)
+          results.resultsHasSid = String(/sid=[a-f0-9]{32}/.test(resultsHtml))
+        } catch (searchErr) {
+          results.searchError = searchErr instanceof Error ? searchErr.message : String(searchErr)
+        }
+      }
+
       await this.browserPool.releasePage(page)
       results.pageReleased = 'true'
     } catch (err) {
