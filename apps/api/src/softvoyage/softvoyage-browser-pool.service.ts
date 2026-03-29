@@ -15,10 +15,7 @@
 
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import puppeteerCore, { type Browser, type Page } from 'puppeteer-core'
-
-// Puppeteer launcher — resolved lazily in constructor to avoid module-level crashes
-let puppeteerLauncher: any = null
+import puppeteer, { type Browser, type Page } from 'puppeteer-core'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,22 +64,6 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
 
     this.enabled =
       this.configService.get<string>('ENABLE_VACATION_LIVE_PRICING', 'false') === 'true'
-
-    // Lazily resolve puppeteer launcher (try stealth first, fallback to core)
-    if (!puppeteerLauncher) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const pExtra = require('puppeteer-extra')
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const StealthPlugin = require('puppeteer-extra-plugin-stealth')
-        pExtra.use(StealthPlugin())
-        puppeteerLauncher = pExtra
-        this.logger.log('Using puppeteer-extra with stealth plugin')
-      } catch (err) {
-        puppeteerLauncher = puppeteerCore
-        this.logger.warn(`puppeteer-extra unavailable (${err}), using puppeteer-core (no stealth)`)
-      }
-    }
 
     this.logger.log(
       `Initialized — poolSize=${this.maxPoolSize}, livePricing=${this.enabled}`,
@@ -228,13 +209,14 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
       } catch { /* ignore invalid proxy URL */ }
     }
 
-    const browser = await puppeteerLauncher.launch({
+    const browser = await puppeteer.launch({
       executablePath,
       headless: 'shell',
       args: launchArgs,
     })
 
     const page = await browser.newPage()
+    await this.applyStealthPatches(page)
 
     // Authenticate proxy if credentials provided
     if (proxyUrl) {
@@ -291,13 +273,14 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
       } catch { /* ignore */ }
     }
 
-    const browser = await puppeteerLauncher.launch({
+    const browser = await puppeteer.launch({
       executablePath,
       headless: 'shell',
       args: recycleArgs,
     })
 
     const page = await browser.newPage()
+    await this.applyStealthPatches(page)
 
     // Authenticate proxy
     if (proxyUrl) {
@@ -315,6 +298,39 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
     entry.browser = browser
     entry.page = page
     entry.useCount = 0
+  }
+
+  /**
+   * Apply stealth patches to a page to bypass DataDome bot detection.
+   * Replicates the key evasions from puppeteer-extra-plugin-stealth.
+   */
+  private async applyStealthPatches(page: Page): Promise<void> {
+    await page.evaluateOnNewDocument(`
+      // webdriver
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      // plugins
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+      // languages
+      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+      // permissions
+      const origQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (params) =>
+        params.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : origQuery(params);
+      // chrome runtime
+      window.chrome = { runtime: {} };
+      // webgl vendor
+      const getParam = WebGLRenderingContext.prototype.getParameter;
+      WebGLRenderingContext.prototype.getParameter = function(p) {
+        if (p === 37445) return 'Intel Inc.';
+        if (p === 37446) return 'Intel Iris OpenGL Engine';
+        return getParam.call(this, p);
+      };
+    `)
+    await page.setUserAgent(
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    )
   }
 
   /**

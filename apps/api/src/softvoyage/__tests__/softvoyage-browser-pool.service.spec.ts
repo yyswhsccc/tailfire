@@ -9,15 +9,6 @@ const mockNewPage = jest.fn()
 const mockBrowserClose = jest.fn()
 const mockLaunch = jest.fn()
 
-// Mock both puppeteer-extra and puppeteer-core (service tries extra first, falls back to core)
-jest.mock('puppeteer-extra', () => {
-  throw new Error('puppeteer-extra not available in test')
-})
-
-jest.mock('puppeteer-extra-plugin-stealth', () => {
-  throw new Error('stealth not available in test')
-})
-
 jest.mock('puppeteer-core', () => ({
   __esModule: true,
   default: {
@@ -47,6 +38,9 @@ function makeMockPage() {
   return {
     close: jest.fn().mockResolvedValue(undefined),
     goto: jest.fn().mockResolvedValue(undefined),
+    evaluateOnNewDocument: jest.fn().mockResolvedValue(undefined),
+    setUserAgent: jest.fn().mockResolvedValue(undefined),
+    authenticate: jest.fn().mockResolvedValue(undefined),
     _id: Math.random(), // unique marker for identity checks
   }
 }
