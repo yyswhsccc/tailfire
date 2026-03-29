@@ -2,8 +2,7 @@
 import { ConfigService } from '@nestjs/config'
 
 // ---------------------------------------------------------------------------
-// Mock puppeteer-core — define mock objects INSIDE the factory to avoid
-// jest.mock hoisting issues. Access them afterwards via require().
+// Mock puppeteer-core
 // ---------------------------------------------------------------------------
 
 const mockNewPage = jest.fn()
@@ -15,6 +14,7 @@ jest.mock('puppeteer-core', () => ({
   default: {
     launch: mockLaunch,
   },
+  launch: mockLaunch,
 }))
 
 // We import the service AFTER mock is declared
@@ -121,7 +121,7 @@ describe('SoftvoyageBrowserPoolService', () => {
     expect(mockLaunch).toHaveBeenCalledTimes(1)
     expect(mockLaunch).toHaveBeenCalledWith(
       expect.objectContaining({
-        headless: true,
+        headless: 'shell',
         args: expect.arrayContaining(['--no-sandbox', '--disable-gpu']),
       }),
     )
@@ -211,23 +211,18 @@ describe('SoftvoyageBrowserPoolService', () => {
     // Simulate 50 acquire/release cycles (useCount 1-50)
     for (let i = 0; i < 50; i++) {
       await service.releasePage(page)
-      // Re-acquire the same page (it was released and is idle)
       const p = await service.acquirePage()
-      expect(p).toBe(page) // still the same page object
+      expect(p).toBe(page)
     }
 
     // 51st release triggers recycle (useCount 51 > MAX_USE_COUNT of 50)
     await service.releasePage(page)
 
-    // The old browser should have been closed (by recycle)
     expect(mockBrowserClose).toHaveBeenCalled()
-
-    // Original launch + recycle launch = 2 total launches
     expect(mockLaunch).toHaveBeenCalledTimes(2)
 
-    // Acquire again — should get the recycled (new) page
     const newPage = await service.acquirePage()
-    expect(newPage).not.toBe(page) // different object after recycle
+    expect(newPage).not.toBe(page)
 
     await service.releasePage(newPage)
     await service.onModuleDestroy()

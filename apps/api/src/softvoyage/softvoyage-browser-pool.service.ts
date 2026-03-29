@@ -15,12 +15,7 @@
 
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import type { Browser, Page } from 'puppeteer-core'
-import puppeteer from 'puppeteer-extra'
-import StealthPlugin from 'puppeteer-extra-plugin-stealth'
-
-// Apply stealth plugin to bypass DataDome bot detection
-puppeteer.use(StealthPlugin())
+import puppeteer, { type Browser, type Page } from 'puppeteer-core'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,7 +33,7 @@ interface PoolEntry {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_POOL_SIZE = 2
-const MAX_USE_COUNT = 1  // Fresh browser per search — DataDome tracks session state
+const MAX_USE_COUNT = 50
 const ACQUIRE_TIMEOUT_MS = 30_000
 
 // ---------------------------------------------------------------------------
@@ -251,15 +246,6 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
     })
 
     const page = await browser.newPage()
-
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => false })
-      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] })
-      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] })
-    })
-    await page.setUserAgent(
-      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    )
 
     entry.browser = browser
     entry.page = page
