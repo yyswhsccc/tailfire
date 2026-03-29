@@ -387,9 +387,10 @@ export class VacationImportOrchestratorService {
               .delete(vacationGatewayDestinations)
               .where(eq(vacationGatewayDestinations.gatewayId, gatewayId))
 
-            // Re-insert current links (if any)
-            if (gatewayDestinationIds.length > 0) {
-              const junctionRows = gatewayDestinationIds.map((destinationId) => ({
+            // Re-insert current links (deduplicated)
+            const uniqueDestIds = [...new Set(gatewayDestinationIds)]
+            if (uniqueDestIds.length > 0) {
+              const junctionRows = uniqueDestIds.map((destinationId) => ({
                 gatewayId,
                 destinationId,
                 lastSyncedAt: syncStartedAt,
