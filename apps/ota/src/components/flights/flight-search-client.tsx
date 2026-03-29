@@ -317,14 +317,47 @@ export function FlightSearchClient({
     [activeResults, filters, sort],
   );
 
-  // ---- 4. Handle date select from calendar --------------------------------
+  // ---- 4. Handle date select from strip ------------------------------------
   const handleDateSelect = useCallback(
     (date: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("departureDate", date);
-      startSearch(() => router.push(`/search/flights?${params.toString()}`));
+      if (roundTripStep === "return") {
+        // On return step: re-fetch return flights for the new date
+        const params = new URLSearchParams();
+        params.set("origin", destination);
+        params.set("destination", origin);
+        params.set("departureDate", date);
+        params.set("adults", String(adults));
+        if (children > 0) params.set("children", String(children));
+        params.set("travelClass", travelClass);
+
+        setIsSearching(true);
+        setReturnResults([]);
+        // Update returnDate in URL without full page reload
+        const urlParams = new URLSearchParams(searchParams.toString());
+        urlParams.set("returnDate", date);
+        router.replace(`/search/flights?${urlParams.toString()}`, { scroll: false });
+
+        clientFetch<{ results: FlightOffer[] }>(`/api/flights/search?${params}`)
+          .then((data) => setReturnResults(data.results ?? []))
+          .catch(() => setSearchError("Failed to load return flights."))
+          .finally(() => setIsSearching(false));
+
+        // Fetch nearby prices for new return date
+        setPriceDatesLoading(true);
+        clientFetch<{ prices: Array<{ date: string; price: number; currency: string }> }>(
+          `/api/flights/nearby-prices?origin=${destination}&destination=${origin}&departureDate=${date}&adults=${adults}&travelClass=${travelClass}`,
+        )
+          .then((data) => setPriceDates(data.prices ?? []))
+          .catch(() => {})
+          .finally(() => setPriceDatesLoading(false));
+      } else {
+        // On outbound step: full page navigation with new departure date
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("departureDate", date);
+        startSearch(() => router.push(`/search/flights?${params.toString()}`));
+      }
     },
-    [searchParams, router, startSearch],
+    [roundTripStep, searchParams, router, startSearch, origin, destination, adults, children, travelClass, setIsSearching, setReturnResults, setSearchError, setPriceDates, setPriceDatesLoading],
   );
 
   // ---- 5. Handle flight selection -----------------------------------------
@@ -362,6 +395,16 @@ export function FlightSearchClient({
         } finally {
           setIsSearching(false);
         }
+
+        // Fetch nearby prices for the return date range
+        setPriceDatesLoading(true);
+        clientFetch<{ prices: Array<{ date: string; price: number; currency: string }> }>(
+          `/api/flights/nearby-prices?origin=${destination}&destination=${origin}&departureDate=${returnDate}&adults=${adults}&travelClass=${travelClass}`,
+        )
+          .then((res) => setPriceDates(res.prices ?? []))
+          .catch(() => {})
+          .finally(() => setPriceDatesLoading(false));
+
         return;
       }
 
@@ -385,6 +428,8 @@ export function FlightSearchClient({
       setIsSearching,
       setReturnResults,
       setSearchError,
+      setPriceDates,
+      setPriceDatesLoading,
     ],
   );
 
@@ -450,10 +495,10 @@ export function FlightSearchClient({
       {/* Results */}
       {hasSearch && !searchError && (
         <>
-          {/* 7-day price strip */}
+          {/* 7-day price strip — shows outbound dates or return dates depending on step */}
           <div className="mb-6">
             <DatePriceStrip
-              selectedDate={departureDate}
+              selectedDate={roundTripStep === "return" ? returnDate : departureDate}
               onDateSelect={handleDateSelect}
             />
           </div>
@@ -471,7 +516,11 @@ export function FlightSearchClient({
           </h2>
 
           {/* Round trip bar (return step) */}
-          {roundTripStep === "return" && <RoundTripBar />}
+          {roundTripStep === "return" && (
+            <div className="mb-4">
+              <RoundTripBar />
+            </div>
+          )}
 
           {/* Loading return flights */}
           {isSearching && (
