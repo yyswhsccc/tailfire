@@ -9,14 +9,21 @@ const mockNewPage = jest.fn()
 const mockBrowserClose = jest.fn()
 const mockLaunch = jest.fn()
 
-jest.mock('puppeteer-extra', () => ({
-  launch: mockLaunch,
-  use: jest.fn(),
-}))
+// Mock both puppeteer-extra and puppeteer-core (service tries extra first, falls back to core)
+jest.mock('puppeteer-extra', () => {
+  throw new Error('puppeteer-extra not available in test')
+})
 
 jest.mock('puppeteer-extra-plugin-stealth', () => {
-  return jest.fn(() => ({}))
+  throw new Error('stealth not available in test')
 })
+
+jest.mock('puppeteer-core', () => ({
+  __esModule: true,
+  default: {
+    launch: mockLaunch,
+  },
+}))
 
 // We import the service AFTER mock is declared
 // eslint-disable-next-line @typescript-eslint/no-require-imports

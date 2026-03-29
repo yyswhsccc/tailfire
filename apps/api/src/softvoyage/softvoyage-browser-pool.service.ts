@@ -15,23 +15,10 @@
 
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import type { Browser, Page } from 'puppeteer-core'
+import puppeteerCore, { type Browser, type Page } from 'puppeteer-core'
 
-// Try to use puppeteer-extra with stealth for DataDome bypass.
-// Falls back to plain puppeteer-core if puppeteer-extra is unavailable.
-let puppeteer: any
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  puppeteer = require('puppeteer-extra')
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const StealthPlugin = require('puppeteer-extra-plugin-stealth')
-  puppeteer.use(StealthPlugin())
-  console.log('[SoftvoyageBrowserPoolService] puppeteer-extra + stealth loaded')
-} catch {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  puppeteer = require('puppeteer-core')
-  console.log('[SoftvoyageBrowserPoolService] WARN: puppeteer-extra unavailable, using puppeteer-core (no stealth)')
-}
+// Puppeteer launcher — resolved lazily in constructor to avoid module-level crashes
+let puppeteerLauncher: any = null
 
 // ---------------------------------------------------------------------------
 // Types
@@ -80,6 +67,22 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
 
     this.enabled =
       this.configService.get<string>('ENABLE_VACATION_LIVE_PRICING', 'false') === 'true'
+
+    // Lazily resolve puppeteer launcher (try stealth first, fallback to core)
+    if (!puppeteerLauncher) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const pExtra = require('puppeteer-extra')
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const StealthPlugin = require('puppeteer-extra-plugin-stealth')
+        pExtra.use(StealthPlugin())
+        puppeteerLauncher = pExtra
+        this.logger.log('Using puppeteer-extra with stealth plugin')
+      } catch (err) {
+        puppeteerLauncher = puppeteerCore
+        this.logger.warn(`puppeteer-extra unavailable (${err}), using puppeteer-core (no stealth)`)
+      }
+    }
 
     this.logger.log(
       `Initialized — poolSize=${this.maxPoolSize}, livePricing=${this.enabled}`,
@@ -225,7 +228,7 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
       } catch { /* ignore invalid proxy URL */ }
     }
 
-    const browser = await puppeteer.launch({
+    const browser = await puppeteerLauncher.launch({
       executablePath,
       headless: 'shell',
       args: launchArgs,
@@ -275,7 +278,7 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
       } catch { /* ignore */ }
     }
 
-    const browser = await puppeteer.launch({
+    const browser = await puppeteerLauncher.launch({
       executablePath,
       headless: 'shell',
       args: recycleArgs,
