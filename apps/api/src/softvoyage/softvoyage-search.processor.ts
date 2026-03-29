@@ -149,15 +149,39 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
         }, resultsUrl, formBody),
       ])
 
-      // 4. Wait for result elements to appear (VCO uses div[id^="result-"], VCM uses table[id^="hotel-"])
+      // 4. Wait for initial results page to load
       try {
         await page.waitForSelector('div[id^="result-"], table[id^="hotel-"]', { timeout: 15000 })
       } catch {
-        this.logger.warn('No result elements found — page may use AJAX loading or have no results')
+        this.logger.warn('No result elements found on initial page')
       }
 
-      // 5. Get page HTML
-      const html = await page.content()
+      // 5. Extract SID and search_id, then fetch full results via AJAX endpoint
+      //    The initial page only shows hotel cards; pricing loads via AJAX
+      let html = await page.content()
+
+      const sidMatch = html.match(/sid=([a-f0-9]{32})/)
+      const searchIdMatch = html.match(/search_id=([a-f0-9]{32})/)
+
+      if (sidMatch && searchIdMatch) {
+        const sid = sidMatch[1]
+        const searchId = searchIdMatch[1]
+        this.logger.debug(`VCO session: sid=${sid?.substring(0, 8)}..., searchId=${searchId?.substring(0, 8)}...`)
+
+        // Fetch full results with pricing via AJAX endpoint
+        const ajaxUrl = `${this.vcoBaseUrl}/resultspackage.cgi?language=en&sid=${sid}&search_id=${searchId}&code_ag=${this.codeAg}&alias=${this.alias}&flex=N&combine_date_dep=N&query_timestamp=${Date.now()}&action=results&_=${Date.now()}`
+        this.logger.debug(`Fetching AJAX results: ${ajaxUrl.substring(0, 80)}...`)
+
+        try {
+          await page.goto(ajaxUrl, { waitUntil: 'domcontentloaded', timeout: 20000 })
+          html = await page.content()
+          this.logger.debug(`AJAX results: ${html.length} bytes`)
+        } catch (ajaxErr) {
+          this.logger.warn(`AJAX results fetch failed, using initial page: ${ajaxErr}`)
+        }
+      } else {
+        this.logger.warn('Could not extract SID/searchId from results page — using initial HTML')
+      }
 
       // 6. Close browser immediately after getting HTML (fresh browser per search)
       await browser?.close().catch(() => {})
