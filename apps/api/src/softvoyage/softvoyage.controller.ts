@@ -111,6 +111,9 @@ export class SoftvoyageController {
           // Capture a snippet around any hotel-related content
           const snippetMatch = resultsHtml.match(/(hotel|resort|result|package).{0,200}/i)
           results.htmlSnippet = snippetMatch ? snippetMatch[0].substring(0, 150) : 'no hotel/result patterns found'
+          // Capture first result div structure
+          const resultDivMatch = resultsHtml.match(/<div[^>]*id="result-\d+"[^>]*>[\s\S]{0,3000}/)
+          results.firstResultDiv = resultDivMatch ? resultDivMatch[0].substring(0, 2000) : 'no result div found'
         } catch (searchErr) {
           results.searchError = searchErr instanceof Error ? searchErr.message : String(searchErr)
         }
