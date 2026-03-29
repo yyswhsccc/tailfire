@@ -9,7 +9,7 @@ import {
   type PriceMetrics,
   type DelayPrediction,
 } from "./flight-search-store";
-import { formatPrice, countStops, formatIsoDuration } from "@/lib/flight-utils";
+import { formatPrice, countStops, parseDuration, formatDuration, formatIsoDuration } from "@/lib/flight-utils";
 import { serviceFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -103,17 +103,8 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
   const stops = countStops(offer.segments);
 
   // Total duration across all segments
-  const totalDuration = offer.segments
-    .map((s) => s.duration)
-    .reduce((acc, dur) => {
-      const match = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
-      if (!match) return acc;
-      return acc + parseInt(match[1] || "0", 10) * 60 + parseInt(match[2] || "0", 10);
-    }, 0);
-  const durationLabel =
-    totalDuration > 0
-      ? `${Math.floor(totalDuration / 60)}h ${totalDuration % 60}m`
-      : formatIsoDuration(firstSeg.duration);
+  const totalDuration = offer.segments.reduce((acc, s) => acc + parseDuration(s.duration), 0);
+  const durationLabel = totalDuration > 0 ? formatDuration(totalDuration) : formatIsoDuration(firstSeg.duration);
 
   // Delay prediction
   const prediction: DelayPrediction | undefined = delayPredictions.get(flightKey);

@@ -69,9 +69,9 @@ export function formatPrice(
 /** Bucket a departure ISO timestamp into morning / afternoon / evening. */
 export function getTimeBucket(isoTime: string): TimeBucket {
   const hour = new Date(isoTime).getHours();
-  if (hour < 12) return 'morning';   // 6-11 (anything before noon)
-  if (hour < 18) return 'afternoon'; // 12-17
-  return 'evening';                  // 18+
+  if (hour >= 6 && hour < 12) return 'morning';   // 6am-12pm
+  if (hour >= 12 && hour < 18) return 'afternoon'; // 12pm-6pm
+  return 'evening';                  // 6pm-6am (overnight)
 }
 
 // ---- Stop counting --------------------------------------------------------

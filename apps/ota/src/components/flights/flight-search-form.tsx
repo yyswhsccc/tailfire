@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, type FormEvent } from "react";
 import { Search, ArrowRightLeft } from "lucide-react";
 
 import { AirportAutocomplete } from "@/components/search/airport-autocomplete";
@@ -40,12 +40,14 @@ export function FlightSearchForm({ compact = false }: FlightSearchFormProps) {
   const currentTravelClass = searchParams.get("travelClass") ?? "ECONOMY";
 
   // Sync tripType from URL on first load
-  const urlTripType = searchParams.get("tripType");
-  if (urlTripType === "one-way" && tripType !== "one-way") {
-    setTripType("one-way");
-  } else if (urlTripType === "round-trip" && tripType !== "round-trip") {
-    setTripType("round-trip");
-  }
+  useEffect(() => {
+    const urlTripType = searchParams.get("tripType");
+    if (urlTripType === "one-way" && tripType !== "one-way") {
+      setTripType("one-way");
+    } else if (urlTripType === "round-trip" && tripType !== "round-trip") {
+      setTripType("round-trip");
+    }
+  }, [searchParams, tripType, setTripType]);
 
   const isRoundTrip = tripType === "round-trip";
 
