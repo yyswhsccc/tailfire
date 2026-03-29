@@ -293,13 +293,58 @@ All filters operate on the already-loaded results array — no server round-trip
 
 ---
 
-## 11. Scope & Phasing
+## 11. Implementation Requirements (Codex-validated)
+
+The following backend and infrastructure work is required before the frontend can be fully wired. These are NOT existing capabilities — they need to be built.
+
+### Backend: New Amadeus Provider Methods
+The codebase uses **raw REST calls** to Amadeus (not the SDK). 6 new provider methods need to be created following the existing pattern in `apps/api/src/external-apis/providers/amadeus/`:
+- `AmadeusFlightDatesProvider` — Cheapest Date Search (`GET /v1/shopping/flight-dates`)
+- `AmadeusPriceMetricsProvider` — Price Analysis (`GET /v1/analytics/itinerary-price-metrics`)
+- `AmadeusDirectDestinationsProvider` — Direct Destinations (`GET /v1/airport/direct-destinations`)
+- `AmadeusFlightDelayProvider` — Delay Prediction (`GET /v1/travel/predictions/flight-delay`)
+- `AmadeusFlightUpsellProvider` — Branded Fares Upsell (`POST /v1/shopping/flight-offers/upselling`)
+- `AmadeusFlightPricingProvider` — Flight Offers Pricing (`POST /v1/shopping/flight-offers/pricing`)
+
+Auth is reusable — all share the same `AMADEUS_CLIENT_ID/SECRET` via `AmadeusAuthService`.
+
+### Backend: Flight Request Checkout Endpoint
+No OTA checkout endpoint exists today. Need to build:
+- `POST /ota/flight-requests` — public endpoint (OtaServiceKeyGuard)
+- Creates: inbound trip in Tailfire, itinerary day, flight activity with segments
+- Sends: notification to advisor queue, confirmation email to consumer
+- Links: to existing lead if guest, or to client contact if authenticated
+
+### Backend: Rate Limiting Fix
+Current `canMakeRequest()` in the rate limiter **never records successful requests** — quota is under-enforced. Must fix before adding 6+ Amadeus calls per search. Add:
+- Request recording on success
+- Route/date caching layer (in-memory or Redis) for cheapest dates, price analysis, direct destinations
+- Budget strategy: core search is blocking, enrichment calls are fire-and-forget with cache
+
+### Frontend: Airport Autocomplete Fixes
+- Change min chars from 2 to 3 (matches API requirement)
+- Validate selected value is a valid IATA code before form submission
+- Add `subType=CITY,AIRPORT` to query (currently only `AIRPORT`)
+
+### Frontend: Round Trip Data Shape
+Current provider flattens all Amadeus itineraries into a single `segments[]` array. For outbound/return picker:
+- **Option A:** Separate API calls for outbound and return searches
+- **Option B:** Preserve itinerary boundaries in normalization (outbound segments vs return segments)
+- Recommendation: **Option A** — simpler, cleaner, matches Google Flights flow
+
+### Backend: Children Parameter
+`children` is in the search form but ignored by `ota-search.controller.ts`. Wire it through to the Amadeus API call.
+
+## 12. Scope & Phasing
 
 ### This Spec Covers
 - Complete flight search page redesign (form, calendar, filters, results, cards)
 - Round-trip selection flow (outbound → return → confirm)
 - Flight request submission (guest flow)
-- 6 Amadeus API integrations
+- 6 Amadeus API integrations (new provider methods)
+- Flight Request backend endpoint (trip/activity creation in Tailfire)
+- Airport autocomplete fixes
+- Rate limiting fix + caching layer
 - Mobile responsive design
 - AI concierge context integration
 
