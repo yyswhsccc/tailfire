@@ -146,6 +146,7 @@ export class AmadeusFlightDelayProvider
         })
       )
 
+      this.recordRequest()
       this.logger.log('Amadeus Flight Delay response', { requestId, latencyMs: Date.now() - startTime })
 
       return {

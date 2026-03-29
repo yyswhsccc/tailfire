@@ -125,6 +125,7 @@ export class AmadeusDirectDestinationsProvider
         })
       )
 
+      this.recordRequest()
       this.logger.log('Amadeus Direct Destinations response', { requestId, latencyMs: Date.now() - startTime })
 
       return {

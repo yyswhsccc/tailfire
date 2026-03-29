@@ -12,6 +12,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { firstValueFrom } from 'rxjs'
 import * as Sentry from '@sentry/nestjs'
+import { OtaSearchCacheService } from './ota-search-cache.service'
 import { AmadeusFlightOffersProvider } from '../external-apis/providers/amadeus/amadeus-flight-offers.provider'
 import { AmadeusHotelsProvider } from '../external-apis/providers/amadeus/amadeus-hotels.provider'
 import { AmadeusFlightDatesProvider, type FlightDateSearchParams } from '../external-apis/providers/amadeus/amadeus-flight-dates.provider'
@@ -45,6 +46,7 @@ export class OtaSearchService {
     private readonly credentialResolver: CredentialResolverService,
     private readonly bookingService: BookingService,
     private readonly httpService: HttpService,
+    private readonly cache: OtaSearchCacheService,
   ) {}
 
   // ============================================================================
@@ -171,13 +173,19 @@ export class OtaSearchService {
   async searchFlightDates(
     params: FlightDateSearchParams,
   ): Promise<{ dates: Array<{ date: string; price: number; currency: string }> } | { error: string }> {
+    const cacheKey = `flight-dates:${params.origin}:${params.destination}:${params.departureDate || ''}`
+    const cached = this.cache.get<{ dates: Array<{ date: string; price: number; currency: string }> }>(cacheKey)
+    if (cached) return cached
+
     try {
       await this.initEnrichmentCredentials(this.flightDatesProvider)
       const response = await this.flightDatesProvider.search(params)
       if (!response.success || !response.data) {
         return { dates: [] }
       }
-      return { dates: response.data }
+      const result = { dates: response.data }
+      this.cache.set(cacheKey, result, 3600) // 1 hour
+      return result
     } catch (error: any) {
       this.logger.error(`Flight dates search failed: ${error.message}`)
       Sentry.captureException(error, {
@@ -198,13 +206,19 @@ export class OtaSearchService {
   async searchPriceMetrics(
     params: PriceMetricsSearchParams,
   ): Promise<{ metrics: { min: number; firstQuartile: number; median: number; thirdQuartile: number; max: number; currencyCode: string } | null } | { error: string }> {
+    const cacheKey = `price-metrics:${params.originIataCode}:${params.destinationIataCode}:${params.departureDate}:${params.currencyCode || 'CAD'}`
+    const cached = this.cache.get<{ metrics: { min: number; firstQuartile: number; median: number; thirdQuartile: number; max: number; currencyCode: string } | null }>(cacheKey)
+    if (cached) return cached
+
     try {
       await this.initEnrichmentCredentials(this.priceMetricsProvider)
       const response = await this.priceMetricsProvider.search(params)
       if (!response.success || !response.data || response.data.length === 0) {
         return { metrics: null }
       }
-      return { metrics: response.data[0]! }
+      const result = { metrics: response.data[0]! }
+      this.cache.set(cacheKey, result, 21600) // 6 hours
+      return result
     } catch (error: any) {
       this.logger.error(`Price metrics search failed: ${error.message}`)
       Sentry.captureException(error, {
@@ -225,13 +239,19 @@ export class OtaSearchService {
   async searchDirectDestinations(
     params: DirectDestinationsSearchParams,
   ): Promise<{ destinations: Array<{ destination: string; airlines: string[] }> } | { error: string }> {
+    const cacheKey = `direct-destinations:${params.departureAirportCode}`
+    const cached = this.cache.get<{ destinations: Array<{ destination: string; airlines: string[] }> }>(cacheKey)
+    if (cached) return cached
+
     try {
       await this.initEnrichmentCredentials(this.directDestinationsProvider)
       const response = await this.directDestinationsProvider.search(params)
       if (!response.success || !response.data) {
         return { destinations: [] }
       }
-      return { destinations: response.data }
+      const result = { destinations: response.data }
+      this.cache.set(cacheKey, result, 86400) // 24 hours
+      return result
     } catch (error: any) {
       this.logger.error(`Direct destinations search failed: ${error.message}`)
       Sentry.captureException(error, {

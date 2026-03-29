@@ -21,6 +21,7 @@ import { OtaPublishedTripsController } from './ota-published-trips.controller'
 import { OtaPublishedTripsService } from './ota-published-trips.service'
 import { OtaSearchController } from './ota-search.controller'
 import { OtaSearchService } from './ota-search.service'
+import { OtaSearchCacheService } from './ota-search-cache.service'
 import { OtaServiceKeyGuard } from './guards/ota-service-key.guard'
 import { CruiseBookingModule } from '../cruise-booking/cruise-booking.module'
 import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
@@ -48,6 +49,7 @@ import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
     OtaReferralsService,
     OtaPublishedTripsService,
     OtaSearchService,
+    OtaSearchCacheService,
     OtaServiceKeyGuard,
   ],
   exports: [OtaLeadsService, OtaReferralsService, OtaPublishedTripsService, OtaSearchService],

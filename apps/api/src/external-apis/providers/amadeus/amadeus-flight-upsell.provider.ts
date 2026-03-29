@@ -182,6 +182,7 @@ export class AmadeusFlightUpsellProvider
         })
       )
 
+      this.recordRequest()
       this.logger.log('Amadeus Flight Upsell response', { requestId, latencyMs: Date.now() - startTime })
 
       return {

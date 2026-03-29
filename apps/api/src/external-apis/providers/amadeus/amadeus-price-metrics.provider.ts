@@ -144,6 +144,7 @@ export class AmadeusPriceMetricsProvider
         })
       )
 
+      this.recordRequest()
       this.logger.log('Amadeus Price Metrics response', { requestId, latencyMs: Date.now() - startTime })
 
       return {
