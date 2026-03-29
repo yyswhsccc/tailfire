@@ -90,10 +90,13 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
 
     // Launch a fresh browser for each search to avoid DataDome session contamination.
     // puppeteer-extra stealth plugin must be applied before launch.
-    const puppeteer = (await import('puppeteer-extra')).default
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const puppeteerExtra = require('puppeteer-extra')
+    const StealthPlugin = require('puppeteer-extra-plugin-stealth')
+    puppeteerExtra.use(StealthPlugin())
     const executablePath = this.configService.get<string>('PUPPETEER_EXECUTABLE_PATH') || '/usr/bin/chromium'
-    let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
-    let page: Awaited<ReturnType<typeof puppeteer.launch extends (...args: any) => Promise<infer R> ? R extends { newPage: () => Promise<infer P> } ? () => Promise<P> : never : never>> | null = null
+    let browser: any = null
+    let page: any = null
 
     try {
       // Build launch args — add residential proxy if configured
@@ -105,7 +108,7 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
         launchArgs.push(`--proxy-server=${proxyParsed.protocol}//${proxyParsed.hostname}:${proxyParsed.port}`)
       }
 
-      browser = await puppeteer.launch({
+      browser = await puppeteerExtra.launch({
         executablePath,
         headless: 'shell' as any,
         args: launchArgs,
