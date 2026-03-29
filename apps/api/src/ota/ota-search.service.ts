@@ -87,7 +87,8 @@ export class OtaSearchService {
       const { clientId, clientSecret } = creds as { clientId: string; clientSecret: string }
       const token = await this.amadeusAuthService.getAccessToken(baseUrl, { clientId, clientSecret })
 
-      const url = `${baseUrl}/v1/reference-data/locations?keyword=${encodeURIComponent(keyword.trim())}&subType=CITY,AIRPORT&page%5Blimit%5D=10`
+      const kw = keyword.trim().toUpperCase()
+      const url = `${baseUrl}/v1/reference-data/locations?keyword=${encodeURIComponent(kw)}&subType=CITY,AIRPORT&page%5Blimit%5D=10`
       const response = await firstValueFrom(
         this.httpService.get(url, {
           headers: { Authorization: `Bearer ${token}` },
@@ -96,14 +97,25 @@ export class OtaSearchService {
       )
 
       const locations = response.data?.data || []
-      return locations
+      const mapped = locations
         .map((loc: any) => ({
           code: loc.iataCode,
           name: loc.name,
           city: loc.address?.cityName || '',
           country: loc.address?.countryCode || '',
+          subType: loc.subType || '',
         }))
         .filter((a: any) => a.code)
+
+      // Deduplicate: prefer AIRPORT over CITY when same IATA code
+      const seen = new Map<string, any>()
+      for (const a of mapped) {
+        const existing = seen.get(a.code)
+        if (!existing || (a.subType === 'AIRPORT' && existing.subType !== 'AIRPORT')) {
+          seen.set(a.code, a)
+        }
+      }
+      return Array.from(seen.values())
     } catch (error: any) {
       this.logger.error(`Airport keyword search failed: ${error.message}`)
       Sentry.captureException(error, {

@@ -9,6 +9,7 @@ interface Airport {
   name: string;
   city: string;
   country: string;
+  subType?: string;
 }
 
 interface AirportAutocompleteProps {
@@ -125,9 +126,9 @@ export function AirportAutocomplete({
       {/* Dropdown */}
       {isOpen && results.length > 0 && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-white shadow-lg">
-          {results.map((airport) => (
+          {results.map((airport, index) => (
             <button
-              key={airport.code}
+              key={`${airport.code}-${airport.subType || index}`}
               type="button"
               onClick={() => handleSelect(airport)}
               className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-[#faf6f0] transition-colors first:rounded-t-lg last:rounded-b-lg"
