@@ -88,17 +88,21 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
       `Processing vacation search: ${gatewayCode} -> ${destDep}, ${dateDep}, ${duration}n, ${nbAdults}a, ${nbRooms}r [${job.id}]`,
     )
 
-    let page: Awaited<ReturnType<SoftvoyageBrowserPoolService['acquirePage']>> | null = null
+    // Launch a fresh browser for each search to avoid DataDome session contamination.
+    // puppeteer-extra stealth plugin must be applied before launch.
+    const puppeteer = (await import('puppeteer-extra')).default
+    const executablePath = this.configService.get<string>('PUPPETEER_EXECUTABLE_PATH') || '/usr/bin/chromium'
+    let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
+    let page: Awaited<ReturnType<typeof puppeteer.launch extends (...args: any) => Promise<infer R> ? R extends { newPage: () => Promise<infer P> } ? () => Promise<P> : never : never>> | null = null
 
     try {
-      // 1. Acquire page from browser pool
-      page = await this.browserPool.acquirePage()
-
-      // 1b. Clear cookies and cache to avoid DataDome state contamination between searches
-      const client = await page.createCDPSession()
-      await client.send('Network.clearBrowserCookies')
-      await client.send('Network.clearBrowserCache')
-      await client.detach()
+      browser = await puppeteer.launch({
+        executablePath,
+        headless: 'shell' as any,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-blink-features=AutomationControlled', '--window-size=1920,1080'],
+      })
+      page = await browser.newPage()
+      this.logger.log(`Fresh browser launched for search [${job.id}]`)
 
       // 2. Navigate to query form page first to establish VCO session
       const queryUrl = `${this.vcoBaseUrl}/querypackage.cgi?code_ag=${this.codeAg}&alias=${this.alias}&language=en`
@@ -155,10 +159,10 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
       // 5. Get page HTML
       const html = await page.content()
 
-      // 6. Release page back to pool before parsing (done in finally, but mark null to avoid double release)
-      await this.browserPool.releasePage(page)
-      const releasedPage = page
-      page = null // Prevent double release in finally
+      // 6. Close browser immediately after getting HTML (fresh browser per search)
+      await browser?.close().catch(() => {})
+      browser = null
+      page = null
 
       this.logger.debug(`Got HTML response (${html.length} bytes), parsing results...`)
 
@@ -197,12 +201,12 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
       )
       throw error // Let BullMQ retry
     } finally {
-      // Always release page back to pool if not already released
-      if (page) {
+      // Always close browser if not already closed
+      if (browser) {
         try {
-          await this.browserPool.releasePage(page)
-        } catch (releaseErr) {
-          this.logger.warn(`Failed to release page back to pool: ${releaseErr}`)
+          await browser.close()
+        } catch {
+          // Browser may already be closed
         }
       }
     }
