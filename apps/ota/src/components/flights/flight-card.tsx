@@ -144,13 +144,15 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
       duration: firstSeg.duration,
     });
 
-    serviceFetch<DelayPrediction>(
+    serviceFetch<{ prediction: DelayPrediction | null }>(
       `/ota/search/flight-delay?${params.toString()}`,
     )
       .then((data) => {
-        const updated = new Map(useFlightSearch.getState().delayPredictions);
-        updated.set(flightKey, data);
-        setDelayPredictions(updated);
+        if (data.prediction) {
+          const updated = new Map(useFlightSearch.getState().delayPredictions);
+          updated.set(flightKey, data.prediction);
+          setDelayPredictions(updated);
+        }
       })
       .catch(() => {
         // Silently ignore — delay prediction is optional enrichment

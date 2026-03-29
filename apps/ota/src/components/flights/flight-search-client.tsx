@@ -183,10 +183,10 @@ export function FlightSearchClient({
     (async () => {
       try {
         setPriceMetricsLoading(true);
-        const data = await serviceFetch<PriceMetrics>(
+        const data = await serviceFetch<{ metrics: PriceMetrics | null }>(
           `/ota/search/flight-price-metrics?origin=${origin}&destination=${destination}&departureDate=${departureDate}`,
         );
-        setPriceMetrics(data);
+        setPriceMetrics(data.metrics ?? null);
       } catch {
         // Non-critical — silently degrade
       } finally {
@@ -198,10 +198,10 @@ export function FlightSearchClient({
     (async () => {
       try {
         setDirectDestinationsLoading(true);
-        const data = await serviceFetch<DirectDestination[]>(
+        const data = await serviceFetch<{ destinations: DirectDestination[] }>(
           `/ota/search/direct-destinations?airport=${origin}`,
         );
-        setDirectDestinations(data);
+        setDirectDestinations(data.destinations ?? []);
       } catch {
         // Non-critical
       } finally {
@@ -214,7 +214,7 @@ export function FlightSearchClient({
       (async () => {
         try {
           setUpsellLoading(true);
-          const data = await serviceFetch<FlightOffer[]>(
+          const data = await serviceFetch<{ alternatives: FlightOffer[] }>(
             "/ota/search/flight-upsell",
             {
               method: "POST",
@@ -223,7 +223,7 @@ export function FlightSearchClient({
               }),
             },
           );
-          setUpsellOffers(data);
+          setUpsellOffers(data.alternatives ?? []);
         } catch {
           // Non-critical
         } finally {
