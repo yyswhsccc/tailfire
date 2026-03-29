@@ -99,7 +99,7 @@ export function DatePriceStrip({
   if (priceDatesLoading) {
     return (
       <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-        <div className="flex gap-2 overflow-hidden">
+        <div className="flex justify-center gap-2 overflow-hidden">
           {Array.from({ length: 7 }).map((_, i) => (
             <div
               key={i}
@@ -127,7 +127,7 @@ export function DatePriceStrip({
         {/* Scrollable strip */}
         <div
           ref={scrollRef}
-          className="flex gap-2 overflow-x-auto scroll-smooth px-6 py-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          className="flex justify-center gap-2 overflow-x-auto scroll-smooth px-6 py-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
           {dateRange.map((dateStr) => {
             const d = new Date(dateStr + "T00:00:00");
@@ -192,7 +192,7 @@ export function DatePriceStrip({
       </div>
 
       {/* Legend */}
-      <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground">
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-[10px] text-muted-foreground">
         <div className="flex items-center gap-1">
           <span className="inline-block size-3 rounded-sm bg-emerald-100 border border-emerald-200" />
           Cheapest
