@@ -21,6 +21,7 @@ import { ApiTags, ApiHeader, ApiSecurity, ApiResponse } from '@nestjs/swagger'
 import { Public } from '../auth/decorators/public.decorator'
 import { CatalogAuthGuard, CatalogThrottleGuard } from '../common/guards'
 import { SoftvoyageService } from './softvoyage.service'
+import { SoftvoyageBrowserPoolService } from './softvoyage-browser-pool.service'
 import { VacationLiveSearchDto } from './dto/vacation-live-search.dto'
 
 @ApiTags('Softvoyage Live Pricing')
@@ -34,7 +35,44 @@ import { VacationLiveSearchDto } from './dto/vacation-live-search.dto'
   required: false,
 })
 export class SoftvoyageController {
-  constructor(private readonly softvoyageService: SoftvoyageService) {}
+  constructor(
+    private readonly softvoyageService: SoftvoyageService,
+    private readonly browserPool: SoftvoyageBrowserPoolService,
+  ) {}
+
+  /**
+   * Diagnostic: test browser launch and VCO connectivity.
+   */
+  @Get('diagnostic')
+  async diagnostic() {
+    const results: Record<string, string> = {}
+    try {
+      results.browserPoolEnabled = String(this.browserPool.isEnabled())
+      results.chromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
+
+      // Try to acquire a page
+      const page = await this.browserPool.acquirePage()
+      results.browserLaunched = 'true'
+
+      // Try to navigate to VCO
+      await page.goto('https://vco.sax.softvoyage.com/cgi-bin/querypackage.cgi?code_ag=VCO&alias=YAQ&language=en', {
+        waitUntil: 'domcontentloaded',
+        timeout: 15000,
+      })
+      const html = await page.content()
+      results.vcoReachable = 'true'
+      results.htmlLength = String(html.length)
+      results.hasDataDome = String(html.includes('captcha-delivery'))
+      results.hasSid = String(/sid=[a-f0-9]{32}/.test(html))
+
+      await this.browserPool.releasePage(page)
+      results.pageReleased = 'true'
+    } catch (err) {
+      results.error = err instanceof Error ? err.message : String(err)
+      results.stack = err instanceof Error ? (err.stack?.split('\n').slice(0, 3).join(' | ') ?? '') : ''
+    }
+    return results
+  }
 
   /**
    * Submit a vacation package live search.
