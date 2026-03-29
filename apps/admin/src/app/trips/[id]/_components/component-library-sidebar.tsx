@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FileText, Sparkles, ChevronDown, ChevronUp, Library, Compass, Anchor, MapPin } from 'lucide-react'
+import { FileText, Sparkles, ChevronDown, ChevronUp, Library, Compass, Anchor, MapPin, Palmtree } from 'lucide-react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -171,6 +171,12 @@ export function ComponentLibrarySidebar({ isDragging = false }: { isDragging?: b
               componentType="library-item"
               label="Activity Library"
               icon={Compass}
+            />
+            <DraggableComponent
+              id="library-vacation"
+              componentType="library-item"
+              label="Vacation Package"
+              icon={Palmtree}
             />
             <DraggableComponent
               id="library-cruise"

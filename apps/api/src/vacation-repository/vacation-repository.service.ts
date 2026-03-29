@@ -66,6 +66,7 @@ export class VacationRepositoryService {
     {
       id: string
       name: string
+      providerIdentifier: string
       countryCode: string | null
       countryName: string | null
       regionGroup: string | null
@@ -78,6 +79,7 @@ export class VacationRepositoryService {
         .select({
           id: vacationDestinations.id,
           name: vacationDestinations.name,
+          providerIdentifier: vacationDestinations.providerIdentifier,
           countryCode: vacationDestinations.countryCode,
           countryName: vacationDestinations.countryName,
           regionGroup: vacationDestinations.regionGroup,
@@ -104,6 +106,7 @@ export class VacationRepositoryService {
       .select({
         id: vacationDestinations.id,
         name: vacationDestinations.name,
+        providerIdentifier: vacationDestinations.providerIdentifier,
         countryCode: vacationDestinations.countryCode,
         countryName: vacationDestinations.countryName,
         regionGroup: vacationDestinations.regionGroup,
@@ -282,6 +285,104 @@ export class VacationRepositoryService {
     const row = results[0]
     if (!row) {
       throw new NotFoundException(`Vacation hotel with id ${id} not found`)
+    }
+
+    // Determine enrichment staleness
+    const hasEnrichment = row.enrichedAt !== null
+    const isStale = hasEnrichment && row.expiresAt !== null && row.expiresAt < new Date()
+
+    // Dispatch enrichment if missing or stale (async, non-blocking)
+    if (!hasEnrichment || isStale) {
+      const destination = row.destinationName ?? ''
+      this.enrichmentDispatcher
+        .dispatchEnrichment(row.id, row.name, destination)
+        .catch((err) => {
+          this.logger.warn({
+            message: 'Failed to dispatch enrichment',
+            hotelId: row.id,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        })
+    }
+
+    const enrichment: VacationEnrichmentData | null = hasEnrichment
+      ? {
+          googleRating: row.googleRating ?? null,
+          googleReviewCount: row.googleReviewCount ?? null,
+          tripadvisorRating: row.tripadvisorRating ?? null,
+          tripadvisorReviewCount: row.tripadvisorReviewCount ?? null,
+          tripadvisorLink: row.tripadvisorLink ?? null,
+          latitude: row.latitude ?? null,
+          longitude: row.longitude ?? null,
+          address: row.formattedAddress ?? null,
+          website: row.website ?? null,
+          phone: row.phone ?? null,
+          photos: (row.photos as string[]) ?? [],
+          enrichedAt: row.enrichedAt?.toISOString() ?? null,
+          isStale: isStale ?? false,
+        }
+      : null
+
+    return {
+      id: row.id,
+      name: row.name,
+      destination: row.destinationName ?? '',
+      hotelChain: row.hotelChain ?? null,
+      starRating: row.starRating ?? null,
+      imageUrl: row.imageUrl ?? null,
+      amenities: (row.amenities as Record<string, boolean> | null) ?? null,
+      monarcRating: row.monarcRating ?? null,
+      monarcReviewCount: row.monarcReviewCount ?? null,
+      enrichment,
+    }
+  }
+
+  // ============================================================================
+  // GET HOTEL BY PROVIDER IDENTIFIER
+  // ============================================================================
+
+  async getHotelByProvider(providerIdentifier: string): Promise<VacationHotelDetail> {
+    const results = await this.db.db
+      .select({
+        id: vacationHotels.id,
+        name: vacationHotels.name,
+        hotelChain: vacationHotels.hotelChain,
+        starRating: vacationHotels.starRating,
+        imageUrl: vacationHotels.imageUrl,
+        amenities: vacationHotels.amenities,
+        monarcRating: vacationHotels.monarcRating,
+        monarcReviewCount: vacationHotels.monarcReviewCount,
+        destinationName: vacationDestinations.name,
+        // Enrichment fields
+        googleRating: vacationHotelEnrichment.googleRating,
+        googleReviewCount: vacationHotelEnrichment.googleReviewCount,
+        tripadvisorRating: vacationHotelEnrichment.tripadvisorRating,
+        tripadvisorReviewCount: vacationHotelEnrichment.tripadvisorReviewCount,
+        tripadvisorLink: vacationHotelEnrichment.tripadvisorLink,
+        latitude: vacationHotelEnrichment.latitude,
+        longitude: vacationHotelEnrichment.longitude,
+        formattedAddress: vacationHotelEnrichment.formattedAddress,
+        website: vacationHotelEnrichment.website,
+        phone: vacationHotelEnrichment.phone,
+        photos: vacationHotelEnrichment.photos,
+        enrichedAt: vacationHotelEnrichment.enrichedAt,
+        expiresAt: vacationHotelEnrichment.expiresAt,
+      })
+      .from(vacationHotels)
+      .leftJoin(
+        vacationHotelEnrichment,
+        eq(vacationHotelEnrichment.hotelId, vacationHotels.id)
+      )
+      .leftJoin(vacationDestinations, eq(vacationHotels.destinationId, vacationDestinations.id))
+      .where(and(
+        eq(vacationHotels.providerIdentifier, providerIdentifier),
+        eq(vacationHotels.isActive, true),
+      ))
+      .limit(1)
+
+    const row = results[0]
+    if (!row) {
+      throw new NotFoundException(`Vacation hotel with provider identifier ${providerIdentifier} not found`)
     }
 
     // Determine enrichment staleness

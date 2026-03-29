@@ -1,6 +1,6 @@
 'use client'
 
-import { Ship, CalendarClock, Map, Package, MapPin, Building2, Award, Tag, FileText } from 'lucide-react'
+import { Ship, CalendarClock, Map, Package, MapPin, Building2, Award, Tag, FileText, Palmtree } from 'lucide-react'
 import { DetailLayout } from '@/components/layout/detail-layout'
 import type { SidebarSection } from '@/components/layout/detail-sidebar'
 
@@ -17,6 +17,11 @@ const librarySections: SidebarSection[] = [
         name: 'Package Templates',
         href: '/library/packages',
         icon: Package,
+      },
+      {
+        name: 'Vacation Packages',
+        href: '/library/vacation',
+        icon: Palmtree,
       },
       {
         name: 'Cruises',

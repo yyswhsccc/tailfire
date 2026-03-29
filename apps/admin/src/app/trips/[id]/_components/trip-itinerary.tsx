@@ -321,6 +321,31 @@ export function TripItinerary({ trip }: TripItineraryProps) {
         return
       }
 
+      // Handle Vacation Library
+      if (activeId === 'library-vacation') {
+        if (!selectedItinerary) {
+          toast({
+            title: 'No itinerary selected',
+            description: 'Please select an itinerary before adding a vacation package.',
+            variant: 'destructive',
+          })
+          return
+        }
+        const returnUrl = `/trips/${trip.id}?tab=itinerary`
+        const params = new URLSearchParams({
+          tripId: trip.id,
+          dayId: targetDayId,
+          itineraryId: selectedItinerary.id,
+          returnUrl,
+        })
+        if (selectedItinerary.startDate) {
+          params.set('startDate', selectedItinerary.startDate)
+        }
+        startLoading('vacation-library', 'Opening Vacation Library...')
+        router.push(`/library/vacation?${params.toString()}`)
+        return
+      }
+
       // Other library items can be handled here in the future
       toast({
         title: 'Not yet available',
@@ -462,6 +487,32 @@ export function TripItinerary({ trip }: TripItineraryProps) {
         })
         startLoading('tour-library', 'Opening Tour Library...')
         router.push(`/library/tours?${params.toString()}`)
+        return
+      }
+
+      // Handle Vacation Library - requires a day, so we need to use first day
+      if (activeId === 'library-vacation') {
+        if (!selectedItinerary || !days || days.length === 0) {
+          toast({
+            title: 'No days available',
+            description: 'Create itinerary days before adding a vacation package.',
+            variant: 'destructive',
+          })
+          return
+        }
+        const firstDay = days[0]!
+        const returnUrl = `/trips/${trip.id}?tab=itinerary`
+        const params = new URLSearchParams({
+          tripId: trip.id,
+          dayId: firstDay.id,
+          itineraryId: selectedItinerary.id,
+          returnUrl,
+        })
+        if (selectedItinerary.startDate) {
+          params.set('startDate', selectedItinerary.startDate)
+        }
+        startLoading('vacation-library', 'Opening Vacation Library...')
+        router.push(`/library/vacation?${params.toString()}`)
         return
       }
 
