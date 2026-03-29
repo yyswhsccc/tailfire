@@ -23,12 +23,11 @@ import { useSearch } from "@/components/search/search-page-shell";
 import {
   useFlightSearch,
   type FlightOffer,
-  type PriceMetrics,
   type DirectDestination,
+  type PriceDate,
 } from "./flight-search-store";
 import { FlightSearchForm } from "./flight-search-form";
-import { PriceCalendar } from "./price-calendar";
-import { PriceDateStrip } from "./price-date-strip";
+import { DatePriceStrip } from "./date-price-strip";
 import { SavingsTip, PriceInsightBar, DirectFlightsBanner } from "./flight-insights";
 import { RoundTripBar } from "./round-trip-bar";
 import { FlightCard } from "./flight-card";
@@ -127,10 +126,13 @@ export function FlightSearchClient({
   const setRoundTripStep = useFlightSearch((s) => s.setRoundTripStep);
   const setPriceMetrics = useFlightSearch((s) => s.setPriceMetrics);
   const setPriceMetricsLoading = useFlightSearch((s) => s.setPriceMetricsLoading);
+  const setPriceLevel = useFlightSearch((s) => s.setPriceLevel);
   const setDirectDestinations = useFlightSearch((s) => s.setDirectDestinations);
   const setDirectDestinationsLoading = useFlightSearch(
     (s) => s.setDirectDestinationsLoading,
   );
+  const setPriceDates = useFlightSearch((s) => s.setPriceDates);
+  const setPriceDatesLoading = useFlightSearch((s) => s.setPriceDatesLoading);
   const setUpsellOffers = useFlightSearch((s) => s.setUpsellOffers);
   const setUpsellLoading = useFlightSearch((s) => s.setUpsellLoading);
   const selectOutbound = useFlightSearch((s) => s.selectOutbound);
@@ -188,14 +190,38 @@ export function FlightSearchClient({
     if (!hasSearch || enrichmentFetchedRef.current) return;
     enrichmentFetchedRef.current = true;
 
-    // Price metrics
+    // Price insights (SerpAPI Google Flights — replaces Amadeus price metrics)
     (async () => {
       try {
         setPriceMetricsLoading(true);
-        const data = await clientFetch<{ metrics: PriceMetrics | null }>(
-          `/api/flights/price-metrics?origin=${origin}&destination=${destination}&departureDate=${departureDate}`,
-        );
-        setPriceMetrics(data.metrics ?? null);
+        const qs = new URLSearchParams({
+          origin,
+          destination,
+          departureDate,
+        });
+        if (returnDate) qs.set("returnDate", returnDate);
+        const data = await clientFetch<{
+          insights: {
+            lowestPrice: number;
+            priceLevel: string;
+            typicalRange: [number, number];
+            currency: string;
+          } | null;
+        }>(`/api/flights/price-insights?${qs}`);
+        if (data.insights) {
+          setPriceMetrics({
+            min: data.insights.typicalRange[0],
+            firstQuartile: data.insights.typicalRange[0],
+            median: data.insights.lowestPrice,
+            thirdQuartile: data.insights.typicalRange[1],
+            max: data.insights.typicalRange[1],
+            currencyCode: data.insights.currency,
+          });
+          setPriceLevel(data.insights.priceLevel);
+        } else {
+          setPriceMetrics(null);
+          setPriceLevel(null);
+        }
       } catch {
         // Non-critical — silently degrade
       } finally {
@@ -240,18 +266,46 @@ export function FlightSearchClient({
         }
       })();
     }
+
+    // Nearby date prices (7-day strip)
+    (async () => {
+      try {
+        setPriceDatesLoading(true);
+        const qs = new URLSearchParams({
+          origin,
+          destination,
+          departureDate,
+          adults: String(adults),
+          travelClass,
+        });
+        const data = await clientFetch<{ prices: PriceDate[] }>(
+          `/api/flights/nearby-prices?${qs}`,
+        );
+        setPriceDates(data.prices ?? []);
+      } catch {
+        setPriceDates([]);
+      } finally {
+        setPriceDatesLoading(false);
+      }
+    })();
   }, [
     hasSearch,
     origin,
     destination,
     departureDate,
+    returnDate,
+    adults,
+    travelClass,
     initialResults,
     setPriceMetrics,
     setPriceMetricsLoading,
+    setPriceLevel,
     setDirectDestinations,
     setDirectDestinationsLoading,
     setUpsellOffers,
     setUpsellLoading,
+    setPriceDates,
+    setPriceDatesLoading,
   ]);
 
   // ---- 3. Compute filtered/sorted results ---------------------------------
@@ -396,17 +450,9 @@ export function FlightSearchClient({
       {/* Results */}
       {hasSearch && !searchError && (
         <>
-          {/* Price calendar (desktop) + strip (mobile) */}
-          <div className="mb-6 hidden md:block">
-            <PriceCalendar
-              origin={origin}
-              destination={destination}
-              selectedDate={departureDate}
-              onDateSelect={handleDateSelect}
-            />
-          </div>
-          <div className="mb-6 md:hidden">
-            <PriceDateStrip
+          {/* 7-day price strip */}
+          <div className="mb-6">
+            <DatePriceStrip
               selectedDate={departureDate}
               onDateSelect={handleDateSelect}
             />

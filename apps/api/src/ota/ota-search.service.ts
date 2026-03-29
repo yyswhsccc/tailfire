@@ -13,6 +13,7 @@ import { HttpService } from '@nestjs/axios'
 import { firstValueFrom } from 'rxjs'
 import * as Sentry from '@sentry/nestjs'
 import { OtaSearchCacheService } from './ota-search-cache.service'
+import { SerpFlightPricesService, type FlightPriceInsights } from './serp-flight-prices.service'
 import { AmadeusFlightOffersProvider } from '../external-apis/providers/amadeus/amadeus-flight-offers.provider'
 import { AmadeusHotelsProvider } from '../external-apis/providers/amadeus/amadeus-hotels.provider'
 import { AmadeusFlightDatesProvider, type FlightDateSearchParams } from '../external-apis/providers/amadeus/amadeus-flight-dates.provider'
@@ -47,6 +48,7 @@ export class OtaSearchService {
     private readonly bookingService: BookingService,
     private readonly httpService: HttpService,
     private readonly cache: OtaSearchCacheService,
+    private readonly serpFlightPrices: SerpFlightPricesService,
   ) {}
 
   // ============================================================================
@@ -176,6 +178,100 @@ export class OtaSearchService {
   }
 
   // ============================================================================
+  // Nearby Date Prices (7-day strip)
+  // ============================================================================
+
+  /**
+   * Get cheapest prices for 7 dates centered on the searched date.
+   * Uses the same Flight Offers Search API that works in production.
+   * Each date is cached individually for 1 hour.
+   */
+  async searchNearbyPrices(params: {
+    origin: string
+    destination: string
+    departureDate: string
+    adults?: number
+    travelClass?: string
+  }): Promise<{ prices: Array<{ date: string; price: number; currency: string }> }> {
+    const { origin, destination, departureDate, adults = 1, travelClass } = params
+
+    // Generate 7 dates: departureDate-3 through departureDate+3
+    const centerDate = new Date(departureDate + 'T00:00:00')
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const dates: string[] = []
+    for (let offset = -3; offset <= 3; offset++) {
+      const d = new Date(centerDate)
+      d.setDate(d.getDate() + offset)
+      // Skip dates in the past
+      if (d < today) continue
+      const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      dates.push(ymd)
+    }
+
+    // Check cache for each date, collect uncached dates
+    const results: Array<{ date: string; price: number; currency: string }> = []
+    const uncachedDates: string[] = []
+
+    for (const date of dates) {
+      const cacheKey = `nearby-price:${origin}:${destination}:${date}`
+      const cached = this.cache.get<{ date: string; price: number; currency: string }>(cacheKey)
+      if (cached) {
+        results.push(cached)
+      } else {
+        uncachedDates.push(date)
+      }
+    }
+
+    // Fetch uncached dates in parallel
+    if (uncachedDates.length > 0) {
+      const fetchPromises = uncachedDates.map(async (date) => {
+        try {
+          await this.initFlightCredentials()
+          const response = await this.flightOffersProvider.search({
+            origin,
+            destination,
+            departureDate: date,
+            adults,
+            travelClass: travelClass as any,
+            currencyCode: 'CAD',
+          })
+
+          if (response.success && response.data && response.data.length > 0) {
+            const cheapest = response.data[0]!
+            const priceEntry = {
+              date,
+              price: parseFloat(cheapest.price.total),
+              currency: cheapest.price.currency,
+            }
+            // Cache individually for 1 hour
+            const cacheKey = `nearby-price:${origin}:${destination}:${date}`
+            this.cache.set(cacheKey, priceEntry, 3600)
+            return priceEntry
+          }
+          return null
+        } catch (error: any) {
+          this.logger.warn(`Nearby price fetch failed for ${date}: ${error.message}`)
+          return null
+        }
+      })
+
+      const settled = await Promise.allSettled(fetchPromises)
+      for (const result of settled) {
+        if (result.status === 'fulfilled' && result.value) {
+          results.push(result.value)
+        }
+      }
+    }
+
+    // Sort by date
+    results.sort((a, b) => a.date.localeCompare(b.date))
+
+    return { prices: results }
+  }
+
+  // ============================================================================
   // Flight Dates (Cheapest Dates)
   // ============================================================================
 
@@ -238,6 +334,28 @@ export class OtaSearchService {
       })
       return { error: error.message }
     }
+  }
+
+  // ============================================================================
+  // Flight Price Insights (SerpAPI Google Flights)
+  // ============================================================================
+
+  /**
+   * Get price insights (lowest price, price level, typical range) for a route+date
+   * via SerpAPI Google Flights. Replaces deprecated Amadeus Price Metrics.
+   */
+  async getFlightPriceInsights(params: {
+    origin: string
+    destination: string
+    departureDate: string
+    returnDate?: string
+  }): Promise<FlightPriceInsights | null> {
+    return this.serpFlightPrices.getPriceInsights({
+      origin: params.origin,
+      destination: params.destination,
+      departureDate: params.departureDate,
+      returnDate: params.returnDate,
+    })
   }
 
   // ============================================================================

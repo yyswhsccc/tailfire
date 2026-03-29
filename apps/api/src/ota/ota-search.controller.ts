@@ -213,6 +213,50 @@ export class OtaSearchController {
   }
 
   // ============================================================================
+  // Nearby Date Prices (7-day strip)
+  // ============================================================================
+
+  /**
+   * Get cheapest prices for nearby dates around a departure date.
+   * Returns 7 dates (departureDate-3 through departureDate+3) with cheapest fares.
+   * GET /ota/search/flight-nearby-prices
+   */
+  @Get('flight-nearby-prices')
+  @Public()
+  @UseGuards(OtaServiceKeyGuard)
+  @ApiOperation({ summary: 'Get cheapest prices for dates near departure date' })
+  @ApiHeader({ name: 'x-ota-service-key', required: true, description: 'OTA service-to-service key' })
+  @ApiQuery({ name: 'origin', required: true, description: '3-letter IATA origin code', example: 'YOW' })
+  @ApiQuery({ name: 'destination', required: true, description: '3-letter IATA destination code', example: 'CUN' })
+  @ApiQuery({ name: 'departureDate', required: true, description: 'Center date (YYYY-MM-DD)', example: '2026-04-15' })
+  @ApiQuery({ name: 'adults', required: false, description: 'Number of adults', example: '1' })
+  @ApiQuery({ name: 'travelClass', required: false, enum: ['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST'] })
+  @ApiResponse({ status: 200, description: 'Nearby date prices returned' })
+  @ApiResponse({ status: 400, description: 'Invalid search parameters' })
+  @ApiResponse({ status: 401, description: 'Invalid OTA service key' })
+  async searchNearbyPrices(
+    @Query('origin') origin?: string,
+    @Query('destination') destination?: string,
+    @Query('departureDate') departureDate?: string,
+    @Query('adults') adults?: string,
+    @Query('travelClass') travelClass?: string,
+  ) {
+    if (!origin || !destination || !departureDate) {
+      throw new BadRequestException('origin, destination, and departureDate are required')
+    }
+
+    this.logger.log('OTA nearby date prices', { origin, destination, departureDate })
+
+    return this.otaSearchService.searchNearbyPrices({
+      origin: origin.toUpperCase(),
+      destination: destination.toUpperCase(),
+      departureDate,
+      adults: adults ? parseInt(adults, 10) : 1,
+      travelClass,
+    })
+  }
+
+  // ============================================================================
   // Flight Dates (Cheapest Dates)
   // ============================================================================
 
@@ -287,6 +331,49 @@ export class OtaSearchController {
       departureDate,
       currencyCode: currencyCode || 'CAD',
     })
+  }
+
+  // ============================================================================
+  // Flight Price Insights (SerpAPI Google Flights)
+  // ============================================================================
+
+  /**
+   * Get price insights for a route from SerpAPI Google Flights.
+   * Returns lowest price, price level (low/typical/high), and typical range.
+   * GET /ota/search/flight-price-insights
+   */
+  @Get('flight-price-insights')
+  @Public()
+  @UseGuards(OtaServiceKeyGuard)
+  @ApiOperation({ summary: 'Get Google Flights price insights for a route (via SerpAPI)' })
+  @ApiHeader({ name: 'x-ota-service-key', required: true, description: 'OTA service-to-service key' })
+  @ApiQuery({ name: 'origin', required: true, description: '3-letter IATA origin code', example: 'YOW' })
+  @ApiQuery({ name: 'destination', required: true, description: '3-letter IATA destination code', example: 'CUN' })
+  @ApiQuery({ name: 'departureDate', required: true, description: 'Departure date (YYYY-MM-DD)', example: '2026-04-15' })
+  @ApiQuery({ name: 'returnDate', required: false, description: 'Return date for round-trip (YYYY-MM-DD)' })
+  @ApiResponse({ status: 200, description: 'Price insights returned (or null if unavailable)' })
+  @ApiResponse({ status: 400, description: 'Invalid search parameters' })
+  @ApiResponse({ status: 401, description: 'Invalid OTA service key' })
+  async getFlightPriceInsights(
+    @Query('origin') origin?: string,
+    @Query('destination') destination?: string,
+    @Query('departureDate') departureDate?: string,
+    @Query('returnDate') returnDate?: string,
+  ) {
+    if (!origin || !destination || !departureDate) {
+      throw new BadRequestException('origin, destination, and departureDate are required')
+    }
+
+    this.logger.log('OTA flight price insights (SerpAPI)', { origin, destination, departureDate })
+
+    const insights = await this.otaSearchService.getFlightPriceInsights({
+      origin: origin.toUpperCase(),
+      destination: destination.toUpperCase(),
+      departureDate,
+      returnDate,
+    })
+
+    return { insights }
   }
 
   // ============================================================================
