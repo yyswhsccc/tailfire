@@ -123,14 +123,16 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
 
       this.logger.debug(`Submitting search form to ${resultsUrl}`)
 
-      // Use page.evaluate to submit a form via POST
-      await page.evaluate(
-        ({ url, params }: { url: string; params: string }) => {
+      // Submit form via POST and wait for navigation
+      const formBody = formParams.toString()
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }),
+        page.evaluate((url: string, body: string) => {
           const form = document.createElement('form')
           form.method = 'POST'
           form.action = url
 
-          for (const [key, value] of new URLSearchParams(params).entries()) {
+          for (const [key, value] of new URLSearchParams(body).entries()) {
             const input = document.createElement('input')
             input.type = 'hidden'
             input.name = key
@@ -140,12 +142,15 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
 
           document.body.appendChild(form)
           form.submit()
-        },
-        { url: resultsUrl, params: formParams.toString() },
-      )
+        }, resultsUrl, formBody),
+      ])
 
-      // 4. Wait for results to load (VCO uses div[id^="result-"], VCM uses table[id^="hotel-"])
-      await page.waitForSelector('div[id^="result-"], table[id^="hotel-"]', { timeout: 20000 })
+      // 4. Wait for result elements to appear (VCO uses div[id^="result-"], VCM uses table[id^="hotel-"])
+      try {
+        await page.waitForSelector('div[id^="result-"], table[id^="hotel-"]', { timeout: 15000 })
+      } catch {
+        this.logger.warn('No result elements found — page may use AJAX loading or have no results')
+      }
 
       // 5. Get page HTML
       const html = await page.content()
