@@ -74,8 +74,9 @@ export class SoftvoyageResultParserService {
       // ── Hotel name ──────────────────────────────────────────────
       let hotelName = '';
       let destination = '';
+      // Try multiple selectors — VCM uses td with inline styles, VCO may use different elements
       const nameCell = $hotel
-        .find('td[style*="color: #CC6633"], td[style*="font-size: 17px"]')
+        .find('td[style*="color: #CC6633"], td[style*="font-size: 17px"], [style*="font-weight: bold"][style*="font-size"]')
         .first();
       if (nameCell.length) {
         hotelName = nameCell
@@ -90,10 +91,17 @@ export class SoftvoyageResultParserService {
         destination = nameCell.find('nobr').text().trim();
         if (!destination) {
           destination = nameCell
-            .find('span[style*="font-size:12px"]')
+            .find('span[style*="font-size:12px"], span[style*="font-size: 12px"]')
             .first()
             .text()
             .trim();
+        }
+      }
+      // Fallback: try finding hotel name from any bold/large text with the hotel pattern
+      if (!hotelName) {
+        const boldText = $hotel.find('.hotel-name, h3, h4, [class*="hotel"], [style*="font-weight: bold"]').first();
+        if (boldText.length) {
+          hotelName = boldText.text().trim();
         }
       }
 
@@ -130,7 +138,16 @@ export class SoftvoyageResultParserService {
 
       // ── Package pricing rows from moreres table ─────────────────
       const packages: VacationPackageOption[] = [];
-      const $moreres = $(`#moreres-${hotelId}`);
+      // VCM uses #moreres-{id}, VCO may use different IDs or nested tables
+      let $moreres = $(`#moreres-${hotelId}`);
+      if (!$moreres.length) {
+        // Fallback: look for the pricing table inside the result container
+        $moreres = $hotel.find('table.search, table[cellspacing="0"]').last();
+      }
+      if (!$moreres.length) {
+        // Last resort: look for rows with pricing data directly in the container
+        $moreres = $hotel;
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       $moreres.find('tbody tr').each((_: number, rowEl: any) => {
