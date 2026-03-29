@@ -4,11 +4,20 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, Loader2, RefreshCw, Search } from "lucide-react";
 
-import { serviceFetch } from "@/lib/api";
 import {
   applyFilters,
   sortFlights,
 } from "@/lib/flight-utils";
+
+/** Client-safe fetch that hits our Next.js API proxy routes (not the backend directly) */
+async function clientFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+  return res.json() as Promise<T>;
+}
 import { useSearch } from "@/components/search/search-page-shell";
 
 import {
@@ -183,8 +192,8 @@ export function FlightSearchClient({
     (async () => {
       try {
         setPriceMetricsLoading(true);
-        const data = await serviceFetch<{ metrics: PriceMetrics | null }>(
-          `/ota/search/flight-price-metrics?origin=${origin}&destination=${destination}&departureDate=${departureDate}`,
+        const data = await clientFetch<{ metrics: PriceMetrics | null }>(
+          `/api/flights/price-metrics?origin=${origin}&destination=${destination}&departureDate=${departureDate}`,
         );
         setPriceMetrics(data.metrics ?? null);
       } catch {
@@ -198,8 +207,8 @@ export function FlightSearchClient({
     (async () => {
       try {
         setDirectDestinationsLoading(true);
-        const data = await serviceFetch<{ destinations: DirectDestination[] }>(
-          `/ota/search/direct-destinations?airport=${origin}`,
+        const data = await clientFetch<{ destinations: DirectDestination[] }>(
+          `/api/flights/direct-destinations?airport=${origin}`,
         );
         setDirectDestinations(data.destinations ?? []);
       } catch {
@@ -214,8 +223,8 @@ export function FlightSearchClient({
       (async () => {
         try {
           setUpsellLoading(true);
-          const data = await serviceFetch<{ alternatives: FlightOffer[] }>(
-            "/ota/search/flight-upsell",
+          const data = await clientFetch<{ alternatives: FlightOffer[] }>(
+            "/api/flights/upsell",
             {
               method: "POST",
               body: JSON.stringify({
@@ -290,8 +299,8 @@ export function FlightSearchClient({
           if (children > 0) params.set("children", String(children));
           params.set("travelClass", travelClass);
 
-          const data = await serviceFetch<{ results: FlightOffer[] }>(
-            `/ota/search/flights?${params.toString()}`,
+          const data = await clientFetch<{ results: FlightOffer[] }>(
+            `/api/flights/search?${params.toString()}`,
           );
           setReturnResults(data.results ?? []);
         } catch {

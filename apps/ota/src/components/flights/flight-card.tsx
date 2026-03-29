@@ -10,7 +10,12 @@ import {
   type DelayPrediction,
 } from "./flight-search-store";
 import { formatPrice, countStops, parseDuration, formatDuration, formatIsoDuration } from "@/lib/flight-utils";
-import { serviceFetch } from "@/lib/api";
+/** Client-safe fetch via Next.js proxy routes */
+async function clientFetch<T>(path: string): Promise<T> {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+  return res.json() as Promise<T>;
+}
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -109,11 +114,13 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
   // Delay prediction
   const prediction: DelayPrediction | undefined = delayPredictions.get(flightKey);
 
-  // Lazy-fetch delay prediction on mount
+  // Lazy-fetch delay prediction on mount (only for first 5 cards to limit API calls)
+  const predictionCount = delayPredictions.size;
   useEffect(() => {
     if (fetchedRef.current) return;
     if (delayPredictions.has(flightKey)) return;
     if (!firstSeg.aircraft) return;
+    if (predictionCount >= 5) return; // Limit to 5 predictions max
 
     fetchedRef.current = true;
 
@@ -135,8 +142,8 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
       duration: firstSeg.duration,
     });
 
-    serviceFetch<{ prediction: DelayPrediction | null }>(
-      `/ota/search/flight-delay?${params.toString()}`,
+    clientFetch<{ prediction: DelayPrediction | null }>(
+      `/api/flights/delay?${params.toString()}`,
     )
       .then((data) => {
         if (data.prediction) {

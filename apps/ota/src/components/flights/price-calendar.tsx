@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
-import { serviceFetch } from "@/lib/api";
+/** Client-safe fetch via Next.js proxy routes */
+async function clientFetch<T>(path: string): Promise<T> {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+  return res.json() as Promise<T>;
+}
 import { formatPrice } from "@/lib/flight-utils";
 import { useFlightSearch, type PriceDate } from "./flight-search-store";
 
@@ -129,8 +134,8 @@ export function PriceCalendar({
 
     store.setPriceDatesLoading(true);
 
-    serviceFetch<{ dates: PriceDate[] }>(
-      `/ota/search/flight-dates?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&departureDate=${encodeURIComponent(firstOfMonth)}`,
+    clientFetch<{ dates: PriceDate[] }>(
+      `/api/flights/dates?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&departureDate=${encodeURIComponent(firstOfMonth)}`,
     )
       .then((res) => {
         if (!cancelled) {

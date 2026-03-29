@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { serviceFetch } from "@/lib/api";
+/** Client-safe fetch via Next.js proxy routes */
+async function clientFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...init });
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+  return res.json() as Promise<T>;
+}
 import { countStops } from "@/lib/flight-utils";
 import { useFlightSearch, type FlightOffer } from "./flight-search-store";
 import { FlightRequestSuccess } from "./flight-request-success";
@@ -108,7 +113,7 @@ export function FlightRequestForm() {
 
     setSubmitting(true);
     try {
-      await serviceFetch("/ota/leads/flight-requests", {
+      await clientFetch("/api/flights/request", {
         method: "POST",
         body: JSON.stringify(body),
       });

@@ -52,7 +52,9 @@ function buildSearchQuery(params: SearchParams): string {
   if (params.origin) qs.set("origin", params.origin);
   if (params.destination) qs.set("destination", params.destination);
   if (params.departureDate) qs.set("departureDate", params.departureDate);
-  if (params.returnDate) qs.set("returnDate", params.returnDate);
+  // Do NOT pass returnDate — Amadeus flattens both itineraries into one
+  // segments array when returnDate is provided. Return flights are fetched
+  // separately when the user selects an outbound flight (in the client).
   if (params.adults) qs.set("adults", params.adults);
   if (params.children && params.children !== "0")
     qs.set("children", params.children);
