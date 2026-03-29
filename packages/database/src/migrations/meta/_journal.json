@@ -1282,6 +1282,13 @@
       "when": 1774926000000,
       "tag": "20260327150000_sailing_public_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 183,
+      "version": "7",
+      "when": 1774997516000,
+      "tag": "20260328183156_create_vacation_package_tables",
+      "breakpoints": true
     }
   ]
 }
