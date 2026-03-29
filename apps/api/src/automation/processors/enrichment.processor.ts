@@ -22,14 +22,18 @@ import { StorageService } from '../../trips/storage.service'
 import { GeocodingService } from '../../trips/geocoding.service'
 import { CatalogMatcherService } from '../../catalog-matcher/catalog-matcher.service'
 import { DatabaseService } from '../../db/database.service'
+import { AutomationService } from '../automation.service'
 import { QUEUES, JOB_TYPES } from '../automation.types'
 import type {
   HotelPhotoEnrichmentJobData,
   CruiseCatalogEnrichmentJobData,
   ActivityGeocodingJobData,
+  VacationHotelEnrichmentJobData,
 } from '../automation.types'
+import { GooglePlacesEnricherService } from '../../vacation-enrichment/services/google-places-enricher.service'
+import { TripadvisorEnricherService } from '../../vacation-enrichment/services/tripadvisor-enricher.service'
 
-const { customCruiseDetails, itineraryActivities } = schema
+const { customCruiseDetails, itineraryActivities, vacationHotelEnrichment } = schema
 
 const DEFAULT_MAX_PHOTOS = 3
 
@@ -47,6 +51,9 @@ export class EnrichmentProcessor extends WorkerHost {
     private readonly catalogMatcher: CatalogMatcherService,
     private readonly geocodingService: GeocodingService,
     private readonly db: DatabaseService,
+    private readonly automationService: AutomationService,
+    private readonly googlePlacesEnricher: GooglePlacesEnricherService,
+    private readonly tripadvisorEnricher: TripadvisorEnricherService,
   ) {
     super()
   }
@@ -61,6 +68,9 @@ export class EnrichmentProcessor extends WorkerHost {
         break
       case JOB_TYPES.ACTIVITY_GEOCODING:
         await this.handleActivityGeocoding(job as Job<ActivityGeocodingJobData>)
+        break
+      case JOB_TYPES.VACATION_HOTEL_ENRICHMENT:
+        await this.handleVacationHotelEnrichment(job as Job<VacationHotelEnrichmentJobData>)
         break
       default:
         this.logger.warn(`Unknown enrichment job type: ${job.name}`)
@@ -356,8 +366,123 @@ export class EnrichmentProcessor extends WorkerHost {
     }
   }
 
+  private async handleVacationHotelEnrichment(job: Job<VacationHotelEnrichmentJobData>): Promise<void> {
+    const { hotelId, hotelName, destination } = job.data
+
+    this.logger.log({ message: 'Starting vacation hotel enrichment', hotelId, hotelName, destination })
+
+    // Run Google Places and TripAdvisor enrichment in parallel
+    const [googlePlaces, tripadvisor] = await Promise.all([
+      this.googlePlacesEnricher.enrich(hotelName, destination),
+      this.tripadvisorEnricher.enrich(hotelName, destination),
+    ])
+
+    if (!googlePlaces && !tripadvisor) {
+      this.logger.log({ message: 'No enrichment data found — skipping', hotelId, hotelName })
+      return
+    }
+
+    // Upload top 5 photos from Google Places to R2 (fall back to original URLs if storage unavailable)
+    let r2PhotoUrls: string[] = googlePlaces?.photoUrls?.slice(0, 5) ?? []
+
+    if (r2PhotoUrls.length > 0 && this.storageService.isMediaAvailable()) {
+      const uploadedUrls: string[] = []
+
+      for (let i = 0; i < r2PhotoUrls.length; i++) {
+        const photoUrl = r2PhotoUrls[i]!
+        try {
+          const response = await firstValueFrom(
+            this.httpService.get(photoUrl, {
+              responseType: 'arraybuffer',
+              timeout: 15000,
+            }),
+          )
+
+          const buffer = Buffer.from(response.data)
+          const contentType = (response.headers['content-type'] as string) || 'image/jpeg'
+          const extension = contentType.includes('png') ? 'png' : 'jpg'
+          const photoHash = createHash('md5').update(`${hotelId}-${i}`).digest('hex')
+          const fileName = `vacation-hotel-${photoHash}.${extension}`
+
+          const { url: fileUrl } = await this.storageService.uploadMediaFile(
+            buffer,
+            `vacation-hotels/${hotelId}`,
+            fileName,
+            contentType,
+          )
+
+          uploadedUrls.push(fileUrl)
+        } catch (error) {
+          this.logger.warn({
+            message: `Failed to upload photo ${i + 1} to R2 — keeping original URL`,
+            hotelId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          uploadedUrls.push(photoUrl) // Keep the original SerpAPI URL as fallback
+        }
+      }
+
+      r2PhotoUrls = uploadedUrls
+    }
+
+    // Build rawData for debugging (full SerpAPI responses)
+    const rawData = { googlePlaces, tripadvisor }
+
+    // Upsert into vacationHotelEnrichment table
+    const enrichmentFields = {
+      googlePlaceId: googlePlaces?.placeId ?? null,
+      latitude: googlePlaces?.latitude?.toString() ?? null,
+      longitude: googlePlaces?.longitude?.toString() ?? null,
+      formattedAddress: googlePlaces?.address ?? null,
+      googleRating: googlePlaces?.rating?.toString() ?? null,
+      googleReviewCount: googlePlaces?.reviewCount ?? null,
+      tripadvisorRating: tripadvisor?.rating?.toString() ?? null,
+      tripadvisorReviewCount: tripadvisor?.reviewCount ?? null,
+      tripadvisorLink: tripadvisor?.link ?? null,
+      website: googlePlaces?.website ?? null,
+      phone: googlePlaces?.phone ?? null,
+      photos: r2PhotoUrls,
+      rawData,
+      enrichedAt: new Date(),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+    }
+
+    await this.db.client
+      .insert(vacationHotelEnrichment)
+      .values({ hotelId, ...enrichmentFields })
+      .onConflictDoUpdate({
+        target: vacationHotelEnrichment.hotelId,
+        set: { ...enrichmentFields, updatedAt: new Date() },
+      })
+
+    this.logger.log({
+      message: 'Vacation hotel enrichment complete',
+      hotelId,
+      hotelName,
+      hasGooglePlaces: !!googlePlaces,
+      hasTripAdvisor: !!tripadvisor,
+      photoCount: r2PhotoUrls.length,
+    })
+  }
+
+  @OnWorkerEvent('active')
+  async onActive(job: Job) {
+    this.logger.debug(`Enrichment job ${job.id} started processing`)
+    if (job.id) {
+      await this.automationService.updateJobHistory(QUEUES.ENRICHMENT, job.id, 'processing')
+    }
+  }
+
+  @OnWorkerEvent('completed')
+  async onCompleted(job: Job) {
+    this.logger.debug(`Enrichment job ${job.id} completed`)
+    if (job.id) {
+      await this.automationService.updateJobHistory(QUEUES.ENRICHMENT, job.id, 'completed')
+    }
+  }
+
   @OnWorkerEvent('failed')
-  onFailed(job: Job, error: Error): void {
+  async onFailed(job: Job, error: Error) {
     this.logger.error({
       message: 'Enrichment job failed',
       jobId: job.id,
@@ -365,5 +490,8 @@ export class EnrichmentProcessor extends WorkerHost {
       error: error.message,
       attemptsMade: job.attemptsMade,
     })
+    if (job.id) {
+      await this.automationService.updateJobHistory(QUEUES.ENRICHMENT, job.id, 'failed', error.message)
+    }
   }
 }

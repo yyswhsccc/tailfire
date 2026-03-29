@@ -94,6 +94,7 @@ export function setupBullBoard(
     clientCareQueue: Queue
     notificationsQueue: Queue
     documentRenderQueue: Queue
+    vacationSearchQueue?: Queue
   },
 ) {
   const enableBullBoard = process.env.ENABLE_BULL_BOARD === 'true'
@@ -115,13 +116,21 @@ export function setupBullBoard(
     const serverAdapter = new ExpressAdapter()
     serverAdapter.setBasePath('/admin/queues')
 
+    const queueAdapters = [
+      new BullMQAdapter(options.tripAutomationQueue, { readOnlyMode: isProduction }),
+      new BullMQAdapter(options.clientCareQueue, { readOnlyMode: isProduction }),
+      new BullMQAdapter(options.notificationsQueue, { readOnlyMode: isProduction }),
+      new BullMQAdapter(options.documentRenderQueue, { readOnlyMode: isProduction }),
+    ]
+
+    if (options.vacationSearchQueue) {
+      queueAdapters.push(
+        new BullMQAdapter(options.vacationSearchQueue, { readOnlyMode: isProduction }),
+      )
+    }
+
     createBullBoard({
-      queues: [
-        new BullMQAdapter(options.tripAutomationQueue, { readOnlyMode: isProduction }),
-        new BullMQAdapter(options.clientCareQueue, { readOnlyMode: isProduction }),
-        new BullMQAdapter(options.notificationsQueue, { readOnlyMode: isProduction }),
-        new BullMQAdapter(options.documentRenderQueue, { readOnlyMode: isProduction }),
-      ],
+      queues: queueAdapters,
       serverAdapter,
       options: {
         uiConfig: {
@@ -165,6 +174,7 @@ export async function getQueuesFromApp(app: INestApplication): Promise<{
   clientCareQueue: Queue
   notificationsQueue: Queue
   documentRenderQueue: Queue
+  vacationSearchQueue?: Queue
 } | null> {
   try {
     // Use getQueueToken from @nestjs/bullmq for correct token format
@@ -173,12 +183,21 @@ export async function getQueuesFromApp(app: INestApplication): Promise<{
     const notificationsQueue = app.get<Queue>(getQueueToken(QUEUE_NAMES.NOTIFICATIONS))
     const documentRenderQueue = app.get<Queue>(getQueueToken(QUEUE_NAMES.DOCUMENT_RENDER))
 
+    // Vacation search queue is optional (only available when SoftvoyageModule is loaded)
+    let vacationSearchQueue: Queue | undefined
+    try {
+      vacationSearchQueue = app.get<Queue>(getQueueToken(QUEUE_NAMES.VACATION_SEARCH))
+    } catch {
+      logger.debug('Vacation search queue not available — SoftvoyageModule may not be loaded')
+    }
+
     logger.log('Queue instances retrieved successfully')
     return {
       tripAutomationQueue,
       clientCareQueue,
       notificationsQueue,
       documentRenderQueue,
+      vacationSearchQueue,
     }
   } catch (error) {
     logger.warn(`Could not get queue instances - Bull Board will not be available: ${error}`)

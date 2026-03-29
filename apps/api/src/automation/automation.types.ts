@@ -18,6 +18,7 @@ export const QUEUES = {
   ENRICHMENT: 'enrichment',
   DOCUMENT_RENDER: 'document-render',
   EMAIL_SYNC: 'email-sync',
+  VACATION_SEARCH: 'vacation-search',
 } as const
 
 // Alias for backward compatibility
@@ -82,6 +83,10 @@ export const JOB_TYPES = {
   // Email sync jobs (queue registered in EmailAccountsModule, NOT here)
   EMAIL_SYNC: 'email.sync',
   EMAIL_DISPATCH_SYNC: 'email.dispatch_sync',
+
+  // Vacation pricing jobs
+  VACATION_SEARCH: 'vacation_search',
+  VACATION_HOTEL_ENRICHMENT: 'vacation_hotel_enrichment',
 } as const
 
 export type JobType = (typeof JOB_TYPES)[keyof typeof JOB_TYPES]
@@ -322,6 +327,30 @@ export interface DocumentRenderJobData {
 export interface EmailSyncJobData {
   type: 'email.sync' | 'email.dispatch_sync'
   emailAccountId?: string // required for 'email.sync'
+}
+
+// ============================================================================
+// Vacation Search Job Types
+// ============================================================================
+
+export interface VacationSearchJobData {
+  gatewayCode: string
+  destDep: string
+  dateDep: string // YYYYMMDD
+  duration: string
+  nbAdults: number
+  nbRooms: number
+  allInclusive: boolean
+  cacheKey: string
+}
+
+/**
+ * Vacation hotel enrichment job — enriches a hotel with Google Places and TripAdvisor data
+ */
+export interface VacationHotelEnrichmentJobData {
+  hotelId: string
+  hotelName: string
+  destination: string
 }
 
 // ============================================================================

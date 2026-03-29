@@ -30,7 +30,11 @@ import { CruiseRepositoryModule } from './cruise-repository/cruise-repository.mo
 import { CruiseBookingModule } from './cruise-booking/cruise-booking.module'
 import { GlobusModule } from './globus/globus.module'
 import { TourImportModule } from './tour-import/tour-import.module'
+import { VacationImportModule } from './vacation-import/vacation-import.module'
 import { TourRepositoryModule } from './tour-repository/tour-repository.module'
+import { VacationRepositoryModule } from './vacation-repository/vacation-repository.module'
+import { SoftvoyageModule } from './softvoyage/softvoyage.module'
+import { VacationEnrichmentModule } from './vacation-enrichment/vacation-enrichment.module'
 import { TemplatesModule } from './templates/templates.module'
 import { UserProfilesModule } from './user-profiles/user-profiles.module'
 import { UsersModule } from './users/users.module'
@@ -132,8 +136,20 @@ import { DestinationsModule } from './destinations/destinations.module'
     // Tour data import (Globus Family of Brands catalog sync)
     TourImportModule,
 
+    // Vacation package catalog sync (Softvoyage VCO)
+    VacationImportModule,
+
     // Tour repository (search/detail API)
     TourRepositoryModule,
+
+    // Vacation package catalog browse
+    VacationRepositoryModule,
+
+    // Softvoyage live pricing (VCO browser-based search)
+    SoftvoyageModule,
+
+    // Vacation hotel enrichment (Google Places + TripAdvisor via SerpAPI)
+    VacationEnrichmentModule,
 
     // Itinerary & Package Templates (Library)
     TemplatesModule,
