@@ -1,9 +1,10 @@
 /**
  * Softvoyage Browser Pool Service
  *
- * Manages a pool of reusable Playwright browser instances for navigating
- * Softvoyage VCO (public widget, no auth needed). Browsers are lazy-launched
- * on first acquirePage() call — nothing starts at module init.
+ * Manages a pool of reusable headless browser instances for navigating
+ * Softvoyage VCO (public widget, no auth needed). Uses puppeteer-core
+ * (same Chromium binary as PDF renderer — proven to work on Railway).
+ * Browsers are lazy-launched on first acquirePage() call.
  *
  * Used by the VACATION_SEARCH BullMQ processor to:
  * 1. Acquire a page
@@ -14,7 +15,7 @@
 
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { type Browser, type Page, chromium } from 'playwright-core'
+import puppeteer, { type Browser, type Page } from 'puppeteer-core'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -190,7 +191,7 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
       `Launching Chromium from ${executablePath} (pool slot ${this.pool.length + 1}/${this.maxPoolSize})`,
     )
 
-    const browser = await chromium.launch({
+    const browser = await puppeteer.launch({
       executablePath,
       headless: true,
       args: [
@@ -229,7 +230,7 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
 
     this.logger.log(`Launching replacement Chromium from ${executablePath}`)
 
-    const browser = await chromium.launch({
+    const browser = await puppeteer.launch({
       executablePath,
       headless: true,
       args: [

@@ -2,7 +2,7 @@
 import { ConfigService } from '@nestjs/config'
 
 // ---------------------------------------------------------------------------
-// Mock playwright-core — define mock objects INSIDE the factory to avoid
+// Mock puppeteer-core — define mock objects INSIDE the factory to avoid
 // jest.mock hoisting issues. Access them afterwards via require().
 // ---------------------------------------------------------------------------
 
@@ -10,8 +10,9 @@ const mockNewPage = jest.fn()
 const mockBrowserClose = jest.fn()
 const mockLaunch = jest.fn()
 
-jest.mock('playwright-core', () => ({
-  chromium: {
+jest.mock('puppeteer-core', () => ({
+  __esModule: true,
+  default: {
     launch: mockLaunch,
   },
 }))
