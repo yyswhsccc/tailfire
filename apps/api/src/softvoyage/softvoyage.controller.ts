@@ -41,6 +41,42 @@ export class SoftvoyageController {
   ) {}
 
   /**
+   * Debug: get saved VCO HTML from last search (stored in Redis by processor).
+   */
+  @Get('debug/html')
+  async debugHtml() {
+    try {
+      const Redis = (await import('ioredis')).default
+      const ConfigService = (await import('@nestjs/config')).ConfigService
+      const redisUrl = process.env.REDIS_URL
+      if (!redisUrl) return { error: 'No REDIS_URL' }
+      const redis = new Redis(redisUrl)
+      const html = await redis.get('vco:debug:raw-html')
+      await redis.quit()
+      if (!html) return { error: 'No cached HTML — run a search first' }
+      // Return first result div
+      const resultMatch = html.match(/<div[^>]*id="result-\d+"[^>]*>[\s\S]{0,5000}/)
+      return {
+        totalLength: html.length,
+        hasDataDome: html.includes('captcha-delivery'),
+        resultDivCount: (html.match(/id="result-/g) || []).length,
+        hotelTableCount: (html.match(/id="hotel-/g) || []).length,
+        firstResultDiv: resultMatch ? resultMatch[0].substring(0, 3000) : 'no result divs found',
+        // Also check what selectors exist
+        hasBoldColor: html.includes('color: #CC6633'),
+        hasFontSize17: html.includes('font-size: 17px'),
+        hasStarImg: html.includes('star1'),
+        hasSoftvoyageImg: html.includes('images.softvoyage.com'),
+        hasMonarc: html.includes('monarc'),
+        hasMoreres: html.includes('moreres-'),
+        hasClassExpand: html.includes('classExpand'),
+      }
+    } catch (err) {
+      return { error: String(err) }
+    }
+  }
+
+  /**
    * Diagnostic: test browser launch and VCO connectivity.
    */
   @Get('diagnostic')
