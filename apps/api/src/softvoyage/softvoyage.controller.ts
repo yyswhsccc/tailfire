@@ -101,6 +101,16 @@ export class SoftvoyageController {
     try {
       results.browserPoolEnabled = String(this.browserPool.isEnabled())
       results.chromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
+      results.hasProxy = String(!!process.env.RESIDENTIAL_PROXY_URL)
+
+      // Check which puppeteer is loaded
+      let stealthAvailable = false
+      try {
+        require('puppeteer-extra')
+        require('puppeteer-extra-plugin-stealth')
+        stealthAvailable = true
+      } catch { /* not available */ }
+      results.stealthAvailable = String(stealthAvailable)
 
       // Try to acquire a page
       const page = await this.browserPool.acquirePage()
