@@ -33,10 +33,12 @@ export interface DirectDestinationsSearchParams {
 }
 
 export interface NormalizedDirectDestination {
-  /** Destination airport IATA code */
-  destination: string
-  /** Airlines operating direct flights to this destination */
-  airlines: string[]
+  /** Destination IATA code */
+  iataCode: string
+  /** Destination city or airport name */
+  name: string
+  /** Location type (e.g. "city") */
+  type: string
 }
 
 interface AmadeusDirectDestinationsResponse {
@@ -211,25 +213,12 @@ export class AmadeusDirectDestinationsProvider
       return { success: false, error: 'No direct destinations found from this airport', metadata: response.metadata }
     }
 
-    // Group by destination IATA code — each entry may represent a separate airline route
-    const destinationMap = new Map<string, Set<string>>()
-    for (const item of items) {
-      const dest = item.iataCode
-      if (!destinationMap.has(dest)) {
-        destinationMap.set(dest, new Set())
-      }
-      // The API returns location entries; airline info may be in subType or name
-      if (item.subType) {
-        destinationMap.get(dest)!.add(item.subType)
-      }
-    }
-
-    const normalized: NormalizedDirectDestination[] = Array.from(destinationMap.entries()).map(
-      ([destination, airlines]) => ({
-        destination,
-        airlines: Array.from(airlines),
-      })
-    )
+    // Each item is a destination location — map directly, no fabricated airline data
+    const normalized: NormalizedDirectDestination[] = items.map((item) => ({
+      iataCode: item.iataCode,
+      name: item.name ?? '',
+      type: item.type ?? 'location',
+    }))
 
     return { success: true, data: normalized, metadata: response.metadata }
   }
@@ -256,8 +245,9 @@ export class AmadeusDirectDestinationsProvider
 
   transformResponse(apiData: any): NormalizedDirectDestination {
     return {
-      destination: apiData.iataCode || '',
-      airlines: [],
+      iataCode: apiData.iataCode || '',
+      name: apiData.name ?? '',
+      type: apiData.type ?? 'location',
     }
   }
 

@@ -303,7 +303,7 @@ export class OtaSearchController {
   @ApiOperation({ summary: 'Get direct flight destinations from an airport' })
   @ApiHeader({ name: 'x-ota-service-key', required: true, description: 'OTA service-to-service key' })
   @ApiQuery({ name: 'airport', required: true, description: '3-letter IATA airport code', example: 'YYZ' })
-  @ApiResponse({ status: 200, description: 'Direct destinations returned' })
+  @ApiResponse({ status: 200, description: 'Direct destinations returned as array of {iataCode, name, type}' })
   @ApiResponse({ status: 400, description: 'Invalid airport code' })
   @ApiResponse({ status: 401, description: 'Invalid OTA service key' })
   async searchDirectDestinations(

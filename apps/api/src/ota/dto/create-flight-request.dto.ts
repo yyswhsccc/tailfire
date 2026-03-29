@@ -40,4 +40,6 @@ export class CreateFlightRequestDto {
   @ApiProperty() @IsString() travelClass!: string
   @ApiPropertyOptional() @IsString() @IsOptional() specialRequests?: string
   @ApiPropertyOptional() @IsString() @IsOptional() amadeusOfferId?: string
+  @ApiPropertyOptional({ default: 'ota', description: 'Attribution source for the request' })
+  @IsString() @IsOptional() source?: string
 }

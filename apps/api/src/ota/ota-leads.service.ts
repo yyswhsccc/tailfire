@@ -282,23 +282,38 @@ export class OtaLeadsService {
     }
 
     // -----------------------------------------------------------------
-    // Step 2: Log structured flight details
+    // Step 2: Persist flight request in contact's travelPreferences
     // -----------------------------------------------------------------
-    const flightDetails = JSON.stringify(
-      {
-        outbound: dto.outboundFlight,
-        return: dto.returnFlight,
-        travelers: dto.travelers,
-        travelClass: dto.travelClass,
-        specialRequests: dto.specialRequests,
-        amadeusOfferId: dto.amadeusOfferId,
-      },
-      null,
-      2,
-    )
+    const flightRequest = {
+      source: dto.source ?? 'ota',
+      submittedAt: new Date().toISOString(),
+      outbound: dto.outboundFlight,
+      return: dto.returnFlight ?? null,
+      travelers: dto.travelers,
+      travelClass: dto.travelClass,
+      specialRequests: dto.specialRequests ?? null,
+      amadeusOfferId: dto.amadeusOfferId ?? null,
+    }
+
+    // Merge into existing travelPreferences — preserve prior data, append to flightRequests array
+    const existingPrefs: Record<string, any> = (contact!.travelPreferences as Record<string, any>) ?? {}
+    const existingRequests: any[] = Array.isArray(existingPrefs.flightRequests)
+      ? existingPrefs.flightRequests
+      : []
+
+    const updatedPrefs = {
+      ...existingPrefs,
+      flightRequests: [...existingRequests, flightRequest],
+    }
+
+    await this.db.client
+      .update(contacts)
+      .set({ travelPreferences: updatedPrefs, updatedAt: new Date() })
+      .where(eq(contacts.id, contact!.id))
 
     this.logger.log(
-      `Flight request for contact ${contact!.id}:\n${flightDetails}`,
+      `Flight request persisted for contact ${contact!.id} (source=${flightRequest.source}, ` +
+        `${dto.outboundFlight.origin}→${dto.outboundFlight.destination})`,
     )
 
     return {

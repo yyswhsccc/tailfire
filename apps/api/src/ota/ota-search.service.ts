@@ -238,9 +238,9 @@ export class OtaSearchService {
    */
   async searchDirectDestinations(
     params: DirectDestinationsSearchParams,
-  ): Promise<{ destinations: Array<{ destination: string; airlines: string[] }> } | { error: string }> {
+  ): Promise<{ destinations: Array<{ iataCode: string; name: string; type: string }> } | { error: string }> {
     const cacheKey = `direct-destinations:${params.departureAirportCode}`
-    const cached = this.cache.get<{ destinations: Array<{ destination: string; airlines: string[] }> }>(cacheKey)
+    const cached = this.cache.get<{ destinations: Array<{ iataCode: string; name: string; type: string }> }>(cacheKey)
     if (cached) return cached
 
     try {
