@@ -15,7 +15,15 @@
 
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import puppeteer, { type Browser, type Page } from 'puppeteer-core'
+import type { Browser, Page } from 'puppeteer-core'
+
+// Use puppeteer-extra with stealth for DataDome bypass
+// Static import works with SWC; require() in BullMQ processors does not
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const puppeteer = require('puppeteer-extra')
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const StealthPlugin = require('puppeteer-extra-plugin-stealth')
+puppeteer.use(StealthPlugin())
 
 // ---------------------------------------------------------------------------
 // Types
@@ -191,17 +199,28 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
       `Launching Chromium from ${executablePath} (pool slot ${this.pool.length + 1}/${this.maxPoolSize})`,
     )
 
+    const launchArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-blink-features=AutomationControlled',
+      '--window-size=1920,1080',
+    ]
+
+    // Add residential proxy if configured
+    const proxyUrl = this.configService.get<string>('RESIDENTIAL_PROXY_URL')
+    if (proxyUrl) {
+      try {
+        const parsed = new URL(proxyUrl)
+        launchArgs.push(`--proxy-server=${parsed.protocol}//${parsed.hostname}:${parsed.port}`)
+      } catch { /* ignore invalid proxy URL */ }
+    }
+
     const browser = await puppeteer.launch({
       executablePath,
       headless: 'shell',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-blink-features=AutomationControlled',
-        '--window-size=1920,1080',
-      ],
+      args: launchArgs,
     })
 
     const page = await browser.newPage()
@@ -232,17 +251,26 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
 
     this.logger.log(`Launching replacement Chromium from ${executablePath}`)
 
+    const recycleArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-blink-features=AutomationControlled',
+      '--window-size=1920,1080',
+    ]
+    const proxyUrl = this.configService.get<string>('RESIDENTIAL_PROXY_URL')
+    if (proxyUrl) {
+      try {
+        const parsed = new URL(proxyUrl)
+        recycleArgs.push(`--proxy-server=${parsed.protocol}//${parsed.hostname}:${parsed.port}`)
+      } catch { /* ignore */ }
+    }
+
     const browser = await puppeteer.launch({
       executablePath,
       headless: 'shell',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-blink-features=AutomationControlled',
-        '--window-size=1920,1080',
-      ],
+      args: recycleArgs,
     })
 
     const page = await browser.newPage()

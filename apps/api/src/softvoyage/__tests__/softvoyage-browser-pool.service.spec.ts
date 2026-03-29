@@ -2,20 +2,21 @@
 import { ConfigService } from '@nestjs/config'
 
 // ---------------------------------------------------------------------------
-// Mock puppeteer-core
+// Mock puppeteer-extra (used by browser pool service with stealth plugin)
 // ---------------------------------------------------------------------------
 
 const mockNewPage = jest.fn()
 const mockBrowserClose = jest.fn()
 const mockLaunch = jest.fn()
 
-jest.mock('puppeteer-core', () => ({
-  __esModule: true,
-  default: {
-    launch: mockLaunch,
-  },
+jest.mock('puppeteer-extra', () => ({
   launch: mockLaunch,
+  use: jest.fn(),
 }))
+
+jest.mock('puppeteer-extra-plugin-stealth', () => {
+  return jest.fn(() => ({}))
+})
 
 // We import the service AFTER mock is declared
 // eslint-disable-next-line @typescript-eslint/no-require-imports

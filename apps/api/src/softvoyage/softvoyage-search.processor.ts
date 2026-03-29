@@ -88,57 +88,14 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
       `Processing vacation search: ${gatewayCode} -> ${destDep}, ${dateDep}, ${duration}n, ${nbAdults}a, ${nbRooms}r [${job.id}]`,
     )
 
-    // Launch a fresh browser per search with residential proxy + manual stealth patches.
-    // Using puppeteer-core directly (not puppeteer-extra) to avoid SWC/module loading issues.
-    const puppeteer = await import('puppeteer-core')
-    const executablePath = this.configService.get<string>('PUPPETEER_EXECUTABLE_PATH') || '/usr/bin/chromium'
-    let browser: import('puppeteer-core').Browser | null = null
-    let page: import('puppeteer-core').Page | null = null
+    // Use browser pool (has puppeteer-extra stealth applied at module level)
+    let page: Awaited<ReturnType<SoftvoyageBrowserPoolService['acquirePage']>> | null = null
 
     try {
-      // Build launch args — add residential proxy if configured
+      page = await this.browserPool.acquirePage()
+
+      // Set up proxy authentication if configured
       const proxyUrl = this.configService.get<string>('RESIDENTIAL_PROXY_URL')
-      const launchArgs = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-blink-features=AutomationControlled', '--window-size=1920,1080']
-      if (proxyUrl) {
-        const proxyParsed = new URL(proxyUrl)
-        launchArgs.push(`--proxy-server=${proxyParsed.protocol}//${proxyParsed.hostname}:${proxyParsed.port}`)
-      }
-
-      browser = await puppeteer.default.launch({
-        executablePath,
-        headless: 'shell',
-        args: launchArgs,
-      })
-      page = await browser.newPage()
-
-      // Manual stealth patches (replaces puppeteer-extra-plugin-stealth)
-      await page.evaluateOnNewDocument(() => {
-        // Hide webdriver flag
-        Object.defineProperty(navigator, 'webdriver', { get: () => false })
-        // Fake plugins array
-        Object.defineProperty(navigator, 'plugins', {
-          get: () => [1, 2, 3, 4, 5],
-        })
-        // Fake languages
-        Object.defineProperty(navigator, 'languages', {
-          get: () => ['en-US', 'en'],
-        })
-        // Override permissions query
-        const originalQuery = window.navigator.permissions.query
-        // @ts-ignore
-        window.navigator.permissions.query = (parameters: any) =>
-          parameters.name === 'notifications'
-            ? Promise.resolve({ state: Notification.permission } as PermissionStatus)
-            : originalQuery(parameters)
-        // Chrome runtime
-        // @ts-ignore
-        window.chrome = { runtime: {} }
-      })
-      await page.setUserAgent(
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      )
-
-      // Authenticate proxy if credentials provided
       if (proxyUrl) {
         const proxyParsed = new URL(proxyUrl)
         if (proxyParsed.username) {
@@ -147,10 +104,8 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
             password: decodeURIComponent(proxyParsed.password),
           })
         }
-        this.logger.log(`Fresh browser launched with residential proxy for search [${job.id}]`)
-      } else {
-        this.logger.log(`Fresh browser launched (no proxy) for search [${job.id}]`)
       }
+      this.logger.log(`Acquired browser page for search [${job.id}]${proxyUrl ? ' (with proxy)' : ''}`)
 
       // 2. Navigate to query form page first to establish VCO session
       const queryUrl = `${this.vcoBaseUrl}/querypackage.cgi?code_ag=${this.codeAg}&alias=${this.alias}&language=en`
@@ -208,9 +163,8 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
       const html = await page.content()
       this.logger.log(`Results page: ${html.length} bytes`)
 
-      // 6. Close browser immediately after getting HTML (fresh browser per search)
-      await browser?.close().catch(() => {})
-      browser = null
+      // 6. Release page back to pool
+      await this.browserPool.releasePage(page)
       page = null
 
       this.logger.debug(`Got HTML response (${html.length} bytes), parsing results...`)
@@ -252,12 +206,11 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
       )
       throw error // Let BullMQ retry
     } finally {
-      // Always close browser if not already closed
-      if (browser) {
+      if (page) {
         try {
-          await browser.close()
+          await this.browserPool.releasePage(page)
         } catch {
-          // Browser may already be closed
+          // Pool may be shutting down
         }
       }
     }
