@@ -15,9 +15,11 @@ import { formatPrice, countStops, formatIsoDuration } from "@/lib/flight-utils";
 function ConfirmSegment({
   offer,
   label,
+  onChangeClick,
 }: {
   offer: FlightOffer;
   label: "DEPARTURE" | "RETURN";
+  onChangeClick?: () => void;
 }) {
   const firstSeg = offer.segments[0];
   const lastSeg = offer.segments[offer.segments.length - 1];
@@ -60,12 +62,21 @@ function ConfirmSegment({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <span className="text-xs uppercase tracking-wider text-muted-foreground">
             {label}
           </span>
         </CardTitle>
+        {onChangeClick && (
+          <button
+            type="button"
+            onClick={onChangeClick}
+            className="text-xs font-medium text-[#C59746] hover:underline"
+          >
+            Change
+          </button>
+        )}
       </CardHeader>
       <CardContent>
         <div className="flex items-start justify-between gap-4">
@@ -143,6 +154,7 @@ export function FlightConfirmation() {
   const children = useFlightSearch((s) => s.children);
   const setShowRequestForm = useFlightSearch((s) => s.setShowRequestForm);
   const changeOutbound = useFlightSearch((s) => s.changeOutbound);
+  const changeReturn = useFlightSearch((s) => s.changeReturn);
 
   if (!selectedOutbound) return null;
 
@@ -160,11 +172,11 @@ export function FlightConfirmation() {
       <h2 className="text-xl font-bold">Confirm Your Selection</h2>
 
       {/* Outbound segment */}
-      <ConfirmSegment offer={selectedOutbound} label="DEPARTURE" />
+      <ConfirmSegment offer={selectedOutbound} label="DEPARTURE" onChangeClick={changeOutbound} />
 
       {/* Return segment (round-trip only) */}
       {tripType === "round-trip" && selectedReturn && (
-        <ConfirmSegment offer={selectedReturn} label="RETURN" />
+        <ConfirmSegment offer={selectedReturn} label="RETURN" onChangeClick={changeReturn} />
       )}
 
       {/* Total card */}
@@ -180,17 +192,43 @@ export function FlightConfirmation() {
       </Card>
 
       {/* Action buttons */}
-      <div className="flex gap-3">
-        <Button variant="outline" onClick={changeOutbound}>
-          Start Over
-        </Button>
+      <div className="flex flex-wrap gap-3">
         <Button
-          className="bg-[#C59746] text-white hover:bg-[#B08636]"
+          className="flex-1 bg-[#C59746] text-white hover:bg-[#B08636]"
           onClick={() => setShowRequestForm(true)}
         >
           <Check className="size-4 mr-1.5" data-icon="inline-start" />
           Request This Flight
         </Button>
+      </div>
+      <div className="flex gap-3 text-center">
+        <button
+          type="button"
+          onClick={changeOutbound}
+          className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+        >
+          Change departure
+        </button>
+        {tripType === "round-trip" && selectedReturn && (
+          <>
+            <span className="text-xs text-muted-foreground">·</span>
+            <button
+              type="button"
+              onClick={changeReturn}
+              className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
+              Change return
+            </button>
+          </>
+        )}
+        <span className="text-xs text-muted-foreground">·</span>
+        <button
+          type="button"
+          onClick={changeOutbound}
+          className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+        >
+          Start over
+        </button>
       </div>
     </div>
   );

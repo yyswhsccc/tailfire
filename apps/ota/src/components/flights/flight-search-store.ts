@@ -163,6 +163,7 @@ interface FlightSearchState {
   selectOutbound: (offer: FlightOffer) => void;
   selectReturn: (offer: FlightOffer) => void;
   changeOutbound: () => void;
+  changeReturn: () => void;
   resetFilters: () => void;
   reset: () => void;
 }
@@ -271,6 +272,12 @@ export const useFlightSearch = create<FlightSearchState>((set) => ({
       selectedOutbound: null,
       selectedReturn: null,
       roundTripStep: 'outbound',
+    }),
+
+  changeReturn: () =>
+    set({
+      selectedReturn: null,
+      roundTripStep: 'return',
     }),
 
   resetFilters: () => set({ filters: { ...DEFAULT_FILTERS } }),
