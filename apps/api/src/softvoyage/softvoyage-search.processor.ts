@@ -94,6 +94,12 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
       // 1. Acquire page from browser pool
       page = await this.browserPool.acquirePage()
 
+      // 1b. Clear cookies and cache to avoid DataDome state contamination between searches
+      const client = await page.createCDPSession()
+      await client.send('Network.clearBrowserCookies')
+      await client.send('Network.clearBrowserCache')
+      await client.detach()
+
       // 2. Navigate to query form page first to establish VCO session
       const queryUrl = `${this.vcoBaseUrl}/querypackage.cgi?code_ag=${this.codeAg}&alias=${this.alias}&language=en`
       this.logger.debug(`Navigating to query form: ${queryUrl}`)
