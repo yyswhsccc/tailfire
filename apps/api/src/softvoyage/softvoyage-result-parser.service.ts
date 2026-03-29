@@ -61,10 +61,10 @@ export class SoftvoyageResultParserService {
     const $ = cheerio.load(html);
     const results: VacationSearchResult[] = [];
 
-    // Try VCO format first (div[id^="result-"]), fall back to VCM (table[id^="hotel-"])
-    const vcoResults = $('div[id^="result-"]');
-    const selector = vcoResults.length > 0 ? 'div[id^="result-"]' : 'table[id^="hotel-"]';
-    const idPrefix = vcoResults.length > 0 ? 'result-' : 'hotel-';
+    // Detect format: VCO uses div[id^="result-"], VCM uses table[id^="hotel-"]
+    const isVCO = $('div[id^="result-"]').length > 0;
+    const selector = isVCO ? 'div[id^="result-"]' : 'table[id^="hotel-"]';
+    const idPrefix = isVCO ? 'result-' : 'hotel-';
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     $(selector).each((_: number, hotelEl: any) => {
@@ -74,39 +74,51 @@ export class SoftvoyageResultParserService {
       // ── Hotel name ──────────────────────────────────────────────
       let hotelName = '';
       let destination = '';
-      // Try multiple selectors — VCM uses td with inline styles, VCO may use different elements
-      const nameCell = $hotel
-        .find('td[style*="color: #CC6633"], td[style*="font-size: 17px"], [style*="font-weight: bold"][style*="font-size"]')
-        .first();
-      if (nameCell.length) {
-        hotelName = nameCell
-          .contents()
-          .filter(function () {
-            return (this as { type: string }).type === 'text';
-          })
-          .first()
-          .text()
-          .trim();
-        // Destination in <nobr> or small span
-        destination = nameCell.find('nobr').text().trim();
-        if (!destination) {
-          destination = nameCell
-            .find('span[style*="font-size:12px"], span[style*="font-size: 12px"]')
+
+      if (isVCO) {
+        // VCO: name in h5.card-title, destination in <p> inside .link column
+        const titleEl = $hotel.find('h5.card-title, .card-header h5').first();
+        if (titleEl.length) {
+          // Get text without star icons
+          hotelName = titleEl.clone().find('i').remove().end().text().trim();
+        }
+        // Destination from <p> in the .link column
+        const destP = $hotel.find('.link p, .card-body p').first();
+        if (destP.length) {
+          destination = destP.text().trim();
+        }
+      } else {
+        // VCM: name in td with inline color style
+        const nameCell = $hotel
+          .find('td[style*="color: #CC6633"], td[style*="font-size: 17px"]')
+          .first();
+        if (nameCell.length) {
+          hotelName = nameCell
+            .contents()
+            .filter(function () {
+              return (this as { type: string }).type === 'text';
+            })
             .first()
             .text()
             .trim();
-        }
-      }
-      // Fallback: try finding hotel name from any bold/large text with the hotel pattern
-      if (!hotelName) {
-        const boldText = $hotel.find('.hotel-name, h3, h4, [class*="hotel"], [style*="font-weight: bold"]').first();
-        if (boldText.length) {
-          hotelName = boldText.text().trim();
+          destination = nameCell.find('nobr').text().trim();
+          if (!destination) {
+            destination = nameCell
+              .find('span[style*="font-size:12px"]')
+              .first()
+              .text()
+              .trim();
+          }
         }
       }
 
-      // ── Star rating (count star images) ─────────────────────────
-      const starRating = $hotel.find('img[src*="star1"]').length;
+      // ── Star rating ───────────────────────────────────────────
+      // VCO uses <i class="fas fa-star">, VCM uses <img src="...star1...">
+      const starRating = isVCO
+        ? $hotel.find('i.fa-star').length
+        : $hotel.find('img[src*="star1"]').length;
+      // VCO counts stars twice (desktop + mobile) — take half rounded down
+      const adjustedStars = isVCO ? Math.ceil(starRating / 2) : starRating;
 
       // ── Hotel image ─────────────────────────────────────────────
       const imageUrl =
@@ -128,7 +140,7 @@ export class SoftvoyageResultParserService {
       });
 
       // ── Monarc rating & review count ────────────────────────────
-      const monarcLink = $hotel.find('a[onclick*="monarc"]');
+      const monarcLink = $hotel.find('a[onclick*="monarc"], a[href*="monarc"]');
       const monarcText = monarcLink.text();
       const monarcRating = monarcText.match(/\(([0-9.]+)\)/)?.[1] ?? '';
       const monarcReviewCount = parseInt(
@@ -136,17 +148,18 @@ export class SoftvoyageResultParserService {
         10,
       );
 
-      // ── Package pricing rows from moreres table ─────────────────
+      // ── Package pricing rows ─────────────────────────────────
       const packages: VacationPackageOption[] = [];
-      // VCM uses #moreres-{id}, VCO may use different IDs or nested tables
+      // VCM: #moreres-{id} tbody tr
+      // VCO: table inside the card, or table after the card
       let $moreres = $(`#moreres-${hotelId}`);
       if (!$moreres.length) {
-        // Fallback: look for the pricing table inside the result container
-        $moreres = $hotel.find('table.search, table[cellspacing="0"]').last();
+        // VCO: look for tables inside the result card
+        $moreres = $hotel.find('table').first();
       }
       if (!$moreres.length) {
-        // Last resort: look for rows with pricing data directly in the container
-        $moreres = $hotel;
+        // VCO: the results table might be a sibling, not a child
+        $moreres = $hotel.next('table');
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -264,7 +277,7 @@ export class SoftvoyageResultParserService {
           hotelId,
           hotelName: hotelName || `Hotel ${hotelId}`,
           destination,
-          starRating,
+          starRating: adjustedStars,
           imageUrl,
           amenities: [...new Set(amenities)],
           monarcRating,
