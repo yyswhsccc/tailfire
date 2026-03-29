@@ -150,53 +150,121 @@ export class SoftvoyageResultParserService {
 
       // ── Package pricing rows ─────────────────────────────────
       const packages: VacationPackageOption[] = [];
-      // VCM: #moreres-{id} tbody tr
-      // VCO: table inside the card, or table after the card
-      let $moreres = $(`#moreres-${hotelId}`);
-      if (!$moreres.length) {
-        // VCO: look for tables inside the result card
-        $moreres = $hotel.find('table').first();
-      }
-      if (!$moreres.length) {
-        // VCO: the results table might be a sibling, not a child
-        $moreres = $hotel.next('table');
-      }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      $moreres.find('tbody tr').each((_: number, rowEl: any) => {
-        const $row = $(rowEl);
+      if (isVCO) {
+        // VCO: table.table-options-chambres inside or after the result card
+        const $pricingTable = $hotel.find('table.table-options-chambres').length
+          ? $hotel.find('table.table-options-chambres')
+          : $hotel.nextAll('table.table-options-chambres').first();
 
-        // Room type is in a span with text-transform
-        const roomTypeSpan = $row.find('span[style*="text-transform"]');
-        if (!roomTypeSpan.length) return; // flight continuation row
-
-        const roomType = roomTypeSpan.text().trim();
-
-        // Meal plan (text near room type)
-        const roomCell = roomTypeSpan.closest('td');
-        const roomCellText = roomCell.text();
-        const mealPlan = roomCellText.includes('All Inclusive')
-          ? 'All Inclusive'
-          : roomCellText.replace(roomType, '').trim() || 'All Inclusive';
-
-        // Nights from cell with Check-in title
-        const nightsCell = $row.find('td[title*="Check-in"]');
-        const nights = parseInt(nightsCell.text().trim(), 10) || 0;
-
-        // Tour operator (short code in rowspan cell)
-        let tourOperator = '';
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        $row.find('td[rowspan]').each((_: number, c: any) => {
-          const text = $(c).text().trim();
-          if (/^[A-Z]{2,4}$/.test(text)) tourOperator = text;
-        });
+        $pricingTable.find('tr.option-chambre').each((_: number, rowEl: any) => {
+          const $row = $(rowEl);
+          // Skip mobile rows
+          if ($row.hasClass('tr-mobile') || $row.hasClass('d-table-row')) return;
 
-        // Flight info from itinerary cells
-        const itinCells = $row.find('td.ligne-point-itin');
-        let departureDate = '';
-        let flightNumber = '';
-        let departureTime = '';
-        let arrivalTime = '';
+          // Tour operator from logo img title
+          const tourOperator = $row.find('td.col-tour-op img').attr('title') ?? '';
+
+          // Room type from a.description-chambre
+          const roomType = $row.find('a.description-chambre, .description-chambre').text().trim();
+
+          // Meal plan
+          const mealPlan = $row.find('p.description-meal, .description-meal').text().trim() || 'All Inclusive';
+
+          // Nights
+          const nightsText = $row.find('td.col-nuit, .col-nuit').text().trim();
+          const nights = parseInt(nightsText, 10) || 0;
+
+          // Itinerary / flight info from col-itin
+          const itinText = $row.find('td.col-itin, .col-itin').text().trim();
+          let departureDate = '';
+          let flightNumber = '';
+          let departureTime = '';
+          let arrivalTime = '';
+
+          // Parse itinerary text — typically has date, flight#, times
+          const dateMatch = itinText.match(/([A-Z]{3}\s+\d{1,2})/);
+          if (dateMatch) departureDate = dateMatch[1]!;
+          const flightMatch = itinText.match(/([A-Z]{2}\d+)/);
+          if (flightMatch) flightNumber = flightMatch[1]!;
+          const timeMatches = itinText.match(/(\d{1,2}:\d{2})/g);
+          if (timeMatches) {
+            departureTime = timeMatches[0] ?? '';
+            arrivalTime = timeMatches[1] ?? '';
+          }
+
+          // Baggage
+          const baggage = $row.find('[title*="bag"], [title*="Bag"]').attr('title') ?? '';
+
+          // Price — look for col-prix or any element with $ amount
+          const priceText = $row.find('td.col-prix, .col-prix, .prix').text().trim();
+          const priceMatches: string[] = priceText.match(/\$[\d,]+/g) ?? [];
+          // Also check for price in any td with dollar amounts
+          if (priceMatches.length === 0) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            $row.find('td').each((_: number, td: any) => {
+              const text = $(td).text().trim();
+              const m = text.match(/\$[\d,]+/g);
+              if (m) priceMatches.push(...m);
+            });
+          }
+
+          packages.push({
+            roomType,
+            mealPlan,
+            nights,
+            tourOperator,
+            departureDate,
+            flightNumber,
+            departureTime,
+            arrivalTime,
+            baggage,
+            basePrice: dollarsToCents(priceMatches[0] ?? ''),
+            taxes: dollarsToCents(priceMatches[1] ?? ''),
+            totalPrice: dollarsToCents(priceMatches[2] ?? priceMatches[0] ?? ''),
+            grandTotal: dollarsToCents(priceMatches[3] ?? priceMatches[0] ?? ''),
+          });
+        });
+      } else {
+        // VCM format
+        const $moreres = $(`#moreres-${hotelId}`);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        $moreres.find('tbody tr').each((_: number, rowEl: any) => {
+          const $row = $(rowEl);
+
+          // Room type is in a span with text-transform
+          const roomTypeSpan = $row.find('span[style*="text-transform"]');
+          if (!roomTypeSpan.length) return; // flight continuation row
+
+          const roomType = roomTypeSpan.text().trim();
+
+          // Meal plan (text near room type)
+          const roomCell = roomTypeSpan.closest('td');
+          const roomCellText = roomCell.text();
+          const mealPlan = roomCellText.includes('All Inclusive')
+            ? 'All Inclusive'
+            : roomCellText.replace(roomType, '').trim() || 'All Inclusive';
+
+          // Nights from cell with Check-in title
+          const nightsCell = $row.find('td[title*="Check-in"]');
+          const nights = parseInt(nightsCell.text().trim(), 10) || 0;
+
+          // Tour operator (short code in rowspan cell)
+          let tourOperator = '';
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          $row.find('td[rowspan]').each((_: number, c: any) => {
+            const text = $(c).text().trim();
+            if (/^[A-Z]{2,4}$/.test(text)) tourOperator = text;
+          });
+
+          // Flight info from itinerary cells
+          const itinCells = $row.find('td.ligne-point-itin');
+          let departureDate = '';
+          let flightNumber = '';
+          let departureTime = '';
+          let arrivalTime = '';
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         itinCells.each((_: number, c: any) => {
@@ -271,6 +339,7 @@ export class SoftvoyageResultParserService {
           grandTotal: dollarsToCents(prices[3] ?? ''),
         });
       });
+      } // end VCM else block
 
       if (hotelId) {
         results.push({
