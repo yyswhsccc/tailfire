@@ -130,7 +130,7 @@ describe('SoftvoyageCatalogClientService', () => {
       const rawResponse = [
         {
           destinations: [
-            'Cancun--xx--Cancun xxx101,102xxxMX--xx--7,14',
+            'Cancun--xx--Cancun xxx101_102--xx--7,14',
           ],
         },
       ]
@@ -138,11 +138,11 @@ describe('SoftvoyageCatalogClientService', () => {
 
       const result = await service.fetchDestinations('YYZ')
 
-      // Composite ID "101,102" should produce 2 individual entries
+      // Composite ID "101_102" should produce 2 individual entries
       expect(result).toHaveLength(2)
       expect(result[0]!.name).toBe('Cancun')
       expect(result[0]!.id).toBe('101')
-      expect(result[0]!.countryCodes).toBe('MX')
+      expect(result[0]!.countryCodes).toBe('')
       expect(result[0]!.durations).toEqual([7, 14])
       expect(result[0]!.isGroup).toBe(false)
       expect(result[1]!.name).toBe('Cancun')
@@ -165,11 +165,11 @@ describe('SoftvoyageCatalogClientService', () => {
       expect(result[0]!.name).toBe('All Mexico')
     })
 
-    it('should mark destinations starting with "- " as groups', async () => {
+    it('should clean sub-destination names starting with "- "', async () => {
       const rawResponse = [
         {
           destinations: [
-            '- Beach Resorts--xx--Beach Resorts xxx301xxxMX--xx--7',
+            '- Beach Resorts--xx--Beach Resorts xxx301--xx--7',
           ],
         },
       ]
@@ -177,8 +177,8 @@ describe('SoftvoyageCatalogClientService', () => {
 
       const result = await service.fetchDestinations('YYZ')
 
-      expect(result[0]!.isGroup).toBe(true)
-      expect(result[0]!.name).toBe('- Beach Resorts')
+      expect(result[0]!.isGroup).toBe(false)
+      expect(result[0]!.name).toBe('Beach Resorts')
     })
 
     it('should skip separator entries starting with "--xx--"', async () => {
@@ -186,7 +186,7 @@ describe('SoftvoyageCatalogClientService', () => {
         {
           destinations: [
             '--xx-- xxx--xx--',
-            'Cancun--xx--Cancun xxx101xxxMX--xx--7',
+            'Cancun--xx--Cancun xxx101--xx--7',
           ],
         },
       ]
@@ -220,11 +220,11 @@ describe('SoftvoyageCatalogClientService', () => {
       expect(result).toEqual([])
     })
 
-    it('should handle destination with no country codes or durations', async () => {
+    it('should handle destination with no durations', async () => {
       const rawResponse = [
         {
           destinations: [
-            'Punta Cana--xx--Punta Cana xxx401xxx--xx--',
+            'Punta Cana--xx--Punta Cana xxx401--xx--',
           ],
         },
       ]
@@ -242,7 +242,7 @@ describe('SoftvoyageCatalogClientService', () => {
       const rawResponse = [
         {
           destinations: [
-            'Cuba--xx--Cuba xxx501xxxCU--xx--7,10,14,21',
+            'Cuba (Havana)--xx--Cuba (Havana) xxx501--xx--7,10,14,21',
           ],
         },
       ]
@@ -254,14 +254,14 @@ describe('SoftvoyageCatalogClientService', () => {
       result[0]!.durations.forEach((d) => expect(typeof d).toBe('number'))
     })
 
-    it('should handle multiple destinations including groups and individuals', async () => {
+    it('should handle multiple destinations including groups and sub-destinations', async () => {
       const rawResponse = [
         {
           destinations: [
-            'All Caribbean--xx--All Caribbean xxx601,602,603xxxMX,DO,CU--xx--7,14',
-            '- Cancun--xx--Cancun xxx601xxxMX--xx--7',
-            'Punta Cana--xx--Punta Cana xxx602xxxDO--xx--7,14',
-            'Havana--xx--Havana xxx603xxxCU--xx--14',
+            'All Caribbean--xx--All Caribbean xxx601_602_603--xx--7,14',
+            '- Cancun--xx--Cancun xxx601--xx--7',
+            'Punta Cana--xx--Punta Cana xxx602--xx--7,14',
+            'Havana--xx--Havana xxx603--xx--14',
           ],
         },
       ]
@@ -269,15 +269,16 @@ describe('SoftvoyageCatalogClientService', () => {
 
       const result = await service.fetchDestinations('YYZ')
 
-      // "All Caribbean" has composite ID 601,602,603 → 3 group entries
-      // "- Cancun" has single ID → 1 group entry
+      // "All Caribbean" has composite ID 601_602_603 → 3 group entries
+      // "- Cancun" is a sub-destination with single ID → 1 entry (name cleaned to "Cancun")
       // "Punta Cana" and "Havana" have single IDs → 1 each
       expect(result).toHaveLength(6)
       expect(result[0]!.isGroup).toBe(true)   // "All Caribbean" id=601
       expect(result[0]!.id).toBe('601')
       expect(result[1]!.isGroup).toBe(true)   // "All Caribbean" id=602
       expect(result[2]!.isGroup).toBe(true)   // "All Caribbean" id=603
-      expect(result[3]!.isGroup).toBe(true)   // "- Cancun" id=601
+      expect(result[3]!.name).toBe('Cancun')  // "- Cancun" cleaned → "Cancun"
+      expect(result[3]!.id).toBe('601')
       expect(result[4]!.isGroup).toBe(false)  // "Punta Cana" id=602
       expect(result[5]!.isGroup).toBe(false)  // "Havana" id=603
     })

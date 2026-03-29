@@ -227,48 +227,50 @@ export class SoftvoyageCatalogClientService {
     const destinations: VcoDestination[] = []
 
     for (const d of raw) {
-      // Skip separator entries (e.g., "--xx-- xxx--xx--")
-      if (d.trim().startsWith('--xx--') || d.trim() === '') {
-        continue
-      }
+      // Skip separator entries (e.g., "--xx-- xxx--xx--") and empty strings
+      if (!d.trim() || d.trim().startsWith('--xx--')) continue
 
-      const [displayPart, ...restParts] = d.split('--xx--')
-      const rest = restParts.join('--xx--')
-      const name = (displayPart ?? '').trim()
+      const parts = d.split('--xx--')
+      // VCO format: "DisplayName--xx--NameWithIds xxx<IDs>--xx--durations"
+      // Example: "Anguilla (Anguilla)--xx--Anguilla (Anguilla) xxx174--xx--5,6,7,8,14"
+      // Example: "Bahamas--xx--Bahamas xxx25_188--xx--4,5,6,7,8"
+      // Example: "- Nassau--xx--Nassau xxx25--xx--4,5,6,7,8"
 
-      // Skip entries with no name
-      if (!name) continue
+      const displayName = (parts[0] ?? '').trim()
+      const idsField = (parts[1] ?? '').trim()
+      const durField = (parts[2] ?? '').trim()
 
-      // Skip separator-style entries (blank name before first --xx--)
-      if (name === '' || (name.startsWith(' ') && name.trim() === '')) continue
+      if (!displayName) continue
 
-      const isGroup = name.startsWith('All ') || name.startsWith('- ')
+      // Clean display name: remove leading "- " for sub-destinations
+      const isSubDest = displayName.startsWith('- ')
+      const isGroup = displayName.startsWith('All ')
+      const cleanName = isSubDest ? displayName.substring(2).trim() : displayName
 
-      // Extract IDs between first pair of xxx markers: xxx<IDS>xxx
-      const xxxMatch = rest.match(/xxx(.+?)xxx/)
-      const rawIds = xxxMatch ? xxxMatch[1]! : ''
+      // Extract numeric IDs after "xxx" in the second field
+      // "Anguilla (Anguilla) xxx174" → "174"
+      // "Bahamas xxx25_188" → "25_188"
+      const xxxIdx = idsField.lastIndexOf('xxx')
+      const rawIds = xxxIdx >= 0 ? idsField.substring(xxxIdx + 3).trim() : ''
 
-      // Extract country codes: uppercase letters+commas between xxx markers and --xx--
-      const ccMatch = rest.match(/xxx([A-Z,]+)--xx--/)
-      const countryCodes = ccMatch ? ccMatch[1]! : ''
+      // Extract country info from parentheses in display name
+      // "Anguilla (Anguilla)" → countryCodes = ""  (it's a location, not a code)
+      // We don't have real country codes from VCO — leave empty
+      const countryCodes = ''
 
-      // Extract durations after last --xx--: digits and commas
-      const durMatch = rest.match(/--xx--([0-9,]+)$/)
-      const durationsRaw = durMatch ? durMatch[1]! : ''
-      const durations = durationsRaw
-        ? durationsRaw.split(',').map((s) => parseInt(s, 10)).filter((n) => !isNaN(n))
+      // Parse durations
+      const durations = durField
+        ? durField.split(',').map((s) => parseInt(s, 10)).filter((n) => !isNaN(n))
         : []
 
-      // Split composite IDs into individual destination entries
-      // Per spec: "providerIdentifier stores individual destination IDs only"
-      const individualIds = rawIds.split(',').map((s) => s.trim()).filter(Boolean)
+      // Split composite IDs (underscore-separated): "25_188" → ["25", "188"]
+      const individualIds = rawIds.split('_').map((s) => s.trim()).filter(Boolean)
 
       if (individualIds.length === 0) {
-        // No valid ID — store with empty id (groups, etc.)
-        destinations.push({ name, id: '', countryCodes, durations, isGroup })
+        destinations.push({ name: cleanName, id: '', countryCodes, durations, isGroup })
       } else {
         for (const id of individualIds) {
-          destinations.push({ name, id, countryCodes, durations, isGroup })
+          destinations.push({ name: cleanName, id, countryCodes, durations, isGroup })
         }
       }
     }
