@@ -23,6 +23,8 @@ import { OtaSearchController } from './ota-search.controller'
 import { OtaSearchService } from './ota-search.service'
 import { OtaSearchCacheService } from './ota-search-cache.service'
 import { SerpFlightPricesService } from './serp-flight-prices.service'
+import { OtaTripRequestsService } from './ota-trip-requests.service'
+import { OwnerResolutionService } from './owner-resolution.service'
 import { OtaServiceKeyGuard } from './guards/ota-service-key.guard'
 import { CruiseBookingModule } from '../cruise-booking/cruise-booking.module'
 import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
@@ -52,8 +54,10 @@ import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
     OtaSearchService,
     OtaSearchCacheService,
     SerpFlightPricesService,
+    OtaTripRequestsService,
+    OwnerResolutionService,
     OtaServiceKeyGuard,
   ],
-  exports: [OtaLeadsService, OtaReferralsService, OtaPublishedTripsService, OtaSearchService],
+  exports: [OtaLeadsService, OtaReferralsService, OtaPublishedTripsService, OtaSearchService, OtaTripRequestsService, OwnerResolutionService],
 })
 export class OtaModule {}
