@@ -287,6 +287,9 @@ export function toFlightDefaults(
     // API response with segments in flightDetails
     const apiSegments = (serverData as any).flightDetails.segments
     segments = apiSegments.map((seg: any) => mapApiSegmentToFormSegment(seg, dayDate))
+  } else if (serverData?.flightDetails?.departureDate || serverData?.flightDetails?.departureTime) {
+    // No segments but flightDetails has departure data — create segment from details
+    segments = [mapApiSegmentToFormSegment(serverData.flightDetails, dayDate)]
   } else {
     // No segments found, create default
     segments = [createDefaultSegment(dayDate)]
