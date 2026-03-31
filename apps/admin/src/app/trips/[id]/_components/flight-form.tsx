@@ -144,6 +144,43 @@ function coerceFlightDetails(details: any): FlightFormData['flightDetails'] & { 
   }
 }
 
+/**
+ * Fallback: synthesize flight details from activity startDatetime/endDatetime
+ * when the flight_details table was never populated (e.g. TES import).
+ * Extracts date (YYYY-MM-DD) and time (HH:MM) from ISO datetime strings.
+ */
+function synthesizeFlightDetailsFromActivity(activity: any): FlightFormData['flightDetails'] | undefined {
+  const start = activity?.startDatetime
+  const end = activity?.endDatetime
+  if (!start && !end) return undefined
+
+  const extractDate = (iso: string) => iso.substring(0, 10)
+  const extractTime = (iso: string) => iso.substring(11, 16)
+
+  // Try to extract flight number and airports from the activity name
+  // Common pattern: "Outbound Flight WS2622 YFC→CUN" or "AF328"
+  const name = activity?.name || ''
+  const airportMatch = name.match(/([A-Z]{3})\s*[→\-–>]+\s*([A-Z]{3})/)
+  const flightMatch = name.match(/\b([A-Z]{2}\d{2,4})\b/)
+
+  return {
+    airline: '',
+    flightNumber: flightMatch?.[1] || '',
+    departureAirportCode: airportMatch?.[1] || '',
+    arrivalAirportCode: airportMatch?.[2] || '',
+    departureDate: start ? extractDate(start) : null,
+    departureTime: start ? extractTime(start) : null,
+    departureTimezone: '',
+    departureTerminal: '',
+    departureGate: '',
+    arrivalDate: end ? extractDate(end) : null,
+    arrivalTime: end ? extractTime(end) : null,
+    arrivalTimezone: '',
+    arrivalTerminal: '',
+    arrivalGate: '',
+  }
+}
+
 interface FlightFormProps {
   itineraryId: string
   dayId: string
@@ -516,7 +553,8 @@ export function FlightForm({
           name: sourceData.name,
           description: sourceData.description || '',
           proposalStatus: coerceStatus(sourceData.proposalStatus),
-          flightDetails: coerceFlightDetails(sourceData.flightDetails),
+          flightDetails: coerceFlightDetails(sourceData.flightDetails)
+            ?? synthesizeFlightDetailsFromActivity(sourceData),
           totalPriceCents: initialPricing.totalPriceCents,
           taxesAndFeesCents: initialPricing.taxesAndFeesCents,
           currency: trip?.currency || initialPricing.currency,
