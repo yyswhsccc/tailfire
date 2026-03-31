@@ -1991,6 +1991,8 @@ export function FlightForm({
             onUpdate={handlePricingUpdate}
             onSupplierDefaultsApplied={handleSupplierDefaultsApplied}
             onNavigateToTab={(tab) => setActiveTab(tab as any)}
+            bookingDate={activityBookingDate}
+            onBookingDateChange={setActivityBookingDate}
           />
 
           <Separator />

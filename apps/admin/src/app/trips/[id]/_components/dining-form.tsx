@@ -1030,6 +1030,8 @@ export function DiningForm({
               setSupplierCommissionRate(defaults.commissionRate)
             }}
             onNavigateToTab={(tab) => setActiveTab(tab as any)}
+            bookingDate={activityBookingDate}
+            onBookingDateChange={setActivityBookingDate}
           />
 
           <Separator />

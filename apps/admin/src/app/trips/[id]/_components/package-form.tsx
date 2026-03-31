@@ -801,6 +801,8 @@ export function PackageForm({
             onUpdate={handlePricingUpdate}
             onSupplierDefaultsApplied={handleSupplierDefaultsApplied}
             onNavigateToTab={(tab) => setActiveTab(tab as any)}
+            bookingDate={bookingDate}
+            onBookingDateChange={setBookingDate}
           />
 
           <Separator />

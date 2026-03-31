@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { SupplierCombobox } from '@/components/suppliers/supplier-combobox'
+import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import type { SupplierDto } from '@tailfire/shared-types'
 
 /**
@@ -39,6 +40,10 @@ interface BookingDetailsSectionProps {
   onSupplierDefaultsApplied?: (defaults: SupplierDefaults) => void
   /** Navigate to a tab in the parent form (e.g., 'documents') */
   onNavigateToTab?: (tab: string) => void
+  /** Booking date (ISO string YYYY-MM-DD) — lives on the activity, not pricing */
+  bookingDate?: string | null
+  /** Callback when booking date changes */
+  onBookingDateChange?: (date: string | null) => void
 }
 
 export function BookingDetailsSection({
@@ -46,6 +51,8 @@ export function BookingDetailsSection({
   onUpdate,
   onSupplierDefaultsApplied,
   onNavigateToTab,
+  bookingDate,
+  onBookingDateChange,
 }: BookingDetailsSectionProps) {
   /**
    * Handle supplier selection with defaults application
@@ -110,6 +117,18 @@ export function BookingDetailsSection({
           allowCreate
         />
       </div>
+
+      {/* Booking Date */}
+      {onBookingDateChange && (
+        <div className="space-y-2" data-field="bookingDate">
+          <Label className="text-sm font-medium text-gray-700">Booking Date</Label>
+          <DatePickerEnhanced
+            value={bookingDate || null}
+            onChange={(date) => onBookingDateChange(date)}
+            placeholder="YYYY-MM-DD"
+          />
+        </div>
+      )}
 
       {/* Terms & Conditions */}
       <div className="space-y-2">
