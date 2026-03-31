@@ -968,8 +968,9 @@ export class ContactsService {
    * Map database entity to response DTO
    */
   private mapToResponseDto(contact: any): ContactResponseDto {
-    // Compute display name: preferred > first > legal_first
-    const displayName = contact.preferredName || contact.firstName || contact.legalFirstName || 'Unknown'
+    // Compute display name: "preferred/first last" or just first/preferred
+    const firstPart = contact.preferredName || contact.firstName || contact.legalFirstName || 'Unknown'
+    const displayName = contact.lastName ? `${firstPart} ${contact.lastName}` : firstPart
 
     // Compute legal full name for documents
     const legalFullName = [
