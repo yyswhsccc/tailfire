@@ -11,7 +11,7 @@
  * Bypasses JWT but requires a valid service key.
  */
 
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
 import { OtaLeadsController } from './ota-leads.controller'
 import { OtaLeadsService } from './ota-leads.service'
@@ -28,6 +28,11 @@ import { OwnerResolutionService } from './owner-resolution.service'
 import { OtaServiceKeyGuard } from './guards/ota-service-key.guard'
 import { CruiseBookingModule } from '../cruise-booking/cruise-booking.module'
 import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
+import { TripsModule } from '../trips/trips.module'
+import { FlightPromoter } from './component-promoters/flight.promoter'
+import { LodgingPromoter } from './component-promoters/lodging.promoter'
+import { CruisePromoter } from './component-promoters/cruise.promoter'
+import { TourPromoter } from './component-promoters/tour.promoter'
 
 /**
  * Note: ExternalApisModule is @Global() so AmadeusFlightOffersProvider,
@@ -40,6 +45,7 @@ import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
     HttpModule.register({ timeout: 10000 }),
     CruiseBookingModule,
     ApiCredentialsModule,
+    forwardRef(() => TripsModule),
   ],
   controllers: [
     OtaLeadsController,
@@ -57,7 +63,11 @@ import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
     OtaTripRequestsService,
     OwnerResolutionService,
     OtaServiceKeyGuard,
+    FlightPromoter,
+    LodgingPromoter,
+    CruisePromoter,
+    TourPromoter,
   ],
-  exports: [OtaLeadsService, OtaReferralsService, OtaPublishedTripsService, OtaSearchService, OtaTripRequestsService, OwnerResolutionService],
+  exports: [OtaLeadsService, OtaReferralsService, OtaPublishedTripsService, OtaSearchService, OtaTripRequestsService, OwnerResolutionService, FlightPromoter, LodgingPromoter, CruisePromoter, TourPromoter],
 })
 export class OtaModule {}
