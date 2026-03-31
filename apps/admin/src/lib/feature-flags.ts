@@ -20,6 +20,17 @@ export const FEATURE_FLAGS = {
    * Default: false (old UI)
    */
   NEW_BOOKING_PRICING_UI: process.env.NEXT_PUBLIC_FEATURE_NEW_BOOKING_PRICING === 'true',
+
+  /**
+   * Vacation Packages (SoftVoyage)
+   *
+   * Enables the Vacation Package Library page and the "package" activity type.
+   * Disabled by default while the SoftVoyage integration is stabilized.
+   *
+   * Environment variable: NEXT_PUBLIC_FEATURE_VACATION_PACKAGES
+   * Default: false (hidden)
+   */
+  VACATION_PACKAGES: process.env.NEXT_PUBLIC_FEATURE_VACATION_PACKAGES === 'true',
 } as const
 
 export type FeatureFlag = keyof typeof FEATURE_FLAGS
