@@ -1385,6 +1385,8 @@ export function TourForm({
               setSupplierCommissionRate(defaults.commissionRate)
             }}
             onNavigateToTab={(tab) => setActiveTab(tab as any)}
+            bookingDate={bookingDate}
+            onBookingDateChange={setBookingDate}
           />
 
           <Separator />

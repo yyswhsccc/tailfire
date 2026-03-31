@@ -1898,7 +1898,7 @@ export function CustomCruiseForm({
                   <Input
                     type="number"
                     step="0.01"
-                    value={onboardCreditCentsValue ? centsToDollars(onboardCreditCentsValue) : ''}
+                    value={onboardCreditCentsValue != null ? centsToDollars(onboardCreditCentsValue) : ''}
                     onChange={(e) => {
                       const cents = e.target.value ? dollarsToCents(e.target.value) : null
                       setValue('customCruiseDetails.onboardCreditCents', cents, { shouldDirty: true })
@@ -2223,6 +2223,8 @@ export function CustomCruiseForm({
             onUpdate={handlePricingUpdate}
             onSupplierDefaultsApplied={handleSupplierDefaultsApplied}
             onNavigateToTab={(tab) => setActiveTab(tab as any)}
+            bookingDate={activityBookingDate}
+            onBookingDateChange={setActivityBookingDate}
           />
 
           <Separator />
