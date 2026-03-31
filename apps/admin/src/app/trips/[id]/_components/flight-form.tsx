@@ -149,7 +149,7 @@ function coerceFlightDetails(details: any): FlightFormData['flightDetails'] & { 
  * when the flight_details table was never populated (e.g. TES import).
  * Extracts date (YYYY-MM-DD) and time (HH:MM) from ISO datetime strings.
  */
-function synthesizeFlightDetailsFromActivity(activity: any): FlightFormData['flightDetails'] | undefined {
+function synthesizeFlightDetailsFromActivity(activity: any): (FlightFormData['flightDetails'] & { segments?: any[] }) | undefined {
   const start = activity?.startDatetime
   const end = activity?.endDatetime
   if (!start && !end) return undefined
@@ -163,7 +163,7 @@ function synthesizeFlightDetailsFromActivity(activity: any): FlightFormData['fli
   const airportMatch = name.match(/([A-Z]{3})\s*[→\-–>]+\s*([A-Z]{3})/)
   const flightMatch = name.match(/\b([A-Z]{2}\d{2,4})\b/)
 
-  return {
+  const seg = {
     airline: '',
     flightNumber: flightMatch?.[1] || '',
     departureAirportCode: airportMatch?.[1] || '',
@@ -179,6 +179,9 @@ function synthesizeFlightDetailsFromActivity(activity: any): FlightFormData['fli
     arrivalTerminal: '',
     arrivalGate: '',
   }
+
+  // Include segments array so toFlightDefaults maps to flightSegments form fields
+  return { ...seg, segments: [seg] }
 }
 
 interface FlightFormProps {
