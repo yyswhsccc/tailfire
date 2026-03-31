@@ -331,6 +331,13 @@ export class ContactsService {
       updateData.travelPreferences = JSON.parse(dto.travelPreferences)
     }
 
+    // Normalize empty date strings to null (PostgreSQL date columns reject '')
+    for (const dateField of ['dateOfBirth', 'passportExpiry', 'anniversaryDate'] as const) {
+      if (dateField in updateData && updateData[dateField] === '') {
+        updateData[dateField] = null
+      }
+    }
+
     const [contact] = await this.db.client
       .update(this.db.schema.contacts)
       .set({
