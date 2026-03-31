@@ -9,6 +9,7 @@ import { SIDEBAR_WIDTH, ITINERARY_CARD_STYLES, FOCUS_VISIBLE_RING } from '@/lib/
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ACTIVITY_TYPE_METADATA, isValidActivityType } from '@/lib/activity-constants'
+import { FEATURE_FLAGS } from '@/lib/feature-flags'
 import { ActivityIconBadge } from '@/components/ui/activity-icon-badge'
 import type { ComponentDragData } from '@/lib/dnd-config'
 
@@ -172,12 +173,14 @@ export function ComponentLibrarySidebar({ isDragging = false }: { isDragging?: b
               label="Activity Library"
               icon={Compass}
             />
+            {FEATURE_FLAGS.VACATION_PACKAGES && (
             <DraggableComponent
               id="library-vacation"
               componentType="library-item"
               label="Vacation Package"
               icon={Palmtree}
             />
+            )}
             <DraggableComponent
               id="library-cruise"
               componentType="library-item"

@@ -3,6 +3,7 @@
 import { Ship, CalendarClock, Map, Package, MapPin, Building2, Award, Tag, FileText, Palmtree } from 'lucide-react'
 import { DetailLayout } from '@/components/layout/detail-layout'
 import type { SidebarSection } from '@/components/layout/detail-sidebar'
+import { FEATURE_FLAGS } from '@/lib/feature-flags'
 
 const librarySections: SidebarSection[] = [
   {
@@ -18,11 +19,11 @@ const librarySections: SidebarSection[] = [
         href: '/library/packages',
         icon: Package,
       },
-      {
+      ...(FEATURE_FLAGS.VACATION_PACKAGES ? [{
         name: 'Vacation Packages',
         href: '/library/vacation',
         icon: Palmtree,
-      },
+      }] : []),
       {
         name: 'Cruises',
         href: '/library/cruises',
