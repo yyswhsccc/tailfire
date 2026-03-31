@@ -1,9 +1,10 @@
 /**
  * Softvoyage Browser Pool Service
  *
- * Manages a pool of reusable Playwright browser instances for navigating
- * Softvoyage VCO (public widget, no auth needed). Browsers are lazy-launched
- * on first acquirePage() call — nothing starts at module init.
+ * Manages a pool of reusable headless browser instances for navigating
+ * Softvoyage VCO (public widget, no auth needed). Uses puppeteer-core
+ * (same Chromium binary as PDF renderer — proven to work on Railway).
+ * Browsers are lazy-launched on first acquirePage() call.
  *
  * Used by the VACATION_SEARCH BullMQ processor to:
  * 1. Acquire a page
@@ -14,7 +15,7 @@
 
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { type Browser, type Page, chromium } from 'playwright-core'
+import puppeteer, { type Browser, type Page } from 'puppeteer-core'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -190,18 +191,45 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
       `Launching Chromium from ${executablePath} (pool slot ${this.pool.length + 1}/${this.maxPoolSize})`,
     )
 
-    const browser = await chromium.launch({
+    const launchArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-blink-features=AutomationControlled',
+      '--window-size=1920,1080',
+    ]
+
+    // Add residential proxy if configured
+    const proxyUrl = this.configService.get<string>('RESIDENTIAL_PROXY_URL')
+    if (proxyUrl) {
+      try {
+        const parsed = new URL(proxyUrl)
+        launchArgs.push(`--proxy-server=${parsed.protocol}//${parsed.hostname}:${parsed.port}`)
+      } catch { /* ignore invalid proxy URL */ }
+    }
+
+    const browser = await puppeteer.launch({
       executablePath,
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
+      headless: 'shell',
+      args: launchArgs,
     })
 
     const page = await browser.newPage()
+    await this.applyStealthPatches(page)
+
+    // Authenticate proxy if credentials provided
+    if (proxyUrl) {
+      try {
+        const parsed = new URL(proxyUrl)
+        if (parsed.username) {
+          await page.authenticate({
+            username: decodeURIComponent(parsed.username),
+            password: decodeURIComponent(parsed.password),
+          })
+        }
+      } catch { /* ignore auth errors */ }
+    }
 
     const entry: PoolEntry = {
       browser,
@@ -229,22 +257,80 @@ export class SoftvoyageBrowserPoolService implements OnModuleDestroy {
 
     this.logger.log(`Launching replacement Chromium from ${executablePath}`)
 
-    const browser = await chromium.launch({
+    const recycleArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-blink-features=AutomationControlled',
+      '--window-size=1920,1080',
+    ]
+    const proxyUrl = this.configService.get<string>('RESIDENTIAL_PROXY_URL')
+    if (proxyUrl) {
+      try {
+        const parsed = new URL(proxyUrl)
+        recycleArgs.push(`--proxy-server=${parsed.protocol}//${parsed.hostname}:${parsed.port}`)
+      } catch { /* ignore */ }
+    }
+
+    const browser = await puppeteer.launch({
       executablePath,
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
+      headless: 'shell',
+      args: recycleArgs,
     })
 
     const page = await browser.newPage()
+    await this.applyStealthPatches(page)
+
+    // Authenticate proxy
+    if (proxyUrl) {
+      try {
+        const parsed = new URL(proxyUrl)
+        if (parsed.username) {
+          await page.authenticate({
+            username: decodeURIComponent(parsed.username),
+            password: decodeURIComponent(parsed.password),
+          })
+        }
+      } catch { /* ignore */ }
+    }
 
     entry.browser = browser
     entry.page = page
     entry.useCount = 0
+  }
+
+  /**
+   * Apply stealth patches to a page to bypass DataDome bot detection.
+   * Replicates the key evasions from puppeteer-extra-plugin-stealth.
+   */
+  private async applyStealthPatches(page: Page): Promise<void> {
+    await page.evaluateOnNewDocument(`
+      // webdriver
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      // plugins
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+      // languages
+      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+      // permissions
+      const origQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (params) =>
+        params.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : origQuery(params);
+      // chrome runtime
+      window.chrome = { runtime: {} };
+      // webgl vendor
+      const getParam = WebGLRenderingContext.prototype.getParameter;
+      WebGLRenderingContext.prototype.getParameter = function(p) {
+        if (p === 37445) return 'Intel Inc.';
+        if (p === 37446) return 'Intel Iris OpenGL Engine';
+        return getParam.call(this, p);
+      };
+    `)
+    await page.setUserAgent(
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    )
   }
 
   /**

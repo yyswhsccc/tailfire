@@ -88,16 +88,29 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
       `Processing vacation search: ${gatewayCode} -> ${destDep}, ${dateDep}, ${duration}n, ${nbAdults}a, ${nbRooms}r [${job.id}]`,
     )
 
+    // Use browser pool (has puppeteer-extra stealth applied at module level)
     let page: Awaited<ReturnType<SoftvoyageBrowserPoolService['acquirePage']>> | null = null
 
     try {
-      // 1. Acquire page from browser pool
       page = await this.browserPool.acquirePage()
+
+      // Set up proxy authentication if configured
+      const proxyUrl = this.configService.get<string>('RESIDENTIAL_PROXY_URL')
+      if (proxyUrl) {
+        const proxyParsed = new URL(proxyUrl)
+        if (proxyParsed.username) {
+          await page.authenticate({
+            username: decodeURIComponent(proxyParsed.username),
+            password: decodeURIComponent(proxyParsed.password),
+          })
+        }
+      }
+      this.logger.log(`Acquired browser page for search [${job.id}]${proxyUrl ? ' (with proxy)' : ''}`)
 
       // 2. Navigate to query form page first to establish VCO session
       const queryUrl = `${this.vcoBaseUrl}/querypackage.cgi?code_ag=${this.codeAg}&alias=${this.alias}&language=en`
       this.logger.debug(`Navigating to query form: ${queryUrl}`)
-      await page.goto(queryUrl, { waitUntil: 'domcontentloaded', timeout: 15000 })
+      await page.goto(queryUrl, { waitUntil: 'domcontentloaded', timeout: 30000 })
 
       // 3. Build the search URL with POST form data and navigate
       const resultsUrl = `${this.vcoBaseUrl}/resultspackage.cgi`
@@ -117,14 +130,16 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
 
       this.logger.debug(`Submitting search form to ${resultsUrl}`)
 
-      // Use page.evaluate to submit a form via POST
-      await page.evaluate(
-        ({ url, params }: { url: string; params: string }) => {
+      // Submit form via POST and wait for navigation
+      const formBody = formParams.toString()
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
+        page.evaluate((url: string, body: string) => {
           const form = document.createElement('form')
           form.method = 'POST'
           form.action = url
 
-          for (const [key, value] of new URLSearchParams(params).entries()) {
+          for (const [key, value] of new URLSearchParams(body).entries()) {
             const input = document.createElement('input')
             input.type = 'hidden'
             input.name = key
@@ -134,22 +149,33 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
 
           document.body.appendChild(form)
           form.submit()
-        },
-        { url: resultsUrl, params: formParams.toString() },
-      )
+        }, resultsUrl, formBody),
+      ])
 
-      // 4. Wait for results to load
-      await page.waitForSelector('table[id^="hotel-"]', { timeout: 20000 })
+      // 4. Wait for initial results page to load
+      try {
+        await page.waitForSelector('div[id^="result-"], table[id^="hotel-"]', { timeout: 30000 })
+      } catch {
+        this.logger.warn('No result elements found on initial page')
+      }
 
-      // 5. Get page HTML
+      // 5. Get the results page HTML (initial page has hotel cards with basic pricing)
       const html = await page.content()
+      this.logger.log(`Results page: ${html.length} bytes`)
 
-      // 6. Release page back to pool before parsing (done in finally, but mark null to avoid double release)
+      // 6. Release page back to pool
       await this.browserPool.releasePage(page)
-      const releasedPage = page
-      page = null // Prevent double release in finally
+      page = null
 
       this.logger.debug(`Got HTML response (${html.length} bytes), parsing results...`)
+
+      // Temporary: save raw HTML to Redis for debugging parser selectors
+      if (this.redis) {
+        try {
+          await this.redis.set('vco:debug:raw-html', html, 'EX', 600) // 10 min
+          this.logger.log(`Saved ${html.length} bytes of raw VCO HTML to Redis for debugging`)
+        } catch {}
+      }
 
       // 7. Parse HTML via result parser
       const results = this.resultParser.parseResults(html)
@@ -180,12 +206,11 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
       )
       throw error // Let BullMQ retry
     } finally {
-      // Always release page back to pool if not already released
       if (page) {
         try {
           await this.browserPool.releasePage(page)
-        } catch (releaseErr) {
-          this.logger.warn(`Failed to release page back to pool: ${releaseErr}`)
+        } catch {
+          // Pool may be shutting down
         }
       }
     }
@@ -195,10 +220,25 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
   // Worker events
   // ---------------------------------------------------------------------------
 
+  @OnWorkerEvent('active')
+  onActive(job: Job<VacationSearchJobData>) {
+    this.logger.log(`Job ${job.id} active — processing vacation search`)
+  }
+
+  @OnWorkerEvent('completed')
+  onCompleted(job: Job<VacationSearchJobData>) {
+    this.logger.log(`Job ${job.id} completed`)
+  }
+
   @OnWorkerEvent('failed')
   onFailed(job: Job<VacationSearchJobData>, error: Error) {
     this.logger.error(
       `Job ${job.id} (${job.data.gatewayCode} -> ${job.data.destDep}) failed after ${job.attemptsMade} attempts: ${error.message}`,
     )
+  }
+
+  @OnWorkerEvent('error')
+  onError(error: Error) {
+    this.logger.error(`Worker error: ${error.message}`)
   }
 }

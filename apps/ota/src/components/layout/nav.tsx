@@ -2,26 +2,99 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Menu } from "lucide-react";
-import { useState } from "react";
+import { Menu, ChevronDown } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { openChat } from "@/components/chat/chat-widget";
 import phoenixLogo from "@/assets/phoenix-logo.svg";
 
-const NAV_LINKS = [
+// Grouped navigation structure
+export interface NavItem {
+  label: string;
+  href: string;
+  children?: Array<{ label: string; href: string; description?: string }>;
+}
+
+export const NAV_ITEMS: NavItem[] = [
   { label: "Deals", href: "/deals" },
-  { label: "Cruises", href: "/search/cruises" },
-  { label: "Cruise Lines", href: "/cruise-lines" },
-  { label: "Destinations", href: "/destinations" },
-  { label: "Regions", href: "/regions" },
+  {
+    label: "Cruises",
+    href: "/search/cruises",
+    children: [
+      { label: "Search Cruises", href: "/search/cruises", description: "Find your perfect sailing" },
+      { label: "Cruise Lines", href: "/cruise-lines", description: "Browse 52 cruise lines" },
+    ],
+  },
+  {
+    label: "Destinations",
+    href: "/destinations",
+    children: [
+      { label: "All Destinations", href: "/destinations", description: "Explore worldwide" },
+      { label: "Regions", href: "/regions", description: "Browse by cruise region" },
+    ],
+  },
   { label: "Flights", href: "/search/flights" },
   { label: "Hotels", href: "/search/hotels" },
   { label: "Tours", href: "/search/tours" },
   { label: "Advisors", href: "/advisors" },
   { label: "Join Us", href: "/join" },
-] as const;
+];
+
+// Flat links for backward compat
+export const NAV_LINKS = NAV_ITEMS.flatMap((item) =>
+  item.children
+    ? item.children.map((child) => ({ label: child.label, href: child.href }))
+    : [{ label: item.label, href: item.href }],
+);
+
+function NavDropdown({ item }: { item: NavItem }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        onMouseEnter={() => setOpen(true)}
+        className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-[#1A1A1A] transition-colors hover:bg-muted hover:text-[#C59746]"
+      >
+        {item.label}
+        <ChevronDown className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-lg"
+          onMouseLeave={() => setOpen(false)}
+        >
+          {item.children!.map((child) => (
+            <Link
+              key={child.href}
+              href={child.href}
+              onClick={() => setOpen(false)}
+              className="block px-4 py-2.5 transition-colors hover:bg-muted"
+            >
+              <span className="text-sm font-medium text-[#1A1A1A]">{child.label}</span>
+              {child.description && (
+                <span className="block text-xs text-[#888]">{child.description}</span>
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -43,21 +116,25 @@ export function Nav() {
           </span>
         </Link>
 
-        {/* Desktop nav links */}
-        <div className="hidden items-center gap-1 md:flex">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-[#1A1A1A] transition-colors hover:bg-muted hover:text-[#C59746]"
-            >
-              {link.label}
-            </Link>
-          ))}
+        {/* Desktop nav */}
+        <div className="hidden items-center gap-0.5 lg:flex">
+          {NAV_ITEMS.map((item) =>
+            item.children ? (
+              <NavDropdown key={item.href} item={item} />
+            ) : (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-[#1A1A1A] transition-colors hover:bg-muted hover:text-[#C59746]"
+              >
+                {item.label}
+              </Link>
+            ),
+          )}
         </div>
 
         {/* Desktop CTA */}
-        <div className="hidden md:block">
+        <div className="hidden lg:block">
           <Button
             className="bg-[#C59746] text-white hover:bg-[#B08638]"
             size="default"
@@ -71,7 +148,7 @@ export function Nav() {
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden"
+          className="lg:hidden"
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation menu"
         >
@@ -79,10 +156,7 @@ export function Nav() {
         </Button>
       </nav>
 
-      {/* Mobile sheet */}
       <MobileNav open={mobileOpen} onOpenChange={setMobileOpen} />
     </header>
   );
 }
-
-export { NAV_LINKS };

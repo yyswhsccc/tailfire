@@ -92,6 +92,7 @@ export interface FlightOfferSearchParams {
   departureDate: string        // YYYY-MM-DD
   returnDate?: string
   adults: number
+  children?: number
   travelClass?: 'ECONOMY' | 'PREMIUM_ECONOMY' | 'BUSINESS' | 'FIRST'
   nonStop?: boolean
   maxPrice?: number

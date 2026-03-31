@@ -9,6 +9,7 @@ interface Airport {
   name: string;
   city: string;
   country: string;
+  subType?: string;
 }
 
 interface AirportAutocompleteProps {
@@ -39,7 +40,7 @@ export function AirportAutocomplete({
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   const search = useCallback(async (keyword: string) => {
-    if (keyword.length < 2) {
+    if (keyword.length < 3) {
       setResults([]);
       setIsOpen(false);
       return;
@@ -115,15 +116,19 @@ export function AirportAutocomplete({
         )}
       </div>
 
-      {/* Hidden input sends just the IATA code */}
-      <input type="hidden" name={name} value={selectedCode} />
+      {/* Hidden input sends just the IATA code — only when a valid 3-letter code is selected */}
+      <input
+        type="hidden"
+        name={name}
+        value={/^[A-Z]{3}$/.test(selectedCode) ? selectedCode : ""}
+      />
 
       {/* Dropdown */}
       {isOpen && results.length > 0 && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-white shadow-lg">
-          {results.map((airport) => (
+          {results.map((airport, index) => (
             <button
-              key={airport.code}
+              key={`${airport.code}-${airport.subType || index}`}
               type="button"
               onClick={() => handleSelect(airport)}
               className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-[#faf6f0] transition-colors first:rounded-t-lg last:rounded-b-lg"

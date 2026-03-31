@@ -13,6 +13,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { eq, and } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import type { CreateLeadDto } from './dto/create-lead.dto'
+import type { CreateFlightRequestDto } from './dto/create-flight-request.dto'
 import type { schema } from '@tailfire/database'
 
 type Contact = typeof schema.contacts.$inferSelect
@@ -210,6 +211,116 @@ export class OtaLeadsService {
       contact,
       attribution,
       advisorName: advisor?.displayName ?? undefined,
+    }
+  }
+
+  /**
+   * Create a flight request from the OTA portal.
+   *
+   * Finds or creates a contact from the consumer's info, then logs the
+   * structured flight data. An advisor picks this up from the lead queue.
+   */
+  async createFlightRequest(dto: CreateFlightRequestDto): Promise<{
+    success: boolean
+    message: string
+    contactId: string
+  }> {
+    const { contacts } = this.db.schema
+
+    // -----------------------------------------------------------------
+    // Step 1: Find or create contact by email
+    // -----------------------------------------------------------------
+    let contact: Contact | undefined
+
+    const [existing] = await this.db.client
+      .select()
+      .from(contacts)
+      .where(eq(contacts.email, dto.email))
+      .limit(1)
+
+    if (existing) {
+      // Update name/phone if currently empty
+      const updateValues: Record<string, unknown> = { updatedAt: new Date() }
+      if (dto.name && !existing.firstName) {
+        const nameParts = splitName(dto.name)
+        updateValues.firstName = nameParts.firstName
+        updateValues.lastName = nameParts.lastName
+      }
+      if (dto.phone && !existing.phone) {
+        updateValues.phone = dto.phone
+      }
+
+      const [updated] = await this.db.client
+        .update(contacts)
+        .set(updateValues)
+        .where(eq(contacts.id, existing.id))
+        .returning()
+
+      contact = updated!
+      this.logger.log(
+        `Flight request from ${dto.email}: updated existing contact ${contact.id}`,
+      )
+    } else {
+      const nameParts = splitName(dto.name)
+
+      const [created] = await this.db.client
+        .insert(contacts)
+        .values({
+          email: dto.email,
+          firstName: nameParts.firstName,
+          lastName: nameParts.lastName,
+          phone: dto.phone,
+          contactType: 'lead',
+          contactStatus: 'prospecting',
+        })
+        .returning()
+
+      contact = created!
+      this.logger.log(
+        `Flight request from ${dto.email}: created new contact ${contact.id}`,
+      )
+    }
+
+    // -----------------------------------------------------------------
+    // Step 2: Persist flight request in contact's travelPreferences
+    // -----------------------------------------------------------------
+    const flightRequest = {
+      source: dto.source ?? 'ota',
+      submittedAt: new Date().toISOString(),
+      outbound: dto.outboundFlight,
+      return: dto.returnFlight ?? null,
+      travelers: dto.travelers,
+      travelClass: dto.travelClass,
+      specialRequests: dto.specialRequests ?? null,
+      amadeusOfferId: dto.amadeusOfferId ?? null,
+    }
+
+    // Merge into existing travelPreferences — preserve prior data, append to flightRequests array
+    const existingPrefs: Record<string, any> = (contact!.travelPreferences as Record<string, any>) ?? {}
+    const existingRequests: any[] = Array.isArray(existingPrefs.flightRequests)
+      ? existingPrefs.flightRequests
+      : []
+
+    const updatedPrefs = {
+      ...existingPrefs,
+      flightRequests: [...existingRequests, flightRequest],
+    }
+
+    await this.db.client
+      .update(contacts)
+      .set({ travelPreferences: updatedPrefs, updatedAt: new Date() })
+      .where(eq(contacts.id, contact!.id))
+
+    this.logger.log(
+      `Flight request persisted for contact ${contact!.id} (source=${flightRequest.source}, ` +
+        `${dto.outboundFlight.origin}→${dto.outboundFlight.destination})`,
+    )
+
+    return {
+      success: true,
+      message:
+        'Your flight request has been submitted. An advisor will confirm your booking within 2 hours.',
+      contactId: contact!.id,
     }
   }
 }

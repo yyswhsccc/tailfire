@@ -13,7 +13,7 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { NAV_LINKS } from "@/components/layout/nav";
+import { NAV_ITEMS, type NavItem } from "@/components/layout/nav";
 import phoenixLogo from "@/assets/phoenix-logo.svg";
 
 interface MobileNavProps {
@@ -21,20 +21,50 @@ interface MobileNavProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function MobileNav({ open, onOpenChange }: MobileNavProps) {
+function MobileNavItem({ item, onClose }: { item: NavItem; onClose: () => void }) {
+  if (!item.children) {
+    return (
+      <Link
+        href={item.href}
+        onClick={onClose}
+        className="rounded-lg px-3 py-3 text-base font-medium text-[#1A1A1A] transition-colors hover:bg-muted hover:text-[#C59746]"
+      >
+        {item.label}
+      </Link>
+    );
+  }
+
   return (
-    <Sheet
-      open={open}
-      onOpenChange={(nextOpen) => onOpenChange(nextOpen)}
-    >
+    <div>
+      <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-[#C59746]">
+        {item.label}
+      </p>
+      {item.children.map((child) => (
+        <Link
+          key={child.href}
+          href={child.href}
+          onClick={onClose}
+          className="block rounded-lg px-3 py-2.5 pl-6 transition-colors hover:bg-muted hover:text-[#C59746]"
+        >
+          <span className="text-base font-medium text-[#1A1A1A]">{child.label}</span>
+          {child.description && (
+            <span className="block text-xs text-[#888]">{child.description}</span>
+          )}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+export function MobileNav({ open, onOpenChange }: MobileNavProps) {
+  const close = () => onOpenChange(false);
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-80 flex-col">
         <SheetHeader>
           <SheetTitle>
-            <Link
-              href="/"
-              className="flex items-center gap-3"
-              onClick={() => onOpenChange(false)}
-            >
+            <Link href="/" className="flex items-center gap-3" onClick={close}>
               <Image
                 src={phoenixLogo}
                 alt="Phoenix Voyages"
@@ -51,16 +81,9 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
 
         <Separator />
 
-        <nav className="flex flex-1 flex-col gap-1 px-4">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => onOpenChange(false)}
-              className="rounded-lg px-3 py-3 text-base font-medium text-[#1A1A1A] transition-colors hover:bg-muted hover:text-[#C59746]"
-            >
-              {link.label}
-            </Link>
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-4">
+          {NAV_ITEMS.map((item) => (
+            <MobileNavItem key={item.href} item={item} onClose={close} />
           ))}
         </nav>
 
@@ -69,7 +92,7 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
             className="w-full bg-[#C59746] text-white hover:bg-[#B08638]"
             size="lg"
             onClick={() => {
-              onOpenChange(false);
+              close();
               openChat("Hi! I'm looking for help planning a trip.");
             }}
           >

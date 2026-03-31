@@ -204,11 +204,12 @@ export class BookingValidationService {
         ia.confirmation_number,
         ia.passport_verified,
         ap.id as pricing_id,
-        ap.supplier,
+        COALESCE(NULLIF(BTRIM(pd.supplier_name), ''), NULLIF(BTRIM(ap.supplier), '')) as supplier,
         ap.total_price_cents,
         ap.non_refundable_deposit
       FROM itinerary_activities ia
       LEFT JOIN activity_pricing ap ON ap.activity_id = ia.id
+      LEFT JOIN package_details pd ON pd.activity_id = ia.id
       WHERE ia.id = ${activityId}
       LIMIT 1
     `) as unknown as ActivityPricingRow[]

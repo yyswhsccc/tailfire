@@ -36,6 +36,11 @@ export class VacationRepositoryController {
     return this.vacationRepository.searchHotels(dto)
   }
 
+  @Get('hotels/by-provider/:providerIdentifier')
+  async getHotelByProvider(@Param('providerIdentifier') providerIdentifier: string) {
+    return this.vacationRepository.getHotelByProvider(providerIdentifier)
+  }
+
   @Get('hotels/:id')
   async getHotelDetail(@Param('id', ParseUUIDPipe) id: string) {
     return this.vacationRepository.getHotelDetail(id)

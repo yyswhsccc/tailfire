@@ -17,6 +17,12 @@ import { AmadeusHotelsProvider } from './amadeus-hotels.provider'
 import { AmadeusFlightOffersProvider } from './amadeus-flight-offers.provider'
 import { AmadeusTransfersProvider } from './amadeus-transfers.provider'
 import { AmadeusActivitiesProvider } from './amadeus-activities.provider'
+import { AmadeusFlightDatesProvider } from './amadeus-flight-dates.provider'
+import { AmadeusPriceMetricsProvider } from './amadeus-price-metrics.provider'
+import { AmadeusDirectDestinationsProvider } from './amadeus-direct-destinations.provider'
+import { AmadeusFlightDelayProvider } from './amadeus-flight-delay.provider'
+import { AmadeusFlightPricingProvider } from './amadeus-flight-pricing.provider'
+import { AmadeusFlightUpsellProvider } from './amadeus-flight-upsell.provider'
 
 @Module({
   providers: [
@@ -26,6 +32,12 @@ import { AmadeusActivitiesProvider } from './amadeus-activities.provider'
     AmadeusFlightOffersProvider,
     AmadeusTransfersProvider,
     AmadeusActivitiesProvider,
+    AmadeusFlightDatesProvider,
+    AmadeusPriceMetricsProvider,
+    AmadeusDirectDestinationsProvider,
+    AmadeusFlightDelayProvider,
+    AmadeusFlightPricingProvider,
+    AmadeusFlightUpsellProvider,
   ],
   exports: [
     AmadeusAuthService,
@@ -34,6 +46,12 @@ import { AmadeusActivitiesProvider } from './amadeus-activities.provider'
     AmadeusFlightOffersProvider,
     AmadeusTransfersProvider,
     AmadeusActivitiesProvider,
+    AmadeusFlightDatesProvider,
+    AmadeusPriceMetricsProvider,
+    AmadeusDirectDestinationsProvider,
+    AmadeusFlightDelayProvider,
+    AmadeusFlightPricingProvider,
+    AmadeusFlightUpsellProvider,
   ],
 })
 export class AmadeusModule {}

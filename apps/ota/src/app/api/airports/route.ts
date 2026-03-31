@@ -5,7 +5,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const keyword = searchParams.get("keyword");
 
-  if (!keyword || keyword.length < 2) {
+  if (!keyword || keyword.length < 3) {
     return NextResponse.json([]);
   }
 

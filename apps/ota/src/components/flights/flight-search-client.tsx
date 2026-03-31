@@ -1,0 +1,615 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AlertCircle, Loader2, RefreshCw, Search } from "lucide-react";
+
+import {
+  applyFilters,
+  sortFlights,
+} from "@/lib/flight-utils";
+
+/** Client-safe fetch that hits our Next.js API proxy routes (not the backend directly) */
+async function clientFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+  return res.json() as Promise<T>;
+}
+import { useSearch } from "@/components/search/search-page-shell";
+
+import {
+  useFlightSearch,
+  type FlightOffer,
+  type DirectDestination,
+  type PriceDate,
+} from "./flight-search-store";
+import { FlightSearchForm } from "./flight-search-form";
+import { DatePriceStrip } from "./date-price-strip";
+import { SavingsTip, PriceInsightBar, DirectFlightsBanner } from "./flight-insights";
+import { RoundTripBar } from "./round-trip-bar";
+import { FlightCard } from "./flight-card";
+import { FlightSortPills } from "./flight-sort-pills";
+import { FlightFilters } from "./flight-filters";
+import { FlightFilterSheet } from "./flight-filter-sheet";
+import { FlightConfirmation } from "./flight-confirmation";
+import { FlightRequestForm } from "./flight-request-form";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface FlightSearchClientProps {
+  initialResults: FlightOffer[];
+  searchError?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// EmptyPrompt
+// ---------------------------------------------------------------------------
+
+function EmptyPrompt() {
+  return (
+    <div className="rounded-2xl border border-border bg-muted/30 px-6 py-16 text-center">
+      <Search className="mx-auto mb-4 size-10 text-muted-foreground/60" />
+      <p className="text-lg font-medium text-[#1A1A1A]">
+        Enter your route above to see fares
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Provide origin, destination, and departure date to search live
+        availability.
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ErrorState
+// ---------------------------------------------------------------------------
+
+function ErrorState() {
+  return (
+    <div className="rounded-2xl border border-border bg-muted/30 px-6 py-16 text-center">
+      <AlertCircle className="mx-auto mb-4 size-10 text-red-400" />
+      <p className="text-lg font-medium text-[#1A1A1A]">
+        Unable to fetch flights right now
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        The flight search service may be slow or temporarily unavailable. Please
+        try again.
+      </p>
+      <a
+        href="/search/flights"
+        className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-[#1A1A1A] transition-colors hover:bg-gray-100"
+      >
+        <RefreshCw className="size-4" />
+        Try Again
+      </a>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Client component
+// ---------------------------------------------------------------------------
+
+export function FlightSearchClient({
+  initialResults,
+  searchError,
+}: FlightSearchClientProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { startSearch } = useSearch();
+  const enrichmentFetchedRef = useRef(false);
+
+  // ---- Store selectors ----------------------------------------------------
+  const outboundResults = useFlightSearch((s) => s.outboundResults);
+  const returnResults = useFlightSearch((s) => s.returnResults);
+  const isSearching = useFlightSearch((s) => s.isSearching);
+  const sort = useFlightSearch((s) => s.sort);
+  const filters = useFlightSearch((s) => s.filters);
+  const roundTripStep = useFlightSearch((s) => s.roundTripStep);
+  const selectedOutbound = useFlightSearch((s) => s.selectedOutbound);
+  const tripType = useFlightSearch((s) => s.tripType);
+  const showRequestForm = useFlightSearch((s) => s.showRequestForm);
+  // upsellOffers selector removed — upsell rendering disabled (see Bug 5 TODO)
+
+  // ---- Store setters ------------------------------------------------------
+  const setSearchParams = useFlightSearch((s) => s.setSearchParams);
+  const setTripType = useFlightSearch((s) => s.setTripType);
+  const setOutboundResults = useFlightSearch((s) => s.setOutboundResults);
+  const setReturnResults = useFlightSearch((s) => s.setReturnResults);
+  const setIsSearching = useFlightSearch((s) => s.setIsSearching);
+  const setSearchError = useFlightSearch((s) => s.setSearchError);
+  const setRoundTripStep = useFlightSearch((s) => s.setRoundTripStep);
+  const setPriceMetrics = useFlightSearch((s) => s.setPriceMetrics);
+  const setPriceMetricsLoading = useFlightSearch((s) => s.setPriceMetricsLoading);
+  const setPriceLevel = useFlightSearch((s) => s.setPriceLevel);
+  const setDirectDestinations = useFlightSearch((s) => s.setDirectDestinations);
+  const setDirectDestinationsLoading = useFlightSearch(
+    (s) => s.setDirectDestinationsLoading,
+  );
+  const setPriceDates = useFlightSearch((s) => s.setPriceDates);
+  const setPriceDatesLoading = useFlightSearch((s) => s.setPriceDatesLoading);
+  const setUpsellOffers = useFlightSearch((s) => s.setUpsellOffers);
+  const setUpsellLoading = useFlightSearch((s) => s.setUpsellLoading);
+  const selectOutbound = useFlightSearch((s) => s.selectOutbound);
+  const selectReturn = useFlightSearch((s) => s.selectReturn);
+
+  // ---- URL params ---------------------------------------------------------
+  const origin = searchParams.get("origin") ?? "";
+  const destination = searchParams.get("destination") ?? "";
+  const departureDate = searchParams.get("departureDate") ?? "";
+  const returnDate = searchParams.get("returnDate") ?? "";
+  const adults = parseInt(searchParams.get("adults") ?? "1", 10);
+  const children = parseInt(searchParams.get("children") ?? "0", 10);
+  const travelClass = searchParams.get("travelClass") ?? "ECONOMY";
+
+  const hasSearch = !!(origin && destination && departureDate);
+
+  // ---- 1. Sync URL -> Store on mount / URL change -------------------------
+  useEffect(() => {
+    if (!hasSearch) return;
+
+    setSearchParams({
+      origin,
+      destination,
+      departureDate,
+      returnDate,
+      adults,
+      children,
+      travelClass,
+    });
+    setTripType(returnDate ? "round-trip" : "one-way");
+    setOutboundResults(initialResults);
+    setSearchError(searchError ?? null);
+
+    // Reset round-trip flow state on new search
+    useFlightSearch.setState({
+      showRequestForm: false,
+      selectedOutbound: null,
+      selectedReturn: null,
+      returnResults: [],
+      roundTripStep: 'outbound',
+    });
+
+    // Reset enrichment tracking on URL change so enrichments re-fetch
+    enrichmentFetchedRef.current = false;
+  }, [
+    origin,
+    destination,
+    departureDate,
+    returnDate,
+    adults,
+    children,
+    travelClass,
+    hasSearch,
+    initialResults,
+    searchError,
+    setSearchParams,
+    setTripType,
+    setOutboundResults,
+    setSearchError,
+  ]);
+
+  // ---- 2. Fetch enrichment data in parallel (non-blocking) ----------------
+  useEffect(() => {
+    if (!hasSearch || enrichmentFetchedRef.current) return;
+    enrichmentFetchedRef.current = true;
+
+    // Price insights (SerpAPI Google Flights — replaces Amadeus price metrics)
+    (async () => {
+      try {
+        setPriceMetricsLoading(true);
+        const qs = new URLSearchParams({
+          origin,
+          destination,
+          departureDate,
+        });
+        if (returnDate) qs.set("returnDate", returnDate);
+        const data = await clientFetch<{
+          insights: {
+            lowestPrice: number;
+            priceLevel: string;
+            typicalRange: [number, number];
+            currency: string;
+          } | null;
+        }>(`/api/flights/price-insights?${qs}`);
+        if (data.insights) {
+          setPriceMetrics({
+            min: data.insights.typicalRange[0],
+            firstQuartile: data.insights.typicalRange[0],
+            median: data.insights.lowestPrice,
+            thirdQuartile: data.insights.typicalRange[1],
+            max: data.insights.typicalRange[1],
+            currencyCode: data.insights.currency,
+          });
+          setPriceLevel(data.insights.priceLevel);
+        } else {
+          setPriceMetrics(null);
+          setPriceLevel(null);
+        }
+      } catch {
+        // Non-critical — silently degrade
+      } finally {
+        setPriceMetricsLoading(false);
+      }
+    })();
+
+    // Direct destinations
+    (async () => {
+      try {
+        setDirectDestinationsLoading(true);
+        const data = await clientFetch<{ destinations: DirectDestination[] }>(
+          `/api/flights/direct-destinations?airport=${origin}`,
+        );
+        setDirectDestinations(data.destinations ?? []);
+      } catch {
+        // Non-critical
+      } finally {
+        setDirectDestinationsLoading(false);
+      }
+    })();
+
+    // TODO: Upsell needs a dedicated card component that handles the
+    // NormalizedFlightUpsell shape ({ cabinClass, price, currency, includedServices, rawOffer })
+    // instead of FlightOffer ({ segments, price, ... }). Passing upsell data to FlightCard
+    // crashes because FlightCard expects offer.segments[0]. Disabled until a dedicated
+    // UpsellCard component is built.
+    // if (initialResults.length > 0) {
+    //   (async () => {
+    //     try {
+    //       setUpsellLoading(true);
+    //       const data = await clientFetch<{ alternatives: FlightOffer[] }>(
+    //         "/api/flights/upsell",
+    //         {
+    //           method: "POST",
+    //           body: JSON.stringify({
+    //             flightOffers: [initialResults[0]],
+    //           }),
+    //         },
+    //       );
+    //       setUpsellOffers(data.alternatives ?? []);
+    //     } catch {
+    //       // Non-critical
+    //     } finally {
+    //       setUpsellLoading(false);
+    //     }
+    //   })();
+    // }
+
+    // Nearby date prices (7-day strip)
+    (async () => {
+      try {
+        setPriceDatesLoading(true);
+        const qs = new URLSearchParams({
+          origin,
+          destination,
+          departureDate,
+          adults: String(adults),
+          travelClass,
+        });
+        const data = await clientFetch<{ prices: PriceDate[] }>(
+          `/api/flights/nearby-prices?${qs}`,
+        );
+        setPriceDates(data.prices ?? []);
+      } catch {
+        setPriceDates([]);
+      } finally {
+        setPriceDatesLoading(false);
+      }
+    })();
+  }, [
+    hasSearch,
+    origin,
+    destination,
+    departureDate,
+    returnDate,
+    adults,
+    travelClass,
+    initialResults,
+    setPriceMetrics,
+    setPriceMetricsLoading,
+    setPriceLevel,
+    setDirectDestinations,
+    setDirectDestinationsLoading,
+    setUpsellOffers,
+    setUpsellLoading,
+    setPriceDates,
+    setPriceDatesLoading,
+  ]);
+
+  // ---- 3. Compute filtered/sorted results ---------------------------------
+  const activeResults =
+    roundTripStep === "return" ? returnResults : outboundResults;
+
+  const filteredResults = useMemo(
+    () => sortFlights(applyFilters(activeResults, filters), sort),
+    [activeResults, filters, sort],
+  );
+
+  // ---- 4. Handle date select from strip ------------------------------------
+  const handleDateSelect = useCallback(
+    (date: string) => {
+      if (roundTripStep === "return") {
+        // On return step: re-fetch return flights for the new date
+        const params = new URLSearchParams();
+        params.set("origin", destination);
+        params.set("destination", origin);
+        params.set("departureDate", date);
+        params.set("adults", String(adults));
+        if (children > 0) params.set("children", String(children));
+        params.set("travelClass", travelClass);
+
+        setIsSearching(true);
+        setReturnResults([]);
+        // Update returnDate in URL without full page reload
+        const urlParams = new URLSearchParams(searchParams.toString());
+        urlParams.set("returnDate", date);
+        router.replace(`/search/flights?${urlParams.toString()}`, { scroll: false });
+
+        clientFetch<{ results: FlightOffer[] }>(`/api/flights/search?${params}`)
+          .then((data) => setReturnResults(data.results ?? []))
+          .catch(() => setSearchError("Failed to load return flights."))
+          .finally(() => setIsSearching(false));
+
+        // Fetch nearby prices for new return date
+        setPriceDatesLoading(true);
+        clientFetch<{ prices: Array<{ date: string; price: number; currency: string }> }>(
+          `/api/flights/nearby-prices?origin=${destination}&destination=${origin}&departureDate=${date}&adults=${adults}&travelClass=${travelClass}`,
+        )
+          .then((data) => setPriceDates(data.prices ?? []))
+          .catch(() => {})
+          .finally(() => setPriceDatesLoading(false));
+      } else {
+        // On outbound step: full page navigation with new departure date
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("departureDate", date);
+        startSearch(() => router.push(`/search/flights?${params.toString()}`));
+      }
+    },
+    [roundTripStep, searchParams, router, startSearch, origin, destination, adults, children, travelClass, setIsSearching, setReturnResults, setSearchError, setPriceDates, setPriceDatesLoading],
+  );
+
+  // ---- 5. Handle flight selection -----------------------------------------
+  const handleFlightSelect = useCallback(
+    async (offer: FlightOffer) => {
+      if (tripType === "one-way") {
+        selectOutbound(offer);
+        setRoundTripStep("confirm");
+        return;
+      }
+
+      // Round-trip: outbound step
+      if (roundTripStep === "outbound") {
+        selectOutbound(offer);
+
+        // Fetch return flights
+        setIsSearching(true);
+        setReturnResults([]);
+        try {
+          const params = new URLSearchParams();
+          // Swap origin/destination for return leg
+          params.set("origin", destination);
+          params.set("destination", origin);
+          params.set("departureDate", returnDate);
+          params.set("adults", String(adults));
+          if (children > 0) params.set("children", String(children));
+          params.set("travelClass", travelClass);
+
+          const data = await clientFetch<{ results: FlightOffer[] }>(
+            `/api/flights/search?${params.toString()}`,
+          );
+          setReturnResults(data.results ?? []);
+        } catch {
+          setSearchError("Failed to load return flights. Please try again.");
+        } finally {
+          setIsSearching(false);
+        }
+
+        // Fetch nearby prices for the return date range
+        setPriceDatesLoading(true);
+        clientFetch<{ prices: Array<{ date: string; price: number; currency: string }> }>(
+          `/api/flights/nearby-prices?origin=${destination}&destination=${origin}&departureDate=${returnDate}&adults=${adults}&travelClass=${travelClass}`,
+        )
+          .then((res) => setPriceDates(res.prices ?? []))
+          .catch(() => {})
+          .finally(() => setPriceDatesLoading(false));
+
+        return;
+      }
+
+      // Round-trip: return step
+      if (roundTripStep === "return") {
+        selectReturn(offer);
+      }
+    },
+    [
+      tripType,
+      roundTripStep,
+      origin,
+      destination,
+      returnDate,
+      adults,
+      children,
+      travelClass,
+      selectOutbound,
+      selectReturn,
+      setRoundTripStep,
+      setIsSearching,
+      setReturnResults,
+      setSearchError,
+      setPriceDates,
+      setPriceDatesLoading,
+    ],
+  );
+
+  // ---- 6. Render ----------------------------------------------------------
+
+  // (A) Request form flow
+  if (showRequestForm) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <FlightSearchForm compact />
+        </div>
+        <FlightRequestForm />
+      </div>
+    );
+  }
+
+  // (B) Confirmation flow
+  if (roundTripStep === "confirm" && selectedOutbound) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <FlightSearchForm compact />
+        </div>
+        <FlightConfirmation />
+      </div>
+    );
+  }
+
+  // (C) Full search results layout
+  const stepHeader =
+    tripType === "round-trip"
+      ? roundTripStep === "return"
+        ? "Select your return flight"
+        : "Select your departure flight"
+      : "Select your flight";
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* Page heading */}
+      <div className="mb-6">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
+          {hasSearch ? "FLIGHT RESULTS" : "SEARCH FLIGHTS"}
+        </h1>
+        <p className="mt-2 text-base text-muted-foreground">
+          {hasSearch
+            ? "Comparing fares for your route"
+            : "Find the best fares from hundreds of airlines worldwide"}
+        </p>
+      </div>
+
+      {/* Search form */}
+      <div className={hasSearch ? "mb-6" : "mb-12"}>
+        <FlightSearchForm compact={hasSearch} />
+      </div>
+
+      {/* No search params yet */}
+      {!hasSearch && <EmptyPrompt />}
+
+      {/* Error state */}
+      {hasSearch && searchError && <ErrorState />}
+
+      {/* Results */}
+      {hasSearch && !searchError && (
+        <>
+          {/* 7-day price strip — shows outbound dates or return dates depending on step */}
+          <div className="mb-6">
+            <DatePriceStrip
+              selectedDate={roundTripStep === "return" ? returnDate : departureDate}
+              onDateSelect={handleDateSelect}
+            />
+          </div>
+
+          {/* Insights */}
+          <div className="mb-6 space-y-3">
+            <SavingsTip />
+            <PriceInsightBar />
+            <DirectFlightsBanner />
+          </div>
+
+          {/* Step header */}
+          <h2 className="mb-4 text-lg font-semibold text-[#1A1A1A]">
+            {stepHeader}
+          </h2>
+
+          {/* Round trip bar (return step) */}
+          {roundTripStep === "return" && (
+            <div className="mb-4">
+              <RoundTripBar />
+            </div>
+          )}
+
+          {/* Loading return flights */}
+          {isSearching && (
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-white px-6 py-12 text-muted-foreground">
+              <Loader2 className="size-5 animate-spin" />
+              <span>Searching return flights...</span>
+            </div>
+          )}
+
+          {/* Two-column layout: filters + results */}
+          {!isSearching && (
+            <div className="flex gap-6">
+              {/* Filter sidebar (desktop) */}
+              <aside className="hidden w-60 shrink-0 lg:block">
+                <div className="sticky top-20">
+                  <FlightFilters results={activeResults} />
+                </div>
+              </aside>
+
+              {/* Main results area */}
+              <div className="min-w-0 flex-1">
+                {/* Sort pills + mobile filter sheet */}
+                <div className="mb-4 flex items-center gap-3">
+                  <FlightSortPills />
+                  <div className="lg:hidden">
+                    <FlightFilterSheet
+                      results={activeResults}
+                      filteredCount={filteredResults.length}
+                    />
+                  </div>
+                </div>
+
+                {/* Result count */}
+                <p className="mb-3 text-sm text-muted-foreground">
+                  {filteredResults.length}{" "}
+                  {filteredResults.length === 1 ? "flight" : "flights"} found
+                </p>
+
+                {/* Live pricing notice */}
+                <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <p>
+                    Prices and seat availability may change. Our advisors can
+                    lock in the best fare for you.
+                  </p>
+                </div>
+
+                {/* Flight cards */}
+                {filteredResults.length > 0 ? (
+                  <div className="space-y-4">
+                    {filteredResults.map((offer) => (
+                      <div key={offer.id}>
+                        <FlightCard
+                          offer={offer}
+                          onSelect={handleFlightSelect}
+                        />
+                        {/* TODO: Render UpsellCard here once a dedicated component
+                            that handles NormalizedFlightUpsell shape is built. */}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-border bg-muted/30 px-6 py-12 text-center">
+                    <p className="text-sm font-medium text-[#1A1A1A]">
+                      No flights match your filters
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Try adjusting your filter criteria to see more results.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

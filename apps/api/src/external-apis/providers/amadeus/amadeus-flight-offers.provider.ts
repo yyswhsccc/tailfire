@@ -104,6 +104,7 @@ export class AmadeusFlightOffersProvider
         })
       )
 
+      this.recordRequest()
       this.logger.log('Amadeus Flight Offers response', { requestId, latencyMs: Date.now() - startTime })
 
       return {
@@ -184,6 +185,7 @@ export class AmadeusFlightOffersProvider
     })
 
     if (params.returnDate) queryParams.set('returnDate', params.returnDate)
+    if (params.children && params.children > 0) queryParams.set('children', String(params.children))
     if (params.travelClass) queryParams.set('travelClass', params.travelClass)
     if (params.nonStop) queryParams.set('nonStop', 'true')
     if (params.maxPrice) queryParams.set('maxPrice', String(params.maxPrice))
