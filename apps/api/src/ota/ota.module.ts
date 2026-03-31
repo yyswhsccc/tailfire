@@ -29,10 +29,12 @@ import { OtaServiceKeyGuard } from './guards/ota-service-key.guard'
 import { CruiseBookingModule } from '../cruise-booking/cruise-booking.module'
 import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
 import { TripsModule } from '../trips/trips.module'
+import { TripPromotionService } from './trip-promotion.service'
 import { FlightPromoter } from './component-promoters/flight.promoter'
 import { LodgingPromoter } from './component-promoters/lodging.promoter'
 import { CruisePromoter } from './component-promoters/cruise.promoter'
 import { TourPromoter } from './component-promoters/tour.promoter'
+import { NotificationModule } from '../notifications/notification.module'
 
 /**
  * Note: ExternalApisModule is @Global() so AmadeusFlightOffersProvider,
@@ -46,6 +48,7 @@ import { TourPromoter } from './component-promoters/tour.promoter'
     CruiseBookingModule,
     ApiCredentialsModule,
     forwardRef(() => TripsModule),
+    NotificationModule,
   ],
   controllers: [
     OtaLeadsController,
@@ -63,11 +66,12 @@ import { TourPromoter } from './component-promoters/tour.promoter'
     OtaTripRequestsService,
     OwnerResolutionService,
     OtaServiceKeyGuard,
+    TripPromotionService,
     FlightPromoter,
     LodgingPromoter,
     CruisePromoter,
     TourPromoter,
   ],
-  exports: [OtaLeadsService, OtaReferralsService, OtaPublishedTripsService, OtaSearchService, OtaTripRequestsService, OwnerResolutionService, FlightPromoter, LodgingPromoter, CruisePromoter, TourPromoter],
+  exports: [OtaLeadsService, OtaReferralsService, OtaPublishedTripsService, OtaSearchService, OtaTripRequestsService, OwnerResolutionService, TripPromotionService, FlightPromoter, LodgingPromoter, CruisePromoter, TourPromoter],
 })
 export class OtaModule {}
