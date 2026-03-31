@@ -261,7 +261,7 @@ export function RelationshipDialog({
                             {getInitials(selectedContact.firstName, selectedContact.lastName)}
                           </AvatarFallback>
                         </Avatar>
-                        <span>{selectedContact.displayName}</span>
+                        <span>{selectedContact.displayName || [selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(' ')}</span>
                       </div>
                     ) : selectedContactDisplay ? (
                       <div className="flex items-center gap-2">
@@ -306,7 +306,7 @@ export function RelationshipDialog({
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex flex-col">
-                                <span className="text-sm font-medium">{contact.displayName}</span>
+                                <span className="text-sm font-medium">{contact.displayName || [contact.firstName, contact.lastName].filter(Boolean).join(' ')}</span>
                                 {contact.email && (
                                   <span className="text-xs text-ash-500">{contact.email}</span>
                                 )}
