@@ -3157,10 +3157,10 @@ export class ComponentOrchestrationService {
     timings['getItineraryDates'] = Date.now() - stepStart
 
     if (itinerary?.startDate && itinerary?.endDate) {
-      const itineraryStart = new Date(itinerary.startDate + 'T00:00:00')
-      const itineraryEnd = new Date(itinerary.endDate + 'T00:00:00')
-      const cruiseDeparture = new Date(cruiseDetails.departureDate + 'T00:00:00')
-      const cruiseArrival = new Date(cruiseDetails.arrivalDate + 'T00:00:00')
+      const itineraryStart = new Date(itinerary.startDate + 'T00:00:00Z')
+      const itineraryEnd = new Date(itinerary.endDate + 'T00:00:00Z')
+      const cruiseDeparture = new Date(cruiseDetails.departureDate + 'T00:00:00Z')
+      const cruiseArrival = new Date(cruiseDetails.arrivalDate + 'T00:00:00Z')
 
       if (cruiseDeparture < itineraryStart || cruiseArrival > itineraryEnd) {
         if (cruiseData?.autoExtendItinerary) {
@@ -3205,9 +3205,9 @@ export class ComponentOrchestrationService {
       timings['deleteExisting'] = Date.now() - stepStart
     }
 
-    // Parse cruise dates from cruise details (departureDate/arrivalDate)
-    const startDate = new Date(cruiseDetails.departureDate + 'T00:00:00')
-    const endDate = new Date(cruiseDetails.arrivalDate + 'T00:00:00')
+    // Parse cruise dates as UTC to avoid timezone issues with setUTCDate below
+    const startDate = new Date(cruiseDetails.departureDate + 'T00:00:00Z')
+    const endDate = new Date(cruiseDetails.arrivalDate + 'T00:00:00Z')
 
     // Validate dates are valid and in correct order
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
