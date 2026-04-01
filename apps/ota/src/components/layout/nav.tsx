@@ -8,6 +8,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { openChat } from "@/components/chat/chat-widget";
+import { TripBasketIndicator } from "@/components/trip-builder/trip-basket-indicator";
 import phoenixLogo from "@/assets/phoenix-logo.svg";
 
 // Grouped navigation structure
@@ -134,7 +135,8 @@ export function Nav() {
         </div>
 
         {/* Desktop CTA */}
-        <div className="hidden lg:block">
+        <div className="hidden items-center gap-2 lg:flex">
+          <TripBasketIndicator />
           <Button
             className="bg-[#C59746] text-white hover:bg-[#B08638]"
             size="default"
