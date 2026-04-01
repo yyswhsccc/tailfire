@@ -406,7 +406,13 @@ export function OcrPreview({
               <DataRow label="Duration" value={`${extraction.cruise.nights} nights`} />
             )}
             {extraction.cruise.totalPriceCents && (
-              <DataRow label="Total" value={formatPrice(extraction.cruise.totalPriceCents, extraction.cruise.currency)} />
+              <DataRow label="Gross" value={formatPrice(extraction.cruise.totalPriceCents, extraction.cruise.currency)} />
+            )}
+            {extraction.cruise.netPriceCents && (
+              <DataRow label="Net" value={formatPrice(extraction.cruise.netPriceCents, extraction.cruise.currency)} />
+            )}
+            {extraction.cruise.commissionCents && (
+              <DataRow label="Commission" value={formatPrice(extraction.cruise.commissionCents, extraction.cruise.currency)} />
             )}
           </CardContent>
         </Card>
