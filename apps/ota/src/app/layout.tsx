@@ -5,6 +5,7 @@ import { cinzel, lato } from "@/lib/fonts";
 import { Nav } from "@/components/layout/nav";
 import { Footer } from "@/components/layout/footer";
 import { ChatWidgetLoader } from "@/components/chat/chat-widget-loader";
+import { TripBasketProvider } from "@/components/trip-builder/trip-basket-provider";
 import { generateOrganizationJsonLd, generateSearchActionJsonLd } from "@/lib/structured-data";
 import "./globals.css";
 
@@ -63,10 +64,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(searchActionJsonLd) }}
         />
-        <Nav />
-        <main>{children}</main>
-        <Footer />
-        <ChatWidgetLoader />
+        <TripBasketProvider>
+          <Nav />
+          <main>{children}</main>
+          <Footer />
+          <ChatWidgetLoader />
+        </TripBasketProvider>
       </body>
     </html>
   );
