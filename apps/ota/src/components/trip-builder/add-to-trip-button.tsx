@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Plus, Check, Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { useTripBasket, type TripComponent } from "./trip-basket-store";
 import { TripPickerDropdown } from "./trip-picker-dropdown";
 
@@ -79,13 +78,19 @@ export function AddToTripButton({
       className="relative"
       onClick={(e) => e.stopPropagation()}
     >
-      <Button
-        type="button"
-        variant={isAlreadyAdded || justAdded ? "secondary" : "default"}
-        size={size}
-        className={className}
-        disabled={isAlreadyAdded || isLoading}
-        onClick={handleClick}
+      {/* Use a div styled as button to avoid nested <button> inside flight card <button> */}
+      <div
+        role="button"
+        tabIndex={0}
+        className={`inline-flex shrink-0 items-center justify-center rounded-lg text-xs font-medium transition-colors cursor-pointer select-none ${
+          size === "sm" ? "h-7 gap-1 px-2.5" : "h-8 gap-1.5 px-3"
+        } ${
+          isAlreadyAdded || justAdded
+            ? "bg-muted text-muted-foreground"
+            : "bg-[#C59746] text-white hover:bg-[#B08638]"
+        } ${isAlreadyAdded || isLoading ? "pointer-events-none opacity-60" : ""} ${className || ""}`}
+        onClick={isAlreadyAdded || isLoading ? undefined : handleClick}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}
       >
         {isLoading ? (
           <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -95,7 +100,7 @@ export function AddToTripButton({
           <Plus className="mr-1 h-3.5 w-3.5" />
         )}
         {isAlreadyAdded ? "Added" : justAdded ? "Added!" : "Add to Trip"}
-      </Button>
+      </div>
 
       {showPicker && (
         <TripPickerDropdown
