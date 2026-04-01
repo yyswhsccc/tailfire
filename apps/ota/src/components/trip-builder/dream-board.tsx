@@ -38,32 +38,45 @@ function computeTotal(components: TripComponent[]): number {
   }, 0);
 }
 
-export function DreamBoard({
-  requestId,
-  title,
-  components,
-  inspiration,
-  boardOrder,
-  readOnly,
-  startDate,
-  endDate,
-  travelers,
-}: DreamBoardProps) {
+export function DreamBoard(props: DreamBoardProps) {
+  const {
+    requestId,
+    readOnly,
+    startDate,
+    endDate,
+    travelers,
+  } = props;
+
   const removeComponent = useTripBasket((s) => s.removeComponent);
   const isIdentified = useTripBasket((s) => s.isIdentified);
   const [showSubmit, setShowSubmit] = useState(false);
+
+  // Read from Zustand store (which gets seeded from props on mount)
+  const storeComponents = useTripBasket((s) => s.components);
+  const storeInspiration = useTripBasket((s) => s.inspiration);
+  const storeBoardOrder = useTripBasket((s) => s.boardOrder);
+  const storeTitle = useTripBasket((s) => s.title);
 
   // Seed Zustand store from server-fetched data so client mutations
   // (removeComponent, updateBoardOrder) have the requestId they need.
   useEffect(() => {
     useTripBasket.setState({
       requestId,
-      title,
-      components,
-      inspiration,
-      boardOrder,
+      title: props.title,
+      components: props.components,
+      inspiration: props.inspiration,
+      boardOrder: props.boardOrder,
     });
   }, [requestId]); // Only on mount / request change
+
+  // Use store values for rendering, falling back to props on first render
+  const components =
+    storeComponents.length > 0 ? storeComponents : props.components;
+  const inspiration =
+    storeInspiration.length > 0 ? storeInspiration : props.inspiration;
+  const boardOrder =
+    storeBoardOrder.length > 0 ? storeBoardOrder : props.boardOrder;
+  const title = storeTitle ?? props.title;
 
   const handleRemove = useCallback(
     (id: string) => {

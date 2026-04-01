@@ -550,6 +550,7 @@ export class OtaTripRequestsService {
       travelStyle?: string
       travelers?: number
       specialRequests?: string
+      startDate?: string
     },
   ): Promise<OtaTripRequest> {
     const existing = await this.findById(id)
@@ -569,6 +570,7 @@ export class OtaTripRequestsService {
         travelStyle: dto.travelStyle,
         travelers: dto.travelers,
         specialRequests: dto.specialRequests,
+        startDate: dto.startDate ?? undefined,
         updatedAt: new Date(),
       })
       .where(eq(otaTripRequests.id, id))

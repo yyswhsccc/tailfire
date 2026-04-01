@@ -225,7 +225,7 @@ export class OtaTripRequestsController {
     const shareToken = await this.tripRequests.generateShareToken(id)
     return {
       shareToken,
-      shareUrl: `/shared/${shareToken}`,
+      shareUrl: `/my-trip/${id}?token=${shareToken}`,
     }
   }
 
@@ -311,7 +311,21 @@ export class OtaTripRequestsController {
   @ApiResponse({ status: 400, description: 'Request is not in draft status or has no components' })
   @ApiResponse({ status: 404, description: 'Trip request not found' })
   @ApiResponse({ status: 401, description: 'Invalid OTA service key' })
-  async submit(@Param('id', ParseUUIDPipe) id: string) {
+  async submit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: Record<string, any> = {},
+  ) {
+    // Step 0: Persist any submit-time details (date flexibility, travel style, etc.)
+    if (body && Object.keys(body).length > 0) {
+      await this.tripRequests.updateSubmitDetails(id, {
+        dateFlexibility: body.dateFlexibility,
+        travelStyle: body.travelStyle,
+        travelers: body.travelers,
+        specialRequests: body.specialRequests,
+        startDate: body.startDate,
+      })
+    }
+
     // Step 1: Transition draft → submitted
     await this.tripRequests.submit(id)
 

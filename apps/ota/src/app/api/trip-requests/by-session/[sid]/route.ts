@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { serviceFetch } from "@/lib/api";
 
 /**
@@ -10,6 +11,14 @@ export async function GET(
 ) {
   try {
     const { sid } = await params;
+
+    // Validate that the caller's ota_session cookie matches the requested session
+    const cookieStore = await cookies();
+    const callerSession = cookieStore.get("ota_session")?.value;
+    if (callerSession !== sid) {
+      return NextResponse.json([], { status: 200 }); // Empty array, don't reveal existence
+    }
+
     const data = await serviceFetch<unknown>(
       `/ota/trip-requests/by-session/${sid}`,
     );
