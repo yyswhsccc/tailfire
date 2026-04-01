@@ -59,7 +59,7 @@ export interface BookingHeaderButtonProps {
   /** Switch to a specific tab in the parent form */
   onNavigateToTab?: (tab: string) => void
   /** Called after successful booking */
-  onBooked?: (cascadedCount?: number) => void
+  onBooked?: (cascadedCount?: number, bookingDate?: string) => void
   /** Called after successful unbooking */
   onUnbooked?: () => void
 }
@@ -225,7 +225,7 @@ export function BookingHeaderButton({
         })
       }
 
-      onBooked?.(cascadedCount)
+      onBooked?.(cascadedCount, bookingDateInput)
     } catch (err) {
       toast({
         title: 'Booking failed',
