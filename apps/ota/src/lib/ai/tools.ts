@@ -416,7 +416,86 @@ export function createTools(ctx: ToolContext = {}) {
   })
 
   // -------------------------------------------------------------------------
-  // 7. requestAdvisor
+  // 7. manageTripBasket
+  // -------------------------------------------------------------------------
+  const manageTripBasket = tool({
+    description:
+      "Add or remove travel components (flights, hotels, cruises, tours) from the consumer's trip basket. Use when the consumer says they want to save, add, or remove a search result to/from their trip. For 'add', include the component type and relevant data from the search result. For 'remove', provide the componentId of the item to remove.",
+    inputSchema: z.object({
+      action: z.enum(['add', 'remove']).describe("Whether to add or remove a component from the basket"),
+      componentId: z
+        .string()
+        .optional()
+        .describe("The ID of the component to remove (required for 'remove' action)"),
+      component: z
+        .object({
+          type: z.enum(['flight', 'hotel', 'cruise', 'tour']).describe('Type of travel component'),
+          data: z.record(z.unknown()).describe('The search result data for this component'),
+          display: z.object({
+            title: z.string().describe('Short display title for the basket card'),
+            subtitle: z.string().optional().describe('Secondary line (e.g. dates, route)'),
+            price: z.string().optional().describe('Formatted price string'),
+          }),
+        })
+        .optional()
+        .describe("The component to add (required for 'add' action)"),
+    }),
+    execute: async ({ action, componentId, component }) => {
+      if (action === 'add') {
+        if (!component) {
+          return { error: 'A component object is required when adding to the basket.' }
+        }
+        const id = `ai-${Date.now()}`
+        return {
+          action: 'addToBasket' as const,
+          component: {
+            id,
+            ...component,
+            addedAt: new Date().toISOString(),
+          },
+          message: `Added "${component.display.title}" to your trip basket.`,
+        }
+      }
+
+      if (action === 'remove') {
+        if (!componentId) {
+          return { error: 'A componentId is required when removing from the basket.' }
+        }
+        return {
+          action: 'removeFromBasket' as const,
+          componentId,
+          message: 'Removed the item from your trip basket.',
+        }
+      }
+
+      return { error: 'Invalid action. Use "add" or "remove".' }
+    },
+  })
+
+  // -------------------------------------------------------------------------
+  // 8. captureIdentity
+  // -------------------------------------------------------------------------
+  const captureIdentity = tool({
+    description:
+      "Save the consumer's email address to link their trip basket for persistence across sessions. Use when the consumer shares their email in conversation and you want to ensure their trip data is saved. This is different from captureContact — captureIdentity links the basket, captureContact creates a lead for advisor follow-up.",
+    inputSchema: z.object({
+      email: z.string().describe("Consumer's email address"),
+      name: z.string().optional().describe("Consumer's full name, if known"),
+      phone: z.string().optional().describe("Consumer's phone number, if known"),
+    }),
+    execute: async ({ email, name, phone }) => {
+      return {
+        action: 'linkIdentity' as const,
+        email,
+        ...(name ? { name } : {}),
+        ...(phone ? { phone } : {}),
+        message: `Got it! I've linked your email (${email}) so your trip basket will be saved across sessions.`,
+      }
+    },
+  })
+
+  // -------------------------------------------------------------------------
+  // 9. requestAdvisor
   // -------------------------------------------------------------------------
   const requestAdvisor = tool({
     description:
@@ -462,6 +541,8 @@ export function createTools(ctx: ToolContext = {}) {
     browseTours,
     assemblePackage,
     captureContact,
+    manageTripBasket,
+    captureIdentity,
     requestAdvisor,
   }
 }
