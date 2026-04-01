@@ -186,7 +186,7 @@ In the board header or floating action menu:
 - "+ Add Hotel" → navigates to `/search/hotels?tripId=xxx`
 - "+ Add Cruise" → navigates to `/search/cruises?tripId=xxx`
 - "+ Add Tour" → navigates to `/search/tours?tripId=xxx`
-- "+ Add Note" → adds a freeform text card (stored in `components[]` as type `note`)
+- "+ Add Note" → adds a freeform text card (stored in `components[]` as `type: 'custom'` with `data.description` and `data.category: 'note'` — uses existing `custom` DTO type, skipped during promotion)
 
 When navigating to search pages from the board, `tripId` query param ensures "Add to Trip" auto-targets the correct trip.
 
@@ -273,9 +273,9 @@ DELETE /ota/trip-requests/:id/components/:componentId
   → Removes a component from the JSONB array
   → Returns: { requestId, componentCount }
 
-PATCH /ota/trip-requests/:id/components/reorder
-  Body: { componentIds: string[] }
-  → Reorders the components array
+PATCH /ota/trip-requests/:id/board-order
+  Body: { boardOrder: Array<{ type: 'component' | 'inspiration', id: string }> }
+  → Updates the board_order JSONB (interleaved display sequence)
 
 POST /ota/trip-requests/:id/share
   → Generates or returns existing shareToken
@@ -308,7 +308,7 @@ apps/ota/src/app/api/trip-requests/
 ├── [id]/route.ts                   # GET — get request details
 ├── [id]/components/add/route.ts    # POST — append component
 ├── [id]/components/[cid]/route.ts  # DELETE — remove component
-├── [id]/components/reorder/route.ts # PATCH — reorder
+├── [id]/board-order/route.ts        # PATCH — update board order
 ├── [id]/submit/route.ts            # POST — submit + promote
 ├── [id]/share/route.ts             # POST/DELETE — manage share token
 ├── [id]/identity/route.ts          # PATCH — link identity
@@ -342,7 +342,7 @@ interface TripBasketState {
   hydrate: () => Promise<void>         // Load from session cookie
   addComponent: (component) => Promise<void>
   removeComponent: (componentId) => Promise<void>
-  reorderComponents: (ids) => Promise<void>
+  updateBoardOrder: (order: Array<{type: string, id: string}>) => Promise<void>
   setTitle: (title) => Promise<void>
   createDraft: (firstComponent) => Promise<string>
   linkIdentity: (email, name?, phone?) => Promise<void>
