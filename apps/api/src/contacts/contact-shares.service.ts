@@ -95,9 +95,6 @@ export class ContactSharesService {
         accessLevel: dto.accessLevel || 'basic',
         sharedBy: auth.userId,
         notes: dto.notes,
-        reason: dto.reason,
-        grantedBy: auth.userId,
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
       })
       .returning()
 

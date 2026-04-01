@@ -103,7 +103,8 @@ export class OtaTripRequestsController {
     let message = 'Trip request submitted and promoted successfully'
 
     try {
-      tripId = await this.promotionService.promote(id)
+      const result = await this.promotionService.promote(id)
+      tripId = result.tripId
     } catch (error) {
       // Promotion failed, but the request was still submitted successfully
       const errorMessage = error instanceof Error ? error.message : String(error)
