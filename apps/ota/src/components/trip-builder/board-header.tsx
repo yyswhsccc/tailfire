@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { Share2, Send } from "lucide-react";
+import { Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ShareButton } from "./share-button";
 
 interface BoardHeaderProps {
   title: string | null;
@@ -11,6 +11,7 @@ interface BoardHeaderProps {
   totalEstimate: number;
   readOnly: boolean;
   requestId: string;
+  onSubmitClick?: () => void;
 }
 
 function formatCurrency(cents: number): string {
@@ -24,6 +25,7 @@ export function BoardHeader({
   totalEstimate,
   readOnly,
   requestId,
+  onSubmitClick,
 }: BoardHeaderProps) {
   return (
     <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -40,14 +42,11 @@ export function BoardHeader({
 
       {!readOnly && (
         <div className="flex items-center gap-2 pt-2 sm:pt-0">
-          <Button variant="outline" size="sm" render={<Link href={`/my-trip/${requestId}`} />}>
-            <Share2 data-icon="inline-start" className="size-3.5" />
-            Share
-          </Button>
+          <ShareButton requestId={requestId} />
           <Button
             size="sm"
             className="bg-[#C59746] text-white hover:bg-[#B08636]"
-            render={<Link href={`/my-trip/${requestId}/submit`} />}
+            onClick={onSubmitClick}
           >
             <Send data-icon="inline-start" className="size-3.5" />
             Submit Trip

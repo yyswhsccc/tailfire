@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 
 import {
@@ -14,6 +14,7 @@ import { BoardAddMenu } from "./board-add-menu";
 import { BoardEmptyState } from "./board-empty-state";
 import { BoardFunctionalCard } from "./board-functional-card";
 import { BoardInspirationCard } from "./board-inspiration-card";
+import { SubmitReview } from "./submit-review";
 
 interface DreamBoardProps {
   requestId: string;
@@ -49,6 +50,8 @@ export function DreamBoard({
   travelers,
 }: DreamBoardProps) {
   const removeComponent = useTripBasket((s) => s.removeComponent);
+  const isIdentified = useTripBasket((s) => s.isIdentified);
+  const [showSubmit, setShowSubmit] = useState(false);
 
   // Seed Zustand store from server-fetched data so client mutations
   // (removeComponent, updateBoardOrder) have the requestId they need.
@@ -98,6 +101,20 @@ export function DreamBoard({
     }
   }
 
+  // Submit review flow
+  if (showSubmit) {
+    return (
+      <SubmitReview
+        requestId={requestId}
+        components={components}
+        startDate={startDate}
+        travelers={travelers}
+        isIdentified={isIdentified}
+        onBack={() => setShowSubmit(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -107,6 +124,7 @@ export function DreamBoard({
         totalEstimate={totalEstimate}
         readOnly={readOnly}
         requestId={requestId}
+        onSubmitClick={() => setShowSubmit(true)}
       />
 
       {/* Add menu */}
