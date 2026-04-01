@@ -326,6 +326,7 @@ export function toTourApiPayload(data: TourFormData): CreateActivityDto & {
     termsAndConditions: data.termsAndConditions || undefined,
     cancellationPolicy: data.cancellationPolicy || undefined,
     supplier: data.supplier || undefined,
+    bookingDate: (data as any).bookingDate || null,
   }
 }
 
