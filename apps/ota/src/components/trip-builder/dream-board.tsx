@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Plus, Plane, Hotel, Ship, Map } from "lucide-react";
+import Link from "next/link";
 import {
   DndContext,
   closestCenter,
@@ -58,6 +59,108 @@ function computeTotal(components: TripComponent[]): number {
   }, 0);
 }
 
+/** Extract a destination string from components for inspiration auto-fetch. */
+function extractDestination(components: TripComponent[]): string | null {
+  for (const c of components) {
+    const data = c.data as Record<string, unknown>;
+    // Flight: destination city or airport code
+    if (c.type === "flight") {
+      const dest =
+        (data.destinationCity as string) ||
+        (data.arrivalCity as string) ||
+        (data.destination as string) ||
+        (data.to as string);
+      if (dest) return dest;
+    }
+    // Hotel: location or city
+    if (c.type === "hotel") {
+      const loc =
+        (data.city as string) ||
+        (data.location as string) ||
+        (data.destination as string);
+      if (loc) return loc;
+    }
+    // Cruise: destination port or region
+    if (c.type === "cruise") {
+      const port =
+        (data.destination as string) ||
+        (data.region as string) ||
+        (data.departurePort as string);
+      if (port) return port;
+    }
+    // Tour: destination
+    if (c.type === "tour") {
+      const dest = (data.destination as string) || (data.location as string);
+      if (dest) return dest;
+    }
+  }
+  // Fallback: try display title for any component
+  for (const c of components) {
+    if (c.display?.title) return c.display.title;
+  }
+  return null;
+}
+
+/** Hero banner at the top of the dream board */
+function TripBanner({
+  title,
+  startDate,
+  endDate,
+  travelers,
+  bannerImage,
+  destination,
+}: {
+  title: string | null;
+  startDate?: string;
+  endDate?: string;
+  travelers?: number;
+  bannerImage: string | null;
+  destination: string | null;
+}) {
+  return (
+    <div className="relative w-full overflow-hidden rounded-2xl h-[200px] sm:h-[240px]">
+      {/* Background: image or gradient */}
+      {bannerImage ? (
+        <img
+          src={bannerImage}
+          alt={destination || "Trip destination"}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-[#1A1A1A] via-[#2A2A2A] to-[#C59746]/40" />
+      )}
+
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10" />
+
+      {/* Content */}
+      <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+          {title || "My Dream Trip"}
+        </h1>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/80">
+          {destination && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 backdrop-blur-sm">
+              {destination}
+            </span>
+          )}
+          {startDate && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 backdrop-blur-sm">
+              {startDate}
+              {endDate ? ` — ${endDate}` : ""}
+            </span>
+          )}
+          {travelers && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 backdrop-blur-sm">
+              {travelers} traveler{travelers !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Sortable wrapper for each card on the board. */
 function SortableCard({ id, children }: { id: string; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -88,6 +191,7 @@ export function DreamBoard(props: DreamBoardProps) {
   const isIdentified = useTripBasket((s) => s.isIdentified);
   const [showSubmit, setShowSubmit] = useState(false);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const inspirationFetched = useRef(false);
 
   // Read from Zustand store (which gets seeded from props on mount)
   const storeComponents = useTripBasket((s) => s.components);
@@ -115,6 +219,46 @@ export function DreamBoard(props: DreamBoardProps) {
   const boardOrder =
     storeBoardOrder.length > 0 ? storeBoardOrder : props.boardOrder;
   const title = storeTitle ?? props.title;
+
+  // Auto-fetch inspiration images when board has components but no inspiration
+  const destination = extractDestination(components);
+  useEffect(() => {
+    if (inspirationFetched.current) return;
+    if (!requestId || components.length === 0 || inspiration.length > 0) return;
+
+    const dest = extractDestination(components);
+    if (!dest) return;
+
+    inspirationFetched.current = true;
+
+    fetch(`/api/trip-requests/${requestId}/inspiration`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ destination: dest }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.cards && Array.isArray(data.cards)) {
+          useTripBasket.setState((state) => ({
+            inspiration: data.cards,
+            boardOrder: [
+              ...state.boardOrder,
+              ...data.cards.map((c: InspirationCard) => ({
+                type: "inspiration" as const,
+                id: c.id,
+              })),
+            ],
+          }));
+        }
+      })
+      .catch(() => {
+        // Silent — inspiration is non-critical
+      });
+  }, [requestId, components.length, inspiration.length]);
+
+  // Banner image: use first inspiration image if available
+  const firstInspiration = inspiration[0];
+  const bannerImage = firstInspiration ? firstInspiration.imageUrl : null;
 
   const handleRemove = useCallback(
     (id: string) => {
@@ -198,8 +342,11 @@ export function DreamBoard(props: DreamBoardProps) {
 
   // Render the card grid — wrapped in DnD when not readOnly
   const cardGrid = (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 auto-rows-auto">
-      {orderedItems.map((entry) => {
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 auto-rows-auto">
+      {orderedItems.map((entry, index) => {
+        // First component card spans 2 columns on desktop for hero effect
+        const isHero = index === 0 && entry.kind === "component";
+
         const card =
           entry.kind === "component" ? (
             <BoardFunctionalCard
@@ -207,6 +354,7 @@ export function DreamBoard(props: DreamBoardProps) {
               component={entry.item}
               readOnly={readOnly}
               onRemove={handleRemove}
+              isHero={isHero}
             />
           ) : (
             <BoardInspirationCard
@@ -215,19 +363,48 @@ export function DreamBoard(props: DreamBoardProps) {
             />
           );
 
-        if (readOnly) return <div key={entry.item.id}>{card}</div>;
+        const wrapperClass = isHero ? "col-span-2 lg:col-span-2" : "";
+
+        if (readOnly) {
+          return (
+            <div key={entry.item.id} className={wrapperClass}>
+              {card}
+            </div>
+          );
+        }
 
         return (
           <SortableCard key={entry.item.id} id={entry.item.id}>
-            {card}
+            <div className={wrapperClass}>{card}</div>
           </SortableCard>
         );
       })}
 
-      {/* Placeholder "add" card */}
+      {/* Placeholder "add" card — more inviting */}
       {!readOnly && (
-        <div className="flex h-[160px] items-center justify-center rounded-xl border-2 border-dashed border-border/50 text-muted-foreground/40 transition-colors hover:border-border hover:text-muted-foreground/60">
-          <Plus className="size-8" />
+        <div className="flex h-[180px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border/40 bg-white/50 text-muted-foreground/50 transition-all hover:border-[#C59746]/40 hover:bg-[#C59746]/5 hover:text-muted-foreground/70">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/50">
+            <Plus className="size-5" />
+          </div>
+          <span className="text-xs font-medium">Add to your trip</span>
+          <div className="flex items-center gap-2">
+            {[
+              { icon: Plane, path: "flights", label: "Flights" },
+              { icon: Hotel, path: "hotels", label: "Hotels" },
+              { icon: Ship, path: "cruises", label: "Cruises" },
+              { icon: Map, path: "tours", label: "Tours" },
+            ].map(({ icon: Icon, path, label }) => (
+              <Link
+                key={path}
+                href={`/search/${path}?tripId=${requestId}`}
+                className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-1 text-[10px] font-medium text-foreground/60 transition-colors hover:bg-[#C59746]/15 hover:text-[#C59746]"
+                onClick={(e) => e.stopPropagation()}
+                title={label}
+              >
+                <Icon className="size-3" />
+              </Link>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -236,10 +413,22 @@ export function DreamBoard(props: DreamBoardProps) {
   return (
     <>
       <div
-        className={`space-y-6 transition-[margin] duration-300 ${
+        className={`mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 space-y-6 transition-[margin] duration-300 ${
           aiPanelOpen ? "lg:mr-[400px]" : ""
         }`}
       >
+        {/* Hero banner — trip destination photo with title overlay */}
+        {hasComponents && (
+          <TripBanner
+            title={title}
+            startDate={startDate}
+            endDate={endDate}
+            travelers={travelers}
+            bannerImage={bannerImage}
+            destination={destination}
+          />
+        )}
+
         {/* Header */}
         <BoardHeader
           title={title}
@@ -261,27 +450,6 @@ export function DreamBoard(props: DreamBoardProps) {
 
         {/* Add menu */}
         {!readOnly && hasComponents && <BoardAddMenu requestId={requestId} />}
-
-        {/* Trip metadata hint */}
-        {(startDate || endDate || travelers) && (
-          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-            {startDate && (
-              <span>
-                From: <span className="font-medium text-foreground">{startDate}</span>
-              </span>
-            )}
-            {endDate && (
-              <span>
-                To: <span className="font-medium text-foreground">{endDate}</span>
-              </span>
-            )}
-            {travelers && (
-              <span>
-                {travelers} traveler{travelers !== 1 ? "s" : ""}
-              </span>
-            )}
-          </div>
-        )}
 
         {/* Empty state */}
         {!hasComponents && <BoardEmptyState requestId={requestId} />}

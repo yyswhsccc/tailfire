@@ -8,6 +8,8 @@ interface BoardFunctionalCardProps {
   component: TripComponent;
   readOnly: boolean;
   onRemove?: (id: string) => void;
+  /** When true, card uses the hero (taller) height for spanning 2 columns. */
+  isHero?: boolean;
 }
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -19,14 +21,18 @@ const TYPE_EMOJI: Record<string, string> = {
   custom: "\u2728",
 };
 
-const TYPE_HEIGHT: Record<string, string> = {
-  flight: "h-[200px]",
-  hotel: "h-[240px]",
-  cruise: "h-[260px]",
-  tour: "h-[220px]",
-  package: "h-[220px]",
-  custom: "h-[180px]",
+/** Pixel heights vary by type for masonry visual variety. */
+const TYPE_HEIGHT_PX: Record<string, number> = {
+  flight: 200,
+  hotel: 280,
+  cruise: 300,
+  tour: 240,
+  package: 220,
+  custom: 160,
 };
+
+/** Hero cards (col-span-2) get extra height. */
+const HERO_HEIGHT_PX = 320;
 
 const TYPE_GRADIENT: Record<string, string> = {
   flight: "bg-gradient-to-br from-sky-500 to-sky-700",
@@ -41,19 +47,23 @@ export function BoardFunctionalCard({
   component,
   readOnly,
   onRemove,
+  isHero = false,
 }: BoardFunctionalCardProps) {
   const [imgError, setImgError] = useState(false);
 
   const type = component.type;
   const heroImage = component.display?.heroImage;
   const hasImage = heroImage && !imgError;
-  const height = TYPE_HEIGHT[type] ?? TYPE_HEIGHT.custom;
+  const heightPx = isHero
+    ? HERO_HEIGHT_PX
+    : (TYPE_HEIGHT_PX[type] ?? TYPE_HEIGHT_PX.custom);
   const gradient = TYPE_GRADIENT[type] ?? TYPE_GRADIENT.custom;
   const emoji = TYPE_EMOJI[type] ?? TYPE_EMOJI.custom;
 
   return (
     <div
-      className={`group relative rounded-xl overflow-hidden transition-transform duration-200 hover:scale-[1.02] hover:shadow-lg ${height}`}
+      className="group relative rounded-2xl overflow-hidden shadow-md ring-1 ring-white/10 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl"
+      style={{ height: `${heightPx}px` }}
     >
       {/* Background: image or gradient */}
       {hasImage ? (
@@ -67,22 +77,22 @@ export function BoardFunctionalCard({
         <div className={`absolute inset-0 ${gradient}`} />
       )}
 
-      {/* Gradient overlay for text legibility */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+      {/* Gradient overlay for text legibility — stronger for depth */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
 
-      {/* Type badge - top left */}
-      <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+      {/* Type badge - top left — polished with stronger blur */}
+      <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md">
         {emoji} {type.charAt(0).toUpperCase() + type.slice(1)}
       </span>
 
-      {/* Price badge - top right */}
+      {/* Price badge - top right — prominent white pill */}
       {component.display?.price && (
-        <span className="absolute top-2 right-2 rounded-full bg-black/30 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
+        <span className="absolute top-3 right-3 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-[#1A1A1A] shadow-sm">
           {component.display.price}
         </span>
       )}
 
-      {/* Remove button - top right, fades in on hover */}
+      {/* Remove button - top right, fades in on hover (overlays price when visible) */}
       {!readOnly && onRemove && (
         <button
           type="button"
@@ -90,7 +100,7 @@ export function BoardFunctionalCard({
             e.stopPropagation();
             onRemove(component.id);
           }}
-          className="absolute top-2 right-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-black/70"
+          className="absolute top-3 right-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-black/70"
           aria-label={`Remove ${component.display?.title ?? type}`}
         >
           <X className="size-3.5" />
@@ -98,13 +108,13 @@ export function BoardFunctionalCard({
       )}
 
       {/* Content at bottom */}
-      <div className="absolute inset-x-0 bottom-0 p-3">
-        <p className="text-sm font-semibold text-white leading-tight">
+      <div className="absolute inset-x-0 bottom-0 p-4">
+        <p className={`font-bold text-white leading-tight ${isHero ? "text-lg" : "text-base"}`}>
           {component.display?.title ??
             type.charAt(0).toUpperCase() + type.slice(1)}
         </p>
         {component.display?.subtitle && (
-          <p className="mt-0.5 text-xs text-white/80 leading-tight">
+          <p className="mt-1 text-sm text-white/80 leading-tight">
             {component.display.subtitle}
           </p>
         )}
