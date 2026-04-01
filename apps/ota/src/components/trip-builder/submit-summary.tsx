@@ -18,12 +18,12 @@ const TYPE_EMOJI: Record<string, string> = {
 
 function extractPrice(data: Record<string, unknown>): number {
   const price = data?.price as Record<string, unknown> | undefined;
-  return typeof price?.total === "number" ? price.total : 0;
+  const raw = price?.total;
+  return typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) || 0 : 0;
 }
 
-function formatCurrency(cents: number): string {
-  const dollars = Math.round(cents / 100);
-  return dollars.toLocaleString("en-US");
+function formatCurrency(dollars: number): string {
+  return Math.round(dollars).toLocaleString("en-US");
 }
 
 export function SubmitSummary({ components }: SubmitSummaryProps) {

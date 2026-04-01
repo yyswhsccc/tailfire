@@ -33,7 +33,8 @@ function computeTotal(components: TripComponent[]): number {
     const price = (c.data as Record<string, unknown>)?.price as
       | Record<string, unknown>
       | undefined;
-    const total = typeof price?.total === "number" ? price.total : 0;
+    const raw = price?.total;
+    const total = typeof raw === "number" ? raw : typeof raw === "string" ? parseFloat(raw) || 0 : 0;
     return sum + total;
   }, 0);
 }
