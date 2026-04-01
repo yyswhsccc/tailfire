@@ -79,15 +79,23 @@ export class TripPromotionService {
         )
       }
 
+      if (!request.contactEmail) {
+        throw new BadRequestException(
+          `Cannot promote trip request ${requestId}: contactEmail is required`,
+        )
+      }
+
+      const contactEmail: string = request.contactEmail
+
       this.logger.log(
-        `Starting promotion pipeline for trip request ${requestId} (${request.contactEmail})`,
+        `Starting promotion pipeline for trip request ${requestId} (${contactEmail})`,
       )
 
       // ================================================================
       // Step 2: Resolve owner — determine who owns this trip
       // ================================================================
       const resolution = await this.ownerResolution.resolve({
-        contactEmail: request.contactEmail,
+        contactEmail,
         advisorSlug: request.advisorSlug,
         tripGroupId: request.tripGroupId,
       })
@@ -102,7 +110,7 @@ export class TripPromotionService {
       // Step 3: Create/update contact via lead capture
       // ================================================================
       const leadResult = await this.leadsService.captureLead({
-        email: request.contactEmail,
+        email: contactEmail,
         name: request.contactName ?? undefined,
         phone: request.contactPhone ?? undefined,
         advisorSlug: request.advisorSlug ?? undefined,
@@ -158,7 +166,7 @@ export class TripPromotionService {
       // ================================================================
       // Step 5: Create trip
       // ================================================================
-      const tripName = request.title ?? `Trip Request from ${request.contactEmail}`
+      const tripName = request.title ?? `Trip Request from ${contactEmail}`
 
       const trip = await this.tripsService.create(
         {
@@ -300,7 +308,7 @@ export class TripPromotionService {
             tripGroupId: request.tripGroupId,
             tripId: trip.id,
             contactId,
-            contactName: request.contactName ?? request.contactEmail,
+            contactName: request.contactName ?? contactEmail,
             agencyId: resolution.agencyId,
             originalContactOwnerId,
             resolvedOwnerId: resolution.ownerId,
