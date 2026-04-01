@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { serviceFetch } from "@/lib/api";
+import { createClient } from "@/lib/supabase/server";
 import { DreamBoard } from "@/components/trip-builder/dream-board";
 
 export const metadata: Metadata = {
@@ -25,6 +26,10 @@ export default async function MyTripPage({ params, searchParams }: PageProps) {
     // Shared view — public, read-only
     try {
       tripRequest = await serviceFetch(`/ota/trip-requests/shared/${token}`);
+      // Verify token resolves to the same row as the URL id
+      if (tripRequest.id !== id) {
+        notFound();
+      }
       readOnly = true;
     } catch {
       notFound();
@@ -36,9 +41,26 @@ export default async function MyTripPage({ params, searchParams }: PageProps) {
 
     try {
       tripRequest = await serviceFetch(`/ota/trip-requests/${id}`);
-      // Verify ownership
+
+      // Primary check: session cookie matches
       if (tripRequest.sessionId !== sessionId) {
-        notFound();
+        // Fallback: contact-based auth for identified users (e.g. different device)
+        let contactAuthed = false;
+        try {
+          const supabase = await createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          const contactId =
+            user?.user_metadata?.contact_id || user?.app_metadata?.contact_id;
+          if (contactId && tripRequest.contactId === contactId) {
+            contactAuthed = true;
+          }
+        } catch {
+          // Supabase auth not available — fall through to notFound
+        }
+
+        if (!contactAuthed) {
+          notFound();
+        }
       }
     } catch {
       notFound();

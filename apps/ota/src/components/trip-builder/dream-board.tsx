@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Plus } from "lucide-react";
 
 import {
@@ -49,6 +49,18 @@ export function DreamBoard({
   travelers,
 }: DreamBoardProps) {
   const removeComponent = useTripBasket((s) => s.removeComponent);
+
+  // Seed Zustand store from server-fetched data so client mutations
+  // (removeComponent, updateBoardOrder) have the requestId they need.
+  useEffect(() => {
+    useTripBasket.setState({
+      requestId,
+      title,
+      components,
+      inspiration,
+      boardOrder,
+    });
+  }, [requestId]); // Only on mount / request change
 
   const handleRemove = useCallback(
     (id: string) => {

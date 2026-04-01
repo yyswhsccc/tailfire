@@ -28,6 +28,7 @@ export function BoardHeader({
   return (
     <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
       <div>
+        {/* Title is read-only — editable title requires a PATCH /title endpoint */}
         <h1 className="text-2xl font-bold tracking-tight text-[#1A1A1A]">
           {title || "My Dream Trip"}
         </h1>
