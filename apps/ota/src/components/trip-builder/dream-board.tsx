@@ -15,6 +15,8 @@ import { BoardEmptyState } from "./board-empty-state";
 import { BoardFunctionalCard } from "./board-functional-card";
 import { BoardInspirationCard } from "./board-inspiration-card";
 import { SubmitReview } from "./submit-review";
+import { AiBoardPanel } from "./ai-board-panel";
+import { AiMobileBar } from "./ai-mobile-bar";
 
 interface DreamBoardProps {
   requestId: string;
@@ -51,6 +53,7 @@ export function DreamBoard(props: DreamBoardProps) {
   const removeComponent = useTripBasket((s) => s.removeComponent);
   const isIdentified = useTripBasket((s) => s.isIdentified);
   const [showSubmit, setShowSubmit] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   // Read from Zustand store (which gets seeded from props on mount)
   const storeComponents = useTripBasket((s) => s.components);
@@ -130,71 +133,92 @@ export function DreamBoard(props: DreamBoardProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <BoardHeader
-        title={title}
-        componentCount={components.length}
-        totalEstimate={totalEstimate}
-        readOnly={readOnly}
-        requestId={requestId}
-        onSubmitClick={() => setShowSubmit(true)}
+    <>
+      <div
+        className={`space-y-6 transition-[margin] duration-300 ${
+          aiPanelOpen ? "lg:mr-[400px]" : ""
+        }`}
+      >
+        {/* Header */}
+        <BoardHeader
+          title={title}
+          componentCount={components.length}
+          totalEstimate={totalEstimate}
+          readOnly={readOnly}
+          requestId={requestId}
+          onSubmitClick={() => setShowSubmit(true)}
+          aiPanelOpen={aiPanelOpen}
+          onAiToggle={() => setAiPanelOpen((prev) => !prev)}
+        />
+
+        {/* Mobile AI bar — visible on small screens only */}
+        {!readOnly && (
+          <div className="lg:hidden">
+            <AiMobileBar />
+          </div>
+        )}
+
+        {/* Add menu */}
+        {!readOnly && hasComponents && <BoardAddMenu requestId={requestId} />}
+
+        {/* Trip metadata hint */}
+        {(startDate || endDate || travelers) && (
+          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+            {startDate && (
+              <span>
+                From: <span className="font-medium text-foreground">{startDate}</span>
+              </span>
+            )}
+            {endDate && (
+              <span>
+                To: <span className="font-medium text-foreground">{endDate}</span>
+              </span>
+            )}
+            {travelers && (
+              <span>
+                {travelers} traveler{travelers !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!hasComponents && <BoardEmptyState requestId={requestId} />}
+
+        {/* Masonry grid */}
+        {hasComponents && (
+          <div className="columns-2 gap-4 md:columns-3">
+            {orderedItems.map((entry) =>
+              entry.kind === "component" ? (
+                <BoardFunctionalCard
+                  key={entry.item.id}
+                  component={entry.item}
+                  readOnly={readOnly}
+                  onRemove={handleRemove}
+                />
+              ) : (
+                <BoardInspirationCard
+                  key={entry.item.id}
+                  card={entry.item}
+                />
+              ),
+            )}
+
+            {/* Placeholder "add" card */}
+            {!readOnly && (
+              <div className="mb-4 flex h-[160px] break-inside-avoid items-center justify-center rounded-xl border-2 border-dashed border-border/50 text-muted-foreground/40 transition-colors hover:border-border hover:text-muted-foreground/60">
+                <Plus className="size-8" />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop AI panel — slides out from right */}
+      <AiBoardPanel
+        isOpen={aiPanelOpen}
+        onClose={() => setAiPanelOpen(false)}
       />
-
-      {/* Add menu */}
-      {!readOnly && hasComponents && <BoardAddMenu requestId={requestId} />}
-
-      {/* Trip metadata hint */}
-      {(startDate || endDate || travelers) && (
-        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-          {startDate && (
-            <span>
-              From: <span className="font-medium text-foreground">{startDate}</span>
-            </span>
-          )}
-          {endDate && (
-            <span>
-              To: <span className="font-medium text-foreground">{endDate}</span>
-            </span>
-          )}
-          {travelers && (
-            <span>
-              {travelers} traveler{travelers !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!hasComponents && <BoardEmptyState requestId={requestId} />}
-
-      {/* Masonry grid */}
-      {hasComponents && (
-        <div className="columns-2 gap-4 md:columns-3">
-          {orderedItems.map((entry) =>
-            entry.kind === "component" ? (
-              <BoardFunctionalCard
-                key={entry.item.id}
-                component={entry.item}
-                readOnly={readOnly}
-                onRemove={handleRemove}
-              />
-            ) : (
-              <BoardInspirationCard
-                key={entry.item.id}
-                card={entry.item}
-              />
-            ),
-          )}
-
-          {/* Placeholder "add" card */}
-          {!readOnly && (
-            <div className="mb-4 flex h-[160px] break-inside-avoid items-center justify-center rounded-xl border-2 border-dashed border-border/50 text-muted-foreground/40 transition-colors hover:border-border hover:text-muted-foreground/60">
-              <Plus className="size-8" />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    </>
   );
 }

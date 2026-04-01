@@ -1,6 +1,6 @@
 "use client";
 
-import { Send } from "lucide-react";
+import { Send, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ShareButton } from "./share-button";
@@ -12,6 +12,8 @@ interface BoardHeaderProps {
   readOnly: boolean;
   requestId: string;
   onSubmitClick?: () => void;
+  aiPanelOpen?: boolean;
+  onAiToggle?: () => void;
 }
 
 function formatCurrency(dollars: number): string {
@@ -25,6 +27,8 @@ export function BoardHeader({
   readOnly,
   requestId,
   onSubmitClick,
+  aiPanelOpen,
+  onAiToggle,
 }: BoardHeaderProps) {
   return (
     <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -41,6 +45,21 @@ export function BoardHeader({
 
       {!readOnly && (
         <div className="flex items-center gap-2 pt-2 sm:pt-0">
+          {onAiToggle && (
+            <Button
+              size="sm"
+              variant={aiPanelOpen ? "default" : "outline"}
+              className={
+                aiPanelOpen
+                  ? "hidden bg-[#1A1A1A] text-[#C59746] hover:bg-[#252525] lg:flex"
+                  : "hidden border-[#1A1A1A]/20 text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#C59746] lg:flex"
+              }
+              onClick={onAiToggle}
+            >
+              <Sparkles className="size-3.5" />
+              AI
+            </Button>
+          )}
           <ShareButton requestId={requestId} />
           <Button
             size="sm"
