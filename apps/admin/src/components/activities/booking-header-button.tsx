@@ -165,7 +165,7 @@ export function BookingHeaderButton({
       if (result.valid) {
         // Reset confirmation state each time we open it
         setPassportVerified(false)
-        setBookingDateInput(new Date().toISOString().split('T')[0])
+        setBookingDateInput(bookingDate || new Date().toISOString().split('T')[0])
         setShowConfirmation(true)
       } else {
         // Navigate to the first error's tab
