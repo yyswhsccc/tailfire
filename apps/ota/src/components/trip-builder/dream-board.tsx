@@ -411,12 +411,10 @@ export function DreamBoard(props: DreamBoardProps) {
   );
 
   return (
-    <>
-      <div
-        className={`mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 space-y-6 transition-[margin] duration-300 ${
-          aiPanelOpen ? "lg:mr-[400px]" : ""
-        }`}
-      >
+    <div className="flex min-h-screen">
+      {/* Main board content — shrinks when AI panel opens */}
+      <div className="min-w-0 flex-1">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Hero banner — trip destination photo with title overlay */}
         {hasComponents && (
           <TripBanner
@@ -470,13 +468,18 @@ export function DreamBoard(props: DreamBoardProps) {
             </DndContext>
           )
         )}
+        </div>
       </div>
 
-      {/* Desktop AI panel — slides out from right */}
-      <AiBoardPanel
-        isOpen={aiPanelOpen}
-        onClose={() => setAiPanelOpen(false)}
-      />
-    </>
+      {/* Desktop AI panel — side by side, pushes content */}
+      {aiPanelOpen && (
+        <div className="hidden lg:block">
+          <AiBoardPanel
+            isOpen={aiPanelOpen}
+            onClose={() => setAiPanelOpen(false)}
+          />
+        </div>
+      )}
+    </div>
   );
 }

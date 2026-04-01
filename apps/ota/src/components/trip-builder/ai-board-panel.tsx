@@ -53,7 +53,7 @@ export function AiBoardPanel({ isOpen, onClose }: AiBoardPanelProps) {
   }
 
   return (
-    <div className="fixed bottom-0 right-0 top-16 z-30 flex w-[400px] flex-col rounded-l-2xl bg-[#1A1A1A] shadow-2xl">
+    <div className="flex h-[calc(100vh-4rem)] w-[400px] shrink-0 flex-col rounded-l-2xl bg-[#1A1A1A] shadow-2xl">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
         <div className="flex items-center gap-3">
