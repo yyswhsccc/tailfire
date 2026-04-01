@@ -526,6 +526,8 @@ export type UpdatePackageDto = {
   cancellationDeadline?: string | null
   termsAndConditions?: string | null
   groupBookingNumber?: string | null
+  // Booking date (stored on the activity, not package_details)
+  bookingDate?: string | null
 }
 
 /**

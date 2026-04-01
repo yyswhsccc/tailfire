@@ -111,16 +111,13 @@ The AI panel is NOT the existing floating chat widget. It's a new layout mode:
 ## 3. Dream Board Page
 
 ### URL and Access Control
-- **Edit view**: `/my-trip/[id]` — requires authorization
+- **Authenticated view**: `/my-trip/[id]` — requires identity (email captured via AI or manual entry)
 - **Shared view**: `/my-trip/[id]?token=SHARE_TOKEN` — read-only, no login required
-
-**Access rules** (checked server-side by the Next.js page route):
-- **Anonymous creator**: `ota_session` cookie value matches `session_id` on the request row → full edit access
-- **Authenticated contact**: Portal JWT (via `portal-auth.guard.ts`) carries `contact_id` matching `contact_id` on the request → full edit access
-- **Shared viewer**: URL contains `?token=X` AND `X` matches `share_token` on the row with the given `id`. Both `id` and `token` must resolve to the same row → read-only access only
-- **No match**: Return 404 (do not reveal existence with 403)
-
-Single URL shape — token query param determines read-only mode. No separate `/share` route.
+- **Access rule**: A draft can be accessed if:
+  - The `ota_session` cookie matches `session_id` on the request (anonymous creator)
+  - The authenticated contact matches `contact_id` on the request
+  - A valid `share_token` is provided (read-only)
+- Single URL shape — no separate `/share` route. Token in query param determines read-only mode.
 
 ### Layout
 
@@ -157,22 +154,6 @@ Each functional card has: hero image with gradient overlay, type badge, price ba
 
 **Storage:** Inspiration cards stored in a separate `inspiration` JSONB field on `ota_trip_requests` — NOT in the `components[]` array. This keeps the components array clean for bookable items only, avoiding conflicts with the Phase 1 DTO validation and promotion pipeline which only accepts flight/hotel/cruise/tour types.
 
-**Board Ordering:** Since functional cards (in `components[]`) and inspiration cards (in `inspiration[]`) are in separate arrays but displayed interleaved on the board, a `board_order` JSONB array stores the display sequence:
-
-```jsonc
-// board_order: ordered list of { type, id } references
-[
-  { "type": "component", "id": "flight-out-1" },
-  { "type": "inspiration", "id": "unsplash-cancun-1" },
-  { "type": "component", "id": "hotel-hyatt-1" },
-  { "type": "inspiration", "id": "unsplash-cenote-1" },
-  { "type": "component", "id": "tour-chichen-1" },
-  { "type": "inspiration", "id": "unsplash-beach-1" }
-]
-```
-
-The board renders cards in `board_order` sequence. Each entry references an item in either `components[]` or `inspiration[]` by `id`. New components are appended to the end. Drag-and-drop updates `board_order` without touching the source arrays. If `board_order` is empty/null, fall back to rendering `components[]` followed by `inspiration[]`. During promotion, only `components[]` is processed — `board_order` and `inspiration[]` are ignored.
-
 ### Drag and Drop
 - Reorder cards within the board (drag to rearrange)
 - Drag from AI suggestion cards onto the board (desktop)
@@ -186,7 +167,7 @@ In the board header or floating action menu:
 - "+ Add Hotel" → navigates to `/search/hotels?tripId=xxx`
 - "+ Add Cruise" → navigates to `/search/cruises?tripId=xxx`
 - "+ Add Tour" → navigates to `/search/tours?tripId=xxx`
-- "+ Add Note" → adds a freeform text card (stored in `components[]` as `type: 'custom'` with `data.description` and `data.category: 'note'` — uses existing `custom` DTO type, skipped during promotion)
+- "+ Add Note" → adds a freeform text card (stored in `components[]` as type `note`)
 
 When navigating to search pages from the board, `tripId` query param ensures "Add to Trip" auto-targets the correct trip.
 
@@ -233,8 +214,7 @@ ALTER TABLE ota_trip_requests
   ADD COLUMN IF NOT EXISTS date_flexibility BOOLEAN DEFAULT false,
   ADD COLUMN IF NOT EXISTS travel_style VARCHAR(20),  -- relaxed|adventure|luxury|budget|family
   ADD COLUMN IF NOT EXISTS contact_id UUID,           -- Linked contact after identity capture
-  ADD COLUMN IF NOT EXISTS inspiration JSONB DEFAULT '[]', -- Inspiration cards (separate from components)
-  ADD COLUMN IF NOT EXISTS board_order JSONB DEFAULT '[]'; -- Display sequence for interleaved board rendering
+  ADD COLUMN IF NOT EXISTS inspiration JSONB DEFAULT '[]'; -- Inspiration cards (separate from components)
 
 -- Indexes
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ota_trip_requests_share_token
@@ -273,9 +253,9 @@ DELETE /ota/trip-requests/:id/components/:componentId
   → Removes a component from the JSONB array
   → Returns: { requestId, componentCount }
 
-PATCH /ota/trip-requests/:id/board-order
-  Body: { boardOrder: Array<{ type: 'component' | 'inspiration', id: string }> }
-  → Updates the board_order JSONB (interleaved display sequence)
+PATCH /ota/trip-requests/:id/components/reorder
+  Body: { componentIds: string[] }
+  → Reorders the components array
 
 POST /ota/trip-requests/:id/share
   → Generates or returns existing shareToken
@@ -308,7 +288,7 @@ apps/ota/src/app/api/trip-requests/
 ├── [id]/route.ts                   # GET — get request details
 ├── [id]/components/add/route.ts    # POST — append component
 ├── [id]/components/[cid]/route.ts  # DELETE — remove component
-├── [id]/board-order/route.ts        # PATCH — update board order
+├── [id]/components/reorder/route.ts # PATCH — reorder
 ├── [id]/submit/route.ts            # POST — submit + promote
 ├── [id]/share/route.ts             # POST/DELETE — manage share token
 ├── [id]/identity/route.ts          # PATCH — link identity
@@ -342,7 +322,7 @@ interface TripBasketState {
   hydrate: () => Promise<void>         // Load from session cookie
   addComponent: (component) => Promise<void>
   removeComponent: (componentId) => Promise<void>
-  updateBoardOrder: (order: Array<{type: string, id: string}>) => Promise<void>
+  reorderComponents: (ids) => Promise<void>
   setTitle: (title) => Promise<void>
   createDraft: (firstComponent) => Promise<string>
   linkIdentity: (email, name?, phone?) => Promise<void>
