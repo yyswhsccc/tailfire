@@ -2,6 +2,23 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  rectSortingStrategy,
+  useSortable,
+  sortableKeyboardCoordinates,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import {
   useTripBasket,
@@ -41,6 +58,22 @@ function computeTotal(components: TripComponent[]): number {
   }, 0);
 }
 
+/** Sortable wrapper for each card on the board. */
+function SortableCard({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+    cursor: "grab",
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </div>
+  );
+}
+
 export function DreamBoard(props: DreamBoardProps) {
   const {
     requestId,
@@ -51,6 +84,7 @@ export function DreamBoard(props: DreamBoardProps) {
   } = props;
 
   const removeComponent = useTripBasket((s) => s.removeComponent);
+  const updateBoardOrder = useTripBasket((s) => s.updateBoardOrder);
   const isIdentified = useTripBasket((s) => s.isIdentified);
   const [showSubmit, setShowSubmit] = useState(false);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
@@ -118,6 +152,36 @@ export function DreamBoard(props: DreamBoardProps) {
     }
   }
 
+  // DnD sensors — pointer needs a small activation distance to allow clicks
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // Stable list of sortable IDs (must match the order of rendered items)
+  const sortableIds = orderedItems.map((e) => e.item.id);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const oldIndex = sortableIds.indexOf(active.id as string);
+      const newIndex = sortableIds.indexOf(over.id as string);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      // Build the new board order from orderedItems in their new positions
+      const reordered = arrayMove(orderedItems, oldIndex, newIndex);
+      const newBoardOrder: BoardOrderItem[] = reordered.map((entry) => ({
+        id: entry.item.id,
+        type: entry.kind === "component" ? ("component" as const) : ("inspiration" as const),
+      }));
+
+      updateBoardOrder(newBoardOrder);
+    },
+    [orderedItems, sortableIds, updateBoardOrder],
+  );
+
   // Submit review flow
   if (showSubmit) {
     return (
@@ -131,6 +195,43 @@ export function DreamBoard(props: DreamBoardProps) {
       />
     );
   }
+
+  // Render the card grid — wrapped in DnD when not readOnly
+  const cardGrid = (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 auto-rows-auto">
+      {orderedItems.map((entry) => {
+        const card =
+          entry.kind === "component" ? (
+            <BoardFunctionalCard
+              key={entry.item.id}
+              component={entry.item}
+              readOnly={readOnly}
+              onRemove={handleRemove}
+            />
+          ) : (
+            <BoardInspirationCard
+              key={entry.item.id}
+              card={entry.item}
+            />
+          );
+
+        if (readOnly) return <div key={entry.item.id}>{card}</div>;
+
+        return (
+          <SortableCard key={entry.item.id} id={entry.item.id}>
+            {card}
+          </SortableCard>
+        );
+      })}
+
+      {/* Placeholder "add" card */}
+      {!readOnly && (
+        <div className="flex h-[160px] items-center justify-center rounded-xl border-2 border-dashed border-border/50 text-muted-foreground/40 transition-colors hover:border-border hover:text-muted-foreground/60">
+          <Plus className="size-8" />
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -185,32 +286,21 @@ export function DreamBoard(props: DreamBoardProps) {
         {/* Empty state */}
         {!hasComponents && <BoardEmptyState requestId={requestId} />}
 
-        {/* Masonry grid */}
+        {/* Card grid with optional DnD */}
         {hasComponents && (
-          <div className="columns-2 gap-4 md:columns-3">
-            {orderedItems.map((entry) =>
-              entry.kind === "component" ? (
-                <BoardFunctionalCard
-                  key={entry.item.id}
-                  component={entry.item}
-                  readOnly={readOnly}
-                  onRemove={handleRemove}
-                />
-              ) : (
-                <BoardInspirationCard
-                  key={entry.item.id}
-                  card={entry.item}
-                />
-              ),
-            )}
-
-            {/* Placeholder "add" card */}
-            {!readOnly && (
-              <div className="mb-4 flex h-[160px] break-inside-avoid items-center justify-center rounded-xl border-2 border-dashed border-border/50 text-muted-foreground/40 transition-colors hover:border-border hover:text-muted-foreground/60">
-                <Plus className="size-8" />
-              </div>
-            )}
-          </div>
+          readOnly ? (
+            cardGrid
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
+                {cardGrid}
+              </SortableContext>
+            </DndContext>
+          )
         )}
       </div>
 

@@ -19,15 +19,12 @@ function hashHeight(id: string): number {
 
 export function BoardInspirationCard({ card }: BoardInspirationCardProps) {
   const [imgError, setImgError] = useState(false);
-  const [hovered, setHovered] = useState(false);
   const height = hashHeight(card.id);
 
   return (
     <div
-      className="group relative break-inside-avoid mb-4 rounded-xl overflow-hidden"
+      className="group relative rounded-xl overflow-hidden transition-transform duration-200 hover:scale-[1.01] hover:brightness-110"
       style={{ height: `${height}px` }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       {card.imageUrl && !imgError ? (
         <img
@@ -54,8 +51,8 @@ export function BoardInspirationCard({ card }: BoardInspirationCardProps) {
       )}
 
       {/* Attribution on hover */}
-      {card.attribution && hovered && (
-        <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/40 to-transparent px-2 py-1">
+      {card.attribution && (
+        <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/40 to-transparent px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <p className="text-[10px] text-white/70">{card.attribution}</p>
         </div>
       )}

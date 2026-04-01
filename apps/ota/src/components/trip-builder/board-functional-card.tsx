@@ -42,7 +42,6 @@ export function BoardFunctionalCard({
   readOnly,
   onRemove,
 }: BoardFunctionalCardProps) {
-  const [hovered, setHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
 
   const type = component.type;
@@ -54,9 +53,7 @@ export function BoardFunctionalCard({
 
   return (
     <div
-      className={`group relative break-inside-avoid mb-4 rounded-xl overflow-hidden ${height}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className={`group relative rounded-xl overflow-hidden transition-transform duration-200 hover:scale-[1.02] hover:shadow-lg ${height}`}
     >
       {/* Background: image or gradient */}
       {hasImage ? (
@@ -85,15 +82,15 @@ export function BoardFunctionalCard({
         </span>
       )}
 
-      {/* Remove button - top right, shown on hover */}
-      {!readOnly && onRemove && hovered && (
+      {/* Remove button - top right, fades in on hover */}
+      {!readOnly && onRemove && (
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onRemove(component.id);
           }}
-          className="absolute top-2 right-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+          className="absolute top-2 right-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-black/70"
           aria-label={`Remove ${component.display?.title ?? type}`}
         >
           <X className="size-3.5" />
