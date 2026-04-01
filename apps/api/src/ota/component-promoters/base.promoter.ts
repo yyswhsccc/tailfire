@@ -60,8 +60,11 @@ export function extractDates(type: string, data: any): string[] {
       // Collect departure/arrival dates from all segments
       const segments = data.segments ?? []
       for (const seg of segments) {
-        if (seg.departureDate) dates.push(seg.departureDate)
-        if (seg.arrivalDate) dates.push(seg.arrivalDate)
+        // Support both date-only (departureDate) and ISO datetime (departureAt) formats
+        const depDate = seg.departureDate || seg.departureAt?.split('T')[0]
+        const arrDate = seg.arrivalDate || seg.arrivalAt?.split('T')[0]
+        if (depDate) dates.push(depDate)
+        if (arrDate) dates.push(arrDate)
       }
       // Fallback: top-level departure/arrival dates
       if (data.departureDate) dates.push(data.departureDate)
@@ -69,12 +72,14 @@ export function extractDates(type: string, data: any): string[] {
       break
     }
     case 'hotel': {
-      if (data.checkInDate) dates.push(data.checkInDate)
-      if (data.checkOutDate) dates.push(data.checkOutDate)
+      const checkIn = data.checkInDate || data.checkIn
+      const checkOut = data.checkOutDate || data.checkOut
+      if (checkIn) dates.push(checkIn)
+      if (checkOut) dates.push(checkOut)
       // Include all intermediate dates for multi-night stays
-      if (data.checkInDate && data.checkOutDate) {
-        const start = new Date(data.checkInDate)
-        const end = new Date(data.checkOutDate)
+      if (checkIn && checkOut) {
+        const start = new Date(checkIn)
+        const end = new Date(checkOut)
         const current = new Date(start)
         current.setDate(current.getDate() + 1) // skip check-in (already added)
         while (current < end) {
