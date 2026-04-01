@@ -124,6 +124,8 @@ export interface OcrCruiseExtraction {
   cabinDeck?: string | null
   nights?: number | null
   totalPriceCents?: number | null
+  netPriceCents?: number | null
+  commissionCents?: number | null
   currency?: string | null
   termsAndConditions?: string | null
   cancellationPolicy?: string | null
@@ -378,6 +380,8 @@ export const ocrCruiseExtractionSchema = z.object({
   cabinDeck: z.string().nullish(),
   nights: z.number().nullish(),
   totalPrice: z.number().nullish(),
+  netPrice: z.number().nullish(),
+  commissionAmount: z.number().nullish(),
   currency: z.string().nullish(),
   termsAndConditions: z.string().nullish(),
   cancellationPolicy: z.string().nullish(),

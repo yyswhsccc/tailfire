@@ -497,7 +497,7 @@ export function OptionsForm({
     try {
       setSaveStatus('saving')
       const formData = getValues()
-      const payload = { ...formData, pricingBreakdownJson: pricingBreakdown }
+      const payload = { ...formData, pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
       const apiPayload = toOptionsApiPayload(payload)
 
       let response: any
