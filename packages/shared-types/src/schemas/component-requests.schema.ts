@@ -7,7 +7,7 @@
  */
 
 import { z } from 'zod'
-import { activityStatusSchema, pricingTypeSchema } from './enums.schema'
+import { activityStatusSchema, activityProposalStatusSchema, activityBookingStatusSchema, pricingTypeSchema } from './enums.schema'
 import { coordinatesSchema, photoSchema } from './common.schema'
 import { flightDetailsDtoSchema } from './flight-details.schema'
 import { lodgingDetailsDtoSchema } from './lodging-details.schema'
@@ -56,6 +56,7 @@ const baseCreateComponentSchema = z.object({
   // Details
   notes: z.string().nullable().optional(),
   confirmationNumber: z.string().nullable().optional(),
+  bookingDate: z.string().nullable().optional(),
   status: activityStatusSchema.optional(),
 
   // Pricing
@@ -108,6 +109,9 @@ const baseUpdateComponentSchema = z.object({
   // Details
   notes: z.string().nullable().optional(),
   confirmationNumber: z.string().nullable().optional(),
+  proposalStatus: activityProposalStatusSchema.optional(),
+  bookingStatus: activityBookingStatusSchema.optional(),
+  bookingDate: z.string().nullable().optional(),
   status: activityStatusSchema.optional(),
 
   // Pricing
