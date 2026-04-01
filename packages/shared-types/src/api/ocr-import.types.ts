@@ -146,6 +146,8 @@ export interface OcrCruiseData {
   cabinNumber?: string | null
   nights?: number | null
   totalPriceCents?: number | null
+  netPriceCents?: number | null
+  commissionCents?: number | null
   currency?: string | null
   termsAndConditions?: string | null
   cancellationPolicy?: string | null

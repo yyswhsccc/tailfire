@@ -19,6 +19,7 @@ import { PASSPORT_EXTRACTION_SYSTEM_PROMPT, PASSPORT_EXTRACTION_USER_PROMPT } fr
 import { TRANSPORTATION_EXTRACTION_SYSTEM_PROMPT, TRANSPORTATION_EXTRACTION_USER_PROMPT } from './prompts/transportation.prompt'
 import { DINING_EXTRACTION_SYSTEM_PROMPT, DINING_EXTRACTION_USER_PROMPT } from './prompts/dining.prompt'
 import { PACKAGE_EXTRACTION_SYSTEM_PROMPT, PACKAGE_EXTRACTION_USER_PROMPT } from './prompts/package.prompt'
+import { EXTRACTION_GUARDRAILS } from './prompts/guardrails.prompt'
 import type {
   OcrDocumentType,
   OcrExtractionContext,
@@ -41,16 +42,16 @@ import {
 /** Maximum number of PDF pages to process */
 const MAX_PAGES = 5
 
-/** Prompt map by document type */
+/** Prompt map by document type — guardrails appended to all booking prompts */
 const PROMPTS: Record<OcrDocumentType, { system: string; user: string }> = {
-  flight_confirmation: { system: FLIGHT_EXTRACTION_SYSTEM_PROMPT, user: FLIGHT_EXTRACTION_USER_PROMPT },
-  hotel_confirmation: { system: LODGING_EXTRACTION_SYSTEM_PROMPT, user: LODGING_EXTRACTION_USER_PROMPT },
-  cruise_confirmation: { system: CRUISE_EXTRACTION_SYSTEM_PROMPT, user: CRUISE_EXTRACTION_USER_PROMPT },
+  flight_confirmation: { system: FLIGHT_EXTRACTION_SYSTEM_PROMPT + EXTRACTION_GUARDRAILS, user: FLIGHT_EXTRACTION_USER_PROMPT },
+  hotel_confirmation: { system: LODGING_EXTRACTION_SYSTEM_PROMPT + EXTRACTION_GUARDRAILS, user: LODGING_EXTRACTION_USER_PROMPT },
+  cruise_confirmation: { system: CRUISE_EXTRACTION_SYSTEM_PROMPT + EXTRACTION_GUARDRAILS, user: CRUISE_EXTRACTION_USER_PROMPT },
   passport: { system: PASSPORT_EXTRACTION_SYSTEM_PROMPT, user: PASSPORT_EXTRACTION_USER_PROMPT },
-  transportation_confirmation: { system: TRANSPORTATION_EXTRACTION_SYSTEM_PROMPT, user: TRANSPORTATION_EXTRACTION_USER_PROMPT },
-  dining_confirmation: { system: DINING_EXTRACTION_SYSTEM_PROMPT, user: DINING_EXTRACTION_USER_PROMPT },
-  package_confirmation: { system: PACKAGE_EXTRACTION_SYSTEM_PROMPT, user: PACKAGE_EXTRACTION_USER_PROMPT },
-  general_travel_document: { system: FLIGHT_EXTRACTION_SYSTEM_PROMPT, user: FLIGHT_EXTRACTION_USER_PROMPT },
+  transportation_confirmation: { system: TRANSPORTATION_EXTRACTION_SYSTEM_PROMPT + EXTRACTION_GUARDRAILS, user: TRANSPORTATION_EXTRACTION_USER_PROMPT },
+  dining_confirmation: { system: DINING_EXTRACTION_SYSTEM_PROMPT + EXTRACTION_GUARDRAILS, user: DINING_EXTRACTION_USER_PROMPT },
+  package_confirmation: { system: PACKAGE_EXTRACTION_SYSTEM_PROMPT + EXTRACTION_GUARDRAILS, user: PACKAGE_EXTRACTION_USER_PROMPT },
+  general_travel_document: { system: FLIGHT_EXTRACTION_SYSTEM_PROMPT + EXTRACTION_GUARDRAILS, user: FLIGHT_EXTRACTION_USER_PROMPT },
 }
 
 @Injectable()
@@ -252,6 +253,9 @@ export class OcrService {
       }
     }
 
+    // Post-extraction guardrail validation (auto-correct + log warnings)
+    this.validateAndCorrectExtraction(result)
+
     result.rawResponse = response.content
     result.usage = {
       promptTokens: response.usage.promptTokens,
@@ -415,6 +419,8 @@ export class OcrService {
       cabinDeck: data.cabinDeck ? String(data.cabinDeck) : null,
       nights: typeof data.nights === 'number' ? data.nights : null,
       totalPriceCents: typeof data.totalPrice === 'number' ? Math.round(data.totalPrice * 100) : null,
+      netPriceCents: typeof data.netPrice === 'number' ? Math.round(data.netPrice * 100) : null,
+      commissionCents: typeof data.commissionAmount === 'number' ? Math.round(data.commissionAmount * 100) : null,
       currency: data.currency ? String(data.currency) : null,
       termsAndConditions: data.termsAndConditions ? String(data.termsAndConditions) : null,
       cancellationPolicy: data.cancellationPolicy ? String(data.cancellationPolicy) : null,
@@ -559,5 +565,191 @@ export class OcrService {
       pickupDate: t.pickupDate ? String(t.pickupDate) : null,
       dropoffDate: t.dropoffDate ? String(t.dropoffDate) : null,
     }
+  }
+
+  // ==========================================================================
+  // Post-Extraction Guardrail Validation
+  // ==========================================================================
+
+  /**
+   * Auto-correct obvious extraction mistakes and log warnings.
+   * Mutates the result in place.
+   */
+  private validateAndCorrectExtraction(result: OcrExtractionResult): void {
+    // --- Pricing guardrails ---
+    const pricing = this.extractPricingFields(result)
+    if (pricing) {
+      // Gross must be >= Net — swap if reversed
+      if (pricing.total !== null && pricing.net !== null && pricing.net > pricing.total) {
+        this.logger.warn({
+          message: 'Guardrail: net > gross — swapping prices',
+          documentType: result.documentType,
+          originalTotal: pricing.total,
+          originalNet: pricing.net,
+        })
+        this.swapPricing(result, pricing.net, pricing.total)
+      }
+
+      // Prices must be positive
+      if (pricing.total !== null && pricing.total < 0) {
+        this.logger.warn({
+          message: 'Guardrail: negative total price — setting to null',
+          documentType: result.documentType,
+          value: pricing.total,
+        })
+        this.setPricingField(result, 'total', null)
+      }
+      if (pricing.net !== null && pricing.net < 0) {
+        this.logger.warn({
+          message: 'Guardrail: negative net price — setting to null',
+          documentType: result.documentType,
+          value: pricing.net,
+        })
+        this.setPricingField(result, 'net', null)
+      }
+    }
+
+    // --- Date guardrails ---
+    const dates = this.extractDateFields(result)
+    if (dates.start && dates.end) {
+      const startMs = new Date(dates.start).getTime()
+      const endMs = new Date(dates.end).getTime()
+      if (!isNaN(startMs) && !isNaN(endMs) && endMs < startMs) {
+        this.logger.warn({
+          message: 'Guardrail: end date before start date — swapping',
+          documentType: result.documentType,
+          start: dates.start,
+          end: dates.end,
+        })
+        this.swapDates(result)
+      }
+    }
+
+    // --- Nights vs date range consistency ---
+    if (dates.start && dates.end) {
+      const nights = this.extractNights(result)
+      if (nights !== null) {
+        const startMs = new Date(dates.start).getTime()
+        const endMs = new Date(dates.end).getTime()
+        if (!isNaN(startMs) && !isNaN(endMs)) {
+          const calculatedNights = Math.round((endMs - startMs) / (1000 * 60 * 60 * 24))
+          if (calculatedNights > 0 && nights !== calculatedNights) {
+            this.logger.warn({
+              message: 'Guardrail: nights mismatch — trusting dates',
+              documentType: result.documentType,
+              extractedNights: nights,
+              calculatedNights,
+            })
+            this.setNights(result, calculatedNights)
+          }
+        }
+      }
+    }
+
+    // --- Traveler DOB in the past ---
+    const now = new Date()
+    for (const traveler of result.travelers) {
+      if (traveler.dateOfBirth) {
+        const dobMs = new Date(traveler.dateOfBirth).getTime()
+        if (!isNaN(dobMs) && dobMs > now.getTime()) {
+          this.logger.warn({
+            message: 'Guardrail: DOB is in the future — clearing',
+            name: `${traveler.firstName} ${traveler.lastName}`,
+            dob: traveler.dateOfBirth,
+          })
+          traveler.dateOfBirth = null
+        }
+      }
+    }
+
+    // --- Currency format ---
+    const currency = this.extractCurrency(result)
+    if (currency && !/^[A-Z]{3}$/.test(currency)) {
+      this.logger.warn({
+        message: 'Guardrail: invalid currency format — clearing',
+        documentType: result.documentType,
+        currency,
+      })
+      this.setCurrency(result, null)
+    }
+  }
+
+  /** Extract total and net price (in cents) from the type-specific extraction */
+  private extractPricingFields(result: OcrExtractionResult): { total: number | null; net: number | null } | null {
+    if (result.flight) return { total: result.flight.totalPriceCents ?? null, net: null }
+    if (result.lodging) return { total: result.lodging.totalPriceCents ?? null, net: null }
+    if (result.cruise) return { total: result.cruise.totalPriceCents ?? null, net: result.cruise.netPriceCents ?? null }
+    if (result.transportation) return { total: result.transportation.totalPriceCents ?? null, net: null }
+    if (result.dining) return { total: result.dining.totalPriceCents ?? null, net: null }
+    if (result.package) return { total: result.package.totalPrice ? Math.round(result.package.totalPrice * 100) : null, net: null }
+    return null
+  }
+
+  /** Swap gross/net pricing on the type-specific extraction */
+  private swapPricing(result: OcrExtractionResult, newTotal: number, newNet: number): void {
+    if (result.cruise) {
+      result.cruise.totalPriceCents = newTotal
+      result.cruise.netPriceCents = newNet
+    }
+  }
+
+  /** Set a pricing field to a value */
+  private setPricingField(result: OcrExtractionResult, field: 'total' | 'net', value: number | null): void {
+    const target = result.flight || result.lodging || result.cruise || result.transportation || result.dining
+    if (!target) return
+    if (field === 'total') (target as any).totalPriceCents = value
+    if (field === 'net' && result.cruise) result.cruise.netPriceCents = value
+  }
+
+  /** Extract start/end date strings from the type-specific extraction */
+  private extractDateFields(result: OcrExtractionResult): { start: string | null; end: string | null } {
+    if (result.flight?.segments?.length) {
+      const sorted = [...result.flight.segments].sort((a, b) => (a.segmentOrder ?? 0) - (b.segmentOrder ?? 0))
+      return { start: sorted[0]?.departureDate ?? null, end: sorted[sorted.length - 1]?.arrivalDate ?? null }
+    }
+    if (result.lodging) return { start: result.lodging.checkInDate ?? null, end: result.lodging.checkOutDate ?? null }
+    if (result.cruise) return { start: result.cruise.departureDate ?? null, end: result.cruise.arrivalDate ?? null }
+    return { start: null, end: null }
+  }
+
+  /** Swap start/end dates on the type-specific extraction */
+  private swapDates(result: OcrExtractionResult): void {
+    if (result.lodging) {
+      const tmp = result.lodging.checkInDate
+      result.lodging.checkInDate = result.lodging.checkOutDate
+      result.lodging.checkOutDate = tmp
+    }
+    if (result.cruise) {
+      const tmp = result.cruise.departureDate
+      result.cruise.departureDate = result.cruise.arrivalDate
+      result.cruise.arrivalDate = tmp
+    }
+  }
+
+  /** Extract nights from the type-specific extraction */
+  private extractNights(result: OcrExtractionResult): number | null {
+    if (result.cruise?.nights != null) return result.cruise.nights
+    if (result.lodging) {
+      // Lodging doesn't have a nights field — skip
+      return null
+    }
+    return null
+  }
+
+  /** Set nights on the type-specific extraction */
+  private setNights(result: OcrExtractionResult, nights: number): void {
+    if (result.cruise) result.cruise.nights = nights
+  }
+
+  /** Extract currency from the type-specific extraction */
+  private extractCurrency(result: OcrExtractionResult): string | null {
+    return (result.flight?.currency || result.lodging?.currency || result.cruise?.currency
+      || result.transportation?.currency || result.dining?.currency || null) ?? null
+  }
+
+  /** Set currency on the type-specific extraction */
+  private setCurrency(result: OcrExtractionResult, currency: string | null): void {
+    const target = result.flight || result.lodging || result.cruise || result.transportation || result.dining
+    if (target) (target as any).currency = currency
   }
 }
