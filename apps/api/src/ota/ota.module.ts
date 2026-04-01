@@ -36,6 +36,8 @@ import { LodgingPromoter } from './component-promoters/lodging.promoter'
 import { CruisePromoter } from './component-promoters/cruise.promoter'
 import { TourPromoter } from './component-promoters/tour.promoter'
 import { NotificationModule } from '../notifications/notification.module'
+import { UnsplashModule } from '../unsplash/unsplash.module'
+import { TripInspirationService } from './trip-inspiration.service'
 
 /**
  * Note: ExternalApisModule is @Global() so AmadeusFlightOffersProvider,
@@ -50,6 +52,7 @@ import { NotificationModule } from '../notifications/notification.module'
     ApiCredentialsModule,
     forwardRef(() => TripsModule),
     NotificationModule,
+    UnsplashModule,
   ],
   controllers: [
     OtaLeadsController,
@@ -73,6 +76,7 @@ import { NotificationModule } from '../notifications/notification.module'
     LodgingPromoter,
     CruisePromoter,
     TourPromoter,
+    TripInspirationService,
   ],
   exports: [OtaLeadsService, OtaReferralsService, OtaPublishedTripsService, OtaSearchService, OtaTripRequestsService, OwnerResolutionService, TripPromotionService, FlightPromoter, LodgingPromoter, CruisePromoter, TourPromoter],
 })
