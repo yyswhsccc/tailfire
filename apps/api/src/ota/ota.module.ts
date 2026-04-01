@@ -14,6 +14,7 @@
 import { Module, forwardRef } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
 import { OtaLeadsController } from './ota-leads.controller'
+import { OtaTripRequestsController } from './ota-trip-requests.controller'
 import { OtaLeadsService } from './ota-leads.service'
 import { OtaReferralsController } from './ota-referrals.controller'
 import { OtaReferralsService } from './ota-referrals.service'
@@ -52,6 +53,7 @@ import { NotificationModule } from '../notifications/notification.module'
   ],
   controllers: [
     OtaLeadsController,
+    OtaTripRequestsController,
     OtaReferralsController,
     OtaPublishedTripsController,
     OtaSearchController,
