@@ -41,12 +41,7 @@ export class BookingValidationService {
       errors.push({ message: 'Supplier must be identified', code: 'SUPPLIER_MISSING' })
     }
 
-    // === Check 2: Booking date set ===
-    if (!activityData.booking_date) {
-      errors.push({ message: 'Booking date is required', code: 'BOOKING_DATE_MISSING' })
-    }
-
-    // === Check 3: Departure + return dates ===
+    // === Check 2: Departure + return dates ===
     if (!activityData.start_datetime) {
       errors.push({ message: 'Start date/time is required', code: 'START_DATE_MISSING' })
     }

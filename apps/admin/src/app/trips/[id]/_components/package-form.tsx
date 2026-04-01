@@ -552,9 +552,9 @@ export function PackageForm({
               isChildOfPackage={false}
               tripId={tripId}
               onNavigateToTab={(tab) => setActiveTab(tab as PackageTab)}
-              onBooked={() => {
+              onBooked={(_cascadedCount, confirmedDate) => {
                 setIsBooked(true)
-                setBookingDate(new Date().toISOString().split('T')[0] ?? null)
+                setBookingDate(confirmedDate ? confirmedDate : new Date().toISOString().split('T')[0]!)
                 queryClient.invalidateQueries({ queryKey: ['activities'] })
                 queryClient.invalidateQueries({ queryKey: ['bookings'] })
                 queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })

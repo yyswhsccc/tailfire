@@ -25,9 +25,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,7 +57,7 @@ export interface BookingHeaderButtonProps {
   /** Switch to a specific tab in the parent form */
   onNavigateToTab?: (tab: string) => void
   /** Called after successful booking */
-  onBooked?: (cascadedCount?: number) => void
+  onBooked?: (cascadedCount?: number, bookingDate?: string) => void
   /** Called after successful unbooking */
   onUnbooked?: () => void
 }
@@ -149,7 +147,6 @@ export function BookingHeaderButton({
 
   // Confirmation panel state
   const [showConfirmation, setShowConfirmation] = useState(false)
-  const [passportVerified, setPassportVerified] = useState(false)
   const [bookingDateInput, setBookingDateInput] = useState(
     () => new Date().toISOString().split('T')[0]
   )
@@ -164,8 +161,7 @@ export function BookingHeaderButton({
 
       if (result.valid) {
         // Reset confirmation state each time we open it
-        setPassportVerified(false)
-        setBookingDateInput(new Date().toISOString().split('T')[0])
+        setBookingDateInput(bookingDate || new Date().toISOString().split('T')[0])
         setShowConfirmation(true)
       } else {
         // Navigate to the first error's tab
@@ -206,7 +202,6 @@ export function BookingHeaderButton({
         activityId,
         data: {
           bookingDate: bookingDateInput,
-          passportVerified: true,
         },
       })
 
@@ -225,7 +220,7 @@ export function BookingHeaderButton({
         })
       }
 
-      onBooked?.(cascadedCount)
+      onBooked?.(cascadedCount, bookingDateInput)
     } catch (err) {
       toast({
         title: 'Booking failed',
@@ -358,17 +353,6 @@ export function BookingHeaderButton({
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="passport-verified"
-                checked={passportVerified}
-                onCheckedChange={(v) => setPassportVerified(!!v)}
-              />
-              <Label htmlFor="passport-verified" className="text-sm">
-                Passports verified
-              </Label>
-            </div>
-
             <Input
               type="date"
               value={bookingDateInput}
@@ -379,7 +363,7 @@ export function BookingHeaderButton({
             <Button
               size="sm"
               onClick={handleConfirm}
-              disabled={!passportVerified || markBooked.isPending}
+              disabled={markBooked.isPending}
             >
               {markBooked.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-1" />
