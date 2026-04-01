@@ -490,6 +490,9 @@ export class TripPromotionService {
           accessLevel: 'write',
           sharedBy: resolvedOwnerId ?? groupOwnerId,
           notes: `Auto-shared: ${contactName} booked into group`,
+          reason: 'group_booking',
+          scopedContactId: contactId,
+          grantedBy: resolvedOwnerId ?? groupOwnerId,
         })
         .onConflictDoNothing()
 
@@ -514,6 +517,8 @@ export class TripPromotionService {
           accessLevel: 'basic',
           sharedBy: resolvedOwnerId ?? crmAdvisorId,
           notes: `Auto-shared: ${contactName} is in your group`,
+          reason: 'group_booking',
+          grantedBy: resolvedOwnerId ?? crmAdvisorId,
         })
         .onConflictDoNothing()
 

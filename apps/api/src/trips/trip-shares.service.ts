@@ -98,6 +98,10 @@ export class TripSharesService {
         accessLevel: dto.accessLevel || 'read',
         sharedBy: auth.userId,
         notes: dto.notes,
+        reason: dto.reason,
+        scopedContactId: dto.scopedContactId,
+        grantedBy: auth.userId,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
       })
       .returning()
 

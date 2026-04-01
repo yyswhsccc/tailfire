@@ -168,7 +168,7 @@ export class TripsService {
         customFields: dto.customFields,
         timezone: dto.timezone,
         tripGroupId: dto.tripGroupId,
-        source: (dto as any).source || 'admin',
+        source: dto.source || 'admin',
       })
       .returning()
 
