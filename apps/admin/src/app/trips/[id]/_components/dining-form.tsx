@@ -613,7 +613,7 @@ export function DiningForm({
           onNavigateToTab={(tab) => { if (tab) setActiveTab(tab === 'pricing' ? 'booking' : tab) }}
           onBooked={(_cascadedCount, confirmedDate) => {
             setActivityIsBooked(true)
-            setActivityBookingDate(confirmedDate || new Date().toISOString().split('T')[0])
+            setActivityBookingDate(confirmedDate ? confirmedDate : new Date().toISOString().split('T')[0]!)
             queryClient.invalidateQueries({ queryKey: ['activities'] })
             queryClient.invalidateQueries({ queryKey: ['bookings'] })
             queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })

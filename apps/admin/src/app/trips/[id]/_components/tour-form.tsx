@@ -798,7 +798,7 @@ export function TourForm({
           onNavigateToTab={(tab) => { if (tab) setActiveTab(tab) }}
           onBooked={(_cascadedCount, confirmedDate) => {
             setIsBooked(true)
-            setBookingDate(confirmedDate || new Date().toISOString().split('T')[0])
+            setBookingDate(confirmedDate ? confirmedDate : new Date().toISOString().split('T')[0]!)
             queryClient.invalidateQueries({ queryKey: ['activities'] })
             queryClient.invalidateQueries({ queryKey: ['bookings'] })
             queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
