@@ -699,6 +699,17 @@ export class OcrImportService {
       auth,
     )
 
+    // Persist net price and commission if extracted
+    if (activity.activityPricingId && (cruise.netPriceCents || cruise.commissionCents)) {
+      const pricingUpdate: Record<string, unknown> = {}
+      if (cruise.netPriceCents) pricingUpdate.netPriceCents = cruise.netPriceCents
+      if (cruise.commissionCents) pricingUpdate.commissionTotalCents = cruise.commissionCents
+      await this.db.client
+        .update(schema.activityPricing)
+        .set(pricingUpdate)
+        .where(eq(schema.activityPricing.id, activity.activityPricingId))
+    }
+
     // Create payment schedule (non-blocking)
     const totalPriceCents = cruise.totalPriceCents || 0
     if (totalPriceCents > 0 && activity.activityPricingId) {
