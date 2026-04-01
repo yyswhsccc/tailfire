@@ -14,9 +14,8 @@ interface BoardHeaderProps {
   onSubmitClick?: () => void;
 }
 
-function formatCurrency(cents: number): string {
-  const dollars = Math.round(cents / 100);
-  return dollars.toLocaleString("en-US");
+function formatCurrency(dollars: number): string {
+  return Math.round(dollars).toLocaleString("en-US");
 }
 
 export function BoardHeader({

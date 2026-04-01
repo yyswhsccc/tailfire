@@ -97,6 +97,7 @@ interface FlightSearchState {
   priceDatesLoading: boolean;
   priceMetrics: PriceMetrics | null;
   priceMetricsLoading: boolean;
+  priceLevel: string | null;
   directDestinations: DirectDestination[];
   directDestinationsLoading: boolean;
   delayPredictions: Map<string, DelayPrediction>;
@@ -134,6 +135,7 @@ interface FlightSearchState {
   setPriceDatesLoading: (v: boolean) => void;
   setPriceMetrics: (v: PriceMetrics | null) => void;
   setPriceMetricsLoading: (v: boolean) => void;
+  setPriceLevel: (v: string | null) => void;
   setDirectDestinations: (v: DirectDestination[]) => void;
   setDirectDestinationsLoading: (v: boolean) => void;
   setDelayPredictions: (v: Map<string, DelayPrediction>) => void;
@@ -194,6 +196,7 @@ export const useFlightSearch = create<FlightSearchState>((set) => ({
   priceDatesLoading: false,
   priceMetrics: null,
   priceMetricsLoading: false,
+  priceLevel: null,
   directDestinations: [],
   directDestinationsLoading: false,
   delayPredictions: new Map(),
@@ -231,6 +234,7 @@ export const useFlightSearch = create<FlightSearchState>((set) => ({
   setPriceDatesLoading: (v) => set({ priceDatesLoading: v }),
   setPriceMetrics: (v) => set({ priceMetrics: v }),
   setPriceMetricsLoading: (v) => set({ priceMetricsLoading: v }),
+  setPriceLevel: (v) => set({ priceLevel: v }),
   setDirectDestinations: (v) => set({ directDestinations: v }),
   setDirectDestinationsLoading: (v) => set({ directDestinationsLoading: v }),
   setDelayPredictions: (v) => set({ delayPredictions: v }),
@@ -294,6 +298,7 @@ export const useFlightSearch = create<FlightSearchState>((set) => ({
       priceDatesLoading: false,
       priceMetrics: null,
       priceMetricsLoading: false,
+      priceLevel: null,
       directDestinations: [],
       directDestinationsLoading: false,
       delayPredictions: new Map(),

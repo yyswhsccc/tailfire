@@ -73,7 +73,7 @@ export function SubmitReview({
           body: JSON.stringify({
             travelers: data.travelers,
             startDate: data.startDate,
-            flexible: data.flexible,
+            dateFlexibility: data.flexible,
             travelStyle: data.travelStyle,
             specialRequests: data.specialRequests,
           }),
