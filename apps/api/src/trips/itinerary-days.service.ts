@@ -336,6 +336,21 @@ export class ItineraryDaysService {
       return []
     }
 
+    // Safety guard: prevent accidental creation of hundreds of days
+    const MAX_ITINERARY_DAYS = 120
+    if (dates.length > MAX_ITINERARY_DAYS) {
+      this.logger.error({
+        message: `Refusing to create ${dates.length} itinerary days — exceeds safety limit of ${MAX_ITINERARY_DAYS}`,
+        itineraryId,
+        dateCount: dates.length,
+        firstDate: dates[0],
+        lastDate: dates[dates.length - 1],
+      })
+      throw new BadRequestException(
+        `Cannot create ${dates.length} itinerary days — maximum is ${MAX_ITINERARY_DAYS}. Check the date range.`
+      )
+    }
+
     const db = tx || this.db.client
 
     // Get agencyId from itinerary (needed for RLS on inserts)
@@ -746,6 +761,14 @@ export class ItineraryDaysService {
     const startDate = new Date(effectiveStartDate)
     const endDate = new Date(effectiveEndDate)
     const dayCount = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+
+    // Safety guard: prevent accidental creation of hundreds of days
+    const MAX_ITINERARY_DAYS = 120
+    if (dayCount > MAX_ITINERARY_DAYS) {
+      throw new BadRequestException(
+        `Cannot auto-generate ${dayCount} itinerary days — maximum is ${MAX_ITINERARY_DAYS}. Check the date range (${effectiveStartDate} to ${effectiveEndDate}).`
+      )
+    }
 
     // Delete existing days for this itinerary
     await this.db.client
