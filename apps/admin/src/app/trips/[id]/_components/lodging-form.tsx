@@ -420,7 +420,7 @@ export function LodgingForm({
     async (data: LodgingFormData) => {
       // Convert form data to API payload with proper type conversions
       const apiPayload = toApiPayload(data)
-      const payload = { ...apiPayload, pricingBreakdownJson: pricingBreakdown }
+      const payload = { ...apiPayload, pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
 
       if (activityId) {
         return updateLodging.mutateAsync({ id: activityId, data: payload })
@@ -428,7 +428,7 @@ export function LodgingForm({
         return createLodging.mutateAsync(payload)
       }
     },
-    [activityId, createLodging, updateLodging, pricingBreakdown]
+    [activityId, createLodging, updateLodging, pricingBreakdown, activityBookingDate]
   )
 
   // Auto-save effect with proper gating

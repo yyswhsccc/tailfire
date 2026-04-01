@@ -624,7 +624,7 @@ export function TransportationForm({
     async (data: TransportationFormData) => {
       // Convert form data to API payload with proper type conversions
       const formData = toTransportationApiPayload(data)
-      const payload = { ...formData, pricingBreakdownJson: pricingBreakdown }
+      const payload = { ...formData, pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
 
       if (activityId) {
         return updateMutation.mutateAsync({
@@ -635,7 +635,7 @@ export function TransportationForm({
         return createMutation.mutateAsync(payload)
       }
     },
-    [activityId, createMutation, updateMutation, pricingBreakdown]
+    [activityId, createMutation, updateMutation, pricingBreakdown, activityBookingDate]
   )
 
   // Auto-save effect with proper gating

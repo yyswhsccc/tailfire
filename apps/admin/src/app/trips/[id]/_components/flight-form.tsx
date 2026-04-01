@@ -640,7 +640,7 @@ export function FlightForm({
 
       isSavingRef.current = true
       const data = getValues()
-      const payload = { ...toFlightApiPayload(data), pricingBreakdownJson: pricingBreakdown }
+      const payload = { ...toFlightApiPayload(data), pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
 
       setSaveStatus('saving')
 
@@ -968,7 +968,7 @@ export function FlightForm({
   }
 
   const onSubmit = handleSubmit(async (data) => {
-    const payload = { ...toFlightApiPayload(data), pricingBreakdownJson: pricingBreakdown }
+    const payload = { ...toFlightApiPayload(data), pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
 
     setSaveStatus('saving')
 

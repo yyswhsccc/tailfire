@@ -233,13 +233,13 @@ export function PackageForm({
         // Use ref for immediate check (state may be stale)
         if (currentPackageId || packageIdRef.current) {
           const id = currentPackageId || packageIdRef.current!
-          const updatePayload = { ...toPackageUpdatePayload(formData), pricingBreakdownJson: pricingBreakdown }
+          const updatePayload = { ...toPackageUpdatePayload(formData), pricingBreakdownJson: pricingBreakdown, bookingDate: bookingDate || null }
           response = await updateBooking.mutateAsync({ id, data: updatePayload })
         } else {
           // Mark create as in progress before API call
           createInProgressRef.current = true
           try {
-            const createPayload = { ...toPackageApiPayload(formData, tripId), pricingBreakdownJson: pricingBreakdown }
+            const createPayload = { ...toPackageApiPayload(formData, tripId), pricingBreakdownJson: pricingBreakdown, bookingDate: bookingDate || null }
             response = await createBooking.mutateAsync(createPayload)
           } finally {
             createInProgressRef.current = false
@@ -310,10 +310,10 @@ export function PackageForm({
 
       let response
       if (currentPackageId) {
-        const updatePayload = { ...toPackageUpdatePayload(formData), pricingBreakdownJson: pricingBreakdown }
+        const updatePayload = { ...toPackageUpdatePayload(formData), pricingBreakdownJson: pricingBreakdown, bookingDate: bookingDate || null }
         response = await updateBooking.mutateAsync({ id: currentPackageId, data: updatePayload })
       } else {
-        const createPayload = { ...toPackageApiPayload(formData, tripId), pricingBreakdownJson: pricingBreakdown }
+        const createPayload = { ...toPackageApiPayload(formData, tripId), pricingBreakdownJson: pricingBreakdown, bookingDate: bookingDate || null }
         response = await createBooking.mutateAsync(createPayload)
       }
 
