@@ -474,6 +474,8 @@ export interface CreateContactShareDto {
   sharedWithUserId: string
   accessLevel?: ContactShareAccessLevel // Defaults to 'basic'
   notes?: string
+  reason?: string
+  expiresAt?: string
 }
 
 /**
@@ -495,6 +497,9 @@ export interface ContactShareResponseDto {
   sharedBy: string
   sharedAt: string
   notes: string | null
+  reason: string | null
+  grantedBy: string | null
+  expiresAt: string | null
   createdAt: string
   updatedAt: string
   // Populated user data (when available)

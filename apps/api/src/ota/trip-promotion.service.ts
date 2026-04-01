@@ -64,9 +64,9 @@ export class TripPromotionService {
    * Promote a submitted OTA trip request into a full Tailfire trip.
    *
    * @param requestId - The OTA trip request ID to promote
-   * @returns The created trip ID
+   * @returns The created trip ID and any promotion warnings
    */
-  async promote(requestId: string): Promise<string> {
+  async promote(requestId: string): Promise<{ tripId: string; promotedCount: number; failedCount: number; warnings: string[] }> {
     try {
       // ================================================================
       // Step 1: Validate — request must exist and be 'submitted'
@@ -110,6 +110,20 @@ export class TripPromotionService {
       })
 
       const contactId = leadResult.contact.id
+      const originalContactOwnerId = leadResult.contact.ownerId ?? null
+
+      // Reconcile: if owner resolution and lead capture disagree, patch the contact
+      if (resolution.ownerId && leadResult.contact.ownerId !== resolution.ownerId) {
+        const { contacts } = this.db.schema
+        await this.db.client
+          .update(contacts)
+          .set({ ownerId: resolution.ownerId, updatedAt: new Date() })
+          .where(eq(contacts.id, contactId))
+
+        this.logger.log(
+          `Contact ${contactId}: patched ownerId from ${leadResult.contact.ownerId ?? 'null'} to ${resolution.ownerId} (owner-resolution wins)`,
+        )
+      }
 
       this.logger.log(
         `Contact resolved: ${contactId} (attribution=${leadResult.attribution})`,
@@ -155,6 +169,7 @@ export class TripPromotionService {
           startDate,
           endDate,
           tripGroupId: request.tripGroupId ?? undefined,
+          source: 'ota',
         },
         resolution.ownerId,
         resolution.agencyId,
@@ -231,14 +246,15 @@ export class TripPromotionService {
 
       let promotedCount = 0
       let failedCount = 0
+      const warnings: string[] = []
 
       for (const component of components) {
         const promoter = this.promoterMap.get(component.type)
 
         if (!promoter) {
-          this.logger.warn(
-            `Unsupported component type '${component.type}' — skipping (request=${requestId})`,
-          )
+          const msg = `Unsupported component type '${component.type}' — skipped (no promoter implemented)`
+          this.logger.warn(`${msg} (request=${requestId})`)
+          warnings.push(msg)
           failedCount++
           continue
         }
@@ -252,6 +268,7 @@ export class TripPromotionService {
         } catch (error) {
           failedCount++
           const message = error instanceof Error ? error.message : String(error)
+          warnings.push(`Failed to promote ${component.type} component: ${message}`)
           this.logger.error(
             `Failed to promote ${component.type} component: ${message}`,
             error instanceof Error ? error.stack : undefined,
@@ -275,6 +292,31 @@ export class TripPromotionService {
       this.logger.log(`Trip request ${requestId} marked as promoted → trip ${trip.id}`)
 
       // ================================================================
+      // Step 9b: Handle group booking conflict (auto-share)
+      // ================================================================
+      if (request.tripGroupId) {
+        try {
+          await this.handleGroupConflict({
+            tripGroupId: request.tripGroupId,
+            tripId: trip.id,
+            contactId,
+            contactName: request.contactName ?? request.contactEmail,
+            agencyId: resolution.agencyId,
+            originalContactOwnerId,
+            resolvedOwnerId: resolution.ownerId,
+          })
+        } catch (error) {
+          // Group conflict handling should not fail the promotion
+          const msg = error instanceof Error ? error.message : String(error)
+          warnings.push(`Group conflict handling failed: ${msg}`)
+          this.logger.error(
+            `Group conflict handling failed for trip ${trip.id}: ${msg}`,
+            error instanceof Error ? error.stack : undefined,
+          )
+        }
+      }
+
+      // ================================================================
       // Step 10: Notify
       // ================================================================
       try {
@@ -286,7 +328,7 @@ export class TripPromotionService {
         )
       }
 
-      return trip.id
+      return { tripId: trip.id, promotedCount, failedCount, warnings }
     } catch (error) {
       // ================================================================
       // Error handling — mark request as failed
@@ -371,6 +413,121 @@ export class TripPromotionService {
 
       this.logger.log(
         `Assignment notification sent to ${admins.length} agency admin(s)`,
+      )
+    }
+  }
+
+  /**
+   * Handle group booking ownership conflict.
+   *
+   * When a consumer's ORIGINAL CRM advisor differs from the trip group owner,
+   * auto-create shares so both advisors have appropriate access:
+   *
+   * 1. Trip share: CRM advisor gets 'write' access to the group trip,
+   *    scoped to their contact's activities (only if CRM advisor !== trip owner)
+   * 2. Contact share: Group owner gets 'basic' access to the consumer's contact
+   *    (only if group owner !== contact owner)
+   *
+   * Uses direct Drizzle inserts with onConflictDoNothing() to bypass the
+   * self-share guard and avoid 409s on duplicate shares.
+   */
+  private async handleGroupConflict(params: {
+    tripGroupId: string
+    tripId: string
+    contactId: string
+    contactName: string
+    agencyId: string
+    originalContactOwnerId: string | null
+    resolvedOwnerId: string | null
+  }): Promise<void> {
+    const {
+      tripGroupId, tripId, contactId, contactName,
+      agencyId, originalContactOwnerId, resolvedOwnerId,
+    } = params
+    const { tripGroups, tripShares, contactShares } = this.db.schema
+
+    // Look up the group owner
+    const [group] = await this.db.client
+      .select({ ownerId: tripGroups.ownerId })
+      .from(tripGroups)
+      .where(eq(tripGroups.id, tripGroupId))
+      .limit(1)
+
+    if (!group?.ownerId) {
+      this.logger.log(
+        `Group conflict check: trip group ${tripGroupId} has no owner, skipping`,
+      )
+      return
+    }
+
+    const groupOwnerId = group.ownerId
+    const crmAdvisorId = originalContactOwnerId
+
+    // No conflict if same owner or no CRM advisor
+    if (!crmAdvisorId || groupOwnerId === crmAdvisorId) {
+      this.logger.log(
+        `Group conflict check: same owner or no CRM advisor (group=${groupOwnerId}, crm=${crmAdvisorId}), no shares needed`,
+      )
+      return
+    }
+
+    this.logger.log(
+      `Group conflict detected: group owner=${groupOwnerId}, CRM advisor=${crmAdvisorId}. Creating auto-shares.`,
+    )
+
+    // The trip was created with resolvedOwnerId as the owner.
+    // The contact was patched to resolvedOwnerId during reconciliation.
+
+    // 1. Trip share: give CRM advisor scoped access to the group trip
+    //    Skip if CRM advisor is already the trip owner
+    if (crmAdvisorId !== resolvedOwnerId) {
+      await this.db.client
+        .insert(tripShares)
+        .values({
+          tripId,
+          sharedWithUserId: crmAdvisorId,
+          agencyId,
+          accessLevel: 'write',
+          sharedBy: resolvedOwnerId ?? groupOwnerId,
+          reason: 'group_booking',
+          scopedContactId: contactId,
+          grantedBy: resolvedOwnerId ?? groupOwnerId,
+          notes: `Auto-shared: ${contactName} booked into group`,
+        })
+        .onConflictDoNothing()
+
+      this.logger.log(
+        `Trip share created: CRM advisor ${crmAdvisorId} → trip ${tripId} (scoped to contact ${contactId})`,
+      )
+    } else {
+      this.logger.log(
+        `Trip share skipped: CRM advisor ${crmAdvisorId} is already the trip owner`,
+      )
+    }
+
+    // 2. Contact share: give group owner basic access to the consumer's contact
+    //    Skip if group owner is already the contact owner (post-reconciliation)
+    if (groupOwnerId !== resolvedOwnerId) {
+      await this.db.client
+        .insert(contactShares)
+        .values({
+          contactId,
+          sharedWithUserId: groupOwnerId,
+          agencyId,
+          accessLevel: 'basic',
+          sharedBy: resolvedOwnerId ?? crmAdvisorId,
+          reason: 'group_booking',
+          grantedBy: resolvedOwnerId ?? crmAdvisorId,
+          notes: `Auto-shared: ${contactName} is in your group`,
+        })
+        .onConflictDoNothing()
+
+      this.logger.log(
+        `Contact share created: group owner ${groupOwnerId} → contact ${contactId}`,
+      )
+    } else {
+      this.logger.log(
+        `Contact share skipped: group owner ${groupOwnerId} is already the contact owner`,
       )
     }
   }
