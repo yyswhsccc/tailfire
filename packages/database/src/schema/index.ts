@@ -232,3 +232,6 @@ export * from './destination-vacation-destinations.schema'
 export * from './planning-sessions.schema'
 export * from './planning-session-messages.schema'
 export * from './planning-session-items.schema'
+
+// OTA trip requests (consumer-side trip builder)
+export * from './ota-trip-requests.schema'
