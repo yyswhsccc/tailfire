@@ -64,9 +64,15 @@ export class TripRequestComponentDto {
 // ============================================================================
 
 export class CreateTripRequestDto {
-  @ApiProperty({ description: 'Consumer email address' })
+  @ApiPropertyOptional({ description: 'Consumer email address (optional for anonymous drafts)' })
+  @IsOptional()
   @IsEmail()
-  email!: string
+  email?: string
+
+  @ApiPropertyOptional({ description: 'Anonymous session ID for pre-auth drafts' })
+  @IsOptional()
+  @IsString()
+  sessionId?: string
 
   @ApiPropertyOptional({ description: 'Consumer full name' })
   @IsOptional()
