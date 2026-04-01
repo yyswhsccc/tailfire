@@ -174,7 +174,9 @@ export class ImportBookingService {
     // 8. Build and create custom cruise activity
     const rawCruiseDetails = this.mapToCruiseDetails(cruiseItem, dto.bookingReference, result)
     const cruiseDetails = await this.enrichFromCatalog(rawCruiseDetails, cruiseItem) as CustomCruiseDetailsDto
-    const totalPriceCents = this.parsePriceToCents(cruiseItem.grossprice)
+    // Traveltek uses reversed terminology: their "nettprice" = client selling price (our gross/total),
+    // their "grossprice" = agency/wholesale cost (our net). Swap to match standard convention.
+    const totalPriceCents = this.parsePriceToCents(cruiseItem.nettprice)
     const commissionCents = result.commission
       ? Math.round(result.commission * 100)
       : null
@@ -251,8 +253,8 @@ export class ImportBookingService {
           pricingUpdate.pricingType = 'per_person'
         }
 
-        // Universal booking fields
-        const netPriceCents = this.parsePriceToCents(cruiseItem.nettprice)
+        // Universal booking fields — grossprice is agency cost (our net) in Traveltek terminology
+        const netPriceCents = this.parsePriceToCents(cruiseItem.grossprice)
         if (netPriceCents !== null) {
           pricingUpdate.netPriceCents = netPriceCents
         }
@@ -624,8 +626,10 @@ export class ImportBookingService {
         supplier: cruiseItem.suppliername,
         itinerary: cruiseItem.itinerary,
         pricing: {
-          grossPrice: cruiseItem.grossprice,
-          netPrice: cruiseItem.nettprice,
+          // Traveltek uses reversed terminology: their "grossprice" = agency/wholesale cost,
+          // their "nettprice" = client selling price. We swap to match standard travel convention.
+          grossPrice: cruiseItem.nettprice,
+          netPrice: cruiseItem.grossprice,
           price: cruiseItem.price,
           currency: cruiseItem.scurrency,
         },
