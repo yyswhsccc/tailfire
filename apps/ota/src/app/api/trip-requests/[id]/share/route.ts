@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { serviceFetch } from "@/lib/api";
+import { validateTripAccess } from "@/app/api/trip-requests/validate-access";
 
 /**
  * POST /api/trip-requests/:id/share — Generate a share token for the trip request.
@@ -10,6 +11,9 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    if (!(await validateTripAccess(id))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
     const data = await serviceFetch<unknown>(
       `/ota/trip-requests/${id}/share`,
       { method: "POST" },
@@ -32,6 +36,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    if (!(await validateTripAccess(id))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
     const data = await serviceFetch<unknown>(
       `/ota/trip-requests/${id}/share`,
       { method: "DELETE" },

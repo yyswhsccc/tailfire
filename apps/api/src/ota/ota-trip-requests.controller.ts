@@ -100,17 +100,18 @@ export class OtaTripRequestsController {
       throw new NotFoundException('Share token not found or revoked')
     }
 
-    // Strip sensitive fields for the shared view
-    const {
-      contactPhone,
-      contactEmail,
-      resolvedOwnerId,
-      resolvedAgencyId,
-      promotionError,
-      ...safeFields
-    } = request
-
-    return safeFields
+    // Only expose safe display fields — strip all internal/sensitive data
+    return {
+      id: request.id,
+      title: request.title,
+      components: request.components,
+      inspiration: request.inspiration,
+      boardOrder: request.boardOrder,
+      startDate: request.startDate,
+      endDate: request.endDate,
+      travelers: request.travelers,
+      status: request.status,
+    }
   }
 
   // ==========================================================================
@@ -285,13 +286,12 @@ export class OtaTripRequestsController {
 
     // Merge: deduplicate by card ID
     const existingIds = new Set(existingCards.map((c: any) => c.id))
-    const merged = [
-      ...existingCards,
-      ...newCards.filter((c) => !existingIds.has(c.id)),
-    ]
+    const trulyNewCards = newCards.filter((c) => !existingIds.has(c.id))
+    const merged = [...existingCards, ...trulyNewCards]
 
-    // Persist merged inspiration
-    await this.tripRequests.updateInspiration(id, merged)
+    // Persist merged inspiration + auto-append new cards to board_order
+    const newCardIds = trulyNewCards.map((c) => c.id)
+    await this.tripRequests.updateInspiration(id, merged, newCardIds)
 
     return { cards: merged }
   }

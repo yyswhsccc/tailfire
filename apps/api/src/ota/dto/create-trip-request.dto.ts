@@ -12,6 +12,8 @@ import {
   IsOptional,
   IsArray,
   IsInt,
+  IsBoolean,
+  IsIn,
   IsUUID,
   IsDateString,
   IsEnum,
@@ -130,6 +132,16 @@ export class CreateTripRequestDto {
   @IsOptional()
   @IsString()
   specialRequests?: string
+
+  @ApiPropertyOptional({ description: 'Whether travel dates are flexible' })
+  @IsOptional()
+  @IsBoolean()
+  dateFlexibility?: boolean
+
+  @ApiPropertyOptional({ description: 'Preferred travel style', enum: ['relaxed', 'adventure', 'luxury', 'budget', 'family'] })
+  @IsOptional()
+  @IsIn(['relaxed', 'adventure', 'luxury', 'budget', 'family'])
+  travelStyle?: string
 
   @ApiProperty({ type: [TripRequestComponentDto], description: 'Trip components (flights, hotels, cruises, etc.)' })
   @IsArray()

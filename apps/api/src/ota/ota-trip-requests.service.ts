@@ -61,7 +61,10 @@ export class OtaTripRequestsService {
         endDate: dto.endDate ?? null,
         travelers: dto.travelers ?? 1,
         specialRequests: dto.specialRequests ?? null,
+        dateFlexibility: dto.dateFlexibility ?? false,
+        travelStyle: dto.travelStyle ?? null,
         components: dto.components,
+        boardOrder: dto.components.map((c: any) => ({ type: 'component', id: c.id })),
         status: 'draft',
         expiresAt,
       })
@@ -305,6 +308,10 @@ export class OtaTripRequestsService {
     }
 
     const components = [...((existing.components as any[]) ?? []), component]
+    const boardOrder = [
+      ...((existing.boardOrder as any[]) ?? []),
+      { type: 'component', id: component.id },
+    ]
 
     const { otaTripRequests } = this.db.schema
 
@@ -312,6 +319,7 @@ export class OtaTripRequestsService {
       .update(otaTripRequests)
       .set({
         components,
+        boardOrder,
         updatedAt: new Date(),
       })
       .where(eq(otaTripRequests.id, id))
@@ -497,7 +505,7 @@ export class OtaTripRequestsService {
   // UPDATE INSPIRATION — Replace inspiration JSONB array
   // ============================================================================
 
-  async updateInspiration(id: string, cards: any[]): Promise<void> {
+  async updateInspiration(id: string, cards: any[], newCardIds?: string[]): Promise<void> {
     const existing = await this.findById(id)
 
     if (existing.status !== 'draft') {
@@ -508,14 +516,66 @@ export class OtaTripRequestsService {
 
     const { otaTripRequests } = this.db.schema
 
+    // Auto-append new inspiration cards to board_order
+    const setValues: Record<string, any> = {
+      inspiration: cards,
+      updatedAt: new Date(),
+    }
+
+    if (newCardIds && newCardIds.length > 0) {
+      const currentBoardOrder = (existing.boardOrder as any[]) ?? []
+      const existingBoardIds = new Set(currentBoardOrder.map((item: any) => item.id))
+      const newBoardEntries = newCardIds
+        .filter((cid) => !existingBoardIds.has(cid))
+        .map((cid) => ({ type: 'inspiration', id: cid }))
+      setValues.boardOrder = [...currentBoardOrder, ...newBoardEntries]
+    }
+
     await this.db.client
       .update(otaTripRequests)
-      .set({
-        inspiration: cards,
-        updatedAt: new Date(),
-      })
+      .set(setValues)
       .where(eq(otaTripRequests.id, id))
 
     this.logger.log(`Updated inspiration for trip request ${id} (${cards.length} cards)`)
+  }
+
+  // ============================================================================
+  // UPDATE SUBMIT DETAILS — Update date flexibility, travel style, etc. before submit
+  // ============================================================================
+
+  async updateSubmitDetails(
+    id: string,
+    dto: {
+      dateFlexibility?: boolean
+      travelStyle?: string
+      travelers?: number
+      specialRequests?: string
+    },
+  ): Promise<OtaTripRequest> {
+    const existing = await this.findById(id)
+
+    if (existing.status !== 'draft') {
+      throw new BadRequestException(
+        `Cannot update submit details: trip request ${id} is '${existing.status}', expected 'draft'`,
+      )
+    }
+
+    const { otaTripRequests } = this.db.schema
+
+    const [updated] = await this.db.client
+      .update(otaTripRequests)
+      .set({
+        dateFlexibility: dto.dateFlexibility,
+        travelStyle: dto.travelStyle,
+        travelers: dto.travelers,
+        specialRequests: dto.specialRequests,
+        updatedAt: new Date(),
+      })
+      .where(eq(otaTripRequests.id, id))
+      .returning()
+
+    this.logger.log(`Updated submit details for trip request ${id}`)
+
+    return updated!
   }
 }
