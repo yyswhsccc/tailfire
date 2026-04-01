@@ -1289,6 +1289,34 @@
       "when": 1774997516000,
       "tag": "20260328183156_create_vacation_package_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 184,
+      "version": "7",
+      "when": 1775044800000,
+      "tag": "20260329120000_create_ota_trip_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 185,
+      "version": "7",
+      "when": 1775045460000,
+      "tag": "20260329120100_add_source_to_trips",
+      "breakpoints": true
+    },
+    {
+      "idx": 186,
+      "version": "7",
+      "when": 1775048400000,
+      "tag": "20260329130000_extend_sharing_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 187,
+      "version": "7",
+      "when": 1775217600000,
+      "tag": "20260401120000_extend_ota_trip_requests",
+      "breakpoints": true
     }
   ]
 }

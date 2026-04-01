@@ -6,7 +6,7 @@
  * which are then promoted into full Tailfire trips upon submission.
  */
 
-import { pgTable, uuid, text, date, integer, jsonb, timestamp, index } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, varchar, boolean, date, integer, jsonb, timestamp, index } from 'drizzle-orm/pg-core'
 
 // ============================================================================
 // TABLE: ota_trip_requests
@@ -17,7 +17,7 @@ export const otaTripRequests = pgTable('ota_trip_requests', {
   id: uuid('id').primaryKey().defaultRandom(),
 
   // Consumer identity
-  contactEmail: text('contact_email').notNull(),
+  contactEmail: text('contact_email'),
   contactName: text('contact_name'),
   contactPhone: text('contact_phone'),
 
@@ -33,6 +33,20 @@ export const otaTripRequests = pgTable('ota_trip_requests', {
   endDate: date('end_date'),
   travelers: integer('travelers').default(1),
   specialRequests: text('special_requests'),
+
+  // Phase 2: Session tracking
+  sessionId: text('session_id'),
+  // Phase 2: Share token
+  shareToken: varchar('share_token', { length: 64 }),
+  // Phase 2: Submit flow
+  dateFlexibility: boolean('date_flexibility').default(false),
+  travelStyle: varchar('travel_style', { length: 20 }),
+  // Phase 2: Linked contact
+  contactId: uuid('contact_id'),
+  // Phase 2: Inspiration cards (separate from promotable components)
+  inspiration: jsonb('inspiration').default([]),
+  // Phase 2: Board display order
+  boardOrder: jsonb('board_order').default([]),
 
   // Components JSONB
   components: jsonb('components').notNull().default([]),
@@ -63,6 +77,9 @@ export const otaTripRequests = pgTable('ota_trip_requests', {
   emailIdx: index('idx_ota_trip_requests_email').on(table.contactEmail),
   statusIdx: index('idx_ota_trip_requests_status').on(table.status),
   advisorIdx: index('idx_ota_trip_requests_advisor').on(table.advisorSlug),
+  sessionIdx: index('idx_ota_trip_requests_session').on(table.sessionId),
+  shareTokenIdx: index('idx_ota_trip_requests_share_token').on(table.shareToken),
+  contactIdx: index('idx_ota_trip_requests_contact').on(table.contactId),
 }))
 
 // ============================================================================
