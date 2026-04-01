@@ -541,7 +541,7 @@ export function TourForm({
     setAutoSaveStatus('saving')
     try {
       const formData = getValues()
-      const payload = { ...formData, pricingBreakdownJson: pricingBreakdown }
+      const payload = { ...formData, pricingBreakdownJson: pricingBreakdown, bookingDate: bookingDate || null }
 
       let response
       if (activityId) {

@@ -413,7 +413,7 @@ export function DiningForm({
     setAutoSaveStatus('saving')
     try {
       const formData = getValues()
-      const payload = { ...toDiningApiPayload(formData), pricingBreakdownJson: pricingBreakdown }
+      const payload = { ...toDiningApiPayload(formData), pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
 
       let response
       if (activityId) {

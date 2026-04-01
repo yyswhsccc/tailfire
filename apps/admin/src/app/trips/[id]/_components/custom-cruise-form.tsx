@@ -719,7 +719,7 @@ export function CustomCruiseForm({
     }
 
     const basePayload = toCustomCruiseApiPayload(formData)
-    const payload = { ...basePayload, pricingBreakdownJson: pricingBreakdown }
+    const payload = { ...basePayload, pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
 
     try {
       setAutoSaveStatus('saving')
