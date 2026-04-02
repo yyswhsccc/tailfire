@@ -3,6 +3,15 @@
 import type { DestinationDetail } from '@/types/entities'
 import type { HubAdapter, HeroData, ContextPill, SectionDescriptor, AiPageContext } from '../types'
 
+const DESTINATION_TYPE_LABELS: Record<string, string> = {
+  port_city: 'Port City',
+  island: 'Island',
+  resort_area: 'Resort Area',
+  city: 'City',
+  country: 'Country',
+  region: 'Region',
+}
+
 export const destinationAdapter: HubAdapter<DestinationDetail> = {
   heroData(dest): HeroData {
     const enrichment = dest.enrichment
@@ -39,7 +48,7 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       pills.push({ icon: '\uD83D\uDCCD', label: dest.countryCode })
     }
     if (dest.destinationType) {
-      pills.push({ label: dest.destinationType })
+      pills.push({ label: DESTINATION_TYPE_LABELS[dest.destinationType] ?? dest.destinationType })
     }
 
     return pills
