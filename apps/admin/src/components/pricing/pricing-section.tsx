@@ -226,6 +226,21 @@ export function PricingSection({
     onUpdate({ pricingBreakdown: breakdown, totalPriceCents: newTotal })
   }, [pricingData.pricingBreakdown, onUpdate])
 
+  // Line items breakdown handlers (DON'T auto-update total — total is independent)
+  const handleLineItemRowChange = useCallback((index: number, priceCents: number) => {
+    const breakdown = [...(pricingData.pricingBreakdown || [])]
+    const existing = breakdown[index]
+    if (!existing) return
+    breakdown[index] = { ...existing, priceCents }
+    onUpdate({ pricingBreakdown: breakdown })
+  }, [pricingData.pricingBreakdown, onUpdate])
+
+  const handleLineItemRemove = useCallback((index: number) => {
+    const breakdown = [...(pricingData.pricingBreakdown || [])]
+    breakdown.splice(index, 1)
+    onUpdate({ pricingBreakdown: breakdown })
+  }, [pricingData.pricingBreakdown, onUpdate])
+
   const handleSplitEvenly = useCallback(() => {
     const breakdown = pricingData.pricingBreakdown || []
     if (breakdown.length === 0) return
@@ -475,9 +490,107 @@ export function PricingSection({
               )}
             </div>
           </div>
+
+          {/* Line Items Breakdown - shown for flat_rate, per_room, per_night modes */}
+          {!isPerPerson && (
+            <LineItemsBreakdown
+              breakdown={pricingData.pricingBreakdown || []}
+              currencySymbol={currencySymbol}
+              onRowPriceChange={handleLineItemRowChange}
+              onRowLabelChange={handleBreakdownLabelChange}
+              onAddRow={handleAddRow}
+              onRemoveRow={handleLineItemRemove}
+            />
+          )}
         </>
       )}
     </Card>
+  )
+}
+
+// =============================================================================
+// Line Items Breakdown Sub-Component (flat_rate, per_room, per_night)
+// =============================================================================
+
+interface LineItemsBreakdownProps {
+  breakdown: PricingBreakdownItem[]
+  currencySymbol: string
+  onRowPriceChange: (index: number, priceCents: number) => void
+  onRowLabelChange: (index: number, label: string) => void
+  onAddRow: () => void
+  onRemoveRow: (index: number) => void
+}
+
+function LineItemsBreakdown({
+  breakdown,
+  currencySymbol,
+  onRowPriceChange,
+  onRowLabelChange,
+  onAddRow,
+  onRemoveRow,
+}: LineItemsBreakdownProps) {
+  if (breakdown.length === 0) {
+    return (
+      <div className="pt-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onAddRow}
+          className="text-xs text-ash-500 hover:text-ash-900"
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          Add Price Breakdown
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3 pt-4 border-t">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium text-gray-700">
+          Price Breakdown
+        </Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onAddRow}
+          className="text-xs"
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          Add Item
+        </Button>
+      </div>
+
+      <div className="space-y-1">
+        {/* Header */}
+        <div className="grid grid-cols-[1fr_140px_36px] gap-2 px-1">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Item</span>
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Amount</span>
+          <span />
+        </div>
+
+        {/* Rows */}
+        {breakdown.map((item, index) => (
+          <BreakdownRow
+            key={`line-${index}`}
+            item={item}
+            index={index}
+            currencySymbol={currencySymbol}
+            onPriceChange={onRowPriceChange}
+            onLabelChange={onRowLabelChange}
+            onRemove={onRemoveRow}
+            hasLinkedTraveler={false}
+          />
+        ))}
+      </div>
+
+      <p className="text-xs text-gray-400">
+        Line items are for record-keeping. The total price above is the authoritative amount.
+      </p>
+    </div>
   )
 }
 
