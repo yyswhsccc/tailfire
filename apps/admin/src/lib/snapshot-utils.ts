@@ -430,3 +430,69 @@ export function validateContactForTravel(
     totalIssues: issues.length,
   }
 }
+
+/**
+ * Convert a traveler's contactSnapshot JSONB to the Contact type
+ * used by validateContactForTravel. Maps common snapshot field variations.
+ */
+export function contactFromSnapshot(snapshot: Record<string, any> | null): Contact {
+  if (!snapshot) {
+    return {
+      id: '',
+      firstName: null,
+      lastName: null,
+      legalFirstName: null,
+      legalLastName: null,
+      middleName: null,
+      preferredName: null,
+      prefix: null,
+      suffix: null,
+      gender: null,
+      pronouns: null,
+      email: null,
+      phone: null,
+      dateOfBirth: null,
+      passportNumber: null,
+      passportExpiry: null,
+      passportCountry: null,
+      passportIssueDate: null,
+      nationality: null,
+      redressNumber: null,
+      knownTravelerNumber: null,
+      dietaryRequirements: null,
+      mobilityRequirements: null,
+      seatPreference: null,
+      cabinPreference: null,
+      floorPreference: null,
+    }
+  }
+
+  return {
+    id: snapshot.id || '',
+    firstName: snapshot.firstName || null,
+    lastName: snapshot.lastName || null,
+    legalFirstName: snapshot.legalFirstName || null,
+    legalLastName: snapshot.legalLastName || null,
+    middleName: snapshot.middleName || null,
+    preferredName: snapshot.preferredName || null,
+    prefix: snapshot.prefix || null,
+    suffix: snapshot.suffix || null,
+    gender: snapshot.gender || null,
+    pronouns: snapshot.pronouns || null,
+    email: snapshot.email || null,
+    phone: snapshot.phone || null,
+    dateOfBirth: snapshot.dateOfBirth || null,
+    passportNumber: snapshot.passportNumber || snapshot.passport?.number || null,
+    passportExpiry: snapshot.passportExpiry || snapshot.passport?.expiry || null,
+    passportCountry: snapshot.passportCountry || snapshot.passport?.country || null,
+    passportIssueDate: snapshot.passportIssueDate || null,
+    nationality: snapshot.nationality || null,
+    redressNumber: snapshot.redressNumber || null,
+    knownTravelerNumber: snapshot.knownTravelerNumber || null,
+    dietaryRequirements: snapshot.dietaryRequirements || null,
+    mobilityRequirements: snapshot.mobilityRequirements || null,
+    seatPreference: snapshot.seatPreference || null,
+    cabinPreference: snapshot.cabinPreference || null,
+    floorPreference: snapshot.floorPreference || null,
+  }
+}

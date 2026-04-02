@@ -102,7 +102,12 @@ export function DetailSidebar({
                         <Icon className="h-4 w-4 flex-shrink-0" />
                         <span className="flex-1 text-left">{item.name}</span>
                         {item.badge && (
-                          <span className="text-xs text-ash-500">
+                          <span className={cn(
+                            "text-xs font-medium",
+                            typeof item.badge === 'number' || (typeof item.badge === 'string' && /^\d+$/.test(item.badge))
+                              ? "bg-red-500 text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"
+                              : "text-ash-500"
+                          )}>
                             {item.badge}
                           </span>
                         )}
@@ -126,7 +131,12 @@ export function DetailSidebar({
                       <Icon className="h-4 w-4 flex-shrink-0" />
                       <span className="flex-1">{item.name}</span>
                       {item.badge && (
-                        <span className="text-xs text-ash-500">
+                        <span className={cn(
+                          "text-xs font-medium",
+                          typeof item.badge === 'number' || (typeof item.badge === 'string' && /^\d+$/.test(item.badge))
+                            ? "bg-red-500 text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"
+                            : "text-ash-500"
+                        )}>
                           {item.badge}
                         </span>
                       )}
