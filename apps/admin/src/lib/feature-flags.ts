@@ -22,10 +22,14 @@ export const FEATURE_FLAGS = {
   NEW_BOOKING_PRICING_UI: process.env.NEXT_PUBLIC_FEATURE_NEW_BOOKING_PRICING === 'true',
 
   /**
-   * Vacation Packages (SoftVoyage)
+   * Vacation Package Library (SoftVoyage/SIREV)
    *
-   * Enables the Vacation Package Library page and the "package" activity type.
-   * Disabled by default while the SoftVoyage integration is stabilized.
+   * Enables the Vacation Package Library page (/library/vacation) and the
+   * "Vacation Package" drag item in the itinerary component library.
+   * Disabled by default while the SoftVoyage scraper integration is stabilized.
+   *
+   * NOTE: This does NOT affect the "Package" activity type — Package activities
+   * (bundling flights + hotel + transfers) are core functionality and always visible.
    *
    * Environment variable: NEXT_PUBLIC_FEATURE_VACATION_PACKAGES
    * Default: false (hidden)

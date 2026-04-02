@@ -14,7 +14,6 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { ActivityType as DatabaseActivityType } from '@tailfire/shared-types/api'
-import { FEATURE_FLAGS } from './feature-flags'
 
 /**
  * UI activity type - includes 'package' for routing, but package is NOT a database activity type.
@@ -188,7 +187,6 @@ export const ACTIVITY_TYPE_METADATA: Record<UIActivityType, ActivityTypeMetadata
     hasMedia: true,
     hasDocs: true,
     allowedFields: [], // Packages use their own form with different fields
-    hidden: !FEATURE_FLAGS.VACATION_PACKAGES,
   },
   custom_tour: {
     type: 'custom_tour',
