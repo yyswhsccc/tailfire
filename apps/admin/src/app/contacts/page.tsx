@@ -11,10 +11,14 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useContacts } from '@/hooks/use-contacts'
 import { ContactsTable } from './_components/contacts-table'
 import { ContactsFilterPanel } from './_components/contacts-filter-panel'
+import { BulkActionsToolbar } from './_components/bulk-actions-toolbar'
 import { QuickContactDialog } from './_components/quick-contact-dialog'
+import { TripFormDialog } from '@/app/trips/_components/trip-form-dialog'
 import { TableSkeleton } from '@/components/shared/loading-skeleton'
+import { useToast } from '@/hooks/use-toast'
+import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { ContactFilterDto } from '@tailfire/shared-types/api'
+import type { ContactFilterDto, TripResponseDto } from '@tailfire/shared-types/api'
 
 type ContactsView = 'table' | 'kanban'
 
@@ -29,8 +33,10 @@ export default function ContactsPageWrapper() {
 function ContactsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { toast } = useToast()
   const urlSearch = searchParams?.get('search') || ''
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [showCreateTrip, setShowCreateTrip] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [view, setView] = useState<ContactsView>('table')
@@ -108,6 +114,36 @@ function ContactsPage() {
   const handleFiltersChange = useCallback((newFilters: ContactFilterDto) => {
     setFilters(newFilters)
   }, [])
+
+  // ---------------------------------------------------------------------------
+  // Create trip from selected contacts
+  // ---------------------------------------------------------------------------
+
+  const handleTripCreated = useCallback(async (newTrip: TripResponseDto) => {
+    const contactIds = Array.from(selectedIds)
+
+    for (let i = 0; i < contactIds.length; i++) {
+      try {
+        await api.post(`/trips/${newTrip.id}/travelers`, {
+          contactId: contactIds[i],
+          role: i === 0 ? 'primary_contact' : 'full_access',
+          isPrimaryTraveler: i === 0,
+          travelerType: 'adult',
+        })
+      } catch (err) {
+        console.error(`Failed to add traveler ${contactIds[i]}:`, err)
+      }
+    }
+
+    toast({
+      title: 'Trip created',
+      description: `${newTrip.name} created with ${contactIds.length} traveler${contactIds.length !== 1 ? 's' : ''}`,
+    })
+
+    setSelectedIds(new Set())
+    setShowCreateTrip(false)
+    router.push(`/trips/${newTrip.id}?tab=travelers`)
+  }, [selectedIds, toast, router])
 
   // ---------------------------------------------------------------------------
   // Clear selection on filter/page change
@@ -190,16 +226,13 @@ function ContactsPage() {
         }
       />
 
-      {/* Selected count indicator */}
+      {/* Bulk actions toolbar */}
       {selectedIds.size > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-center justify-between mb-4">
-          <span className="text-sm font-medium text-blue-900">
-            {selectedIds.size} contact{selectedIds.size !== 1 ? 's' : ''} selected
-          </span>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
-            Deselect All
-          </Button>
-        </div>
+        <BulkActionsToolbar
+          selectedIds={selectedIds}
+          onDeselect={() => setSelectedIds(new Set())}
+          onCreateTrip={() => setShowCreateTrip(true)}
+        />
       )}
 
       {/* Content */}
@@ -287,6 +320,14 @@ function ContactsPage() {
       <QuickContactDialog
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
+      />
+
+      <TripFormDialog
+        open={showCreateTrip}
+        onOpenChange={setShowCreateTrip}
+        mode="create"
+        redirectOnCreate={false}
+        onCreated={handleTripCreated}
       />
     </DashboardLayout>
   )

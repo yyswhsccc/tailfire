@@ -21,7 +21,6 @@ import {
 import { Tag, BarChart3, Trash2, Plane, X, Loader2, Check } from 'lucide-react'
 import { TagAssignPopover } from './tag-assign-popover'
 import { useDeleteContact, useUpdateContactStatus } from '@/hooks/use-contacts'
-import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/use-toast'
 
 // ---------------------------------------------------------------------------
