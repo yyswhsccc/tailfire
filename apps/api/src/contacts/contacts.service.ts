@@ -207,6 +207,18 @@ export class ContactsService {
       )
     }
 
+    // contactType filter
+    if (filters.contactType) {
+      conditions.push(eq(this.db.schema.contacts.contactType, filters.contactType))
+    }
+
+    // contactStatus filter (multi-select)
+    if (filters.contactStatus && filters.contactStatus.length > 0) {
+      conditions.push(
+        inArray(this.db.schema.contacts.contactStatus, filters.contactStatus)
+      )
+    }
+
     // Build ORDER BY
     const sortBy = filters.sortBy || 'lastName'
     const sortOrder = filters.sortOrder || 'asc'
@@ -257,11 +269,59 @@ export class ContactsService {
       this.logger.warn('findAll: userId absent, returning empty tags for contact list')
     }
 
+    // Batch compute nextTrip and relationshipCount for contacts on this page
+    let nextTripMap = new Map<string, { name: string; date: string }>()
+    let relCountMap = new Map<string, number>()
+
+    if (contactIds.length > 0) {
+      // Build IN clause for raw SQL (Drizzle sql template can't pass arrays to ANY())
+      const idsList = sql.join(contactIds.map(id => sql`${id}`), sql`, `)
+
+      // Next upcoming trip per contact
+      const nextTrips: any[] = await this.db.client.execute(sql`
+        SELECT DISTINCT ON (tt.contact_id)
+          tt.contact_id,
+          t.name AS trip_name,
+          t.start_date AS trip_date
+        FROM trip_travelers tt
+        JOIN trips t ON t.id = tt.trip_id
+        WHERE tt.contact_id IN (${idsList})
+          AND t.start_date > CURRENT_DATE
+          AND t.status NOT IN ('cancelled')
+        ORDER BY tt.contact_id, t.start_date ASC
+      `)
+
+      for (const row of nextTrips) {
+        nextTripMap.set(row.contact_id, { name: row.trip_name, date: row.trip_date })
+      }
+
+      // Relationship count per contact
+      const relCounts: any[] = await this.db.client.execute(sql`
+        SELECT contact_id, COUNT(*)::int AS cnt FROM (
+          SELECT contact_id1 AS contact_id FROM contact_relationships WHERE contact_id1 IN (${idsList})
+          UNION ALL
+          SELECT contact_id2 AS contact_id FROM contact_relationships WHERE contact_id2 IN (${idsList})
+        ) sub
+        GROUP BY contact_id
+      `)
+
+      for (const row of relCounts) {
+        relCountMap.set(row.contact_id, Number(row.cnt))
+      }
+    }
+
     return {
-      data: contacts.map((c) => ({
-        ...this.mapToResponseDto(c),
-        tags: [...(tagsByContact.get(c.id) || [])],
-      })),
+      data: contacts.map((c) => {
+        const base = this.mapToResponseDto(c)
+        const nextTrip = nextTripMap.get(c.id)
+        return {
+          ...base,
+          tags: [...(tagsByContact.get(c.id) || [])],
+          nextTripName: nextTrip?.name || null,
+          nextTripDate: nextTrip?.date || null,
+          relationshipCount: relCountMap.get(c.id) || 0,
+        }
+      }),
       pagination: {
         page,
         limit,

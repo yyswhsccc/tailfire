@@ -41,6 +41,13 @@ export function useContacts(filters: ContactFilterDto = {}) {
       if (filters.isActive !== undefined)
         params.append('isActive', filters.isActive.toString())
       if (filters.sortBy) params.append('sortBy', filters.sortBy)
+      if (filters.contactType) params.append('contactType', filters.contactType)
+      if (filters.contactStatus?.length) {
+        params.append('contactStatus', filters.contactStatus.join(','))
+      }
+      if (filters.sortOrder) params.append('sortOrder', filters.sortOrder)
+      if (filters.hasPassport !== undefined) params.append('hasPassport', filters.hasPassport.toString())
+      if (filters.passportExpiring !== undefined) params.append('passportExpiring', filters.passportExpiring.toString())
 
       return api.get<PaginatedContactsResponseDto>(
         `/contacts?${params.toString()}`

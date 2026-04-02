@@ -1317,6 +1317,13 @@
       "when": 1775217600000,
       "tag": "20260401120000_extend_ota_trip_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 188,
+      "version": "7",
+      "when": 1775160839000,
+      "tag": "20260402201359_add_contacts_crm_indexes",
+      "breakpoints": true
     }
   ]
 }
