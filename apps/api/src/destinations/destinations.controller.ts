@@ -14,13 +14,17 @@ import {
   Param,
   Query,
   ParseUUIDPipe,
+  UseGuards,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger'
 import { Public } from '../auth/decorators/public.decorator'
 import { AdminOnly } from '../auth/decorators/admin-only.decorator'
+import { InternalApiKeyGuard } from '../cruise-import/guards/internal-api-key.guard'
 import { DestinationsService } from './destinations.service'
 import { DestinationsBootstrapService } from './destinations-bootstrap.service'
 import { DestinationEnrichmentService } from './destination-enrichment.service'
+import { AutomationService } from '../automation/automation.service'
+import { QUEUES, JOB_TYPES } from '../automation/automation.types'
 
 @ApiTags('Destinations')
 @Controller('destinations')
@@ -29,6 +33,7 @@ export class DestinationsController {
     private readonly destinationsService: DestinationsService,
     private readonly bootstrapService: DestinationsBootstrapService,
     private readonly enrichmentService: DestinationEnrichmentService,
+    private readonly automationService: AutomationService,
   ) {}
 
   // ============================================================================
@@ -198,6 +203,48 @@ export class DestinationsController {
   @ApiResponse({ status: 200, description: 'Backfill results with counts' })
   async backfillHeroImages(@Query('limit') limit?: string) {
     return this.enrichmentService.backfillHeroImages(limit ? parseInt(limit, 10) : 500)
+  }
+
+  /**
+   * Trigger batch hero image enrichment via Unsplash (BullMQ job).
+   * POST /destinations/enrich-hero-images
+   *
+   * Queues a background job that searches Unsplash for destinations without
+   * hero images and backfills them. Self-re-queues if more remain.
+   * Auth: internal API key (x-internal-api-key header).
+   *
+   * Note: Defined BEFORE :id/enrich to avoid NestJS treating "enrich-hero-images"
+   * as a UUID param.
+   */
+  @Post('enrich-hero-images')
+  @Public() // Bypass JWT — uses API key guard instead
+  @UseGuards(InternalApiKeyGuard)
+  @ApiOperation({ summary: 'Trigger batch hero image enrichment via Unsplash (internal)' })
+  @ApiQuery({ name: 'batchSize', required: false, description: 'Destinations per batch (default: 50)' })
+  @ApiResponse({ status: 200, description: 'Job queued successfully' })
+  async triggerHeroImageEnrichment(@Query('batchSize') batchSize?: string) {
+    const size = batchSize ? parseInt(batchSize, 10) : 50
+
+    const jobId = await this.automationService.schedule(
+      QUEUES.ENRICHMENT,
+      JOB_TYPES.DESTINATION_HERO_IMAGE,
+      {
+        type: JOB_TYPES.DESTINATION_HERO_IMAGE,
+        batchSize: Math.min(size, 100),
+      },
+      {
+        jobId: `destination-hero-image-${Date.now()}`,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      },
+    )
+
+    return {
+      status: 'queued',
+      jobId,
+      batchSize: Math.min(size, 100),
+      message: 'Hero image enrichment job queued. It will self-re-queue if more destinations remain.',
+    }
   }
 
   /**

@@ -15,8 +15,10 @@ import { DestinationsBootstrapService } from './destinations-bootstrap.service'
 import { SerpApiService } from './serpapi.service'
 import { DestinationEnrichmentService } from './destination-enrichment.service'
 import { UnsplashService } from './unsplash.service'
+import { AutomationModule } from '../automation/automation.module'
 
 @Module({
+  imports: [AutomationModule],
   controllers: [DestinationsController],
   providers: [
     DestinationsService,
