@@ -1,0 +1,110 @@
+// apps/ota/src/lib/entity-hubs/adapters/destination.adapter.ts
+
+import type { DestinationDetail } from '@/types/entities'
+import type { HubAdapter, HeroData, ContextPill, SectionDescriptor, AiPageContext } from '../types'
+
+export const destinationAdapter: HubAdapter<DestinationDetail> = {
+  heroData(dest): HeroData {
+    const enrichment = dest.enrichment
+
+    // Build subtitle from rating + review count (mirrors old page meta items)
+    const subtitleParts: string[] = []
+    if (enrichment?.averageRating) {
+      subtitleParts.push(`\u2B50 ${enrichment.averageRating.toFixed(1)}`)
+    }
+    if (enrichment?.totalReviewCount) {
+      subtitleParts.push(`${enrichment.totalReviewCount.toLocaleString()} reviews`)
+    }
+
+    return {
+      imageUrl: dest.heroImageUrl || enrichment?.photos?.[0]?.url || null,
+      badge: dest.countryCode ?? '',
+      title: dest.name,
+      subtitle: subtitleParts.length > 0 ? subtitleParts.join(' \u00B7 ') : undefined,
+      description: enrichment?.summary || dest.summary || undefined,
+      ctaLabel: `Plan a Trip to ${dest.name}`,
+    }
+  },
+
+  contextPills(dest, counts): ContextPill[] {
+    const pills: ContextPill[] = []
+
+    if (counts?.cruises) {
+      pills.push({ icon: '\uD83D\uDEA2', label: `${counts.cruises} Cruises` })
+    }
+    if (dest.stats?.tourCount) {
+      pills.push({ icon: '\uD83C\uDFAF', label: `${dest.stats.tourCount} Tours` })
+    }
+    if (dest.countryCode) {
+      pills.push({ icon: '\uD83D\uDCCD', label: dest.countryCode })
+    }
+    if (dest.destinationType) {
+      pills.push({ label: dest.destinationType })
+    }
+
+    return pills
+  },
+
+  sections(dest): SectionDescriptor[] {
+    const sections: SectionDescriptor[] = []
+    const enrichment = dest.enrichment
+
+    // Cruises -- always present; the shared CruisesSection fetches data itself
+    sections.push({
+      key: 'cruises',
+      title: `\uD83D\uDEA2 Cruises Visiting ${dest.name}`,
+      viewAllHref: `/destinations/${dest.slug}/cruises`,
+      props: {},
+      priority: 'high',
+    })
+
+    // Activities from enrichment topAttractions
+    const attractions = enrichment?.topAttractions ?? []
+    if (attractions.length > 0) {
+      sections.push({
+        key: 'activities',
+        title: `\uD83C\uDFAF Things to Do in ${dest.name}`,
+        props: {
+          // Map topAttractions shape to what shared ActivitiesSection expects
+          activities: attractions.map((a) => ({
+            name: a.title,
+            category: a.description,
+            rating: a.rating,
+          })),
+        },
+        priority: 'medium',
+      })
+    }
+
+    // Photos from enrichment
+    const photos = enrichment?.photos ?? []
+    if (photos.length > 0) {
+      sections.push({
+        key: 'photoMosaic',
+        title: '\uD83D\uDCF8 Photos',
+        props: { photos },
+        priority: 'low',
+      })
+    }
+
+    return sections
+  },
+
+  aiContext(dest): AiPageContext {
+    return {
+      entityType: 'destination',
+      entityName: dest.name,
+      entitySlug: dest.slug,
+      availableProducts: dest.stats
+        ? [
+            ...(dest.stats.cruiseCount > 0
+              ? [{ type: 'cruise', count: dest.stats.cruiseCount }]
+              : []),
+            ...(dest.stats.tourCount > 0
+              ? [{ type: 'tour', count: dest.stats.tourCount }]
+              : []),
+          ]
+        : undefined,
+    }
+  },
+}
