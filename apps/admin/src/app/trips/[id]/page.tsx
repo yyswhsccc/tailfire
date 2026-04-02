@@ -78,18 +78,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { TravelerSnapshotComparison } from '@/components/trips/TravelerSnapshotComparison'
-import { useTravelerSnapshotDiff } from '@/hooks/use-traveler-snapshot-diff'
-import { useTripTravelers, useResetTravelerSnapshot } from '@/hooks/use-trip-travelers'
+import { useTripTravelers } from '@/hooks/use-trip-travelers'
 import { useToast } from '@/hooks/use-toast'
-import { validateContactForTravel } from '@/lib/snapshot-utils'
+import { TripTravelersTab, useTravelerValidationCount } from './_components/trip-travelers-tab'
+import { EditTravelersDialog } from './_components/edit-travelers-dialog'
 import { formatDate } from '@/lib/date-utils'
 import { useLoading } from '@/context/loading-context'
 import type { TripTravelerResponseDto } from '@tailfire/shared-types/api'
 
 type ActiveTab = 'overview' | 'itinerary' | 'tasks' | 'bookings' | 'payments' | 'insurance' | 'service-fees' | 'documents' | 'emails' | 'forms' | 'notes' | 'automations' | 'activity' | 'travelers' | 'media'
 
-const getSidebarNav = (activeTab: ActiveTab, setActiveTab: (tab: ActiveTab) => void, hasTravelerChanges: boolean = false) => [
+const getSidebarNav = (activeTab: ActiveTab, setActiveTab: (tab: ActiveTab) => void, travelerIssueCount: number = 0) => [
   {
     title: 'General',
     items: [
@@ -200,7 +199,7 @@ const getSidebarNav = (activeTab: ActiveTab, setActiveTab: (tab: ActiveTab) => v
         icon: Users,
         isActive: activeTab === 'travelers',
         onClick: () => setActiveTab('travelers'),
-        badge: hasTravelerChanges ? '!' : undefined,
+        badge: travelerIssueCount > 0 ? travelerIssueCount.toString() : undefined,
       },
       {
         name: 'Media',
@@ -237,117 +236,6 @@ function getTravelerName(traveler: TripTravelerResponseDto): string {
     return `${first} ${last}`.trim()
   }
   return 'Unknown Traveler'
-}
-
-/**
- * Travelers Tab Component
- * Displays traveler snapshot comparison for the primary traveler
- */
-function TravelersTab({ tripId, primaryContactId, tripStartDate }: { tripId: string; primaryContactId?: string | null; tripStartDate?: string | null }) {
-  const { toast } = useToast()
-  const { data: travelers = [] } = useTripTravelers(tripId)
-
-  const primaryTraveler = travelers.find((traveler) => traveler.contactId === primaryContactId)
-
-  const { diff, snapshot, currentContact, isLoading, isError } = useTravelerSnapshotDiff({
-    tripId,
-    travelerId: primaryTraveler?.id || '',
-    contactId: primaryTraveler?.contactId,
-    enabled: Boolean(primaryTraveler?.id && primaryTraveler?.contactId),
-  })
-
-  const resetSnapshot = useResetTravelerSnapshot(tripId)
-
-  // Validate contact data for travel readiness
-  const validation = currentContact ? validateContactForTravel(currentContact, tripStartDate) : undefined
-
-  const handleConfirmChanges = async () => {
-    if (!primaryTraveler) return
-
-    try {
-      await resetSnapshot.mutateAsync(primaryTraveler.id)
-      toast({
-        title: 'Changes confirmed',
-        description: 'Traveler snapshot has been updated to reflect current information.',
-      })
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to confirm changes. Please try again.',
-        variant: 'destructive',
-      })
-    }
-  }
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <EmptyState
-        title="Loading traveler information..."
-        description="Please wait while we fetch the traveler data."
-      />
-    )
-  }
-
-  // Error state
-  if (isError) {
-    return (
-      <EmptyState
-        icon={<Users className="h-6 w-6" />}
-        title="Failed to load traveler information"
-        description="There was an error loading the traveler data. Please try again."
-        action={{
-          label: 'Retry',
-          onClick: () => window.location.reload(),
-        }}
-      />
-    )
-  }
-
-  // No primary traveler
-  if (!primaryTraveler) {
-    return (
-      <EmptyState
-        icon={<Users className="h-6 w-6" />}
-        title="No primary traveler assigned"
-        description="Assign a primary traveler to this trip to track their information and travel readiness."
-        action={{
-          label: 'Go to Overview',
-          onClick: () => {
-            // Navigate to overview tab where travelers can be managed
-            window.history.replaceState(null, '', `?tab=overview`)
-          },
-        }}
-      />
-    )
-  }
-
-  // No changes or validation issues
-  if ((!diff || !diff.hasChanges) && (!validation || !validation.hasIssues)) {
-    return (
-      <EmptyState
-        icon={<Users className="h-6 w-6" />}
-        title="All traveler information is up to date"
-        description="The primary traveler&apos;s information is complete and matches the current contact record."
-      />
-    )
-  }
-
-  // Render the comparison with validation
-  const travelerName = currentContact
-    ? `${currentContact.firstName || ''} ${currentContact.lastName || ''}`.trim() || 'Unknown Traveler'
-    : 'Unknown Traveler'
-
-  return (
-    <TravelerSnapshotComparison
-      diff={diff || { hasChanges: false, changes: [], changesByCategory: {} as any, totalChanges: 0 }}
-      snapshotDate={snapshot?.snapshotAt ?? ''}
-      validation={validation}
-      onConfirm={handleConfirmChanges}
-      isConfirming={resetSnapshot.isPending}
-      travelerName={travelerName}
-    />
-  )
 }
 
 /**
@@ -519,19 +407,14 @@ export default function TripDetailPage() {
   // Disable all trip-related queries when deletion is in progress
   const { data: travelers = [], isLoading: loadingTravelers } = useTripTravelers(tripId, { enabled: !isDeleting })
 
-  // Get primary traveler to check for changes
+  // Get primary traveler for header display
   const primaryTraveler = travelers.find((traveler) => traveler.contactId === trip?.primaryContactId)
 
-  // Check if there are traveler changes or validation issues
-  const { diff, currentContact } = useTravelerSnapshotDiff({
-    tripId,
-    travelerId: primaryTraveler?.id || '',
-    contactId: primaryTraveler?.contactId,
-    enabled: Boolean(primaryTraveler?.id && primaryTraveler?.contactId && trip && !isDeleting),
-  })
+  // Validation count for sidebar badge (red count pill)
+  const travelerIssueCount = useTravelerValidationCount(tripId, trip?.startDate)
 
-  const validation = currentContact ? validateContactForTravel(currentContact, trip?.startDate) : undefined
-  const hasTravelerChanges = (diff?.hasChanges || validation?.hasIssues) || false
+  // Edit Travelers dialog state
+  const [showEditTravelersDialog, setShowEditTravelersDialog] = useState(false)
 
   // Build group back link if trip belongs to a group
   const tripGroup = trip?.tripGroupId ? tripGroups?.find((g) => g.id === trip.tripGroupId) : null
@@ -544,7 +427,7 @@ export default function TripDetailPage() {
       <DetailLayout
         backHref="/trips"
         backLabel="Trips"
-        sidebarSections={getSidebarNav(activeTab, handleTabChange, hasTravelerChanges)}
+        sidebarSections={getSidebarNav(activeTab, handleTabChange, travelerIssueCount)}
       >
         <TripDetailSkeleton />
       </DetailLayout>
@@ -556,7 +439,7 @@ export default function TripDetailPage() {
       <DetailLayout
         backHref="/trips"
         backLabel="Trips"
-        sidebarSections={getSidebarNav(activeTab, handleTabChange, hasTravelerChanges)}
+        sidebarSections={getSidebarNav(activeTab, handleTabChange, travelerIssueCount)}
       >
         <div className="p-6">
           <EmptyState
@@ -590,7 +473,11 @@ export default function TripDetailPage() {
           </Card>
         )
       case 'travelers':
-        return <TravelersTab tripId={trip.id} primaryContactId={trip.primaryContactId} tripStartDate={trip.startDate} />
+        return <TripTravelersTab
+          tripId={trip.id}
+          tripStartDate={trip.startDate}
+          onManageTravelers={() => setShowEditTravelersDialog(true)}
+        />
       case 'media':
         return <TripMediaTab trip={trip} />
       case 'payments':
@@ -636,7 +523,7 @@ export default function TripDetailPage() {
       backHref="/trips"
       backLabel="Trips"
       additionalBackLinks={additionalBackLinks}
-      sidebarSections={getSidebarNav(activeTab, handleTabChange, hasTravelerChanges)}
+      sidebarSections={getSidebarNav(activeTab, handleTabChange, travelerIssueCount)}
     >
       <div className="p-6">
         {/* Header */}
@@ -859,6 +746,15 @@ export default function TripDetailPage() {
           onOpenChange={setShowMoveToGroupDialog}
           tripId={trip.id}
           currentGroupId={trip.tripGroupId}
+        />
+      )}
+
+      {/* Edit Travelers Dialog */}
+      {trip && (
+        <EditTravelersDialog
+          open={showEditTravelersDialog}
+          onOpenChange={setShowEditTravelersDialog}
+          trip={trip}
         />
       )}
     </DetailLayout>
