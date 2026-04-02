@@ -61,6 +61,21 @@ export class ContactFilterDto {
   })
   tags?: string[]
 
+  @IsOptional()
+  @IsIn(['lead', 'client'])
+  contactType?: 'lead' | 'client'
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return value.split(',').map((s: string) => s.trim())
+    }
+    return value
+  })
+  contactStatus?: string[]
+
   // Sorting
   @IsOptional()
   @IsIn([

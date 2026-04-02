@@ -235,6 +235,8 @@ export interface ContactFilterDto {
   tags?: string[] // Match any of these tags
   hasPassport?: boolean
   passportExpiring?: boolean // Within 6 months
+  contactType?: 'lead' | 'client'
+  contactStatus?: string[]
 
   // Sorting
   sortBy?: 'firstName' | 'lastName' | 'email' | 'createdAt' | 'updatedAt'

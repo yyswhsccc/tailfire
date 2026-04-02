@@ -207,6 +207,18 @@ export class ContactsService {
       )
     }
 
+    // contactType filter
+    if (filters.contactType) {
+      conditions.push(eq(this.db.schema.contacts.contactType, filters.contactType))
+    }
+
+    // contactStatus filter (multi-select)
+    if (filters.contactStatus && filters.contactStatus.length > 0) {
+      conditions.push(
+        inArray(this.db.schema.contacts.contactStatus, filters.contactStatus)
+      )
+    }
+
     // Build ORDER BY
     const sortBy = filters.sortBy || 'lastName'
     const sortOrder = filters.sortOrder || 'asc'
