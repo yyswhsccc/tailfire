@@ -32,6 +32,7 @@ import {
 } from './dto'
 import type {
   ContactResponseDto,
+  ContactListItemDto,
   PaginatedContactsResponseDto,
   UpdateContactOwnerDto,
   PortalInviteResponseDto,
@@ -85,7 +86,8 @@ export class ContactsController {
   ): Promise<PaginatedContactsResponseDto> {
     const result = await this.contactsService.findAll(filters, auth.agencyId, auth.userId)
     // Apply access control filtering using ContactAccessService (includes shares)
-    const filteredData = await this.contactAccessService.applyAccessControlToMany(result.data, auth)
+    // Cast: applyAccessControlToMany spreads all fields, so ContactListItemDto extras are preserved
+    const filteredData = await this.contactAccessService.applyAccessControlToMany(result.data, auth) as ContactListItemDto[]
     return {
       ...result,
       data: filteredData,

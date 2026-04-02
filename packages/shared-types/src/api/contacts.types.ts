@@ -365,6 +365,17 @@ export interface ContactResponseDto {
   _accessLevel?: 'basic' | 'full'
 }
 
+/**
+ * Extended contact DTO for list views with computed fields.
+ * Avoids adding to global ContactResponseDto which is embedded in
+ * trip-travelers, relationships, and other responses.
+ */
+export interface ContactListItemDto extends ContactResponseDto {
+  nextTripName?: string | null
+  nextTripDate?: string | null
+  relationshipCount?: number
+}
+
 export interface ContactWithRelationshipsResponseDto extends ContactResponseDto {
   relationships: ContactRelationshipResponseDto[]
   groups: ContactGroupResponseDto[]
@@ -439,7 +450,7 @@ export interface LoyaltyProgramDto {
 // ============================================================================
 
 export interface PaginatedContactsResponseDto {
-  data: ContactResponseDto[]
+  data: ContactListItemDto[]
   pagination: {
     page: number
     limit: number

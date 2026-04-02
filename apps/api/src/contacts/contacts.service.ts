@@ -269,11 +269,56 @@ export class ContactsService {
       this.logger.warn('findAll: userId absent, returning empty tags for contact list')
     }
 
+    // Batch compute nextTrip and relationshipCount for contacts on this page
+    let nextTripMap = new Map<string, { name: string; date: string }>()
+    let relCountMap = new Map<string, number>()
+
+    if (contactIds.length > 0) {
+      // Next upcoming trip per contact
+      const nextTrips: any[] = await this.db.client.execute(sql`
+        SELECT DISTINCT ON (tt.contact_id)
+          tt.contact_id,
+          t.name AS trip_name,
+          t.start_date AS trip_date
+        FROM trip_travelers tt
+        JOIN trips t ON t.id = tt.trip_id
+        WHERE tt.contact_id = ANY(${contactIds})
+          AND t.start_date > CURRENT_DATE
+          AND t.status NOT IN ('cancelled')
+        ORDER BY tt.contact_id, t.start_date ASC
+      `)
+
+      for (const row of nextTrips) {
+        nextTripMap.set(row.contact_id, { name: row.trip_name, date: row.trip_date })
+      }
+
+      // Relationship count per contact
+      const relCounts: any[] = await this.db.client.execute(sql`
+        SELECT contact_id, COUNT(*)::int AS cnt FROM (
+          SELECT contact_id1 AS contact_id FROM contact_relationships WHERE contact_id1 = ANY(${contactIds})
+          UNION ALL
+          SELECT contact_id2 AS contact_id FROM contact_relationships WHERE contact_id2 = ANY(${contactIds})
+        ) sub
+        GROUP BY contact_id
+      `)
+
+      for (const row of relCounts) {
+        relCountMap.set(row.contact_id, Number(row.cnt))
+      }
+    }
+
     return {
-      data: contacts.map((c) => ({
-        ...this.mapToResponseDto(c),
-        tags: [...(tagsByContact.get(c.id) || [])],
-      })),
+      data: contacts.map((c) => {
+        const base = this.mapToResponseDto(c)
+        const nextTrip = nextTripMap.get(c.id)
+        return {
+          ...base,
+          tags: [...(tagsByContact.get(c.id) || [])],
+          nextTripName: nextTrip?.name || null,
+          nextTripDate: nextTrip?.date || null,
+          relationshipCount: relCountMap.get(c.id) || 0,
+        }
+      }),
       pagination: {
         page,
         limit,
