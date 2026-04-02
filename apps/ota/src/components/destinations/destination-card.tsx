@@ -1,41 +1,51 @@
-import Image from 'next/image'
 import Link from 'next/link'
-import { MapPin } from 'lucide-react'
 import type { DestinationSummary } from '@/types/entities'
 
+/**
+ * Generate an Unsplash source URL for a destination.
+ * Uses Unsplash Source (free, no API key) for consistent, beautiful destination photos.
+ * The seed ensures the same destination always gets the same photo.
+ */
+function getDestinationImage(name: string, width = 600, height = 400): string {
+  const query = encodeURIComponent(name.split(',')[0]?.trim() || name)
+  // Use a hash of the name as seed for consistent images
+  const seed = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  return `https://source.unsplash.com/${width}x${height}/?${query},travel&sig=${seed}`
+}
+
 export function DestinationCard({ destination }: { destination: DestinationSummary }) {
+  const imageUrl = destination.heroImageUrl || getDestinationImage(destination.name)
+
   return (
     <Link
       href={`/destinations/${destination.slug}`}
-      className="group overflow-hidden rounded-xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md"
+      className="group overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
     >
-      <div className="relative h-40 overflow-hidden bg-muted">
-        {destination.heroImageUrl ? (
-          <Image
-            src={destination.heroImageUrl}
-            alt={destination.name}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center bg-gradient-to-br from-sky-100 to-teal-50">
-            <MapPin className="size-8 text-muted-foreground/30" />
-          </div>
-        )}
+      <div className="relative h-48 overflow-hidden">
+        {/* Always show an image — hero or Unsplash fallback */}
+        <img
+          src={imageUrl}
+          alt={destination.name}
+          loading="lazy"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+        />
+        {/* Gradient overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+        {/* Country badge */}
         {destination.countryCode && (
-          <span className="absolute right-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+          <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-bold text-[#1A1A1A] shadow-sm">
             {destination.countryCode}
           </span>
         )}
-      </div>
-      <div className="p-3">
-        <h3 className="truncate text-sm font-semibold text-[#1A1A1A] group-hover:text-[#C59746]">
-          {destination.name}
-        </h3>
-        {destination.summary && (
-          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{destination.summary}</p>
-        )}
+        {/* Destination name overlaid on image */}
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <h3 className="text-base font-bold text-white drop-shadow-md group-hover:text-[#C59746] transition-colors">
+            {destination.name}
+          </h3>
+          {destination.summary && (
+            <p className="mt-0.5 line-clamp-1 text-xs text-white/80 drop-shadow-sm">{destination.summary}</p>
+          )}
+        </div>
       </div>
     </Link>
   )
