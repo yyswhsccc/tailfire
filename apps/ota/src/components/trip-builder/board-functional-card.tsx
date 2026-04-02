@@ -62,7 +62,7 @@ export function BoardFunctionalCard({
 
   return (
     <div
-      className="group relative rounded-2xl overflow-hidden shadow-md ring-1 ring-white/10 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl"
+      className="group relative rounded-2xl overflow-hidden shadow-md ring-1 ring-white/10 transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1 hover:shadow-xl"
       style={{ height: `${heightPx}px` }}
     >
       {/* Background: image or gradient */}

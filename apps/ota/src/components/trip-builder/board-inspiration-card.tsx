@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "motion/react";
 import type { InspirationCard } from "./trip-basket-store";
 
 interface BoardInspirationCardProps {
@@ -22,9 +23,15 @@ export function BoardInspirationCard({ card }: BoardInspirationCardProps) {
   const height = hashHeight(card.id);
 
   return (
-    <div
-      className="group relative rounded-2xl overflow-hidden shadow-md ring-1 ring-black/5 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl"
+    <motion.div
+      className="group relative rounded-2xl overflow-hidden shadow-md ring-1 ring-black/5 transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1 hover:shadow-xl"
       style={{ height: `${height}px` }}
+      animate={{ y: [0, -4, 0] }}
+      transition={{
+        duration: 4 + (height % 3), // slightly varied per card
+        repeat: Infinity,
+        ease: "easeInOut",
+      }}
     >
       {card.imageUrl && !imgError ? (
         <img
@@ -56,6 +63,6 @@ export function BoardInspirationCard({ card }: BoardInspirationCardProps) {
           <p className="text-[10px] text-white/70">{card.attribution}</p>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

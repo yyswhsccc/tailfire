@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, Plane, Hotel, Ship, Map } from "lucide-react";
 import Link from "next/link";
+import { motion, AnimatePresence } from "motion/react";
 import {
   DndContext,
   closestCenter,
@@ -59,10 +60,44 @@ function computeTotal(components: TripComponent[]): number {
   }, 0);
 }
 
+/** Return true if the string looks like a 3-letter IATA code (all uppercase). */
+function looksLikeIataCode(s: string): boolean {
+  return /^[A-Z]{3}$/.test(s.trim());
+}
+
+/**
+ * Try to extract a human-readable city name from a display title.
+ * Handles patterns like "YOW -> Cancun", "Ottawa -> CUN", etc.
+ * Returns the most readable portion, preferring non-IATA text.
+ */
+function readableCityFromTitle(title: string): string | null {
+  // Arrow separator: "Origin -> Destination" — prefer the destination side
+  const arrowMatch = title.match(/\u2192|→|->|>>/);
+  if (arrowMatch && arrowMatch.index != null) {
+    const after = title.slice(arrowMatch.index + arrowMatch[0].length).trim();
+    if (after && !looksLikeIataCode(after)) return after;
+    // Destination is a code — try the origin side for a readable name
+    const before = title.slice(0, arrowMatch.index).trim();
+    if (before && !looksLikeIataCode(before)) return before;
+    // Both sides are codes — return destination code as fallback
+    if (after) return after;
+  }
+  // No arrow — if title itself is not an IATA code, use it
+  if (!looksLikeIataCode(title)) return title;
+  return null;
+}
+
 /** Extract a destination string from components for inspiration auto-fetch. */
 function extractDestination(components: TripComponent[]): string | null {
   for (const c of components) {
     const data = c.data as Record<string, unknown>;
+
+    // First, try to get a readable name from the display title
+    if (c.display?.title) {
+      const readable = readableCityFromTitle(c.display.title);
+      if (readable && !looksLikeIataCode(readable)) return readable;
+    }
+
     // Flight: destination city or airport code
     if (c.type === "flight") {
       const dest =
@@ -72,31 +107,43 @@ function extractDestination(components: TripComponent[]): string | null {
         (data.to as string);
       if (dest) return dest;
     }
-    // Hotel: location or city
+    // Hotel: property name, city, or location
     if (c.type === "hotel") {
       const loc =
         (data.city as string) ||
         (data.location as string) ||
         (data.destination as string);
       if (loc) return loc;
+      // Try address city portion
+      const address = data.address as Record<string, unknown> | undefined;
+      if (address) {
+        const addrCity = (address.city as string) || (address.cityName as string);
+        if (addrCity) return addrCity;
+      }
     }
     // Cruise: destination port or region
     if (c.type === "cruise") {
       const port =
+        (data.departurePort as string) ||
         (data.destination as string) ||
-        (data.region as string) ||
-        (data.departurePort as string);
+        (data.region as string);
       if (port) return port;
     }
-    // Tour: destination
+    // Tour: departure city, destination, or name-based location
     if (c.type === "tour") {
-      const dest = (data.destination as string) || (data.location as string);
+      const dest =
+        (data.departureCity as string) ||
+        (data.destination as string) ||
+        (data.location as string);
       if (dest) return dest;
     }
   }
-  // Fallback: try display title for any component
+  // Fallback: try display title for any component, preferring readable text
   for (const c of components) {
-    if (c.display?.title) return c.display.title;
+    if (c.display?.title) {
+      const readable = readableCityFromTitle(c.display.title);
+      if (readable) return readable;
+    }
   }
   return null;
 }
@@ -343,46 +390,79 @@ export function DreamBoard(props: DreamBoardProps) {
   // Render the card grid — wrapped in DnD when not readOnly
   const cardGrid = (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 auto-rows-auto">
-      {orderedItems.map((entry, index) => {
-        // First component card spans 2 columns on desktop for hero effect
-        const isHero = index === 0 && entry.kind === "component";
+      <AnimatePresence mode="popLayout">
+        {orderedItems.map((entry, index) => {
+          // First component card spans 2 columns on desktop for hero effect
+          const isHero = index === 0 && entry.kind === "component";
 
-        const card =
-          entry.kind === "component" ? (
-            <BoardFunctionalCard
-              key={entry.item.id}
-              component={entry.item}
-              readOnly={readOnly}
-              onRemove={handleRemove}
-              isHero={isHero}
-            />
-          ) : (
-            <BoardInspirationCard
-              key={entry.item.id}
-              card={entry.item}
-            />
-          );
+          const card =
+            entry.kind === "component" ? (
+              <BoardFunctionalCard
+                component={entry.item}
+                readOnly={readOnly}
+                onRemove={handleRemove}
+                isHero={isHero}
+              />
+            ) : (
+              <BoardInspirationCard
+                card={entry.item}
+              />
+            );
 
-        const wrapperClass = isHero ? "col-span-2 lg:col-span-2" : "";
+          const wrapperClass = isHero ? "col-span-2 lg:col-span-2" : "";
 
-        if (readOnly) {
+          if (readOnly) {
+            return (
+              <motion.div
+                key={entry.item.id}
+                className={wrapperClass}
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: -10 }}
+                transition={{
+                  duration: 0.4,
+                  delay: index * 0.08,
+                  ease: [0.25, 0.46, 0.45, 0.94],
+                }}
+                layout
+              >
+                {card}
+              </motion.div>
+            );
+          }
+
           return (
-            <div key={entry.item.id} className={wrapperClass}>
-              {card}
-            </div>
+            <SortableCard key={entry.item.id} id={entry.item.id}>
+              <motion.div
+                className={wrapperClass}
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: -10 }}
+                transition={{
+                  duration: 0.35,
+                  delay: index * 0.06,
+                  ease: [0.25, 0.46, 0.45, 0.94],
+                }}
+              >
+                {card}
+              </motion.div>
+            </SortableCard>
           );
-        }
-
-        return (
-          <SortableCard key={entry.item.id} id={entry.item.id}>
-            <div className={wrapperClass}>{card}</div>
-          </SortableCard>
-        );
-      })}
+        })}
+      </AnimatePresence>
 
       {/* Placeholder "add" card — more inviting */}
       {!readOnly && (
-        <div className="flex h-[180px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border/40 bg-white/50 text-muted-foreground/50 transition-all hover:border-[#C59746]/40 hover:bg-[#C59746]/5 hover:text-muted-foreground/70">
+        <motion.div
+          className="flex h-[180px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border/40 bg-white/50 text-muted-foreground/50 transition-all hover:border-[#C59746]/40 hover:bg-[#C59746]/5 hover:text-muted-foreground/70"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{
+            duration: 0.4,
+            delay: orderedItems.length * 0.06 + 0.1,
+            ease: [0.25, 0.46, 0.45, 0.94],
+          }}
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/50">
             <Plus className="size-5" />
           </div>
@@ -405,7 +485,7 @@ export function DreamBoard(props: DreamBoardProps) {
               </Link>
             ))}
           </div>
-        </div>
+        </motion.div>
       )}
     </div>
   );
@@ -417,14 +497,20 @@ export function DreamBoard(props: DreamBoardProps) {
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Hero banner — trip destination photo with title overlay */}
         {hasComponents && (
-          <TripBanner
-            title={title}
-            startDate={startDate}
-            endDate={endDate}
-            travelers={travelers}
-            bannerImage={bannerImage}
-            destination={destination}
-          />
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+          >
+            <TripBanner
+              title={title}
+              startDate={startDate}
+              endDate={endDate}
+              travelers={travelers}
+              bannerImage={bannerImage}
+              destination={destination}
+            />
+          </motion.div>
         )}
 
         {/* Header */}

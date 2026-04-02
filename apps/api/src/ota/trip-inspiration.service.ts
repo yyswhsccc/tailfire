@@ -30,6 +30,21 @@ export class TripInspirationService {
   ) {}
 
   /**
+   * Build a smarter Unsplash query from the destination string.
+   * If it looks like a 3-letter IATA code (all caps), append "destination"
+   * to get better photo results (e.g. "CUN destination travel" instead of
+   * "CUN travel landscape").
+   */
+  private buildSearchQuery(destination: string): string {
+    const trimmed = destination.trim()
+    const isIataCode = /^[A-Z]{3}$/.test(trimmed)
+    if (isIataCode) {
+      return `${trimmed} airport destination travel`
+    }
+    return `${trimmed} travel landscape`
+  }
+
+  /**
    * Get inspiration cards for a destination.
    * Returns cached results when available, otherwise fetches from Unsplash.
    */
@@ -47,8 +62,11 @@ export class TripInspirationService {
     }
 
     try {
+      const query = this.buildSearchQuery(destination)
+      this.logger.debug(`Searching Unsplash for: "${query}"`)
+
       const response = await this.unsplashService.searchPhotos(
-        `${destination} travel landscape`,
+        query,
         1,
         count || 4,
       )

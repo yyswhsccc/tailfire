@@ -1,9 +1,13 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { Ship, Calendar, MapPin, Clock } from "lucide-react";
 
 import { formatPrice } from "@/lib/format";
 import { PortPills } from "@/components/search/port-pills";
+import { AddToTripButton } from "@/components/trip-builder/add-to-trip-button";
+import type { TripComponent } from "@/components/trip-builder/trip-basket-store";
 
 // Matches SailingSearchItemDto from the API
 export interface CruiseSailing {
@@ -83,6 +87,31 @@ export function CruiseResultCard({ sailing }: CruiseResultCardProps) {
   const colors = getLineColors(sailing.cruiseLine.name);
   const cheapest = getCheapestPrice(sailing.prices);
   const shipImageUrl = sailing.ship.imageUrl;
+
+  // Build TripComponent for basket
+  const tripComponent: TripComponent = {
+    id: `cruise-${sailing.id}`,
+    type: "cruise",
+    data: {
+      sailingId: sailing.id,
+      name: sailing.name,
+      sailDate: sailing.sailDate,
+      endDate: sailing.endDate,
+      nights: sailing.nights,
+      shipName: sailing.ship.name,
+      cruiseLine: sailing.cruiseLine.name,
+      departurePort: sailing.embarkPort.name,
+      disembarkPort: sailing.disembarkPort.name,
+      prices: sailing.prices,
+      price: cheapest != null ? { total: cheapest / 100, currency: "CAD" } : undefined,
+    },
+    display: {
+      heroImage: shipImageUrl ?? undefined,
+      title: sailing.name,
+      subtitle: `${sailing.cruiseLine.name} - ${sailing.ship.name}`,
+      price: cheapest != null ? formatPrice(cheapest) : undefined,
+    },
+  };
 
   return (
     <Link href={`/cruises/${sailing.id}`} className="group block overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -224,12 +253,17 @@ export function CruiseResultCard({ sailing }: CruiseResultCardProps) {
             </div>
 
             {/* CTA */}
-            <button
-              type="button"
-              className="inline-flex h-9 items-center rounded-lg bg-[#C59746] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#B08638]"
-            >
-              Inquire
-            </button>
+            <div className="flex items-center gap-2">
+              <div onClick={(e) => e.stopPropagation()}>
+                <AddToTripButton component={tripComponent} size="sm" />
+              </div>
+              <button
+                type="button"
+                className="inline-flex h-9 items-center rounded-lg bg-[#C59746] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#B08638]"
+              >
+                Inquire
+              </button>
+            </div>
           </div>
         </div>
       </div>
