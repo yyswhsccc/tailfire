@@ -14,7 +14,7 @@ export async function fetchDestinations(params?: {
   if (params?.pageSize) searchParams.set('pageSize', String(params.pageSize))
   const qs = searchParams.toString()
   return publicFetch(`/destinations${qs ? `?${qs}` : ''}`, {
-    next: { revalidate: 3600, tags: ['destinations'] },
+    cache: 'no-store',
   })
 }
 
