@@ -1,0 +1,11 @@
+{"type":"server-started","port":53162,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:53162","screen_dir":"/Users/alguertin/Development/tailfire-project/tailfire/.superpowers/brainstorm/40440-1774708864/content","state_dir":"/Users/alguertin/Development/tailfire-project/tailfire/.superpowers/brainstorm/40440-1774708864/state"}
+{"type":"screen-added","file":"/Users/alguertin/Development/tailfire-project/tailfire/.superpowers/brainstorm/40440-1774708864/content/universal-hub-pattern.html"}
+{"type":"screen-added","file":"/Users/alguertin/Development/tailfire-project/tailfire/.superpowers/brainstorm/40440-1774708864/content/universal-hub-v2.html"}
+{"type":"screen-added","file":"/Users/alguertin/Development/tailfire-project/tailfire/.superpowers/brainstorm/40440-1774708864/content/universal-hub-v3.html"}
+{"type":"screen-added","file":"/Users/alguertin/Development/tailfire-project/tailfire/.superpowers/brainstorm/40440-1774708864/content/universal-hub-v4-mobile.html"}
+{"type":"screen-added","file":"/Users/alguertin/Development/tailfire-project/tailfire/.superpowers/brainstorm/40440-1774708864/content/universal-hub-v4-desktop.html"}
+{"type":"screen-added","file":"/Users/alguertin/Development/tailfire-project/tailfire/.superpowers/brainstorm/40440-1774708864/content/ship-hub-beyond.html"}
+{"type":"screen-added","file":"/Users/alguertin/Development/tailfire-project/tailfire/.superpowers/brainstorm/40440-1774708864/content/sailing-hub-caribbean.html"}
+{"type":"screen-added","file":"/Users/alguertin/Development/tailfire-project/tailfire/.superpowers/brainstorm/40440-1774708864/content/deal-hub-entity.html"}
+{"type":"screen-added","file":"/Users/alguertin/Development/tailfire-project/tailfire/.superpowers/brainstorm/40440-1774708864/content/waiting.html"}
+{"type":"server-stopped","reason":"idle timeout"}

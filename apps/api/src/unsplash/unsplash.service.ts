@@ -3,7 +3,7 @@
  *
  * Provides Unsplash API integration with:
  * - CredentialResolverService for Doppler-managed API keys
- * - Rate limiting (50 requests/hour for free tier)
+ * - Rate limiting (500 requests/hour for Unsplash+ subscription)
  * - Simple in-memory cache for search queries
  * - Download tracking (Unsplash API requirement)
  */
@@ -68,12 +68,12 @@ export class UnsplashService implements OnModuleInit {
   private cache = new Map<string, CacheEntry<any>>()
   private readonly CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
-  // Rate limiting (50 requests per hour for free tier)
+  // Rate limiting (500 requests per hour for Unsplash+ subscription)
   private rateLimit: RateLimitState = {
     requestCount: 0,
     resetTime: Date.now() + 60 * 60 * 1000, // 1 hour from now
   }
-  private readonly RATE_LIMIT = 50
+  private readonly RATE_LIMIT = 500
   private readonly RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000 // 1 hour
 
   constructor(private readonly credentialResolver: CredentialResolverService) {}

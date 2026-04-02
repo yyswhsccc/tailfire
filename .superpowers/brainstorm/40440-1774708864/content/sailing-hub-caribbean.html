@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>7-Night Eastern Caribbean — Sailing Hub</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #fafaf8; color: #1a1a1a; }
+  .serif { font-family: 'Georgia', 'Times New Roman', serif; }
+
+  .hero { height: 480px; position: relative; overflow: hidden; }
+  .hero img { width: 100%; height: 100%; object-fit: cover; }
+  .hero-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.15) 40%, transparent 100%); }
+  .hero-content { position: absolute; bottom: 0; left: 0; right: 0; padding: 40px 60px; max-width: 1280px; margin: 0 auto; }
+  .hero-badge { font-size: 12px; text-transform: uppercase; letter-spacing: 3px; color: #C59746; font-weight: 600; }
+  .hero-title { font-size: 48px; font-weight: 700; color: white; line-height: 1.1; margin-top: 8px; }
+  .hero-subtitle { font-size: 16px; color: rgba(255,255,255,0.7); margin-top: 6px; }
+  .hero-meta { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .hero-meta span { font-size: 14px; color: rgba(255,255,255,0.75); }
+  .hero-meta .dot { color: rgba(255,255,255,0.3); }
+  .hero-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-primary { background: #C59746; color: white; padding: 12px 28px; border-radius: 10px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; }
+  .btn-secondary { background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); color: white; padding: 12px 20px; border-radius: 10px; font-size: 14px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; }
+  .hero-nav { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; padding: 16px 60px; z-index: 10; }
+  .hero-nav .back { width: 40px; height: 40px; background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; cursor: pointer; }
+  .hero-nav .save { width: 40px; height: 40px; background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; cursor: pointer; margin-left: auto; }
+
+  .feed { max-width: 1280px; margin: 0 auto; padding: 0 60px 60px; }
+  .feed-divider { height: 1px; background: #eee; margin: 32px 0; }
+  .context { max-width: 1280px; margin: 0 auto; padding: 28px 60px; }
+  .context-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .pill { background: #f0eeea; padding: 6px 16px; border-radius: 20px; font-size: 12px; color: #666; }
+
+  .card-base { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,0.05); transition: box-shadow 0.2s, transform 0.2s; cursor: pointer; }
+  .card-base:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
+  .card-tag { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.92); padding: 3px 10px; border-radius: 8px; font-size: 10px; font-weight: 600; color: #C59746; backdrop-filter: blur(4px); }
+  .price { font-weight: 700; color: #C59746; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; }
+  .grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+
+  .section-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+  .section-label h2 { font-size: 20px; font-weight: 700; }
+  .section-label .see-all { font-size: 13px; color: #C59746; font-weight: 500; text-decoration: none; }
+
+  /* Itinerary timeline */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .timeline-day { display: flex; gap: 16px; }
+  .timeline-line { display: flex; flex-direction: column; align-items: center; width: 20px; }
+  .timeline-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .timeline-dot.port { background: #C59746; }
+  .timeline-dot.sea { background: #7dd3fc; }
+  .timeline-connector { width: 2px; flex: 1; background: #eee; min-height: 16px; }
+  .timeline-content { flex: 1; padding-bottom: 20px; }
+
+  .deal-banner { background: linear-gradient(135deg, #1a1a1a, #2a2a2a); color: white; border-radius: 16px; padding: 24px 28px; display: flex; align-items: center; gap: 20px; }
+  .deal-banner .deal-badge { background: #C59746; color: white; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; flex-shrink: 0; }
+
+  .nearby { background: #f4f3f0; margin: 0 -60px; padding: 40px 60px; }
+  .nearby-scroll { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; }
+  .nearby-card { min-width: 200px; background: white; border-radius: 14px; overflow: hidden; flex-shrink: 0; }
+  .nearby-card img { width: 100%; height: 120px; object-fit: cover; }
+  .nearby-card .info { padding: 12px 14px; }
+  .nearby-card .info h4 { font-size: 14px; font-weight: 600; }
+  .nearby-card .info span { font-size: 11px; color: #888; }
+
+  .ai-fab { position: fixed; bottom: 28px; right: 28px; width: 56px; height: 56px; background: #1a1a1a; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(0,0,0,0.25); cursor: pointer; z-index: 100; font-size: 22px; color: #C59746; }
+</style>
+</head>
+<body>
+
+<!-- HERO — uses the SHIP's verified image -->
+<div class="hero">
+  <img src="https://images.unsplash.com/photo-1548574505-5e239809ee19?w=1600&q=85" alt="Freedom of the Seas">
+  <div class="hero-overlay"></div>
+  <div class="hero-nav">
+    <div class="back">←</div>
+    <div class="save">♡</div>
+  </div>
+  <div class="hero-content">
+    <div class="hero-badge">Royal Caribbean · Freedom of the Seas</div>
+    <div class="hero-title serif">Eastern Caribbean</div>
+    <div class="hero-subtitle">May 2 – May 9, 2026 · 7 Nights</div>
+    <div class="hero-meta">
+      <span>🚢 Freedom of the Seas</span>
+      <span class="dot">·</span>
+      <span>5 ports</span>
+      <span class="dot">·</span>
+      <span>From <span style="color: #C59746; font-weight: 700; font-size: 18px;">$753</span>/person</span>
+    </div>
+    <div class="hero-actions">
+      <button class="btn-primary">✨ Inquire About This Sailing</button>
+      <button class="btn-secondary">♡ Save to Trip</button>
+    </div>
+  </div>
+</div>
+
+<!-- DEAL BANNER — if applicable -->
+<div style="max-width: 1280px; margin: 0 auto; padding: 20px 60px 0;">
+  <div class="deal-banner">
+    <div class="deal-badge">🔥 Deal</div>
+    <div style="flex: 1;">
+      <div style="font-size: 15px; font-weight: 600;">Early Booking Bonus — Save up to 30% + $200 onboard credit</div>
+      <div style="font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 3px;">Ends April 30, 2026 · Combinable with loyalty discounts</div>
+    </div>
+    <button style="background: #C59746; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0;">View Deal →</button>
+  </div>
+</div>
+
+<div class="feed">
+
+  <div style="padding-top: 28px;"></div>
+
+  <!-- ITINERARY — the heart of a sailing page -->
+  <div class="grid-2-1">
+
+    <!-- Left: Day-by-day itinerary -->
+    <div>
+      <div class="section-label">
+        <h2>📍 Day-by-Day Itinerary</h2>
+      </div>
+
+      <div class="timeline">
+        <!-- Day 1 -->
+        <div class="timeline-day">
+          <div class="timeline-line">
+            <div class="timeline-dot port"></div>
+            <div class="timeline-connector"></div>
+          </div>
+          <div class="timeline-content">
+            <div style="font-size: 11px; color: #888; font-weight: 500;">Day 1 · May 2</div>
+            <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">
+              <a href="#" style="color: #1a1a1a; text-decoration: none; border-bottom: 1px dashed #ccc;">Miami, Florida</a>
+            </div>
+            <div style="font-size: 12px; color: #888; margin-top: 3px;">Embark · Departs 4:30 PM</div>
+            <!-- Inline destination preview -->
+            <div class="card-base" style="margin-top: 10px; display: flex; overflow: hidden;">
+              <div style="width: 80px; height: 70px; overflow: hidden; flex-shrink: 0;">
+                <img src="https://images.unsplash.com/photo-1533106497176-45ae19e68ba2?w=200&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+              </div>
+              <div style="padding: 10px 12px; flex: 1;">
+                <div style="font-size: 11px; font-weight: 600;">Explore Miami</div>
+                <div style="font-size: 10px; color: #888;">🎯 12 activities · 🏨 Hotels from $189</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Day 2 -->
+        <div class="timeline-day">
+          <div class="timeline-line">
+            <div class="timeline-dot port"></div>
+            <div class="timeline-connector"></div>
+          </div>
+          <div class="timeline-content">
+            <div style="font-size: 11px; color: #888; font-weight: 500;">Day 2 · May 3</div>
+            <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">
+              <a href="#" style="color: #1a1a1a; text-decoration: none; border-bottom: 1px dashed #ccc;">Nassau, Bahamas</a>
+            </div>
+            <div style="font-size: 12px; color: #888; margin-top: 3px;">8:00 AM – 5:00 PM</div>
+            <div class="card-base" style="margin-top: 10px; display: flex; overflow: hidden;">
+              <div style="width: 80px; height: 70px; overflow: hidden; flex-shrink: 0;">
+                <img src="https://images.unsplash.com/photo-1580237541049-2d715a09486e?w=200&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+              </div>
+              <div style="padding: 10px 12px; flex: 1;">
+                <div style="font-size: 11px; font-weight: 600;">Explore Nassau</div>
+                <div style="font-size: 10px; color: #888;">⭐ 4.3 · 🎯 Shore excursions available</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Day 3 -->
+        <div class="timeline-day">
+          <div class="timeline-line">
+            <div class="timeline-dot sea"></div>
+            <div class="timeline-connector"></div>
+          </div>
+          <div class="timeline-content">
+            <div style="font-size: 11px; color: #888; font-weight: 500;">Day 3 · May 4</div>
+            <div style="font-size: 16px; font-weight: 600; margin-top: 2px; color: #7dd3fc;">At Sea</div>
+            <div style="font-size: 12px; color: #aaa; margin-top: 3px; font-style: italic;">Enjoy the ship — pools, spa, dining, shows</div>
+          </div>
+        </div>
+
+        <!-- Day 4 -->
+        <div class="timeline-day">
+          <div class="timeline-line">
+            <div class="timeline-dot port"></div>
+            <div class="timeline-connector"></div>
+          </div>
+          <div class="timeline-content">
+            <div style="font-size: 11px; color: #888; font-weight: 500;">Day 4 · May 5</div>
+            <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">
+              <a href="#" style="color: #1a1a1a; text-decoration: none; border-bottom: 1px dashed #ccc;">Puerto Plata, Dominican Republic</a>
+            </div>
+            <div style="font-size: 12px; color: #888; margin-top: 3px;">8:00 AM – 5:00 PM</div>
+            <div class="card-base" style="margin-top: 10px; display: flex; overflow: hidden;">
+              <div style="width: 80px; height: 70px; overflow: hidden; flex-shrink: 0;">
+                <img src="https://images.unsplash.com/photo-1500759285222-a95626b934cb?w=200&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+              </div>
+              <div style="padding: 10px 12px; flex: 1;">
+                <div style="font-size: 11px; font-weight: 600;">Explore Puerto Plata</div>
+                <div style="font-size: 10px; color: #888;">⭐ 4.1 · 🏖️ Beaches · 🎯 Excursions</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Day 5 -->
+        <div class="timeline-day">
+          <div class="timeline-line">
+            <div class="timeline-dot sea"></div>
+            <div class="timeline-connector"></div>
+          </div>
+          <div class="timeline-content">
+            <div style="font-size: 11px; color: #888; font-weight: 500;">Day 5 · May 6</div>
+            <div style="font-size: 16px; font-weight: 600; margin-top: 2px; color: #7dd3fc;">At Sea</div>
+            <div style="font-size: 12px; color: #aaa; margin-top: 3px; font-style: italic;">Last full day onboard</div>
+          </div>
+        </div>
+
+        <!-- Day 6 -->
+        <div class="timeline-day">
+          <div class="timeline-line">
+            <div class="timeline-dot port"></div>
+          </div>
+          <div class="timeline-content">
+            <div style="font-size: 11px; color: #888; font-weight: 500;">Day 6 · May 7</div>
+            <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">
+              <a href="#" style="color: #1a1a1a; text-decoration: none; border-bottom: 1px dashed #ccc;">Miami, Florida</a>
+            </div>
+            <div style="font-size: 12px; color: #888; margin-top: 3px;">Disembark · Arrives 6:00 AM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Ship card + pricing sticky -->
+    <div>
+      <!-- Ship card -->
+      <div class="card-base" style="margin-bottom: 16px;">
+        <div style="height: 160px; overflow: hidden; position: relative;">
+          <img src="https://images.unsplash.com/photo-1548574505-5e239809ee19?w=600&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+          <div style="position: absolute; bottom: 8px; left: 10px; background: rgba(0,0,0,0.6); color: white; padding: 3px 10px; border-radius: 8px; font-size: 10px; backdrop-filter: blur(4px);">Royal Caribbean</div>
+        </div>
+        <div style="padding: 16px;">
+          <div style="font-size: 16px; font-weight: 600;">Freedom of the Seas</div>
+          <div style="font-size: 12px; color: #888; margin-top: 4px;">3,634 guests · 154K GT · 15 decks</div>
+          <a href="#" style="font-size: 12px; color: #C59746; margin-top: 8px; display: inline-block;">Explore this ship →</a>
+        </div>
+      </div>
+
+      <!-- Cabin pricing -->
+      <div class="card-base" style="padding: 20px;">
+        <div style="font-size: 14px; font-weight: 700; margin-bottom: 14px;">Cabin Pricing</div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f8f6; border-radius: 10px;">
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #6b7280;">Inside</div>
+              <div style="font-size: 11px; color: #aaa;">Cozy, no window</div>
+            </div>
+            <div style="font-size: 18px;" class="price">$753</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f5f9fc; border-radius: 10px;">
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #0891b2;">Ocean View</div>
+              <div style="font-size: 11px; color: #aaa;">Window to the sea</div>
+            </div>
+            <div style="font-size: 18px;" class="price">$862</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fdf8f0; border-radius: 10px; border: 2px solid #C59746;">
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #C59746;">Balcony ★</div>
+              <div style="font-size: 11px; color: #aaa;">Private ocean terrace</div>
+            </div>
+            <div style="font-size: 18px;" class="price">$1,087</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8f5fc; border-radius: 10px;">
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #7c3aed;">Suite</div>
+              <div style="font-size: 11px; color: #aaa;">Premium experience</div>
+            </div>
+            <div style="font-size: 18px;" class="price">$1,414</div>
+          </div>
+        </div>
+
+        <div style="font-size: 11px; color: #aaa; margin-top: 12px;">Per person in CAD · Subject to availability</div>
+
+        <button class="btn-primary" style="width: 100%; margin-top: 16px; padding: 14px; font-size: 15px;">Inquire About This Sailing</button>
+      </div>
+
+      <!-- Embark/Disembark -->
+      <div class="card-base" style="padding: 16px; margin-top: 16px;">
+        <div style="display: flex; justify-content: space-between;">
+          <div>
+            <div style="font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px;">Departs</div>
+            <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">Miami, FL</div>
+            <div style="font-size: 11px; color: #888;">May 2, 4:30 PM</div>
+          </div>
+          <div style="display: flex; align-items: center; color: #ccc; font-size: 20px;">→</div>
+          <div style="text-align: right;">
+            <div style="font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px;">Returns</div>
+            <div style="font-size: 13px; font-weight: 600; margin-top: 2px;">Miami, FL</div>
+            <div style="font-size: 11px; color: #888;">May 7, 6:00 AM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="feed-divider"></div>
+
+  <!-- PORT HIGHLIGHTS — destination cards for each port -->
+  <div class="section-label">
+    <h2>🌴 Port Highlights</h2>
+  </div>
+  <div class="grid-3" style="margin-bottom: 16px;">
+    <div class="card-base">
+      <div style="height: 180px; position: relative; overflow: hidden;">
+        <img src="https://images.unsplash.com/photo-1533106497176-45ae19e68ba2?w=600&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+        <div class="card-tag">Day 1 & 6</div>
+      </div>
+      <div style="padding: 14px 16px;">
+        <div style="font-size: 15px; font-weight: 600;">Miami, Florida</div>
+        <div style="font-size: 12px; color: #888; margin-top: 3px;">⭐ 4.4 · South Beach, Art Deco, nightlife</div>
+        <div style="font-size: 12px; color: #C59746; margin-top: 8px;">Explore destination →</div>
+      </div>
+    </div>
+    <div class="card-base">
+      <div style="height: 180px; position: relative; overflow: hidden;">
+        <img src="https://images.unsplash.com/photo-1580237541049-2d715a09486e?w=600&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+        <div class="card-tag">Day 2</div>
+      </div>
+      <div style="padding: 14px 16px;">
+        <div style="font-size: 15px; font-weight: 600;">Nassau, Bahamas</div>
+        <div style="font-size: 12px; color: #888; margin-top: 3px;">⭐ 4.3 · Crystal waters, pirates, market</div>
+        <div style="font-size: 12px; color: #C59746; margin-top: 8px;">Explore destination →</div>
+      </div>
+    </div>
+    <div class="card-base">
+      <div style="height: 180px; position: relative; overflow: hidden;">
+        <img src="https://images.unsplash.com/photo-1500759285222-a95626b934cb?w=600&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+        <div class="card-tag">Day 4</div>
+      </div>
+      <div style="padding: 14px 16px;">
+        <div style="font-size: 15px; font-weight: 600;">Puerto Plata</div>
+        <div style="font-size: 12px; color: #888; margin-top: 3px;">⭐ 4.1 · Amber coast, cable car, beaches</div>
+        <div style="font-size: 12px; color: #C59746; margin-top: 8px;">Explore destination →</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="feed-divider"></div>
+
+  <!-- FLIGHTS — get to the embark port -->
+  <div class="section-label">
+    <h2>✈️ Flights to Miami</h2>
+    <a href="#" class="see-all">Search all flights →</a>
+  </div>
+  <div style="font-size: 12px; color: #888; margin-top: -12px; margin-bottom: 16px;">From Toronto (YYZ) · Arrive May 1 for embarkation</div>
+  <div class="grid-3" style="margin-bottom: 16px;">
+    <div class="card-base" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px; font-weight: 600;">Air Canada</div>
+        <div style="font-size: 11px; color: #2a9d3a; background: #edf7ee; padding: 3px 10px; border-radius: 10px;">Direct</div>
+      </div>
+      <div style="font-size: 13px; color: #888; margin-top: 6px;">YYZ → MIA · 3h 30m</div>
+      <div style="font-size: 20px; margin-top: 10px;" class="price">$289</div>
+      <div style="font-size: 11px; color: #aaa;">one-way · May 1</div>
+    </div>
+    <div class="card-base" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px; font-weight: 600;">WestJet</div>
+        <div style="font-size: 11px; color: #2a9d3a; background: #edf7ee; padding: 3px 10px; border-radius: 10px;">Direct</div>
+      </div>
+      <div style="font-size: 13px; color: #888; margin-top: 6px;">YYZ → MIA · 3h 25m</div>
+      <div style="font-size: 20px; margin-top: 10px;" class="price">$312</div>
+      <div style="font-size: 11px; color: #aaa;">one-way · May 1</div>
+    </div>
+    <div class="card-base" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px; font-weight: 600;">United</div>
+        <div style="font-size: 11px; color: #888;">1 stop via EWR</div>
+      </div>
+      <div style="font-size: 13px; color: #888; margin-top: 6px;">YYZ → EWR → MIA · 6h 10m</div>
+      <div style="font-size: 20px; margin-top: 10px;" class="price">$218</div>
+      <div style="font-size: 11px; color: #aaa;">one-way · May 1</div>
+    </div>
+  </div>
+
+  <div class="feed-divider"></div>
+
+  <!-- HOTELS — pre/post cruise stay -->
+  <div class="section-label">
+    <h2>🏨 Hotels in Miami</h2>
+    <a href="#" class="see-all">Search hotels →</a>
+  </div>
+  <div style="font-size: 12px; color: #888; margin-top: -12px; margin-bottom: 16px;">Stay the night before embarkation · May 1</div>
+  <div class="grid-3" style="margin-bottom: 16px;">
+    <div class="card-base">
+      <div style="height: 150px; position: relative; overflow: hidden;">
+        <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+        <div class="card-tag">🏨 Hotel</div>
+      </div>
+      <div style="padding: 14px 16px;">
+        <div style="font-size: 14px; font-weight: 600;">Marriott Biscayne Bay</div>
+        <div style="font-size: 12px; color: #888; margin-top: 2px;">⭐ 4.5 · 10 min from port</div>
+        <div style="font-size: 18px; margin-top: 8px;" class="price">$189 <span style="font-size: 11px; font-weight: 400; color: #888;">/night</span></div>
+      </div>
+    </div>
+    <div class="card-base">
+      <div style="height: 150px; position: relative; overflow: hidden;">
+        <img src="https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=600&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+        <div class="card-tag">🏨 Hotel</div>
+      </div>
+      <div style="padding: 14px 16px;">
+        <div style="font-size: 14px; font-weight: 600;">Fontainebleau Miami Beach</div>
+        <div style="font-size: 12px; color: #888; margin-top: 2px;">⭐ 4.6 · South Beach</div>
+        <div style="font-size: 18px; margin-top: 8px;" class="price">$329 <span style="font-size: 11px; font-weight: 400; color: #888;">/night</span></div>
+      </div>
+    </div>
+    <div class="card-base">
+      <div style="height: 150px; position: relative; overflow: hidden;">
+        <img src="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+        <div class="card-tag">🏨 Hotel</div>
+      </div>
+      <div style="padding: 14px 16px;">
+        <div style="font-size: 14px; font-weight: 600;">Hampton Inn Port of Miami</div>
+        <div style="font-size: 12px; color: #888; margin-top: 2px;">⭐ 4.3 · Walking distance to port</div>
+        <div style="font-size: 18px; margin-top: 8px;" class="price">$149 <span style="font-size: 11px; font-weight: 400; color: #888;">/night</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="feed-divider"></div>
+
+  <!-- SIMILAR SAILINGS -->
+  <div class="nearby">
+    <div class="section-label">
+      <h2>🔄 Similar Sailings</h2>
+      <a href="#" class="see-all">Compare all →</a>
+    </div>
+    <div class="nearby-scroll">
+      <div class="nearby-card card-base" style="min-width: 260px;">
+        <img src="https://images.unsplash.com/photo-1599640842225-85d111c60e6b?w=400&q=80">
+        <div class="info">
+          <h4>Western Caribbean · 7 nights</h4>
+          <span>Freedom of the Seas · May 9 · from $812</span>
+        </div>
+      </div>
+      <div class="nearby-card card-base" style="min-width: 260px;">
+        <img src="https://images.unsplash.com/photo-1548574505-5e239809ee19?w=400&q=80">
+        <div class="info">
+          <h4>Eastern Caribbean · 5 nights</h4>
+          <span>Freedom of the Seas · May 21 · from $1,468</span>
+        </div>
+      </div>
+      <div class="nearby-card card-base" style="min-width: 260px;">
+        <img src="https://images.unsplash.com/photo-1530841377377-3ff06c0ca713?w=400&q=80">
+        <div class="info">
+          <h4>Bahamas & Perfect Day · 4 nights</h4>
+          <span>Wonder of the Seas · Jun 1 · from $918</span>
+        </div>
+      </div>
+      <div class="nearby-card card-base" style="min-width: 260px;">
+        <img src="https://images.unsplash.com/photo-1559599746-8823b38544c6?w=400&q=80">
+        <div class="info">
+          <h4>Southern Caribbean · 9 nights</h4>
+          <span>Harmony of the Seas · Jun 8 · from $1,690</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- AI FAB -->
+<div class="ai-fab">✦</div>
+
+</body>
+</html>

@@ -1,0 +1,190 @@
+<h2>Dream Board — Mobile First</h2>
+<p class="subtitle">How should the board and AI coexist on a phone screen?</p>
+
+<div class="cards">
+  <!-- Option A: Bottom sheet AI -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#fafaf8;display:flex;justify-content:center">
+      <!-- Phone frame -->
+      <div style="width:220px;height:420px;border:2px solid #333;border-radius:24px;overflow:hidden;background:white;position:relative">
+        <!-- Status bar -->
+        <div style="background:#1a1a1a;padding:4px 12px;display:flex;justify-content:between;align-items:center">
+          <span style="font-size:8px;color:white">9:41</span>
+          <span style="font-size:8px;color:white;margin-left:auto">●●● ▌</span>
+        </div>
+        <!-- Header -->
+        <div style="padding:8px 12px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#1a1a1a">🌴 Cancun Getaway</div>
+            <div style="font-size:8px;color:#888">3 items · $2,783</div>
+          </div>
+          <div style="font-size:8px;background:#C59746;color:white;padding:3px 8px;border-radius:4px;font-weight:600">Submit</div>
+        </div>
+        <!-- Board content (scrollable) -->
+        <div style="padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:8px;padding:6px;color:white;height:70px">
+            <div style="font-size:7px;opacity:0.7">✈️ FLIGHT</div>
+            <div style="font-size:9px;font-weight:600">YOW → CUN</div>
+            <div style="font-size:8px">$244</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:8px;padding:6px;color:white;height:85px">
+            <div style="font-size:7px;opacity:0.7">🏨 HOTEL</div>
+            <div style="font-size:9px;font-weight:600">Hyatt Ziva</div>
+            <div style="font-size:8px">7 nts · $2,450</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#10b981,#059669);border-radius:8px;padding:6px;color:white;height:65px">
+            <div style="font-size:7px;opacity:0.7">🗺️ TOUR</div>
+            <div style="font-size:9px;font-weight:600">Chichen Itza</div>
+            <div style="font-size:8px">$89</div>
+          </div>
+          <div style="border:1.5px dashed #d4d4d4;border-radius:8px;height:65px;display:flex;align-items:center;justify-content:center">
+            <span style="font-size:16px;color:#d4d4d4">+</span>
+          </div>
+        </div>
+        <!-- Bottom sheet (AI) - half screen -->
+        <div style="position:absolute;bottom:0;left:0;right:0;height:45%;background:#1a1a1a;border-radius:16px 16px 0 0;padding:12px;color:white;display:flex;flex-direction:column;gap:6px">
+          <div style="width:32px;height:3px;background:#555;border-radius:2px;margin:0 auto 4px"></div>
+          <div style="font-size:9px;color:#C59746;font-weight:600">✦ AI CONCIERGE</div>
+          <div style="background:#2a2a2a;border-radius:6px;padding:6px;font-size:8px;color:#ccc">Here are some activities for Cancun...</div>
+          <!-- Draggable suggestion -->
+          <div style="background:#333;border:1px solid #C59746;border-radius:6px;padding:6px;font-size:8px">
+            <span style="color:white;font-weight:600">🤿 Snorkeling</span>
+            <span style="color:#999"> · $65</span>
+            <div style="font-size:7px;color:#C59746;margin-top:2px">Swipe up to add ↑</div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="background:#2a2a2a;border-radius:6px;padding:6px 8px;font-size:8px;color:#666">Ask me anything...</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A: Bottom Sheet AI</h3>
+      <p>Board scrolls full-screen. AI slides up as a bottom sheet (like Google Maps). Swipe up to expand, down to minimize. Suggestions swipe up to add to board. Natural mobile gesture pattern.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Tab switching -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#fafaf8;display:flex;justify-content:center">
+      <!-- Phone frame -->
+      <div style="width:220px;height:420px;border:2px solid #333;border-radius:24px;overflow:hidden;background:white;position:relative">
+        <!-- Status bar -->
+        <div style="background:#1a1a1a;padding:4px 12px;display:flex;justify-content:between">
+          <span style="font-size:8px;color:white">9:41</span>
+          <span style="font-size:8px;color:white;margin-left:auto">●●● ▌</span>
+        </div>
+        <!-- Header with tabs -->
+        <div style="padding:8px 12px 0">
+          <div style="font-size:11px;font-weight:700;color:#1a1a1a;margin-bottom:6px">🌴 Cancun Getaway</div>
+          <div style="display:flex;gap:0;border-bottom:2px solid #eee">
+            <div style="padding:6px 12px;font-size:9px;font-weight:600;color:#C59746;border-bottom:2px solid #C59746;margin-bottom:-2px">Board</div>
+            <div style="padding:6px 12px;font-size:9px;color:#888">✦ AI</div>
+            <div style="padding:6px 12px;font-size:9px;color:#888">Details</div>
+          </div>
+        </div>
+        <!-- Board tab (active) -->
+        <div style="padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:8px;padding:6px;color:white;height:70px">
+            <div style="font-size:7px;opacity:0.7">✈️ FLIGHT</div>
+            <div style="font-size:9px;font-weight:600">YOW → CUN</div>
+            <div style="font-size:8px">$244</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:8px;padding:6px;color:white;height:85px">
+            <div style="font-size:7px;opacity:0.7">🏨 HOTEL</div>
+            <div style="font-size:9px;font-weight:600">Hyatt Ziva</div>
+            <div style="font-size:8px">7 nts · $2,450</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#10b981,#059669);border-radius:8px;padding:6px;color:white;height:65px">
+            <div style="font-size:7px;opacity:0.7">🗺️ TOUR</div>
+            <div style="font-size:9px;font-weight:600">Chichen Itza</div>
+            <div style="font-size:8px">$89</div>
+          </div>
+          <div style="border:1.5px dashed #d4d4d4;border-radius:8px;height:65px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+            <span style="font-size:16px;color:#d4d4d4">+</span>
+            <span style="font-size:7px;color:#bbb">Add</span>
+          </div>
+        </div>
+        <!-- Bottom bar -->
+        <div style="position:absolute;bottom:0;left:0;right:0;padding:8px 12px;border-top:1px solid #eee;background:white;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:8px;color:#888">3 items · $2,783</div>
+          <div style="font-size:8px;background:#C59746;color:white;padding:4px 12px;border-radius:4px;font-weight:600">Submit Trip</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B: Tab Switching</h3>
+      <p>Board and AI are separate tabs within the trip page. Swipe between Board / AI / Details. Simple, no overlapping UI. But loses the simultaneous view — can't see board while chatting.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Mini AI bar + expand -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#fafaf8;display:flex;justify-content:center">
+      <!-- Phone frame -->
+      <div style="width:220px;height:420px;border:2px solid #333;border-radius:24px;overflow:hidden;background:white;position:relative">
+        <!-- Status bar -->
+        <div style="background:#1a1a1a;padding:4px 12px;display:flex;justify-content:between">
+          <span style="font-size:8px;color:white">9:41</span>
+          <span style="font-size:8px;color:white;margin-left:auto">●●● ▌</span>
+        </div>
+        <!-- Header -->
+        <div style="padding:8px 12px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#1a1a1a">🌴 Cancun Getaway</div>
+            <div style="font-size:8px;color:#888">3 items · $2,783</div>
+          </div>
+          <div style="font-size:8px;background:#C59746;color:white;padding:3px 8px;border-radius:4px;font-weight:600">Submit</div>
+        </div>
+        <!-- AI suggestion bar (collapsed) -->
+        <div style="margin:6px 8px;background:#1a1a1a;border-radius:8px;padding:6px 10px;display:flex;align-items:center;gap:6px">
+          <span style="font-size:10px">✦</span>
+          <div style="flex:1">
+            <div style="font-size:8px;color:#C59746;font-weight:600">AI suggests: Snorkeling at Isla Mujeres · $65</div>
+          </div>
+          <div style="font-size:7px;color:white;background:#333;padding:2px 6px;border-radius:3px">Add</div>
+          <div style="font-size:7px;color:#888">▾</div>
+        </div>
+        <!-- Board content -->
+        <div style="padding:4px 8px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:8px;padding:6px;color:white;height:70px">
+            <div style="font-size:7px;opacity:0.7">✈️ FLIGHT</div>
+            <div style="font-size:9px;font-weight:600">YOW → CUN</div>
+            <div style="font-size:8px">$244</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:8px;padding:6px;color:white;height:85px">
+            <div style="font-size:7px;opacity:0.7">🏨 HOTEL</div>
+            <div style="font-size:9px;font-weight:600">Hyatt Ziva</div>
+            <div style="font-size:8px">7 nts · $2,450</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#10b981,#059669);border-radius:8px;padding:6px;color:white;height:65px">
+            <div style="font-size:7px;opacity:0.7">🗺️ TOUR</div>
+            <div style="font-size:9px;font-weight:600">Chichen Itza</div>
+            <div style="font-size:8px">$89</div>
+          </div>
+          <div style="border:1.5px dashed #d4d4d4;border-radius:8px;height:65px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+            <span style="font-size:16px;color:#d4d4d4">+</span>
+            <span style="font-size:7px;color:#bbb">Add</span>
+          </div>
+        </div>
+        <!-- Bottom action bar -->
+        <div style="position:absolute;bottom:0;left:0;right:0;padding:6px 8px;background:white;border-top:1px solid #eee">
+          <div style="display:flex;gap:4px">
+            <div style="flex:1;background:#f5f5f5;border-radius:6px;padding:6px 8px;font-size:8px;color:#888;display:flex;align-items:center;gap:4px">
+              <span>✦</span> Ask AI anything...
+            </div>
+            <div style="background:#f5f5f5;border-radius:6px;padding:6px 8px;font-size:8px;color:#888">+</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C: Inline AI Bar + Chat Input</h3>
+      <p>Board is always full-screen. AI shows as a compact suggestion bar at top (one suggestion at a time, swipeable). Chat input at bottom (like iMessage). Tap the bar to expand into full AI conversation. Board stays visible underneath. Most space-efficient.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>Desktop Behavior (for reference)</h3>
+  <p class="subtitle">On desktop: board fills the main area. AI panel slides out from the right, and the board resizes to accommodate (not overlays). Side-by-side when AI is open, full-width when closed.</p>
+</div>

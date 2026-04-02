@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Flight Search — Google Flights Style</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #fafaf8; color: #1a1a1a; }
+
+  /* Search Header */
+  .search-header { background: #1A1A1A; padding: 24px 0 0; }
+  .search-header-inner { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  .search-title { color: white; font-size: 24px; font-weight: 700; font-family: serif; margin-bottom: 20px; }
+
+  /* Search Form */
+  .search-form { background: white; border-radius: 16px 16px 0 0; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+  .trip-type { display: flex; gap: 8px; margin-bottom: 16px; }
+  .trip-type button { padding: 6px 16px; border-radius: 20px; border: 1px solid #ddd; font-size: 13px; cursor: pointer; background: white; }
+  .trip-type button.active { background: #1A1A1A; color: white; border-color: #1A1A1A; }
+
+  .form-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .field { flex: 1; position: relative; }
+  .field label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; font-weight: 600; }
+  .field input, .field select { width: 100%; height: 44px; border: 1px solid #e0e0e0; border-radius: 10px; padding: 0 12px; font-size: 14px; outline: none; }
+  .field input:focus, .field select:focus { border-color: #C59746; box-shadow: 0 0 0 2px rgba(197,151,70,0.15); }
+  .field-airport { flex: 2; }
+  .swap-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid #e0e0e0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; align-self: flex-end; margin-bottom: 4px; font-size: 16px; }
+
+  .search-btn { width: 100%; height: 48px; background: #C59746; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+  .search-btn:hover { background: #B08638; }
+
+  /* Quick Filters below form */
+  .quick-filters { display: flex; gap: 8px; padding: 12px 20px; background: white; border-top: 1px solid #f0f0f0; }
+  .qf { padding: 5px 14px; border-radius: 20px; border: 1px solid #e0e0e0; font-size: 12px; cursor: pointer; background: white; color: #666; }
+  .qf.active { background: #C59746; color: white; border-color: #C59746; }
+
+  /* Content area */
+  .content { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+  /* Price Calendar */
+  .price-calendar { background: white; border-radius: 0 0 16px 16px; padding: 16px 20px 20px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+  .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .calendar-header h3 { font-size: 14px; font-weight: 600; }
+  .calendar-nav { display: flex; gap: 8px; }
+  .calendar-nav button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #e0e0e0; background: white; cursor: pointer; font-size: 14px; }
+
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-day-header { text-align: center; font-size: 11px; color: #888; font-weight: 600; padding: 4px; }
+  .cal-day { text-align: center; padding: 8px 4px; border-radius: 8px; cursor: pointer; position: relative; }
+  .cal-day:hover { background: #f5f5f0; }
+  .cal-day .date { font-size: 13px; font-weight: 500; }
+  .cal-day .price { font-size: 10px; color: #C59746; font-weight: 600; }
+  .cal-day.cheapest { background: #f0faf0; }
+  .cal-day.cheapest .price { color: #2a9d3a; }
+  .cal-day.selected { background: #C59746; color: white; }
+  .cal-day.selected .price { color: rgba(255,255,255,0.8); }
+  .cal-day.empty { visibility: hidden; }
+  .cal-day.past { opacity: 0.3; pointer-events: none; }
+
+  /* Price insights bar */
+  .price-insight { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #f8f7f4; border-radius: 10px; margin-bottom: 16px; font-size: 13px; }
+  .price-insight .badge { padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; }
+  .badge-low { background: #edf7ee; color: #2a9d3a; }
+  .badge-typical { background: #fef3c7; color: #92400e; }
+  .badge-high { background: #fef2f2; color: #dc2626; }
+
+  /* Results */
+  .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .results-header h2 { font-size: 18px; font-weight: 700; }
+  .sort-pills { display: flex; gap: 6px; }
+  .sort-pills button { padding: 5px 14px; border-radius: 20px; border: 1px solid #e0e0e0; font-size: 12px; cursor: pointer; background: white; }
+  .sort-pills button.active { background: #1A1A1A; color: white; border-color: #1A1A1A; }
+
+  /* Flight card */
+  .flight-card { background: white; border-radius: 14px; padding: 16px 20px; margin-bottom: 10px; border: 1px solid #f0f0f0; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 16px; }
+  .flight-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); border-color: #C59746; }
+  .fc-airline { width: 40px; text-align: center; }
+  .fc-airline img { width: 32px; height: 32px; border-radius: 4px; }
+  .fc-airline-code { font-size: 10px; color: #888; margin-top: 2px; }
+  .fc-times { flex: 1; }
+  .fc-route { display: flex; align-items: center; gap: 8px; }
+  .fc-time { font-size: 18px; font-weight: 600; }
+  .fc-line { flex: 1; height: 1px; background: #ddd; position: relative; }
+  .fc-line .fc-duration { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #888; background: white; padding: 0 6px; white-space: nowrap; }
+  .fc-line .fc-stops { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #2a9d3a; background: white; padding: 0 6px; white-space: nowrap; }
+  .fc-airports { display: flex; justify-content: space-between; margin-top: 2px; }
+  .fc-airports span { font-size: 11px; color: #888; }
+  .fc-meta { display: flex; gap: 8px; margin-top: 6px; }
+  .fc-meta span { font-size: 11px; color: #888; padding: 2px 8px; background: #f5f5f0; border-radius: 6px; }
+  .fc-price { text-align: right; min-width: 100px; }
+  .fc-price .amount { font-size: 22px; font-weight: 700; color: #C59746; }
+  .fc-price .per { font-size: 11px; color: #888; }
+  .fc-price .indicator { font-size: 10px; margin-top: 2px; }
+
+  /* Sidebar for filters */
+  .main-layout { display: flex; gap: 24px; }
+  .sidebar { width: 240px; flex-shrink: 0; }
+  .results-area { flex: 1; min-width: 0; }
+
+  .filter-group { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid #f0f0f0; }
+  .filter-group h4 { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .filter-option { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; color: #444; cursor: pointer; }
+  .filter-option input { accent-color: #C59746; }
+  .filter-slider { width: 100%; margin: 8px 0; accent-color: #C59746; }
+
+  /* Direct flights banner */
+  .direct-banner { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #edf7ee; border-radius: 10px; margin-bottom: 16px; font-size: 13px; color: #166534; }
+  .direct-banner strong { font-weight: 600; }
+
+  /* AI Concierge hint */
+  .ai-hint { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: linear-gradient(135deg, #1A1A1A, #2a2a2a); border-radius: 10px; margin-bottom: 16px; color: white; font-size: 13px; cursor: pointer; }
+  .ai-hint:hover { opacity: 0.95; }
+  .ai-hint .ai-icon { width: 32px; height: 32px; background: #C59746; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<!-- SEARCH HEADER -->
+<div class="search-header">
+  <div class="search-header-inner">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="font-size: 11px; color: rgba(255,255,255,0.5);">← Back</div>
+      <div style="flex:1;"></div>
+      <div style="color: #C59746; font-size: 13px; font-weight: 500;">Phoenix Voyages</div>
+    </div>
+    <div class="search-title">Flights</div>
+
+    <!-- Search Form -->
+    <div class="search-form">
+      <div class="trip-type">
+        <button class="active">Round trip</button>
+        <button>One way</button>
+        <button>Multi-city</button>
+      </div>
+
+      <div class="form-row">
+        <div class="field field-airport">
+          <label>From</label>
+          <input type="text" value="Toronto (YYZ)" style="font-weight: 500;" />
+        </div>
+        <button class="swap-btn">⇄</button>
+        <div class="field field-airport">
+          <label>To</label>
+          <input type="text" value="Cancun (CUN)" style="font-weight: 500;" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label>Depart</label>
+          <input type="text" value="Jun 15, 2026" />
+        </div>
+        <div class="field">
+          <label>Return</label>
+          <input type="text" value="Jun 22, 2026" />
+        </div>
+        <div class="field" style="flex: 0.6;">
+          <label>Travelers</label>
+          <select><option>2 Adults</option></select>
+        </div>
+        <div class="field" style="flex: 0.6;">
+          <label>Class</label>
+          <select><option>Economy</option></select>
+        </div>
+      </div>
+
+      <button class="search-btn">Search Flights</button>
+    </div>
+
+    <!-- Quick Filters -->
+    <div class="quick-filters">
+      <span class="qf active">All</span>
+      <span class="qf">Nonstop only</span>
+      <span class="qf">Under $500</span>
+      <span class="qf">Morning departure</span>
+      <span class="qf">Shortest flight</span>
+    </div>
+  </div>
+</div>
+
+<div class="content" style="padding-top: 0;">
+
+  <!-- PRICE CALENDAR -->
+  <div class="price-calendar">
+    <div class="calendar-header">
+      <h3>📅 June 2026 — Departure prices</h3>
+      <div class="calendar-nav">
+        <button>←</button>
+        <button>→</button>
+      </div>
+    </div>
+    <div class="calendar-grid">
+      <div class="cal-day-header">Mon</div>
+      <div class="cal-day-header">Tue</div>
+      <div class="cal-day-header">Wed</div>
+      <div class="cal-day-header">Thu</div>
+      <div class="cal-day-header">Fri</div>
+      <div class="cal-day-header">Sat</div>
+      <div class="cal-day-header">Sun</div>
+
+      <div class="cal-day past"><div class="date">1</div><div class="price">$412</div></div>
+      <div class="cal-day past"><div class="date">2</div><div class="price">$398</div></div>
+      <div class="cal-day past"><div class="date">3</div><div class="price">$425</div></div>
+      <div class="cal-day past"><div class="date">4</div><div class="price">$451</div></div>
+      <div class="cal-day past"><div class="date">5</div><div class="price">$389</div></div>
+      <div class="cal-day past"><div class="date">6</div><div class="price">$367</div></div>
+      <div class="cal-day past"><div class="date">7</div><div class="price">$445</div></div>
+
+      <div class="cal-day cheapest"><div class="date">8</div><div class="price">$312</div></div>
+      <div class="cal-day"><div class="date">9</div><div class="price">$398</div></div>
+      <div class="cal-day cheapest"><div class="date">10</div><div class="price">$325</div></div>
+      <div class="cal-day"><div class="date">11</div><div class="price">$442</div></div>
+      <div class="cal-day"><div class="date">12</div><div class="price">$389</div></div>
+      <div class="cal-day"><div class="date">13</div><div class="price">$456</div></div>
+      <div class="cal-day"><div class="date">14</div><div class="price">$478</div></div>
+
+      <div class="cal-day selected"><div class="date">15</div><div class="price">$425</div></div>
+      <div class="cal-day"><div class="date">16</div><div class="price">$398</div></div>
+      <div class="cal-day cheapest"><div class="date">17</div><div class="price">$298</div></div>
+      <div class="cal-day"><div class="date">18</div><div class="price">$412</div></div>
+      <div class="cal-day"><div class="date">19</div><div class="price">$445</div></div>
+      <div class="cal-day"><div class="date">20</div><div class="price">$512</div></div>
+      <div class="cal-day"><div class="date">21</div><div class="price">$489</div></div>
+
+      <div class="cal-day"><div class="date">22</div><div class="price">$398</div></div>
+      <div class="cal-day cheapest"><div class="date">23</div><div class="price">$315</div></div>
+      <div class="cal-day"><div class="date">24</div><div class="price">$425</div></div>
+      <div class="cal-day"><div class="date">25</div><div class="price">$456</div></div>
+      <div class="cal-day"><div class="date">26</div><div class="price">$478</div></div>
+      <div class="cal-day"><div class="date">27</div><div class="price">$498</div></div>
+      <div class="cal-day"><div class="date">28</div><div class="price">$512</div></div>
+
+      <div class="cal-day"><div class="date">29</div><div class="price">$445</div></div>
+      <div class="cal-day"><div class="date">30</div><div class="price">$389</div></div>
+      <div class="cal-day empty"></div>
+      <div class="cal-day empty"></div>
+      <div class="cal-day empty"></div>
+      <div class="cal-day empty"></div>
+      <div class="cal-day empty"></div>
+    </div>
+  </div>
+
+  <!-- AI Concierge Hint -->
+  <div class="ai-hint">
+    <div class="ai-icon">✦</div>
+    <div>
+      <strong>Save $127</strong> — Flying on June 17 instead of June 15 could save you $127 per person. Want me to find the best dates?
+    </div>
+  </div>
+
+  <!-- Price Insight -->
+  <div class="price-insight">
+    <span class="badge badge-typical">Typical</span>
+    <span>$425 is <strong>about average</strong> for YYZ → CUN in June. Prices typically range $298–$512.</span>
+  </div>
+
+  <!-- Direct Flights Banner -->
+  <div class="direct-banner">
+    ✈️ <span><strong>3 airlines</strong> fly direct from Toronto to Cancun: Air Canada, WestJet, Sunwing</span>
+  </div>
+
+  <!-- Main Layout: Sidebar + Results -->
+  <div class="main-layout">
+
+    <!-- Filter Sidebar -->
+    <div class="sidebar">
+      <div class="filter-group">
+        <h4>Stops</h4>
+        <label class="filter-option"><input type="checkbox" checked /> Nonstop <span style="color:#888; margin-left:auto;">from $425</span></label>
+        <label class="filter-option"><input type="checkbox" checked /> 1 stop <span style="color:#888; margin-left:auto;">from $312</span></label>
+        <label class="filter-option"><input type="checkbox" /> 2+ stops <span style="color:#888; margin-left:auto;">from $289</span></label>
+      </div>
+
+      <div class="filter-group">
+        <h4>Airlines</h4>
+        <label class="filter-option"><input type="checkbox" checked /> Air Canada</label>
+        <label class="filter-option"><input type="checkbox" checked /> WestJet</label>
+        <label class="filter-option"><input type="checkbox" checked /> Sunwing</label>
+        <label class="filter-option"><input type="checkbox" checked /> United</label>
+        <label class="filter-option"><input type="checkbox" checked /> American</label>
+      </div>
+
+      <div class="filter-group">
+        <h4>Price Range</h4>
+        <input type="range" class="filter-slider" min="200" max="800" value="600" />
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #888;">
+          <span>$200</span><span>Up to $600</span>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <h4>Departure Time</h4>
+        <label class="filter-option"><input type="checkbox" checked /> Morning (6am–12pm)</label>
+        <label class="filter-option"><input type="checkbox" checked /> Afternoon (12pm–6pm)</label>
+        <label class="filter-option"><input type="checkbox" /> Evening (6pm–12am)</label>
+      </div>
+
+      <div class="filter-group">
+        <h4>Duration</h4>
+        <input type="range" class="filter-slider" min="3" max="24" value="12" />
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #888;">
+          <span>3h</span><span>Up to 12h</span>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <h4>Baggage</h4>
+        <label class="filter-option"><input type="checkbox" /> Carry-on included</label>
+        <label class="filter-option"><input type="checkbox" /> Checked bag included</label>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-area">
+      <div class="results-header">
+        <h2>24 flights found</h2>
+        <div class="sort-pills">
+          <button class="active">Best</button>
+          <button>Cheapest</button>
+          <button>Fastest</button>
+          <button>Departure</button>
+        </div>
+      </div>
+
+      <!-- Flight Card 1 — Nonstop -->
+      <div class="flight-card">
+        <div class="fc-airline">
+          <div style="width: 32px; height: 32px; background: #dc2626; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: 700;">AC</div>
+          <div class="fc-airline-code">Air Canada</div>
+        </div>
+        <div class="fc-times">
+          <div class="fc-route">
+            <span class="fc-time">08:15</span>
+            <div class="fc-line">
+              <div class="fc-duration">4h 35m</div>
+              <div class="fc-stops">Nonstop</div>
+            </div>
+            <span class="fc-time">13:50</span>
+          </div>
+          <div class="fc-airports">
+            <span>YYZ Toronto</span>
+            <span>CUN Cancun</span>
+          </div>
+          <div class="fc-meta">
+            <span>AC 1842</span>
+            <span>✓ Carry-on</span>
+            <span>✓ Checked bag</span>
+          </div>
+        </div>
+        <div class="fc-price">
+          <div class="amount">$425</div>
+          <div class="per">per person</div>
+          <div class="indicator" style="color: #92400e;">📊 Typical price</div>
+        </div>
+      </div>
+
+      <!-- Flight Card 2 — Nonstop cheaper -->
+      <div class="flight-card">
+        <div class="fc-airline">
+          <div style="width: 32px; height: 32px; background: #0369a1; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: 700;">WS</div>
+          <div class="fc-airline-code">WestJet</div>
+        </div>
+        <div class="fc-times">
+          <div class="fc-route">
+            <span class="fc-time">14:30</span>
+            <div class="fc-line">
+              <div class="fc-duration">4h 45m</div>
+              <div class="fc-stops">Nonstop</div>
+            </div>
+            <span class="fc-time">19:15</span>
+          </div>
+          <div class="fc-airports">
+            <span>YYZ Toronto</span>
+            <span>CUN Cancun</span>
+          </div>
+          <div class="fc-meta">
+            <span>WS 2254</span>
+            <span>✓ Carry-on</span>
+            <span>No checked bag</span>
+          </div>
+        </div>
+        <div class="fc-price">
+          <div class="amount">$389</div>
+          <div class="per">per person</div>
+          <div class="indicator" style="color: #2a9d3a;">📉 Low price</div>
+        </div>
+      </div>
+
+      <!-- Flight Card 3 — 1 stop -->
+      <div class="flight-card">
+        <div class="fc-airline">
+          <div style="width: 32px; height: 32px; background: #4338ca; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: 700;">UA</div>
+          <div class="fc-airline-code">United</div>
+        </div>
+        <div class="fc-times">
+          <div class="fc-route">
+            <span class="fc-time">06:45</span>
+            <div class="fc-line">
+              <div class="fc-duration">7h 20m</div>
+              <div class="fc-stops" style="color: #888;">1 stop · IAH</div>
+            </div>
+            <span class="fc-time">14:05</span>
+          </div>
+          <div class="fc-airports">
+            <span>YYZ Toronto</span>
+            <span>CUN Cancun</span>
+          </div>
+          <div class="fc-meta">
+            <span>UA 4512 → UA 1187</span>
+            <span>✓ Carry-on</span>
+            <span>✓ Checked bag</span>
+          </div>
+        </div>
+        <div class="fc-price">
+          <div class="amount">$312</div>
+          <div class="per">per person</div>
+          <div class="indicator" style="color: #2a9d3a;">📉 Great price</div>
+        </div>
+      </div>
+
+      <!-- Flight Card 4 — Business upsell -->
+      <div class="flight-card" style="border: 1px solid #C59746; background: #fffdf8;">
+        <div class="fc-airline">
+          <div style="width: 32px; height: 32px; background: #dc2626; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: 700;">AC</div>
+          <div class="fc-airline-code">Air Canada</div>
+        </div>
+        <div class="fc-times">
+          <div class="fc-route">
+            <span class="fc-time">11:00</span>
+            <div class="fc-line">
+              <div class="fc-duration">4h 30m</div>
+              <div class="fc-stops">Nonstop</div>
+            </div>
+            <span class="fc-time">15:30</span>
+          </div>
+          <div class="fc-airports">
+            <span>YYZ Toronto</span>
+            <span>CUN Cancun</span>
+          </div>
+          <div class="fc-meta">
+            <span>AC 1846</span>
+            <span style="background: #C59746; color: white;">★ Business Class</span>
+            <span>✓ Lounge access</span>
+            <span>✓ 2 checked bags</span>
+          </div>
+        </div>
+        <div class="fc-price">
+          <div class="amount">$1,245</div>
+          <div class="per">per person</div>
+          <div class="indicator" style="color: #C59746;">✦ Premium fare</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Floating AI button -->
+<div style="position: fixed; bottom: 24px; right: 24px; width: 52px; height: 52px; background: #1A1A1A; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(0,0,0,0.2); cursor: pointer; color: #C59746; font-size: 20px;">✦</div>
+
+</body>
+</html>

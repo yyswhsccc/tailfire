@@ -84,6 +84,9 @@ export const JOB_TYPES = {
   EMAIL_SYNC: 'email.sync',
   EMAIL_DISPATCH_SYNC: 'email.dispatch_sync',
 
+  // Destination enrichment jobs
+  DESTINATION_HERO_IMAGE: 'destination.hero_image',
+
   // Vacation pricing jobs
   VACATION_SEARCH: 'vacation_search',
   VACATION_HOTEL_ENRICHMENT: 'vacation_hotel_enrichment',
@@ -275,6 +278,20 @@ export interface ActivityGeocodingJobData {
   locationName?: string | null
   portName?: string | null
   agencyId: string
+}
+
+// ============================================================================
+// Destination Enrichment Job Types
+// ============================================================================
+
+/**
+ * Destination hero image enrichment job — searches Unsplash for travel photos
+ * and backfills heroImageUrl on destinations that don't have one.
+ */
+export interface DestinationHeroImageJobData {
+  type: 'destination.hero_image'
+  batchSize?: number
+  offset?: number
 }
 
 // ============================================================================

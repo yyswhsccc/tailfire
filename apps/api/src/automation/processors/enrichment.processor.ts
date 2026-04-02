@@ -10,7 +10,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { Job } from 'bullmq'
 import { createHash } from 'crypto'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, sql, isNull, asc } from 'drizzle-orm'
 import { firstValueFrom } from 'rxjs'
 import { ApiProvider } from '@tailfire/shared-types'
 import { schema } from '@tailfire/database'
@@ -29,11 +29,13 @@ import type {
   CruiseCatalogEnrichmentJobData,
   ActivityGeocodingJobData,
   VacationHotelEnrichmentJobData,
+  DestinationHeroImageJobData,
 } from '../automation.types'
+import { UnsplashService } from '../../unsplash/unsplash.service'
 import { GooglePlacesEnricherService } from '../../vacation-enrichment/services/google-places-enricher.service'
 import { TripadvisorEnricherService } from '../../vacation-enrichment/services/tripadvisor-enricher.service'
 
-const { customCruiseDetails, itineraryActivities, vacationHotelEnrichment } = schema
+const { customCruiseDetails, itineraryActivities, vacationHotelEnrichment, destinations } = schema
 
 const DEFAULT_MAX_PHOTOS = 3
 
@@ -54,6 +56,7 @@ export class EnrichmentProcessor extends WorkerHost {
     private readonly automationService: AutomationService,
     private readonly googlePlacesEnricher: GooglePlacesEnricherService,
     private readonly tripadvisorEnricher: TripadvisorEnricherService,
+    private readonly unsplashService: UnsplashService,
   ) {
     super()
   }
@@ -71,6 +74,9 @@ export class EnrichmentProcessor extends WorkerHost {
         break
       case JOB_TYPES.VACATION_HOTEL_ENRICHMENT:
         await this.handleVacationHotelEnrichment(job as Job<VacationHotelEnrichmentJobData>)
+        break
+      case JOB_TYPES.DESTINATION_HERO_IMAGE:
+        await this.handleDestinationHeroImage(job as Job<DestinationHeroImageJobData>)
         break
       default:
         this.logger.warn(`Unknown enrichment job type: ${job.name}`)
@@ -463,6 +469,129 @@ export class EnrichmentProcessor extends WorkerHost {
       hasTripAdvisor: !!tripadvisor,
       photoCount: r2PhotoUrls.length,
     })
+  }
+
+  /**
+   * Destination hero image enrichment via Unsplash.
+   * Queries destinations WHERE hero_image_url IS NULL, prioritizes port_city > city > others.
+   * Searches Unsplash for each, updates heroImageUrl if found.
+   * Re-queues itself if more destinations remain.
+   */
+  private async handleDestinationHeroImage(job: Job<DestinationHeroImageJobData>): Promise<void> {
+    const batchSize = job.data.batchSize || 50
+
+    if (!this.unsplashService.isAvailable()) {
+      this.logger.warn('Unsplash not configured — cannot enrich destination hero images')
+      return
+    }
+
+    // Query destinations without hero images, prioritized by type
+    const missing = await this.db.client
+      .select({
+        id: destinations.id,
+        name: destinations.name,
+        countryCode: destinations.countryCode,
+        destinationType: destinations.destinationType,
+      })
+      .from(destinations)
+      .where(isNull(destinations.heroImageUrl))
+      .orderBy(
+        sql`CASE destination_type
+          WHEN 'port_city' THEN 1
+          WHEN 'city' THEN 2
+          WHEN 'island' THEN 3
+          WHEN 'resort_area' THEN 4
+          WHEN 'country' THEN 5
+          WHEN 'region' THEN 6
+          ELSE 7
+        END`,
+        asc(destinations.name),
+      )
+      .limit(batchSize)
+
+    if (missing.length === 0) {
+      this.logger.log('Destination hero image enrichment complete — no more destinations without images')
+      return
+    }
+
+    this.logger.log(`Processing ${missing.length} destinations for hero image enrichment`)
+
+    let updated = 0
+    let skipped = 0
+    let failed = 0
+
+    for (const dest of missing) {
+      try {
+        const query = `${dest.name} ${dest.countryCode || ''} travel`.trim()
+        const result = await this.unsplashService.searchPhotos(query, 1, 1)
+
+        if (!result.results || result.results.length === 0) {
+          skipped++
+          continue
+        }
+
+        const photo = result.results[0]!
+        const heroImageUrl = photo.urls.regular
+
+        await this.db.client
+          .update(destinations)
+          .set({
+            heroImageUrl,
+            metadata: sql`jsonb_set(
+              COALESCE(metadata, '{}'::jsonb),
+              '{unsplash_attribution}',
+              ${JSON.stringify({
+                photoId: photo.id,
+                photographer: photo.user.name,
+                profileUrl: photo.user.links.html,
+              })}::jsonb
+            )`,
+          })
+          .where(eq(destinations.id, dest.id))
+
+        updated++
+
+        // Trigger download tracking (Unsplash API requirement)
+        try {
+          await this.unsplashService.triggerDownload(photo.links.download_location)
+        } catch {
+          // Non-critical — don't fail the job
+        }
+      } catch (error) {
+        failed++
+        if (failed <= 5) {
+          this.logger.warn({
+            message: `Failed to enrich hero image for "${dest.name}"`,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+
+      // Progress reporting
+      const processed = updated + skipped + failed
+      if (processed % 10 === 0) {
+        await job.updateProgress(Math.round((processed / missing.length) * 100))
+      }
+    }
+
+    this.logger.log({
+      message: 'Destination hero image batch complete',
+      updated,
+      skipped,
+      failed,
+      total: missing.length,
+    })
+
+    // If we processed a full batch, there may be more — re-queue
+    if (missing.length === batchSize) {
+      this.logger.log('Full batch processed — re-queuing for next batch')
+      await this.automationService.schedule(
+        QUEUES.ENRICHMENT,
+        JOB_TYPES.DESTINATION_HERO_IMAGE,
+        { type: JOB_TYPES.DESTINATION_HERO_IMAGE, batchSize },
+        { delay: 5000, jobId: `destination-hero-image-${Date.now()}` },
+      )
+    }
   }
 
   @OnWorkerEvent('active')
