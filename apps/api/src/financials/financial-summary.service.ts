@@ -10,7 +10,7 @@
  */
 
 import { Injectable, NotFoundException, Logger } from '@nestjs/common'
-import { eq, sql } from 'drizzle-orm'
+import { eq, sql, and, isNull } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { ExchangeRatesService } from './exchange-rates.service'
 import { TripAccessService } from '../trips/trip-access.service'
@@ -103,8 +103,9 @@ export class FinancialSummaryService {
     totalInTripCurrencyCents: number
     byActivity: ActivityCostSummaryDto[]
   }> {
-    // Get all activities for the trip via itineraries
+    // Get all TOP-LEVEL activities for the trip via itineraries
     // LEFT JOIN with activity_pricing to get authoritative pricing data
+    // Exclude child activities (e.g. port_info under cruises) — they're informational, not billable
     const activities = await this.db.client
       .select({
         activityId: this.db.schema.itineraryActivities.id,
@@ -127,7 +128,12 @@ export class FinancialSummaryService {
         this.db.schema.itineraries,
         eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
       )
-      .where(eq(this.db.schema.itineraries.tripId, tripId))
+      .where(
+        and(
+          eq(this.db.schema.itineraries.tripId, tripId),
+          isNull(this.db.schema.itineraryActivities.parentActivityId)
+        )
+      )
 
     const byActivity: ActivityCostSummaryDto[] = []
     let totalCents = 0
@@ -430,7 +436,12 @@ export class FinancialSummaryService {
         this.db.schema.itineraries,
         eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
       )
-      .where(eq(this.db.schema.itineraries.tripId, tripId))
+      .where(
+        and(
+          eq(this.db.schema.itineraries.tripId, tripId),
+          isNull(this.db.schema.itineraryActivities.parentActivityId)
+        )
+      )
 
     let expectedTotalCents = 0
     let receivedTotalCents = 0
