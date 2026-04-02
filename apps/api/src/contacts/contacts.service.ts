@@ -274,6 +274,9 @@ export class ContactsService {
     let relCountMap = new Map<string, number>()
 
     if (contactIds.length > 0) {
+      // Build IN clause for raw SQL (Drizzle sql template can't pass arrays to ANY())
+      const idsList = sql.join(contactIds.map(id => sql`${id}`), sql`, `)
+
       // Next upcoming trip per contact
       const nextTrips: any[] = await this.db.client.execute(sql`
         SELECT DISTINCT ON (tt.contact_id)
@@ -282,7 +285,7 @@ export class ContactsService {
           t.start_date AS trip_date
         FROM trip_travelers tt
         JOIN trips t ON t.id = tt.trip_id
-        WHERE tt.contact_id = ANY(${contactIds})
+        WHERE tt.contact_id IN (${idsList})
           AND t.start_date > CURRENT_DATE
           AND t.status NOT IN ('cancelled')
         ORDER BY tt.contact_id, t.start_date ASC
@@ -295,9 +298,9 @@ export class ContactsService {
       // Relationship count per contact
       const relCounts: any[] = await this.db.client.execute(sql`
         SELECT contact_id, COUNT(*)::int AS cnt FROM (
-          SELECT contact_id1 AS contact_id FROM contact_relationships WHERE contact_id1 = ANY(${contactIds})
+          SELECT contact_id1 AS contact_id FROM contact_relationships WHERE contact_id1 IN (${idsList})
           UNION ALL
-          SELECT contact_id2 AS contact_id FROM contact_relationships WHERE contact_id2 = ANY(${contactIds})
+          SELECT contact_id2 AS contact_id FROM contact_relationships WHERE contact_id2 IN (${idsList})
         ) sub
         GROUP BY contact_id
       `)
