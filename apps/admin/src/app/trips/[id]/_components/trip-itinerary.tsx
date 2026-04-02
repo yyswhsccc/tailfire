@@ -725,7 +725,7 @@ export function TripItinerary({ trip }: TripItineraryProps) {
         </div>
 
         {/* Right Sidebar - fixed width, never shrinks */}
-        {selectedItinerary && <div className="flex-shrink-0"><ComponentLibrarySidebar isDragging={!!activeDragItem} /></div>}
+        {selectedItinerary && <div className="flex-shrink-0"><ComponentLibrarySidebar isDragging={!!activeDragItem} activityCount={days?.reduce((sum, d) => sum + (d.activities?.length || 0), 0) || 0} /></div>}
       </div>
 
       {/* Create Itinerary Dialog (TERN pattern) */}
