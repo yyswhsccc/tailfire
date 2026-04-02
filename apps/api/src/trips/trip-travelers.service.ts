@@ -6,7 +6,7 @@
 
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common'
 import { EventEmitter2 } from '@nestjs/event-emitter'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, asc, desc } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TravellerSplitsService } from '../financials/traveller-splits.service'
 import { TripNotificationsService } from '../financials/trip-notifications.service'
@@ -272,6 +272,11 @@ export class TripTravelersService {
       .select()
       .from(this.db.schema.tripTravelers)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(
+        desc(this.db.schema.tripTravelers.isPrimaryTraveler),
+        asc(this.db.schema.tripTravelers.sequenceOrder),
+        asc(this.db.schema.tripTravelers.createdAt),
+      )
 
     return Promise.all(travelers.map((traveler) => this.mapToResponseDto(traveler, auth)))
   }
