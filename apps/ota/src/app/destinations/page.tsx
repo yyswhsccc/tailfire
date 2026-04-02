@@ -34,12 +34,10 @@ export default async function DestinationsPage({ searchParams }: DestinationsPag
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      {/* Debug: show fetch error if any */}
-      {fetchError && (
-        <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">
-          <strong>Debug:</strong> {fetchError} | API_URL: {process.env.API_URL || 'NOT SET'}
-        </div>
-      )}
+      {/* Debug: always show fetch status */}
+      <div className="mb-4 rounded bg-blue-50 p-3 text-sm text-blue-700">
+        <strong>Debug:</strong> total={data.total}, count={data.destinations.length}, error={fetchError || 'none'}, API={process.env.API_URL || 'NOT SET'}
+      </div>
       <div className="mb-8">
         <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
           DESTINATIONS
