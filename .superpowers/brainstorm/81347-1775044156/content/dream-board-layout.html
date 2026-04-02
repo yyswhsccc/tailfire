@@ -1,0 +1,184 @@
+<h2>Dream Board + AI Concierge Layout</h2>
+<p class="subtitle">The consumer's trip building canvas — how should the board and AI panel coexist?</p>
+
+<div class="cards">
+  <!-- Option A: Side by side -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#fafaf8">
+      <div style="display:flex;gap:8px;height:320px">
+        <!-- AI Panel -->
+        <div style="width:35%;background:#1a1a1a;border-radius:12px;padding:16px;color:white;display:flex;flex-direction:column;gap:8px;overflow:hidden">
+          <div style="font-size:11px;color:#C59746;font-weight:600;letter-spacing:1px">AI CONCIERGE</div>
+          <div style="background:#2a2a2a;border-radius:8px;padding:8px;font-size:10px;color:#ccc">Hi! I see you're planning a trip to Cancun. I found a great nonstop flight...</div>
+          <div style="background:#C59746;border-radius:8px;padding:8px;font-size:10px;color:white;cursor:grab">
+            <div style="font-weight:600">✈️ Porter YOW → CUN</div>
+            <div style="font-size:9px;opacity:0.8">Apr 15 · Nonstop · $244</div>
+            <div style="font-size:8px;margin-top:4px;opacity:0.6">⟵ Drag to add to board</div>
+          </div>
+          <div style="background:#C59746;border-radius:8px;padding:8px;font-size:10px;color:white;cursor:grab">
+            <div style="font-weight:600">🏨 Hyatt Ziva Cancun</div>
+            <div style="font-size:9px;opacity:0.8">Apr 15-22 · Ocean View · $350/nt</div>
+            <div style="font-size:8px;margin-top:4px;opacity:0.6">⟵ Drag to add to board</div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="background:#2a2a2a;border-radius:8px;padding:8px;display:flex;gap:4px">
+            <div style="flex:1;background:#333;border-radius:4px;padding:4px 8px;font-size:10px;color:#888">Ask me anything...</div>
+          </div>
+        </div>
+        <!-- Dream Board -->
+        <div style="flex:1;background:white;border:1px solid #e5e5e5;border-radius:12px;padding:12px;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-size:12px;font-weight:600;color:#1a1a1a">🌴 Cancun Getaway</div>
+            <div style="font-size:9px;color:#C59746;font-weight:500">+ Add Component</div>
+          </div>
+          <!-- Masonry grid -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:8px;padding:8px;color:white;height:80px">
+              <div style="font-size:9px;opacity:0.7">FLIGHT</div>
+              <div style="font-size:11px;font-weight:600">YOW → CUN</div>
+              <div style="font-size:9px">Apr 15 · $244</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:8px;padding:8px;color:white;height:100px">
+              <div style="font-size:9px;opacity:0.7">HOTEL</div>
+              <div style="font-size:11px;font-weight:600">Hyatt Ziva</div>
+              <div style="font-size:9px">7 nights · $2,450</div>
+              <div style="font-size:8px;margin-top:4px;opacity:0.7">Ocean View King</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#10b981,#059669);border-radius:8px;padding:8px;color:white;height:100px">
+              <div style="font-size:9px;opacity:0.7">TOUR</div>
+              <div style="font-size:11px;font-weight:600">Chichen Itza</div>
+              <div style="font-size:9px">Day trip · $89</div>
+            </div>
+            <div style="border:2px dashed #d4d4d4;border-radius:8px;height:80px;display:flex;align-items:center;justify-content:center">
+              <div style="font-size:20px;color:#d4d4d4">+</div>
+            </div>
+          </div>
+          <!-- Footer -->
+          <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid #eee">
+            <div style="font-size:10px;color:#888">4 components · $2,827 total</div>
+            <div style="background:#C59746;color:white;padding:4px 12px;border-radius:6px;font-size:10px;font-weight:600">Submit Trip</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A: Fixed Side-by-Side</h3>
+      <p>AI panel on left (35%), dream board on right (65%). Always visible together. Drag from AI → board horizontally. Desktop-first, collapses on mobile.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Board with floating AI -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#fafaf8">
+      <div style="position:relative;height:320px;background:white;border:1px solid #e5e5e5;border-radius:12px;padding:12px;overflow:hidden">
+        <!-- Full-width board -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:600;color:#1a1a1a">🌴 Cancun Getaway</div>
+          <div style="display:flex;gap:6px">
+            <div style="font-size:9px;color:#888;background:#f5f5f5;padding:3px 8px;border-radius:4px">+ Add Flight</div>
+            <div style="font-size:9px;color:#888;background:#f5f5f5;padding:3px 8px;border-radius:4px">+ Add Hotel</div>
+            <div style="font-size:9px;color:#888;background:#f5f5f5;padding:3px 8px;border-radius:4px">+ Add Tour</div>
+          </div>
+        </div>
+        <!-- 3-column masonry -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+          <div style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:8px;padding:10px;color:white;height:90px">
+            <div style="font-size:9px;opacity:0.7">✈️ FLIGHT</div>
+            <div style="font-size:11px;font-weight:600">YOW → CUN</div>
+            <div style="font-size:9px">Apr 15 · Nonstop</div>
+            <div style="font-size:11px;font-weight:700;margin-top:4px">$244</div>
+          </div>
+          <div style="border-radius:8px;overflow:hidden;height:120px;background:#f97316">
+            <div style="height:60%;background:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 60%22><rect fill=%22%2306b6d4%22 width=%22100%22 height=%2260%22/><text x=%2250%22 y=%2235%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%228%22>🏖️ Hotel Photo</text></svg>') center/cover"></div>
+            <div style="padding:6px;color:white">
+              <div style="font-size:10px;font-weight:600">Hyatt Ziva Cancun</div>
+              <div style="font-size:9px">$350/nt · 7 nights</div>
+            </div>
+          </div>
+          <div style="background:linear-gradient(135deg,#10b981,#059669);border-radius:8px;padding:10px;color:white;height:90px">
+            <div style="font-size:9px;opacity:0.7">🗺️ TOUR</div>
+            <div style="font-size:11px;font-weight:600">Chichen Itza</div>
+            <div style="font-size:9px">Full day tour</div>
+            <div style="font-size:11px;font-weight:700;margin-top:4px">$89</div>
+          </div>
+          <div style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:8px;padding:10px;color:white;height:90px">
+            <div style="font-size:9px;opacity:0.7">✈️ RETURN</div>
+            <div style="font-size:11px;font-weight:600">CUN → YOW</div>
+            <div style="font-size:9px">Apr 22 · Nonstop</div>
+            <div style="font-size:11px;font-weight:700;margin-top:4px">$343</div>
+          </div>
+          <div style="border:2px dashed #d4d4d4;border-radius:8px;height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+            <div style="font-size:20px;color:#d4d4d4">+</div>
+            <div style="font-size:8px;color:#aaa">Drag here or click to add</div>
+          </div>
+        </div>
+        <!-- Floating AI bubble -->
+        <div style="position:absolute;bottom:12px;right:12px;width:48px;height:48px;background:#1a1a1a;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer">
+          <span style="font-size:20px">✦</span>
+        </div>
+        <!-- Footer -->
+        <div style="position:absolute;bottom:0;left:0;right:0;background:white;border-top:1px solid #eee;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:10px;color:#888">4 components · $2,827 total</div>
+          <div style="background:#C59746;color:white;padding:4px 12px;border-radius:6px;font-size:10px;font-weight:600">Submit Trip</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B: Full-Width Board + Floating AI</h3>
+      <p>Board uses full screen width for max visual impact (3-col masonry). AI is a floating bubble that expands into an overlay/drawer when clicked. More Pinterest-like. Drag from expanded AI panel → board.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Board with slide-over AI -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#fafaf8">
+      <div style="position:relative;height:320px;overflow:hidden">
+        <!-- Board (full width, slightly dimmed) -->
+        <div style="height:100%;background:white;border:1px solid #e5e5e5;border-radius:12px;padding:12px;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:12px;font-weight:600">🌴 Cancun Getaway</div>
+            <div style="display:flex;gap:4px">
+              <div style="font-size:9px;background:#f5f5f5;padding:3px 8px;border-radius:4px">+ Add</div>
+              <div style="font-size:9px;background:#1a1a1a;color:#C59746;padding:3px 8px;border-radius:4px">✦ AI</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;opacity:0.4">
+            <div style="background:#0ea5e9;border-radius:8px;height:80px"></div>
+            <div style="background:#f97316;border-radius:8px;height:100px"></div>
+            <div style="background:#10b981;border-radius:8px;height:80px"></div>
+          </div>
+        </div>
+        <!-- AI Slide-over panel -->
+        <div style="position:absolute;top:0;right:0;bottom:0;width:55%;background:#1a1a1a;border-radius:0 12px 12px 0;padding:16px;color:white;display:flex;flex-direction:column;gap:8px;box-shadow:-4px 0 20px rgba(0,0,0,0.2)">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:11px;color:#C59746;font-weight:600;letter-spacing:1px">AI CONCIERGE</div>
+            <div style="font-size:14px;cursor:pointer;opacity:0.5">✕</div>
+          </div>
+          <div style="background:#2a2a2a;border-radius:8px;padding:8px;font-size:10px;color:#ccc">I found some amazing options for your Cancun trip! Here are my top picks...</div>
+          <div style="background:#2a2a2a;border-radius:8px;padding:8px;font-size:10px;color:#ccc;border-left:2px solid #C59746">
+            <div style="font-weight:600;color:white;margin-bottom:4px">Suggested for you:</div>
+          </div>
+          <!-- Draggable suggestions -->
+          <div style="background:#333;border:1px solid #C59746;border-radius:8px;padding:8px;cursor:grab">
+            <div style="font-size:10px;font-weight:600;color:white">🏨 Secrets Riviera Cancun</div>
+            <div style="font-size:9px;color:#999">Adults-only · All-inclusive · $420/nt</div>
+            <div style="font-size:8px;color:#C59746;margin-top:4px">Drag to board →</div>
+          </div>
+          <div style="background:#333;border:1px solid #555;border-radius:8px;padding:8px;cursor:grab">
+            <div style="font-size:10px;font-weight:600;color:white">🤿 Snorkeling at Isla Mujeres</div>
+            <div style="font-size:9px;color:#999">Half day · $65/person</div>
+            <div style="font-size:8px;color:#C59746;margin-top:4px">Drag to board →</div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="background:#2a2a2a;border-radius:8px;padding:8px;display:flex;gap:4px">
+            <div style="flex:1;background:#333;border-radius:4px;padding:6px 8px;font-size:10px;color:#888">What else would you like?</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C: Board + Slide-Over AI Panel</h3>
+      <p>Board is always full-width. AI panel slides over from the right when opened (like the current chat widget but larger). Drag suggestions from the slide-over onto the visible board beneath. Board dims but stays interactive under the panel.</p>
+    </div>
+  </div>
+</div>

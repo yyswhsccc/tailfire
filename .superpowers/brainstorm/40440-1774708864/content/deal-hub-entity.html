@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Deal Entity Hub</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #fafaf8; color: #1a1a1a; }
+  .serif { font-family: 'Georgia', 'Times New Roman', serif; }
+
+  /* HERO — with guaranteed text contrast solution */
+  .hero { height: 480px; position: relative; overflow: hidden; }
+  .hero img { width: 100%; height: 100%; object-fit: cover; }
+  /* THREE layers of contrast protection */
+  .hero-scrim { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.35) 35%, rgba(0,0,0,0.15) 100%); }
+  .hero-content { position: absolute; bottom: 0; left: 0; right: 0; padding: 40px 60px; max-width: 1280px; margin: 0 auto; }
+  .hero-content * { text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+  .hero-badge { font-size: 12px; text-transform: uppercase; letter-spacing: 3px; color: #C59746; font-weight: 600; }
+  .hero-title { font-size: 48px; font-weight: 700; color: white; line-height: 1.1; margin-top: 8px; }
+  .hero-subtitle { font-size: 16px; color: rgba(255,255,255,0.85); margin-top: 8px; line-height: 1.5; max-width: 640px; }
+  .hero-meta { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .hero-meta span { font-size: 14px; color: rgba(255,255,255,0.85); }
+  .hero-meta .dot { color: rgba(255,255,255,0.3); }
+  .hero-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .hero-actions * { text-shadow: none; }
+  .btn-primary { background: #C59746; color: white; padding: 12px 28px; border-radius: 10px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; }
+  .btn-secondary { background: rgba(255,255,255,0.2); backdrop-filter: blur(8px); color: white; padding: 12px 20px; border-radius: 10px; font-size: 14px; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; }
+  .hero-nav { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; padding: 16px 60px; z-index: 10; }
+  .hero-nav div { width: 40px; height: 40px; background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; cursor: pointer; }
+  .hero-nav .save { margin-left: auto; }
+
+  /* Deal urgency badge */
+  .urgency-badge { display: inline-flex; align-items: center; gap: 6px; background: #dc2626; color: white; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-shadow: none; margin-bottom: 12px; }
+  .urgency-badge.active { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }
+
+  .feed { max-width: 1280px; margin: 0 auto; padding: 0 60px 60px; }
+  .feed-divider { height: 1px; background: #eee; margin: 32px 0; }
+  .context { max-width: 1280px; margin: 0 auto; padding: 28px 60px; }
+  .pill { background: #f0eeea; padding: 6px 16px; border-radius: 20px; font-size: 12px; color: #666; }
+
+  .card-base { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,0.05); transition: box-shadow 0.2s, transform 0.2s; cursor: pointer; }
+  .card-base:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
+  .card-tag { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.92); padding: 3px 10px; border-radius: 8px; font-size: 10px; font-weight: 600; color: #C59746; backdrop-filter: blur(4px); }
+  .price { font-weight: 700; color: #C59746; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+
+  .section-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+  .section-label h2 { font-size: 20px; font-weight: 700; }
+  .section-label .see-all { font-size: 13px; color: #C59746; font-weight: 500; text-decoration: none; }
+
+  /* Deal-specific: savings highlight */
+  .savings-bar { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1px solid #f59e0b; border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+  .savings-amount { font-size: 28px; font-weight: 800; color: #b45309; }
+  .savings-detail { flex: 1; }
+  .savings-detail .main { font-size: 14px; font-weight: 600; color: #92400e; }
+  .savings-detail .sub { font-size: 12px; color: #a16207; margin-top: 2px; }
+
+  /* Terms card */
+  .terms-card { background: #f8f7f4; border: 1px solid #e8e6e0; border-radius: 14px; padding: 20px; }
+  .terms-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+  .terms-card li { font-size: 13px; color: #555; line-height: 1.7; margin-left: 16px; }
+
+  .nearby { background: #f4f3f0; margin: 0 -60px; padding: 40px 60px; }
+  .nearby-scroll { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; }
+  .nearby-card { min-width: 260px; background: white; border-radius: 14px; overflow: hidden; flex-shrink: 0; }
+  .nearby-card img { width: 100%; height: 130px; object-fit: cover; }
+  .nearby-card .info { padding: 12px 14px; }
+  .nearby-card .info h4 { font-size: 14px; font-weight: 600; }
+  .nearby-card .info span { font-size: 11px; color: #888; }
+
+  .ai-fab { position: fixed; bottom: 28px; right: 28px; width: 56px; height: 56px; background: #1a1a1a; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(0,0,0,0.25); cursor: pointer; z-index: 100; font-size: 22px; color: #C59746; }
+
+  /* Countdown timer */
+  .countdown { display: inline-flex; gap: 6px; margin-top: 10px; }
+  .countdown-unit { background: rgba(255,255,255,0.2); backdrop-filter: blur(8px); padding: 6px 10px; border-radius: 8px; text-align: center; min-width: 48px; text-shadow: none; }
+  .countdown-unit .num { font-size: 18px; font-weight: 700; color: white; }
+  .countdown-unit .lbl { font-size: 9px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<!-- HERO — Deal/Offer with contrast-safe text -->
+<div class="hero">
+  <img src="https://images.unsplash.com/photo-1559599746-8823b38544c6?w=1600&q=85" alt="Mediterranean Cruise Deal">
+  <div class="hero-scrim"></div>
+  <div class="hero-nav">
+    <div>←</div>
+    <div class="save">♡</div>
+  </div>
+  <div class="hero-content">
+    <div class="urgency-badge active">🔥 Limited Time Offer · Ends April 30</div>
+    <div class="hero-badge">Royal Caribbean · Mediterranean</div>
+    <div class="hero-title serif">Save up to 40% on Mediterranean Cruises</div>
+    <div class="hero-subtitle">Book any 2026 Mediterranean sailing and receive up to $500 onboard credit + free drink package for balcony cabins and above.</div>
+    <div class="countdown">
+      <div class="countdown-unit"><div class="num">33</div><div class="lbl">Days</div></div>
+      <div class="countdown-unit"><div class="num">14</div><div class="lbl">Hrs</div></div>
+      <div class="countdown-unit"><div class="num">52</div><div class="lbl">Min</div></div>
+    </div>
+    <div class="hero-actions">
+      <button class="btn-primary">✨ Claim This Deal</button>
+      <button class="btn-secondary">♡ Save Deal</button>
+    </div>
+  </div>
+</div>
+
+<!-- SAVINGS HIGHLIGHT -->
+<div style="max-width: 1280px; margin: 0 auto; padding: 24px 60px 0;">
+  <div class="savings-bar">
+    <div class="savings-amount">40% OFF</div>
+    <div class="savings-detail">
+      <div class="main">Save up to $2,400 per couple on select Mediterranean sailings</div>
+      <div class="sub">Plus $500 onboard credit + free classic drink package on balcony & above</div>
+    </div>
+    <button class="btn-primary" style="flex-shrink: 0;">View Qualifying Sailings</button>
+  </div>
+</div>
+
+<div class="feed">
+
+  <!-- QUALIFYING SAILINGS -->
+  <div class="section-label">
+    <h2>🚢 Qualifying Sailings</h2>
+    <a href="#" class="see-all">View all 24 sailings →</a>
+  </div>
+
+  <div class="grid-2" style="margin-bottom: 16px;">
+    <div class="card-base">
+      <div style="height: 200px; position: relative; overflow: hidden;">
+        <img src="https://images.unsplash.com/photo-1548574505-5e239809ee19?w=800&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+        <div class="card-tag">🚢 7 Nights</div>
+        <div style="position: absolute; bottom: 8px; left: 10px; background: rgba(0,0,0,0.6); color: white; padding: 3px 10px; border-radius: 8px; font-size: 10px; backdrop-filter: blur(4px);">Allure of the Seas</div>
+        <!-- Deal savings badge on card -->
+        <div style="position: absolute; top: 10px; left: 10px; background: #dc2626; color: white; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700;">SAVE $1,200</div>
+      </div>
+      <div style="padding: 18px 20px;">
+        <div style="font-size: 17px; font-weight: 600;">Western Mediterranean</div>
+        <div style="font-size: 13px; color: #888; margin-top: 4px;">Allure of the Seas · Jun 14, 2026</div>
+        <div style="font-size: 12px; color: #aaa; margin-top: 4px;">Rome → Barcelona → Marseille → Naples</div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 14px;">
+          <div>
+            <span style="font-size: 14px; color: #aaa; text-decoration: line-through;">$2,199</span>
+            <span style="font-size: 24px; margin-left: 8px;" class="price">$1,299</span>
+            <span style="font-size: 12px; color: #888;">/person</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-base">
+      <div style="height: 200px; position: relative; overflow: hidden;">
+        <img src="https://images.unsplash.com/photo-1530841377377-3ff06c0ca713?w=800&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+        <div class="card-tag">🚢 10 Nights</div>
+        <div style="position: absolute; bottom: 8px; left: 10px; background: rgba(0,0,0,0.6); color: white; padding: 3px 10px; border-radius: 8px; font-size: 10px; backdrop-filter: blur(4px);">Harmony of the Seas</div>
+        <div style="position: absolute; top: 10px; left: 10px; background: #dc2626; color: white; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700;">SAVE $1,800</div>
+      </div>
+      <div style="padding: 18px 20px;">
+        <div style="font-size: 17px; font-weight: 600;">Greek Islands & Turkey</div>
+        <div style="font-size: 13px; color: #888; margin-top: 4px;">Harmony of the Seas · Jul 5, 2026</div>
+        <div style="font-size: 12px; color: #aaa; margin-top: 4px;">Rome → Mykonos → Santorini → Istanbul</div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 14px;">
+          <div>
+            <span style="font-size: 14px; color: #aaa; text-decoration: line-through;">$3,599</span>
+            <span style="font-size: 24px; margin-left: 8px;" class="price">$2,180</span>
+            <span style="font-size: 12px; color: #888;">/person</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="feed-divider"></div>
+
+  <!-- WHAT'S INCLUDED -->
+  <div class="grid-2-1">
+    <div>
+      <div class="section-label">
+        <h2>🎁 What's Included</h2>
+      </div>
+      <div class="grid-2">
+        <div class="card-base" style="padding: 20px; text-align: center;">
+          <div style="font-size: 32px; margin-bottom: 8px;">🍸</div>
+          <div style="font-size: 14px; font-weight: 600;">Free Drink Package</div>
+          <div style="font-size: 12px; color: #888; margin-top: 4px;">Classic drinks package included for balcony cabins & above</div>
+          <div style="font-size: 13px; margin-top: 8px;" class="price">Worth $89/day</div>
+        </div>
+        <div class="card-base" style="padding: 20px; text-align: center;">
+          <div style="font-size: 32px; margin-bottom: 8px;">💳</div>
+          <div style="font-size: 14px; font-weight: 600;">Onboard Credit</div>
+          <div style="font-size: 12px; color: #888; margin-top: 4px;">Up to $500 per stateroom to spend onboard</div>
+          <div style="font-size: 13px; margin-top: 8px;" class="price">$500 value</div>
+        </div>
+        <div class="card-base" style="padding: 20px; text-align: center;">
+          <div style="font-size: 32px; margin-bottom: 8px;">📶</div>
+          <div style="font-size: 14px; font-weight: 600;">Free WiFi</div>
+          <div style="font-size: 12px; color: #888; margin-top: 4px;">Surf & Stream package for suite bookings</div>
+          <div style="font-size: 13px; margin-top: 8px;" class="price">Worth $20/day</div>
+        </div>
+        <div class="card-base" style="padding: 20px; text-align: center;">
+          <div style="font-size: 32px; margin-bottom: 8px;">👶</div>
+          <div style="font-size: 14px; font-weight: 600;">Kids Sail Free</div>
+          <div style="font-size: 12px; color: #888; margin-top: 4px;">3rd & 4th guests under 12 sail free</div>
+          <div style="font-size: 13px; margin-top: 8px;" class="price">Save $800+</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Terms & conditions -->
+    <div>
+      <div class="terms-card">
+        <h3>📋 Deal Terms</h3>
+        <ul>
+          <li>Valid for new bookings made by April 30, 2026</li>
+          <li>Applies to 2026 Mediterranean sailings only</li>
+          <li>Drink package: Balcony & above, 1st & 2nd guest</li>
+          <li>Onboard credit: $250 for Inside/Ocean, $500 for Balcony/Suite</li>
+          <li>Kids sail free: Ages 2-11, 3rd/4th guest, select sailings</li>
+          <li>Combinable with Crown & Anchor loyalty discounts</li>
+          <li>Deposit: $250 per person, refundable until 90 days before sailing</li>
+        </ul>
+      </div>
+
+      <div class="card-base" style="margin-top: 16px; padding: 20px; text-align: center;">
+        <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">Questions about this deal?</div>
+        <div style="font-size: 12px; color: #888; margin-bottom: 14px;">Our advisors can help you find the perfect sailing and apply all available discounts.</div>
+        <button class="btn-primary" style="width: 100%; padding: 14px;">💬 Talk to an Advisor</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="feed-divider"></div>
+
+  <!-- DESTINATIONS IN THIS DEAL -->
+  <div class="section-label">
+    <h2>📍 Destinations You'll Visit</h2>
+  </div>
+  <div class="grid-3" style="margin-bottom: 16px;">
+    <div class="card-base">
+      <div style="height: 180px; position: relative; overflow: hidden;">
+        <img src="https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=600&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+      </div>
+      <div style="padding: 14px 16px;">
+        <div style="font-size: 15px; font-weight: 600;">Rome, Italy</div>
+        <div style="font-size: 12px; color: #888; margin-top: 3px;">⭐ 4.6 · Colosseum, Vatican, Trastevere</div>
+        <div style="font-size: 12px; color: #C59746; margin-top: 8px;">Explore destination →</div>
+      </div>
+    </div>
+    <div class="card-base">
+      <div style="height: 180px; position: relative; overflow: hidden;">
+        <img src="https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?w=600&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+      </div>
+      <div style="padding: 14px 16px;">
+        <div style="font-size: 15px; font-weight: 600;">Barcelona, Spain</div>
+        <div style="font-size: 12px; color: #888; margin-top: 3px;">⭐ 4.7 · Sagrada Familia, Las Ramblas</div>
+        <div style="font-size: 12px; color: #C59746; margin-top: 8px;">Explore destination →</div>
+      </div>
+    </div>
+    <div class="card-base">
+      <div style="height: 180px; position: relative; overflow: hidden;">
+        <img src="https://images.unsplash.com/photo-1504512485720-7d83a16ee930?w=600&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+      </div>
+      <div style="padding: 14px 16px;">
+        <div style="font-size: 15px; font-weight: 600;">Santorini, Greece</div>
+        <div style="font-size: 12px; color: #888; margin-top: 3px;">⭐ 4.8 · Sunsets, blue domes, wine</div>
+        <div style="font-size: 12px; color: #C59746; margin-top: 8px;">Explore destination →</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="feed-divider"></div>
+
+  <!-- FLIGHTS -->
+  <div class="section-label">
+    <h2>✈️ Flights to Rome</h2>
+    <a href="#" class="see-all">Search flights →</a>
+  </div>
+  <div style="font-size: 12px; color: #888; margin-top: -12px; margin-bottom: 16px;">From Toronto (YYZ) · For Jun 13 embarkation</div>
+  <div class="grid-3" style="margin-bottom: 16px;">
+    <div class="card-base" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px; font-weight: 600;">ITA Airways</div>
+        <div style="font-size: 11px; color: #2a9d3a; background: #edf7ee; padding: 3px 10px; border-radius: 10px;">Direct</div>
+      </div>
+      <div style="font-size: 13px; color: #888; margin-top: 6px;">YYZ → FCO · 9h 30m</div>
+      <div style="font-size: 20px; margin-top: 10px;" class="price">$712</div>
+    </div>
+    <div class="card-base" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px; font-weight: 600;">Air Canada</div>
+        <div style="font-size: 11px; color: #2a9d3a; background: #edf7ee; padding: 3px 10px; border-radius: 10px;">Direct</div>
+      </div>
+      <div style="font-size: 13px; color: #888; margin-top: 6px;">YYZ → FCO · 9h 15m</div>
+      <div style="font-size: 20px; margin-top: 10px;" class="price">$849</div>
+    </div>
+    <div class="card-base" style="padding: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px; font-weight: 600;">Lufthansa</div>
+        <div style="font-size: 11px; color: #888;">1 stop via FRA</div>
+      </div>
+      <div style="font-size: 13px; color: #888; margin-top: 6px;">YYZ → FRA → FCO · 12h 40m</div>
+      <div style="font-size: 20px; margin-top: 10px;" class="price">$624</div>
+    </div>
+  </div>
+
+  <div class="feed-divider"></div>
+
+  <!-- MORE DEALS -->
+  <div class="nearby">
+    <div class="section-label">
+      <h2>💰 More Deals You Might Like</h2>
+      <a href="#" class="see-all">View all deals →</a>
+    </div>
+    <div class="nearby-scroll">
+      <div class="nearby-card card-base" style="min-width: 280px;">
+        <div style="position: relative;">
+          <img src="https://images.unsplash.com/photo-1580237541049-2d715a09486e?w=400&q=80">
+          <div style="position: absolute; top: 8px; left: 8px; background: #dc2626; color: white; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700;">30% OFF</div>
+        </div>
+        <div class="info">
+          <h4>Caribbean Flash Sale</h4>
+          <span>Royal Caribbean · Ends May 15 · From $599</span>
+        </div>
+      </div>
+      <div class="nearby-card card-base" style="min-width: 280px;">
+        <div style="position: relative;">
+          <img src="https://images.unsplash.com/photo-1559599746-8823b38544c6?w=400&q=80">
+          <div style="position: absolute; top: 8px; left: 8px; background: #dc2626; color: white; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700;">FREE UPGRADE</div>
+        </div>
+        <div class="info">
+          <h4>Alaska Cabin Upgrade</h4>
+          <span>Celebrity Cruises · Book by Jun 1 · From $1,299</span>
+        </div>
+      </div>
+      <div class="nearby-card card-base" style="min-width: 280px;">
+        <div style="position: relative;">
+          <img src="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=400&q=80">
+          <div style="position: absolute; top: 8px; left: 8px; background: #dc2626; color: white; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 700;">2 FOR 1</div>
+        </div>
+        <div class="info">
+          <h4>Italy & Greece 2-for-1</h4>
+          <span>MSC Cruises · Limited cabins · From $899</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Text contrast solution note -->
+<div style="max-width: 1280px; margin: 0 auto; padding: 40px 60px; background: #f8f7f4; border-top: 1px solid #eee;">
+  <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">💡 Hero Text Contrast Solution</h3>
+  <div style="font-size: 13px; color: #555; line-height: 1.8; max-width: 700px;">
+    Three layers ensure text is always readable regardless of hero image brightness:<br><br>
+    <strong>1. Gradient scrim</strong> — Bottom-heavy dark gradient overlay (75% opacity at bottom → 15% at top)<br>
+    <strong>2. Text shadow</strong> — Every text element gets <code>text-shadow: 0 1px 3px rgba(0,0,0,0.5)</code><br>
+    <strong>3. Bottom placement</strong> — Title/meta always positioned at the darkest part of the gradient<br><br>
+    This works on bright beaches, white buildings, snowy mountains, and sunny ports. The gradient is strong enough to guarantee contrast but subtle enough to not make the image feel dark.
+  </div>
+</div>
+
+<!-- AI FAB -->
+<div class="ai-fab">✦</div>
+
+</body>
+</html>

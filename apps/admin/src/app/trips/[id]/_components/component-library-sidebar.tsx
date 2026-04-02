@@ -82,7 +82,7 @@ function CancelDropZone() {
   )
 }
 
-export function ComponentLibrarySidebar({ isDragging = false }: { isDragging?: boolean }) {
+export function ComponentLibrarySidebar({ isDragging = false, activityCount = 0 }: { isDragging?: boolean; activityCount?: number }) {
   const [aiAssistExpanded, setAiAssistExpanded] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
 
@@ -201,7 +201,7 @@ export function ComponentLibrarySidebar({ isDragging = false }: { isDragging?: b
           <p id="trip-components-heading" className="text-xs font-medium text-ash-500 mb-2">Trip Components</p>
           <div className="space-y-1.5">
             {Object.entries(ACTIVITY_TYPE_METADATA)
-              .filter(([_, metadata]) => !metadata.hidden)
+              .filter(([type, metadata]) => !metadata.hidden && (type !== 'package' || activityCount >= 2))
               .map(([type, metadata]) => (
               <DraggableComponent
                 key={`component-${type}`}

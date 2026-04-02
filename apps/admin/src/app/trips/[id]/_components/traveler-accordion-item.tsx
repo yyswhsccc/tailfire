@@ -400,18 +400,18 @@ export function TravelerAccordionItem({
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
             Travel Essentials
           </h4>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {inputField('First Name', 'firstName')}
             {inputField('Last Name', 'lastName')}
-          </div>
-          <div className="mt-3">
-            <Label className="text-xs text-muted-foreground">Date of Birth</Label>
-            <DatePickerEnhanced
-              value={fields.dateOfBirth || null}
-              onChange={(v) => handleDateChange('dateOfBirth', v)}
-              disabled={isSnapshotOnly}
-              className="mt-1.5"
-            />
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Date of Birth</Label>
+              <DatePickerEnhanced
+                value={fields.dateOfBirth || null}
+                onChange={(v) => handleDateChange('dateOfBirth', v)}
+                disabled={isSnapshotOnly}
+                className="[&_input]:min-h-9 [&_input]:h-9 [&_button]:h-7 [&_button]:w-7"
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3 mt-3">
             {inputField('Email', 'email', { type: 'email' })}
@@ -424,7 +424,7 @@ export function TravelerAccordionItem({
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
             Passport
           </h4>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {inputField('Passport Number', 'passportNumber')}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Passport Expiry</Label>
@@ -432,10 +432,9 @@ export function TravelerAccordionItem({
                 value={fields.passportExpiry || null}
                 onChange={(v) => handleDateChange('passportExpiry', v)}
                 disabled={isSnapshotOnly}
+                className="[&_input]:min-h-9 [&_input]:h-9 [&_button]:h-7 [&_button]:w-7"
               />
             </div>
-          </div>
-          <div className="mt-3">
             {inputField('Passport Country', 'passportCountry', {
               placeholder: 'e.g. CAN',
             })}
@@ -477,14 +476,16 @@ export function TravelerAccordionItem({
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 space-y-3">
-            {inputField('Address Line 1', 'addressLine1')}
-            {inputField('Address Line 2', 'addressLine2')}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              {inputField('Address Line 1', 'addressLine1')}
+              {inputField('Address Line 2', 'addressLine2')}
+            </div>
+            <div className="grid grid-cols-4 gap-3">
               {inputField('City', 'city')}
               {inputField('Province', 'province')}
               {inputField('Postal Code', 'postalCode')}
+              {inputField('Country', 'country', { placeholder: 'e.g. CA' })}
             </div>
-            {inputField('Country', 'country', { placeholder: 'e.g. CA' })}
           </CollapsibleContent>
         </Collapsible>
 
