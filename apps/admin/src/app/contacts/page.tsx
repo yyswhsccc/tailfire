@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus, Search, LayoutGrid, List } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useContacts } from '@/hooks/use-contacts'
 import { ContactsTable } from './_components/contacts-table'
+import { ContactsKanban } from './_components/contacts-kanban'
 import { ContactsFilterPanel } from './_components/contacts-filter-panel'
 import { BulkActionsToolbar } from './_components/bulk-actions-toolbar'
 import { QuickContactDialog } from './_components/quick-contact-dialog'
@@ -154,10 +155,21 @@ function ContactsPage() {
   }, [filters.page, filters.search, filters.tags, filters.contactType, filters.contactStatus])
 
   // ---------------------------------------------------------------------------
+  // Effective filters — kanban fetches all contacts (limit 500)
+  // ---------------------------------------------------------------------------
+
+  const effectiveFilters = useMemo(() => {
+    if (view === 'kanban') {
+      return { ...filters, limit: 500, page: 1 }
+    }
+    return filters
+  }, [filters, view])
+
+  // ---------------------------------------------------------------------------
   // Data fetching
   // ---------------------------------------------------------------------------
 
-  const { data, isLoading, error } = useContacts(filters)
+  const { data, isLoading, error } = useContacts(effectiveFilters)
 
   // ---------------------------------------------------------------------------
   // Render
@@ -237,13 +249,11 @@ function ContactsPage() {
 
       {/* Content */}
       {view === 'kanban' ? (
-        <div className="flex items-center justify-center py-24 text-muted-foreground">
-          <div className="text-center">
-            <LayoutGrid className="h-12 w-12 mx-auto mb-4 text-ash-300" />
-            <h3 className="text-lg font-medium">Pipeline View</h3>
-            <p className="text-sm">Coming in Phase 3</p>
-          </div>
-        </div>
+        <ContactsKanban
+          contacts={data?.data || []}
+          isLoading={isLoading}
+          onContactClick={(id) => router.push(`/contacts/${id}`)}
+        />
       ) : (
         <div className="bg-white border border-ash-200 rounded-lg">
           {error ? (
