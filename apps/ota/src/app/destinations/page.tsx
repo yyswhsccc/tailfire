@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { fetchDestinations } from '@/lib/fetchers/destinations'
 import { DestinationCard } from '@/components/destinations/destination-card'
 
-export const revalidate = 3600
+// Force dynamic rendering — destinations data changes and API may not be available at build time
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Destinations',
@@ -18,6 +19,7 @@ export default async function DestinationsPage({ searchParams }: DestinationsPag
   const { search, type, page } = await searchParams
   // Show all destination types by default — this is travel discovery, not a cruise port directory
   let data: Awaited<ReturnType<typeof fetchDestinations>> = { destinations: [], total: 0, page: 1, pageSize: 24, totalPages: 0 }
+  let fetchError: string | null = null
   try {
     data = await fetchDestinations({
       search,
@@ -25,10 +27,17 @@ export default async function DestinationsPage({ searchParams }: DestinationsPag
       page: page ? parseInt(page) : 1,
       pageSize: 24,
     })
-  } catch { /* API unavailable at build time — ISR fills on first request */ }
+  } catch (err: any) {
+    fetchError = err?.message || 'Unknown error'
+    console.error('Destinations fetch failed:', err?.message, 'API_URL:', process.env.API_URL)
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      {/* Debug: always show fetch status */}
+      <div className="mb-4 rounded bg-blue-50 p-3 text-sm text-blue-700">
+        <strong>Debug:</strong> total={data.total}, count={data.destinations.length}, error={fetchError || 'none'}, API={process.env.API_URL || 'NOT SET'}
+      </div>
       <div className="mb-8">
         <h1 className="font-display text-3xl font-bold tracking-tight text-[#1A1A1A] md:text-4xl">
           DESTINATIONS

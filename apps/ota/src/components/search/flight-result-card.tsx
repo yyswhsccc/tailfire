@@ -1,4 +1,9 @@
+"use client";
+
 import { Plane, Clock, ArrowRight } from "lucide-react";
+
+import { AddToTripButton } from "@/components/trip-builder/add-to-trip-button";
+import type { TripComponent } from "@/components/trip-builder/trip-basket-store";
 
 // Matches NormalizedFlightOffer from packages/shared-types/src/api/flights.types.ts
 export interface FlightOffer {
@@ -129,6 +134,31 @@ export function FlightResultCard({ offer }: FlightResultCardProps) {
   const destinationCode = lastSegment?.arrival.iataCode ?? "";
   const totalMins = totalDurationMinutes(offer.segments);
 
+  // Build TripComponent for basket
+  const tripComponent: TripComponent = {
+    id: offer.id,
+    type: "flight",
+    data: {
+      segments: offer.segments.map((seg) => ({
+        departureAt: seg.departure.at,
+        arrivalAt: seg.arrival.at,
+        airline: seg.carrier,
+        flightNumber: seg.flightNumber,
+        origin: seg.departure.iataCode,
+        destination: seg.arrival.iataCode,
+        duration: seg.duration,
+        cabin: seg.cabin,
+        aircraft: seg.aircraft,
+      })),
+      price: offer.price,
+    },
+    display: {
+      title: `${originCode} \u2192 ${destinationCode}`,
+      subtitle: `${airlineName} ${firstSegment?.flightNumber ?? ""}`.trim(),
+      price: formatDollarString(offer.price.perTraveler, offer.price.currency),
+    },
+  };
+
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
       {/* Dark gradient header */}
@@ -195,7 +225,8 @@ export function FlightResultCard({ offer }: FlightResultCardProps) {
         </div>
 
         {/* CTA row */}
-        <div className="mt-4 flex items-center justify-end gap-3">
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <AddToTripButton component={tripComponent} size="sm" />
           <a
             href="/contact"
             className="inline-flex h-9 items-center rounded-lg bg-[#C59746] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#B08638]"

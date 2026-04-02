@@ -169,6 +169,9 @@ export const trips = pgTable('trips', {
   // Commission fee rate override (nullable — when NULL, uses agency_settings.commission_fee_rate)
   commissionFeeRateOverride: decimal('commission_fee_rate_override', { precision: 5, scale: 2 }),
 
+  // Origin/source of the trip (admin, ota, import)
+  source: text('source').default('admin'),
+
   // Cover Photo (denormalized for quick access - synced from trip_media)
   coverPhotoUrl: text('cover_photo_url'),
 

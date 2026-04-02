@@ -76,6 +76,9 @@ export interface CreateTripDto {
 
   // Optional group association
   tripGroupId?: string | null
+
+  // Source attribution (admin, ota, import, etc.)
+  source?: string
 }
 
 export interface CreateTripCollaboratorDto {
@@ -689,6 +692,9 @@ export interface CreateTripShareDto {
   sharedWithUserId: string
   accessLevel?: TripShareAccessLevel // Defaults to 'read'
   notes?: string
+  reason?: string
+  scopedContactId?: string
+  expiresAt?: string
 }
 
 /**
@@ -710,6 +716,10 @@ export interface TripShareResponseDto {
   sharedBy: string
   sharedAt: string
   notes: string | null
+  reason: string | null
+  scopedContactId: string | null
+  grantedBy: string | null
+  expiresAt: string | null
   createdAt: string
   updatedAt: string
   // Populated user data (when available)

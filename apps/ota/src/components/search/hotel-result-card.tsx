@@ -1,6 +1,10 @@
+"use client";
+
 import { MapPin } from "lucide-react";
 
 import { formatPrice } from "@/lib/format";
+import { AddToTripButton } from "@/components/trip-builder/add-to-trip-button";
+import type { TripComponent } from "@/components/trip-builder/trip-basket-store";
 
 // Matches NormalizedHotelResult from packages/shared-types/src/api/hotels.types.ts
 export interface HotelOffer {
@@ -114,6 +118,33 @@ export function HotelResultCard({ hotel }: HotelResultCardProps) {
   const starRatingStr = hotel.starRating ? String(hotel.starRating) : undefined;
   const pricePerNight = bestOffer ? getPricePerNight(bestOffer) : null;
 
+  // Build TripComponent for basket
+  const tripComponent: TripComponent = {
+    id: `hotel-${hotel.id}`,
+    type: "hotel",
+    data: {
+      hotelId: hotel.id,
+      propertyName: hotel.name,
+      address: hotel.location.address,
+      city: hotel.location.city,
+      country: hotel.location.country,
+      rating: hotel.rating,
+      starRating: hotel.starRating,
+      checkIn: bestOffer?.checkIn,
+      checkOut: bestOffer?.checkOut,
+      roomType: bestOffer?.roomType,
+      boardType: bestOffer?.boardType,
+      price: bestOffer ? { total: parseFloat(bestOffer.price.total), currency: bestOffer.price.currency } : undefined,
+      provider: hotel.provider,
+    },
+    display: {
+      heroImage: hotel.photos?.[0]?.url,
+      title: hotel.name,
+      subtitle: locationLabel || undefined,
+      price: pricePerNight != null ? formatPrice(pricePerNight, bestOffer?.price.currency) + "/night" : undefined,
+    },
+  };
+
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
       {/* Dark gradient header */}
@@ -179,7 +210,8 @@ export function HotelResultCard({ hotel }: HotelResultCardProps) {
         </div>
 
         {/* CTA */}
-        <div className="mt-4 flex items-end justify-end">
+        <div className="mt-4 flex items-end justify-end gap-2">
+          <AddToTripButton component={tripComponent} size="sm" />
           <a
             href="/contact"
             className="inline-flex h-9 items-center rounded-lg bg-[#C59746] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#B08638]"

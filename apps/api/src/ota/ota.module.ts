@@ -11,9 +11,10 @@
  * Bypasses JWT but requires a valid service key.
  */
 
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { HttpModule } from '@nestjs/axios'
 import { OtaLeadsController } from './ota-leads.controller'
+import { OtaTripRequestsController } from './ota-trip-requests.controller'
 import { OtaLeadsService } from './ota-leads.service'
 import { OtaReferralsController } from './ota-referrals.controller'
 import { OtaReferralsService } from './ota-referrals.service'
@@ -23,9 +24,20 @@ import { OtaSearchController } from './ota-search.controller'
 import { OtaSearchService } from './ota-search.service'
 import { OtaSearchCacheService } from './ota-search-cache.service'
 import { SerpFlightPricesService } from './serp-flight-prices.service'
+import { OtaTripRequestsService } from './ota-trip-requests.service'
+import { OwnerResolutionService } from './owner-resolution.service'
 import { OtaServiceKeyGuard } from './guards/ota-service-key.guard'
 import { CruiseBookingModule } from '../cruise-booking/cruise-booking.module'
 import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
+import { TripsModule } from '../trips/trips.module'
+import { TripPromotionService } from './trip-promotion.service'
+import { FlightPromoter } from './component-promoters/flight.promoter'
+import { LodgingPromoter } from './component-promoters/lodging.promoter'
+import { CruisePromoter } from './component-promoters/cruise.promoter'
+import { TourPromoter } from './component-promoters/tour.promoter'
+import { NotificationModule } from '../notifications/notification.module'
+import { UnsplashModule } from '../unsplash/unsplash.module'
+import { TripInspirationService } from './trip-inspiration.service'
 
 /**
  * Note: ExternalApisModule is @Global() so AmadeusFlightOffersProvider,
@@ -38,9 +50,13 @@ import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
     HttpModule.register({ timeout: 10000 }),
     CruiseBookingModule,
     ApiCredentialsModule,
+    forwardRef(() => TripsModule),
+    NotificationModule,
+    UnsplashModule,
   ],
   controllers: [
     OtaLeadsController,
+    OtaTripRequestsController,
     OtaReferralsController,
     OtaPublishedTripsController,
     OtaSearchController,
@@ -52,8 +68,16 @@ import { ApiCredentialsModule } from '../api-credentials/api-credentials.module'
     OtaSearchService,
     OtaSearchCacheService,
     SerpFlightPricesService,
+    OtaTripRequestsService,
+    OwnerResolutionService,
     OtaServiceKeyGuard,
+    TripPromotionService,
+    FlightPromoter,
+    LodgingPromoter,
+    CruisePromoter,
+    TourPromoter,
+    TripInspirationService,
   ],
-  exports: [OtaLeadsService, OtaReferralsService, OtaPublishedTripsService, OtaSearchService],
+  exports: [OtaLeadsService, OtaReferralsService, OtaPublishedTripsService, OtaSearchService, OtaTripRequestsService, OwnerResolutionService, TripPromotionService, FlightPromoter, LodgingPromoter, CruisePromoter, TourPromoter],
 })
 export class OtaModule {}

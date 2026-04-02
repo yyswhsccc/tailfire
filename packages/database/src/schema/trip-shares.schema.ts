@@ -33,6 +33,12 @@ export const tripShares = pgTable('trip_shares', {
   sharedAt: timestamp('shared_at', { withTimezone: true }).notNull().defaultNow(),
   notes: text('notes'),
 
+  // Extended sharing (group bookings, vacation coverage, expiry)
+  reason: text('reason'),
+  scopedContactId: uuid('scoped_contact_id'),
+  grantedBy: uuid('granted_by'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+
   // Audit Fields
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

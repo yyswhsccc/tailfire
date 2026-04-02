@@ -100,9 +100,10 @@ export function TripPackages({ trip }: { trip: TripWithDetailsResponseDto }) {
         <Button
           variant="outline"
           size="sm"
+          className="h-7 text-xs"
           onClick={() => router.push(`/trips/import?tripId=${trip.id}`)}
         >
-          <Download className="h-4 w-4 mr-1.5" />
+          <Download className="h-3.5 w-3.5 mr-1" />
           Import Booking
         </Button>
       </div>

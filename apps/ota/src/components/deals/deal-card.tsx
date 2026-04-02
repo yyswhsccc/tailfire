@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 
 import type { Deal } from "@/types/deal";
 import { formatPrice } from "@/lib/format";
+import { AddToTripButton } from "@/components/trip-builder/add-to-trip-button";
+import type { TripComponent } from "@/components/trip-builder/trip-basket-store";
 
 interface DealCardProps {
   deal: Deal;
@@ -19,6 +23,34 @@ export function DealCard({ deal, advisorName }: DealCardProps) {
         year: "numeric",
       })
     : null;
+
+  // Build TripComponent for basket — type maps from deal.productType
+  const componentType = (["flight", "hotel", "cruise", "tour"] as const).includes(
+    deal.productType as "flight" | "hotel" | "cruise" | "tour",
+  )
+    ? (deal.productType as "flight" | "hotel" | "cruise" | "tour")
+    : ("custom" as const);
+
+  const tripComponent: TripComponent = {
+    id: `deal-${deal.id}`,
+    type: componentType,
+    data: {
+      dealId: deal.id,
+      dealSlug: deal.slug,
+      title: deal.title,
+      description: deal.description,
+      supplierName: deal.supplierName,
+      productType: deal.productType,
+      destinations: deal.destinations,
+      price: hasPrice ? { total: deal.pricing.fromPriceCents! / 100, currency: deal.pricing.currency ?? "CAD" } : undefined,
+    },
+    display: {
+      heroImage: deal.heroImageUrl,
+      title: deal.title,
+      subtitle: deal.supplierName ?? deal.productType,
+      price: hasPrice ? formatPrice(deal.pricing.fromPriceCents!) : undefined,
+    },
+  };
 
   return (
     <Link
@@ -106,9 +138,14 @@ export function DealCard({ deal, advisorName }: DealCardProps) {
           ) : (
             <p className="text-sm text-muted-foreground">Contact for pricing</p>
           )}
-          <span className="text-sm font-semibold text-[#C59746] transition-colors group-hover:text-[#E89E4A]">
-            View &rarr;
-          </span>
+          <div className="flex items-center gap-2">
+            <div onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+              <AddToTripButton component={tripComponent} size="sm" />
+            </div>
+            <span className="text-sm font-semibold text-[#C59746] transition-colors group-hover:text-[#E89E4A]">
+              View &rarr;
+            </span>
+          </div>
         </div>
 
         {advisorName && (

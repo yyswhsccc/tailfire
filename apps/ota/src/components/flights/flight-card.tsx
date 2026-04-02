@@ -11,6 +11,8 @@ import {
 } from "./flight-search-store";
 import { formatPrice, countStops, computeElapsedMinutes, formatDuration, formatIsoDuration } from "@/lib/flight-utils";
 import { Badge } from "@/components/ui/badge";
+import { AddToTripButton } from "@/components/trip-builder/add-to-trip-button";
+import type { TripComponent } from "@/components/trip-builder/trip-basket-store";
 /** Client-safe fetch via Next.js proxy routes */
 async function clientFetch<T>(path: string): Promise<T> {
   const res = await fetch(path);
@@ -162,6 +164,31 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
   const priceNum = parseFloat(offer.price.perTraveler);
   const priceIndicator = getPriceIndicator(priceNum, priceMetrics);
 
+  // Build TripComponent for basket
+  const tripComponent: TripComponent = {
+    id: offer.id,
+    type: "flight",
+    data: {
+      segments: offer.segments.map((seg) => ({
+        departureAt: seg.departure.at,
+        arrivalAt: seg.arrival.at,
+        airline: seg.carrier,
+        flightNumber: seg.flightNumber,
+        origin: seg.departure.iataCode,
+        destination: seg.arrival.iataCode,
+        duration: seg.duration,
+        cabin: seg.cabin,
+        aircraft: seg.aircraft,
+      })),
+      price: offer.price,
+    },
+    display: {
+      title: `${firstSeg.departure.iataCode} → ${lastSeg.arrival.iataCode}`,
+      subtitle: `${firstSeg.carrierName ?? carrier} ${flightNumber}`,
+      price: formatPrice(offer.price.perTraveler, offer.price.currency),
+    },
+  };
+
   return (
     <button
       type="button"
@@ -283,6 +310,9 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
             {priceIndicator.label}
           </Badge>
         )}
+        <div onClick={(e) => e.stopPropagation()}>
+          <AddToTripButton component={tripComponent} size="sm" />
+        </div>
       </div>
     </button>
   );

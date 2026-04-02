@@ -1,4 +1,9 @@
+"use client";
+
 import { Calendar, MapPin, Users } from "lucide-react";
+
+import { AddToTripButton } from "@/components/trip-builder/add-to-trip-button";
+import type { TripComponent } from "@/components/trip-builder/trip-basket-store";
 
 // Matches TourSummaryDto from tour-repository API
 export interface Tour {
@@ -51,6 +56,31 @@ export function TourResultCard({ tour }: TourResultCardProps) {
   const operatorName = tour.operatorCode ?? "Phoenix Voyages";
   const colors = getOperatorColors(operatorName);
   const durationDays = tour.days ?? 0;
+
+  // Build TripComponent for basket
+  const tripComponent: TripComponent = {
+    id: `tour-${tour.id}`,
+    type: "tour",
+    data: {
+      tourId: tour.id,
+      tourName: tour.name,
+      operatorCode: tour.operatorCode,
+      provider: tour.provider,
+      season: tour.season,
+      days: tour.days,
+      nights: tour.nights,
+      description: tour.description,
+      price: tour.lowestPriceCents != null ? { total: tour.lowestPriceCents / 100, currency: "CAD" } : undefined,
+    },
+    display: {
+      heroImage: tour.imageUrl,
+      title: tour.name,
+      subtitle: operatorName,
+      price: tour.lowestPriceCents != null
+        ? new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(tour.lowestPriceCents / 100)
+        : undefined,
+    },
+  };
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -109,8 +139,9 @@ export function TourResultCard({ tour }: TourResultCardProps) {
           )}
         </div>
 
-        {/* CTA — no price, routes to advisor */}
-        <div className="mt-4 flex items-end justify-end">
+        {/* CTA */}
+        <div className="mt-4 flex items-end justify-end gap-2">
+          <AddToTripButton component={tripComponent} size="sm" />
           <a
             href="/contact"
             className="inline-flex h-9 items-center rounded-lg bg-[#C59746] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#B08638]"

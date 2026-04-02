@@ -115,4 +115,10 @@ export class CreateTripDto {
   @ValidateIf((_, value) => value !== null)
   @IsUUID()
   tripGroupId?: string | null
+
+  // Origin source (admin, ota, import)
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  source?: string
 }
