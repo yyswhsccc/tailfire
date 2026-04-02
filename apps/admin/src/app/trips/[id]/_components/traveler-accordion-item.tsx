@@ -409,6 +409,7 @@ export function TravelerAccordionItem({
                 value={fields.dateOfBirth || null}
                 onChange={(v) => handleDateChange('dateOfBirth', v)}
                 disabled={isSnapshotOnly}
+                className="[&_input]:min-h-9 [&_input]:h-9 [&_button]:h-7 [&_button]:w-7"
               />
             </div>
           </div>
@@ -431,6 +432,7 @@ export function TravelerAccordionItem({
                 value={fields.passportExpiry || null}
                 onChange={(v) => handleDateChange('passportExpiry', v)}
                 disabled={isSnapshotOnly}
+                className="[&_input]:min-h-9 [&_input]:h-9 [&_button]:h-7 [&_button]:w-7"
               />
             </div>
             {inputField('Passport Country', 'passportCountry', {
