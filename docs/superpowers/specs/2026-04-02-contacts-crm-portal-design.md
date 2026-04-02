@@ -180,21 +180,23 @@ Appears as a sticky bar between the filter panel and the table/kanban when `sele
 
 ### Create Trip from Contacts Flow
 
+Embeds `TripFormDialog` directly on the contacts page (per Codex review — simpler than URL-param cross-page navigation). Uses existing `redirectOnCreate={false}` + `onCreated` callback pattern.
+
 1. Agent selects contacts in table (checkboxes) or kanban (click cards)
 2. Clicks "Create Trip" in bulk toolbar
-3. App navigates to `/trips?action=create&contactIds=id1,id2,id3`
-4. Trips page detects `action=create` URL param, opens Create Trip modal
-5. Agent fills trip details (name, dates, type) and submits
-6. After trip creation succeeds, the app auto-creates travelers:
+3. `TripFormDialog` opens directly on the contacts page (same modal used on trips page)
+4. Agent fills trip details (name, dates, type) and submits
+5. `onCreated(newTrip)` callback fires. The contacts page then:
+   - Creates travelers via `POST /trips/:id/travelers` for each selected contact
    - First contact → `role: 'primary_contact'`, `isPrimaryTraveler: true`
    - Remaining contacts → `role: 'full_access'`
    - All default to `travelerType: 'adult'`
-7. Navigate to the new trip's Travelers tab
-8. Agent can adjust roles/types there
+6. Navigate to the new trip's Travelers tab via `router.push(/trips/:id?tab=travelers)`
+7. Agent can adjust roles/types there
 
 ### Filter State Management
 
-Filters persist in URL search params for shareability:
+Currently only `search` is read from URL params. This revamp moves ALL filters to URL search params for shareability and back-button support:
 ```
 /contacts?search=smith&status=prospecting,quoted&type=lead&tags=VIP
 ```
@@ -211,15 +213,35 @@ Filters persist in URL search params for shareability:
 
 ### API Changes Needed
 
+**New DTO:**
+- `ContactListItemDto` — extends `ContactResponseDto` with optional computed fields:
+  - `nextTripName?: string | null`
+  - `nextTripDate?: string | null`
+  - `relationshipCount?: number`
+- This avoids breaking the 10+ places that reuse `ContactResponseDto` as an embedded type (trip-travelers, relationships, etc.)
+- Computed fields are batched per-page in the list query, NOT in `mapToResponseDto()` (avoids N+1)
+
+**New filter params (add to filter DTO + service):**
+- `contactType` — "lead" | "client" (NOT currently supported — must add to `ContactFilterDto`, service WHERE clause, and useContacts hook)
+- `contactStatus` — string[] of status values (NOT currently supported — must add same)
+- Note: `isActive`, `hasPassport`, `passportExpiring`, `sortBy`, `sortOrder` already exist server-side but are NOT wired in the frontend hook
+
 **New endpoints:**
-- `POST /contacts/bulk/tags` — `{ contactIds: string[], tags: string[] }` → adds tags
-- `POST /contacts/bulk/status` — `{ contactIds: string[], status: string }` → changes status
+- `POST /contacts/:contactId/tags/add` — `{ tags: string[] }` → MERGES tags (existing PUT replaces all tags). Place with existing tag API in `tags.controller.ts`, not contacts controller.
+- `POST /contacts/bulk/status` — `{ contactIds: string[], status: string }` → changes status for multiple contacts in a transaction
 
-**Modified responses:**
-- `ContactResponseDto` — add `nextTripName: string | null`, `nextTripDate: string | null`, `relationshipCount: number`
-- These are computed fields, added in `mapToResponseDto` in `contacts.service.ts`
+**Status clarification:**
+- `contactStatus = 'inactive'` is a CRM pipeline stage (agent moved them there intentionally)
+- `isActive = false` is a soft-delete (contact is archived/removed)
+- The kanban shows contactStatus columns. The "Active/Inactive" filter toggle controls isActive (soft-delete). These are independent.
 
-**No other API changes needed** — all filter params already supported, status change endpoint exists, tag system exists.
+**Performance — batched computed fields:**
+- `nextTrip`: After fetching the contacts page, batch-query `trip_travelers` → `trips` WHERE `contact_id IN (pageContactIds)` AND `startDate > today` GROUP BY contact_id, pick MIN startDate per contact
+- `relationshipCount`: After fetching, batch-query `contact_relationships` WHERE `contact_id1 IN (ids) OR contact_id2 IN (ids)` GROUP BY contact_id, COUNT
+- **Add indexes:** `CREATE INDEX idx_trip_travelers_contact_id ON trip_travelers(contact_id)` and `CREATE INDEX idx_contact_relationships_contact_ids ON contact_relationships(contact_id1, contact_id2)`
+
+**Status endpoint hardening:**
+- `PATCH /contacts/:id/status` — add Zod enum validation for the 7 contactStatus values
 
 ### Performance Considerations
 
