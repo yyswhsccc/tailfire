@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { fetchDestinations } from '@/lib/fetchers/destinations'
 import { DestinationCard } from '@/components/destinations/destination-card'
 
-export const revalidate = 3600
+// Force dynamic rendering — destinations data changes and API may not be available at build time
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Destinations',
