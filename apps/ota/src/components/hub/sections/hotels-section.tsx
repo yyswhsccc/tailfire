@@ -1,9 +1,9 @@
 // apps/ota/src/components/hub/sections/hotels-section.tsx
 
-import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { FeedSection } from '@/components/hub/feed-section'
 import { HotelProductCard } from '@/components/cards/hotel-product-card'
+import { SectionDatePrompt } from './section-date-prompt'
 import { parseTravelSessionCookie, TRAVEL_SESSION_COOKIE } from '@/lib/travel-session'
 import { API_URL, OTA_SERVICE_KEY } from '@/lib/config'
 import type { SectionComponentProps } from '@/lib/entity-hubs/types'
@@ -157,9 +157,7 @@ export async function HotelsSection({
     )
   }
 
-  // Mode B: no data — render CTA card
-  const searchHref = `/search/hotels?destination=${encodeURIComponent(destinationName)}`
-
+  // Mode B: no data — render inline date prompt
   return (
     <FeedSection
       title={title}
@@ -167,30 +165,14 @@ export async function HotelsSection({
       viewAllHref={viewAllHref}
       viewAllLabel={viewAllLabel}
     >
-      <div className="overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm border-l-4 border-l-[#C59746]">
-        <div className="flex items-center gap-5 p-5 sm:p-6">
-          {/* Hotel icon area */}
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#1A1A1A] text-2xl">
-            🏨
-          </div>
-
-          {/* Text + CTA */}
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-semibold text-[#1A1A1A] sm:text-lg">
-              Find hotels in {destinationName}
-            </p>
-            <p className="mt-0.5 text-sm text-[#666]">
-              Compare rates and availability for your travel dates.
-            </p>
-            <Link
-              href={searchHref}
-              className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[#C59746] hover:underline"
-            >
-              Compare rates and availability →
-            </Link>
-          </div>
-        </div>
-      </div>
+      <SectionDatePrompt
+        icon="🏨"
+        heading="Set your travel dates to see hotel options"
+        subtitle="We'll show top-rated hotels with real prices for your stay"
+        buttonLabel="Show hotels"
+        searchHref={`/search/hotels?destination=${encodeURIComponent(destinationName)}`}
+        searchLabel="Or search hotels manually →"
+      />
     </FeedSection>
   )
 }

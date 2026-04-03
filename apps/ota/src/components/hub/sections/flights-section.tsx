@@ -1,9 +1,9 @@
 // apps/ota/src/components/hub/sections/flights-section.tsx
 
-import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { FeedSection } from '@/components/hub/feed-section'
 import { FlightProductCard } from '@/components/cards/flight-product-card'
+import { SectionDatePrompt } from './section-date-prompt'
 import { parseTravelSessionCookie, TRAVEL_SESSION_COOKIE } from '@/lib/travel-session'
 import { API_URL, OTA_SERVICE_KEY } from '@/lib/config'
 import type { SectionComponentProps } from '@/lib/entity-hubs/types'
@@ -131,7 +131,6 @@ export async function FlightsSection({
   sectionProps,
 }: SectionComponentProps) {
   const destinationName = (sectionProps.destinationName as string | undefined) ?? 'this destination'
-  const detectedAirport = sectionProps.detectedAirport as string | undefined
   const destinationImageUrl = sectionProps.destinationImageUrl as string | undefined
 
   // ---- Try to fetch real flight data from the travel session ----
@@ -197,12 +196,7 @@ export async function FlightsSection({
     )
   }
 
-  // Mode B: no data — render CTA card
-  const searchHref = `/search/flights?to=${encodeURIComponent(destinationName)}`
-  const ctaHeading = detectedAirport
-    ? `Flights from ${detectedAirport} to ${destinationName}`
-    : `Search flights to ${destinationName}`
-
+  // Mode B: no data — render inline date prompt
   return (
     <FeedSection
       title={title}
@@ -210,28 +204,14 @@ export async function FlightsSection({
       viewAllHref={viewAllHref}
       viewAllLabel={viewAllLabel}
     >
-      <div className="overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm border-l-4 border-l-[#C59746]">
-        <div className="flex items-center gap-5 p-5 sm:p-6">
-          {/* Plane icon area */}
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#1A1A1A] text-2xl">
-            ✈️
-          </div>
-
-          {/* Text + CTA */}
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-semibold text-[#1A1A1A] sm:text-lg">{ctaHeading}</p>
-            <p className="mt-0.5 text-sm text-[#666]">
-              Compare fares and find the best deals for your travel dates.
-            </p>
-            <Link
-              href={searchHref}
-              className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[#C59746] hover:underline"
-            >
-              Find the best fares →
-            </Link>
-          </div>
-        </div>
-      </div>
+      <SectionDatePrompt
+        icon="✈️"
+        heading="Set your travel dates to see real flights"
+        subtitle="We'll find the best fares from your city to this destination"
+        buttonLabel="Show flights"
+        searchHref={`/search/flights?to=${encodeURIComponent(destinationName)}`}
+        searchLabel="Or search flights manually →"
+      />
     </FeedSection>
   )
 }
