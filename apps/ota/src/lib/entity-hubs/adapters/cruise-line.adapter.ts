@@ -57,6 +57,16 @@ export const cruiseLineAdapter: HubAdapter<CruiseLineDetail> = {
       priority: 'high',
     })
 
+    // Nearby/related section — no related cruise-line data available; NearbySection
+    // returns null when destinations is empty, so this is a safe no-op placeholder.
+    sections.push({
+      key: 'nearby',
+      title: '\uD83D\uDDFA\uFE0F Explore Destinations',
+      viewAllHref: '/destinations',
+      props: { destinations: [] },
+      priority: 'low',
+    })
+
     return sections
   },
 

@@ -102,6 +102,31 @@ export const sailingAdapter: HubAdapter<SailingDetail> = {
       priority: 'medium',
     })
 
+    // Hotels CTA near embarkation port
+    sections.push({
+      key: 'hotels',
+      title: '\uD83C\uDFE8 Hotels Near Embarkation Port',
+      viewAllHref: `/search/hotels`,
+      props: { destinationName: sailing.embarkPort?.name },
+      priority: 'medium',
+    })
+
+    // Nearby destinations — derive from port stops that have a destinationSlug
+    const portStopsWithSlug = sailing.itinerary.filter(
+      (s) => !s.isSeaDay && s.destinationSlug != null,
+    )
+    const nearbyDestinations = portStopsWithSlug.map((s) => ({
+      name: s.portName,
+      slug: s.destinationSlug as string,
+    }))
+    sections.push({
+      key: 'nearby',
+      title: '\uD83D\uDDFA\uFE0F Explore Destinations on This Route',
+      viewAllHref: '/destinations',
+      props: { destinations: nearbyDestinations },
+      priority: 'low',
+    })
+
     return sections
   },
 

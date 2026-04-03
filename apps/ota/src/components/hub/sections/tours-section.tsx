@@ -33,11 +33,23 @@ export async function ToursSection({
   try {
     if (entityType === 'destination') {
       const destinationName = sectionProps.destinationName as string
-      const data = await catalogFetch<TourSearchResponse>(
+      const primaryData = await catalogFetch<TourSearchResponse>(
         `/tour-repository/tours?q=${encodeURIComponent(destinationName)}&pageSize=4`,
         { next: { revalidate: 3600 } },
       )
-      tours = data.tours
+      tours = primaryData.tours
+
+      // If primary search returned nothing, try the broader fallback term
+      // (e.g., country code "MX" for "Cozumel, Mexico") to improve coverage
+      // for Globus tours that use regional/country-level naming.
+      if (tours.length === 0 && sectionProps.tourSearchFallback) {
+        const fallbackTerm = sectionProps.tourSearchFallback as string
+        const fallbackData = await catalogFetch<TourSearchResponse>(
+          `/tour-repository/tours?q=${encodeURIComponent(fallbackTerm)}&pageSize=4`,
+          { next: { revalidate: 3600 } },
+        )
+        tours = fallbackData.tours
+      }
     } else {
       tours = (sectionProps.tours as any[] | undefined) ?? []
     }
