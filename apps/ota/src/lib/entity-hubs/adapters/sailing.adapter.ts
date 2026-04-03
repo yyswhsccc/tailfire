@@ -77,15 +77,15 @@ export const sailingAdapter: HubAdapter<SailingDetail> = {
       })
     }
 
-    // Similar sailings on this ship
-    if (sailing.ship.slug) {
+    // Similar sailings on this ship — pass the ship UUID so fetchShipSailings works
+    if (sailing.ship.id) {
       sections.push({
         key: 'sailings',
         title: `🚢 More Sailings on ${sailing.ship.name}`,
-        viewAllHref: `/ships/${sailing.ship.slug}`,
+        viewAllHref: sailing.ship.slug ? `/ships/${sailing.ship.slug}` : undefined,
         viewAllLabel: `View ${sailing.ship.name}`,
         props: {
-          shipSlug: sailing.ship.slug,
+          shipId: sailing.ship.id,
           excludeSailingId: sailing.id,
         },
         priority: 'medium',

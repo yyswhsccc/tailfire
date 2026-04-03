@@ -90,8 +90,9 @@ export const dealAdapter: HubAdapter<Deal> = {
         key: 'destinations',
         title: '\uD83D\uDCCD Destinations',
         props: {
-          // Pass destination names as slugs; DestinationsSection will handle resolution
-          destinationNames: deal.destinations,
+          // Deal destinations are plain strings — DestinationsSection's lightweight
+          // fallback path handles them (renders simple location cards).
+          destinations: deal.destinations,
         },
         priority: 'medium',
       })

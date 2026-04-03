@@ -86,6 +86,9 @@ export async function CabinCategoriesSection({
   // --- Ship: fetch cabin summary from API ---
   if (entityType !== 'ship') return null
 
+  // Ship adapter passes shipId (UUID) in sectionProps; fall back to entitySlug for compat
+  const shipId = (sectionProps.shipId as string) || entitySlug
+
   let cabins: Array<{
     category: string
     count: number
@@ -93,7 +96,7 @@ export async function CabinCategoriesSection({
   }> = []
 
   try {
-    cabins = await fetchShipCabinSummary(entitySlug)
+    cabins = await fetchShipCabinSummary(shipId)
   } catch {
     return null
   }

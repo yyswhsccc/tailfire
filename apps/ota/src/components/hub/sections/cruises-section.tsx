@@ -23,6 +23,8 @@ export async function CruisesSection({
       sailings = data.sailings
       total = data.total
     }
+    // Region pages declare a cruises section but no region-specific cruises
+    // fetcher exists yet. Return null gracefully rather than crashing.
   } catch {
     return null
   }

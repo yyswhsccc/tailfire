@@ -46,14 +46,9 @@ export const cruiseLineAdapter: HubAdapter<CruiseLineDetail> = {
       priority: 'high',
     })
 
-    // Upcoming sailings — the shared SailingsSection fetches data itself
-    sections.push({
-      key: 'sailings',
-      title: `\uD83D\uDCC5 Upcoming ${line.name} Sailings`,
-      viewAllHref: `/cruise-lines/${line.slug}/sailings`,
-      props: {},
-      priority: 'high',
-    })
+    // NOTE: Sailings section removed — no cruise-line-specific sailings fetcher
+    // exists yet. SailingsSection only supports ship and sailing entity types.
+    // Re-add once a fetchCruiseLineSailings() fetcher is available.
 
     return sections
   },

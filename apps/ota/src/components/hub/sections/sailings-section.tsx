@@ -28,14 +28,16 @@ export async function SailingsSection({
 
   try {
     if (entityType === 'ship') {
-      const data = await fetchShipSailings(entitySlug)
+      // Ship adapter passes shipId (UUID) in sectionProps; fall back to entitySlug for compat
+      const shipId = (sectionProps.shipId as string) || entitySlug
+      const data = await fetchShipSailings(shipId)
       sailings = data.sailings
       total = data.total
     } else if (entityType === 'sailing') {
-      // On a sailing page, fetch sibling sailings on the same ship via sectionProps.shipSlug
-      const shipSlug = sectionProps.shipSlug as string | undefined
-      if (shipSlug) {
-        const data = await fetchShipSailings(shipSlug)
+      // On a sailing page, fetch sibling sailings on the same ship via sectionProps.shipId
+      const shipId = (sectionProps.shipId as string) || (sectionProps.shipSlug as string | undefined)
+      if (shipId) {
+        const data = await fetchShipSailings(shipId)
         const excludeId = sectionProps.excludeSailingId as string | undefined
         sailings = excludeId ? data.sailings.filter((s) => s.id !== excludeId) : data.sailings
         total = sailings.length
