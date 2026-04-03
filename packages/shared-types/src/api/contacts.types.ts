@@ -82,6 +82,9 @@ export interface CreateContactDto {
 
   // Date/Time Management (Phase 3.5)
   timezone?: string // IANA timezone identifier (e.g., 'America/Toronto')
+
+  // Ownership (admin/import use; non-admin users have ownerId forced by controller)
+  ownerId?: string | null
 }
 
 export interface CreateContactRelationshipDto {
