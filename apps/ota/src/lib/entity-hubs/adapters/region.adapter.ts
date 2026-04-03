@@ -50,7 +50,7 @@ export const regionAdapter: HubAdapter<RegionDetail> = {
       key: 'cruises',
       title: `\uD83D\uDEA2 Cruises in the ${region.name}`,
       viewAllHref: `/regions/${region.slug}/cruises`,
-      props: {},
+      props: { regionId: region.id },
       priority: 'high',
     })
 
