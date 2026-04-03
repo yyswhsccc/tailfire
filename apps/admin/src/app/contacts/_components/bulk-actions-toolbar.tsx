@@ -18,7 +18,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Tag, BarChart3, Trash2, Plane, X, Loader2, Check, GitMerge, Download } from 'lucide-react'
+import { Tag, BarChart3, Trash2, Plane, X, Loader2, Check, GitMerge, Download, FileText } from 'lucide-react'
+import { openContactPrintReport } from './contact-print-report'
 import { TagAssignPopover } from './tag-assign-popover'
 import { useDeleteContact, useUpdateContactStatus } from '@/hooks/use-contacts'
 import { useToast } from '@/hooks/use-toast'
@@ -317,6 +318,22 @@ export function BulkActionsToolbar({
         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleExport}>
           <Download className="h-3.5 w-3.5 mr-1" />
           Export
+        </Button>
+      )}
+
+      {/* Report */}
+      {isAdmin && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => {
+            const selected = contacts.filter(c => selectedIds.has(c.id))
+            if (selected.length > 0) openContactPrintReport(selected)
+          }}
+        >
+          <FileText className="h-3.5 w-3.5 mr-1" />
+          Report
         </Button>
       )}
 
