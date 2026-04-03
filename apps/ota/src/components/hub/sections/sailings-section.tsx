@@ -3,7 +3,28 @@
 import { FeedSection } from '@/components/hub/feed-section'
 import { CruiseProductCard } from '@/components/cards/cruise-product-card'
 import { fetchShipSailings } from '@/lib/fetchers/ships'
+import { catalogFetch } from '@/lib/api'
 import type { SectionComponentProps } from '@/lib/entity-hubs/types'
+
+interface CruiseLineSailing {
+  id: string
+  name: string
+  sailDate: string
+  nights: number
+  ship: { name: string; imageUrl: string | null }
+  cruiseLine: { name: string }
+  prices: {
+    inside: number | null
+    oceanview: number | null
+    balcony: number | null
+    suite: number | null
+  }
+}
+
+interface CruiseLineSailingsResponse {
+  sailings: CruiseLineSailing[]
+  total: number
+}
 
 export async function SailingsSection({
   entityType,
@@ -42,6 +63,26 @@ export async function SailingsSection({
         sailings = excludeId ? data.sailings.filter((s) => s.id !== excludeId) : data.sailings
         total = sailings.length
       }
+    } else if (entityType === 'cruise_line' && sectionProps.cruiseLineId) {
+      const data = await catalogFetch<CruiseLineSailingsResponse>(
+        `/cruise-repository/sailings?cruiseLineId=${sectionProps.cruiseLineId}&pageSize=4&sortBy=sailDate&sortDir=asc`,
+        { next: { revalidate: 3600 } },
+      )
+      total = data.total
+      sailings = data.sailings.map((s) => {
+        const prices = [s.prices.inside, s.prices.oceanview, s.prices.balcony, s.prices.suite]
+        const cheapest = prices.filter((p): p is number => p != null)
+        return {
+          id: s.id,
+          name: s.name,
+          shipName: s.ship.name,
+          shipImageUrl: s.ship.imageUrl,
+          cruiseLineName: s.cruiseLine.name,
+          sailDate: s.sailDate,
+          nights: s.nights,
+          cheapestInsideCents: cheapest.length > 0 ? Math.min(...cheapest) : null,
+        }
+      })
     }
   } catch {
     return null
