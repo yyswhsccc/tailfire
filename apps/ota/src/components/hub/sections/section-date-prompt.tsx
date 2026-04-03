@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Calendar } from 'lucide-react'
 import { useTravelSession } from '@/stores/travel-session-store'
 
@@ -22,7 +21,6 @@ export function SectionDatePrompt({
   searchHref,
   searchLabel,
 }: SectionDatePromptProps) {
-  const router = useRouter()
   const { setDates } = useTravelSession()
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -32,7 +30,8 @@ export function SectionDatePrompt({
   function handleSubmit() {
     if (startDate && endDate) {
       setDates(startDate, endDate)
-      router.refresh()
+      // No router.refresh() needed — ClientFlightResults/ClientHotelResults
+      // react to Zustand store changes directly via useEffect
     }
   }
 
