@@ -67,6 +67,16 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       priority: 'high',
     })
 
+    // Tours -- ToursSection self-fetches via tour-repository API
+    sections.push({
+      key: 'tours',
+      title: `\uD83C\uDFDE Tours in ${dest.name}`,
+      viewAllHref: `/search/tours?q=${encodeURIComponent(dest.name)}`,
+      viewAllLabel: 'Browse all tours \u2192',
+      props: { destinationName: dest.name },
+      priority: 'medium',
+    })
+
     // Activities from enrichment topAttractions
     const attractions = enrichment?.topAttractions ?? []
     if (attractions.length > 0) {

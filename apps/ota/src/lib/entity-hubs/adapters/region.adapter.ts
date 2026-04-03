@@ -50,8 +50,17 @@ export const regionAdapter: HubAdapter<RegionDetail> = {
       key: 'cruises',
       title: `\uD83D\uDEA2 Cruises in the ${region.name}`,
       viewAllHref: `/regions/${region.slug}/cruises`,
-      props: {},
+      props: { regionId: region.id },
       priority: 'high',
+    })
+
+    // Tours -- ToursSection self-fetches via tour-repository API
+    sections.push({
+      key: 'tours',
+      title: `\uD83C\uDFDE Tours in ${region.name}`,
+      viewAllHref: `/search/tours?q=${encodeURIComponent(region.name)}`,
+      props: { destinationName: region.name },
+      priority: 'medium',
     })
 
     return sections

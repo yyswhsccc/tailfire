@@ -2,16 +2,48 @@
 
 import { FeedSection } from '@/components/hub/feed-section'
 import { TourProductCard } from '@/components/cards/tour-product-card'
+import { catalogFetch } from '@/lib/api'
 import type { SectionComponentProps } from '@/lib/entity-hubs/types'
 
-export function ToursSection({
+interface TourSearchResponse {
+  tours: {
+    id: string
+    name: string
+    operatorCode: string
+    days?: number
+    imageUrl?: string
+    lowestPriceCents?: number
+  }[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export async function ToursSection({
+  entityType,
   title,
   subtitle,
   viewAllHref,
   viewAllLabel,
   sectionProps,
 }: SectionComponentProps) {
-  const tours = (sectionProps.tours as any[] | undefined) ?? []
+  let tours: any[] = []
+
+  try {
+    if (entityType === 'destination') {
+      const destinationName = sectionProps.destinationName as string
+      const data = await catalogFetch<TourSearchResponse>(
+        `/tour-repository/tours?q=${encodeURIComponent(destinationName)}&pageSize=4`,
+        { next: { revalidate: 3600 } },
+      )
+      tours = data.tours
+    } else {
+      tours = (sectionProps.tours as any[] | undefined) ?? []
+    }
+  } catch {
+    return null
+  }
 
   if (tours.length === 0) return null
 
