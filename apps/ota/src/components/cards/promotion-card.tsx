@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { SafeImage } from '@/components/hub/safe-image'
 import { AddToTripButton } from '@/components/trip-builder/add-to-trip-button'
 import { PriceShimmer } from '@/components/cards/price-shimmer'
+import { ImageCardFrame } from '@/components/cards/image-card-frame'
 import type { TripComponent } from '@/components/trip-builder/trip-basket-store'
 import type { CardVariant } from '@/lib/entity-hubs/types'
 
@@ -31,18 +32,6 @@ function formatPrice(cents: number): string {
   }).format(cents / 100)
 }
 
-function formatDate(dateStr: string): string {
-  try {
-    return new Date(dateStr).toLocaleDateString('en-CA', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  } catch {
-    return dateStr
-  }
-}
-
 function buildTripComponent(props: PromotionCardProps): TripComponent {
   return {
     id: `deal-${props.id}`,
@@ -64,76 +53,29 @@ function buildTripComponent(props: PromotionCardProps): TripComponent {
 }
 
 function PromotionFull(props: PromotionCardProps) {
-  const priceLoading = props.priceLoading || props.fromPriceCents === undefined
+  const priceLoading = props.priceLoading || (props.fromPriceCents === undefined)
+  const priceStr = props.fromPriceCents != null ? formatPrice(props.fromPriceCents) : null
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
-      <Link href={`/deals/${props.slug}`} className="block">
-        <div className="relative h-52 overflow-hidden sm:h-60">
-          <SafeImage
-            src={props.imageUrl ?? ''}
-            alt={props.title}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            fallback={
-              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-amber-600 to-orange-500 text-3xl text-white">
-                🎁
-              </div>
-            }
-          />
-          {/* OFFER badge */}
-          <span className="absolute left-2.5 top-2.5 rounded-lg bg-[#C59746] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow">
-            Offer
-          </span>
-          {/* Savings badge */}
-          {props.savingsLabel && (
-            <span className="absolute right-2.5 top-2.5 rounded-lg bg-red-600 px-2.5 py-1 text-[11px] font-bold text-white shadow">
-              {props.savingsLabel}
-            </span>
-          )}
-          {/* Supplier badge */}
-          <span className="absolute bottom-2 left-2.5 rounded-lg bg-black/60 px-2.5 py-1 text-[10px] text-white backdrop-blur">
-            {props.supplierName}
-          </span>
-        </div>
-      </Link>
-
-      <div className="p-4 sm:p-5">
-        <Link href={`/deals/${props.slug}`}>
-          <h3 className="text-base font-semibold text-[#1A1A1A] sm:text-[17px]">
-            {props.title}
-          </h3>
-          {props.headline && (
-            <p className="mt-1 text-sm text-[#555]">{props.headline}</p>
-          )}
-          {props.validUntil && (
-            <p className="mt-1 text-xs text-[#aaa]">
-              Valid until {formatDate(props.validUntil)}
-            </p>
-          )}
-        </Link>
-
-        <div className="mt-3 flex items-center justify-between">
-          <div>
-            {priceLoading ? (
-              <PriceShimmer />
-            ) : props.fromPriceCents != null ? (
-              <>
-                <span className="text-xs text-[#888]">From </span>
-                <span className="text-xl font-bold text-[#C59746] sm:text-2xl">
-                  {formatPrice(props.fromPriceCents)}
-                </span>
-                <span className="ml-1 text-xs text-[#888]">/person</span>
-              </>
-            ) : (
-              <span className="text-sm text-[#888]">See offer →</span>
-            )}
-          </div>
-          <AddToTripButton component={buildTripComponent(props)} />
-        </div>
-      </div>
-    </div>
+    <ImageCardFrame
+      imageUrl={props.imageUrl}
+      fallbackGradient="from-violet-500 to-purple-400"
+      typeBadge="⭐ Offer"
+      price={priceStr ? `from ${priceStr}` : null}
+      priceLoading={priceLoading}
+      href={`/deals/${props.slug}`}
+      tripComponent={buildTripComponent(props)}
+      height={280}
+    >
+      <p className="text-base font-bold leading-tight text-white">{props.title}</p>
+      {props.supplierName && <p className="mt-0.5 text-sm text-white/80">{props.supplierName}</p>}
+      {props.savingsLabel && (
+        <span className="mt-1 inline-block rounded-full bg-red-500/90 px-2 py-0.5 text-[10px] font-bold text-white">
+          {props.savingsLabel}
+        </span>
+      )}
+      {props.validUntil && <p className="mt-0.5 text-xs text-white/60">Valid until {props.validUntil}</p>}
+    </ImageCardFrame>
   )
 }
 

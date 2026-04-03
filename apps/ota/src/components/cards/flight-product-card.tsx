@@ -1,6 +1,7 @@
 // apps/ota/src/components/cards/flight-product-card.tsx
 'use client'
 
+import { useState } from 'react'
 import { Plane } from 'lucide-react'
 import { AddToTripButton } from '@/components/trip-builder/add-to-trip-button'
 import { PriceShimmer } from '@/components/cards/price-shimmer'
@@ -35,6 +36,7 @@ export interface FlightProductCardProps {
   priceCents?: number | null
   priceLoading?: boolean
   baggageIncluded?: string
+  destinationImageUrl?: string | null
   variant?: CardVariant
 }
 
@@ -117,41 +119,60 @@ function buildTripComponent(props: FlightProductCardProps): TripComponent {
 function FlightFull(props: FlightProductCardProps) {
   const priceLoading = props.priceLoading || props.priceCents === undefined
   const code = props.airlineCode ?? props.airline.slice(0, 2).toUpperCase()
+  const [imgError, setImgError] = useState(false)
+  const hasDestImage = props.destinationImageUrl && !imgError
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="p-4 sm:p-5">
-        {/* Header: Airline + Price */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#1A1A1A] text-xs font-bold text-[#C59746]">
-              {code}
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-[#1A1A1A]">{props.airline}</p>
-              {props.cabinClass && (
-                <p className="text-xs text-[#888]">{props.cabinClass}</p>
+    <div className="group overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
+      {/* Header: Airline + Price — with optional destination image background */}
+      <div className="relative overflow-hidden">
+        {hasDestImage && (
+          <>
+            <img
+              src={props.destinationImageUrl!}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+              loading="lazy"
+              onError={() => setImgError(true)}
+              style={{ opacity: 0.12 }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/90" />
+          </>
+        )}
+        <div className="relative p-4 sm:p-5 sm:pb-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#1A1A1A] text-xs font-bold text-[#C59746]">
+                {code}
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-[#1A1A1A]">{props.airline}</p>
+                {props.cabinClass && (
+                  <p className="text-xs text-[#888]">{props.cabinClass}</p>
+                )}
+              </div>
+            </div>
+            <div className="text-right">
+              {priceLoading ? (
+                <PriceShimmer />
+              ) : props.priceCents != null ? (
+                <>
+                  <span className="text-xl font-bold text-[#C59746] sm:text-2xl">
+                    {formatPrice(props.priceCents)}
+                  </span>
+                  <p className="text-[10px] text-[#888]">per person</p>
+                </>
+              ) : (
+                <span className="text-sm text-[#888]">Check price &rarr;</span>
               )}
             </div>
           </div>
-          <div className="text-right">
-            {priceLoading ? (
-              <PriceShimmer />
-            ) : props.priceCents != null ? (
-              <>
-                <span className="text-xl font-bold text-[#C59746] sm:text-2xl">
-                  {formatPrice(props.priceCents)}
-                </span>
-                <p className="text-[10px] text-[#888]">per person</p>
-              </>
-            ) : (
-              <span className="text-sm text-[#888]">Check price &rarr;</span>
-            )}
-          </div>
         </div>
+      </div>
 
+      <div className="px-4 pb-4 sm:px-5 sm:pb-5">
         {/* Journey Timeline */}
-        <div className="mt-5 overflow-x-auto">
+        <div className="mt-2 overflow-x-auto">
           <div className="flex items-center">
             {props.segments.map((segment, index) => {
               const isLast = index === props.segments.length - 1

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { SafeImage } from '@/components/hub/safe-image'
 import { AddToTripButton } from '@/components/trip-builder/add-to-trip-button'
 import { PriceShimmer } from '@/components/cards/price-shimmer'
+import { ImageCardFrame } from '@/components/cards/image-card-frame'
 import type { TripComponent } from '@/components/trip-builder/trip-basket-store'
 import type { CardVariant } from '@/lib/entity-hubs/types'
 
@@ -59,85 +60,32 @@ function buildTripComponent(props: HotelProductCardProps): TripComponent {
 
 function HotelFull(props: HotelProductCardProps) {
   const priceLoading = props.priceLoading || (props.priceCents === undefined)
-  const topAmenities = props.amenities?.slice(0, 3) ?? []
+  const priceStr = props.priceCents != null ? formatPrice(props.priceCents) : null
+  const stars = props.starRating ? '★'.repeat(Math.min(props.starRating, 5)) : ''
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
-      <Link href="/search/hotels" className="block">
-        <div className="relative h-48 overflow-hidden sm:h-52">
-          <SafeImage
-            src={props.imageUrl ?? ''}
-            alt={props.name}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            fallback={<div className="flex h-full w-full items-center justify-center bg-[#1A1A1A] text-2xl text-[#C59746]">🏨</div>}
-          />
-          {/* Star rating overlay — top-left */}
-          {props.starRating != null && props.starRating > 0 && (
-            <span className="absolute left-2.5 top-2.5 rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-yellow-400 backdrop-blur">
-              {renderStars(props.starRating)}
-            </span>
-          )}
-          {/* Board type badge — top-right */}
-          {props.boardType && (
-            <span className="absolute right-2.5 top-2.5 rounded-lg bg-white/92 px-2.5 py-1 text-[10px] font-semibold text-[#C59746] backdrop-blur">
-              {props.boardType}
-            </span>
-          )}
+    <ImageCardFrame
+      imageUrl={props.imageUrl}
+      fallbackGradient="from-amber-500 to-amber-700"
+      typeBadge={`🏨 ${stars || 'Hotel'}`}
+      price={priceStr}
+      priceLoading={priceLoading}
+      priceLabel="/night"
+      href="/search/hotels"
+      tripComponent={buildTripComponent(props)}
+      height={280}
+    >
+      <p className="text-base font-bold leading-tight text-white">{props.name}</p>
+      {props.location && <p className="mt-0.5 text-sm text-white/80">{props.location}</p>}
+      {props.boardType && <p className="mt-0.5 text-xs text-white/60">{props.boardType}</p>}
+      {props.amenities && props.amenities.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {props.amenities.slice(0, 3).map((a, i) => (
+            <span key={i} className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm">{a}</span>
+          ))}
         </div>
-      </Link>
-      <div className="p-4 sm:p-5">
-        <Link href="/search/hotels">
-          <h3 className="text-base font-semibold text-[#1A1A1A] sm:text-[17px]">{props.name}</h3>
-          {props.location && (
-            <p className="mt-1 text-sm text-[#888]">{props.location}</p>
-          )}
-          {/* Star display + user rating */}
-          <div className="mt-1 flex items-center gap-2">
-            {props.starRating != null && props.starRating > 0 && (
-              <span className="text-xs font-semibold text-yellow-500">{renderStars(props.starRating)}</span>
-            )}
-            {props.userRating != null && (
-              <span className="text-xs text-[#888]">
-                {props.userRating.toFixed(1)}
-                {props.reviewCount != null && (
-                  <span className="ml-1">({props.reviewCount.toLocaleString()} reviews)</span>
-                )}
-              </span>
-            )}
-          </div>
-        </Link>
-        {/* Amenity pills */}
-        {topAmenities.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {topAmenities.map((amenity) => (
-              <span
-                key={amenity}
-                className="rounded-full bg-[#f5f0e8] px-2 py-0.5 text-[10px] font-medium text-[#8B6A1F]"
-              >
-                {amenity}
-              </span>
-            ))}
-          </div>
-        )}
-        <div className="mt-3 flex items-center justify-between">
-          <div>
-            {priceLoading ? (
-              <PriceShimmer />
-            ) : props.priceCents != null ? (
-              <>
-                <span className="text-xl font-bold text-[#C59746] sm:text-2xl">{formatPrice(props.priceCents)}</span>
-                <span className="ml-1 text-xs text-[#888]">/night</span>
-              </>
-            ) : (
-              <span className="text-sm text-[#888]">Check price →</span>
-            )}
-          </div>
-          <AddToTripButton component={buildTripComponent(props)} />
-        </div>
-      </div>
-    </div>
+      )}
+    </ImageCardFrame>
   )
 }
 

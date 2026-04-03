@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { SafeImage } from '@/components/hub/safe-image'
 import { AddToTripButton } from '@/components/trip-builder/add-to-trip-button'
 import { PriceShimmer } from '@/components/cards/price-shimmer'
+import { ImageCardFrame } from '@/components/cards/image-card-frame'
 import type { TripComponent } from '@/components/trip-builder/trip-basket-store'
 import type { CardVariant } from '@/lib/entity-hubs/types'
 
@@ -48,91 +49,27 @@ function buildTripComponent(props: ActivityProductCardProps): TripComponent {
   }
 }
 
-function StarRating({ rating }: { rating: number }) {
-  const full = Math.floor(rating)
-  const hasHalf = rating - full >= 0.5
-  return (
-    <span className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <span key={i} className={`text-[10px] ${i < full ? 'text-[#C59746]' : i === full && hasHalf ? 'text-[#C59746] opacity-60' : 'text-[#ccc]'}`}>★</span>
-      ))}
-    </span>
-  )
-}
-
 function ActivityFull(props: ActivityProductCardProps) {
   const priceLoading = props.priceLoading || (props.priceCents === undefined)
-  const visibleInclusions = props.inclusions?.slice(0, 2) ?? []
+  const priceStr = props.priceCents != null ? formatPrice(props.priceCents) : null
+  const ratingStr = props.rating ? `⭐ ${props.rating.toFixed(1)}` : ''
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
-      <Link href={`/search/tours`} className="block">
-        <div className="relative h-48 overflow-hidden sm:h-52">
-          <SafeImage
-            src={props.imageUrl ?? ''}
-            alt={props.name}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            fallback={<div className="flex h-full w-full items-center justify-center bg-[#1A1A1A] text-2xl text-[#C59746]">🏄</div>}
-          />
-          {/* Category badge — top-left, gold bg */}
-          {props.category && (
-            <span className="absolute left-2.5 top-2.5 rounded-lg bg-[#C59746] px-2.5 py-1 text-[10px] font-semibold text-white">
-              {props.category}
-            </span>
-          )}
-          {/* Duration badge — top-right */}
-          {props.duration && (
-            <span className="absolute right-2.5 top-2.5 rounded-lg bg-white/92 px-2.5 py-1 text-[10px] font-semibold text-[#1A1A1A] backdrop-blur">
-              {props.duration}
-            </span>
-          )}
-          {/* Rating — bottom-right on image */}
-          {props.rating != null && (
-            <span className="absolute bottom-2 right-2.5 flex items-center gap-1 rounded-lg bg-black/60 px-2.5 py-1 backdrop-blur">
-              <StarRating rating={props.rating} />
-              <span className="text-[10px] font-semibold text-white">{props.rating.toFixed(1)}</span>
-              {props.reviewCount != null && (
-                <span className="text-[9px] text-white/70">({props.reviewCount})</span>
-              )}
-            </span>
-          )}
-        </div>
-      </Link>
-      <div className="p-4 sm:p-5">
-        <Link href={`/search/tours`}>
-          <h3 className="text-base font-semibold text-[#1A1A1A] sm:text-[17px]">{props.name}</h3>
-          {props.provider && (
-            <p className="mt-1 text-sm text-[#888]">{props.provider}</p>
-          )}
-        </Link>
-        {visibleInclusions.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {visibleInclusions.map((inc) => (
-              <span key={inc} className="rounded-full border border-[#e8e8e8] px-2.5 py-0.5 text-[11px] text-[#666]">
-                {inc}
-              </span>
-            ))}
-          </div>
-        )}
-        <div className="mt-3 flex items-center justify-between">
-          <div>
-            {priceLoading ? (
-              <PriceShimmer />
-            ) : props.priceCents != null ? (
-              <>
-                <span className="text-xl font-bold text-[#C59746] sm:text-2xl">{formatPrice(props.priceCents)}</span>
-                <span className="ml-1 text-xs text-[#888]">/pp</span>
-              </>
-            ) : (
-              <span className="text-sm text-[#888]">Check price →</span>
-            )}
-          </div>
-          <AddToTripButton component={buildTripComponent(props)} />
-        </div>
-      </div>
-    </div>
+    <ImageCardFrame
+      imageUrl={props.imageUrl}
+      fallbackGradient="from-rose-500 to-pink-400"
+      typeBadge={`🏄 ${props.category || 'Activity'}`}
+      price={priceStr}
+      priceLoading={priceLoading}
+      priceLabel="/pp"
+      href="/search/tours"
+      tripComponent={buildTripComponent(props)}
+      height={260}
+    >
+      <p className="text-base font-bold leading-tight text-white">{props.name}</p>
+      {props.duration && <p className="mt-0.5 text-sm text-white/80">{props.duration}{ratingStr ? ` · ${ratingStr}` : ''}</p>}
+      {props.provider && <p className="mt-0.5 text-xs text-white/60">{props.provider}</p>}
+    </ImageCardFrame>
   )
 }
 
