@@ -608,3 +608,52 @@ export interface ContactImportConfirmResult {
   errors: Array<{ rowIndex: number; error: string }>
   tagName: string
 }
+
+// ============================================================================
+// Contact Merge
+// ============================================================================
+
+export interface ContactMergeRequest {
+  primaryId: string
+  secondaryId: string
+  fieldOverrides: Record<string, 'primary' | 'secondary'>
+}
+
+export interface ContactMergeResult {
+  success: boolean
+  mergedContactId: string
+  repointed: {
+    trips: number
+    travelers: number
+    relationships: number
+    tags: number
+    payments: number
+    documents: number
+    notes: number
+    tasks: number
+    other: number
+  }
+}
+
+// ============================================================================
+// Duplicate Detection
+// ============================================================================
+
+export type DuplicateMatchType = 'email' | 'phone_name' | 'dob_name'
+
+export interface DuplicateGroup {
+  matchType: DuplicateMatchType
+  confidence: 'high' | 'medium'
+  contacts: [ContactListItemDto, ContactListItemDto]
+}
+
+export interface DuplicateDetectionResult {
+  groups: DuplicateGroup[]
+  totalGroups: number
+}
+
+export interface DuplicateDismissRequest {
+  contactId1: string
+  contactId2: string
+  matchType: string
+}
