@@ -5,12 +5,10 @@ import Link from 'next/link'
 import { publicFetch } from '@/lib/api'
 import type { Deal } from '@/types/deal'
 import { formatPrice, calculateSavings } from '@/lib/format'
-import { HubHero } from '@/components/hub/hub-hero'
-import { HubHeroCta } from '@/components/hub/hub-hero-cta'
-import { HubContext } from '@/components/hub/hub-context'
+import { HubScaffold } from '@/components/hub/hub-scaffold'
+import { dealAdapter } from '@/lib/entity-hubs/adapters/deal.adapter'
 import { FeedSection } from '@/components/hub/feed-section'
 import { FeedDivider } from '@/components/hub/feed-divider'
-import { PageContextBridge } from '@/components/page-context-bridge'
 
 export const revalidate = 3600
 
@@ -33,14 +31,14 @@ export async function generateMetadata({ params }: DealPageProps): Promise<Metad
   const deal = await fetchDeal(slug)
 
   if (!deal) {
-    return { title: 'Deal Not Found | Phoenix Voyages' }
+    return { title: 'Offer Not Found | Phoenix Voyages' }
   }
 
   const title = deal.seoMeta?.title ?? `${deal.title} | Phoenix Voyages`
   const description =
     deal.seoMeta?.description ??
     deal.description ??
-    `Explore this exclusive ${deal.productType} deal from Phoenix Voyages.`
+    `Explore this exclusive ${deal.productType} offer from Phoenix Voyages.`
 
   return {
     title,
@@ -62,6 +60,7 @@ export default async function DealPage({ params }: DealPageProps) {
     notFound()
   }
 
+  // Derived pricing values used in the inline children content
   const hasPrice = deal.pricing.fromPriceCents != null
   const hasOriginalPrice =
     deal.pricing.originalPriceCents != null && deal.pricing.fromPriceCents != null
@@ -80,46 +79,17 @@ export default async function DealPage({ params }: DealPageProps) {
       })
     : null
 
-  const daysUntilExpiry = deal.validUntil
-    ? Math.ceil((new Date(deal.validUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : null
-
-  const urgencyBadge =
-    daysUntilExpiry != null && daysUntilExpiry <= 7 && daysUntilExpiry > 0
-      ? `⏰ Expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''}`
-      : daysUntilExpiry != null && daysUntilExpiry <= 0
-        ? '⏰ Expires today'
-        : undefined
-
-  const contextPills = [
-    deal.productType ? { emoji: '✈️', label: deal.productType } : null,
-    deal.supplierName ? { emoji: '🏢', label: deal.supplierName } : null,
-    validUntil ? { emoji: '📅', label: `Valid until ${validUntil}` } : null,
-    savings > 0 ? { emoji: '💰', label: `Save ${savings}%` } : null,
-  ].filter(Boolean) as Array<{ emoji: string; label: string }>
-
   return (
-    <>
-      <PageContextBridge type="deal" slug={slug} name={deal.title} />
-
-      <HubHero
-        title={deal.title}
-        badge="Exclusive Deal"
-        imageUrl={deal.heroImageUrl}
-        urgencyBadge={urgencyBadge}
-      >
-        <HubHeroCta
-          primaryLabel="Inquire About This Deal"
-          primaryPrompt={`Tell me more about the deal: ${deal.title}`}
-          entityType="deal"
-          entitySlug={slug}
-          entityName={deal.title}
-        />
-      </HubHero>
-
-      <HubContext description={deal.description} pills={contextPills} />
-
-      <FeedSection title="💰 Pricing">
+    <HubScaffold
+      hero={dealAdapter.heroData(deal)}
+      contextPills={dealAdapter.contextPills(deal)}
+      sections={dealAdapter.sections(deal)}
+      aiContext={dealAdapter.aiContext(deal)}
+      entityType="deal"
+      entitySlug={slug}
+    >
+      {/* Pricing */}
+      <FeedSection title="\uD83D\uDCB0 Pricing">
         <div className="rounded-2xl border border-[#f0f0f0] bg-white p-5 shadow-sm sm:max-w-sm">
           {hasPrice ? (
             <div>
@@ -145,32 +115,15 @@ export default async function DealPage({ params }: DealPageProps) {
               )}
             </div>
           ) : (
-            <p className="text-sm text-[#888]">Contact us for pricing on this deal.</p>
+            <p className="text-sm text-[#888]">Contact us for pricing on this offer.</p>
           )}
         </div>
       </FeedSection>
 
-      {deal.destinations && deal.destinations.length > 0 && (
-        <>
-          <FeedDivider />
-          <FeedSection title="📍 Destinations">
-            <div className="flex flex-wrap gap-2">
-              {deal.destinations.map((dest) => (
-                <span
-                  key={dest}
-                  className="rounded-full border border-[#eee] bg-white px-3.5 py-1.5 text-sm font-medium text-[#1A1A1A]"
-                >
-                  {dest}
-                </span>
-              ))}
-            </div>
-          </FeedSection>
-        </>
-      )}
-
       <FeedDivider />
 
-      <FeedSection title="📞 Book This Deal">
+      {/* Booking CTA */}
+      <FeedSection title="\uD83D\uDCDE Book This Offer">
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link
             href="/contact"
@@ -187,10 +140,10 @@ export default async function DealPage({ params }: DealPageProps) {
         </div>
         {validUntil && (
           <p className="mt-4 text-xs text-[#aaa]">
-            Deal valid until {validUntil} &middot; Subject to availability
+            Offer valid until {validUntil} &middot; Subject to availability
           </p>
         )}
       </FeedSection>
-    </>
+    </HubScaffold>
   )
 }
