@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Tag, BarChart3, Trash2, Plane, X, Loader2, Check } from 'lucide-react'
+import { Tag, BarChart3, Trash2, Plane, X, Loader2, Check, GitMerge } from 'lucide-react'
 import { TagAssignPopover } from './tag-assign-popover'
 import { useDeleteContact, useUpdateContactStatus } from '@/hooks/use-contacts'
 import { useToast } from '@/hooks/use-toast'
@@ -31,6 +31,7 @@ interface BulkActionsToolbarProps {
   selectedIds: Set<string>
   onDeselect: () => void
   onCreateTrip: () => void
+  onMerge?: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,7 @@ export function BulkActionsToolbar({
   selectedIds,
   onDeselect,
   onCreateTrip,
+  onMerge,
 }: BulkActionsToolbarProps) {
   const [statusOpen, setStatusOpen] = useState(false)
   const [isChangingStatus, setIsChangingStatus] = useState(false)
@@ -235,6 +237,14 @@ export function BulkActionsToolbar({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Merge (only when exactly 2 contacts are selected) */}
+      {count === 2 && onMerge && (
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onMerge}>
+          <GitMerge className="h-3.5 w-3.5 mr-1" />
+          Merge
+        </Button>
+      )}
 
       {/* Create Trip */}
       <Button

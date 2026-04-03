@@ -15,6 +15,7 @@ import { ContactsFilterPanel } from './_components/contacts-filter-panel'
 import { BulkActionsToolbar } from './_components/bulk-actions-toolbar'
 import { QuickContactDialog } from './_components/quick-contact-dialog'
 import { ContactImportWizard } from './_components/contact-import-wizard'
+import { MergeEditorDialog } from './_components/merge-editor-dialog'
 import { TripFormDialog } from '@/app/trips/_components/trip-form-dialog'
 import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { useToast } from '@/hooks/use-toast'
@@ -42,6 +43,7 @@ function ContactsPage() {
   const [showCreateTrip, setShowCreateTrip] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [mergeIds, setMergeIds] = useState<[string, string] | null>(null)
   const [view, setView] = useState<ContactsView>('table')
   const [filters, setFilters] = useState<ContactFilterDto>({
     page: 1,
@@ -252,6 +254,7 @@ function ContactsPage() {
           selectedIds={selectedIds}
           onDeselect={() => setSelectedIds(new Set())}
           onCreateTrip={() => setShowCreateTrip(true)}
+          onMerge={() => setMergeIds(Array.from(selectedIds) as [string, string])}
         />
       )}
 
@@ -349,6 +352,15 @@ function ContactsPage() {
       />
 
       <ContactImportWizard open={showImport} onOpenChange={setShowImport} />
+
+      {mergeIds && (
+        <MergeEditorDialog
+          open={!!mergeIds}
+          onOpenChange={(open) => { if (!open) setMergeIds(null) }}
+          contactIds={mergeIds}
+          onMergeComplete={() => { setMergeIds(null); setSelectedIds(new Set()) }}
+        />
+      )}
     </DashboardLayout>
   )
 }
