@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Pencil, Save, X } from 'lucide-react'
@@ -220,6 +220,13 @@ export default function ContactDetailPage() {
     contactId,
   )
 
+  // Redirect merged contacts to the surviving contact
+  useEffect(() => {
+    if (contact?.mergedIntoContactId) {
+      router.replace(`/contacts/${contact.mergedIntoContactId}`)
+    }
+  }, [contact?.mergedIntoContactId, router])
+
   const handleEdit = (section: EditSection) => {
     if (!contact) return
     setEditingSection(section)
@@ -415,6 +422,16 @@ export default function ContactDetailPage() {
               <TableSkeleton rows={8} />
             </CardContent>
           </Card>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (contact?.mergedIntoContactId) {
+    return (
+      <DashboardLayout>
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">This contact was merged. Redirecting...</p>
         </div>
       </DashboardLayout>
     )
