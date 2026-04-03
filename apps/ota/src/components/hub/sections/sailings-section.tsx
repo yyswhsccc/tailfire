@@ -12,7 +12,7 @@ export async function SailingsSection({
   subtitle,
   viewAllHref,
   viewAllLabel,
-  sectionProps: _sectionProps,
+  sectionProps,
 }: SectionComponentProps) {
   let sailings: Array<{
     id: string
@@ -31,6 +31,15 @@ export async function SailingsSection({
       const data = await fetchShipSailings(entitySlug)
       sailings = data.sailings
       total = data.total
+    } else if (entityType === 'sailing') {
+      // On a sailing page, fetch sibling sailings on the same ship via sectionProps.shipSlug
+      const shipSlug = sectionProps.shipSlug as string | undefined
+      if (shipSlug) {
+        const data = await fetchShipSailings(shipSlug)
+        const excludeId = sectionProps.excludeSailingId as string | undefined
+        sailings = excludeId ? data.sailings.filter((s) => s.id !== excludeId) : data.sailings
+        total = sailings.length
+      }
     }
   } catch {
     return null

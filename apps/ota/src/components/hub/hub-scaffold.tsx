@@ -14,6 +14,8 @@ export function HubScaffold({
   aiContext: _aiContext,
   entityType,
   entitySlug,
+  parentContext,
+  children,
 }: HubScaffoldProps) {
   return (
     <>
@@ -21,6 +23,7 @@ export function HubScaffold({
         type={entityType === 'cruise_line' ? 'cruise_line' : entityType}
         slug={entitySlug}
         name={hero.title}
+        parentContext={parentContext}
       />
 
       <HubHero
@@ -51,6 +54,8 @@ export function HubScaffold({
           entitySlug={entitySlug}
         />
       </div>
+
+      {children}
     </>
   )
 }

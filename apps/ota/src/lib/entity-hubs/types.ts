@@ -1,6 +1,6 @@
 // apps/ota/src/lib/entity-hubs/types.ts
 
-import type { ComponentType } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 
 // ---------------------------------------------------------------------------
 // Entity types
@@ -19,6 +19,9 @@ export interface HubScaffoldProps {
   aiContext: AiPageContext
   entityType: EntityType
   entitySlug: string
+  parentContext?: { type: string; slug: string; name: string }
+  /** Optional content rendered below the scaffold sections (e.g. sailing itinerary) */
+  children?: ReactNode
 }
 
 export interface HeroData {
