@@ -4,7 +4,7 @@ import { RefreshCw } from "lucide-react";
 
 import { serviceFetch } from "@/lib/api";
 import { HotelSearchForm } from "@/components/search/hotel-search-form";
-import { HotelResultCard, type HotelOffer } from "@/components/search/hotel-result-card";
+import { HotelProductCard, type HotelProductCardProps } from "@/components/cards/hotel-product-card";
 import { SearchResultsHeader } from "@/components/search/search-results-header";
 import { SearchPageShell } from "@/components/search/search-page-shell";
 import HotelsLoading from "./loading";
@@ -24,9 +24,86 @@ export const metadata: Metadata = {
 // TYPES
 // ============================================================================
 
+// Matches NormalizedHotelResult from packages/shared-types/src/api/hotels.types.ts
+interface HotelPriceOffer {
+  checkIn: string;
+  checkOut: string;
+  roomType?: string;
+  price: {
+    currency: string;
+    total: string;
+    base?: string;
+    taxes?: string;
+  };
+  cancellationPolicy?: {
+    deadline?: string;
+    refundable?: boolean;
+    description?: string;
+  };
+  boardType?: string;
+}
+
+interface HotelOffer {
+  id: string;
+  placeId?: string;
+  hotelId?: string;
+  name: string;
+  description?: string;
+  location: {
+    address: string;
+    city?: string;
+    country?: string;
+    postalCode?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  phone?: string;
+  website?: string;
+  rating?: number;
+  reviewCount?: number;
+  starRating?: number;
+  photos?: { url: string; thumbnailUrl?: string }[];
+  amenities?: string[];
+  offers?: HotelPriceOffer[];
+  provider: string;
+}
+
 interface HotelSearchResponse {
   results: HotelOffer[];
   warning?: string;
+}
+
+const BOARD_BASIS_LABELS: Record<string, string> = {
+  ROOM_ONLY: "Room Only",
+  BREAKFAST: "Breakfast Included",
+  HALF_BOARD: "Half Board",
+  FULL_BOARD: "Full Board",
+  ALL_INCLUSIVE: "All Inclusive",
+};
+
+function hotelOfferToCardProps(hotel: HotelOffer): HotelProductCardProps {
+  const bestOffer = hotel.offers?.[0];
+  const locationParts = [hotel.location.city, hotel.location.country].filter(Boolean);
+  const priceCents = bestOffer
+    ? Math.round(parseFloat(bestOffer.price.total) * 100) || null
+    : null;
+  const boardType = bestOffer?.boardType
+    ? (BOARD_BASIS_LABELS[bestOffer.boardType] ?? bestOffer.boardType)
+    : undefined;
+
+  return {
+    id: hotel.id,
+    name: hotel.name,
+    imageUrl: hotel.photos?.[0]?.url ?? null,
+    starRating: hotel.starRating,
+    userRating: hotel.rating,
+    reviewCount: hotel.reviewCount,
+    amenities: hotel.amenities,
+    location: locationParts.join(", ") || undefined,
+    boardType,
+    priceCents,
+    checkInDate: bestOffer?.checkIn,
+  };
 }
 
 // ============================================================================
@@ -143,7 +220,7 @@ function HotelResults({ hotels }: { hotels: HotelSearchResponse }) {
       {/* Result cards */}
       <div className="space-y-4">
         {results.map((hotel) => (
-          <HotelResultCard key={hotel.id} hotel={hotel} />
+          <HotelProductCard key={hotel.id} {...hotelOfferToCardProps(hotel)} />
         ))}
       </div>
     </>
