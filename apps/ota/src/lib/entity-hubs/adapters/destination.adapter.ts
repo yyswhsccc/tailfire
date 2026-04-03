@@ -12,6 +12,15 @@ const DESTINATION_TYPE_LABELS: Record<string, string> = {
   region: 'Region',
 }
 
+const DESTINATION_TYPE_PLURALS: Record<string, string> = {
+  port_city: 'Port Cities',
+  island: 'Islands',
+  resort_area: 'Resort Areas',
+  city: 'Cities',
+  country: 'Countries',
+  region: 'Regions',
+}
+
 export const destinationAdapter: HubAdapter<DestinationDetail> = {
   heroData(dest): HeroData {
     const enrichment = dest.enrichment
@@ -120,7 +129,7 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
     // Nearby destinations — self-fetching section that finds same-type destinations
     sections.push({
       key: 'nearby',
-      title: `\uD83D\uDDFA\uFE0F More ${DESTINATION_TYPE_LABELS[dest.destinationType] ?? 'Destinations'} to Explore`,
+      title: `\uD83D\uDDFA\uFE0F More ${DESTINATION_TYPE_PLURALS[dest.destinationType] ?? 'Destinations'} to Explore`,
       subtitle: 'Discover similar destinations',
       viewAllHref: '/destinations',
       viewAllLabel: 'View all destinations \u2192',
