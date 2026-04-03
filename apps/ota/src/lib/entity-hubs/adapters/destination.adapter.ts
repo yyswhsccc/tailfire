@@ -87,13 +87,29 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       priority: 'high',
     })
 
-    // Tours -- ToursSection self-fetches via tour-repository API
+    // Hotels CTA — links to hotel search; upgrades to live data when available
+    sections.push({
+      key: 'hotels',
+      title: `\uD83C\uDFE8 Hotels in ${dest.name}`,
+      viewAllHref: `/search/hotels?destination=${encodeURIComponent(dest.name)}`,
+      viewAllLabel: 'Search hotels \u2192',
+      props: { destinationName: dest.name },
+      priority: 'medium',
+    })
+
+    // Tours -- ToursSection self-fetches via tour-repository API.
+    // tourSearchFallback is a broader term (country code) tried when the primary
+    // destinationName search returns zero results — improves coverage for port cities
+    // where Globus uses regional names (e.g., "Caribbean" rather than "Cozumel, Mexico").
     sections.push({
       key: 'tours',
       title: `\uD83C\uDFDE Tours in ${dest.name}`,
       viewAllHref: `/search/tours?q=${encodeURIComponent(dest.name)}`,
       viewAllLabel: 'Browse all tours \u2192',
-      props: { destinationName: dest.name },
+      props: {
+        destinationName: dest.name,
+        tourSearchFallback: dest.countryCode ?? undefined,
+      },
       priority: 'medium',
     })
 
