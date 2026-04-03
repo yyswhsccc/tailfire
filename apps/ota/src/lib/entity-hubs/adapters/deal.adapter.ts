@@ -35,6 +35,7 @@ export const dealAdapter: HubAdapter<Deal> = {
 
     return {
       imageUrl: deal.heroImageUrl ?? null,
+      fallbackGradient: 'bg-gradient-to-br from-[#3a2a1a] via-[#2a1a0a] to-[#1A1A1A]',
       badge: deal.productType === 'cruise' ? 'PROMOTION' : 'OFFER',
       title: deal.title,
       description: deal.description,

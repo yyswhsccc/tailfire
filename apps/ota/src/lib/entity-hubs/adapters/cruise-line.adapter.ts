@@ -10,6 +10,7 @@ export const cruiseLineAdapter: HubAdapter<CruiseLineDetail> = {
 
     return {
       imageUrl,
+      fallbackGradient: 'bg-gradient-to-br from-[#2a1a3a] via-[#1a0d2a] to-[#1A1A1A]',
       badge: 'CRUISE LINE',
       title: line.name,
       subtitle: line.logoUrl ? undefined : undefined,

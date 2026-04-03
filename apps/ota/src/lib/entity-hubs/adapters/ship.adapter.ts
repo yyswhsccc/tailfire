@@ -25,6 +25,7 @@ export const shipAdapter: HubAdapter<ShipDetail> = {
 
     return {
       imageUrl: ship.imageUrl,
+      fallbackGradient: 'bg-gradient-to-br from-[#1a2a3a] via-[#0d1a2a] to-[#1A1A1A]',
       badge: 'SHIP',
       title: ship.name,
       subtitle,

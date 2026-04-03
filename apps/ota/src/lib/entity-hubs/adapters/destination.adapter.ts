@@ -27,7 +27,8 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
 
     return {
       imageUrl: dest.heroImageUrl || enrichment?.photos?.[0]?.url || null,
-      badge: dest.countryCode ?? '',
+      fallbackGradient: 'bg-gradient-to-br from-[#1a3a5c] via-[#0d2137] to-[#1A1A1A]',
+      badge: dest.countryCode ? `${dest.countryCode} · DESTINATION` : 'DESTINATION',
       title: dest.name,
       subtitle: subtitleParts.length > 0 ? subtitleParts.join(' \u00B7 ') : undefined,
       description: enrichment?.summary || dest.summary || undefined,

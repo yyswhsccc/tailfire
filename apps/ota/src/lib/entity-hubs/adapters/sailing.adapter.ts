@@ -24,6 +24,7 @@ export const sailingAdapter: HubAdapter<SailingDetail> = {
 
     return {
       imageUrl: sailing.ship.imageUrl,
+      fallbackGradient: 'bg-gradient-to-br from-[#1a3a5c] via-[#0d2137] to-[#1A1A1A]',
       badge: `${sailing.cruiseLine.name} · ${sailing.ship.name}`,
       title: sailing.name,
       subtitle: `${fmtDate(sailing.sailDate)} — ${fmtDate(sailing.endDate)}`,
