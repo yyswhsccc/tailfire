@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react'
 import {
   DndContext,
   DragOverlay,
+  closestCorners,
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
@@ -237,9 +238,21 @@ export function ContactsKanban({
 
   const handleDragOver = useCallback(
     (event: DragOverEvent) => {
-      setOverColumnId(event.over?.id ? String(event.over.id) : null)
+      if (!event.over) {
+        setOverColumnId(null)
+        return
+      }
+      const overId = String(event.over.id)
+      const columnIds: Set<string> = new Set(KANBAN_COLUMNS.map((c) => c.id))
+      if (columnIds.has(overId)) {
+        setOverColumnId(overId)
+      } else {
+        // Hovering over a card — find its column
+        const overContact = contacts.find((c) => c.id === overId)
+        setOverColumnId((overContact?.contactStatus as string) ?? null)
+      }
     },
-    [],
+    [contacts],
   )
 
   const handleDragEnd = useCallback(
@@ -251,9 +264,21 @@ export function ContactsKanban({
       if (!over) return
 
       const contactId = String(active.id)
-      const targetColumn = String(over.id) as ColumnId
+      const overId = String(over.id)
 
-      // Find the contact and its current status
+      // Resolve target column — over.id may be a column ID or a card ID
+      const columnIds: Set<string> = new Set(KANBAN_COLUMNS.map((c) => c.id))
+      let targetColumn: ColumnId
+      if (columnIds.has(overId)) {
+        targetColumn = overId as ColumnId
+      } else {
+        // over.id is a contact card — find which column it belongs to
+        const overContact = contacts.find((c) => c.id === overId)
+        if (!overContact) return
+        targetColumn = (overContact.contactStatus ?? 'prospecting') as ColumnId
+      }
+
+      // Find the dragged contact and its current status
       const contact = contacts.find((c) => c.id === contactId)
       if (!contact) return
 
@@ -344,6 +369,7 @@ export function ContactsKanban({
       {/* Board */}
       <DndContext
         sensors={sensors}
+        collisionDetection={closestCorners}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
