@@ -90,11 +90,15 @@ export function ContactsFilterPanel({ filters, onFiltersChange }: ContactsFilter
 
   // Active/Inactive
   const handleActiveChange = (value: string) => {
-    let isActive: boolean | undefined
-    if (value === 'active') isActive = true
-    else if (value === 'inactive') isActive = false
-    else isActive = undefined
-    onFiltersChange({ ...filters, isActive, page: 1 })
+    if (value === 'active') {
+      onFiltersChange({ ...filters, isActive: true, page: 1 })
+    } else if (value === 'inactive') {
+      onFiltersChange({ ...filters, isActive: false, page: 1 })
+    } else {
+      // "All" — remove isActive entirely so the API returns all contacts
+      const { isActive: _removed, ...rest } = filters
+      onFiltersChange({ ...rest, page: 1 })
+    }
   }
 
   // Passport
@@ -123,7 +127,7 @@ export function ContactsFilterPanel({ filters, onFiltersChange }: ContactsFilter
 
   // Derive current active select value
   const activeValue =
-    filters.isActive === true ? 'active' : filters.isActive === false ? 'inactive' : 'active'
+    filters.isActive === true ? 'active' : filters.isActive === false ? 'inactive' : 'all'
 
   return (
     <div className="flex flex-wrap items-center gap-2">
