@@ -63,7 +63,7 @@ async function parseExcel(file: File): Promise<ParsedFileResult> {
     throw new Error('The Excel file contains no sheets.')
   }
 
-  const sheet = workbook.Sheets[firstSheetName]
+  const sheet = workbook.Sheets[firstSheetName]!
 
   // Use defval: '' so missing cells become empty strings instead of undefined
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
@@ -75,7 +75,7 @@ async function parseExcel(file: File): Promise<ParsedFileResult> {
     return { headers: [], rows: [] }
   }
 
-  const headers = Object.keys(rawRows[0])
+  const headers = Object.keys(rawRows[0]!)
   const rows = rawRows.map((row) => stringifyRow(row))
 
   return { headers, rows }

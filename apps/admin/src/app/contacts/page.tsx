@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Plus, Search, LayoutGrid, List } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Upload } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { PageHeader } from '@/components/shared'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { ContactsKanban } from './_components/contacts-kanban'
 import { ContactsFilterPanel } from './_components/contacts-filter-panel'
 import { BulkActionsToolbar } from './_components/bulk-actions-toolbar'
 import { QuickContactDialog } from './_components/quick-contact-dialog'
+import { ContactImportWizard } from './_components/contact-import-wizard'
 import { TripFormDialog } from '@/app/trips/_components/trip-form-dialog'
 import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { useToast } from '@/hooks/use-toast'
@@ -37,6 +38,7 @@ function ContactsPage() {
   const { toast } = useToast()
   const urlSearch = searchParams?.get('search') || ''
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [showCreateTrip, setShowCreateTrip] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -229,6 +231,12 @@ function ContactsPage() {
               />
             </div>
 
+            {/* Import */}
+            <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+              <Upload className="h-4 w-4 mr-1.5" />
+              Import
+            </Button>
+
             {/* New Contact */}
             <Button onClick={() => setIsCreateOpen(true)} size="sm">
               <Plus className="mr-2 h-4 w-4" />
@@ -339,6 +347,8 @@ function ContactsPage() {
         redirectOnCreate={false}
         onCreated={handleTripCreated}
       />
+
+      <ContactImportWizard open={showImport} onOpenChange={setShowImport} />
     </DashboardLayout>
   )
 }

@@ -72,10 +72,10 @@ export function splitFullName(fullName: string): { firstName: string; lastName: 
   // Standard "First [Middle] Last" format
   const parts = trimmed.split(/\s+/)
   if (parts.length === 1) {
-    return { firstName: parts[0], lastName: '' }
+    return { firstName: parts[0]!, lastName: '' }
   }
 
-  const lastName = parts[parts.length - 1]
+  const lastName = parts[parts.length - 1]!
   const firstName = parts.slice(0, parts.length - 1).join(' ')
   return { firstName, lastName }
 }

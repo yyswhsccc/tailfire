@@ -35,27 +35,27 @@ export function normalizeDate(value: string): string | null {
   // YYYY-MM-DD
   const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (isoMatch) {
-    const [, y, m, d] = isoMatch
-    return validateAndFormat(parseInt(y), parseInt(m), parseInt(d))
+    const [, y, m, d] = isoMatch as RegExpMatchArray
+    return validateAndFormat(parseInt(y!), parseInt(m!), parseInt(d!))
   }
 
   // DD-MMM-YYYY  (e.g. 15-Jan-2000 or 15-January-2000)
   const dmmmMatch = trimmed.match(/^(\d{1,2})[-\s]([A-Za-z]+)[-\s](\d{4})$/)
   if (dmmmMatch) {
-    const [, d, mon, y] = dmmmMatch
-    const month = parseMonthName(mon)
+    const [, d, mon, y] = dmmmMatch as RegExpMatchArray
+    const month = parseMonthName(mon!)
     if (month !== null) {
-      return validateAndFormat(parseInt(y), month, parseInt(d))
+      return validateAndFormat(parseInt(y!), month, parseInt(d!))
     }
   }
 
   // MM/DD/YYYY or DD/MM/YYYY or MM-DD-YYYY etc.
   const slashMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
   if (slashMatch) {
-    const [, first, second, y] = slashMatch
-    const a = parseInt(first)
-    const b = parseInt(second)
-    const year = parseInt(y)
+    const [, first, second, y] = slashMatch as RegExpMatchArray
+    const a = parseInt(first!)
+    const b = parseInt(second!)
+    const year = parseInt(y!)
 
     // If first > 12, it must be a day (DD/MM/YYYY)
     if (a > 12) {
@@ -68,8 +68,8 @@ export function normalizeDate(value: string): string | null {
   // YYYY/MM/DD
   const ymdSlash = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
   if (ymdSlash) {
-    const [, y, m, d] = ymdSlash
-    return validateAndFormat(parseInt(y), parseInt(m), parseInt(d))
+    const [, y, m, d] = ymdSlash as RegExpMatchArray
+    return validateAndFormat(parseInt(y!), parseInt(m!), parseInt(d!))
   }
 
   return null
