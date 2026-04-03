@@ -9,6 +9,9 @@ import { DestinationsSection } from '@/components/hub/sections/destinations-sect
 import { ToursSection } from '@/components/hub/sections/tours-section'
 import { ShipsSection } from '@/components/hub/sections/ships-section'
 import { CabinCategoriesSection } from '@/components/hub/sections/cabin-categories-section'
+import { NearbySection } from '@/components/hub/sections/nearby-section'
+import { OffersSection } from '@/components/hub/sections/offers-section'
+import { DeckPlansSection } from '@/components/hub/sections/deck-plans-section'
 
 // Section components are async Server Components.
 // Static imports + per-section Suspense boundaries.
@@ -22,6 +25,9 @@ export const SECTION_REGISTRY: Record<string, SectionEntry> = {
   tours:            { component: ToursSection as any,            skeleton: 'grid-2' },
   ships:            { component: ShipsSection as any,            skeleton: 'grid-3' },
   cabinCategories:  { component: CabinCategoriesSection as any,  skeleton: 'grid-4' },
+  nearby:           { component: NearbySection as any,           skeleton: 'scroll' },
+  offers:           { component: OffersSection as any,           skeleton: 'banner' },
+  deckPlans:        { component: DeckPlansSection as any,        skeleton: 'single' },
   // Future sections (Plan 3+):
-  // flights, hotels, offers, deckPlans, itinerary, nearby
+  // flights, hotels, itinerary
 }

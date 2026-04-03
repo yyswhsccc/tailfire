@@ -80,6 +80,14 @@ export const shipAdapter: HubAdapter<ShipDetail> = {
       priority: 'medium',
     })
 
+    // Deck plans — self-fetching section
+    sections.push({
+      key: 'deckPlans',
+      title: '🚢 Deck Plans',
+      props: { shipId: ship.id },
+      priority: 'low' as const,
+    })
+
     // Destinations — receives data via sectionProps (no self-fetcher)
     sections.push({
       key: 'destinations',
