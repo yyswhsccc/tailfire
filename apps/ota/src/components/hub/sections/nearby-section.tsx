@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { FeedSection } from '@/components/hub/feed-section'
+import { publicFetch } from '@/lib/api'
+import type { DestinationSummary } from '@/types/entities'
 import type { SectionComponentProps } from '@/lib/entity-hubs/types'
 
 /**
@@ -12,10 +14,12 @@ function NearbyDestinationCard({
   name,
   country,
   slug,
+  heroImageUrl,
 }: {
   name: string
   country?: string | null
   slug?: string | null
+  heroImageUrl?: string | null
 }) {
   // Simple gradient backgrounds cycling by hash of name
   const gradients = [
@@ -31,9 +35,20 @@ function NearbyDestinationCard({
 
   const inner = (
     <div className="group w-64 shrink-0 overflow-hidden rounded-2xl shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-      {/* Gradient hero area */}
-      <div className={`relative h-32 bg-gradient-to-br ${gradient}`}>
-        <div className="absolute inset-0 bg-black/10" />
+      {/* Hero area — image or gradient fallback */}
+      <div
+        className={`relative h-32 bg-gradient-to-br ${gradient}`}
+        style={
+          heroImageUrl
+            ? {
+                backgroundImage: `url(${heroImageUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }
+            : undefined
+        }
+      >
+        <div className="absolute inset-0 bg-black/20" />
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <p className="truncate text-sm font-bold text-white drop-shadow">{name}</p>
           {country && (
@@ -54,14 +69,40 @@ function NearbyDestinationCard({
   return inner
 }
 
+interface DestinationLike {
+  name: string
+  slug?: string | null
+  country?: string | null
+  countryCode?: string | null
+  heroImageUrl?: string | null
+}
+
 export async function NearbySection({
+  entitySlug,
   title,
   subtitle,
   viewAllHref,
   viewAllLabel,
   sectionProps,
 }: SectionComponentProps) {
-  const destinations = (sectionProps.destinations as any[]) ?? []
+  let destinations: DestinationLike[] = (sectionProps.destinations as DestinationLike[]) ?? []
+
+  // Self-fetch when no destinations are pre-populated but a destinationType is provided
+  if (destinations.length === 0 && sectionProps.destinationType) {
+    try {
+      const result = await publicFetch<{ destinations: DestinationSummary[] }>(
+        `/destinations?type=${encodeURIComponent(sectionProps.destinationType as string)}&pageSize=12`,
+        { next: { revalidate: 3600, tags: ['destinations'] } },
+      )
+      // Exclude the current destination page from the nearby list
+      destinations = (result.destinations ?? [])
+        .filter((d) => d.slug !== entitySlug)
+        .slice(0, 8)
+    } catch {
+      // Non-critical — degrade gracefully
+    }
+  }
+
   if (destinations.length === 0) return null
 
   return (
@@ -76,16 +117,18 @@ export async function NearbySection({
           className="flex gap-4 overflow-x-auto pb-2"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          {destinations.map((d: any, i: number) => {
+          {destinations.map((d, i) => {
             const name = typeof d === 'string' ? d : d.name
-            const country = typeof d === 'string' ? null : (d.country ?? null)
+            const country = typeof d === 'string' ? null : (d.country ?? d.countryCode ?? null)
             const slug = typeof d === 'string' ? null : (d.slug ?? null)
+            const heroImageUrl = typeof d === 'string' ? null : (d.heroImageUrl ?? null)
             return (
               <NearbyDestinationCard
                 key={slug || name || i}
                 name={name}
                 country={country}
                 slug={slug}
+                heroImageUrl={heroImageUrl}
               />
             )
           })}

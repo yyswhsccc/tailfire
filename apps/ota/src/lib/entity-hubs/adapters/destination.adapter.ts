@@ -117,6 +117,19 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       })
     }
 
+    // Nearby destinations — self-fetching section that finds same-type destinations
+    sections.push({
+      key: 'nearby',
+      title: `\uD83D\uDDFA\uFE0F More ${DESTINATION_TYPE_LABELS[dest.destinationType] ?? 'Destinations'} to Explore`,
+      subtitle: 'Discover similar destinations',
+      viewAllHref: '/destinations',
+      viewAllLabel: 'View all destinations \u2192',
+      props: {
+        destinationType: dest.destinationType,
+      },
+      priority: 'low',
+    })
+
     return sections
   },
 
