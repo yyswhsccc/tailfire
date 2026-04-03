@@ -19,6 +19,7 @@ import { MergeEditorDialog } from './_components/merge-editor-dialog'
 import { TripFormDialog } from '@/app/trips/_components/trip-form-dialog'
 import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { useToast } from '@/hooks/use-toast'
+import { useUser } from '@/hooks/use-user'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { ContactFilterDto, TripResponseDto } from '@tailfire/shared-types/api'
@@ -37,6 +38,7 @@ function ContactsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const { isAdmin } = useUser()
   const urlSearch = searchParams?.get('search') || ''
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [showImport, setShowImport] = useState(false)
@@ -252,6 +254,8 @@ function ContactsPage() {
       {selectedIds.size > 0 && (
         <BulkActionsToolbar
           selectedIds={selectedIds}
+          contacts={data?.data || []}
+          isAdmin={isAdmin}
           onDeselect={() => setSelectedIds(new Set())}
           onCreateTrip={() => setShowCreateTrip(true)}
           onMerge={() => setMergeIds(Array.from(selectedIds) as [string, string])}
