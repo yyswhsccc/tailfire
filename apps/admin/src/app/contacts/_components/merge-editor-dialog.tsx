@@ -106,7 +106,7 @@ export function MergeEditorDialog({
     if (!contacts[0] || !contacts[1]) return sel
     for (const { key } of MERGE_FIELDS) {
       if (key in overrides) {
-        sel[key] = overrides[key]
+        sel[key] = overrides[key] as 0 | 1
       } else {
         const aVal = contacts[0][key]
         const bVal = contacts[1][key]

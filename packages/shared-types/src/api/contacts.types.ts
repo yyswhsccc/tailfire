@@ -360,6 +360,11 @@ export interface ContactResponseDto {
   portalStatus: 'not_invited' | 'pending' | 'active' // computed
   portalInvitedAt: string | null
 
+  // Merge tracking
+  mergedIntoContactId: string | null
+  mergedAt: string | null
+  mergedBy: string | null
+
   // Audit
   createdAt: string // ISO timestamp
   updatedAt: string // ISO timestamp

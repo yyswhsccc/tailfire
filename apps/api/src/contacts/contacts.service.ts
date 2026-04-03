@@ -1146,6 +1146,11 @@ export class ContactsService {
       portalStatus: contact.portalActivatedAt ? 'active' : contact.portalUserId ? 'pending' : 'not_invited',
       portalInvitedAt: contact.portalInvitedAt?.toISOString() ?? null,
 
+      // Merge tracking
+      mergedIntoContactId: contact.mergedIntoContactId ?? null,
+      mergedAt: contact.mergedAt?.toISOString() ?? null,
+      mergedBy: contact.mergedBy ?? null,
+
       // Audit
       createdAt: contact.createdAt.toISOString(),
       updatedAt: contact.updatedAt.toISOString(),
