@@ -14,7 +14,7 @@ const SUGGESTIONS: Record<EntityType, (name: string) => string> = {
   ship:        (name) => `Interested in ${name}? I can find the best sailings and cabin deals`,
   sailing:     (_name) => `Ready to book? I can check availability and find the best cabin`,
   cruise_line: (name) => `Exploring ${name}? I can compare ships and find deals`,
-  region:      (name) => `Dreaming of the ${name}? Let me build your perfect itinerary`,
+  region:      (name) => `Dreaming of ${name}? Let me build your perfect itinerary`,
   deal:        (_name) => `Want to take advantage of this offer? I can help you plan`,
 }
 
@@ -23,7 +23,7 @@ const PROMPTS: Record<EntityType, (name: string) => string> = {
   ship:        (name) => `Help me find sailings and cabin options on ${name}`,
   sailing:     (name) => `Help me check availability and book ${name}`,
   cruise_line: (name) => `Help me compare ships and find deals with ${name}`,
-  region:      (name) => `Help me build a perfect itinerary for the ${name}`,
+  region:      (name) => `Help me build a perfect itinerary for ${name}`,
   deal:        (name) => `Help me take advantage of this deal: ${name}`,
 }
 

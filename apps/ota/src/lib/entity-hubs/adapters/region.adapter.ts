@@ -11,7 +11,7 @@ export const regionAdapter: HubAdapter<RegionDetail> = {
       badge: 'REGION',
       title: region.name,
       description: region.description ?? undefined,
-      ctaLabel: `Explore the ${region.name}`,
+      ctaLabel: `Explore ${region.name}`,
     }
   },
 
@@ -38,7 +38,7 @@ export const regionAdapter: HubAdapter<RegionDetail> = {
     if (region.destinations.length > 0) {
       sections.push({
         key: 'destinations',
-        title: `\uD83D\uDCCD Destinations in the ${region.name}`,
+        title: `\uD83D\uDCCD Destinations in ${region.name}`,
         props: {
           destinations: region.destinations,
         },
@@ -49,7 +49,7 @@ export const regionAdapter: HubAdapter<RegionDetail> = {
     // Cruises sailing in this region
     sections.push({
       key: 'cruises',
-      title: `\uD83D\uDEA2 Cruises in the ${region.name}`,
+      title: `\uD83D\uDEA2 Cruises in ${region.name}`,
       viewAllHref: `/regions/${region.slug}/cruises`,
       props: { regionId: region.id },
       priority: 'high',
