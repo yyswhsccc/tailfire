@@ -29,28 +29,44 @@ Allow agents (not just admins) to bulk-import contacts from CSV/Excel files with
 - Client sends mapped + normalized rows to `POST /contacts/import/preview`
 - Server runs duplicate matching and returns per-row disposition:
   - **New** (green): no match found → will create, importing agent becomes owner
-  - **Update** (amber): matched agency-wide contact → will fill empty fields, importing agent becomes owner
+  - **Update** (amber): matched contact (email or name+DOB) owned by agent or agency-wide → will fill empty fields
+  - **Possible Match** (blue): name-only match found → agent must choose: merge, create new, or skip
   - **Skip - Other Agent** (gray): matched contact owned by a different agent → skip, don't touch
   - **Skip - Invalid** (red): missing firstName (only required field)
+- For `possible_match` rows, agent selects per-row: "Merge with [Name]" / "Create New" / "Skip"
 - Preview table shows first 100 rows with disposition + match details
-- Summary bar: "45 new, 12 updates, 3 skipped (other agent), 2 invalid"
+- Summary bar: "45 new, 12 updates, 5 possible matches, 3 skipped (other agent), 2 invalid"
 - Agent can uncheck individual rows to exclude them
 
 ### Step 4: Confirm (server-side execution)
 - "Import N contacts" button sends selected rows to `POST /contacts/import/confirm`
-- Server creates/updates in a transaction
-- Tags all imported contacts with selected tags
+- Each row carries an `action` field: `create`, `merge` (with `mergeContactId`), or `skip`
+- Server re-runs matching to verify dispositions haven't changed since preview
+- Processes each row independently (partial-success — row failures don't block other rows)
+- Tags all successfully imported contacts with selected tags
 - Returns summary: counts + any per-row errors
-- Client shows results with success/error breakdown
+
 
 ## Duplicate Matching Logic (server-side)
 
 Priority order:
 1. **Email exact match** — if imported row has email AND a contact in the agency has same email (case-insensitive) → match
 2. **Name + DOB match** — if no email match, check firstName + lastName + dateOfBirth exact match (case-insensitive names)
-3. **Name-only match** — if no DOB available, firstName + lastName exact match → treated as "possible match", shown in preview but NOT auto-merged. Agent must confirm.
+3. **Name-only match** — if no DOB available, firstName + lastName exact match → treated as `possible_match` disposition. NOT auto-merged. Preview shows the candidate contact's details and the agent must explicitly choose per row: **merge** (update existing), **create new**, or **skip**.
 
 Matching scoped to the agency (all contacts in the agency, not just the importing agent's).
+
+### Multi-match rules
+
+Email is NOT unique in the contacts table — multiple contacts can share an email. When a match query returns multiple results:
+
+| Scenario | Rule |
+|----------|------|
+| Multiple email matches | Pick the one owned by the importing agent. If none, pick the agency-wide one (ownerId = null). If multiple agency-wide, pick the most recently updated. If all owned by other agents, skip. |
+| Multiple name+DOB matches | Same priority: agent-owned > agency-wide > skip |
+| Possible match (name-only) owned by another agent | Show in preview as `skip_other_agent`, not `possible_match` — agent can't merge with another agent's contact |
+
+**Re-matching on confirm:** The server re-runs matching during confirm (not just preview) because contacts may have been created/modified between preview and confirm.
 
 ## Ownership Rules
 
@@ -67,11 +83,13 @@ Matching scoped to the agency (all contacts in the agency, not just the importin
 
 When updating a matched contact, only fill fields that are currently null/empty on the existing contact. Never overwrite existing data.
 
+**IMPORTANT:** The server must build the fill-only payload by reading the current DB state and only including fields where the existing value is null/empty AND the import value is non-null. Sending all non-null import fields to `PUT /contacts/:id` would overwrite existing data — the fill-only logic must happen server-side in `contact-import.service.ts`, not via the existing PUT endpoint directly.
+
 ```
 Existing: { firstName: "John", email: "john@email.com", phone: null, city: "Ottawa" }
 Import:   { firstName: "John", email: "john@email.com", phone: "+1613555000", city: "Toronto" }
+Payload:  { phone: "+1613555000" }  ← only null fields with import values
 Result:   { firstName: "John", email: "john@email.com", phone: "+1613555000", city: "Ottawa" }
-                                                         ↑ filled                    ↑ NOT overwritten
 ```
 
 ## Auto-Tagging
@@ -100,7 +118,6 @@ Result:   { firstName: "John", email: "john@email.com", phone: "+1613555000", ci
 | passportNumber | "Passport", "Passport Number", "Passport #" |
 | passportExpiry | "Passport Expiry", "Passport Exp", "Expiry Date" |
 | passportCountry | "Passport Country", "Issuing Country" |
-| notes | "Notes", "Comments", "Remarks" |
 
 Special: "Full Name" / "Name" / "Nom Complet" → auto-split into firstName + lastName
 
@@ -126,7 +143,6 @@ Special: "Full Name" / "Name" / "Nom Complet" → auto-split into firstName + la
     passportNumber?: string
     passportExpiry?: string // ISO YYYY-MM-DD
     passportCountry?: string // ISO 3-letter
-    notes?: string
   }>
 }
 ```
@@ -136,9 +152,10 @@ Special: "Full Name" / "Name" / "Nom Complet" → auto-split into firstName + la
 {
   results: Array<{
     rowIndex: number
-    disposition: 'new' | 'update' | 'skip_other_agent' | 'skip_invalid'
+    disposition: 'new' | 'update' | 'possible_match' | 'skip_other_agent' | 'skip_invalid'
     matchedContactId?: string
     matchedContactName?: string
+    matchedContactEmail?: string
     matchedContactOwner?: string  // Agent name if owned by another agent
     matchType?: 'email' | 'name_dob' | 'name_only'
     fieldsToFill?: string[]  // Which fields would be updated
@@ -147,6 +164,7 @@ Special: "Full Name" / "Name" / "Nom Complet" → auto-split into firstName + la
   summary: {
     newCount: number
     updateCount: number
+    possibleMatchCount: number
     skipOtherAgentCount: number
     skipInvalidCount: number
     totalRows: number
@@ -159,7 +177,11 @@ Special: "Full Name" / "Name" / "Nom Complet" → auto-split into firstName + la
 **Request:**
 ```typescript
 {
-  rows: Array<{...}>  // Same as preview, but only selected rows
+  rows: Array<{
+    ...contactFields,  // Same fields as preview
+    action: 'create' | 'merge' | 'skip'  // Agent decision per row
+    mergeContactId?: string  // Which contact to merge with (for possible_match rows)
+  }>
   tags: string[]       // Tag names to apply
 }
 ```
@@ -173,6 +195,9 @@ Special: "Full Name" / "Name" / "Nom Complet" → auto-split into firstName + la
   errors: Array<{ rowIndex: number; error: string }>
   tagName: string  // The import tag that was created/used
 }
+```
+
+**Semantics:** Partial-success batch — each row is processed independently. If row 5 fails, rows 1-4 and 6+ are still committed. Errors are returned per-row so the agent can see what failed and retry those rows.
 ```
 
 ## Architecture
@@ -203,6 +228,11 @@ Special: "Full Name" / "Name" / "Nom Complet" → auto-split into firstName + la
 - Matched contacts owned by other agents are silently skipped
 - Agency-wide contacts (ownerId = null) are claimed by the importing agent
 - The import endpoints respect the same agency scoping as other contact endpoints
+
+## Prerequisites (fix before import)
+
+- **ownerId in create flow:** The `ownerId` field exists on the contacts table but is not reliably persisted via `POST /contacts`. Add `ownerId` to `CreateContactDto` shared type and ensure `ContactsService.create()` persists it. The import service sets `ownerId = currentUserId` for all new contacts.
+- **Remove notes from mappable fields:** Unless real contact notes support exists (notes are currently only on the detail page activity timeline, not a contact field). If `notes` is a real column on contacts, keep it.
 
 ## Not Changing
 
