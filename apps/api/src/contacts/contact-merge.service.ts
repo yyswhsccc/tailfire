@@ -291,6 +291,7 @@ export class ContactMergeService {
         { table: 'expected_payment_items', column: 'contact_id', countKey: 'payments' },
         { table: 'payment_transactions', column: 'contact_id', countKey: 'payments' },
         { table: 'contact_share_requests', column: 'contact_id', countKey: 'other' },
+        { table: 'task_notification_pending', column: 'contact_id', countKey: 'other' },
       ]
 
       for (const { table, column, countKey } of simpleRepoints) {
