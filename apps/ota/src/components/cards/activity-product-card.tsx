@@ -101,7 +101,7 @@ function ActivityCompact(props: ActivityProductCardProps) {
           ) : props.priceCents != null ? (
             <span className="text-sm font-bold text-[#C59746]">{formatPrice(props.priceCents)}<span className="ml-0.5 text-xs font-normal text-[#888]">/pp</span></span>
           ) : (
-            <span className="text-xs text-[#888]">Check price</span>
+            <span className="text-xs text-[#888]">View pricing</span>
           )}
           <AddToTripButton component={buildTripComponent(props)} size="sm" />
         </div>

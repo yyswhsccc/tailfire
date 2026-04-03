@@ -122,7 +122,7 @@ function HotelCompact(props: HotelProductCardProps) {
           ) : props.priceCents != null ? (
             <span className="text-sm font-bold text-[#C59746]">{formatPrice(props.priceCents)}<span className="ml-0.5 text-[10px] font-normal text-[#888]">/night</span></span>
           ) : (
-            <span className="text-xs text-[#888]">Check price</span>
+            <span className="text-xs text-[#888]">View pricing</span>
           )}
           <AddToTripButton component={buildTripComponent(props)} size="sm" />
         </div>
