@@ -18,9 +18,10 @@
 
 | File | Responsibility |
 |------|---------------|
-| `apps/ota/src/stores/travel-session-store.ts` | Zustand store for travel dates, origin, adults — persisted to cookie |
-| `apps/ota/src/components/hub/travel-date-prompt.tsx` | Date range prompt bar shown when no dates set |
-| `apps/ota/src/components/cards/image-card-frame.tsx` | Shared visual chrome for image-forward cards (Dream Board style) |
+| `apps/ota/src/lib/travel-session.ts` | Server-safe travel session types, defaults, cookie parser (shared by client store + server sections) |
+| `apps/ota/src/stores/travel-session-store.ts` | Client Zustand store — imports types from lib/travel-session.ts |
+| `apps/ota/src/components/hub/travel-date-prompt.tsx` | Date range prompt bar — calls router.refresh() after setting dates |
+| `apps/ota/src/components/cards/image-card-frame.tsx` | Shared visual chrome — does NOT wrap in Link (AddToTrip compatibility) |
 
 ### Modified Files
 
