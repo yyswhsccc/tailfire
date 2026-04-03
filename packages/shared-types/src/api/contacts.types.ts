@@ -82,6 +82,9 @@ export interface CreateContactDto {
 
   // Date/Time Management (Phase 3.5)
   timezone?: string // IANA timezone identifier (e.g., 'America/Toronto')
+
+  // Ownership (admin/import use; non-admin users have ownerId forced by controller)
+  ownerId?: string | null
 }
 
 export interface CreateContactRelationshipDto {
@@ -546,4 +549,62 @@ export interface PortalInviteResponseDto {
   portalUserId: string
   email: string
   inviteSent: boolean
+}
+
+// ============================================================================
+// Contact Import
+// ============================================================================
+
+export interface ContactImportRow {
+  firstName?: string
+  lastName?: string
+  email?: string
+  phone?: string
+  dateOfBirth?: string
+  addressLine1?: string
+  addressLine2?: string
+  city?: string
+  province?: string
+  postalCode?: string
+  country?: string
+  passportNumber?: string
+  passportExpiry?: string
+  passportCountry?: string
+}
+
+export interface ContactImportConfirmRow extends ContactImportRow {
+  action: 'create' | 'merge' | 'skip'
+  mergeContactId?: string
+}
+
+export type ContactImportDisposition = 'new' | 'update' | 'possible_match' | 'skip_other_agent' | 'skip_invalid'
+
+export interface ContactImportPreviewResult {
+  results: Array<{
+    rowIndex: number
+    disposition: ContactImportDisposition
+    matchedContactId?: string
+    matchedContactName?: string
+    matchedContactEmail?: string
+    matchedContactOwner?: string
+    matchType?: 'email' | 'name_dob' | 'name_only'
+    fieldsToFill?: string[]
+    validationErrors?: string[]
+  }>
+  summary: {
+    newCount: number
+    updateCount: number
+    possibleMatchCount: number
+    skipOtherAgentCount: number
+    skipInvalidCount: number
+    totalRows: number
+  }
+}
+
+export interface ContactImportConfirmResult {
+  created: number
+  updated: number
+  skipped: number
+  errors: Array<{ rowIndex: number; error: string }>
+  tagName: string
 }

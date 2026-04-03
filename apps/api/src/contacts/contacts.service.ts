@@ -63,6 +63,7 @@ export class ContactsService {
       .insert(this.db.schema.contacts)
       .values({
         agencyId,
+        ownerId: dto.ownerId || null,
         // Name fields
         firstName: dto.firstName,
         lastName: dto.lastName,
