@@ -12,7 +12,7 @@ export function HubContextPills({ pills, children }: HubContextPillsProps) {
 
   return (
     <div className="border-b border-[#E0E0E0]">
-      <div className="mx-auto flex max-w-[1280px] items-center gap-2.5 overflow-x-auto px-4 py-3 sm:flex-wrap sm:overflow-visible sm:px-10 lg:px-[60px]"
+      <div className="mx-auto flex max-w-[1280px] items-center gap-2.5 overflow-x-auto px-4 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:px-10 lg:px-[60px]"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {pills.map((pill, i) => (

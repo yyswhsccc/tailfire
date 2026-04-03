@@ -163,7 +163,7 @@ function FlightFull(props: FlightProductCardProps) {
                   <p className="text-[10px] text-[#888]">per person</p>
                 </>
               ) : (
-                <span className="text-sm text-[#888]">Check price &rarr;</span>
+                <span className="text-sm text-[#888]">View pricing &rarr;</span>
               )}
             </div>
           </div>
@@ -294,7 +294,7 @@ function FlightCompact(props: FlightProductCardProps) {
           ) : props.priceCents != null ? (
             <span className="text-sm font-bold text-[#C59746]">{formatPrice(props.priceCents)}</span>
           ) : (
-            <span className="text-xs text-[#888]">Check price</span>
+            <span className="text-xs text-[#888]">View pricing</span>
           )}
           <AddToTripButton component={buildTripComponent(props)} size="sm" />
         </div>

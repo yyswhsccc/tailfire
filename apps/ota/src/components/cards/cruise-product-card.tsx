@@ -100,7 +100,7 @@ function CruiseCompact(props: CruiseProductCardProps) {
           ) : props.priceCents != null ? (
             <span className="text-sm font-bold text-[#C59746]">{formatPrice(props.priceCents)}</span>
           ) : (
-            <span className="text-xs text-[#888]">Check price</span>
+            <span className="text-xs text-[#888]">View pricing</span>
           )}
           <AddToTripButton component={buildTripComponent(props)} size="sm" />
         </div>
