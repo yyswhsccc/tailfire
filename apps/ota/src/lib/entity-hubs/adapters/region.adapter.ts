@@ -54,6 +54,15 @@ export const regionAdapter: HubAdapter<RegionDetail> = {
       priority: 'high',
     })
 
+    // Tours -- ToursSection self-fetches via tour-repository API
+    sections.push({
+      key: 'tours',
+      title: `\uD83C\uDFDE Tours in ${region.name}`,
+      viewAllHref: `/search/tours?q=${encodeURIComponent(region.name)}`,
+      props: { destinationName: region.name },
+      priority: 'medium',
+    })
+
     return sections
   },
 
