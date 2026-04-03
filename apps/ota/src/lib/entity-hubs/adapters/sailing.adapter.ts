@@ -93,6 +93,15 @@ export const sailingAdapter: HubAdapter<SailingDetail> = {
       })
     }
 
+    // Flights CTA to embarkation port
+    sections.push({
+      key: 'flights',
+      title: '\u2708\uFE0F Flights to Embarkation Port',
+      viewAllHref: `/search/flights`,
+      props: { destinationName: sailing.embarkPort?.name },
+      priority: 'medium',
+    })
+
     return sections
   },
 

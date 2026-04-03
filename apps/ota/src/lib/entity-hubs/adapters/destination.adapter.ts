@@ -68,6 +68,16 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       priority: 'high',
     })
 
+    // Flights CTA — links to flight search; upgrades to live data when available
+    sections.push({
+      key: 'flights',
+      title: `\u2708\uFE0F Flights to ${dest.name}`,
+      viewAllHref: `/search/flights`,
+      viewAllLabel: 'Search flights \u2192',
+      props: { destinationName: dest.name },
+      priority: 'high',
+    })
+
     // Tours -- ToursSection self-fetches via tour-repository API
     sections.push({
       key: 'tours',
