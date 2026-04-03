@@ -61,7 +61,7 @@ export const contacts = pgTable('contacts', {
   ownerId: uuid('owner_id'),
 
   // Merge tracking (set when this contact is merged into another)
-  mergedIntoContactId: uuid('merged_into_contact_id').references(() => contacts.id),
+  mergedIntoContactId: uuid('merged_into_contact_id'), // FK to contacts.id (self-ref, defined in migration)
   mergedAt: timestamp('merged_at', { withTimezone: true }),
   mergedBy: uuid('merged_by'),
 
