@@ -46,7 +46,7 @@ export async function ShipsSection({
       viewAllLabel={resolvedViewAll}
     >
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {ships.map((ship) => (
+        {ships.slice(0, 6).map((ship) => (
           <ShipCard
             key={ship.id}
             slug={ship.slug}
