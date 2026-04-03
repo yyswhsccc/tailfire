@@ -31,7 +31,7 @@ import type {
 } from '../../../../packages/shared-types/src/api'
 
 // Fields on the contacts table that can be overridden during merge
-const MERGEABLE_FIELDS = [
+const _MERGEABLE_FIELDS = [
   'firstName',
   'lastName',
   'legalFirstName',
@@ -230,8 +230,6 @@ export class ContactMergeService {
           continue
         }
         if (source === 'secondary') {
-          // Take the value from the secondary contact
-          const val = secondary[col]
           // Build a SET clause — we handle this via parameterized update below
           setClauses.push(field)
         }
@@ -245,13 +243,13 @@ export class ContactMergeService {
       if (setClauses.length > 0) {
         // For each override field that picks secondary, copy the value
         const updateParts = setClauses.map((field) => {
-          const col = FIELD_TO_COLUMN[field]
-          const val = secondary[col]
+          const col = FIELD_TO_COLUMN[field] ?? field
+          const val = secondary[col as keyof typeof secondary]
           if (val === null || val === undefined) {
             return sql.raw(`${col} = NULL`)
           }
           // Use parameterized value for safety
-          return sql`${sql.raw(col)} = ${typeof val === 'object' ? JSON.stringify(val) : val}`
+          return sql`${sql.raw(col)} = ${typeof val === 'object' ? JSON.stringify(val) : String(val)}`
         })
 
         // Also update the updated_at timestamp
@@ -436,6 +434,36 @@ export class ContactMergeService {
       // Delete remaining duplicates
       await tx.execute(sql`
         DELETE FROM traveler_bookings
+        WHERE trip_traveler_id = ${secondaryTravelerId}
+      `)
+
+      // Re-point trip_traveler_insurance
+      await tx.execute(sql`
+        UPDATE trip_traveler_insurance
+        SET trip_traveler_id = ${primaryTravelerId}
+        WHERE trip_traveler_id = ${secondaryTravelerId}
+      `)
+
+      // Re-point traveler_group_members
+      await tx.execute(sql`
+        UPDATE traveler_group_members
+        SET trip_traveler_id = ${primaryTravelerId}
+        WHERE trip_traveler_id = ${secondaryTravelerId}
+          AND NOT EXISTS (
+            SELECT 1 FROM traveler_group_members
+            WHERE trip_traveler_id = ${primaryTravelerId}
+              AND traveler_group_id = traveler_group_members.traveler_group_id
+          )
+      `)
+      await tx.execute(sql`
+        DELETE FROM traveler_group_members
+        WHERE trip_traveler_id = ${secondaryTravelerId}
+      `)
+
+      // Re-point cruise_booking_sessions
+      await tx.execute(sql`
+        UPDATE cruise_booking_sessions
+        SET trip_traveler_id = ${primaryTravelerId}
         WHERE trip_traveler_id = ${secondaryTravelerId}
       `)
 
@@ -701,6 +729,17 @@ export class ContactMergeService {
         SET contact_id = ${primaryId}
         WHERE contact_id = ${secondaryId}
       `)
+      // Sync contacts.portalUserId from secondary to primary
+      const [secondaryContact] = await tx.execute(sql`
+        SELECT portal_user_id FROM contacts WHERE id = ${secondaryId}
+      `)
+      if (secondaryContact?.portal_user_id) {
+        await tx.execute(sql`
+          UPDATE contacts
+          SET portal_user_id = ${secondaryContact.portal_user_id}
+          WHERE id = ${primaryId}
+        `)
+      }
       counts.other += (result as any)?.rowCount ?? (result as any)?.count ?? 0
     } else {
       // Deactivate secondary's portal user
@@ -1040,6 +1079,9 @@ export class ContactMergeService {
       portalStatus: 'not_invited' as const,
       portalInvitedAt: null,
       photoUrl: photoUrl ?? null,
+      mergedIntoContactId: null,
+      mergedAt: null,
+      mergedBy: null,
       createdAt: createdAt ? new Date(createdAt).toISOString() : new Date().toISOString(),
       updatedAt: createdAt ? new Date(createdAt).toISOString() : new Date().toISOString(),
     } as ContactListItemDto

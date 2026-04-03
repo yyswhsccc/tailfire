@@ -82,10 +82,13 @@ export class ContactFilterDto {
     'firstName',
     'lastName',
     'email',
+    'contactType',
+    'contactStatus',
+    'dateOfBirth',
     'createdAt',
     'updatedAt',
   ])
-  sortBy?: 'firstName' | 'lastName' | 'email' | 'createdAt' | 'updatedAt'
+  sortBy?: 'firstName' | 'lastName' | 'email' | 'contactType' | 'contactStatus' | 'dateOfBirth' | 'createdAt' | 'updatedAt'
 
   @IsOptional()
   @IsIn(['asc', 'desc'])

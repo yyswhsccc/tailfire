@@ -95,7 +95,7 @@ export function ContactsFilterPanel({ filters, onFiltersChange }: ContactsFilter
     } else if (value === 'inactive') {
       onFiltersChange({ ...filters, isActive: false, page: 1 })
     } else {
-      // "All" — remove isActive entirely so the API returns all contacts
+      // "All" — remove isActive so API returns all contacts
       const { isActive: _removed, ...rest } = filters
       onFiltersChange({ ...rest, page: 1 })
     }

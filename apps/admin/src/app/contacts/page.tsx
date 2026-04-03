@@ -49,6 +49,7 @@ function ContactsPage() {
   const [view, setView] = useState<ContactsView>('table')
   const [filters, setFilters] = useState<ContactFilterDto>({
     page: 1,
+    isActive: true,
     limit: 25,
   })
 

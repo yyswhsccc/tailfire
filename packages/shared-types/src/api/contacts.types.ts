@@ -242,7 +242,7 @@ export interface ContactFilterDto {
   contactStatus?: string[]
 
   // Sorting
-  sortBy?: 'firstName' | 'lastName' | 'email' | 'createdAt' | 'updatedAt'
+  sortBy?: 'firstName' | 'lastName' | 'email' | 'contactType' | 'contactStatus' | 'dateOfBirth' | 'createdAt' | 'updatedAt'
   sortOrder?: 'asc' | 'desc'
 }
 
