@@ -2,12 +2,14 @@
  * Contacts Module
  *
  * Provides CRUD operations for the Contact CRM system.
- * Includes contacts, relationships, groups management, and sharing.
+ * Includes contacts, relationships, groups management, sharing, and import.
  */
 
 import { Module, forwardRef } from '@nestjs/common'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './contacts.service'
+import { ContactImportController } from './contact-import.controller'
+import { ContactImportService } from './contact-import.service'
 import { ContactRelationshipsController } from './contact-relationships.controller'
 import { ContactRelationshipsService } from './contact-relationships.service'
 import { ContactGroupsController } from './contact-groups.controller'
@@ -23,15 +25,18 @@ import { ContactShareRequestsController } from './contact-share-requests.control
 import { ContactShareRequestsService } from './contact-share-requests.service'
 import { ActivityLogsModule } from '../activity-logs/activity-logs.module'
 import { EmailModule } from '../email/email.module'
+import { TagsModule } from '../tags/tags.module'
 import { TripsModule } from '../trips/trips.module'
 
 @Module({
   imports: [
     ActivityLogsModule,
     EmailModule,
+    TagsModule,
     forwardRef(() => TripsModule), // forwardRef to avoid circular dependency (TripsModule already imports ContactsModule)
   ],
   controllers: [
+    ContactImportController, // BEFORE ContactsController so /contacts/import matches before /contacts/:id
     ContactsController,
     ContactRelationshipsController,
     ContactGroupsController,
@@ -42,6 +47,7 @@ import { TripsModule } from '../trips/trips.module'
   ],
   providers: [
     ContactsService,
+    ContactImportService,
     ContactRelationshipsService,
     ContactGroupsService,
     ContactSharesService,
