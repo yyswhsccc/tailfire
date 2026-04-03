@@ -1,7 +1,7 @@
 // apps/ota/src/components/hub/travel-date-prompt.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar } from 'lucide-react'
 import { useTravelSession } from '@/stores/travel-session-store'
@@ -15,7 +15,12 @@ export function TravelDatePrompt({ entityName: _entityName }: TravelDatePromptPr
   const { departureDate, returnDate, dismissedDatePrompt, setDates, dismissPrompt } = useTravelSession()
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [mounted, setMounted] = useState(false)
 
+  useEffect(() => { setMounted(true) }, [])
+
+  // Don't render anything until mounted (avoids hydration mismatch with cookie-based store)
+  if (!mounted) return null
   if ((departureDate && returnDate) || dismissedDatePrompt) return null
 
   const today = new Date().toISOString().split('T')[0]
