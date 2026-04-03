@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { RefreshCw } from "lucide-react";
 
 import { catalogFetch } from "@/lib/api";
-import { TourResultCard, type Tour } from "@/components/search/tour-result-card";
+import { TourProductCard } from "@/components/cards/tour-product-card";
 import { SearchResultsHeader } from "@/components/search/search-results-header";
 import { SearchPageShell } from "@/components/search/search-page-shell";
 import { TourSearchForm } from "@/components/search/tour-search-form";
@@ -23,6 +23,22 @@ export const metadata: Metadata = {
 // ============================================================================
 // TYPES
 // ============================================================================
+
+/** Matches TourSummaryDto from tour-repository API */
+interface Tour {
+  id: string;
+  name: string;
+  provider?: string;
+  providerIdentifier?: string;
+  operatorCode: string;
+  season?: string;
+  days?: number;
+  nights?: number;
+  description?: string;
+  imageUrl?: string;
+  lowestPriceCents?: number;
+  departureCount?: number;
+}
 
 interface TourSearchResponse {
   tours: Tour[];
@@ -176,9 +192,18 @@ function TourResults({
       </div>
 
       {/* Result cards */}
-      <div className="space-y-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((tour) => (
-          <TourResultCard key={tour.id} tour={tour} />
+          <TourProductCard
+            key={tour.id}
+            id={tour.id}
+            name={tour.name}
+            operatorName={tour.operatorCode ?? "Phoenix Voyages"}
+            operatorCode={tour.operatorCode}
+            durationDays={tour.days ?? 0}
+            imageUrl={tour.imageUrl ?? null}
+            priceCents={tour.lowestPriceCents ?? null}
+          />
         ))}
       </div>
 

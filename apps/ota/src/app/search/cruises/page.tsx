@@ -4,7 +4,7 @@ import { RefreshCw } from "lucide-react";
 
 import { catalogFetch } from "@/lib/api";
 import { CruiseSearchForm } from "@/components/search/cruise-search-form";
-import { CruiseResultCard, type CruiseSailing } from "@/components/search/cruise-result-card";
+import { CruiseProductCard } from "@/components/cards/cruise-product-card";
 import { FilterChips, type FilterChipOption } from "@/components/search/filter-chips";
 import { SearchResultsHeader } from "@/components/search/search-results-header";
 import { SearchPageShell } from "@/components/search/search-page-shell";
@@ -24,6 +24,26 @@ export const metadata: Metadata = {
 // ============================================================================
 // TYPES (matching API response DTOs)
 // ============================================================================
+
+/** Matches SailingSearchItemDto from the API */
+interface CruiseSailing {
+  id: string;
+  name: string;
+  sailDate: string;
+  endDate: string;
+  nights: number;
+  ship: { id: string; name: string; imageUrl: string | null };
+  cruiseLine: { id: string; name: string; logoUrl: string | null };
+  embarkPort: { id: string | null; name: string };
+  disembarkPort: { id: string | null; name: string };
+  prices: {
+    inside: number | null;
+    oceanview: number | null;
+    balcony: number | null;
+    suite: number | null;
+  };
+  portNames?: string[];
+}
 
 interface FilterOption {
   id: string;
@@ -58,6 +78,21 @@ interface FiltersResponse {
   dateRange: { min: string | null; max: string | null };
   nightsRange: { min: number | null; max: number | null };
   priceRange: { min: number | null; max: number | null };
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function getCheapestPrice(prices: CruiseSailing["prices"]): number | null {
+  const vals = [prices.inside, prices.oceanview, prices.balcony, prices.suite].filter(
+    (v): v is number => v != null,
+  );
+  return vals.length > 0 ? Math.min(...vals) : null;
+}
+
+function buildRoute(embark: string, disembark: string): string {
+  return embark === disembark ? embark : `${embark} → ${disembark}`;
 }
 
 // ============================================================================
@@ -259,9 +294,20 @@ function CruiseResults({
       </div>
 
       {/* Result cards */}
-      <div className="space-y-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((sailing) => (
-          <CruiseResultCard key={sailing.id} sailing={sailing} />
+          <CruiseProductCard
+            key={sailing.id}
+            id={sailing.id}
+            name={sailing.name}
+            shipName={sailing.ship.name}
+            shipImageUrl={sailing.ship.imageUrl}
+            cruiseLineName={sailing.cruiseLine.name}
+            sailDate={sailing.sailDate}
+            nights={sailing.nights}
+            route={buildRoute(sailing.embarkPort.name, sailing.disembarkPort.name)}
+            priceCents={getCheapestPrice(sailing.prices) ?? null}
+          />
         ))}
       </div>
 
