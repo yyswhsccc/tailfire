@@ -23,6 +23,8 @@ import { ContactLoyaltyProgramsController } from './contact-loyalty-programs.con
 import { ContactLoyaltyProgramsService } from './contact-loyalty-programs.service'
 import { ContactShareRequestsController } from './contact-share-requests.controller'
 import { ContactShareRequestsService } from './contact-share-requests.service'
+import { ContactMergeController } from './contact-merge.controller'
+import { ContactMergeService } from './contact-merge.service'
 import { ActivityLogsModule } from '../activity-logs/activity-logs.module'
 import { EmailModule } from '../email/email.module'
 import { TagsModule } from '../tags/tags.module'
@@ -37,6 +39,7 @@ import { TripsModule } from '../trips/trips.module'
   ],
   controllers: [
     ContactImportController, // BEFORE ContactsController so /contacts/import matches before /contacts/:id
+    ContactMergeController, // BEFORE ContactsController so /contacts/merge and /contacts/duplicates match before /contacts/:id
     ContactsController,
     ContactRelationshipsController,
     ContactGroupsController,
@@ -48,6 +51,7 @@ import { TripsModule } from '../trips/trips.module'
   providers: [
     ContactsService,
     ContactImportService,
+    ContactMergeService,
     ContactRelationshipsService,
     ContactGroupsService,
     ContactSharesService,
