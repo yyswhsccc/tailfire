@@ -27,7 +27,8 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
 
     return {
       imageUrl: dest.heroImageUrl || enrichment?.photos?.[0]?.url || null,
-      badge: dest.countryCode ?? '',
+      fallbackGradient: 'bg-gradient-to-br from-[#1a3a5c] via-[#0d2137] to-[#1A1A1A]',
+      badge: dest.countryCode ? `${dest.countryCode} · DESTINATION` : 'DESTINATION',
       title: dest.name,
       subtitle: subtitleParts.length > 0 ? subtitleParts.join(' \u00B7 ') : undefined,
       description: enrichment?.summary || dest.summary || undefined,
@@ -64,6 +65,16 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       title: `\uD83D\uDEA2 Cruises Visiting ${dest.name}`,
       viewAllHref: `/destinations/${dest.slug}/cruises`,
       props: {},
+      priority: 'high',
+    })
+
+    // Flights CTA — links to flight search; upgrades to live data when available
+    sections.push({
+      key: 'flights',
+      title: `\u2708\uFE0F Flights to ${dest.name}`,
+      viewAllHref: `/search/flights`,
+      viewAllLabel: 'Search flights \u2192',
+      props: { destinationName: dest.name },
       priority: 'high',
     })
 
@@ -105,6 +116,19 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
         priority: 'low',
       })
     }
+
+    // Nearby destinations — self-fetching section that finds same-type destinations
+    sections.push({
+      key: 'nearby',
+      title: `\uD83D\uDDFA\uFE0F More ${DESTINATION_TYPE_LABELS[dest.destinationType] ?? 'Destinations'} to Explore`,
+      subtitle: 'Discover similar destinations',
+      viewAllHref: '/destinations',
+      viewAllLabel: 'View all destinations \u2192',
+      props: {
+        destinationType: dest.destinationType,
+      },
+      priority: 'low',
+    })
 
     return sections
   },

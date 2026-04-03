@@ -6,13 +6,17 @@ interface HubHeroProps {
   badge?: string
   subtitle?: string
   imageUrl?: string | null
+  fallbackGradient?: string
   children?: React.ReactNode
   urgencyBadge?: string
 }
 
-export function HubHero({ title, badge, subtitle, imageUrl, children, urgencyBadge }: HubHeroProps) {
+export function HubHero({ title, badge, subtitle, imageUrl, fallbackGradient, children, urgencyBadge }: HubHeroProps) {
+  const backgroundClass = imageUrl
+    ? 'bg-[#1A1A1A]'
+    : (fallbackGradient ?? 'bg-gradient-to-br from-[#1A1A1A] via-[#2a1a0a] to-[#1A1A1A]')
   return (
-    <div className="relative overflow-hidden bg-[#1A1A1A]">
+    <div className={`relative overflow-hidden ${backgroundClass}`}>
       {imageUrl && (
         <SafeImage src={imageUrl} alt={title} fill className="object-cover" sizes="100vw" priority hideOnError />
       )}

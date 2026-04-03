@@ -1,18 +1,11 @@
 "use client";
 
-import Image from "next/image";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import {
-  Plane,
-  Hotel,
-  MapPin,
-  Calendar,
-  Clock,
-  Star,
-  ArrowRight,
-  Ship,
-  ImageIcon,
-} from "lucide-react";
+import { CruiseProductCard } from "@/components/cards/cruise-product-card";
+import { FlightProductCard } from "@/components/cards/flight-product-card";
+import { HotelProductCard } from "@/components/cards/hotel-product-card";
+import { TourProductCard } from "@/components/cards/tour-product-card";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -36,32 +29,8 @@ export function ChatProductCards({ toolName, output }: ChatProductCardsProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared card wrapper
+// Shared footer
 // ---------------------------------------------------------------------------
-
-function CardShell({
-  href,
-  accentColor,
-  children,
-}: {
-  href: string;
-  accentColor?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group block overflow-hidden rounded-lg border border-gray-200 bg-white transition-shadow hover:shadow-md"
-    >
-      {/* Thin accent stripe */}
-      <div
-        className="h-1"
-        style={{ backgroundColor: accentColor ?? "#1A1A1A" }}
-      />
-      <div className="px-3 py-2.5">{children}</div>
-    </Link>
-  );
-}
 
 function SectionFooter({
   href,
@@ -91,17 +60,18 @@ function SectionFooter({
   );
 }
 
-function PriceBadge({ label, price }: { label?: string; price: string }) {
-  return (
-    <div className="text-right">
-      {label && (
-        <div className="text-[10px] uppercase tracking-wide text-gray-400">
-          {label}
-        </div>
-      )}
-      <div className="text-sm font-semibold text-[#C59746]">{price}</div>
-    </div>
-  );
+// ---------------------------------------------------------------------------
+// Price parser — converts "$1,234" or "CAD 1234" or "1234" to cents
+// ---------------------------------------------------------------------------
+
+function parsePriceToCents(price: string | null | undefined): number | null {
+  if (!price) return null;
+  // Strip currency symbols, letters, spaces, commas — keep digits and dot
+  const cleaned = price.replace(/[^0-9.]/g, "");
+  const parsed = parseFloat(cleaned);
+  if (isNaN(parsed)) return null;
+  // If price string looks like it's already in dollars (no cents part or small value)
+  return Math.round(parsed * 100);
 }
 
 // ---------------------------------------------------------------------------
@@ -113,11 +83,9 @@ interface CruiseOutput {
     cruiseLine: string;
     ship: string;
     shipImage?: string | null;
-    cruiseLineLogo?: string | null;
     departurePort: string;
     itinerary: string;
     departureDate: string;
-    endDate?: string;
     nights: number;
     insidePrice: string | null;
     balconyPrice: string | null;
@@ -137,64 +105,22 @@ function CruiseResults({ data }: { data: unknown }) {
   return (
     <div className="mt-2 space-y-2">
       {cruises.map((c, i) => {
-        const displayPrice =
-          c.insidePrice ?? c.balconyPrice ?? c.suitePrice ?? null;
+        const rawPrice = c.insidePrice ?? c.balconyPrice ?? c.suitePrice ?? null;
+        const priceCents = parsePriceToCents(rawPrice);
         return (
-          <CardShell key={i} href="/search/cruises" accentColor="#1A1A1A">
-            <div className="flex items-start gap-2.5">
-              {/* Ship thumbnail */}
-              <div className="relative h-[60px] w-[80px] shrink-0 overflow-hidden rounded-md bg-gray-100">
-                {c.shipImage ? (
-                  <Image
-                    src={c.shipImage}
-                    alt={c.ship}
-                    fill
-                    className="object-cover"
-                    sizes="80px"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <Ship className="size-5 text-gray-300" />
-                  </div>
-                )}
-              </div>
-              {/* Details */}
-              <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#C59746]">
-                    {c.cruiseLine}
-                  </div>
-                  <div className="truncate text-sm font-semibold text-[#1A1A1A]">
-                    {c.ship}
-                  </div>
-                  <div className="mt-0.5 truncate text-xs text-gray-500">
-                    {c.itinerary}
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-400">
-                    <span className="flex items-center gap-0.5">
-                      <MapPin className="size-3" />
-                      {c.departurePort}
-                    </span>
-                    <span className="flex items-center gap-0.5">
-                      <Calendar className="size-3" />
-                      {formatDate(c.departureDate)}
-                    </span>
-                    <span className="flex items-center gap-0.5">
-                      <Clock className="size-3" />
-                      {c.nights} nights
-                    </span>
-                  </div>
-                </div>
-                <div className="shrink-0">
-                  {displayPrice ? (
-                    <PriceBadge label="from" price={displayPrice} />
-                  ) : (
-                    <div className="text-xs text-gray-400">Contact for pricing</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardShell>
+          <CruiseProductCard
+            key={i}
+            variant="compact"
+            id={`chat-cruise-${i}`}
+            name={c.itinerary || `${c.nights}-Night Cruise`}
+            shipName={c.ship}
+            shipImageUrl={c.shipImage ?? null}
+            cruiseLineName={c.cruiseLine}
+            sailDate={c.departureDate}
+            nights={c.nights}
+            route={`From ${c.departurePort}`}
+            priceCents={priceCents}
+          />
         );
       })}
       <SectionFooter
@@ -227,6 +153,28 @@ interface FlightOutput {
   error?: string;
 }
 
+/**
+ * Parse a route string like "YOW → CZM" or "YOW - CZM" into [origin, destination].
+ */
+function parseRoute(route: string): [string, string] {
+  const parts = route.split(/\s*[→\-–]\s*/);
+  return [parts[0]?.trim() ?? "???", parts[1]?.trim() ?? "???"];
+}
+
+/**
+ * Extract HH:mm from an ISO datetime string or a plain time string.
+ */
+function extractTime(dateTimeStr: string): string {
+  if (!dateTimeStr) return "00:00";
+  // ISO: "2026-06-01T08:30:00"
+  const isoMatch = dateTimeStr.match(/T(\d{2}:\d{2})/);
+  if (isoMatch) return isoMatch[1]!;
+  // Plain time like "08:30" or "08:30 AM"
+  const timeMatch = dateTimeStr.match(/(\d{1,2}:\d{2})/);
+  if (timeMatch) return timeMatch[1]!.padStart(5, "0");
+  return "00:00";
+}
+
 function FlightResults({ data }: { data: unknown }) {
   const d = data as FlightOutput;
   if (d.error) return <ErrorCard message={d.error} />;
@@ -235,43 +183,36 @@ function FlightResults({ data }: { data: unknown }) {
 
   return (
     <div className="mt-2 space-y-2">
-      {flights.map((f, i) => (
-        <CardShell key={i} href="/search/flights" accentColor="#2563eb">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <Plane className="size-3.5 text-gray-400" />
-                <span className="text-sm font-semibold text-[#1A1A1A]">
-                  {f.route}
-                </span>
-              </div>
-              <div className="mt-0.5 text-xs text-gray-500">
-                {f.airline}
-                {f.flightNumber ? ` \u00b7 ${f.flightNumber}` : ""}
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-gray-400">
-                {f.departure && (
-                  <span className="flex items-center gap-0.5">
-                    <Calendar className="size-3" />
-                    {formatDateTime(f.departure)}
-                  </span>
-                )}
-                {f.duration && (
-                  <span className="flex items-center gap-0.5">
-                    <Clock className="size-3" />
-                    {f.duration}
-                  </span>
-                )}
-                <span>
-                  {f.stops === 0 ? "Direct" : `${f.stops} stop${f.stops > 1 ? "s" : ""}`}
-                </span>
-                {f.cabin && <span className="uppercase">{f.cabin}</span>}
-              </div>
-            </div>
-            <PriceBadge label="per person" price={f.price} />
-          </div>
-        </CardShell>
-      ))}
+      {flights.map((f, i) => {
+        const [origin, destination] = parseRoute(f.route);
+        const depTime = extractTime(f.departure);
+        const arrTime = extractTime(f.arrival);
+        const priceCents = parsePriceToCents(f.price);
+
+        return (
+          <FlightProductCard
+            key={i}
+            variant="compact"
+            id={`chat-flight-${i}`}
+            airline={f.airline}
+            totalDuration={f.duration}
+            stops={f.stops ?? 0}
+            cabinClass={f.cabin || undefined}
+            priceCents={priceCents}
+            segments={[
+              {
+                departureAirport: origin,
+                arrivalAirport: destination,
+                departureTime: depTime,
+                arrivalTime: arrTime,
+                duration: f.duration,
+                airline: f.airline,
+                flightNumber: f.flightNumber || undefined,
+              },
+            ]}
+          />
+        );
+      })}
       <SectionFooter
         href="/search/flights"
         label="View Flights"
@@ -297,6 +238,15 @@ interface HotelOutput {
   error?: string;
 }
 
+/**
+ * Parse a rating string like "5 star", "4.5/5 rated" into a numeric star count.
+ */
+function parseStarRating(rating: string): number | undefined {
+  const starMatch = rating.match(/^(\d+(?:\.\d+)?)\s*star/i);
+  if (starMatch) return Math.min(Math.round(parseFloat(starMatch[1] ?? "0")), 5);
+  return undefined;
+}
+
 function HotelResults({ data }: { data: unknown }) {
   const d = data as HotelOutput;
   if (d.error) return <ErrorCard message={d.error} />;
@@ -305,35 +255,24 @@ function HotelResults({ data }: { data: unknown }) {
 
   return (
     <div className="mt-2 space-y-2">
-      {hotels.map((h, i) => (
-        <CardShell key={i} href="/search/hotels" accentColor="#059669">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <Hotel className="size-3.5 text-gray-400" />
-                <span className="truncate text-sm font-semibold text-[#1A1A1A]">
-                  {h.name}
-                </span>
-              </div>
-              <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
-                {h.rating && <StarRating rating={h.rating} />}
-                {h.location && (
-                  <span className="flex items-center gap-0.5">
-                    <MapPin className="size-3" />
-                    {h.location}
-                  </span>
-                )}
-              </div>
-              {h.boardBasis && (
-                <div className="mt-0.5 text-[11px] text-gray-400">
-                  {h.boardBasis}
-                </div>
-              )}
-            </div>
-            <PriceBadge label="per night" price={h.pricePerNight} />
-          </div>
-        </CardShell>
-      ))}
+      {hotels.map((h, i) => {
+        const priceCents = parsePriceToCents(h.pricePerNight);
+        const starRating = parseStarRating(h.rating);
+
+        return (
+          <HotelProductCard
+            key={i}
+            variant="compact"
+            id={`chat-hotel-${i}`}
+            name={h.name}
+            imageUrl={null}
+            starRating={starRating}
+            location={h.location || undefined}
+            boardType={h.boardBasis || undefined}
+            priceCents={priceCents}
+          />
+        );
+      })}
       <SectionFooter
         href="/search/hotels"
         label="View Hotels"
@@ -361,6 +300,20 @@ interface TourOutput {
   error?: string;
 }
 
+/**
+ * Parse a duration string like "7 days", "10D", "2 weeks" into a number of days.
+ */
+function parseDurationDays(duration: string): number {
+  if (!duration) return 1;
+  const dayMatch = duration.match(/(\d+)\s*(?:day|d)/i);
+  if (dayMatch) return parseInt(dayMatch[1] ?? "1", 10);
+  const weekMatch = duration.match(/(\d+)\s*week/i);
+  if (weekMatch) return parseInt(weekMatch[1] ?? "1", 10) * 7;
+  const numMatch = duration.match(/(\d+)/);
+  if (numMatch) return parseInt(numMatch[1] ?? "1", 10);
+  return 1;
+}
+
 function TourResults({ data }: { data: unknown }) {
   const d = data as TourOutput;
   if (d.error) return <ErrorCard message={d.error} />;
@@ -369,46 +322,24 @@ function TourResults({ data }: { data: unknown }) {
 
   return (
     <div className="mt-2 space-y-2">
-      {tours.map((t, i) => (
-        <CardShell key={i} href="/search/tours" accentColor="#7c3aed">
-          <div className="flex items-start gap-2.5">
-            {/* Tour thumbnail */}
-            <div className="relative h-[60px] w-[80px] shrink-0 overflow-hidden rounded-md bg-gray-100">
-              {t.imageUrl ? (
-                <Image
-                  src={t.imageUrl}
-                  alt={t.name}
-                  fill
-                  className="object-cover"
-                  sizes="80px"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center">
-                  <ImageIcon className="size-5 text-gray-300" />
-                </div>
-              )}
-            </div>
-            {/* Details */}
-            <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-[#1A1A1A]">
-                  {t.name}
-                </div>
-                <div className="mt-0.5 text-xs text-gray-500">
-                  {t.operator}
-                  {t.duration ? ` \u00b7 ${t.duration}` : ""}
-                </div>
-                {t.description && (
-                  <div className="mt-0.5 line-clamp-2 text-[11px] text-gray-400">
-                    {t.description}
-                  </div>
-                )}
-              </div>
-              <PriceBadge label="from" price={t.priceFrom} />
-            </div>
-          </div>
-        </CardShell>
-      ))}
+      {tours.map((t, i) => {
+        const priceCents = parsePriceToCents(t.priceFrom);
+        const durationDays = parseDurationDays(t.duration);
+
+        return (
+          <TourProductCard
+            key={i}
+            variant="compact"
+            id={`chat-tour-${i}`}
+            name={t.name}
+            operatorName={t.operator}
+            durationDays={durationDays}
+            imageUrl={t.imageUrl ?? null}
+            highlights={t.description ? [t.description] : undefined}
+            priceCents={priceCents}
+          />
+        );
+      })}
       <SectionFooter
         href="/search/tours"
         label="View Tours"
@@ -422,28 +353,6 @@ function TourResults({ data }: { data: unknown }) {
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
-
-function StarRating({ rating }: { rating: string }) {
-  // rating is like "5 star" or "4.2/5 rated" or "unrated"
-  const starMatch = rating.match(/^(\d+)\s*star/);
-  if (starMatch) {
-    const count = Math.min(parseInt(starMatch[1] ?? "0", 10), 5);
-    return (
-      <span className="flex items-center gap-0.5">
-        {Array.from({ length: count }).map((_, i) => (
-          <Star
-            key={i}
-            className="size-3 fill-[#C59746] text-[#C59746]"
-          />
-        ))}
-      </span>
-    );
-  }
-  if (rating !== "unrated") {
-    return <span className="text-[11px] text-gray-400">{rating}</span>;
-  }
-  return null;
-}
 
 function ErrorCard({ message }: { message: string }) {
   return (
@@ -459,34 +368,4 @@ function EmptyCard({ label }: { label: string }) {
       No {label} found matching your criteria. Try adjusting your search.
     </div>
   );
-}
-
-function formatDate(dateStr: string): string {
-  try {
-    const d = new Date(dateStr + "T00:00:00");
-    return d.toLocaleDateString("en-CA", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  } catch {
-    return dateStr;
-  }
-}
-
-function formatDateTime(dateTimeStr: string): string {
-  try {
-    const d = new Date(dateTimeStr);
-    return d.toLocaleDateString("en-CA", {
-      month: "short",
-      day: "numeric",
-    }) +
-      " " +
-      d.toLocaleTimeString("en-CA", {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-  } catch {
-    return dateTimeStr;
-  }
 }

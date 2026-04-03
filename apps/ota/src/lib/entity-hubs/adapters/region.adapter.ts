@@ -7,6 +7,7 @@ export const regionAdapter: HubAdapter<RegionDetail> = {
   heroData(region): HeroData {
     return {
       imageUrl: null,
+      fallbackGradient: 'bg-gradient-to-br from-[#1a3a2a] via-[#0d2a1a] to-[#1A1A1A]',
       badge: 'REGION',
       title: region.name,
       description: region.description ?? undefined,
