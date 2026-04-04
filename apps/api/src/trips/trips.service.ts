@@ -1678,6 +1678,17 @@ export class TripsService {
       metadata: { shareToken },
     })
 
+    // Auto-set primary contact to 'quoted' if they're still in 'prospecting'
+    if (updated.primaryContactId) {
+      await this.db.client.execute(sql`
+        UPDATE contacts
+        SET contact_status = 'quoted', updated_at = NOW()
+        WHERE id = ${updated.primaryContactId}
+          AND contact_status = 'prospecting'
+          AND is_active = true
+      `)
+    }
+
     return this.mapToResponseDto(updated)
   }
 
