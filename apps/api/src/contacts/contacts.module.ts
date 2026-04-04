@@ -23,6 +23,8 @@ import { ContactLoyaltyProgramsController } from './contact-loyalty-programs.con
 import { ContactLoyaltyProgramsService } from './contact-loyalty-programs.service'
 import { ContactShareRequestsController } from './contact-share-requests.controller'
 import { ContactShareRequestsService } from './contact-share-requests.service'
+import { ContactLifecycleService } from './contact-lifecycle.service'
+import { ContactLifecycleController } from './contact-lifecycle.controller'
 import { ActivityLogsModule } from '../activity-logs/activity-logs.module'
 import { EmailModule } from '../email/email.module'
 import { TagsModule } from '../tags/tags.module'
@@ -36,6 +38,7 @@ import { TripsModule } from '../trips/trips.module'
     forwardRef(() => TripsModule), // forwardRef to avoid circular dependency (TripsModule already imports ContactsModule)
   ],
   controllers: [
+    ContactLifecycleController, // BEFORE ContactsController for static route matching
     ContactImportController, // BEFORE ContactsController so /contacts/import matches before /contacts/:id
     ContactsController,
     ContactRelationshipsController,
@@ -55,6 +58,7 @@ import { TripsModule } from '../trips/trips.module'
     ContactDocumentsService,
     ContactLoyaltyProgramsService,
     ContactShareRequestsService,
+    ContactLifecycleService,
   ],
   exports: [
     ContactsService,
@@ -62,6 +66,7 @@ import { TripsModule } from '../trips/trips.module'
     ContactGroupsService,
     ContactSharesService,
     ContactAccessService,
+    ContactLifecycleService,
   ],
 })
 export class ContactsModule {}
