@@ -1,0 +1,219 @@
+<h2>FlightProductCard — Full Variant with Journey Timeline</h2>
+<p class="subtitle">Matches Tailfire admin's flight-journey-display: visual leg timeline, airport codes, layover status, duration.</p>
+
+<div class="section">
+  <h3>Full Variant — Journey Timeline</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+    <!-- Direct Flight -->
+    <div style="font-family:Lato,system-ui,sans-serif;">
+      <p style="font-size:11px;color:#888;margin:0 0 8px;font-weight:600;">Direct Flight</p>
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;">
+        <div style="padding:16px;">
+          <!-- Airline + Price row -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:32px;height:32px;background:#f0f0f0;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#1A1A1A;">WS</div>
+              <div>
+                <p style="font-size:12px;font-weight:600;color:#1A1A1A;margin:0;">WestJet</p>
+                <p style="font-size:10px;color:#888;margin:0;">WS 2814 &bull; Boeing 737 MAX 8</p>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <span style="font-size:20px;font-weight:700;color:#C59746;">$445</span>
+              <p style="font-size:9px;color:#888;margin:1px 0 0;">per person</p>
+            </div>
+          </div>
+
+          <!-- Journey Timeline -->
+          <div style="display:flex;align-items:center;gap:0;margin:8px 0;">
+            <!-- Origin -->
+            <div style="text-align:center;flex-shrink:0;width:60px;">
+              <p style="font-size:16px;font-weight:800;color:#1A1A1A;margin:0;letter-spacing:1px;">YOW</p>
+              <p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:2px 0 0;">6:45 AM</p>
+              <p style="font-size:9px;color:#888;margin:1px 0 0;">Ottawa</p>
+            </div>
+            <!-- Flight line -->
+            <div style="flex:1;display:flex;align-items:center;padding:0 8px;">
+              <div style="flex:1;position:relative;">
+                <div style="height:2px;background:linear-gradient(to right,#C59746,#E89E4A);border-radius:1px;"></div>
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(45deg);font-size:14px;">&#9992;&#65039;</div>
+                <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);white-space:nowrap;">
+                  <span style="font-size:10px;color:#888;background:#fff;padding:0 4px;">4h 55m &bull; Direct</span>
+                </div>
+              </div>
+            </div>
+            <!-- Destination -->
+            <div style="text-align:center;flex-shrink:0;width:60px;">
+              <p style="font-size:16px;font-weight:800;color:#1A1A1A;margin:0;letter-spacing:1px;">CZM</p>
+              <p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:2px 0 0;">11:40 AM</p>
+              <p style="font-size:9px;color:#888;margin:1px 0 0;">Cozumel</p>
+            </div>
+          </div>
+
+          <!-- Tags -->
+          <div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap;">
+            <span style="background:#ecfdf5;color:#059669;font-size:9px;font-weight:600;padding:3px 8px;border-radius:4px;">Direct</span>
+            <span style="background:#faf6f0;color:#888;font-size:9px;padding:3px 8px;border-radius:4px;">Economy</span>
+            <span style="background:#faf6f0;color:#888;font-size:9px;padding:3px 8px;border-radius:4px;">1 carry-on included</span>
+          </div>
+
+          <!-- Add to Trip -->
+          <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+            <div style="background:#C59746;color:#fff;font-size:11px;font-weight:600;padding:8px 18px;border-radius:8px;cursor:pointer;">+ Add to Trip</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1-Stop Flight -->
+    <div style="font-family:Lato,system-ui,sans-serif;">
+      <p style="font-size:11px;color:#888;margin:0 0 8px;font-weight:600;">1-Stop Flight (with layover)</p>
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;">
+        <div style="padding:16px;">
+          <!-- Airline + Price row -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:32px;height:32px;background:#f0f0f0;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#1A1A1A;">AC</div>
+              <div>
+                <p style="font-size:12px;font-weight:600;color:#1A1A1A;margin:0;">Air Canada</p>
+                <p style="font-size:10px;color:#888;margin:0;">AC 456 / AC 891</p>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <span style="font-size:20px;font-weight:700;color:#C59746;">$389</span>
+              <p style="font-size:9px;color:#888;margin:1px 0 0;">per person</p>
+            </div>
+          </div>
+
+          <!-- Journey Timeline — 2 legs -->
+          <div style="display:flex;align-items:center;gap:0;margin:8px 0;">
+            <!-- Origin -->
+            <div style="text-align:center;flex-shrink:0;width:50px;">
+              <p style="font-size:15px;font-weight:800;color:#1A1A1A;margin:0;letter-spacing:1px;">YOW</p>
+              <p style="font-size:10px;font-weight:600;color:#1A1A1A;margin:2px 0 0;">6:45</p>
+              <p style="font-size:9px;color:#888;margin:0;">AM</p>
+            </div>
+
+            <!-- Leg 1 line -->
+            <div style="flex:1;display:flex;align-items:center;padding:0 4px;">
+              <div style="flex:1;position:relative;">
+                <div style="height:2px;background:linear-gradient(to right,#C59746,#E89E4A);border-radius:1px;"></div>
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(45deg);font-size:11px;">&#9992;&#65039;</div>
+                <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);white-space:nowrap;">
+                  <span style="font-size:9px;color:#888;background:#fff;padding:0 3px;">2h 10m</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Connection Airport -->
+            <div style="text-align:center;flex-shrink:0;padding:0 4px;">
+              <div style="position:relative;">
+                <p style="font-size:13px;font-weight:700;color:#1A1A1A;margin:0;letter-spacing:0.5px;">YYZ</p>
+                <p style="font-size:9px;color:#888;margin:1px 0 0;">Toronto</p>
+                <!-- Layover badge -->
+                <div style="margin-top:4px;display:inline-block;background:#fef3c7;border:1px solid #f59e0b;padding:2px 6px;border-radius:4px;">
+                  <span style="font-size:8px;font-weight:600;color:#92400e;">1h 45m layover</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Leg 2 line -->
+            <div style="flex:1;display:flex;align-items:center;padding:0 4px;">
+              <div style="flex:1;position:relative;">
+                <div style="height:2px;background:linear-gradient(to right,#C59746,#E89E4A);border-radius:1px;"></div>
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(45deg);font-size:11px;">&#9992;&#65039;</div>
+                <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);white-space:nowrap;">
+                  <span style="font-size:9px;color:#888;background:#fff;padding:0 3px;">3h 50m</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Destination -->
+            <div style="text-align:center;flex-shrink:0;width:50px;">
+              <p style="font-size:15px;font-weight:800;color:#1A1A1A;margin:0;letter-spacing:1px;">CZM</p>
+              <p style="font-size:10px;font-weight:600;color:#1A1A1A;margin:2px 0 0;">1:30</p>
+              <p style="font-size:9px;color:#888;margin:0;">PM</p>
+            </div>
+          </div>
+
+          <!-- Total duration -->
+          <div style="text-align:center;margin-top:6px;">
+            <span style="font-size:10px;color:#888;">Total: 7h 45m (includes 1h 45m layover at YYZ)</span>
+          </div>
+
+          <!-- Tags -->
+          <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;">
+            <span style="background:#fef3c7;color:#92400e;font-size:9px;font-weight:600;padding:3px 8px;border-radius:4px;">1 Stop</span>
+            <span style="background:#faf6f0;color:#888;font-size:9px;padding:3px 8px;border-radius:4px;">Economy</span>
+            <span style="background:#faf6f0;color:#888;font-size:9px;padding:3px 8px;border-radius:4px;">1 carry-on included</span>
+          </div>
+
+          <!-- Add to Trip -->
+          <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+            <div style="background:#C59746;color:#fff;font-size:11px;font-weight:600;padding:8px 18px;border-radius:8px;cursor:pointer;">+ Add to Trip</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top:32px;">
+  <h3>Layover Status Colors (from Tailfire admin)</h3>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-family:Lato,sans-serif;">
+    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:12px;text-align:center;">
+      <div style="display:inline-block;background:#fee2e2;border:1px solid #ef4444;padding:4px 10px;border-radius:4px;margin-bottom:6px;">
+        <span style="font-size:10px;font-weight:600;color:#991b1b;">45m layover</span>
+      </div>
+      <p style="font-size:11px;color:#1A1A1A;margin:0;font-weight:600;">Tight</p>
+      <p style="font-size:10px;color:#888;margin:2px 0 0;">&lt; 1h — risk of missed connection</p>
+    </div>
+    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:12px;text-align:center;">
+      <div style="display:inline-block;background:#fef3c7;border:1px solid #f59e0b;padding:4px 10px;border-radius:4px;margin-bottom:6px;">
+        <span style="font-size:10px;font-weight:600;color:#92400e;">1h 45m layover</span>
+      </div>
+      <p style="font-size:11px;color:#1A1A1A;margin:0;font-weight:600;">Comfortable</p>
+      <p style="font-size:10px;color:#888;margin:2px 0 0;">1-3h — standard connection</p>
+    </div>
+    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:12px;text-align:center;">
+      <div style="display:inline-block;background:#f0f0f0;border:1px solid #999;padding:4px 10px;border-radius:4px;margin-bottom:6px;">
+        <span style="font-size:10px;font-weight:600;color:#555;">5h 30m layover</span>
+      </div>
+      <p style="font-size:11px;color:#1A1A1A;margin:0;font-weight:600;">Long</p>
+      <p style="font-size:10px;color:#888;margin:2px 0 0;">&gt; 3h — extended wait</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>Compact &amp; Mini variants unchanged</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-family:Lato,sans-serif;">
+    <div>
+      <p style="font-size:10px;color:#888;margin:0 0 6px;">compact — for related rails, AI suggestions</p>
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <p style="font-size:12px;font-weight:600;color:#1A1A1A;margin:0;">YOW &rarr; CZM</p>
+            <p style="font-size:10px;color:#888;margin:2px 0;">Air Canada &bull; 1 stop &bull; 6h 45m</p>
+          </div>
+          <div style="text-align:right;">
+            <span style="font-size:14px;font-weight:700;color:#C59746;">$389</span>
+            <div style="background:#C59746;color:#fff;font-size:8px;font-weight:600;padding:3px 8px;border-radius:5px;margin-top:3px;">+ Add</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p style="font-size:10px;color:#888;margin:0 0 6px;">mini — for basket list, submit review</p>
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:14px;">&#9992;&#65039;</span>
+        <div style="flex:1;min-width:0;">
+          <p style="font-size:10px;font-weight:600;color:#1A1A1A;margin:0;">YOW&rarr;CZM 6h45m</p>
+          <p style="font-size:9px;color:#C59746;font-weight:600;margin:1px 0 0;">$389</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

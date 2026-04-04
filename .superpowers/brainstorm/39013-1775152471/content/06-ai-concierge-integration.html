@@ -1,0 +1,318 @@
+<h2>AI Concierge — Entity Page Integration</h2>
+<p class="subtitle">Contextual prompts that expand to full chat. The AI knows what page you're on, what's in your basket, and what you've been browsing.</p>
+
+<div class="section">
+  <h3>Three Touchpoints on Every Entity Page</h3>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+    <!-- MOBILE -->
+    <div>
+      <div class="mockup">
+        <div class="mockup-header">Mobile — 3 AI Touchpoints</div>
+        <div class="mockup-body" style="padding:0;">
+          <div style="max-width:375px;margin:0 auto;background:#fff;font-family:Lato,system-ui,sans-serif;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+
+            <!-- 1. Hero CTA -->
+            <div style="position:relative;height:180px;background:#1A1A1A;overflow:hidden;">
+              <div style="position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=200&fit=crop') center/cover;opacity:0.45;"></div>
+              <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.8),transparent 60%);"></div>
+              <div style="position:absolute;bottom:0;left:0;right:0;padding:16px;">
+                <p style="font-size:9px;font-weight:700;letter-spacing:2px;color:#C59746;margin:0 0 4px;">DESTINATION</p>
+                <h1 style="font-family:Cinzel,serif;font-size:22px;font-weight:700;color:#fff;margin:0;">Cozumel, Mexico</h1>
+                <!-- TOUCHPOINT 1: Hero Plan CTA -->
+                <div style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;background:rgba(197,151,70,0.9);padding:8px 16px;border-radius:8px;cursor:pointer;">
+                  <span style="font-size:13px;">&#10024;</span>
+                  <span style="font-size:12px;font-weight:600;color:#fff;">Plan a Trip to Cozumel</span>
+                </div>
+                <div style="position:absolute;top:12px;right:16px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);padding:2px 6px;border-radius:4px;">
+                  <span style="font-size:8px;color:#fff;font-weight:600;letter-spacing:0.5px;">1</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pills -->
+            <div style="padding:8px 16px;display:flex;gap:6px;overflow-x:auto;border-bottom:1px solid #E0E0E0;">
+              <span style="white-space:nowrap;background:#faf6f0;border:1px solid #E0E0E0;padding:4px 10px;border-radius:16px;font-size:10px;">42 Cruises</span>
+              <span style="white-space:nowrap;background:#faf6f0;border:1px solid #E0E0E0;padding:4px 10px;border-radius:16px;font-size:10px;">12 Flights</span>
+            </div>
+
+            <!-- TOUCHPOINT 2: Contextual Suggestion Bar -->
+            <div style="margin:10px 16px;padding:10px 12px;background:linear-gradient(135deg,rgba(197,151,70,0.08),rgba(197,151,70,0.03));border:1px solid rgba(197,151,70,0.2);border-radius:10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:14px;">&#10024;</span>
+                <div style="flex:1;">
+                  <p style="font-size:11px;margin:0;color:#C59746;font-weight:600;">I found 3 direct flights from Ottawa</p>
+                  <p style="font-size:9px;margin:2px 0 0;color:#888;">Starting at $445 — want me to compare options?</p>
+                </div>
+                <span style="font-size:20px;color:#C59746;">&#8250;</span>
+              </div>
+              <div style="position:absolute;right:24px;margin-top:-38px;background:rgba(255,255,255,0.15);border:1px solid rgba(197,151,70,0.25);padding:2px 6px;border-radius:4px;">
+                <span style="font-size:8px;color:#C59746;font-weight:600;">2</span>
+              </div>
+            </div>
+
+            <!-- Section content -->
+            <div style="padding:8px 16px;">
+              <h3 style="font-size:14px;font-weight:700;color:#1A1A1A;margin:0 0 8px;">Cruises visiting Cozumel</h3>
+              <div style="background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:10px;">
+                <p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:0;">7-Night Western Caribbean</p>
+                <p style="font-size:9px;color:#888;margin:2px 0;">Royal Caribbean &bull; from $849/pp</p>
+              </div>
+            </div>
+
+            <!-- spacer -->
+            <div style="height:40px;"></div>
+
+            <!-- TOUCHPOINT 3: Fixed Bottom Chat Input -->
+            <div style="position:relative;border-top:1px solid #E0E0E0;background:#fff;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;background:#faf6f0;border:1px solid #E0E0E0;border-radius:20px;padding:10px 14px;font-size:11px;color:#888;">
+                Ask about Cozumel...
+              </div>
+              <div style="width:36px;height:36px;background:#C59746;border-radius:50%;display:flex;align-items:center;justify-content:center;">
+                <span style="font-size:14px;color:#fff;">&#8593;</span>
+              </div>
+              <div style="position:absolute;top:-8px;right:24px;background:rgba(255,255,255,0.95);border:1px solid rgba(197,151,70,0.3);padding:2px 6px;border-radius:4px;">
+                <span style="font-size:8px;color:#C59746;font-weight:600;">3</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESCRIPTIONS -->
+    <div>
+      <div style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="background:#C59746;color:#fff;font-size:10px;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;">1</span>
+          <h4 style="margin:0;font-size:14px;color:#1A1A1A;">Hero CTA — "Plan a Trip"</h4>
+        </div>
+        <p style="font-size:12px;margin:0;opacity:0.7;">Always visible in the hero area. Opens full AI chat with entity context pre-loaded. The AI already knows you're on the Cozumel page and what products are available.</p>
+        <div style="margin-top:6px;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;">
+          <p style="font-size:10px;color:#C59746;font-weight:600;margin:0;">System prompt includes:</p>
+          <p style="font-size:10px;margin:2px 0 0;opacity:0.6;font-family:monospace;">"User is viewing Cozumel, Mexico (destination). Available: 42 cruises, 12 flights from YOW, 28 hotels. Basket: 1 cruise (Western Caribbean $849)."</p>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="background:#C59746;color:#fff;font-size:10px;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;">2</span>
+          <h4 style="margin:0;font-size:14px;color:#1A1A1A;">Contextual Suggestion Bar</h4>
+        </div>
+        <p style="font-size:12px;margin:0;opacity:0.7;">Proactive, page-aware suggestions below the pills. Changes based on what the AI notices about your browsing. Tapping expands to full chat with the suggestion as the opening message.</p>
+        <div style="margin-top:6px;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;">
+          <p style="font-size:10px;color:#C59746;font-weight:600;margin:0;">Trigger examples:</p>
+          <ul style="font-size:10px;margin:4px 0 0;padding-left:16px;opacity:0.6;">
+            <li>First visit: "I found 3 direct flights from Ottawa"</li>
+            <li>Has cruise in basket: "Your cruise stops here — need hotels for the night before?"</li>
+            <li>Browsed 3+ destinations: "Comparing options? I can help narrow it down"</li>
+            <li>Idle 30s+: "Want me to build a sample itinerary for Cozumel?"</li>
+          </ul>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="background:#C59746;color:#fff;font-size:10px;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;">3</span>
+          <h4 style="margin:0;font-size:14px;color:#1A1A1A;">Fixed Bottom Chat Input</h4>
+        </div>
+        <p style="font-size:12px;margin:0;opacity:0.7;">Always accessible at the bottom of the page (mobile). Tapping opens the full chat bottom sheet. Pre-filled placeholder reflects current page context. On desktop, this becomes the "Talk to AI" nav button.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EXPANSION FLOW -->
+<div class="section" style="margin-top:32px;">
+  <h3>Expansion Flow — Tap to Full Chat</h3>
+  <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:center;">
+
+    <!-- State 1: Suggestion bar -->
+    <div style="font-family:Lato,sans-serif;">
+      <p style="font-size:10px;color:#888;margin:0 0 6px;text-align:center;font-weight:600;">Contextual prompt</p>
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:10px;max-width:280px;margin:0 auto;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:12px;">&#10024;</span>
+          <p style="font-size:10px;color:#C59746;font-weight:600;margin:0;flex:1;">3 direct flights from Ottawa</p>
+          <span style="color:#C59746;">&#8250;</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:24px;color:#C59746;">&#8594;</div>
+
+    <!-- State 2: Half sheet -->
+    <div style="font-family:Lato,sans-serif;">
+      <p style="font-size:10px;color:#888;margin:0 0 6px;text-align:center;font-weight:600;">Half-screen chat</p>
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px 12px 0 0;max-width:280px;margin:0 auto;overflow:hidden;">
+        <div style="padding:10px 12px;border-bottom:1px solid #E0E0E0;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;font-weight:600;color:#1A1A1A;">&#10024; AI Concierge</span>
+          <span style="font-size:9px;color:#888;">Cozumel context</span>
+        </div>
+        <div style="padding:10px 12px;min-height:100px;">
+          <div style="background:#faf6f0;border-radius:8px;padding:8px;margin-bottom:6px;">
+            <p style="font-size:10px;color:#1A1A1A;margin:0;">I found 3 direct flights from Ottawa (YOW) to Cozumel:</p>
+            <p style="font-size:10px;color:#1A1A1A;margin:4px 0 0;">&#8226; WestJet $445 &bull; 4h 55m<br>&#8226; Air Canada $512 &bull; 5h 10m<br>&#8226; Sunwing $389 &bull; 5h 30m</p>
+          </div>
+          <div style="background:#faf6f0;border-radius:8px;padding:8px;">
+            <p style="font-size:10px;color:#1A1A1A;margin:0;">Want me to add the cheapest to your trip?</p>
+          </div>
+        </div>
+        <div style="padding:8px 12px;border-top:1px solid #E0E0E0;display:flex;gap:6px;">
+          <div style="flex:1;background:#f5f5f5;border-radius:16px;padding:8px 12px;font-size:10px;color:#888;">Type a message...</div>
+          <div style="width:28px;height:28px;background:#C59746;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;">&#8593;</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:24px;color:#C59746;">&#8594;</div>
+
+    <!-- State 3: Full chat with actions -->
+    <div style="font-family:Lato,sans-serif;">
+      <p style="font-size:10px;color:#888;margin:0 0 6px;text-align:center;font-weight:600;">Full chat + actions</p>
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;max-width:280px;margin:0 auto;overflow:hidden;">
+        <div style="padding:10px 12px;border-bottom:1px solid #E0E0E0;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;font-weight:600;color:#1A1A1A;">&#10024; AI Concierge</span>
+          <span style="font-size:9px;color:#C59746;font-weight:600;">&#9660; Minimize</span>
+        </div>
+        <div style="padding:10px 12px;min-height:120px;">
+          <div style="background:#faf6f0;border-radius:8px;padding:8px;margin-bottom:8px;">
+            <p style="font-size:10px;color:#1A1A1A;margin:0;">Done! I added the Sunwing flight ($389) to your trip. Your basket now has:</p>
+          </div>
+          <!-- Mini cards in chat -->
+          <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;">
+            <div style="background:#fff;border:1px solid #E0E0E0;border-radius:6px;padding:6px 8px;display:flex;align-items:center;gap:6px;">
+              <span style="font-size:10px;">&#128674;</span>
+              <span style="font-size:9px;flex:1;">W. Caribbean 7N</span>
+              <span style="font-size:9px;color:#C59746;font-weight:600;">$849</span>
+            </div>
+            <div style="background:#fff;border:1px solid #C59746;border-radius:6px;padding:6px 8px;display:flex;align-items:center;gap:6px;">
+              <span style="font-size:10px;">&#9992;&#65039;</span>
+              <span style="font-size:9px;flex:1;">YOW&#8594;CZM 5h30m</span>
+              <span style="font-size:9px;color:#C59746;font-weight:600;">$389</span>
+              <span style="font-size:8px;color:#4ade80;">&#10003; Added</span>
+            </div>
+          </div>
+          <div style="background:#faf6f0;border-radius:8px;padding:8px;">
+            <p style="font-size:10px;color:#1A1A1A;margin:0;">Need a hotel for the night before your cruise departs? I see some great options near the port.</p>
+          </div>
+        </div>
+        <div style="padding:8px 12px;border-top:1px solid #E0E0E0;display:flex;gap:6px;">
+          <div style="flex:1;background:#f5f5f5;border-radius:16px;padding:8px 12px;font-size:10px;color:#888;">Type a message...</div>
+          <div style="width:28px;height:28px;background:#C59746;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;">&#8593;</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DESKTOP AI -->
+<div class="section" style="margin-top:32px;">
+  <h3>Desktop — Side Panel (same as Dream Board)</h3>
+  <div class="mockup">
+    <div class="mockup-header">Desktop — AI panel slides out from right, content reflows</div>
+    <div class="mockup-body" style="padding:0;">
+      <div style="font-family:Lato,sans-serif;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+        <!-- Nav -->
+        <div style="height:40px;background:#fff;border-bottom:1px solid #E0E0E0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;">
+          <span style="font-family:Cinzel,serif;font-size:11px;font-weight:700;letter-spacing:1px;color:#1A1A1A;">PHOENIX VOYAGES</span>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span style="font-size:10px;color:#1A1A1A;">Offers</span>
+            <span style="font-size:10px;color:#1A1A1A;">Cruises</span>
+            <span style="font-size:10px;color:#1A1A1A;">Destinations</span>
+            <div style="background:#C59746;color:#fff;font-size:9px;font-weight:600;padding:4px 10px;border-radius:6px;">&#10024; Talk to AI</div>
+          </div>
+        </div>
+        <!-- Content + Panel side by side -->
+        <div style="display:flex;">
+          <!-- Main Content (60%) -->
+          <div style="flex:6;border-right:1px solid #E0E0E0;">
+            <!-- Compressed hero -->
+            <div style="height:120px;background:#1A1A1A;position:relative;overflow:hidden;">
+              <div style="position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&h=150&fit=crop') center/cover;opacity:0.45;"></div>
+              <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.8),transparent 60%);"></div>
+              <div style="position:absolute;bottom:12px;left:20px;">
+                <p style="font-size:8px;color:#C59746;font-weight:700;letter-spacing:2px;margin:0;">DESTINATION</p>
+                <h1 style="font-family:Cinzel,serif;font-size:20px;color:#fff;margin:2px 0 0;">Cozumel, Mexico</h1>
+              </div>
+            </div>
+            <!-- Section cards (compressed) -->
+            <div style="padding:12px 20px;">
+              <h3 style="font-size:13px;font-weight:700;color:#1A1A1A;margin:0 0 8px;">Cruises visiting Cozumel</h3>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div style="border:1px solid #E0E0E0;border-radius:8px;padding:8px;">
+                  <p style="font-size:10px;font-weight:600;color:#1A1A1A;margin:0;">7N W. Caribbean</p>
+                  <p style="font-size:9px;color:#888;margin:2px 0;">Royal Caribbean</p>
+                  <span style="font-size:11px;font-weight:700;color:#C59746;">$849/pp</span>
+                </div>
+                <div style="border:1px solid #E0E0E0;border-radius:8px;padding:8px;">
+                  <p style="font-size:10px;font-weight:600;color:#1A1A1A;margin:0;">5N Mexico</p>
+                  <p style="font-size:9px;color:#888;margin:2px 0;">Norwegian</p>
+                  <span style="font-size:11px;font-weight:700;color:#C59746;">$629/pp</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- AI Panel (40%) -->
+          <div style="flex:4;background:#faf6f0;display:flex;flex-direction:column;min-height:300px;">
+            <div style="padding:12px 14px;border-bottom:1px solid #E0E0E0;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;font-weight:700;color:#1A1A1A;">&#10024; AI Concierge</span>
+              <span style="font-size:9px;color:#888;cursor:pointer;">&#10005; Close</span>
+            </div>
+            <div style="flex:1;padding:12px 14px;overflow-y:auto;">
+              <!-- Context badge -->
+              <div style="background:rgba(197,151,70,0.1);border:1px solid rgba(197,151,70,0.2);border-radius:6px;padding:6px 8px;margin-bottom:10px;">
+                <p style="font-size:9px;color:#C59746;font-weight:600;margin:0;">Viewing: Cozumel, Mexico</p>
+                <p style="font-size:9px;color:#888;margin:1px 0 0;">Basket: 1 cruise ($849) &bull; Budget: ~$2,500</p>
+              </div>
+              <!-- Chat messages -->
+              <div style="background:#fff;border-radius:8px;padding:8px;margin-bottom:8px;">
+                <p style="font-size:10px;color:#1A1A1A;margin:0;">I see you're looking at Cozumel! Your cruise already stops here. Would you like me to find:</p>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
+                  <span style="background:#fff;border:1px solid #C59746;color:#C59746;font-size:9px;padding:4px 8px;border-radius:12px;cursor:pointer;">Hotels near port</span>
+                  <span style="background:#fff;border:1px solid #C59746;color:#C59746;font-size:9px;padding:4px 8px;border-radius:12px;cursor:pointer;">Shore excursions</span>
+                  <span style="background:#fff;border:1px solid #C59746;color:#C59746;font-size:9px;padding:4px 8px;border-radius:12px;cursor:pointer;">Flights to embark</span>
+                </div>
+              </div>
+            </div>
+            <div style="padding:10px 14px;border-top:1px solid #E0E0E0;display:flex;gap:6px;">
+              <div style="flex:1;background:#fff;border:1px solid #E0E0E0;border-radius:16px;padding:8px 12px;font-size:10px;color:#888;">Ask about Cozumel...</div>
+              <div style="width:28px;height:28px;background:#C59746;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;">&#8593;</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>AI Context Awareness</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:12px;">
+    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:14px;">
+      <strong style="color:#C59746;">What the AI knows</strong>
+      <ul style="margin:6px 0 0;padding-left:16px;opacity:0.7;line-height:1.8;">
+        <li>Current entity page (type, name, slug)</li>
+        <li>Available products (counts per section)</li>
+        <li>User's detected location (geolocation/IP)</li>
+        <li>Basket contents (components + prices)</li>
+        <li>Browsing history this session</li>
+        <li>Whether user is identified (email) or anonymous</li>
+      </ul>
+    </div>
+    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:14px;">
+      <strong style="color:#C59746;">What the AI can do</strong>
+      <ul style="margin:6px 0 0;padding-left:16px;opacity:0.7;line-height:1.8;">
+        <li><strong>manageTripBasket</strong> — add/remove components</li>
+        <li><strong>captureIdentity</strong> — collect name/email</li>
+        <li>Suggest products from current page data</li>
+        <li>Compare options across entity types</li>
+        <li>Build sample itineraries</li>
+        <li>Hand off to human advisor when complex</li>
+      </ul>
+    </div>
+  </div>
+</div>

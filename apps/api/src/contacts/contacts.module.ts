@@ -25,6 +25,8 @@ import { ContactShareRequestsController } from './contact-share-requests.control
 import { ContactShareRequestsService } from './contact-share-requests.service'
 import { ContactMergeController } from './contact-merge.controller'
 import { ContactMergeService } from './contact-merge.service'
+import { ContactLifecycleService } from './contact-lifecycle.service'
+import { ContactLifecycleController } from './contact-lifecycle.controller'
 import { ActivityLogsModule } from '../activity-logs/activity-logs.module'
 import { EmailModule } from '../email/email.module'
 import { TagsModule } from '../tags/tags.module'
@@ -38,6 +40,7 @@ import { TripsModule } from '../trips/trips.module'
     forwardRef(() => TripsModule), // forwardRef to avoid circular dependency (TripsModule already imports ContactsModule)
   ],
   controllers: [
+    ContactLifecycleController, // BEFORE ContactsController for static route matching
     ContactImportController, // BEFORE ContactsController so /contacts/import matches before /contacts/:id
     ContactMergeController, // BEFORE ContactsController so /contacts/merge and /contacts/duplicates match before /contacts/:id
     ContactsController,
@@ -59,6 +62,7 @@ import { TripsModule } from '../trips/trips.module'
     ContactDocumentsService,
     ContactLoyaltyProgramsService,
     ContactShareRequestsService,
+    ContactLifecycleService,
   ],
   exports: [
     ContactsService,
@@ -66,6 +70,7 @@ import { TripsModule } from '../trips/trips.module'
     ContactGroupsService,
     ContactSharesService,
     ContactAccessService,
+    ContactLifecycleService,
   ],
 })
 export class ContactsModule {}

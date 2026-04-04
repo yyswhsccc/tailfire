@@ -1,0 +1,260 @@
+<h2>Universal Trip Hub — Shared Page Architecture</h2>
+<p class="subtitle">Every entity page uses the same HubScaffold. Entity adapters control what sections appear and in what order.</p>
+
+<div class="section">
+  <h3>The HubScaffold (shared across all 6 entity types)</h3>
+  <div class="mockup">
+    <div class="mockup-header">Mobile View (375px) — The base design</div>
+    <div class="mockup-body" style="max-width:375px;margin:0 auto;background:#0a0a0a;color:#fff;font-family:system-ui;overflow:hidden;border-radius:12px;">
+
+      <!-- Hero Zone -->
+      <div style="position:relative;height:280px;background:linear-gradient(135deg,#1a3a5c,#0d2137);overflow:hidden;">
+        <div style="position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=300&fit=crop') center/cover;opacity:0.6;"></div>
+        <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.8) 0%,transparent 50%);"></div>
+        <div style="position:absolute;bottom:0;left:0;right:0;padding:20px;">
+          <span style="display:inline-block;background:rgba(197,151,70,0.9);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;margin-bottom:8px;letter-spacing:0.5px;">DESTINATION</span>
+          <h1 style="font-size:28px;font-weight:800;margin:0;text-shadow:0 2px 8px rgba(0,0,0,0.5);">Cozumel, Mexico</h1>
+          <p style="font-size:13px;opacity:0.8;margin:4px 0 0;">Caribbean Island Paradise</p>
+        </div>
+      </div>
+
+      <!-- Context Pills -->
+      <div style="padding:12px 16px;display:flex;gap:8px;overflow-x:auto;border-bottom:1px solid rgba(255,255,255,0.1);">
+        <span style="white-space:nowrap;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:20px;font-size:11px;">42 Cruises</span>
+        <span style="white-space:nowrap;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:20px;font-size:11px;">12 Flights</span>
+        <span style="white-space:nowrap;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);padding:6px 12px;border-radius:20px;font-size:11px;">28 Hotels</span>
+        <span style="white-space:nowrap;background:rgba(197,151,70,0.2);border:1px solid rgba(197,151,70,0.4);padding:6px 12px;border-radius:20px;font-size:11px;color:#C59746;">3 Offers</span>
+      </div>
+
+      <!-- AI Contextual Prompt -->
+      <div style="margin:12px 16px;padding:12px 16px;background:linear-gradient(135deg,rgba(197,151,70,0.1),rgba(197,151,70,0.05));border:1px solid rgba(197,151,70,0.2);border-radius:12px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">&#10024;</span>
+        <div style="flex:1;">
+          <p style="font-size:12px;margin:0;color:#C59746;font-weight:600;">Planning a trip to Cozumel?</p>
+          <p style="font-size:11px;margin:2px 0 0;opacity:0.6;">I can help you find the best flights, hotels, and activities</p>
+        </div>
+        <span style="font-size:11px;color:#C59746;font-weight:600;">Ask &rarr;</span>
+      </div>
+
+      <!-- Section 1: Cruises (Suspense boundary) -->
+      <div style="padding:20px 16px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;">
+          <h3 style="font-size:16px;font-weight:700;margin:0;">Cruises visiting Cozumel</h3>
+          <span style="font-size:11px;color:#C59746;">See all &rarr;</span>
+        </div>
+        <!-- Cruise Card -->
+        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;overflow:hidden;margin-bottom:10px;">
+          <div style="height:140px;background:linear-gradient(135deg,#1a2a3a,#0d1a2a);display:flex;align-items:center;justify-content:center;position:relative;">
+            <span style="font-size:32px;">&#128674;</span>
+            <div style="position:absolute;top:8px;right:8px;background:rgba(197,151,70,0.9);padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;">SAVE $200</div>
+          </div>
+          <div style="padding:12px;">
+            <p style="font-size:13px;font-weight:600;margin:0;">7-Night Western Caribbean</p>
+            <p style="font-size:11px;opacity:0.5;margin:4px 0;">Royal Caribbean &bull; Harmony of the Seas</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+              <span style="font-size:15px;font-weight:700;color:#C59746;">from $849</span>
+              <div style="background:#C59746;color:#fff;font-size:11px;font-weight:600;padding:6px 14px;border-radius:8px;">+ Add to Trip</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section Divider -->
+      <div style="height:1px;background:linear-gradient(to right,transparent,rgba(255,255,255,0.1),transparent);margin:16px 0;"></div>
+
+      <!-- Section 2: Flights -->
+      <div style="padding:0 16px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;">
+          <h3 style="font-size:16px;font-weight:700;margin:0;">Flights to Cozumel</h3>
+          <span style="font-size:11px;color:#C59746;">See all &rarr;</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <p style="font-size:13px;font-weight:600;margin:0;">YOW &rarr; CZM</p>
+              <p style="font-size:11px;opacity:0.5;margin:2px 0;">Air Canada &bull; 1 stop &bull; 6h 45m</p>
+            </div>
+            <div style="text-align:right;">
+              <span style="font-size:15px;font-weight:700;color:#C59746;">$389</span>
+              <div style="background:#C59746;color:#fff;font-size:10px;font-weight:600;padding:4px 10px;border-radius:6px;margin-top:4px;">+ Add</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- More sections indicator -->
+      <div style="padding:24px 16px;text-align:center;opacity:0.3;">
+        <p style="font-size:12px;">Hotels &bull; Tours &bull; Activities &bull; Photos &bull; Nearby</p>
+        <p style="font-size:11px;">(each section streams independently via Suspense)</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:32px;">
+  <h3>How it works — Entity Adapter Pattern</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+    <div class="mockup">
+      <div class="mockup-header">destination.adapter.ts</div>
+      <div class="mockup-body" style="font-family:monospace;font-size:11px;line-height:1.6;color:#e0e0e0;background:#1a1a2e;">
+        <pre style="margin:0;white-space:pre-wrap;">export const destinationAdapter = {
+  heroData: (dest) => ({
+    image: dest.heroImageUrl,
+    badge: 'DESTINATION',
+    title: dest.name,
+    subtitle: dest.countryName,
+  }),
+
+  contextPills: (dest, counts) => [
+    { label: `${counts.cruises} Cruises` },
+    { label: `${counts.flights} Flights` },
+    { label: `${counts.hotels} Hotels` },
+    { label: `${counts.offers} Offers`,
+      accent: true },
+  ],
+
+  // Personalized section order
+  sections: (signals) => [
+    signals.prefersCruises
+      ? 'cruises' : 'flights',
+    'hotels',
+    'tours',
+    'activities',
+    'photos',
+    'nearby',
+    'offers',
+  ],
+}</pre>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-header">ship.adapter.ts</div>
+      <div class="mockup-body" style="font-family:monospace;font-size:11px;line-height:1.6;color:#e0e0e0;background:#1a1a2e;">
+        <pre style="margin:0;white-space:pre-wrap;">export const shipAdapter = {
+  heroData: (ship) => ({
+    image: ship.imageUrl,
+    badge: 'SHIP',
+    title: ship.name,
+    subtitle: ship.cruiseLine,
+  }),
+
+  contextPills: (ship, counts) => [
+    { label: `${counts.sailings} Sailings` },
+    { label: `${ship.tonnage} GT` },
+    { label: `${ship.passengerCapacity} pax` },
+    { label: `Built ${ship.yearBuilt}` },
+  ],
+
+  // Ship-specific sections
+  sections: () => [
+    'sailings',
+    'cabinCategories',
+    'deckPlans',
+    'destinations',
+    'shipGallery',
+    'moreByCruiseLine',
+  ],
+}</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:32px;">
+  <h3>Section ordering per entity type</h3>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="border-bottom:2px solid rgba(255,255,255,0.2);">
+          <th style="text-align:left;padding:8px;color:#C59746;">Section</th>
+          <th style="text-align:center;padding:8px;">Destination</th>
+          <th style="text-align:center;padding:8px;">Ship</th>
+          <th style="text-align:center;padding:8px;">Sailing</th>
+          <th style="text-align:center;padding:8px;">Cruise Line</th>
+          <th style="text-align:center;padding:8px;">Region</th>
+          <th style="text-align:center;padding:8px;">Offers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Cruises</td>
+          <td style="text-align:center;">1*</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">2</td><td style="text-align:center;">2</td><td style="text-align:center;">-</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Flights</td>
+          <td style="text-align:center;">2*</td><td style="text-align:center;">-</td><td style="text-align:center;">4</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">5</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Hotels</td>
+          <td style="text-align:center;">3</td><td style="text-align:center;">-</td><td style="text-align:center;">5</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Tours</td>
+          <td style="text-align:center;">4</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">3</td><td style="text-align:center;">-</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Sailings</td>
+          <td style="text-align:center;">-</td><td style="text-align:center;">1</td><td style="text-align:center;">-</td><td style="text-align:center;">3</td><td style="text-align:center;">-</td><td style="text-align:center;">2</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Cabins</td>
+          <td style="text-align:center;">-</td><td style="text-align:center;">2</td><td style="text-align:center;">3</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Deck Plans</td>
+          <td style="text-align:center;">-</td><td style="text-align:center;">3</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Itinerary</td>
+          <td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">1</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Offers Banner</td>
+          <td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">2</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">1</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Destinations</td>
+          <td style="text-align:center;">-</td><td style="text-align:center;">4</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">1</td><td style="text-align:center;">3</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Ships</td>
+          <td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">1</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Perks/Terms</td>
+          <td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">4</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;">Photos</td>
+          <td style="text-align:center;">5</td><td style="text-align:center;">5</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td><td style="text-align:center;">-</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;">Nearby / Related</td>
+          <td style="text-align:center;">6</td><td style="text-align:center;">6</td><td style="text-align:center;">6</td><td style="text-align:center;">4</td><td style="text-align:center;">4</td><td style="text-align:center;">6</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:11px;opacity:0.5;margin-top:8px;">* = personalized: order swaps based on user browsing signals (e.g., if basket has cruises, cruises section moves up)</p>
+  </div>
+</div>
+
+<div class="section" style="margin-top:32px;">
+  <h3>Performance Contract</h3>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;text-align:center;">
+      <div style="font-size:28px;font-weight:800;color:#4ade80;">&lt;200ms</div>
+      <div style="font-size:11px;opacity:0.6;margin-top:4px;">Shell + Hero render<br>(ISR cached)</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;text-align:center;">
+      <div style="font-size:28px;font-weight:800;color:#C59746;">&lt;500ms</div>
+      <div style="font-size:11px;opacity:0.6;margin-top:4px;">First section streams<br>(Suspense boundary)</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;text-align:center;">
+      <div style="font-size:28px;font-weight:800;color:#60a5fa;">1-2s</div>
+      <div style="font-size:11px;opacity:0.6;margin-top:4px;">All sections loaded<br>(progressive streaming)</div>
+    </div>
+  </div>
+</div>

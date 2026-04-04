@@ -1,0 +1,139 @@
+<h2>Hub Scaffold — Background Treatment</h2>
+<p class="subtitle">Which approach for the entity page body? The hero stays dark regardless.</p>
+
+<div class="cards" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+  <!-- Option A: Current (White body) -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;">
+      <div style="max-width:320px;margin:0 auto;border-radius:12px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <!-- Dark Hero -->
+        <div style="position:relative;height:180px;background:#1A1A1A;overflow:hidden;">
+          <div style="position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=200&fit=crop') center/cover;opacity:0.5;"></div>
+          <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.75) 0%,rgba(0,0,0,0.35) 50%,rgba(0,0,0,0.15) 100%);"></div>
+          <div style="position:absolute;bottom:0;left:0;right:0;padding:16px;">
+            <p style="font-size:9px;font-weight:700;letter-spacing:2px;color:#C59746;margin:0 0 4px;text-transform:uppercase;">Destination</p>
+            <h1 style="font-family:Cinzel,serif;font-size:22px;font-weight:700;color:#fff;margin:0;text-shadow:0 1px 3px rgba(0,0,0,0.5);">Cozumel, Mexico</h1>
+            <p style="font-size:11px;color:rgba(255,255,255,0.85);margin:3px 0 0;">Caribbean Island Paradise</p>
+          </div>
+        </div>
+        <!-- White Body -->
+        <div style="background:#FFFFFF;padding:12px 16px;">
+          <!-- Pills -->
+          <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;border-bottom:1px solid #E0E0E0;">
+            <span style="white-space:nowrap;background:#faf6f0;border:1px solid #E0E0E0;padding:4px 10px;border-radius:16px;font-size:10px;color:#1A1A1A;font-family:Lato,sans-serif;">42 Cruises</span>
+            <span style="white-space:nowrap;background:#faf6f0;border:1px solid #E0E0E0;padding:4px 10px;border-radius:16px;font-size:10px;color:#1A1A1A;">12 Flights</span>
+            <span style="white-space:nowrap;background:rgba(197,151,70,0.1);border:1px solid rgba(197,151,70,0.3);padding:4px 10px;border-radius:16px;font-size:10px;color:#C59746;font-weight:600;">3 Offers</span>
+          </div>
+          <!-- Section heading -->
+          <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:baseline;">
+            <h3 style="font-family:Lato,sans-serif;font-size:14px;font-weight:700;color:#1A1A1A;margin:0;">Cruises visiting Cozumel</h3>
+            <span style="font-size:10px;color:#C59746;font-weight:500;">See all &rarr;</span>
+          </div>
+          <!-- Card on white -->
+          <div style="margin-top:8px;background:#FFFFFF;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;">
+            <div style="height:80px;background:linear-gradient(135deg,#f0ebe3,#e8dfd3);display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:24px;">&#128674;</span>
+            </div>
+            <div style="padding:10px;">
+              <p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:0;">7-Night Western Caribbean</p>
+              <p style="font-size:9px;color:#888;margin:2px 0;">Royal Caribbean</p>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+                <span style="font-size:13px;font-weight:700;color:#C59746;">from $849</span>
+                <span style="background:#C59746;color:#fff;font-size:9px;font-weight:600;padding:4px 10px;border-radius:6px;">+ Add to Trip</span>
+              </div>
+            </div>
+          </div>
+          <!-- More sections -->
+          <div style="margin-top:16px;text-align:center;padding:8px;">
+            <p style="font-size:9px;color:#888;">Flights &bull; Hotels &bull; Tours &bull; Photos</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A: White Body (current)</h3>
+      <p>Dark hero, white content area. Clean, familiar. Matches current site. Cards have borders on white.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Full Dark (Magazine) -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;">
+      <div style="max-width:320px;margin:0 auto;border-radius:12px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <!-- Dark Hero -->
+        <div style="position:relative;height:180px;background:#0a0a0a;overflow:hidden;">
+          <div style="position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=200&fit=crop') center/cover;opacity:0.55;"></div>
+          <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.8) 0%,transparent 50%);"></div>
+          <div style="position:absolute;bottom:0;left:0;right:0;padding:16px;">
+            <p style="font-size:9px;font-weight:700;letter-spacing:2px;color:#C59746;margin:0 0 4px;text-transform:uppercase;">Destination</p>
+            <h1 style="font-family:Cinzel,serif;font-size:22px;font-weight:700;color:#fff;margin:0;text-shadow:0 1px 3px rgba(0,0,0,0.5);">Cozumel, Mexico</h1>
+            <p style="font-size:11px;color:rgba(255,255,255,0.85);margin:3px 0 0;">Caribbean Island Paradise</p>
+          </div>
+        </div>
+        <!-- Dark Body -->
+        <div style="background:#0f0f0f;padding:12px 16px;">
+          <!-- Pills -->
+          <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);">
+            <span style="white-space:nowrap;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);padding:4px 10px;border-radius:16px;font-size:10px;color:rgba(255,255,255,0.8);font-family:Lato,sans-serif;">42 Cruises</span>
+            <span style="white-space:nowrap;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);padding:4px 10px;border-radius:16px;font-size:10px;color:rgba(255,255,255,0.8);">12 Flights</span>
+            <span style="white-space:nowrap;background:rgba(197,151,70,0.15);border:1px solid rgba(197,151,70,0.3);padding:4px 10px;border-radius:16px;font-size:10px;color:#C59746;font-weight:600;">3 Offers</span>
+          </div>
+          <!-- Section heading -->
+          <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:baseline;">
+            <h3 style="font-family:Lato,sans-serif;font-size:14px;font-weight:700;color:#fff;margin:0;">Cruises visiting Cozumel</h3>
+            <span style="font-size:10px;color:#C59746;font-weight:500;">See all &rarr;</span>
+          </div>
+          <!-- Card on dark -->
+          <div style="margin-top:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow:hidden;">
+            <div style="height:80px;background:linear-gradient(135deg,#1a2a3a,#0d1a2a);display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:24px;">&#128674;</span>
+            </div>
+            <div style="padding:10px;">
+              <p style="font-size:11px;font-weight:600;color:#fff;margin:0;">7-Night Western Caribbean</p>
+              <p style="font-size:9px;color:rgba(255,255,255,0.5);margin:2px 0;">Royal Caribbean</p>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+                <span style="font-size:13px;font-weight:700;color:#C59746;">from $849</span>
+                <span style="background:#C59746;color:#fff;font-size:9px;font-weight:600;padding:4px 10px;border-radius:6px;">+ Add to Trip</span>
+              </div>
+            </div>
+          </div>
+          <!-- More sections -->
+          <div style="margin-top:16px;text-align:center;padding:8px;">
+            <p style="font-size:9px;color:rgba(255,255,255,0.3);">Flights &bull; Hotels &bull; Tours &bull; Photos</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B: Full Dark (Magazine)</h3>
+      <p>Immersive dark throughout. Pinterest/Parkello vibe. Images pop against dark. More cinematic, editorial feel.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <div class="pros-cons" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div>
+      <h4 style="color:#C59746;">A: White Body</h4>
+      <ul style="font-size:12px;line-height:1.8;">
+        <li>Matches current site — no jarring change</li>
+        <li>Better readability for long text content</li>
+        <li>Cleaner contrast for form elements</li>
+        <li>Standard travel site look</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="color:#C59746;">B: Full Dark</h4>
+      <ul style="font-size:12px;line-height:1.8;">
+        <li>Pinterest/Parkello magazine aesthetic</li>
+        <li>Images pop — more visual impact</li>
+        <li>Cinematic, luxury travel feel</li>
+        <li>Differentiates from commodity OTAs</li>
+        <li>Matches the dream board dark theme</li>
+      </ul>
+    </div>
+  </div>
+  <p style="font-size:11px;opacity:0.6;margin-top:12px;">Note: Either way, the hero zone is always dark. The question is whether the feed/sections below continue dark or switch to white.</p>
+</div>
