@@ -20,6 +20,7 @@ import { AutomationService } from '../automation.service'
 import { NotificationService } from '../../notifications/notification.service'
 import { EmailService } from '../../email/email.service'
 import { DocumentTemplatesService } from '../../document-templates/document-templates.service'
+import { ContactLifecycleService } from '../../contacts/contact-lifecycle.service'
 import { getClientWelcomeTemplate } from '../../email/templates/client-welcome.template'
 import { getClientFollowUpTemplate } from '../../email/templates/client-follow-up.template'
 import { getClientPostTripTemplate } from '../../email/templates/client-post-trip.template'
@@ -59,6 +60,7 @@ export class ClientCareProcessor extends WorkerHost {
     private readonly notificationService: NotificationService,
     private readonly emailService: EmailService,
     private readonly documentTemplatesService: DocumentTemplatesService,
+    private readonly contactLifecycleService: ContactLifecycleService,
   ) {
     super()
   }
@@ -152,6 +154,10 @@ export class ClientCareProcessor extends WorkerHost {
         await this.handleInsuranceProposalEmail(data)
         break
       }
+
+      case 'contact-lifecycle-daily':
+        await this.handleContactLifecycleDaily()
+        break
 
       default:
         this.logger.warn(`Unknown client care job type: ${type}`)
@@ -1188,6 +1194,15 @@ ${removedTasks.map((t) => `<tr><td style="font-size:14px;color:#27272a;border-bo
 
       this.logger.log(`Marked payment ${item.id} as overdue`)
     }
+  }
+
+  // ============================================================================
+  // Contact Lifecycle Handler
+  // ============================================================================
+
+  private async handleContactLifecycleDaily(): Promise<void> {
+    const count = await this.contactLifecycleService.transitionReturnedToAwaitingNext()
+    this.logger.log(`Contact lifecycle daily: ${count} contacts transitioned`)
   }
 
   // ============================================================================
