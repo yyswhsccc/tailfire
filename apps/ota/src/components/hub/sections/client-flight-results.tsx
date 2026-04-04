@@ -115,6 +115,7 @@ function mapOfferToCardProps(
 interface ClientFlightResultsProps {
   destinationName: string
   destinationImageUrl?: string | null
+  airportIata?: string | null  // preferred over destinationName for Amadeus lookup
   /** Server-rendered date prompt fallback */
   children: React.ReactNode
 }
@@ -122,6 +123,7 @@ interface ClientFlightResultsProps {
 export function ClientFlightResults({
   destinationName,
   destinationImageUrl,
+  airportIata,
   children,
 }: ClientFlightResultsProps) {
   const { departureDate, origin, adults } = useTravelSession()
@@ -134,9 +136,10 @@ export function ClientFlightResults({
   const fetchFlights = useCallback(async () => {
     if (!departureDate || !origin) return
 
+    const destination = airportIata || destinationName
     const qs = new URLSearchParams({
       origin,
-      destination: destinationName,
+      destination,
       departureDate,
       adults: String(adults),
     })
@@ -147,7 +150,7 @@ export function ClientFlightResults({
     const data: { results?: AmadeusFlightOffer[] } = await res.json()
     const results = (data.results || []).slice(0, 3)
     return results.map((offer) => mapOfferToCardProps(offer, destinationImageUrl))
-  }, [departureDate, origin, adults, destinationName, destinationImageUrl])
+  }, [departureDate, origin, adults, destinationName, airportIata, destinationImageUrl])
 
   useEffect(() => {
     if (!hasDates) {

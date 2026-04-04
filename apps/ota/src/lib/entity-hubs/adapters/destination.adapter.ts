@@ -83,7 +83,11 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       title: `\u2708\uFE0F Flights to ${dest.name}`,
       viewAllHref: `/search/flights`,
       viewAllLabel: 'Search flights \u2192',
-      props: { destinationName: dest.name },
+      props: {
+        destinationName: dest.name,
+        airportIata: (dest.metadata?.airportIata as string | null | undefined) || null,
+        destinationImageUrl: dest.heroImageUrl || dest.enrichment?.photos?.[0]?.url || null,
+      },
       priority: 'high',
     })
 
@@ -93,7 +97,11 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       title: `\uD83C\uDFE8 Hotels in ${dest.name}`,
       viewAllHref: `/search/hotels?destination=${encodeURIComponent(dest.name)}`,
       viewAllLabel: 'Search hotels \u2192',
-      props: { destinationName: dest.name },
+      props: {
+        destinationName: dest.name,
+        latitude: dest.latitude ? parseFloat(String(dest.latitude)) : null,
+        longitude: dest.longitude ? parseFloat(String(dest.longitude)) : null,
+      },
       priority: 'medium',
     })
 
