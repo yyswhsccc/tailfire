@@ -22,6 +22,7 @@ export function FlightsSection({
 }: SectionComponentProps) {
   const destinationName = (sectionProps.destinationName as string | undefined) ?? 'this destination'
   const destinationImageUrl = sectionProps.destinationImageUrl as string | undefined
+  const airportIata = (sectionProps.airportIata as string | null | undefined) ?? null
 
   return (
     <FeedSection
@@ -33,6 +34,7 @@ export function FlightsSection({
       <ClientFlightResults
         destinationName={destinationName}
         destinationImageUrl={destinationImageUrl}
+        airportIata={airportIata}
       >
         <SectionDatePrompt
           icon="✈️"

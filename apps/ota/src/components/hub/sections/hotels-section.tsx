@@ -21,6 +21,8 @@ export function HotelsSection({
   sectionProps,
 }: SectionComponentProps) {
   const destinationName = (sectionProps.destinationName as string | undefined) ?? 'this destination'
+  const latitude = (sectionProps.latitude as number | null | undefined) ?? null
+  const longitude = (sectionProps.longitude as number | null | undefined) ?? null
 
   return (
     <FeedSection
@@ -29,7 +31,7 @@ export function HotelsSection({
       viewAllHref={viewAllHref}
       viewAllLabel={viewAllLabel}
     >
-      <ClientHotelResults destinationName={destinationName}>
+      <ClientHotelResults destinationName={destinationName} latitude={latitude} longitude={longitude}>
         <SectionDatePrompt
           icon="🏨"
           heading="Set your travel dates to see hotel options"

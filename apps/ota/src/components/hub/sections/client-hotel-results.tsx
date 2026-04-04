@@ -86,12 +86,16 @@ function hotelOfferToCardProps(hotel: HotelOffer): HotelProductCardProps {
 
 interface ClientHotelResultsProps {
   destinationName: string
+  latitude?: number | null   // preferred for geo-based search
+  longitude?: number | null  // preferred for geo-based search
   /** Server-rendered date prompt fallback */
   children: React.ReactNode
 }
 
 export function ClientHotelResults({
   destinationName,
+  latitude,
+  longitude,
   children,
 }: ClientHotelResultsProps) {
   const { departureDate, returnDate, adults } = useTravelSession()
@@ -104,12 +108,19 @@ export function ClientHotelResults({
   const fetchHotels = useCallback(async () => {
     if (!departureDate || !returnDate) return
 
-    const qs = new URLSearchParams({
-      destination: destinationName,
+    const baseParams: Record<string, string> = {
       checkIn: departureDate,
       checkOut: returnDate,
       adults: String(adults),
-    })
+    }
+    if (latitude != null && longitude != null) {
+      baseParams.latitude = String(latitude)
+      baseParams.longitude = String(longitude)
+      baseParams.radius = '10000'
+    } else {
+      baseParams.destination = destinationName
+    }
+    const qs = new URLSearchParams(baseParams)
 
     const res = await fetch(`/api/hotels/search?${qs}`)
     if (!res.ok) throw new Error('Hotel search failed')
@@ -117,7 +128,7 @@ export function ClientHotelResults({
     const data: { results?: HotelOffer[] } = await res.json()
     const results = (data.results || []).slice(0, 4)
     return results.map(hotelOfferToCardProps)
-  }, [departureDate, returnDate, adults, destinationName])
+  }, [departureDate, returnDate, adults, destinationName, latitude, longitude])
 
   useEffect(() => {
     if (!hasDates) {
