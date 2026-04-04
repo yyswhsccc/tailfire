@@ -133,7 +133,7 @@ import { QUEUES } from './automation.types'
     forwardRef(() => TripsModule),
     forwardRef(() => NotificationModule),
     EmailModule,
-    ContactsModule,
+    forwardRef(() => ContactsModule),
     HttpModule,
     GooglePlacesModule,
     ApiCredentialsModule,
