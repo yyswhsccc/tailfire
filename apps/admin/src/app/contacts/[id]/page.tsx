@@ -72,6 +72,27 @@ import {
 } from 'lucide-react'
 import type { ContactRelationshipResponseDto, LoyaltyProgramDto } from '@tailfire/shared-types/api'
 
+// Normalize country name/code to ISO 3-letter code (DB stores varchar(3))
+function normalizeCountryCode(value: string | undefined | null): string | undefined {
+  if (!value) return undefined
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  if (/^[A-Za-z]{2,3}$/.test(trimmed)) return trimmed.toUpperCase()
+  const map: Record<string, string> = {
+    'canada': 'CAN', 'united states': 'USA', 'us': 'USA', 'usa': 'USA',
+    'united kingdom': 'GBR', 'uk': 'GBR', 'france': 'FRA', 'germany': 'DEU',
+    'italy': 'ITA', 'spain': 'ESP', 'mexico': 'MEX', 'australia': 'AUS',
+    'japan': 'JPN', 'china': 'CHN', 'india': 'IND', 'brazil': 'BRA',
+    'cuba': 'CUB', 'dominican republic': 'DOM', 'jamaica': 'JAM',
+    'bahamas': 'BHS', 'portugal': 'PRT', 'greece': 'GRC', 'turkey': 'TUR',
+    'ireland': 'IRL', 'netherlands': 'NLD', 'switzerland': 'CHE',
+    'costa rica': 'CRI', 'colombia': 'COL', 'peru': 'PER', 'iceland': 'ISL',
+    'new zealand': 'NZL', 'south africa': 'ZAF', 'egypt': 'EGY',
+    'thailand': 'THA', 'vietnam': 'VNM', 'croatia': 'HRV', 'norway': 'NOR',
+  }
+  return map[trimmed.toLowerCase()] ?? trimmed.substring(0, 3).toUpperCase()
+}
+
 function formatPaymentDate(date: string | null): string {
   if (!date) return '\u2013'
   return new Date(date).toLocaleDateString('en-US', {
@@ -345,7 +366,7 @@ export default function ContactDetailPage() {
             city: formData.city,
             province: formData.province,
             postalCode: formData.postalCode,
-            country: formData.country,
+            country: normalizeCountryCode(formData.country),
           }
           break
         case 'lifecycle':
@@ -1116,6 +1137,7 @@ export default function ContactDetailPage() {
                           id="country"
                           value={formData.country || ''}
                           onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                          placeholder="e.g. Canada, CAN"
                           className="mt-1 h-8 text-sm"
                         />
                       </div>
