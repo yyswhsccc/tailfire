@@ -86,6 +86,7 @@ export const JOB_TYPES = {
 
   // Destination enrichment jobs
   DESTINATION_HERO_IMAGE: 'destination.hero_image',
+  DESTINATION_DATA_ENRICHMENT: 'destination.data_enrichment',
 
   // Vacation pricing jobs
   VACATION_SEARCH: 'vacation_search',
@@ -145,7 +146,7 @@ export type TripAutomationJobData =
  * Client care job for automated communications
  */
 export interface ClientCareJobData {
-  type: 'client.welcome' | 'client.post_trip' | 'client.birthday' | 'client.follow_up'
+  type: 'client.welcome' | 'client.post_trip' | 'client.birthday' | 'client.follow_up' | 'contact-lifecycle-daily'
   contactId: string
   tripId?: string
   agencyId?: string
@@ -290,6 +291,16 @@ export interface ActivityGeocodingJobData {
  */
 export interface DestinationHeroImageJobData {
   type: 'destination.hero_image'
+  batchSize?: number
+  offset?: number
+}
+
+/**
+ * Destination data enrichment job — uses Wikipedia + AI to generate
+ * structured travel content (overview, highlights, best time to visit, etc.)
+ */
+export interface DestinationDataEnrichmentJobData {
+  type: 'destination.data_enrichment'
   batchSize?: number
   offset?: number
 }

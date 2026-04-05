@@ -14,6 +14,7 @@ import { OffersSection } from '@/components/hub/sections/offers-section'
 import { DeckPlansSection } from '@/components/hub/sections/deck-plans-section'
 import { FlightsSection } from '@/components/hub/sections/flights-section'
 import { HotelsSection } from '@/components/hub/sections/hotels-section'
+import { DestinationInfoSection } from '@/components/hub/sections/destination-info-section'
 
 // Section components are async Server Components.
 // Static imports + per-section Suspense boundaries.
@@ -32,6 +33,7 @@ export const SECTION_REGISTRY: Record<string, SectionEntry> = {
   deckPlans:        { component: DeckPlansSection as any,        skeleton: 'single' },
   flights:          { component: FlightsSection as any,          skeleton: 'grid-3' },
   hotels:           { component: HotelsSection as any,           skeleton: 'grid-2' },
+  destinationInfo:  { component: DestinationInfoSection as any,  skeleton: 'grid-3' },
   // Future sections (Plan 3+):
   // itinerary
 }

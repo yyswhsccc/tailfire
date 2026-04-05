@@ -25,14 +25,21 @@ const DESTINATION_TYPE_PLURALS: Record<string, string> = {
 export const destinationAdapter: HubAdapter<DestinationDetail> = {
   heroData(dest): HeroData {
     const enrichment = dest.enrichment
+    const metadata = dest.metadata as Record<string, unknown> | undefined
 
-    // Build subtitle from rating + review count (mirrors old page meta items)
-    const subtitleParts: string[] = []
-    if (enrichment?.averageRating) {
-      subtitleParts.push(`\u2B50 ${enrichment.averageRating.toFixed(1)}`)
-    }
-    if (enrichment?.totalReviewCount) {
-      subtitleParts.push(`${enrichment.totalReviewCount.toLocaleString()} reviews`)
+    // Build subtitle: prefer AI-curated one-liner, fall back to rating/review
+    let subtitle: string | undefined
+    if (metadata?.oneLiner) {
+      subtitle = metadata.oneLiner as string
+    } else {
+      const subtitleParts: string[] = []
+      if (enrichment?.averageRating) {
+        subtitleParts.push(`\u2B50 ${enrichment.averageRating.toFixed(1)}`)
+      }
+      if (enrichment?.totalReviewCount) {
+        subtitleParts.push(`${enrichment.totalReviewCount.toLocaleString()} reviews`)
+      }
+      if (subtitleParts.length > 0) subtitle = subtitleParts.join(' \u00B7 ')
     }
 
     return {
@@ -40,8 +47,8 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       fallbackGradient: 'bg-gradient-to-br from-[#1a3a5c] via-[#0d2137] to-[#1A1A1A]',
       badge: dest.countryCode ? `${dest.countryCode} · DESTINATION` : 'DESTINATION',
       title: dest.name,
-      subtitle: subtitleParts.length > 0 ? subtitleParts.join(' \u00B7 ') : undefined,
-      description: enrichment?.summary || dest.summary || undefined,
+      subtitle,
+      description: (metadata?.travelDescription as string) || enrichment?.summary || dest.summary || undefined,
       ctaLabel: `Plan a Trip to ${dest.name}`,
     }
   },
@@ -60,6 +67,15 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
     }
     if (dest.destinationType) {
       pills.push({ label: DESTINATION_TYPE_LABELS[dest.destinationType] ?? dest.destinationType })
+    }
+
+    // Add top 3 enriched tags as accent pills
+    const metadata = dest.metadata as Record<string, unknown> | undefined
+    const tags = metadata?.tags as string[] | undefined
+    if (tags && tags.length > 0) {
+      for (const tag of tags.slice(0, 3)) {
+        pills.push({ label: tag, accent: true })
+      }
     }
 
     return pills
@@ -123,6 +139,17 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       },
       priority: 'medium',
     })
+
+    // Destination Info — practical travel info (currency, climate, tips)
+    const sectionMetadata = dest.metadata as Record<string, unknown> | undefined
+    if (sectionMetadata && Object.keys(sectionMetadata).length > 0) {
+      sections.push({
+        key: 'destinationInfo',
+        title: `\u2139\uFE0F Travel Info \u2014 ${dest.name}`,
+        props: { metadata: sectionMetadata },
+        priority: 'low',
+      })
+    }
 
     // Activities from enrichment topAttractions
     const attractions = enrichment?.topAttractions ?? []

@@ -15,6 +15,9 @@ import { DestinationsBootstrapService } from './destinations-bootstrap.service'
 import { SerpApiService } from './serpapi.service'
 import { DestinationEnrichmentService } from './destination-enrichment.service'
 import { UnsplashService } from './unsplash.service'
+import { WikipediaService } from './wikipedia.service'
+import { AiTravelEditorService } from './ai-travel-editor'
+import { DestinationDataEnrichmentService } from './destination-data-enrichment.service'
 import { AutomationModule } from '../automation/automation.module'
 
 @Module({
@@ -26,6 +29,9 @@ import { AutomationModule } from '../automation/automation.module'
     SerpApiService,
     DestinationEnrichmentService,
     UnsplashService,
+    WikipediaService,
+    AiTravelEditorService,
+    DestinationDataEnrichmentService,
   ],
   exports: [DestinationsService],
 })

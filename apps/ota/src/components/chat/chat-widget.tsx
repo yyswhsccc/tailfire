@@ -11,7 +11,19 @@ import { useAiPanelStore } from "@/stores/ai-panel-store";
 // ---------------------------------------------------------------------------
 // Page context ref — updated by the widget on render, read by custom fetch
 // ---------------------------------------------------------------------------
-let currentPageContext: { type?: string; name?: string; slug?: string } | undefined;
+let currentPageContext: {
+  type?: string;
+  name?: string;
+  slug?: string;
+  oneLiner?: string;
+  bestMonths?: string;
+  budgetTier?: string;
+  typicalStay?: string;
+  tags?: string;
+  highlights?: string;
+  currency?: string;
+  travelTip?: string;
+} | undefined;
 
 // Custom fetch that injects pageContext into the request body
 const contextFetch: typeof globalThis.fetch = async (input, init) => {
@@ -55,9 +67,28 @@ export default function ChatWidget() {
 
   // Sync page context to module-level ref so the custom fetch can read it
   useEffect(() => {
-    currentPageContext = pageContext
-      ? { type: pageContext.type, name: pageContext.name, slug: pageContext.slug }
-      : undefined;
+    if (!pageContext) {
+      currentPageContext = undefined;
+      return;
+    }
+    const meta = pageContext.metadata as Record<string, unknown> | undefined;
+    const bestMonths = meta?.bestMonths as string[] | undefined;
+    const tags = meta?.tags as string[] | undefined;
+    const highlights = meta?.highlights as string[] | undefined;
+    const travelTips = meta?.travelTips as string[] | undefined;
+    currentPageContext = {
+      type: pageContext.type,
+      name: pageContext.name,
+      slug: pageContext.slug,
+      oneLiner: (meta?.oneLiner as string) || undefined,
+      bestMonths: bestMonths?.join(', ') || undefined,
+      budgetTier: (meta?.budgetTier as string) || undefined,
+      typicalStay: (meta?.typicalStay as string) || undefined,
+      tags: tags?.join(', ') || undefined,
+      highlights: highlights?.join(', ') || undefined,
+      currency: (meta?.currencyName as string) || undefined,
+      travelTip: travelTips?.[0] || undefined,
+    };
   }, [pageContext]);
 
   const { messages, sendMessage, status } = useChat({ transport });
