@@ -10,6 +10,7 @@ export const cruiseLineAdapter: HubAdapter<CruiseLineDetail> = {
 
     return {
       imageUrl,
+      fallbackGradient: 'bg-gradient-to-br from-[#2a1a3a] via-[#1a0d2a] to-[#1A1A1A]',
       badge: 'CRUISE LINE',
       title: line.name,
       subtitle: line.logoUrl ? undefined : undefined,
@@ -46,9 +47,25 @@ export const cruiseLineAdapter: HubAdapter<CruiseLineDetail> = {
       priority: 'high',
     })
 
-    // NOTE: Sailings section removed — no cruise-line-specific sailings fetcher
-    // exists yet. SailingsSection only supports ship and sailing entity types.
-    // Re-add once a fetchCruiseLineSailings() fetcher is available.
+    // Sailings section — fetched in SailingsSection via cruiseLineId filter
+    sections.push({
+      key: 'sailings',
+      title: `Upcoming Sailings`,
+      viewAllHref: `/search/cruises?cruiseLineId=${line.id}`,
+      viewAllLabel: 'View all sailings →',
+      props: { cruiseLineId: line.id },
+      priority: 'high',
+    })
+
+    // Nearby/related section — no related cruise-line data available; NearbySection
+    // returns null when destinations is empty, so this is a safe no-op placeholder.
+    sections.push({
+      key: 'nearby',
+      title: '\uD83D\uDDFA\uFE0F Explore Destinations',
+      viewAllHref: '/destinations',
+      props: { destinations: [] },
+      priority: 'low',
+    })
 
     return sections
   },

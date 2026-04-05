@@ -91,6 +91,16 @@ export class AutomationService implements OnModuleInit {
         { jobId: 'recurring:task_due_reminder' },
       )
       this.logger.log('Scheduled recurring task due reminder job')
+
+      // Contact lifecycle: returned → awaiting_next after 30 days
+      await this.scheduleRecurring(
+        QUEUES.CLIENT_CARE,
+        'contact-lifecycle-daily',
+        { type: 'contact-lifecycle-daily' },
+        '0 7 * * *', // 7 AM daily (before birthday/payment checks)
+        { jobId: 'recurring:contact_lifecycle_daily' },
+      )
+      this.logger.log('Scheduled recurring contact lifecycle daily job')
     } catch (error) {
       this.logger.error(`Failed to initialize recurring jobs: ${error}`)
       // Don't throw - allow service to start even if recurring jobs fail to initialize

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { SafeImage } from '@/components/hub/safe-image'
 import { AddToTripButton } from '@/components/trip-builder/add-to-trip-button'
 import { PriceShimmer } from '@/components/cards/price-shimmer'
+import { ImageCardFrame } from '@/components/cards/image-card-frame'
 import type { TripComponent } from '@/components/trip-builder/trip-basket-store'
 import type { CardVariant } from '@/lib/entity-hubs/types'
 
@@ -52,62 +53,27 @@ function buildTripComponent(props: TourProductCardProps): TripComponent {
 }
 
 function TourFull(props: TourProductCardProps) {
-  const priceLoading = props.priceLoading || props.priceCents === undefined
-  const highlightsToShow = props.highlights?.slice(0, 2) ?? []
+  const priceLoading = props.priceLoading || (props.priceCents === undefined)
+  const priceStr = props.priceCents != null ? formatPrice(props.priceCents) : null
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-[#f0f0f0] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
-      <Link href="/search/tours" className="block">
-        <div className="relative h-48 overflow-hidden sm:h-52">
-          <SafeImage
-            src={props.imageUrl ?? ''}
-            alt={props.name}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            fallback={
-              <div className="flex h-full w-full items-center justify-center bg-[#1A1A1A] text-2xl text-[#C59746]">
-                🏞
-              </div>
-            }
-          />
-          <span className="absolute right-2.5 top-2.5 rounded-lg bg-white/92 px-2.5 py-1 text-[10px] font-semibold text-[#C59746] backdrop-blur">
-            🏞 {props.durationDays} Days
-          </span>
-          <span className="absolute bottom-2 left-2.5 rounded-lg bg-black/60 px-2.5 py-1 text-[10px] text-white backdrop-blur">
-            {props.operatorName}
-          </span>
-        </div>
-      </Link>
-      <div className="p-4 sm:p-5">
-        <Link href="/search/tours">
-          <h3 className="text-base font-semibold text-[#1A1A1A] sm:text-[17px]">{props.name}</h3>
-          <p className="mt-1 text-sm text-[#888]">{props.operatorName} · {props.durationDays} days</p>
-        </Link>
-        {highlightsToShow.length > 0 && (
-          <ul className="mt-2 space-y-0.5">
-            {highlightsToShow.map((h) => (
-              <li key={h} className="text-xs text-[#aaa]">• {h}</li>
-            ))}
-          </ul>
-        )}
-        <div className="mt-3 flex items-center justify-between">
-          <div>
-            {priceLoading ? (
-              <PriceShimmer />
-            ) : props.priceCents != null ? (
-              <>
-                <span className="text-xl font-bold text-[#C59746] sm:text-2xl">{formatPrice(props.priceCents)}</span>
-                <span className="ml-1 text-xs text-[#888]">/person</span>
-              </>
-            ) : (
-              <span className="text-sm text-[#888]">Check price →</span>
-            )}
-          </div>
-          <AddToTripButton component={buildTripComponent(props)} />
-        </div>
-      </div>
-    </div>
+    <ImageCardFrame
+      imageUrl={props.imageUrl}
+      fallbackGradient="from-emerald-500 to-emerald-700"
+      typeBadge={`🏞 ${props.durationDays}D Tour`}
+      price={priceStr}
+      priceLoading={priceLoading}
+      priceLabel="/pp"
+      href="/search/tours"
+      tripComponent={buildTripComponent(props)}
+      height={280}
+    >
+      <p className="text-base font-bold leading-tight text-white">{props.name}</p>
+      <p className="mt-0.5 text-sm text-white/80">{props.operatorName}</p>
+      {props.highlights && props.highlights.length > 0 && (
+        <p className="mt-0.5 text-xs text-white/60">{props.highlights.slice(0, 2).join(' · ')}</p>
+      )}
+    </ImageCardFrame>
   )
 }
 
@@ -141,7 +107,7 @@ function TourCompact(props: TourProductCardProps) {
           ) : props.priceCents != null ? (
             <span className="text-sm font-bold text-[#C59746]">{formatPrice(props.priceCents)}</span>
           ) : (
-            <span className="text-xs text-[#888]">Check price</span>
+            <span className="text-xs text-[#888]">View pricing</span>
           )}
           <AddToTripButton component={buildTripComponent(props)} size="sm" />
         </div>

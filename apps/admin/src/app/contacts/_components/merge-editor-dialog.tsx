@@ -48,8 +48,7 @@ const MERGE_FIELDS: { key: keyof ContactResponseDto; label: string }[] = [
   { key: 'passportNumber', label: 'Passport #' },
   { key: 'passportExpiry', label: 'Passport Expiry' },
   { key: 'passportCountry', label: 'Passport Country' },
-  { key: 'contactType', label: 'Type' },
-  { key: 'contactStatus', label: 'Status' },
+  // contactType and contactStatus are lifecycle-managed — not mergeable
 ]
 
 // ---------------------------------------------------------------------------

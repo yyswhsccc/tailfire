@@ -5,6 +5,8 @@ import { HubHeroCta } from './hub-hero-cta'
 import { HubContextPills } from './hub-context-pills'
 import { HubSectionRenderer } from './hub-section-renderer'
 import { PageContextBridge } from '@/components/page-context-bridge'
+import { AiContextualPrompt } from '@/components/ai/ai-contextual-prompt'
+import { TravelDatePrompt } from './travel-date-prompt'
 import type { HubScaffoldProps } from '@/lib/entity-hubs/types'
 
 export function HubScaffold({
@@ -31,6 +33,7 @@ export function HubScaffold({
         badge={hero.badge}
         subtitle={hero.subtitle}
         imageUrl={hero.imageUrl}
+        fallbackGradient={hero.fallbackGradient}
         urgencyBadge={hero.urgencyBadge}
       >
         {hero.description && (
@@ -46,6 +49,10 @@ export function HubScaffold({
       </HubHero>
 
       <HubContextPills pills={contextPills} />
+
+      <AiContextualPrompt entityType={entityType} entityName={hero.title} />
+
+      <TravelDatePrompt entityName={hero.title} />
 
       <div className="py-8">
         <HubSectionRenderer

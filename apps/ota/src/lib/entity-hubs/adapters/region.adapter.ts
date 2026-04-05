@@ -2,15 +2,17 @@
 
 import type { RegionDetail } from '@/types/entities'
 import type { HubAdapter, HeroData, ContextPill, SectionDescriptor, AiPageContext } from '../types'
+import { getCuratedImage } from '@/lib/curated-images'
 
 export const regionAdapter: HubAdapter<RegionDetail> = {
   heroData(region): HeroData {
     return {
-      imageUrl: null,
+      imageUrl: getCuratedImage(region.name, 'region', 'hero'),
+      fallbackGradient: 'bg-gradient-to-br from-[#1a3a2a] via-[#0d2a1a] to-[#1A1A1A]',
       badge: 'REGION',
       title: region.name,
       description: region.description ?? undefined,
-      ctaLabel: `Explore the ${region.name}`,
+      ctaLabel: `Explore ${region.name}`,
     }
   },
 
@@ -37,7 +39,7 @@ export const regionAdapter: HubAdapter<RegionDetail> = {
     if (region.destinations.length > 0) {
       sections.push({
         key: 'destinations',
-        title: `\uD83D\uDCCD Destinations in the ${region.name}`,
+        title: `\uD83D\uDCCD Destinations in ${region.name}`,
         props: {
           destinations: region.destinations,
         },
@@ -48,10 +50,19 @@ export const regionAdapter: HubAdapter<RegionDetail> = {
     // Cruises sailing in this region
     sections.push({
       key: 'cruises',
-      title: `\uD83D\uDEA2 Cruises in the ${region.name}`,
+      title: `\uD83D\uDEA2 Cruises in ${region.name}`,
       viewAllHref: `/regions/${region.slug}/cruises`,
-      props: {},
+      props: { regionId: region.id },
       priority: 'high',
+    })
+
+    // Tours -- ToursSection self-fetches via tour-repository API
+    sections.push({
+      key: 'tours',
+      title: `\uD83C\uDFDE Tours in ${region.name}`,
+      viewAllHref: `/search/tours?q=${encodeURIComponent(region.name)}`,
+      props: { destinationName: region.name },
+      priority: 'medium',
     })
 
     return sections

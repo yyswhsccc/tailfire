@@ -2,7 +2,10 @@
 
 import Link from 'next/link'
 import { FeedSection } from '@/components/hub/feed-section'
+import { publicFetch } from '@/lib/api'
+import type { DestinationSummary } from '@/types/entities'
 import type { SectionComponentProps } from '@/lib/entity-hubs/types'
+import { getCuratedImage } from '@/lib/curated-images'
 
 /**
  * Lightweight card for nearby destinations.
@@ -12,28 +15,29 @@ function NearbyDestinationCard({
   name,
   country,
   slug,
+  heroImageUrl,
+  destinationType,
 }: {
   name: string
   country?: string | null
   slug?: string | null
+  heroImageUrl?: string | null
+  destinationType?: string | null
 }) {
-  // Simple gradient backgrounds cycling by hash of name
-  const gradients = [
-    'from-blue-500 to-cyan-400',
-    'from-emerald-500 to-teal-400',
-    'from-amber-500 to-orange-400',
-    'from-violet-500 to-purple-400',
-    'from-rose-500 to-pink-400',
-    'from-sky-500 to-indigo-400',
-  ]
-  const hash = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  const gradient = gradients[hash % gradients.length]!
+  const imageUrl = heroImageUrl || getCuratedImage(name, destinationType ?? undefined)
 
   const inner = (
     <div className="group w-64 shrink-0 overflow-hidden rounded-2xl shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-      {/* Gradient hero area */}
-      <div className={`relative h-32 bg-gradient-to-br ${gradient}`}>
-        <div className="absolute inset-0 bg-black/10" />
+      {/* Hero area — curated image background */}
+      <div
+        className="relative h-32 bg-[#1A1A1A]"
+        style={{
+          backgroundImage: `url(${imageUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <p className="truncate text-sm font-bold text-white drop-shadow">{name}</p>
           {country && (
@@ -54,14 +58,41 @@ function NearbyDestinationCard({
   return inner
 }
 
+interface DestinationLike {
+  name: string
+  slug?: string | null
+  country?: string | null
+  countryCode?: string | null
+  heroImageUrl?: string | null
+  destinationType?: string | null
+}
+
 export async function NearbySection({
+  entitySlug,
   title,
   subtitle,
   viewAllHref,
   viewAllLabel,
   sectionProps,
 }: SectionComponentProps) {
-  const destinations = (sectionProps.destinations as any[]) ?? []
+  let destinations: DestinationLike[] = (sectionProps.destinations as DestinationLike[]) ?? []
+
+  // Self-fetch when no destinations are pre-populated but a destinationType is provided
+  if (destinations.length === 0 && sectionProps.destinationType) {
+    try {
+      const result = await publicFetch<{ destinations: DestinationSummary[] }>(
+        `/destinations?type=${encodeURIComponent(sectionProps.destinationType as string)}&pageSize=12`,
+        { next: { revalidate: 3600, tags: ['destinations'] } },
+      )
+      // Exclude the current destination page from the nearby list
+      destinations = (result.destinations ?? [])
+        .filter((d) => d.slug !== entitySlug)
+        .slice(0, 8)
+    } catch {
+      // Non-critical — degrade gracefully
+    }
+  }
+
   if (destinations.length === 0) return null
 
   return (
@@ -76,16 +107,20 @@ export async function NearbySection({
           className="flex gap-4 overflow-x-auto pb-2"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          {destinations.map((d: any, i: number) => {
+          {destinations.map((d, i) => {
             const name = typeof d === 'string' ? d : d.name
-            const country = typeof d === 'string' ? null : (d.country ?? null)
+            const country = typeof d === 'string' ? null : (d.country ?? d.countryCode ?? null)
             const slug = typeof d === 'string' ? null : (d.slug ?? null)
+            const heroImageUrl = typeof d === 'string' ? null : (d.heroImageUrl ?? null)
+            const destinationType = typeof d === 'string' ? null : ((d as DestinationLike).destinationType ?? null)
             return (
               <NearbyDestinationCard
                 key={slug || name || i}
                 name={name}
                 country={country}
                 slug={slug}
+                heroImageUrl={heroImageUrl}
+                destinationType={destinationType}
               />
             )
           })}

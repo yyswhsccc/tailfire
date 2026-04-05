@@ -95,6 +95,7 @@ export interface DestinationSummary {
 }
 
 export interface DestinationDetail extends DestinationSummary {
+  metadata: Record<string, unknown>
   ports: Array<{ portId: string; portName: string; isPrimary: boolean }>
   aliases: string[]
   enrichment: {

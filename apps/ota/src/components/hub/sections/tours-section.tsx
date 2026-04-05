@@ -2,16 +2,65 @@
 
 import { FeedSection } from '@/components/hub/feed-section'
 import { TourProductCard } from '@/components/cards/tour-product-card'
+import { catalogFetch } from '@/lib/api'
 import type { SectionComponentProps } from '@/lib/entity-hubs/types'
 
-export function ToursSection({
+interface TourSearchResponse {
+  tours: {
+    id: string
+    name: string
+    operatorCode: string
+    days?: number
+    imageUrl?: string
+    lowestPriceCents?: number
+  }[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export async function ToursSection({
+  entityType,
   title,
   subtitle,
   viewAllHref,
   viewAllLabel,
   sectionProps,
 }: SectionComponentProps) {
-  const tours = (sectionProps.tours as any[] | undefined) ?? []
+  let tours: any[] = []
+
+  try {
+    if (entityType === 'destination') {
+      const destinationName = sectionProps.destinationName as string
+      const primaryData = await catalogFetch<TourSearchResponse>(
+        `/tour-repository/tours?q=${encodeURIComponent(destinationName)}&pageSize=4`,
+        { next: { revalidate: 3600 } },
+      )
+      tours = primaryData.tours
+
+      // If primary search returned nothing, try the country name (not code) as fallback.
+      // Country codes like "NO" are too short and match unrelated tours.
+      // Only use fallback terms that are 4+ characters to avoid false matches.
+      if (tours.length === 0 && sectionProps.tourSearchFallback) {
+        const fallbackTerm = sectionProps.tourSearchFallback as string
+        if (fallbackTerm.length < 4) {
+          // Skip 2-3 char country codes — too generic for tour search
+          tours = []
+        } else {
+          const fallbackData = await catalogFetch<TourSearchResponse>(
+            `/tour-repository/tours?q=${encodeURIComponent(fallbackTerm)}&pageSize=4`,
+            { next: { revalidate: 3600 } },
+          )
+          tours = fallbackData.tours
+        }
+      }
+    } else {
+      tours = (sectionProps.tours as any[] | undefined) ?? []
+    }
+  } catch {
+    return null
+  }
 
   if (tours.length === 0) return null
 

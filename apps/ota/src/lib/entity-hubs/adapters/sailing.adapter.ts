@@ -24,6 +24,7 @@ export const sailingAdapter: HubAdapter<SailingDetail> = {
 
     return {
       imageUrl: sailing.ship.imageUrl,
+      fallbackGradient: 'bg-gradient-to-br from-[#1a3a5c] via-[#0d2137] to-[#1A1A1A]',
       badge: `${sailing.cruiseLine.name} · ${sailing.ship.name}`,
       title: sailing.name,
       subtitle: `${fmtDate(sailing.sailDate)} — ${fmtDate(sailing.endDate)}`,
@@ -91,6 +92,40 @@ export const sailingAdapter: HubAdapter<SailingDetail> = {
         priority: 'medium',
       })
     }
+
+    // Flights CTA to embarkation port
+    sections.push({
+      key: 'flights',
+      title: '\u2708\uFE0F Flights to Embarkation Port',
+      viewAllHref: `/search/flights`,
+      props: { destinationName: sailing.embarkPort?.name },
+      priority: 'medium',
+    })
+
+    // Hotels CTA near embarkation port
+    sections.push({
+      key: 'hotels',
+      title: '\uD83C\uDFE8 Hotels Near Embarkation Port',
+      viewAllHref: `/search/hotels`,
+      props: { destinationName: sailing.embarkPort?.name },
+      priority: 'medium',
+    })
+
+    // Nearby destinations — derive from port stops that have a destinationSlug
+    const portStopsWithSlug = sailing.itinerary.filter(
+      (s) => !s.isSeaDay && s.destinationSlug != null,
+    )
+    const nearbyDestinations = portStopsWithSlug.map((s) => ({
+      name: s.portName,
+      slug: s.destinationSlug as string,
+    }))
+    sections.push({
+      key: 'nearby',
+      title: '\uD83D\uDDFA\uFE0F Explore Destinations on This Route',
+      viewAllHref: '/destinations',
+      props: { destinations: nearbyDestinations },
+      priority: 'low',
+    })
 
     return sections
   },

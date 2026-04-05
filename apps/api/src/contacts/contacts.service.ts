@@ -19,7 +19,6 @@ import { eq, and, ilike, or, sql, desc, asc, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { UserValidationService } from '../common/user-validation.service'
 import { EmailService } from '../email/email.service'
-import { TripActiveEvent } from '../trips/events/trip-active.event'
 import { AuditEvent } from '../activity-logs/events/audit.event'
 import { sanitizeForAudit, computeAuditDiff } from '../activity-logs/audit-sanitizer'
 import type {
@@ -638,49 +637,6 @@ export class ContactsService {
     }
 
     return this.mapToResponseDto(contact)
-  }
-
-  /**
-   * Set first booking date (called by trips service)
-   * Stores as date-only string (YYYY-MM-DD) to match trip.bookingDate format
-   */
-  async setFirstBookingDate(id: string, date: Date): Promise<void> {
-    await this.db.client
-      .update(this.db.schema.contacts)
-      .set({
-        firstBookingDate: date.toISOString().split('T')[0],
-        updatedAt: new Date(),
-      })
-      .where(eq(this.db.schema.contacts.id, id))
-  }
-
-  /**
-   * Event Listener: Handle TripActiveEvent
-   *
-   * When a trip is activated (booked), set the contact's first booking date if it's not already set.
-   * This decouples ContactsService from TripsService by using domain events.
-   */
-  @OnEvent('trip.active')
-  async handleTripActive(event: TripActiveEvent): Promise<void> {
-    if (!event.primaryContactId) {
-      return
-    }
-
-    // Only set first booking date if it's not already set
-    const [contact] = await this.db.client
-      .select()
-      .from(this.db.schema.contacts)
-      .where(eq(this.db.schema.contacts.id, event.primaryContactId))
-      .limit(1)
-
-    if (!contact || contact.firstBookingDate) {
-      return
-    }
-
-    await this.setFirstBookingDate(
-      event.primaryContactId,
-      new Date(event.bookingDate),
-    )
   }
 
   /**

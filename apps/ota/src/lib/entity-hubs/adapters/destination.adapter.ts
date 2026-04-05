@@ -2,6 +2,7 @@
 
 import type { DestinationDetail } from '@/types/entities'
 import type { HubAdapter, HeroData, ContextPill, SectionDescriptor, AiPageContext } from '../types'
+import { getCuratedImage } from '@/lib/curated-images'
 
 const DESTINATION_TYPE_LABELS: Record<string, string> = {
   port_city: 'Port City',
@@ -10,6 +11,15 @@ const DESTINATION_TYPE_LABELS: Record<string, string> = {
   city: 'City',
   country: 'Country',
   region: 'Region',
+}
+
+const DESTINATION_TYPE_PLURALS: Record<string, string> = {
+  port_city: 'Port Cities',
+  island: 'Islands',
+  resort_area: 'Resort Areas',
+  city: 'Cities',
+  country: 'Countries',
+  region: 'Regions',
 }
 
 export const destinationAdapter: HubAdapter<DestinationDetail> = {
@@ -26,8 +36,9 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
     }
 
     return {
-      imageUrl: dest.heroImageUrl || enrichment?.photos?.[0]?.url || null,
-      badge: dest.countryCode ?? '',
+      imageUrl: dest.heroImageUrl || enrichment?.photos?.[0]?.url || getCuratedImage(dest.name, dest.destinationType, 'hero'),
+      fallbackGradient: 'bg-gradient-to-br from-[#1a3a5c] via-[#0d2137] to-[#1A1A1A]',
+      badge: dest.countryCode ? `${dest.countryCode} · DESTINATION` : 'DESTINATION',
       title: dest.name,
       subtitle: subtitleParts.length > 0 ? subtitleParts.join(' \u00B7 ') : undefined,
       description: enrichment?.summary || dest.summary || undefined,
@@ -67,6 +78,52 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       priority: 'high',
     })
 
+    // Flights CTA — links to flight search; upgrades to live data when available
+    sections.push({
+      key: 'flights',
+      title: `\u2708\uFE0F Flights to ${dest.name}`,
+      viewAllHref: `/search/flights`,
+      viewAllLabel: 'Search flights \u2192',
+      props: {
+        destinationName: dest.name,
+        airportIata: (dest.metadata?.airportIata as string | null | undefined) || null,
+        destinationImageUrl: dest.heroImageUrl || dest.enrichment?.photos?.[0]?.url || getCuratedImage(dest.name, dest.destinationType),
+      },
+      priority: 'high',
+    })
+
+    // Hotels CTA — links to hotel search; upgrades to live data when available
+    sections.push({
+      key: 'hotels',
+      title: `\uD83C\uDFE8 Hotels in ${dest.name}`,
+      viewAllHref: `/search/hotels?destination=${encodeURIComponent(dest.name)}`,
+      viewAllLabel: 'Search hotels \u2192',
+      props: {
+        destinationName: dest.name,
+        latitude: dest.latitude ? parseFloat(String(dest.latitude)) : null,
+        longitude: dest.longitude ? parseFloat(String(dest.longitude)) : null,
+      },
+      priority: 'medium',
+    })
+
+    // Tours -- ToursSection self-fetches via tour-repository API.
+    // tourSearchFallback is a broader term (country code) tried when the primary
+    // destinationName search returns zero results — improves coverage for port cities
+    // where Globus uses regional names (e.g., "Caribbean" rather than "Cozumel, Mexico").
+    sections.push({
+      key: 'tours',
+      title: `\uD83C\uDFDE Tours in ${dest.name}`,
+      viewAllHref: `/search/tours?q=${encodeURIComponent(dest.name)}`,
+      viewAllLabel: 'Browse all tours \u2192',
+      props: {
+        destinationName: dest.name,
+        // Use the country/region part of the name (after comma) as fallback, NOT country code
+        // Country codes like "NO" are too short and match irrelevant tours
+        tourSearchFallback: dest.name.includes(',') ? dest.name.split(',').slice(1).join(',').trim() : undefined,
+      },
+      priority: 'medium',
+    })
+
     // Activities from enrichment topAttractions
     const attractions = enrichment?.topAttractions ?? []
     if (attractions.length > 0) {
@@ -95,6 +152,19 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
         priority: 'low',
       })
     }
+
+    // Nearby destinations — self-fetching section that finds same-type destinations
+    sections.push({
+      key: 'nearby',
+      title: `\uD83D\uDDFA\uFE0F More ${DESTINATION_TYPE_PLURALS[dest.destinationType] ?? 'Destinations'} to Explore`,
+      subtitle: 'Discover similar destinations',
+      viewAllHref: '/destinations',
+      viewAllLabel: 'View all destinations \u2192',
+      props: {
+        destinationType: dest.destinationType,
+      },
+      priority: 'low',
+    })
 
     return sections
   },

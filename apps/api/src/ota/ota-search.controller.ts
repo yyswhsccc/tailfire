@@ -125,9 +125,12 @@ export class OtaSearchController {
   @Get('hotels')
   @Public()
   @UseGuards(OtaServiceKeyGuard)
-  @ApiOperation({ summary: 'Search hotels by destination' })
+  @ApiOperation({ summary: 'Search hotels by destination or coordinates' })
   @ApiHeader({ name: 'x-ota-service-key', required: true, description: 'OTA service-to-service key' })
-  @ApiQuery({ name: 'destination', required: true, description: 'Amadeus city code (e.g., NYC, PAR)', example: 'CUN' })
+  @ApiQuery({ name: 'destination', required: false, description: 'Amadeus city code (e.g., NYC, PAR). Required unless latitude/longitude provided.', example: 'CUN' })
+  @ApiQuery({ name: 'latitude', required: false, description: 'Latitude for geo-based search (use instead of destination)', example: '20.6296' })
+  @ApiQuery({ name: 'longitude', required: false, description: 'Longitude for geo-based search (use instead of destination)', example: '-87.0739' })
+  @ApiQuery({ name: 'radius', required: false, description: 'Search radius in meters (default 5000, max 300km)', example: '5000' })
   @ApiQuery({ name: 'checkIn', required: false, description: 'Check-in date (YYYY-MM-DD)', example: '2026-06-15' })
   @ApiQuery({ name: 'checkOut', required: false, description: 'Check-out date (YYYY-MM-DD)', example: '2026-06-22' })
   @ApiQuery({ name: 'adults', required: false, description: 'Number of adults', example: '2' })
@@ -137,19 +140,32 @@ export class OtaSearchController {
   @ApiResponse({ status: 401, description: 'Invalid OTA service key' })
   async searchHotels(
     @Query('destination') destination?: string,
+    @Query('latitude') latitude?: string,
+    @Query('longitude') longitude?: string,
+    @Query('radius') radius?: string,
     @Query('checkIn') checkIn?: string,
     @Query('checkOut') checkOut?: string,
     @Query('adults') adults?: string,
     @Query('rooms') _rooms?: string,
   ) {
-    if (!destination) {
-      throw new BadRequestException('destination is required (Amadeus city code, e.g., CUN, PAR)')
+    const hasCoords = latitude !== undefined && longitude !== undefined
+    if (!destination && !hasCoords) {
+      throw new BadRequestException(
+        'Either destination (Amadeus city code) or latitude+longitude are required',
+      )
     }
 
-    this.logger.log('OTA hotel search', { destination, checkIn, checkOut })
+    this.logger.log('OTA hotel search', { destination, latitude, longitude, radius, checkIn, checkOut })
 
     const response = await this.otaSearchService.searchHotels({
-      cityCode: destination.toUpperCase(),
+      ...(destination ? { cityCode: destination.toUpperCase() } : {}),
+      ...(hasCoords
+        ? {
+            latitude: parseFloat(latitude!),
+            longitude: parseFloat(longitude!),
+            ...(radius ? { radius: parseInt(radius, 10) } : {}),
+          }
+        : {}),
       checkIn,
       checkOut,
       adults: adults ? parseInt(adults, 10) : undefined,
