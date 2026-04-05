@@ -209,13 +209,16 @@ export class ContactMergeService {
       }
 
       // -----------------------------------------------------------------------
-      // 2. Verify ownership / access
+      // 2. Verify ownership / access — merge is destructive, require owner or admin
       // -----------------------------------------------------------------------
       if (auth.role !== 'admin') {
-        const canUsePrimary = await this.contactAccess.canUseContact(primaryId, auth)
-        const canUseSecondary = await this.contactAccess.canUseContact(secondaryId, auth)
-        if (!canUsePrimary || !canUseSecondary) {
-          throw new ForbiddenException('You do not have access to both contacts')
+        // Non-admins can only merge contacts they own or agency-wide (unowned) contacts
+        const primaryOwner = primary.owner_id
+        const secondaryOwner = secondary.owner_id
+        const canMergePrimary = !primaryOwner || primaryOwner === auth.userId
+        const canMergeSecondary = !secondaryOwner || secondaryOwner === auth.userId
+        if (!canMergePrimary || !canMergeSecondary) {
+          throw new ForbiddenException('You can only merge contacts you own or agency-wide contacts')
         }
       }
 
