@@ -39,16 +39,21 @@ export async function ToursSection({
       )
       tours = primaryData.tours
 
-      // If primary search returned nothing, try the broader fallback term
-      // (e.g., country code "MX" for "Cozumel, Mexico") to improve coverage
-      // for Globus tours that use regional/country-level naming.
+      // If primary search returned nothing, try the country name (not code) as fallback.
+      // Country codes like "NO" are too short and match unrelated tours.
+      // Only use fallback terms that are 4+ characters to avoid false matches.
       if (tours.length === 0 && sectionProps.tourSearchFallback) {
         const fallbackTerm = sectionProps.tourSearchFallback as string
-        const fallbackData = await catalogFetch<TourSearchResponse>(
-          `/tour-repository/tours?q=${encodeURIComponent(fallbackTerm)}&pageSize=4`,
-          { next: { revalidate: 3600 } },
-        )
-        tours = fallbackData.tours
+        if (fallbackTerm.length < 4) {
+          // Skip 2-3 char country codes — too generic for tour search
+          tours = []
+        } else {
+          const fallbackData = await catalogFetch<TourSearchResponse>(
+            `/tour-repository/tours?q=${encodeURIComponent(fallbackTerm)}&pageSize=4`,
+            { next: { revalidate: 3600 } },
+          )
+          tours = fallbackData.tours
+        }
       }
     } else {
       tours = (sectionProps.tours as any[] | undefined) ?? []
