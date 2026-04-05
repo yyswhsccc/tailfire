@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTravelSession } from '@/stores/travel-session-store'
 import { HotelProductCard } from '@/components/cards/hotel-product-card'
+import { getCuratedImage } from '@/lib/curated-images'
 import type { HotelProductCardProps } from '@/components/cards/hotel-product-card'
 
 // ---------------------------------------------------------------------------
@@ -55,7 +56,7 @@ const BOARD_BASIS_LABELS: Record<string, string> = {
   ALL_INCLUSIVE: 'All Inclusive',
 }
 
-function hotelOfferToCardProps(hotel: HotelOffer): HotelProductCardProps {
+function hotelOfferToCardProps(hotel: HotelOffer, destinationName?: string): HotelProductCardProps {
   const bestOffer = hotel.offers?.[0]
   const locationParts = [hotel.location.city, hotel.location.country].filter(Boolean)
   const priceCents = bestOffer
@@ -65,10 +66,14 @@ function hotelOfferToCardProps(hotel: HotelOffer): HotelProductCardProps {
     ? (BOARD_BASIS_LABELS[bestOffer.boardType] ?? bestOffer.boardType)
     : undefined
 
+  // Use hotel photo if available, otherwise use a curated destination image
+  const imageUrl = hotel.photos?.[0]?.url
+    ?? getCuratedImage(destinationName || hotel.location.city || hotel.name, 'city', 'card')
+
   return {
     id: hotel.id,
     name: hotel.name,
-    imageUrl: hotel.photos?.[0]?.url ?? null,
+    imageUrl,
     starRating: hotel.starRating,
     userRating: hotel.rating,
     reviewCount: hotel.reviewCount,
@@ -127,7 +132,7 @@ export function ClientHotelResults({
 
     const data: { results?: HotelOffer[] } = await res.json()
     const results = (data.results || []).slice(0, 4)
-    return results.map(hotelOfferToCardProps)
+    return results.map((h) => hotelOfferToCardProps(h, destinationName))
   }, [departureDate, returnDate, adults, destinationName, latitude, longitude])
 
   useEffect(() => {

@@ -117,7 +117,9 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       viewAllLabel: 'Browse all tours \u2192',
       props: {
         destinationName: dest.name,
-        tourSearchFallback: dest.countryCode ?? undefined,
+        // Use the country/region part of the name (after comma) as fallback, NOT country code
+        // Country codes like "NO" are too short and match irrelevant tours
+        tourSearchFallback: dest.name.includes(',') ? dest.name.split(',').slice(1).join(',').trim() : undefined,
       },
       priority: 'medium',
     })
