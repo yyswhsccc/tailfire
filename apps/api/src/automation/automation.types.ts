@@ -146,7 +146,7 @@ export type TripAutomationJobData =
  * Client care job for automated communications
  */
 export interface ClientCareJobData {
-  type: 'client.welcome' | 'client.post_trip' | 'client.birthday' | 'client.follow_up'
+  type: 'client.welcome' | 'client.post_trip' | 'client.birthday' | 'client.follow_up' | 'contact-lifecycle-daily'
   contactId: string
   tripId?: string
   agencyId?: string
