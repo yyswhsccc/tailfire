@@ -4,18 +4,26 @@ import Link from 'next/link'
 import { FeedSection } from '@/components/hub/feed-section'
 import { DestinationCard } from '@/components/destinations/destination-card'
 import type { SectionComponentProps } from '@/lib/entity-hubs/types'
+import { getCuratedImage } from '@/lib/curated-images'
 
 /**
  * Lightweight card for destinations that only have basic data (name, maybe country)
  * but lack slug, heroImageUrl, etc. — e.g. region destinations or deal destination strings.
+ * Uses curated Unsplash photos for a rich visual appearance.
  */
-function LightweightDestinationCard({ name, country, slug }: { name: string; country?: string | null; slug?: string }) {
+function LightweightDestinationCard({ name, country, slug, destinationType }: { name: string; country?: string | null; slug?: string; destinationType?: string | null }) {
+  const imageUrl = getCuratedImage(name, destinationType ?? undefined)
+
   const inner = (
-    <div className="flex items-center gap-3 rounded-xl border border-[#E0E0E0] bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <span className="text-xl">📍</span>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-[#1A1A1A]">{name}</p>
-        {country && <p className="text-xs text-[#888]">{country}</p>}
+    <div className="group relative overflow-hidden rounded-xl shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md" style={{ height: '120px' }}>
+      <div
+        className="absolute inset-0 bg-[#1A1A1A] bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+        style={{ backgroundImage: `url(${imageUrl})` }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-3">
+        <p className="truncate text-sm font-semibold text-white drop-shadow">{name}</p>
+        {country && <p className="text-[11px] text-white/80 drop-shadow">{country}</p>}
       </div>
     </div>
   )
@@ -63,12 +71,14 @@ export async function DestinationsSection({
             const name = typeof d === 'string' ? d : d.name
             const country = typeof d === 'string' ? null : d.country ?? null
             const slug = typeof d === 'string' ? null : d.slug ?? null
+            const destinationType = typeof d === 'string' ? null : d.destinationType ?? null
             return (
               <LightweightDestinationCard
                 key={slug || name || i}
                 name={name}
                 country={country}
                 slug={slug}
+                destinationType={destinationType}
               />
             )
           })}

@@ -2,6 +2,7 @@
 
 import type { DestinationDetail } from '@/types/entities'
 import type { HubAdapter, HeroData, ContextPill, SectionDescriptor, AiPageContext } from '../types'
+import { getCuratedImage } from '@/lib/curated-images'
 
 const DESTINATION_TYPE_LABELS: Record<string, string> = {
   port_city: 'Port City',
@@ -35,7 +36,7 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
     }
 
     return {
-      imageUrl: dest.heroImageUrl || enrichment?.photos?.[0]?.url || null,
+      imageUrl: dest.heroImageUrl || enrichment?.photos?.[0]?.url || getCuratedImage(dest.name, dest.destinationType, 'hero'),
       fallbackGradient: 'bg-gradient-to-br from-[#1a3a5c] via-[#0d2137] to-[#1A1A1A]',
       badge: dest.countryCode ? `${dest.countryCode} · DESTINATION` : 'DESTINATION',
       title: dest.name,
@@ -86,7 +87,7 @@ export const destinationAdapter: HubAdapter<DestinationDetail> = {
       props: {
         destinationName: dest.name,
         airportIata: (dest.metadata?.airportIata as string | null | undefined) || null,
-        destinationImageUrl: dest.heroImageUrl || dest.enrichment?.photos?.[0]?.url || null,
+        destinationImageUrl: dest.heroImageUrl || dest.enrichment?.photos?.[0]?.url || getCuratedImage(dest.name, dest.destinationType),
       },
       priority: 'high',
     })

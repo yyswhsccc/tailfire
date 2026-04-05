@@ -5,6 +5,7 @@ import { FeedSection } from '@/components/hub/feed-section'
 import { publicFetch } from '@/lib/api'
 import type { DestinationSummary } from '@/types/entities'
 import type { SectionComponentProps } from '@/lib/entity-hubs/types'
+import { getCuratedImage } from '@/lib/curated-images'
 
 /**
  * Lightweight card for nearby destinations.
@@ -15,40 +16,28 @@ function NearbyDestinationCard({
   country,
   slug,
   heroImageUrl,
+  destinationType,
 }: {
   name: string
   country?: string | null
   slug?: string | null
   heroImageUrl?: string | null
+  destinationType?: string | null
 }) {
-  // Simple gradient backgrounds cycling by hash of name
-  const gradients = [
-    'from-blue-500 to-cyan-400',
-    'from-emerald-500 to-teal-400',
-    'from-amber-500 to-orange-400',
-    'from-violet-500 to-purple-400',
-    'from-rose-500 to-pink-400',
-    'from-sky-500 to-indigo-400',
-  ]
-  const hash = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  const gradient = gradients[hash % gradients.length]!
+  const imageUrl = heroImageUrl || getCuratedImage(name, destinationType ?? undefined)
 
   const inner = (
     <div className="group w-64 shrink-0 overflow-hidden rounded-2xl shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-      {/* Hero area — image or gradient fallback */}
+      {/* Hero area — curated image background */}
       <div
-        className={`relative h-32 bg-gradient-to-br ${gradient}`}
-        style={
-          heroImageUrl
-            ? {
-                backgroundImage: `url(${heroImageUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }
-            : undefined
-        }
+        className="relative h-32 bg-[#1A1A1A]"
+        style={{
+          backgroundImage: `url(${imageUrl})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
       >
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <p className="truncate text-sm font-bold text-white drop-shadow">{name}</p>
           {country && (
@@ -75,6 +64,7 @@ interface DestinationLike {
   country?: string | null
   countryCode?: string | null
   heroImageUrl?: string | null
+  destinationType?: string | null
 }
 
 export async function NearbySection({
@@ -122,6 +112,7 @@ export async function NearbySection({
             const country = typeof d === 'string' ? null : (d.country ?? d.countryCode ?? null)
             const slug = typeof d === 'string' ? null : (d.slug ?? null)
             const heroImageUrl = typeof d === 'string' ? null : (d.heroImageUrl ?? null)
+            const destinationType = typeof d === 'string' ? null : ((d as DestinationLike).destinationType ?? null)
             return (
               <NearbyDestinationCard
                 key={slug || name || i}
@@ -129,6 +120,7 @@ export async function NearbySection({
                 country={country}
                 slug={slug}
                 heroImageUrl={heroImageUrl}
+                destinationType={destinationType}
               />
             )
           })}
