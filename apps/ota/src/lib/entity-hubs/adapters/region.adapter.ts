@@ -2,11 +2,12 @@
 
 import type { RegionDetail } from '@/types/entities'
 import type { HubAdapter, HeroData, ContextPill, SectionDescriptor, AiPageContext } from '../types'
+import { getCuratedImage } from '@/lib/curated-images'
 
 export const regionAdapter: HubAdapter<RegionDetail> = {
   heroData(region): HeroData {
     return {
-      imageUrl: null,
+      imageUrl: getCuratedImage(region.name, 'region', 'hero'),
       fallbackGradient: 'bg-gradient-to-br from-[#1a3a2a] via-[#0d2a1a] to-[#1A1A1A]',
       badge: 'REGION',
       title: region.name,
