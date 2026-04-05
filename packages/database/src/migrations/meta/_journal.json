@@ -1324,6 +1324,27 @@
       "when": 1775160839000,
       "tag": "20260402201359_add_contacts_crm_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 189,
+      "version": "7",
+      "when": 1775247968000,
+      "tag": "20260403150608_add_contact_merge_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 190,
+      "version": "7",
+      "when": 1775247969000,
+      "tag": "20260403150609_add_pg_trgm_extension",
+      "breakpoints": true
+    },
+    {
+      "idx": 191,
+      "version": "7",
+      "when": 1775247970000,
+      "tag": "20260403150610_create_duplicate_dismissals",
+      "breakpoints": true
     }
   ]
 }

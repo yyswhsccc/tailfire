@@ -235,3 +235,6 @@ export * from './planning-session-items.schema'
 
 // OTA trip requests (consumer-side trip builder)
 export * from './ota-trip-requests.schema'
+
+// Contact merge support (duplicate dismissals)
+export * from './contact-duplicate-dismissals.schema'

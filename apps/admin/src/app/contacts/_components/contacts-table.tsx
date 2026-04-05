@@ -237,9 +237,9 @@ export function ContactsTable({
             {/* 6. Phone */}
             <TableHead className={`${thClass} w-[130px]`}>Phone</TableHead>
 
-            {/* 7. Next Trip */}
+            {/* 7. Next Trip (computed — not sortable) */}
             <TableHead className={`${thClass} w-[160px]`}>
-              <SortableHeader label="Next Trip" field="nextTripDate" {...sortProps} />
+              <span className="text-xs font-medium">Next Trip</span>
             </TableHead>
 
             {/* 8. Birthday */}

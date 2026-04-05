@@ -242,7 +242,7 @@ export interface ContactFilterDto {
   contactStatus?: string[]
 
   // Sorting
-  sortBy?: 'firstName' | 'lastName' | 'email' | 'createdAt' | 'updatedAt'
+  sortBy?: 'firstName' | 'lastName' | 'email' | 'contactType' | 'contactStatus' | 'dateOfBirth' | 'createdAt' | 'updatedAt'
   sortOrder?: 'asc' | 'desc'
 }
 
@@ -359,6 +359,11 @@ export interface ContactResponseDto {
   portalUserId: string | null
   portalStatus: 'not_invited' | 'pending' | 'active' // computed
   portalInvitedAt: string | null
+
+  // Merge tracking
+  mergedIntoContactId: string | null
+  mergedAt: string | null
+  mergedBy: string | null
 
   // Audit
   createdAt: string // ISO timestamp
@@ -607,4 +612,53 @@ export interface ContactImportConfirmResult {
   skipped: number
   errors: Array<{ rowIndex: number; error: string }>
   tagName: string
+}
+
+// ============================================================================
+// Contact Merge
+// ============================================================================
+
+export interface ContactMergeRequest {
+  primaryId: string
+  secondaryId: string
+  fieldOverrides: Record<string, 'primary' | 'secondary'>
+}
+
+export interface ContactMergeResult {
+  success: boolean
+  mergedContactId: string
+  repointed: {
+    trips: number
+    travelers: number
+    relationships: number
+    tags: number
+    payments: number
+    documents: number
+    notes: number
+    tasks: number
+    other: number
+  }
+}
+
+// ============================================================================
+// Duplicate Detection
+// ============================================================================
+
+export type DuplicateMatchType = 'email' | 'phone_name' | 'dob_name'
+
+export interface DuplicateGroup {
+  matchType: DuplicateMatchType
+  confidence: 'high' | 'medium'
+  contacts: [ContactListItemDto, ContactListItemDto]
+}
+
+export interface DuplicateDetectionResult {
+  groups: DuplicateGroup[]
+  totalGroups: number
+}
+
+export interface DuplicateDismissRequest {
+  contactId1: string
+  contactId2: string
+  matchType: string
 }

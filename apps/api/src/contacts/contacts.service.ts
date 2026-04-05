@@ -160,12 +160,9 @@ export class ContactsService {
     // Always filter by agency
     conditions.push(eq(this.db.schema.contacts.agencyId, agencyId))
 
-    // Default to showing only active contacts unless explicitly filtering for inactive ones
+    // Filter by active status when explicitly requested; show all when omitted
     if (filters.isActive !== undefined) {
       conditions.push(eq(this.db.schema.contacts.isActive, filters.isActive))
-    } else {
-      // Default: only show active contacts
-      conditions.push(eq(this.db.schema.contacts.isActive, true))
     }
 
     if (filters.search) {
@@ -1101,6 +1098,11 @@ export class ContactsService {
       portalUserId: contact.portalUserId ?? null,
       portalStatus: contact.portalActivatedAt ? 'active' : contact.portalUserId ? 'pending' : 'not_invited',
       portalInvitedAt: contact.portalInvitedAt?.toISOString() ?? null,
+
+      // Merge tracking
+      mergedIntoContactId: contact.mergedIntoContactId ?? null,
+      mergedAt: contact.mergedAt?.toISOString() ?? null,
+      mergedBy: contact.mergedBy ?? null,
 
       // Audit
       createdAt: contact.createdAt.toISOString(),

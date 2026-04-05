@@ -15,9 +15,11 @@ import { ContactsFilterPanel } from './_components/contacts-filter-panel'
 import { BulkActionsToolbar } from './_components/bulk-actions-toolbar'
 import { QuickContactDialog } from './_components/quick-contact-dialog'
 import { ContactImportWizard } from './_components/contact-import-wizard'
+import { MergeEditorDialog } from './_components/merge-editor-dialog'
 import { TripFormDialog } from '@/app/trips/_components/trip-form-dialog'
 import { TableSkeleton } from '@/components/shared/loading-skeleton'
 import { useToast } from '@/hooks/use-toast'
+import { useUser } from '@/hooks/use-user'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { ContactFilterDto, TripResponseDto } from '@tailfire/shared-types/api'
@@ -36,15 +38,18 @@ function ContactsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const { isAdmin } = useUser()
   const urlSearch = searchParams?.get('search') || ''
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showCreateTrip, setShowCreateTrip] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [mergeIds, setMergeIds] = useState<[string, string] | null>(null)
   const [view, setView] = useState<ContactsView>('table')
   const [filters, setFilters] = useState<ContactFilterDto>({
     page: 1,
+    isActive: true,
     limit: 25,
   })
 
@@ -250,8 +255,11 @@ function ContactsPage() {
       {selectedIds.size > 0 && (
         <BulkActionsToolbar
           selectedIds={selectedIds}
+          contacts={data?.data || []}
+          isAdmin={isAdmin}
           onDeselect={() => setSelectedIds(new Set())}
           onCreateTrip={() => setShowCreateTrip(true)}
+          onMerge={() => setMergeIds(Array.from(selectedIds) as [string, string])}
         />
       )}
 
@@ -349,6 +357,15 @@ function ContactsPage() {
       />
 
       <ContactImportWizard open={showImport} onOpenChange={setShowImport} />
+
+      {mergeIds && (
+        <MergeEditorDialog
+          open={!!mergeIds}
+          onOpenChange={(open) => { if (!open) setMergeIds(null) }}
+          contactIds={mergeIds}
+          onMergeComplete={() => { setMergeIds(null); setSelectedIds(new Set()) }}
+        />
+      )}
     </DashboardLayout>
   )
 }

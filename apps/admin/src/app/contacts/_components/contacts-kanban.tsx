@@ -282,6 +282,16 @@ export function ContactsKanban({
       const contact = contacts.find((c) => c.id === contactId)
       if (!contact) return
 
+      // Guard: Leads can only be in the 'prospecting' column
+      if (contact.contactType === 'lead' && targetColumn !== 'prospecting') {
+        toast({
+          title: 'Cannot move Lead',
+          description: 'Leads can only be in the Prospecting column. Convert to a client to use other statuses.',
+          variant: 'destructive',
+        })
+        return
+      }
+
       const sourceColumn = contact.contactStatus ?? 'prospecting'
       if (sourceColumn === targetColumn) return
 

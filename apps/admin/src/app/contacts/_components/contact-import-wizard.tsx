@@ -173,20 +173,20 @@ export function ContactImportWizard({ open, onOpenChange }: ContactImportWizardP
       const result = await importPreview.mutateAsync({ rows: normalized })
       setPreviewResults(result)
 
-      // Auto-select all actionable rows
+      // Auto-select actionable rows (new + update only, NOT possible_match)
       const actionable = new Set<number>()
       for (const r of result.results) {
-        if (r.disposition === 'new' || r.disposition === 'update' || r.disposition === 'possible_match') {
+        if (r.disposition === 'new' || r.disposition === 'update') {
           actionable.add(r.rowIndex)
         }
       }
       setSelectedRows(actionable)
 
-      // Set default actions for possible_match rows
+      // Default possible_match rows to 'skip' — agent must explicitly opt in
       const actions = new Map<number, 'create' | 'merge' | 'skip'>()
       for (const r of result.results) {
         if (r.disposition === 'possible_match') {
-          actions.set(r.rowIndex, 'create')
+          actions.set(r.rowIndex, 'skip')
         }
       }
       setRowActions(actions)

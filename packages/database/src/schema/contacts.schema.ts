@@ -60,6 +60,11 @@ export const contacts = pgTable('contacts', {
   // Ownership (NULL = agency-wide contact, non-NULL = user-owned)
   ownerId: uuid('owner_id'),
 
+  // Merge tracking (set when this contact is merged into another)
+  mergedIntoContactId: uuid('merged_into_contact_id'), // FK to contacts.id (self-ref, defined in migration)
+  mergedAt: timestamp('merged_at', { withTimezone: true }),
+  mergedBy: uuid('merged_by'),
+
   // Basic Information (names - flexible, at least one required via constraint)
   firstName: varchar('first_name', { length: 100 }),
   lastName: varchar('last_name', { length: 100 }),

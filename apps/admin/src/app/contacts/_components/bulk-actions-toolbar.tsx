@@ -18,10 +18,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Tag, BarChart3, Trash2, Plane, X, Loader2, Check } from 'lucide-react'
+import { Tag, BarChart3, Trash2, Plane, X, Loader2, Check, GitMerge, Download, FileText } from 'lucide-react'
+import { openContactPrintReport } from './contact-print-report'
 import { TagAssignPopover } from './tag-assign-popover'
 import { useDeleteContact, useUpdateContactStatus } from '@/hooks/use-contacts'
 import { useToast } from '@/hooks/use-toast'
+import type { ContactListItemDto } from '@tailfire/shared-types/api'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,8 +31,11 @@ import { useToast } from '@/hooks/use-toast'
 
 interface BulkActionsToolbarProps {
   selectedIds: Set<string>
+  contacts: ContactListItemDto[]
+  isAdmin: boolean
   onDeselect: () => void
   onCreateTrip: () => void
+  onMerge?: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -53,8 +58,11 @@ const STATUS_OPTIONS = [
 
 export function BulkActionsToolbar({
   selectedIds,
+  contacts,
+  isAdmin,
   onDeselect,
   onCreateTrip,
+  onMerge,
 }: BulkActionsToolbarProps) {
   const [statusOpen, setStatusOpen] = useState(false)
   const [isChangingStatus, setIsChangingStatus] = useState(false)
@@ -141,6 +149,67 @@ export function BulkActionsToolbar({
     }
 
     onDeselect()
+  }
+
+  // -------------------------------------------------------------------------
+  // Export
+  // -------------------------------------------------------------------------
+
+  function handleExport() {
+    const selectedContacts = contacts.filter(c => selectedIds.has(c.id))
+    if (selectedContacts.length === 0) return
+
+    const headers = [
+      'First Name', 'Last Name', 'Email', 'Phone', 'Date of Birth',
+      'Type', 'Status', 'Address', 'City', 'Province', 'Postal Code', 'Country',
+      'Passport Number', 'Passport Expiry', 'Passport Country',
+      'Tags', 'Created At',
+    ]
+
+    const rows = selectedContacts.map(c => [
+      c.firstName || '',
+      c.lastName || '',
+      c.email || '',
+      c.phone || '',
+      c.dateOfBirth || '',
+      c.contactType || '',
+      c.contactStatus || '',
+      c.addressLine1 || '',
+      c.city || '',
+      c.province || '',
+      c.postalCode || '',
+      c.country || '',
+      c.passportNumber || '',
+      c.passportExpiry || '',
+      c.passportCountry || '',
+      (c.tags || []).join('; '),
+      c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '',
+    ])
+
+    const escapeCsv = (val: string) => {
+      if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+        return `"${val.replace(/"/g, '""')}"`
+      }
+      return val
+    }
+
+    const csv = [
+      headers.map(escapeCsv).join(','),
+      ...rows.map(row => row.map(escapeCsv).join(',')),
+    ].join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `contacts-export-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+
+    toast({
+      title: 'Exported',
+      description: `Exported ${selectedContacts.length} contact${selectedContacts.length !== 1 ? 's' : ''} to CSV.`,
+    })
   }
 
   // -------------------------------------------------------------------------
@@ -235,6 +304,38 @@ export function BulkActionsToolbar({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Merge (only when exactly 2 contacts are selected) */}
+      {count === 2 && onMerge && (
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onMerge}>
+          <GitMerge className="h-3.5 w-3.5 mr-1" />
+          Merge
+        </Button>
+      )}
+
+      {/* Export */}
+      {isAdmin && (
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleExport}>
+          <Download className="h-3.5 w-3.5 mr-1" />
+          Export
+        </Button>
+      )}
+
+      {/* Report */}
+      {isAdmin && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => {
+            const selected = contacts.filter(c => selectedIds.has(c.id))
+            if (selected.length > 0) openContactPrintReport(selected)
+          }}
+        >
+          <FileText className="h-3.5 w-3.5 mr-1" />
+          Report
+        </Button>
+      )}
 
       {/* Create Trip */}
       <Button

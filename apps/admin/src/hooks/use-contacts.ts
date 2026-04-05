@@ -38,8 +38,9 @@ export function useContacts(filters: ContactFilterDto = {}) {
       if (filters.tags?.length) {
         filters.tags.forEach((tag) => params.append('tags', tag))
       }
-      if (filters.isActive !== undefined)
-        params.append('isActive', filters.isActive.toString())
+      if (filters.isActive !== undefined) {
+        params.append('isActive', String(filters.isActive))
+      }
       if (filters.sortBy) params.append('sortBy', filters.sortBy)
       if (filters.contactType) params.append('contactType', filters.contactType)
       if (filters.contactStatus?.length) {

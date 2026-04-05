@@ -525,7 +525,7 @@ export class ContactImportService {
       { importKey: 'passportCountry', contactKey: 'passportCountry', dbField: contacts.passportCountry },
     ]
 
-    for (const { importKey, contactKey, dbField } of fieldMap) {
+    for (const { importKey, contactKey } of fieldMap) {
       const importValue = row[importKey]?.trim()
       const existingValue = existing[contactKey]
 
