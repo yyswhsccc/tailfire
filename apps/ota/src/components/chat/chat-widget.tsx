@@ -6,11 +6,31 @@ import { DefaultChatTransport } from "ai";
 import { Sparkles } from "lucide-react";
 
 import { ChatPanel } from "./chat-panel";
+import { useAiPanelStore } from "@/stores/ai-panel-store";
 
 // ---------------------------------------------------------------------------
-// Singleton transport — avoids re-creating on every render
+// Page context ref — updated by the widget on render, read by custom fetch
 // ---------------------------------------------------------------------------
-const transport = new DefaultChatTransport({ api: "/api/chat" });
+let currentPageContext: { type?: string; name?: string; slug?: string } | undefined;
+
+// Custom fetch that injects pageContext into the request body
+const contextFetch: typeof globalThis.fetch = async (input, init) => {
+  if (init?.body && typeof init.body === 'string' && currentPageContext) {
+    try {
+      const parsed = JSON.parse(init.body);
+      parsed.pageContext = currentPageContext;
+      init = { ...init, body: JSON.stringify(parsed) };
+    } catch {
+      // Not JSON — send as-is
+    }
+  }
+  return globalThis.fetch(input, init);
+};
+
+// ---------------------------------------------------------------------------
+// Singleton transport with context-aware fetch
+// ---------------------------------------------------------------------------
+const transport = new DefaultChatTransport({ api: "/api/chat", fetch: contextFetch });
 
 // ---------------------------------------------------------------------------
 // Module-level ref so the hero section (Task 6.4) can open the widget
@@ -31,6 +51,14 @@ export function openChat(text: string) {
 // ---------------------------------------------------------------------------
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
+  const pageContext = useAiPanelStore((s) => s.pageContext);
+
+  // Sync page context to module-level ref so the custom fetch can read it
+  useEffect(() => {
+    currentPageContext = pageContext
+      ? { type: pageContext.type, name: pageContext.name, slug: pageContext.slug }
+      : undefined;
+  }, [pageContext]);
 
   const { messages, sendMessage, status } = useChat({ transport });
 
