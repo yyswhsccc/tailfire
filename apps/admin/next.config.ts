@@ -30,6 +30,12 @@ const nextConfig: NextConfig = {
         hostname: 'pub-0ab7614dd4094206aa5c733bea70d570.r2.dev',
         pathname: '/**',
       },
+      // R2 Storage - Media (activity images, bug report screenshots)
+      {
+        protocol: 'https',
+        hostname: 'pub-d66b3fc17cef4970810f03892f5a76e6.r2.dev',
+        pathname: '/**',
+      },
       // Supabase Storage - Dev
       {
         protocol: 'https',
