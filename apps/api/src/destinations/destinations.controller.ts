@@ -23,6 +23,7 @@ import { InternalApiKeyGuard } from '../cruise-import/guards/internal-api-key.gu
 import { DestinationsService } from './destinations.service'
 import { DestinationsBootstrapService } from './destinations-bootstrap.service'
 import { DestinationEnrichmentService } from './destination-enrichment.service'
+import { DestinationDataEnrichmentService } from './destination-data-enrichment.service'
 import { AutomationService } from '../automation/automation.service'
 import { QUEUES, JOB_TYPES } from '../automation/automation.types'
 
@@ -33,6 +34,7 @@ export class DestinationsController {
     private readonly destinationsService: DestinationsService,
     private readonly bootstrapService: DestinationsBootstrapService,
     private readonly enrichmentService: DestinationEnrichmentService,
+    private readonly dataEnrichmentService: DestinationDataEnrichmentService,
     private readonly automationService: AutomationService,
   ) {}
 
@@ -248,6 +250,34 @@ export class DestinationsController {
   }
 
   /**
+   * Batch enrich destinations with AI-curated travel content.
+   * POST /destinations/batch-enrich-data
+   *
+   * Uses Wikipedia + OpenAI to generate structured travel content for
+   * destinations that haven't been enriched yet. Processes in batches.
+   * Auth: internal API key (x-internal-api-key header).
+   *
+   * Note: Defined BEFORE :id routes to avoid NestJS treating
+   * "batch-enrich-data" as a UUID param.
+   */
+  @Post('batch-enrich-data')
+  @Public() // Bypass JWT — uses API key guard instead
+  @UseGuards(InternalApiKeyGuard)
+  @ApiOperation({ summary: 'Batch enrich destinations with AI-curated travel content (internal)' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Max destinations per batch (default: 50)' })
+  @ApiQuery({ name: 'offset', required: false, description: 'Offset for pagination (default: 0)' })
+  @ApiResponse({ status: 200, description: 'Batch enrichment results' })
+  async batchEnrichData(
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.dataEnrichmentService.batchEnrich({
+      limit: limit ? parseInt(limit, 10) : 50,
+      offset: offset ? parseInt(offset, 10) : 0,
+    })
+  }
+
+  /**
    * Trigger enrichment for a single destination.
    * POST /destinations/:id/enrich
    *
@@ -261,5 +291,21 @@ export class DestinationsController {
   @ApiResponse({ status: 200, description: 'Enrichment result status' })
   async enrichDestination(@Param('id', ParseUUIDPipe) id: string) {
     return this.enrichmentService.enrichDestination(id)
+  }
+
+  /**
+   * Enrich a single destination with AI-curated travel content.
+   * POST /destinations/:id/enrich-data
+   *
+   * Uses Wikipedia + OpenAI to generate structured travel content
+   * for the specified destination.
+   */
+  @Post(':id/enrich-data')
+  @AdminOnly()
+  @ApiOperation({ summary: 'Enrich single destination with AI-curated travel content (admin)' })
+  @ApiParam({ name: 'id', description: 'Destination UUID' })
+  @ApiResponse({ status: 200, description: 'Enrichment result for the destination' })
+  async enrichDestinationData(@Param('id', ParseUUIDPipe) id: string) {
+    return this.dataEnrichmentService.enrichDestination(id)
   }
 }
