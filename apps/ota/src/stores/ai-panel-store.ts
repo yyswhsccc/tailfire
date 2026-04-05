@@ -5,6 +5,7 @@ interface PageContext {
   slug: string
   name: string
   parentContext?: { type: string; slug: string; name: string }
+  metadata?: Record<string, unknown>
 }
 
 interface JourneyItem {

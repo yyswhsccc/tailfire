@@ -20,6 +20,8 @@ export interface HubScaffoldProps {
   entityType: EntityType
   entitySlug: string
   parentContext?: { type: string; slug: string; name: string }
+  /** Enriched metadata to pass to AI concierge via PageContextBridge */
+  metadata?: Record<string, unknown>
   /** Optional content rendered below the scaffold sections (e.g. sailing itinerary) */
   children?: ReactNode
 }

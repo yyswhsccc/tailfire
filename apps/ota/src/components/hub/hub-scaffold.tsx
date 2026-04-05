@@ -17,6 +17,7 @@ export function HubScaffold({
   entityType,
   entitySlug,
   parentContext,
+  metadata,
   children,
 }: HubScaffoldProps) {
   return (
@@ -26,6 +27,7 @@ export function HubScaffold({
         slug={entitySlug}
         name={hero.title}
         parentContext={parentContext}
+        metadata={metadata}
       />
 
       <HubHero

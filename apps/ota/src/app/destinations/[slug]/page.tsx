@@ -53,6 +53,7 @@ export default async function DestinationHubPage({ params }: Props) {
       aiContext={destinationAdapter.aiContext(destination)}
       entityType="destination"
       entitySlug={slug}
+      metadata={destination.metadata as Record<string, unknown> | undefined}
     />
   )
 }

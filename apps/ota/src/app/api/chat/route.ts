@@ -99,7 +99,12 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const messages: UIMessage[] = body.messages
-    const pageContext: { type?: string; name?: string; slug?: string } | undefined = body.pageContext
+    const pageContext: {
+      type?: string; name?: string; slug?: string;
+      oneLiner?: string; bestMonths?: string; budgetTier?: string;
+      typicalStay?: string; tags?: string; highlights?: string;
+      currency?: string; travelTip?: string;
+    } | undefined = body.pageContext
 
     // Read cookies for advisor attribution and session context
     const cookieStore = await cookies()
@@ -148,10 +153,22 @@ export async function POST(request: Request) {
       }
     }
 
-    // Build page context section
+    // Build page context section — include enriched metadata when available
     let pageContextSection = ''
     if (pageContext?.type && pageContext?.name) {
-      pageContextSection = `\n\n--- Current Page ---\nThe consumer is currently viewing: ${pageContext.name} (${pageContext.type} page, slug: ${pageContext.slug || 'unknown'})\nUse this context naturally — reference what they're looking at without being asked.`
+      const lines = [`The consumer is currently viewing: ${pageContext.name} (${pageContext.type} page, slug: ${pageContext.slug || 'unknown'})`]
+
+      if (pageContext.oneLiner) lines.push(`Known for: ${pageContext.oneLiner}`)
+      if (pageContext.bestMonths) lines.push(`Best months: ${pageContext.bestMonths}`)
+      if (pageContext.budgetTier) lines.push(`Budget: ${pageContext.budgetTier}`)
+      if (pageContext.typicalStay) lines.push(`Typical stay: ${pageContext.typicalStay}`)
+      if (pageContext.tags) lines.push(`Tags: ${pageContext.tags}`)
+      if (pageContext.highlights) lines.push(`Highlights: ${pageContext.highlights}`)
+      if (pageContext.currency) lines.push(`Currency: ${pageContext.currency}`)
+      if (pageContext.travelTip) lines.push(`Insider tip: ${pageContext.travelTip}`)
+
+      lines.push('Use this context naturally — reference what they\'re looking at without being asked.')
+      pageContextSection = '\n\n--- Current Page ---\n' + lines.join('\n')
     }
 
     const systemPrompt = BASE_SYSTEM_PROMPT + pageContextSection + basketContext
