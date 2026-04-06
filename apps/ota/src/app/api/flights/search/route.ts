@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const data = await serviceFetch<unknown>(`/ota/search/flights?${qs}`);
     return NextResponse.json(data);
   } catch (error) {
-    console.error("Flight search proxy failed:", error);
+    console.warn('[api/flights/search] Proxy failed:', (error as Error)?.message || 'unknown error');
     return NextResponse.json({ results: [], warning: "Search temporarily unavailable" }, { status: 502 });
   }
 }

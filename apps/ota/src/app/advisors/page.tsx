@@ -40,7 +40,7 @@ async function fetchAdvisors(
       { next: { tags: ["advisors"] } },
     );
   } catch (error) {
-    console.error("Failed to fetch advisors:", error);
+    console.warn('[Advisors] Fetch failed:', (error as Error)?.message || 'unknown error');
     return [];
   }
 }

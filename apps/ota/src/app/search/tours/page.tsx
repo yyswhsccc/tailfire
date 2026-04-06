@@ -77,7 +77,7 @@ async function fetchTours(params: SearchParams): Promise<TourSearchResponse | nu
       { next: { revalidate: 3600 } },
     );
   } catch (error) {
-    console.error("Failed to fetch tours:", error);
+    console.warn('[ToursSearch] Fetch failed:', (error as Error)?.message || 'unknown error');
     return null;
   }
 }

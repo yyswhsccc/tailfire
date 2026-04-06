@@ -58,7 +58,8 @@ export async function ToursSection({
     } else {
       tours = (sectionProps.tours as any[] | undefined) ?? []
     }
-  } catch {
+  } catch (err) {
+    console.warn('[ToursSection] Fetch failed:', (err as Error)?.message || 'unknown error')
     return null
   }
 

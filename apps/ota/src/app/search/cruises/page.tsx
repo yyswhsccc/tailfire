@@ -147,7 +147,7 @@ async function fetchSailings(params: SearchParams): Promise<SailingSearchRespons
       { next: { revalidate: 3600 } },
     );
   } catch (error) {
-    console.error("Failed to fetch sailings:", error);
+    console.warn('[CruisesSearch] Sailings fetch failed:', (error as Error)?.message || 'unknown error');
     return null;
   }
 }
@@ -178,7 +178,7 @@ async function fetchFilters(): Promise<FiltersResponse | null> {
       priceRange: { min: null, max: null },
     };
   } catch (error) {
-    console.error("Failed to fetch cruise filters:", error);
+    console.warn('[CruisesSearch] Filters fetch failed:', (error as Error)?.message || 'unknown error');
     return null;
   }
 }

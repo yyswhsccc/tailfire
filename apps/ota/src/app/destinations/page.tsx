@@ -25,8 +25,8 @@ export default async function DestinationsPage({ searchParams }: DestinationsPag
       page: 1,
       pageSize: PAGE_SIZE,
     })
-  } catch (err: any) {
-    console.error('Destinations fetch failed:', err?.message)
+  } catch (err: unknown) {
+    console.warn('[Destinations] Fetch failed:', (err as Error)?.message || 'unknown error')
   }
 
   return (

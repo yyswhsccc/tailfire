@@ -72,7 +72,7 @@ async function fetchFlights(
     );
     return { results: data.results ?? [] };
   } catch (error) {
-    console.error("Failed to fetch flights:", error);
+    console.warn('[FlightsSearch] Fetch failed:', (error as Error)?.message || 'unknown error');
     return { results: [], error: "Failed to fetch flights" };
   }
 }

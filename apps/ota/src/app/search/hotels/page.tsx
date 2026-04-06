@@ -137,7 +137,7 @@ async function fetchHotels(params: SearchParams): Promise<HotelSearchResponse | 
     const query = buildSearchQuery(params);
     return await serviceFetch<HotelSearchResponse>(`/ota/search/hotels?${query}`);
   } catch (error) {
-    console.error("Failed to fetch hotels:", error);
+    console.warn('[Hotels] Fetch failed:', (error as Error)?.message || 'unknown error');
     return null;
   }
 }
@@ -218,7 +218,7 @@ function HotelResults({ hotels }: { hotels: HotelSearchResponse }) {
       </div>
 
       {/* Result cards */}
-      <div className="space-y-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {results.map((hotel) => (
           <HotelProductCard key={hotel.id} {...hotelOfferToCardProps(hotel)} />
         ))}

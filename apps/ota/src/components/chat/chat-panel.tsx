@@ -17,6 +17,8 @@ const TOOL_LABELS: Record<string, string> = {
   browseTours: "tours",
   captureContact: "contact info",
   requestAdvisor: "advisor request",
+  manageTripBasket: "trip basket",
+  captureIdentity: "identity",
 };
 
 /** Tool names that render as rich product cards */
@@ -192,12 +194,18 @@ export function ChatPanel({ messages, status, onSend, onClose }: ChatPanelProps)
                       const state = (part as { state?: string }).state;
                       if (state === "output-available") {
                         // Non-search tool completed (captureContact, requestAdvisor, etc.)
+                        const DONE_TOOLS = new Set([
+                          "captureContact",
+                          "requestAdvisor",
+                          "manageTripBasket",
+                          "captureIdentity",
+                        ]);
                         return (
                           <div
                             key={`${message.id}-${i}`}
                             className="mt-1 text-xs text-green-600"
                           >
-                            {toolName === "captureContact" || toolName === "requestAdvisor"
+                            {DONE_TOOLS.has(toolName)
                               ? `Done`
                               : `Found ${label} results`}
                           </div>
