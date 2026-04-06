@@ -7,6 +7,7 @@ import { Sparkles } from "lucide-react";
 
 import { ChatPanel } from "./chat-panel";
 import { useAiPanelStore } from "@/stores/ai-panel-store";
+import { useTripBasket } from "@/components/trip-builder/trip-basket-store";
 
 // ---------------------------------------------------------------------------
 // Page context ref — updated by the widget on render, read by custom fetch
@@ -92,6 +93,79 @@ export default function ChatWidget() {
   }, [pageContext]);
 
   const { messages, sendMessage, status } = useChat({ transport });
+
+  // -------------------------------------------------------------------------
+  // Sync AI tool results → client-side trip basket store
+  // When manageTripBasket or captureIdentity tools complete on the server,
+  // apply their effects to the Zustand store (which persists via the API).
+  // -------------------------------------------------------------------------
+  const processedToolCallIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    for (const message of messages) {
+      if (message.role !== "assistant") continue;
+
+      for (const part of message.parts) {
+        // Tool parts have type "tool-{toolName}" in AI SDK v6
+        if (!part.type.startsWith("tool-")) continue;
+
+        const toolName = part.type.replace(/^tool-/, "");
+        const toolPart = part as {
+          type: string;
+          state?: string;
+          toolCallId?: string;
+          output?: Record<string, unknown>;
+        };
+
+        if (toolPart.state !== "output-available" || !toolPart.toolCallId) continue;
+        if (processedToolCallIds.current.has(toolPart.toolCallId)) continue;
+
+        const output = toolPart.output;
+        if (!output) continue;
+
+        // Mark as processed before async work to prevent duplicates
+        processedToolCallIds.current.add(toolPart.toolCallId);
+
+        if (toolName === "manageTripBasket") {
+          const action = output.action as string | undefined;
+          if (action === "addToBasket" && output.component) {
+            const comp = output.component as {
+              id: string;
+              type: string;
+              data: Record<string, unknown>;
+              display?: { title?: string; subtitle?: string; price?: string };
+            };
+            useTripBasket.getState().addComponent({
+              id: comp.id,
+              type: comp.type as "flight" | "hotel" | "cruise" | "tour",
+              data: comp.data,
+              display: comp.display,
+            });
+          } else if (action === "removeFromBasket" && output.componentId) {
+            useTripBasket
+              .getState()
+              .removeComponent(output.componentId as string);
+          }
+        }
+
+        if (toolName === "captureIdentity") {
+          const action = output.action as string | undefined;
+          if (action === "linkIdentity" && output.email) {
+            useTripBasket
+              .getState()
+              .linkIdentity(
+                output.email as string,
+                (output.name as string) || undefined,
+                (output.phone as string) || undefined,
+              )
+              .catch(() => {
+                // Identity linking failed — basket may not exist yet
+              });
+          }
+        }
+      }
+    }
+  }, [messages]);
 
   const handleSend = useCallback(
     (text: string) => {
