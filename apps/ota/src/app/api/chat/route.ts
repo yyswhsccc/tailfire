@@ -186,7 +186,7 @@ export async function POST(request: Request) {
 
     return result.toUIMessageStreamResponse()
   } catch (error) {
-    console.error('[api/chat] error:', error)
+    console.warn('[api/chat] Request failed:', (error as Error)?.message || 'unknown error')
     return new Response(
       JSON.stringify({ error: 'An error occurred while processing your request.' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },

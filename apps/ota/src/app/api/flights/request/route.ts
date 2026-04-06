@@ -149,7 +149,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to submit flight request";
-    console.error("[flights/request] Trip request pipeline failed:", message);
+    console.warn('[api/flights/request] Trip request pipeline failed:', message);
     return NextResponse.json(
       { success: false, message: "Failed to submit flight request" },
       { status: 502 },

@@ -29,7 +29,8 @@ export async function ShipsSection({
     const data = await fetchCruiseLineBySlug(entitySlug)
     ships = data.ships ?? []
     cruiseLineName = data.name
-  } catch {
+  } catch (err) {
+    console.warn('[ShipsSection] Fetch failed:', (err as Error)?.message || 'unknown error')
     return null
   }
 

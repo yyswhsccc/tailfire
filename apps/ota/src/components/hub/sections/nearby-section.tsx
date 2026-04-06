@@ -88,8 +88,8 @@ export async function NearbySection({
       destinations = (result.destinations ?? [])
         .filter((d) => d.slug !== entitySlug)
         .slice(0, 8)
-    } catch {
-      // Non-critical — degrade gracefully
+    } catch (err) {
+      console.warn('[NearbySection] Fetch failed:', (err as Error)?.message || 'unknown error')
     }
   }
 

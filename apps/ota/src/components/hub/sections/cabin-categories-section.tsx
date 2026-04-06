@@ -97,7 +97,8 @@ export async function CabinCategoriesSection({
 
   try {
     cabins = await fetchShipCabinSummary(shipId)
-  } catch {
+  } catch (err) {
+    console.warn('[CabinCategoriesSection] Fetch failed:', (err as Error)?.message || 'unknown error')
     return null
   }
 

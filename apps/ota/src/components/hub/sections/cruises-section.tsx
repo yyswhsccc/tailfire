@@ -64,7 +64,8 @@ export async function CruisesSection({
         }
       })
     }
-  } catch {
+  } catch (err) {
+    console.warn('[CruisesSection] Fetch failed:', (err as Error)?.message || 'unknown error')
     return null
   }
 

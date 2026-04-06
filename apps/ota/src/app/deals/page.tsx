@@ -38,7 +38,7 @@ async function fetchDeals(productType?: string): Promise<{ deals: Deal[]; total:
     );
     return response;
   } catch (error) {
-    console.error("Failed to fetch deals:", error);
+    console.warn('[Deals] Fetch failed:', (error as Error)?.message || 'unknown error');
     return { deals: [], total: 0 };
   }
 }

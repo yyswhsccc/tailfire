@@ -65,7 +65,8 @@ export async function DeckPlansSection({
 
   try {
     decks = await fetchShipDecks(shipId)
-  } catch {
+  } catch (err) {
+    console.warn('[DeckPlansSection] Fetch failed:', (err as Error)?.message || 'unknown error')
     return null
   }
 
