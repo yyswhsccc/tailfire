@@ -53,7 +53,7 @@ export function AiBoardPanel({ isOpen, onClose }: AiBoardPanelProps) {
   }
 
   return (
-    <div className="sticky top-16 flex h-[calc(100vh-4rem)] w-[400px] shrink-0 flex-col rounded-l-2xl bg-[#1A1A1A] shadow-2xl">
+    <div className="sticky top-16 flex h-[calc(100vh-4rem)] w-full shrink-0 flex-col rounded-l-2xl bg-[#1A1A1A] shadow-2xl md:w-[400px]">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
         <div className="flex items-center gap-3">
