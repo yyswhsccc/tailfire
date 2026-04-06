@@ -29,6 +29,7 @@ export interface PlatformPreferencesDto {
   theme?: 'light' | 'dark' | 'system'
   timezone?: string
   dateFormat?: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD'
+  onboardingCompletedAt?: string | null
 }
 
 export interface LicensingInfoDto {
