@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Plane, Hotel, Ship, Map } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
@@ -28,6 +28,7 @@ import {
   type InspirationCard,
   type BoardOrderItem,
 } from "./trip-basket-store";
+import { getCuratedImage } from "@/lib/curated-images";
 import { BoardHeader } from "./board-header";
 import { BoardAddMenu } from "./board-add-menu";
 import { BoardEmptyState } from "./board-empty-state";
@@ -146,6 +147,168 @@ function extractDestination(components: TripComponent[]): string | null {
     }
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-generated inspiration from curated Unsplash photos
+// ---------------------------------------------------------------------------
+
+/** Map component types to curated photo categories. */
+const COMPONENT_TYPE_CATEGORY: Record<string, string> = {
+  cruise: "cruise",
+  hotel: "tropical",
+  flight: "default",
+  tour: "mountain",
+  package: "beach",
+  custom: "default",
+};
+
+/** A few curated category variants per destination to add visual variety. */
+const VARIETY_CATEGORIES = ["beach", "city", "tropical", "island", "mountain", "cruise"];
+
+/** Extract destination name from a single component. */
+function extractComponentDestination(c: TripComponent): string | null {
+  const data = c.data as Record<string, unknown>;
+
+  // Readable name from display title
+  if (c.display?.title) {
+    const readable = readableCityFromTitle(c.display.title);
+    if (readable && !looksLikeIataCode(readable)) return readable;
+  }
+
+  if (c.type === "flight") {
+    return (
+      (data.destinationCity as string) ||
+      (data.arrivalCity as string) ||
+      (data.destination as string) ||
+      (data.to as string) ||
+      null
+    );
+  }
+  if (c.type === "hotel") {
+    const loc =
+      (data.city as string) ||
+      (data.location as string) ||
+      (data.destination as string);
+    if (loc) return loc;
+    const address = data.address as Record<string, unknown> | undefined;
+    if (address) {
+      return (address.city as string) || (address.cityName as string) || null;
+    }
+  }
+  if (c.type === "cruise") {
+    return (
+      (data.departurePort as string) ||
+      (data.destination as string) ||
+      (data.region as string) ||
+      null
+    );
+  }
+  if (c.type === "tour") {
+    return (
+      (data.departureCity as string) ||
+      (data.destination as string) ||
+      (data.location as string) ||
+      null
+    );
+  }
+
+  // Fallback: display subtitle (often has the location)
+  if (c.display?.subtitle) {
+    const sub = c.display.subtitle.trim();
+    if (sub && !looksLikeIataCode(sub)) return sub;
+  }
+
+  return null;
+}
+
+/** Extract unique {destination, type} pairs from trip components. */
+function extractDestinations(
+  components: TripComponent[],
+): Array<{ destination: string; type: string }> {
+  const seen = new Set<string>();
+  const results: Array<{ destination: string; type: string }> = [];
+
+  for (const c of components) {
+    const dest = extractComponentDestination(c);
+    if (!dest) continue;
+    const key = dest.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    results.push({ destination: dest, type: c.type });
+  }
+
+  return results;
+}
+
+/**
+ * Build curated InspirationCard objects from trip components.
+ * Generates 2-4 cards using deterministic Unsplash URLs —
+ * no API call needed, renders instantly.
+ */
+function generateCuratedInspiration(
+  components: TripComponent[],
+): InspirationCard[] {
+  const destinations = extractDestinations(components);
+  if (destinations.length === 0) return [];
+
+  const cards: InspirationCard[] = [];
+  const TARGET = 4; // max cards to generate
+
+  // First pass: one card per unique destination with its natural category
+  for (const { destination, type } of destinations) {
+    if (cards.length >= TARGET) break;
+    const category = COMPONENT_TYPE_CATEGORY[type] || "default";
+    const imageUrl = getCuratedImage(destination, category, "card");
+    cards.push({
+      id: `curated-${destination.toLowerCase().replace(/\s+/g, "-")}-${category}`,
+      destination,
+      imageUrl,
+      caption: `Dreaming of ${destination}`,
+      source: "curated",
+    });
+  }
+
+  // Second pass: fill remaining slots with variety categories for the first destination
+  if (cards.length < TARGET && destinations.length > 0) {
+    const primary = destinations[0]!;
+    const usedCategories = new Set(
+      cards.map((c) => {
+        // Extract category from id suffix
+        const parts = c.id.split("-");
+        return parts[parts.length - 1];
+      }),
+    );
+
+    for (const cat of VARIETY_CATEGORIES) {
+      if (cards.length >= TARGET) break;
+      if (usedCategories.has(cat)) continue;
+      usedCategories.add(cat);
+
+      const imageUrl = getCuratedImage(primary.destination, cat, "card");
+      // Skip if this URL is identical to one we already have
+      if (cards.some((c) => c.imageUrl === imageUrl)) continue;
+
+      const captions: Record<string, string> = {
+        beach: `${primary.destination} beaches`,
+        city: `Explore ${primary.destination}`,
+        tropical: `Paradise in ${primary.destination}`,
+        island: `Island vibes`,
+        mountain: `Adventures await`,
+        cruise: `Set sail from ${primary.destination}`,
+      };
+
+      cards.push({
+        id: `curated-${primary.destination.toLowerCase().replace(/\s+/g, "-")}-${cat}`,
+        destination: primary.destination,
+        imageUrl,
+        caption: captions[cat] || `Discover ${primary.destination}`,
+        source: "curated",
+      });
+    }
+  }
+
+  return cards;
 }
 
 /** Hero banner at the top of the dream board */
@@ -267,41 +430,35 @@ export function DreamBoard(props: DreamBoardProps) {
     storeBoardOrder.length > 0 ? storeBoardOrder : props.boardOrder;
   const title = storeTitle ?? props.title;
 
-  // Auto-fetch inspiration images when board has components but no inspiration
+  // Auto-generate curated inspiration cards from trip destinations.
+  // Deterministic (no API call) — runs on the client from curated Unsplash URLs.
   const destination = extractDestination(components);
+
+  const curatedCards = useMemo(
+    () => generateCuratedInspiration(components),
+    // Re-derive when component count or first destination changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [components.length, destination],
+  );
+
   useEffect(() => {
     if (inspirationFetched.current) return;
-    if (!requestId || components.length === 0 || inspiration.length > 0) return;
-
-    const dest = extractDestination(components);
-    if (!dest) return;
+    if (components.length === 0 || inspiration.length > 0) return;
+    if (curatedCards.length === 0) return;
 
     inspirationFetched.current = true;
 
-    fetch(`/api/trip-requests/${requestId}/inspiration`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ destination: dest }),
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.cards && Array.isArray(data.cards)) {
-          useTripBasket.setState((state) => ({
-            inspiration: data.cards,
-            boardOrder: [
-              ...state.boardOrder,
-              ...data.cards.map((c: InspirationCard) => ({
-                type: "inspiration" as const,
-                id: c.id,
-              })),
-            ],
-          }));
-        }
-      })
-      .catch(() => {
-        // Silent — inspiration is non-critical
-      });
-  }, [requestId, components.length, inspiration.length]);
+    useTripBasket.setState((state) => ({
+      inspiration: curatedCards,
+      boardOrder: [
+        ...state.boardOrder,
+        ...curatedCards.map((c) => ({
+          type: "inspiration" as const,
+          id: c.id,
+        })),
+      ],
+    }));
+  }, [components.length, inspiration.length, curatedCards]);
 
   // Banner image: use first inspiration image if available
   const firstInspiration = inspiration[0];
