@@ -103,7 +103,7 @@ export function Footer() {
 
         {/* Bottom section */}
         <div className="flex flex-col items-center justify-between gap-4 text-center text-xs text-gray-500 md:flex-row md:text-left">
-          <p>TICO Registration #XXXXX</p>
+          <p>{process.env.NEXT_PUBLIC_TICO_NUMBER || 'TICO Registered'}</p>
           <p>&copy; 2026 Phoenix Voyages. All rights reserved.</p>
         </div>
       </div>

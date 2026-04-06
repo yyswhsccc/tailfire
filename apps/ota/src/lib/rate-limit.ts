@@ -28,3 +28,30 @@ function buildRatelimit(): Ratelimit | null {
 }
 
 export const chatRateLimit = buildRatelimit()
+
+// ---------------------------------------------------------------------------
+// Rate limiter for the /api/trip-requests endpoint
+//
+// 100 requests per sliding hour per IP — higher than chat since trip request
+// submissions are less expensive, but still needs abuse protection.
+// ---------------------------------------------------------------------------
+
+function buildTripRequestRatelimit(): Ratelimit | null {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return null
+  }
+  try {
+    return new Ratelimit({
+      redis: Redis.fromEnv(),
+      // 100 requests per sliding hour per IP
+      limiter: Ratelimit.slidingWindow(100, '1 h'),
+      analytics: true,
+      prefix: 'ota:trip-requests',
+    })
+  } catch {
+    console.warn('[rate-limit] Failed to initialise Upstash Ratelimit for trip-requests — rate limiting disabled')
+    return null
+  }
+}
+
+export const tripRequestRateLimit = buildTripRequestRatelimit()
