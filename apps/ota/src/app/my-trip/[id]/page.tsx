@@ -1,14 +1,29 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { Metadata } from "next";
+import { type Metadata } from "next";
 import { serviceFetch } from "@/lib/api";
 import { createClient } from "@/lib/supabase/server";
 import { DreamBoard } from "@/components/trip-builder/dream-board";
 
-export const metadata: Metadata = {
-  title: "My Trip | Phoenix Voyages",
-  description: "Your dream trip board",
-};
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  try {
+    const { id } = await params;
+    const tripRequest = await serviceFetch<{ title?: string | null; components?: unknown[] }>(`/ota/trip-requests/${id}`);
+    const title = tripRequest?.title ?? "My Trip";
+    const count = tripRequest?.components?.length ?? 0;
+    return {
+      title: `${title} | Phoenix Voyages`,
+      description: count > 0
+        ? `${count} item${count !== 1 ? "s" : ""} in your dream board`
+        : "Your dream trip board",
+    };
+  } catch {
+    return {
+      title: "My Trip | Phoenix Voyages",
+      description: "Your dream trip board",
+    };
+  }
+}
 
 interface PageProps {
   params: Promise<{ id: string }>;

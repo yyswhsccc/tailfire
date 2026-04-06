@@ -2,8 +2,7 @@ import type { Metadata } from 'next'
 import { fetchDestinations } from '@/lib/fetchers/destinations'
 import { DestinationGallery } from '@/components/destinations/destination-gallery'
 
-// Force dynamic rendering — destinations data changes and API may not be available at build time
-export const dynamic = 'force-dynamic'
+export const revalidate = 600  // 10-minute ISR
 
 export const metadata: Metadata = {
   title: 'Destinations',

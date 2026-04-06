@@ -18,18 +18,11 @@ BEGIN
 END $$;
 
 -- Phase 1: Commission items (must go before trips cascade)
-DELETE FROM commission_check_items
-WHERE activity_pricing_id IN (
-  SELECT ap.id FROM activity_pricing ap
-  JOIN itinerary_activities ia ON ia.id = ap.activity_id
-  JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
-  JOIN itineraries itin ON itin.id = iday.itinerary_id
-  JOIN trips t ON t.id = itin.trip_id
-  WHERE t.external_reference IS NOT NULL
-);
+DELETE FROM commission_check_items;
 
--- Phase 2: Delete trips (cascades to 20+ child tables)
-DELETE FROM trips WHERE external_reference IS NOT NULL;
+-- Phase 2: Delete ALL trips (cascades to 20+ child tables)
+-- Includes TES-imported and manually created trips
+DELETE FROM trips;
 
 -- Phase 3: Orphaned commission checks
 DELETE FROM commission_checks
@@ -48,7 +41,7 @@ DELETE FROM contact_loyalty_programs;
 DELETE FROM contact_group_members;
 DELETE FROM contact_groups;
 DELETE FROM contact_relationships;
-DELETE FROM tags WHERE contact_id IS NOT NULL;
+DELETE FROM contact_tags;
 DELETE FROM contacts;
 
 -- Phase 6: Suppliers (after commission_checks are cleared)
