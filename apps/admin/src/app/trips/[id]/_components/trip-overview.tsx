@@ -18,6 +18,7 @@ import { DateDisplay } from '@/components/ui/date-display'
 import { ActivityFeed } from '@/components/trips/ActivityFeed'
 import { useTripTravelers } from '@/hooks/use-trip-travelers'
 import { useUpdateTrip } from '@/hooks/use-trips'
+import { useUsers } from '@/hooks/use-users'
 import { useItineraries } from '@/hooks/use-itineraries'
 import { useTripTags, useUpdateTripTags, useCreateAndAssignTripTag } from '@/hooks/use-tags'
 import { EditTravelersDialog } from './edit-travelers-dialog'
@@ -41,6 +42,8 @@ export function TripOverview({ trip }: TripOverviewProps) {
   const updateTrip = useUpdateTrip()
   const updateTripTags = useUpdateTripTags()
   const createAndAssignTag = useCreateAndAssignTripTag()
+  const { data: usersData } = useUsers({ status: 'active', limit: 100 })
+  const users = usersData?.users ?? []
 
   // Check if trip has itineraries to determine if Get Started should show
   const hasItineraries = itineraries && itineraries.length > 0
@@ -438,6 +441,30 @@ export function TripOverview({ trip }: TripOverviewProps) {
                 <SelectContent>
                   <SelectItem value="trip">Trip Span</SelectItem>
                   <SelectItem value="activities">Individual Activities</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Assigned Agent */}
+            <div className="space-y-2">
+              <Label htmlFor="assigned-agent" className="text-sm font-medium text-ash-900">
+                Assigned Agent
+              </Label>
+              <Select
+                value={trip.ownerId || ''}
+                onValueChange={(value) => {
+                  handleUpdateSetting('ownerId', value || null)
+                }}
+              >
+                <SelectTrigger id="assigned-agent">
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
