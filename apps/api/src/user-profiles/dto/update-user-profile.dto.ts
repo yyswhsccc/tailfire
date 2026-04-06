@@ -106,6 +106,10 @@ export class PlatformPreferencesDto {
   @IsOptional()
   @IsString()
   dateFormat?: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD'
+
+  @IsOptional()
+  @IsString()
+  onboardingCompletedAt?: string | null
 }
 
 export class LicensingInfoDto {
