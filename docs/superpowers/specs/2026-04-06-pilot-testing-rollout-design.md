@@ -56,7 +56,9 @@ Known codes from TES data:
 
 ### Trigger
 
-Detect first login via `lastLoginAt === null` on the user profile. Redirect to `/welcome`. After dismissal, set `onboardingCompletedAt` timestamp on the user profile so they never see it again.
+Detect first-time users via `onboardingCompletedAt === null` on the user profile. Redirect to `/welcome`. After dismissal, set `onboardingCompletedAt` timestamp so they never see it again.
+
+> **Note (from Codex validation):** `lastLoginAt` is NOT reliably maintained — no application code or DB trigger updates it on sign-in. We use `onboardingCompletedAt` as the sole detection mechanism. For existing admin users, we pre-set this field so they skip the welcome page.
 
 ### Content (single page, not a wizard)
 
@@ -73,9 +75,10 @@ Detect first login via `lastLoginAt === null` on the user profile. Redirect to `
 ### Implementation
 
 - New route: `apps/admin/src/app/welcome/page.tsx`
-- Layout-level redirect: check `lastLoginAt` in the auth context, redirect to `/welcome` if null and `onboardingCompletedAt` is not set
-- New field on user profile: `onboardingCompletedAt` (nullable timestamp)
-- GET `/welcome` dismissal: PATCH user profile with `onboardingCompletedAt: new Date()`
+- Layout-level redirect: check `onboardingCompletedAt` from the user profile (fetched via `useUserProfile`), redirect to `/welcome` if null
+- New field on user profile: `onboardingCompletedAt` (nullable timestamp) — stored in the existing JSON `settings` field on `user_profiles` to avoid a DB migration (faster for today's timeline)
+- "Get Started" dismissal: PATCH user profile settings with `onboardingCompletedAt: new Date()`
+- Pre-set `onboardingCompletedAt` for existing admin users so they skip the welcome page
 
 ### Deferred
 
@@ -86,17 +89,29 @@ Detect first login via `lastLoginAt === null` on the user profile. Redirect to `
 
 ---
 
+## Workstream 2b: Trip Owner Reassignment UI
+
+> **Found by Codex validation:** The API has `PATCH /trips/:id/owner` but no admin UI is wired to it. Andre cannot reassign trips without a UI control.
+
+**Build:** Add an owner reassignment dropdown/selector to the trip overview page. This uses the existing API endpoint and user list.
+
+- Trip overview page gets an "Assigned Agent" field with a user selector dropdown
+- Calls `PATCH /trips/:id/owner` with the selected userId
+- Server-side search already includes `trips.description`, so searching `(AG)` works for finding trips
+
+---
+
 ## Workstream 3: Agent Setup & Trip Reassignment (Manual)
 
 Andre handles this through the admin UI to validate those flows:
 
 1. **Create user accounts** — via Settings > Users > Create/Invite for each pilot agent
-2. **Reassign trips** — search trips by designation code in the trip description, change owner to the correct agent user
+2. **Reassign trips** — search trips by designation code in the trip description, use the new owner selector to change owner to the correct agent user
 3. **Send credentials** — share login info with pilot agents
 
 This tests:
 - User creation/invitation flow
-- Trip ownership reassignment
+- Trip ownership reassignment (new UI)
 - The welcome page experience (each new agent sees it on first login)
 
 ---
@@ -117,13 +132,13 @@ No changes needed.
 ## Order of Operations (Today)
 
 ```
-1. [Claude]  Build welcome page                    (independent)
+1. [Claude]  Build welcome page + trip owner UI    (independent, parallel)
 2. [Claude]  Re-extract TES data                   (~5-10 min)
 3. [Claude]  Wipe preview DB + re-import           (~15-20 min)
 4. [Claude]  Deploy to preview                     (after 1-3 complete)
-5. [Claude]  Verify: data counts, welcome page, bug report
+5. [Claude]  Verify: data counts, welcome page, owner reassignment, bug report
 6. [Andre]   Create agent user accounts via admin UI
-7. [Andre]   Reassign trips by designation code
+7. [Andre]   Reassign trips by designation code using new owner selector
 8. [Andre]   Send login credentials to pilot agents
 ```
 
