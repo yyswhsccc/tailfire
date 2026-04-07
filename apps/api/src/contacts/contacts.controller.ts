@@ -117,14 +117,10 @@ export class ContactsController {
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
   ) {
-    // Non-admins without full contact access: filter to only accessible trips
     if (auth.role !== 'admin') {
       const accessResult = await this.contactAccessService.canAccessSensitiveData(id, auth)
       if (!accessResult.canAccessSensitive) {
-        const allTrips = await this.contactsService.getTripsForContact(id, auth.agencyId)
-        const accessibleTripIds = await this.tripAccessService.getAccessibleTripIds(auth)
-        if (accessibleTripIds === 'all') return allTrips
-        return allTrips.filter((t: any) => accessibleTripIds.includes(t.id))
+        throw new ForbiddenException('Full contact access required to view trips')
       }
     }
     return this.contactsService.getTripsForContact(id, auth.agencyId)
@@ -140,18 +136,13 @@ export class ContactsController {
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
   ) {
-    await this.contactsService.findOne(id, auth.agencyId)
-    // Non-admins without full contact access: filter to only accessible trips
     if (auth.role !== 'admin') {
       const accessResult = await this.contactAccessService.canAccessSensitiveData(id, auth)
       if (!accessResult.canAccessSensitive) {
-        const allBookings = await this.contactsService.getBookingsForContact(id, auth.agencyId)
-        const accessibleTripIds = await this.tripAccessService.getAccessibleTripIds(auth)
-        if (accessibleTripIds === 'all') return allBookings
-        // getBookingsForContact returns { trip: { id, name, status } } — use b.trip.id
-        return allBookings.filter((b: any) => accessibleTripIds.includes(b.trip.id))
+        throw new ForbiddenException('Full contact access required to view bookings')
       }
     }
+    await this.contactsService.findOne(id, auth.agencyId)
     return this.contactsService.getBookingsForContact(id, auth.agencyId)
   }
 
