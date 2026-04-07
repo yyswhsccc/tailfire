@@ -8,7 +8,7 @@
 import { Injectable, Logger, Optional, Inject, forwardRef } from '@nestjs/common'
 import { eq, and, desc, asc, ilike, or, gte, lte, sql, isNull } from 'drizzle-orm'
 import { getResendClient } from './resend.client'
-import { getPasswordResetTemplate, getWelcomeTemplate, getInviteTemplate, getClientPortalInviteTemplate } from './templates'
+import { getPasswordResetTemplate, getWelcomeTemplate, getInviteTemplate, getClientPortalInviteTemplate, getTripReassignmentTemplate, getTripBulkReassignmentTemplate } from './templates'
 import { getEmailDomainFilter } from './email-domain-filter'
 import { buildEmailBody } from '../common/email/build-email-body'
 import { DatabaseService } from '../db/database.service'
@@ -851,5 +851,45 @@ export class EmailService {
     })
     this.logger.log(`Client portal invite email sent to ${email}`)
     return result
+  }
+
+  async sendTripReassignmentEmail(
+    email: string,
+    tripName: string,
+    adminName: string,
+    contactsAssigned: number,
+    tripUrl: string,
+    agencyId: string,
+  ): Promise<void> {
+    const html = getTripReassignmentTemplate({ tripName, adminName, contactsAssigned, tripUrl })
+    await this.sendEmail({
+      to: [email],
+      subject: `Trip Assigned to You — ${tripName}`,
+      html,
+      agencyId,
+      templateSlug: 'trip-reassignment',
+    })
+    this.logger.log(`Trip reassignment email sent to ${email}`)
+  }
+
+  async sendBulkReassignmentEmail(
+    email: string,
+    adminName: string,
+    tripCount: number,
+    tripNames: string[],
+    contactsAssigned: number,
+    contactsSkipped: number,
+    tripsUrl: string,
+    agencyId: string,
+  ): Promise<void> {
+    const html = getTripBulkReassignmentTemplate({ adminName, tripCount, tripNames, contactsAssigned, contactsSkipped, tripsUrl })
+    await this.sendEmail({
+      to: [email],
+      subject: `${tripCount} Trips Assigned to You`,
+      html,
+      agencyId,
+      templateSlug: 'trip-bulk-reassignment',
+    })
+    this.logger.log(`Bulk reassignment email sent to ${email}`)
   }
 }
