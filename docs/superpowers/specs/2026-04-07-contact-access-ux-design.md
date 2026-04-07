@@ -36,22 +36,23 @@
 
 **Current behavior:** `filterSensitiveFields()` in `contact-access.service.ts:24` uses a blacklist — nulls specific sensitive fields but still exposes tags, lifecycle, portal status, next trip, relationship count, and other business metadata.
 
-**New behavior:** Replace with an allowlist. Basic view contacts return ONLY:
+**New behavior:** Replace with an allowlist. Basic view contacts **null all non-allowed fields** (not omit — the full DTO shape is preserved to prevent frontend crashes). Allowed fields:
 - `id`
 - `firstName`
 - `lastName`
 - `email`
 - `phone`
-- `mobilePhone`
 - `ownerId`
 - `_accessLevel` (existing field)
 - `_ownerName` (new field — see 1b)
 - `_shareRequestStatus` (new field — see 1b)
 
-All other fields are omitted (not nulled — removed from the response entirely).
+All other fields are set to `null` (or `[]` for arrays, `{}` for objects). This preserves the `ContactResponseDto` shape so existing table/kanban renderers don't crash on missing fields like `contactStatus`, `contactType`, or `displayName`.
+
+> **Codex finding:** Omitting fields entirely would break `contacts-table.tsx:318` (`formatStatusLabel(contact.contactStatus)`) and similar hard assumptions. Nulling is safer and allows Phase 1a to ship independently of Phase 2 frontend changes.
 
 **Files:**
-- `apps/api/src/contacts/contact-access.service.ts` — replace `filterSensitiveFields()` with `applyAllowlistFilter()` using an explicit field allowlist
+- `apps/api/src/contacts/contact-access.service.ts` — replace `filterSensitiveFields()` with `applyAllowlistFilter()` using an explicit field allowlist (null non-allowed fields)
 
 ### 1b: Add Access Metadata to Contact Response
 
@@ -79,10 +80,14 @@ Add a `scope` query parameter to `GET /contacts`:
 
 Admin users default to `all`.
 
+**`scope=mine` includes:** owned contacts + full shares. Basic shares are excluded (basic share = limited view, not "my" contact).
+
 **Files:**
-- `apps/api/src/contacts/dto/contact-filter.dto.ts` — add `scope` field
+- `packages/shared-types/src/api/contacts.types.ts` — add `scope` to `ContactFilterDto`
+- `apps/api/src/contacts/dto/contact-filter.dto.ts` — add `scope` field with validation
 - `apps/api/src/contacts/contacts.service.ts` — apply scope filter in list query
 - `apps/api/src/contacts/contacts.controller.ts` — pass scope to service
+- `apps/admin/src/hooks/use-contacts.ts` — serialize `scope` parameter in API calls
 
 ### 1d: Fix Data Leak Endpoints
 
@@ -113,6 +118,27 @@ Admin users default to `all`.
 **Fix:** Add access check. Basic access users cannot view or modify relationships for contacts they don't own/share.
 
 **File:** `apps/api/src/contacts/contact-relationships.controller.ts`
+
+#### Contact Trips and Bookings
+`contacts.controller.ts:112,135` — `GET /contacts/:id/trips` and `GET /contacts/:id/bookings` return data to basic-access users.
+
+**Fix:** Add contact access check. Basic access users get 403 Forbidden.
+
+**File:** `apps/api/src/contacts/contacts.controller.ts`
+
+#### Note CRUD (Full Lifecycle)
+`notes.controller.ts:86` — `GET /notes/:id`, `PUT /notes/:id`, `DELETE /notes/:id`, and `PATCH /notes/:id/pin` bypass contact access checks entirely.
+
+**Fix:** All note endpoints that reference a contact must verify the user has full access to that contact. Basic access users get 403.
+
+**File:** `apps/api/src/notes/notes.controller.ts`
+
+#### Contact Filter Options
+`contacts.service.ts:964` — `GET /contacts/filter-options` exposes tags across all agency contacts regardless of ownership.
+
+**Fix:** Filter options should only reflect contacts the user has access to (same scope as their current list view).
+
+**File:** `apps/api/src/contacts/contacts.service.ts`
 
 ---
 
