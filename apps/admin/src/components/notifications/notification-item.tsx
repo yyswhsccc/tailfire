@@ -30,6 +30,8 @@ function getCategoryStyle(category: string): { bgColor: string; textColor: strin
     case 'trip_updates':
     case 'booking_alerts':
       return { bgColor: 'bg-blue-100', textColor: 'text-blue-700' }
+    case 'contact_share':
+      return { bgColor: 'bg-blue-100', textColor: 'text-blue-700' }
     case 'assignment':
     case 'collaboration':
       return { bgColor: 'bg-purple-100', textColor: 'text-purple-700' }
