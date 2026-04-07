@@ -6,7 +6,7 @@ import type { ComponentType, ReactNode } from 'react'
 // Entity types
 // ---------------------------------------------------------------------------
 
-export type EntityType = 'destination' | 'ship' | 'sailing' | 'cruise_line' | 'region' | 'deal'
+export type EntityType = 'destination' | 'ship' | 'sailing' | 'cruise_line' | 'region' | 'deal' | 'advisor'
 
 // ---------------------------------------------------------------------------
 // HubScaffold props
