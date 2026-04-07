@@ -813,52 +813,179 @@ export class TripsService {
   /**
    * Update trip ownership (Admin only)
    * Can set to any user in the agency or null (only if status is 'inbound')
+   * Now delegates to reassignTripOwner for non-null owners to get contact cascade.
    */
-  async updateOwner(id: string, ownerId: string | null): Promise<TripResponseDto> {
+  async updateOwner(id: string, ownerId: string | null, agencyId: string) {
+    if (ownerId === null) {
+      // Null owner — just update, no cascade
+      const [existingTrip] = await this.db.client
+        .select().from(this.db.schema.trips)
+        .where(eq(this.db.schema.trips.id, id)).limit(1)
+
+      if (!existingTrip) throw new NotFoundException(`Trip ${id} not found`)
+      if (existingTrip.status !== 'inbound') {
+        throw new BadRequestException('Trips can only have no owner when status is "inbound"')
+      }
+
+      const [trip] = await this.db.client
+        .update(this.db.schema.trips)
+        .set({ ownerId: null, updatedAt: new Date() })
+        .where(eq(this.db.schema.trips.id, id))
+        .returning()
+
+      return { trip: this.mapToResponseDto(trip!), cascade: { contactsAssigned: 0, contactsSkipped: [] } }
+    }
+
+    const cascade = await this.reassignTripOwner(id, ownerId, agencyId)
+    const [updatedTrip] = await this.db.client
+      .select().from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.id, id)).limit(1)
+
+    return { trip: this.mapToResponseDto(updatedTrip!), cascade }
+  }
+
+  /**
+   * Shared method: reassign trip owner with contact cascade.
+   *
+   * In a transaction:
+   *  1. Update trip ownerId
+   *  2. Sync lead collaborator (deactivate old, upsert new)
+   *  3. Cascade ownership to trip's contacts (travelers + primary contact)
+   *     - Unowned contacts → assign to new owner
+   *     - Contacts owned by inactive user → reassign
+   *     - Contacts owned by active user → skip
+   *  4. Emit trip.updated event
+   *
+   * @returns { contactsAssigned, contactsSkipped }
+   */
+  async reassignTripOwner(
+    tripId: string,
+    newOwnerId: string,
+    agencyId: string,
+  ): Promise<{ contactsAssigned: number; contactsSkipped: { contactName: string; currentOwner: string }[] }> {
+    // 1. Get existing trip
     const [existingTrip] = await this.db.client
       .select()
       .from(this.db.schema.trips)
-      .where(eq(this.db.schema.trips.id, id))
+      .where(eq(this.db.schema.trips.id, tripId))
       .limit(1)
 
     if (!existingTrip) {
-      throw new NotFoundException(`Trip with ID ${id} not found`)
+      throw new NotFoundException(`Trip ${tripId} not found`)
     }
 
-    // Can only set ownerId to null if status is 'inbound'
-    if (ownerId === null && existingTrip.status !== 'inbound') {
-      throw new BadRequestException('Trips can only have no owner when status is "inbound"')
-    }
-
-    // Validate new owner exists and belongs to same agency
-    if (ownerId !== null) {
-      await this.userValidationService.validateUserInAgency(
-        ownerId,
-        existingTrip.agencyId,
-        'New owner',
-      )
-    }
-
-    const [trip] = await this.db.client
-      .update(this.db.schema.trips)
-      .set({
-        ownerId,
-        updatedAt: new Date(),
-      })
-      .where(eq(this.db.schema.trips.id, id))
-      .returning()
-
-    if (!trip) {
-      throw new NotFoundException(`Trip with ID ${id} not found`)
-    }
-
-    // Emit trip updated event
-    this.eventEmitter.emit(
-      'trip.updated',
-      new TripUpdatedEvent(trip.id, trip.name, null, { ownerId }),
+    // 2. Validate new owner is in same agency
+    await this.userValidationService.validateUserInAgency(
+      newOwnerId,
+      agencyId,
+      'New owner',
     )
 
-    return this.mapToResponseDto(trip)
+    let contactsAssigned = 0
+    const contactsSkipped: { contactName: string; currentOwner: string }[] = []
+
+    await this.db.client.transaction(async (tx) => {
+      // 2a. Update trip ownerId
+      await tx
+        .update(this.db.schema.trips)
+        .set({ ownerId: newOwnerId, updatedAt: new Date() })
+        .where(eq(this.db.schema.trips.id, tripId))
+
+      // 2b. Sync lead collaborator — deactivate old owner's lead
+      if (existingTrip.ownerId) {
+        await tx
+          .update(this.db.schema.tripCollaborators)
+          .set({ isActive: false })
+          .where(
+            and(
+              eq(this.db.schema.tripCollaborators.tripId, tripId),
+              eq(this.db.schema.tripCollaborators.userId, existingTrip.ownerId),
+              eq(this.db.schema.tripCollaborators.role, 'lead'),
+            ),
+          )
+      }
+      // Upsert new owner as lead collaborator
+      await tx
+        .insert(this.db.schema.tripCollaborators)
+        .values({
+          tripId,
+          userId: newOwnerId,
+          commissionPercentage: '100',
+          role: 'lead',
+          isActive: true,
+          createdBy: newOwnerId,
+        })
+        .onConflictDoUpdate({
+          target: [this.db.schema.tripCollaborators.tripId, this.db.schema.tripCollaborators.userId],
+          set: { isActive: true, role: 'lead', commissionPercentage: '100' },
+        })
+
+      // 2c. Collect traveler contacts via DISTINCT(trip_travelers.contact_id) + primary_contact_id
+      const travelers = await tx
+        .selectDistinct({ contactId: this.db.schema.tripTravelers.contactId })
+        .from(this.db.schema.tripTravelers)
+        .where(eq(this.db.schema.tripTravelers.tripId, tripId))
+
+      const contactIds = new Set(travelers.map(t => t.contactId))
+      if (existingTrip.primaryContactId) {
+        contactIds.add(existingTrip.primaryContactId)
+      }
+
+      // 2d. For each contact, apply cascade policy
+      for (const contactId of contactIds) {
+        const [contact] = await tx
+          .select({
+            id: this.db.schema.contacts.id,
+            firstName: this.db.schema.contacts.firstName,
+            lastName: this.db.schema.contacts.lastName,
+            ownerId: this.db.schema.contacts.ownerId,
+          })
+          .from(this.db.schema.contacts)
+          .where(eq(this.db.schema.contacts.id, contactId))
+          .limit(1)
+
+        if (!contact) continue
+        if (contact.ownerId === newOwnerId) continue
+
+        if (!contact.ownerId) {
+          await tx.update(this.db.schema.contacts)
+            .set({ ownerId: newOwnerId, updatedAt: new Date() })
+            .where(eq(this.db.schema.contacts.id, contactId))
+          contactsAssigned++
+          continue
+        }
+
+        const [owner] = await tx
+          .select({
+            status: this.db.schema.userProfiles.status,
+            isActive: this.db.schema.userProfiles.isActive,
+            firstName: this.db.schema.userProfiles.firstName,
+            lastName: this.db.schema.userProfiles.lastName,
+          })
+          .from(this.db.schema.userProfiles)
+          .where(eq(this.db.schema.userProfiles.id, contact.ownerId))
+          .limit(1)
+
+        if (!owner || owner.status !== 'active' || !owner.isActive) {
+          await tx.update(this.db.schema.contacts)
+            .set({ ownerId: newOwnerId, updatedAt: new Date() })
+            .where(eq(this.db.schema.contacts.id, contactId))
+          contactsAssigned++
+        } else {
+          const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Unknown'
+          const ownerName = [owner.firstName, owner.lastName].filter(Boolean).join(' ') || 'Unknown'
+          contactsSkipped.push({ contactName, currentOwner: ownerName })
+        }
+      }
+    })
+
+    // 2e. Emit trip.updated event
+    this.eventEmitter.emit(
+      'trip.updated',
+      new TripUpdatedEvent(existingTrip.id, existingTrip.name, null, { ownerId: newOwnerId }),
+    )
+
+    return { contactsAssigned, contactsSkipped }
   }
 
   /**
@@ -1247,6 +1374,110 @@ export class TripsService {
     }
 
     return { success, failed }
+  }
+
+  /**
+   * Bulk reassign preview (dry-run).
+   *
+   * Collects unique contacts across all selected trips, classifies each
+   * by cascade policy, and returns a preview of what would happen.
+   */
+  async bulkReassignPreview(tripIds: string[], newOwnerId: string, agencyId: string) {
+    const contactMap = new Map<string, { id: string; firstName: string | null; lastName: string | null; ownerId: string | null }>()
+
+    for (const tripId of tripIds) {
+      const travelers = await this.db.client
+        .selectDistinct({ contactId: this.db.schema.tripTravelers.contactId })
+        .from(this.db.schema.tripTravelers)
+        .where(eq(this.db.schema.tripTravelers.tripId, tripId))
+
+      const [trip] = await this.db.client
+        .select({ primaryContactId: this.db.schema.trips.primaryContactId })
+        .from(this.db.schema.trips)
+        .where(eq(this.db.schema.trips.id, tripId))
+        .limit(1)
+
+      const ids = new Set(travelers.map(t => t.contactId))
+      if (trip?.primaryContactId) ids.add(trip.primaryContactId)
+
+      for (const cid of ids) {
+        if (!contactMap.has(cid)) {
+          const [contact] = await this.db.client
+            .select({
+              id: this.db.schema.contacts.id,
+              firstName: this.db.schema.contacts.firstName,
+              lastName: this.db.schema.contacts.lastName,
+              ownerId: this.db.schema.contacts.ownerId,
+            })
+            .from(this.db.schema.contacts)
+            .where(eq(this.db.schema.contacts.id, cid))
+            .limit(1)
+          if (contact) contactMap.set(cid, contact)
+        }
+      }
+    }
+
+    const contactsToAssign: { id: string; name: string; reason: 'unowned' | 'inactive_owner' }[] = []
+    const contactsToSkip: { id: string; name: string; currentOwnerName: string }[] = []
+
+    for (const contact of contactMap.values()) {
+      if (contact.ownerId === newOwnerId) continue
+      const name = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Unknown'
+
+      if (!contact.ownerId) {
+        contactsToAssign.push({ id: contact.id, name, reason: 'unowned' })
+        continue
+      }
+
+      const [owner] = await this.db.client
+        .select({
+          status: this.db.schema.userProfiles.status,
+          isActive: this.db.schema.userProfiles.isActive,
+          firstName: this.db.schema.userProfiles.firstName,
+          lastName: this.db.schema.userProfiles.lastName,
+        })
+        .from(this.db.schema.userProfiles)
+        .where(eq(this.db.schema.userProfiles.id, contact.ownerId))
+        .limit(1)
+
+      if (!owner || owner.status !== 'active' || !owner.isActive) {
+        contactsToAssign.push({ id: contact.id, name, reason: 'inactive_owner' })
+      } else {
+        contactsToSkip.push({
+          id: contact.id,
+          name,
+          currentOwnerName: [owner.firstName, owner.lastName].filter(Boolean).join(' ') || 'Unknown',
+        })
+      }
+    }
+
+    return { tripsCount: tripIds.length, contactsToAssign, contactsToSkip }
+  }
+
+  /**
+   * Bulk reassign trips to a new owner with contact cascade.
+   *
+   * Iterates over all trips, calling reassignTripOwner for each,
+   * and deduplicates skipped-contact reports across trips.
+   */
+  async bulkReassign(tripIds: string[], newOwnerId: string, agencyId: string) {
+    let totalContactsAssigned = 0
+    const allSkipped: { contactName: string; currentOwner: string }[] = []
+    const processedSkipKeys = new Set<string>()
+
+    for (const tripId of tripIds) {
+      const { contactsAssigned, contactsSkipped } = await this.reassignTripOwner(tripId, newOwnerId, agencyId)
+      totalContactsAssigned += contactsAssigned
+      for (const s of contactsSkipped) {
+        const key = `${s.contactName}|${s.currentOwner}`
+        if (!processedSkipKeys.has(key)) {
+          processedSkipKeys.add(key)
+          allSkipped.push(s)
+        }
+      }
+    }
+
+    return { tripsReassigned: tripIds.length, contactsAssigned: totalContactsAssigned, contactsSkipped: allSkipped }
   }
 
   /**
