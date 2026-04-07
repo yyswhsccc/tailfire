@@ -3,7 +3,7 @@
  */
 
 import { Test, TestingModule } from '@nestjs/testing'
-import { ContactAccessService, SENSITIVE_FIELDS } from './contact-access.service'
+import { ContactAccessService, BASIC_VIEW_ALLOWED_FIELDS } from './contact-access.service'
 import { DatabaseService } from '../db/database.service'
 import type { AuthContext } from '../auth/auth.types'
 
@@ -258,13 +258,15 @@ describe('ContactAccessService', () => {
     })
   })
 
-  describe('filterSensitiveFields', () => {
+  describe('filterToBasicView', () => {
     const mockContact = {
       id: mockContactId,
       firstName: 'John',
       lastName: 'Doe',
       email: 'john@example.com',
       phone: '123-456-7890',
+      ownerId: 'owner-1',
+      contactStatus: 'active',
       passportNumber: 'AB123456',
       passportExpiry: '2030-01-01',
       dateOfBirth: '1990-05-15',
@@ -272,18 +274,21 @@ describe('ContactAccessService', () => {
       marketingEmailOptIn: true,
     } as any
 
-    it('should return all fields when canAccessSensitive is true', () => {
-      const result = service.filterSensitiveFields(mockContact, true)
+    it('should preserve allowed fields in basic view', () => {
+      const result = service.filterToBasicView(mockContact)
 
-      expect(result).toEqual(mockContact)
-    })
-
-    it('should strip sensitive fields when canAccessSensitive is false', () => {
-      const result = service.filterSensitiveFields(mockContact, false)
-
+      expect(result.id).toBe(mockContactId)
       expect(result.firstName).toBe('John')
       expect(result.lastName).toBe('Doe')
       expect(result.email).toBe('john@example.com')
+      expect(result.phone).toBe('123-456-7890')
+      expect(result.ownerId).toBe('owner-1')
+      expect(result.contactStatus).toBe('active')
+    })
+
+    it('should null non-allowed fields in basic view', () => {
+      const result = service.filterToBasicView(mockContact)
+
       expect(result.passportNumber).toBeNull()
       expect(result.passportExpiry).toBeNull()
       expect(result.dateOfBirth).toBeNull()
@@ -291,16 +296,16 @@ describe('ContactAccessService', () => {
       expect(result.marketingEmailOptIn).toBeNull()
     })
 
-    it('should contain all expected sensitive fields', () => {
-      expect(SENSITIVE_FIELDS).toContain('passportNumber')
-      expect(SENSITIVE_FIELDS).toContain('passportExpiry')
-      expect(SENSITIVE_FIELDS).toContain('passportCountry')
-      expect(SENSITIVE_FIELDS).toContain('dateOfBirth')
-      expect(SENSITIVE_FIELDS).toContain('dietaryRequirements')
-      expect(SENSITIVE_FIELDS).toContain('mobilityRequirements')
-      expect(SENSITIVE_FIELDS).toContain('trustBalanceCad')
-      expect(SENSITIVE_FIELDS).toContain('marketingEmailOptIn')
-      expect(SENSITIVE_FIELDS.length).toBe(21)
+    it('should contain all expected allowed fields for basic view', () => {
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('id')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('firstName')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('lastName')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('email')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('phone')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('ownerId')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('_accessLevel')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('_ownerName')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('_shareRequestStatus')
     })
   })
 

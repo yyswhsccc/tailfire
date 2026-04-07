@@ -15,6 +15,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { ContactRelationshipsService } from './contact-relationships.service'
@@ -28,11 +29,15 @@ import type {
 } from '../../../../packages/shared-types/src/api'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
+import { ContactAccessService } from './contact-access.service'
 
 @ApiTags('Contact Relationships')
 @Controller('contacts/:contactId/relationships')
 export class ContactRelationshipsController {
-  constructor(private readonly relationshipsService: ContactRelationshipsService) {}
+  constructor(
+    private readonly relationshipsService: ContactRelationshipsService,
+    private readonly contactAccessService: ContactAccessService,
+  ) {}
 
   /**
    * Create a new relationship for a contact
@@ -45,6 +50,13 @@ export class ContactRelationshipsController {
     @Param('contactId') contactId: string,
     @Body() dto: CreateContactRelationshipDto,
   ): Promise<ContactRelationshipResponseDto> {
+    if (auth.role !== 'admin') {
+      const access1 = await this.contactAccessService.canAccessSensitiveData(contactId, auth)
+      const access2 = await this.contactAccessService.canAccessSensitiveData(dto.contactId2, auth)
+      if (!access1.canAccessSensitive || !access2.canAccessSensitive) {
+        throw new ForbiddenException('Full contact access required to manage relationships')
+      }
+    }
     return this.relationshipsService.create(contactId, dto, auth.agencyId)
   }
 
@@ -58,6 +70,12 @@ export class ContactRelationshipsController {
     @Param('contactId') contactId: string,
     @Query() filters: ContactRelationshipFilterDto,
   ): Promise<ContactRelationshipResponseDto[]> {
+    if (auth.role !== 'admin') {
+      const access = await this.contactAccessService.canAccessSensitiveData(contactId, auth)
+      if (!access.canAccessSensitive) {
+        throw new ForbiddenException('Full contact access required to view relationships')
+      }
+    }
     return this.relationshipsService.findAll({ ...filters, contactId }, auth.agencyId)
   }
 
@@ -71,6 +89,14 @@ export class ContactRelationshipsController {
     @Param('id') id: string,
     @Body() dto: UpdateContactRelationshipDto,
   ): Promise<ContactRelationshipResponseDto> {
+    const relationship = await this.relationshipsService.findOne(id)
+    if (auth.role !== 'admin') {
+      const access1 = await this.contactAccessService.canAccessSensitiveData(relationship.contactId1, auth)
+      const access2 = await this.contactAccessService.canAccessSensitiveData(relationship.contactId2, auth)
+      if (!access1.canAccessSensitive && !access2.canAccessSensitive) {
+        throw new ForbiddenException('Full contact access required to manage relationships')
+      }
+    }
     return this.relationshipsService.update(id, dto, auth.agencyId)
   }
 
@@ -84,6 +110,14 @@ export class ContactRelationshipsController {
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
   ): Promise<void> {
+    const relationship = await this.relationshipsService.findOne(id)
+    if (auth.role !== 'admin') {
+      const access1 = await this.contactAccessService.canAccessSensitiveData(relationship.contactId1, auth)
+      const access2 = await this.contactAccessService.canAccessSensitiveData(relationship.contactId2, auth)
+      if (!access1.canAccessSensitive && !access2.canAccessSensitive) {
+        throw new ForbiddenException('Full contact access required to manage relationships')
+      }
+    }
     return this.relationshipsService.remove(id, auth.agencyId)
   }
 }

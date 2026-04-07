@@ -10,7 +10,7 @@ import { eq, and, asc, desc } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TravellerSplitsService } from '../financials/traveller-splits.service'
 import { TripNotificationsService } from '../financials/trip-notifications.service'
-import { ContactAccessService, SENSITIVE_FIELDS } from '../contacts/contact-access.service'
+import { ContactAccessService, BASIC_VIEW_ALLOWED_FIELDS } from '../contacts/contact-access.service'
 import {
   TravelerCreatedEvent,
   TravelerUpdatedEvent,
@@ -740,11 +740,12 @@ export class TripTravelersService {
           legalFullName,
         } as any
 
-        // Filter sensitive fields if user doesn't have access
+        // Filter to basic view if user doesn't have full access
         if (!canAccessSensitive) {
-          for (const field of SENSITIVE_FIELDS) {
-            if (field in contactData) {
-              contactData[field] = null
+          const allowedSet = new Set<string>(BASIC_VIEW_ALLOWED_FIELDS)
+          for (const key of Object.keys(contactData)) {
+            if (!allowedSet.has(key)) {
+              contactData[key] = null
             }
           }
         }

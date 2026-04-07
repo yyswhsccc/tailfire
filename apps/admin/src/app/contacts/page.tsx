@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Plus, Search, LayoutGrid, List, Upload } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Upload, Users } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { PageHeader } from '@/components/shared'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,7 @@ function ContactsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [mergeIds, setMergeIds] = useState<[string, string] | null>(null)
   const [view, setView] = useState<ContactsView>('table')
+  const [scope, setScope] = useState<'mine' | 'all'>(isAdmin ? 'all' : 'mine')
   const [filters, setFilters] = useState<ContactFilterDto>({
     page: 1,
     isActive: true,
@@ -71,6 +72,22 @@ function ContactsPage() {
   const handleViewChange = useCallback((next: string) => {
     if (next === 'table' || next === 'kanban') setView(next)
   }, [])
+
+  // ---------------------------------------------------------------------------
+  // Scope — default admins to 'all', force table view when 'all'
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (isAdmin && scope === 'mine') {
+      setScope('all')
+    }
+  }, [isAdmin]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (scope === 'all' && view === 'kanban') {
+      setView('table')
+    }
+  }, [scope]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // URL search sync
@@ -166,11 +183,12 @@ function ContactsPage() {
   // ---------------------------------------------------------------------------
 
   const effectiveFilters = useMemo(() => {
+    const base = { ...filters, scope }
     if (view === 'kanban') {
-      return { ...filters, limit: 500, page: 1 }
+      return { ...base, limit: 500, page: 1 }
     }
-    return filters
-  }, [filters, view])
+    return base
+  }, [filters, view, scope])
 
   // ---------------------------------------------------------------------------
   // Data fetching
@@ -189,6 +207,26 @@ function ContactsPage() {
         title={data?.pagination?.total != null ? `Contacts (${data.pagination.total})` : 'Contacts'}
         actions={
           <div className="flex items-center gap-2">
+            {/* Scope Toggle */}
+            <div className="flex items-center gap-1 rounded-lg border border-ash-200 bg-ash-50 p-0.5">
+              <button
+                onClick={() => setScope('mine')}
+                className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                  scope === 'mine' ? 'bg-white text-ash-900 shadow-sm' : 'text-ash-500 hover:text-ash-700'
+                }`}
+              >
+                My Contacts
+              </button>
+              <button
+                onClick={() => setScope('all')}
+                className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                  scope === 'all' ? 'bg-white text-ash-900 shadow-sm' : 'text-ash-500 hover:text-ash-700'
+                }`}
+              >
+                All Contacts
+              </button>
+            </div>
+
             {/* View Toggle */}
             <ToggleGroup
               type="single"
@@ -209,9 +247,11 @@ function ContactsPage() {
               <ToggleGroupItem
                 value="kanban"
                 aria-label="Pipeline view"
+                disabled={scope === 'all'}
                 className={cn(
                   'rounded-l-none border',
                   view === 'kanban' && 'bg-muted',
+                  scope === 'all' && 'opacity-50 cursor-not-allowed',
                 )}
               >
                 <LayoutGrid className="h-4 w-4" />
@@ -282,22 +322,38 @@ function ContactsPage() {
           ) : isLoading ? (
             <TableSkeleton rows={filters.limit || 25} />
           ) : !data?.data || data.data.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-ash-500">
-                {(filters.search || (filters.tags?.length ?? 0) > 0 || filters.contactType || (filters.contactStatus?.length ?? 0) > 0)
-                  ? 'No contacts found matching your filters'
-                  : 'No contacts found'}
-              </p>
-              {!filters.search && !(filters.tags?.length) && !filters.contactType && !(filters.contactStatus?.length) && (
-                <Button
-                  className="mt-4 bg-phoenix-gold-500 hover:bg-phoenix-gold-600 text-white"
-                  onClick={() => setIsCreateOpen(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Your First Contact
-                </Button>
-              )}
-            </div>
+            scope === 'mine' && !filters.search && !(filters.tags?.length) && !filters.contactType && !(filters.contactStatus?.length) ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Users className="h-12 w-12 text-ash-300 mb-4" />
+                <h3 className="text-lg font-medium text-ash-900 mb-1">No contacts yet</h3>
+                <p className="text-sm text-ash-500 mb-6">Create a new contact or import from CSV to get started.</p>
+                <div className="flex gap-3">
+                  <Button onClick={() => setIsCreateOpen(true)}>
+                    Create New Contact
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowImport(true)}>
+                    Import from CSV
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-ash-500">
+                  {(filters.search || (filters.tags?.length ?? 0) > 0 || filters.contactType || (filters.contactStatus?.length ?? 0) > 0)
+                    ? 'No contacts found matching your filters'
+                    : 'No contacts found'}
+                </p>
+                {!filters.search && !(filters.tags?.length) && !filters.contactType && !(filters.contactStatus?.length) && (
+                  <Button
+                    className="mt-4 bg-phoenix-gold-500 hover:bg-phoenix-gold-600 text-white"
+                    onClick={() => setIsCreateOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Your First Contact
+                  </Button>
+                )}
+              </div>
+            )
           ) : (
             <>
               <ContactsTable

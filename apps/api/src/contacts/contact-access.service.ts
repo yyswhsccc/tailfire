@@ -13,37 +13,38 @@
  */
 
 import { Injectable } from '@nestjs/common'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import type { AuthContext } from '../auth/auth.types'
 import type { ContactResponseDto } from '../../../../packages/shared-types/src/api'
 
 /**
- * Sensitive fields to strip for non-full-access users.
- * Basic view = Name, Email, Phone, Address only.
+ * Fields visible to basic-access users.
+ * All other fields are nulled (not omitted) to preserve DTO shape.
  */
-export const SENSITIVE_FIELDS = [
-  'passportNumber',
-  'passportExpiry',
-  'passportCountry',
-  'passportIssueDate',
-  'nationality',
-  'redressNumber',
-  'knownTravelerNumber',
-  'dateOfBirth',
-  'dietaryRequirements',
-  'mobilityRequirements',
-  'trustBalanceCad',
-  'trustBalanceUsd',
-  'marketingEmailOptIn',
-  'marketingEmailOptInAt',
-  'marketingSmsOptIn',
-  'marketingSmsOptInAt',
-  'marketingPhoneOptIn',
-  'marketingPhoneOptInAt',
-  'marketingOptInSource',
-  'marketingOptOutAt',
-  'marketingOptOutReason',
+export const BASIC_VIEW_ALLOWED_FIELDS = [
+  'id',
+  'firstName',
+  'lastName',
+  'email',
+  'phone',
+  'ownerId',
+  'agencyId',
+  'isActive',
+  'createdAt',
+  'updatedAt',
+  // Display fields needed by table/kanban to render without crashing
+  'contactStatus',
+  'contactType',
+  'displayName',
+  'nextTripName',
+  'nextTripDate',
+  'relationshipCount',
+  'tags',
+  // Access metadata
+  '_accessLevel',
+  '_ownerName',
+  '_shareRequestStatus',
 ] as const
 
 export interface ContactAccessResult {
@@ -211,21 +212,21 @@ export class ContactAccessService {
   }
 
   /**
-   * Filter sensitive fields from a contact based on access level
+   * Filter contact fields based on access level using an allowlist.
+   * Non-allowed fields are set to null (not omitted) to preserve DTO shape.
    */
-  filterSensitiveFields(
-    contact: ContactResponseDto,
-    canAccessSensitive: boolean,
-  ): ContactResponseDto {
-    if (canAccessSensitive) {
-      return contact
-    }
-
-    // Strip sensitive fields
+  filterToBasicView(contact: ContactResponseDto): ContactResponseDto {
     const filtered = { ...contact }
-    for (const field of SENSITIVE_FIELDS) {
-      if (field in filtered) {
-        ;(filtered as Record<string, unknown>)[field] = null
+    const allowedSet = new Set<string>(BASIC_VIEW_ALLOWED_FIELDS)
+
+    for (const key of Object.keys(filtered)) {
+      if (!allowedSet.has(key)) {
+        const value = (filtered as Record<string, unknown>)[key]
+        if (Array.isArray(value)) {
+          ;(filtered as Record<string, unknown>)[key] = []
+        } else {
+          ;(filtered as Record<string, unknown>)[key] = null
+        }
       }
     }
     return filtered
@@ -240,8 +241,44 @@ export class ContactAccessService {
     auth: AuthContext,
   ): Promise<ContactResponseDto> {
     const access = await this.canAccessSensitiveData(contact.id, auth)
-    const filtered = this.filterSensitiveFields(contact, access.canAccessSensitive)
-    return { ...filtered, _accessLevel: access.canAccessSensitive ? 'full' : 'basic' }
+
+    // Fetch owner name
+    let ownerName: string | null = null
+    if (contact.ownerId) {
+      const [owner] = await this.db.client
+        .select({ firstName: this.db.schema.userProfiles.firstName, lastName: this.db.schema.userProfiles.lastName })
+        .from(this.db.schema.userProfiles)
+        .where(eq(this.db.schema.userProfiles.id, contact.ownerId))
+        .limit(1)
+      if (owner) {
+        ownerName = [owner.firstName, owner.lastName].filter(Boolean).join(' ') || null
+      }
+    }
+
+    // Fetch share request status
+    let shareRequestStatus: 'none' | 'pending' | 'approved' | 'denied' = 'none'
+    if (auth.role !== 'admin') {
+      const [request] = await this.db.client
+        .select({ status: this.db.schema.contactShareRequests.status })
+        .from(this.db.schema.contactShareRequests)
+        .where(
+          and(
+            eq(this.db.schema.contactShareRequests.contactId, contact.id),
+            eq(this.db.schema.contactShareRequests.requesterId, auth.userId),
+          ),
+        )
+        .limit(1)
+      if (request) {
+        shareRequestStatus = request.status as typeof shareRequestStatus
+      }
+    }
+
+    const metadata = { _ownerName: ownerName, _shareRequestStatus: shareRequestStatus }
+
+    if (access.canAccessSensitive) {
+      return { ...contact, ...metadata, _accessLevel: 'full' as const }
+    }
+    return { ...this.filterToBasicView(contact), ...metadata, _accessLevel: 'basic' as const }
   }
 
   /**
@@ -252,9 +289,55 @@ export class ContactAccessService {
     contacts: ContactResponseDto[],
     auth: AuthContext,
   ): Promise<ContactResponseDto[]> {
+    // Batch fetch owner names for all contacts
+    const ownerIds = [...new Set(contacts.map(c => c.ownerId).filter(Boolean))] as string[]
+    const ownerNameMap = new Map<string, string>()
+    if (ownerIds.length > 0) {
+      const owners = await this.db.client
+        .select({
+          id: this.db.schema.userProfiles.id,
+          firstName: this.db.schema.userProfiles.firstName,
+          lastName: this.db.schema.userProfiles.lastName,
+        })
+        .from(this.db.schema.userProfiles)
+        .where(inArray(this.db.schema.userProfiles.id, ownerIds))
+
+      for (const owner of owners) {
+        ownerNameMap.set(owner.id, [owner.firstName, owner.lastName].filter(Boolean).join(' ') || 'Unknown')
+      }
+    }
+
+    // Batch fetch pending share requests for current user
+    const contactIds = contacts.map(c => c.id)
+    const shareRequestMap = new Map<string, 'none' | 'pending' | 'approved' | 'denied'>()
+    if (contactIds.length > 0 && auth.role !== 'admin') {
+      const requests = await this.db.client
+        .select({
+          contactId: this.db.schema.contactShareRequests.contactId,
+          status: this.db.schema.contactShareRequests.status,
+        })
+        .from(this.db.schema.contactShareRequests)
+        .where(
+          and(
+            inArray(this.db.schema.contactShareRequests.contactId, contactIds),
+            eq(this.db.schema.contactShareRequests.requesterId, auth.userId),
+          ),
+        )
+
+      for (const req of requests) {
+        const status = req.status as 'none' | 'pending' | 'approved' | 'denied'
+        if (!shareRequestMap.has(req.contactId) || status === 'pending') {
+          shareRequestMap.set(req.contactId, status)
+        }
+      }
+    }
+
     // For efficiency, batch check ownership and shares
     if (auth.role === 'admin') {
-      return contacts.map((c) => ({ ...c, _accessLevel: 'full' as const }))
+      return contacts.map((c) => {
+        const ownerName = c.ownerId ? (ownerNameMap.get(c.ownerId) || null) : null
+        return { ...c, _ownerName: ownerName, _shareRequestStatus: 'none' as const, _accessLevel: 'full' as const }
+      })
     }
 
     // Get all shares for these contacts for this user
@@ -271,19 +354,23 @@ export class ContactAccessService {
     const shareMap = new Map(shares.map((s) => [s.contactId, s.accessLevel]))
 
     return contacts.map((contact) => {
+      const ownerName = contact.ownerId ? (ownerNameMap.get(contact.ownerId) || null) : null
+      const shareRequestStatus = shareRequestMap.get(contact.id) || 'none'
+      const metadata = { _ownerName: ownerName, _shareRequestStatus: shareRequestStatus }
+
       // Owner has full access
       if (contact.ownerId === auth.userId) {
-        return { ...contact, _accessLevel: 'full' as const }
+        return { ...contact, ...metadata, _accessLevel: 'full' as const }
       }
 
       // Check share
       const shareLevel = shareMap.get(contact.id)
       if (shareLevel === 'full') {
-        return { ...contact, _accessLevel: 'full' as const }
+        return { ...contact, ...metadata, _accessLevel: 'full' as const }
       }
 
-      // Basic access only
-      return { ...this.filterSensitiveFields(contact, false), _accessLevel: 'basic' as const }
+      // Basic access only — apply allowlist filter
+      return { ...this.filterToBasicView(contact), ...metadata, _accessLevel: 'basic' as const }
     })
   }
 

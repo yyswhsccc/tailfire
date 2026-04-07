@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Pencil, Save, X } from 'lucide-react'
+import { ArrowLeft, Lock, Pencil, Save, X } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useContact, useUpdateContact, useContactTrips, useContactBookings, useSendPortalInvite } from '@/hooks/use-contacts'
 import { useUser } from '@/hooks/use-user'
 import { ContactShareRequestButton } from './_components/contact-share-request-button'
+import { PendingAccessRequests } from './_components/pending-access-requests'
 import { useContactTags, useUpdateContactTags, useCreateAndAssignContactTag } from '@/hooks/use-tags'
 import { TagInput } from '@/components/ui/tag-input'
 import { useTasks } from '@/hooks/use-tasks'
@@ -201,12 +202,15 @@ export default function ContactDetailPage() {
   const contactId = params?.id as string
   const { toast } = useToast()
 
-  const { isAdmin } = useUser()
+  const { isAdmin, userId } = useUser()
   const { data: contact, isLoading, error } = useContact(contactId)
-  const { data: contactTrips = [], isLoading: tripsLoading } = useContactTrips(contactId)
-  const { data: contactBookings = [], isLoading: bookingsLoading } = useContactBookings(contactId)
+  const isBasicAccess = contact?._accessLevel === 'basic' && !isAdmin
+  // Gate detail hooks: pass null until contact loads or when basic-access to prevent 403s
+  const gatedContactId = contact && !isBasicAccess ? contactId : null
+  const { data: contactTrips = [], isLoading: tripsLoading } = useContactTrips(gatedContactId)
+  const { data: contactBookings = [], isLoading: bookingsLoading } = useContactBookings(gatedContactId)
   const updateContact = useUpdateContact()
-  const { data: contactTags = [] } = useContactTags(contactId)
+  const { data: contactTags = [] } = useContactTags(gatedContactId)
   const updateContactTags = useUpdateContactTags()
   const createAndAssignContactTag = useCreateAndAssignContactTag()
 
@@ -227,12 +231,14 @@ export default function ContactDetailPage() {
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<TaskResponseDto | null>(null)
   const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useTasks(
-    { contactId, sortBy: 'dueDate', sortOrder: 'asc', limit: 50 },
+    gatedContactId
+      ? { contactId: gatedContactId, sortBy: 'dueDate', sortOrder: 'asc', limit: 50 }
+      : { contactId: 'none', limit: 0 },
   )
   const contactTasks = tasksData?.data ?? []
 
   // Payment state
-  const { data: contactPayments = [], isLoading: paymentsLoading } = useContactPaymentTransactions(contactId)
+  const { data: contactPayments = [], isLoading: paymentsLoading } = useContactPaymentTransactions(gatedContactId)
   const [selectedPaymentTx, setSelectedPaymentTx] = useState<ContactPaymentTransactionDto | null>(null)
   const [paymentDetailOpen, setPaymentDetailOpen] = useState(false)
   const [paymentDeleteConfirm, setPaymentDeleteConfirm] = useState(false)
@@ -536,14 +542,21 @@ export default function ContactDetailPage() {
                       <p className="text-sm text-ash-600">{contact.email}</p>
                     )}
 
+                    {/* Phone in header for quick access (especially useful for basic-access contacts) */}
+                    {contact.phone && (
+                      <p className="text-sm text-ash-500">{contact.phone}</p>
+                    )}
+
                     {/* Badges */}
                     <div className="flex items-center gap-2 pt-1 flex-wrap">
                       {/* Contact Type Badge */}
-                      <Badge
-                        variant={contact.contactType === 'lead' ? 'inbound' : 'secondary'}
-                      >
-                        {contact.contactType === 'lead' ? 'Lead' : 'Client'}
-                      </Badge>
+                      {contact.contactType && (
+                        <Badge
+                          variant={contact.contactType === 'lead' ? 'inbound' : 'secondary'}
+                        >
+                          {contact.contactType === 'lead' ? 'Lead' : 'Client'}
+                        </Badge>
+                      )}
 
                       {/* Lifecycle Status Badge (skip for leads — already shown by Contact Type Badge) */}
                       {contact.contactType !== 'lead' && contact.contactStatus && (
@@ -572,12 +585,9 @@ export default function ContactDetailPage() {
                       )}
                     </div>
 
-                    {/* Limited View badge + Request Access button for non-admin agents */}
-                    {contact._accessLevel === 'basic' && !isAdmin && (
-                      <div className="flex items-center gap-2 pt-1">
-                        <Badge variant="outline" className="border-amber-500 text-amber-500">Limited View</Badge>
-                        <ContactShareRequestButton contactId={contact.id} />
-                      </div>
+                    {/* Limited View badge for non-admin agents (banner shown below) */}
+                    {isBasicAccess && (
+                      <Badge variant="outline" className="border-amber-500 text-amber-500">Limited View</Badge>
                     )}
 
                     {/* Portal Invite Section */}
@@ -592,24 +602,48 @@ export default function ContactDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Tags */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-ash-900">Tags</Label>
-              <TagInput
-                value={contactTags.map(t => t.id)}
-                onChange={(tagIds) => {
-                  updateContactTags.mutate({ contactId, tagIds })
-                }}
-                onCreateTag={async (name) => {
-                  const result = await createAndAssignContactTag.mutateAsync({
-                    contactId,
-                    data: { name },
-                  })
-                  return result
-                }}
-                placeholder="Add tag..."
-              />
-            </div>
+            {/* Owner banner for basic access contacts */}
+            {isBasicAccess && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+                <Lock className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-900">Limited Access</p>
+                  <p className="text-sm text-amber-800 mt-0.5">
+                    This contact belongs to <strong>{contact._ownerName || 'another agent'}</strong>. You can only see basic information.
+                  </p>
+                </div>
+                <ContactShareRequestButton
+                  contactId={contact.id}
+                  initialStatus={contact._shareRequestStatus}
+                />
+              </div>
+            )}
+
+            {/* Pending access requests banner — visible to owner and admins */}
+            {(isAdmin || contact.ownerId === userId) && (
+              <PendingAccessRequests contactId={contactId} />
+            )}
+
+            {!isBasicAccess && (
+              <>
+              {/* Tags */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-ash-900">Tags</Label>
+                <TagInput
+                  value={contactTags.map(t => t.id)}
+                  onChange={(tagIds) => {
+                    updateContactTags.mutate({ contactId, tagIds })
+                  }}
+                  onCreateTag={async (name) => {
+                    const result = await createAndAssignContactTag.mutateAsync({
+                      contactId,
+                      data: { name },
+                    })
+                    return result
+                  }}
+                  placeholder="Add tag..."
+                />
+              </div>
 
             {/* Identity Section */}
             <Card className="border-ash-200">
@@ -760,7 +794,7 @@ export default function ContactDetailPage() {
             <Card className="border-ash-200">
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-semibold text-ash-900">Contact</CardTitle>
-                {editingSection === 'contact' ? (
+                {!isBasicAccess && (editingSection === 'contact' ? (
                   <div className="flex gap-2">
                     <Button
                       size="sm"
@@ -792,7 +826,7 @@ export default function ContactDetailPage() {
                     <Pencil className="h-3.5 w-3.5 mr-1" />
                     Edit
                   </Button>
-                )}
+                ))}
               </CardHeader>
               <CardContent className="space-y-3">
                 {editingSection === 'contact' ? (
@@ -1299,9 +1333,19 @@ export default function ContactDetailPage() {
               contactId={contactId}
               onViewAll={() => setActiveSection('emails')}
             />
+              </>
+            )}
           </div>
 
           {/* Right Column - Dynamic tabbed content */}
+          {isBasicAccess ? (
+            <div className="flex-1 min-w-0 flex items-center justify-center py-16">
+              <div className="text-center text-ash-400">
+                <Lock className="h-8 w-8 mx-auto mb-3" />
+                <p className="text-sm">Request access to view trips, notes, and more.</p>
+              </div>
+            </div>
+          ) : (
           <div className="flex-1 min-w-0 flex flex-col gap-4">
             {/* Navigation Header */}
             <div className="bg-white border border-ash-200 rounded-lg">
@@ -1599,6 +1643,7 @@ export default function ContactDetailPage() {
               )}
             </div>
           </div>
+          )}
         </div>
       </div>
 

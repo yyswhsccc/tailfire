@@ -76,6 +76,12 @@ export class ContactFilterDto {
   })
   contactStatus?: string[]
 
+  // Scope: 'mine' = owned + full shares, 'all' = agency-wide
+  @IsOptional()
+  @IsString()
+  @IsIn(['mine', 'all'])
+  scope?: 'mine' | 'all'
+
   // Sorting
   @IsOptional()
   @IsIn([

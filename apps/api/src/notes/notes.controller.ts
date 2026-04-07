@@ -18,6 +18,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { NotesService } from './notes.service'
@@ -31,6 +32,7 @@ import type { AuthContext } from '../auth/auth.types'
 import { TripAccessService } from '../trips/trip-access.service'
 import { TripGroupAccessService } from '../trips/trip-group-access.service'
 import { ContactsService } from '../contacts/contacts.service'
+import { ContactAccessService } from '../contacts/contact-access.service'
 
 @ApiTags('Notes')
 @Controller('notes')
@@ -39,7 +41,8 @@ export class NotesController {
     private readonly notesService: NotesService,
     private readonly tripAccessService: TripAccessService,
     private readonly tripGroupAccessService: TripGroupAccessService,
-    private readonly contactsService: ContactsService
+    private readonly contactsService: ContactsService,
+    private readonly contactAccessService: ContactAccessService,
   ) {}
 
   /**
@@ -72,6 +75,7 @@ export class NotesController {
     }
     if (filters.contactId) {
       await this.contactsService.findOne(filters.contactId, auth.agencyId)
+      await this.verifyContactAccess(filters.contactId, auth)
     }
     if (filters.tripGroupId) {
       await this.tripGroupAccessService.verifyReadAccess(filters.tripGroupId, auth)
@@ -88,7 +92,9 @@ export class NotesController {
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string
   ): Promise<NoteResponseDto> {
-    return this.notesService.findOne(id, auth.agencyId)
+    const note = await this.notesService.findOne(id, auth.agencyId)
+    await this.verifyContactAccess(note.contactId, auth)
+    return note
   }
 
   /**
@@ -101,6 +107,8 @@ export class NotesController {
     @Param('id') id: string,
     @Body() dto: UpdateNoteDto
   ): Promise<NoteResponseDto> {
+    const note = await this.notesService.findOne(id, auth.agencyId)
+    await this.verifyContactAccess(note.contactId, auth)
     return this.notesService.update(
       id,
       dto,
@@ -120,6 +128,8 @@ export class NotesController {
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string
   ): Promise<void> {
+    const note = await this.notesService.findOne(id, auth.agencyId)
+    await this.verifyContactAccess(note.contactId, auth)
     return this.notesService.remove(
       id,
       auth.agencyId,
@@ -138,6 +148,8 @@ export class NotesController {
     @Param('id') id: string,
     @Body() body: { isPinned: boolean }
   ): Promise<NoteResponseDto> {
+    const note = await this.notesService.findOne(id, auth.agencyId)
+    await this.verifyContactAccess(note.contactId, auth)
     return this.notesService.togglePin(
       id,
       body.isPinned,
@@ -150,6 +162,23 @@ export class NotesController {
   // ============================================================================
   // PRIVATE HELPERS
   // ============================================================================
+
+  /**
+   * Verify the user has full access to a contact before allowing note operations.
+   * Basic-access users get 403.
+   */
+  private async verifyContactAccess(
+    contactId: string | null | undefined,
+    auth: AuthContext,
+  ): Promise<void> {
+    if (!contactId) return
+    if (auth.role === 'admin') return
+
+    const access = await this.contactAccessService.canAccessSensitiveData(contactId, auth)
+    if (!access.canAccessSensitive) {
+      throw new ForbiddenException('Full contact access required for notes')
+    }
+  }
 
   /**
    * Verify the user has access to the target entity before creating a note
@@ -170,6 +199,7 @@ export class NotesController {
     }
     if (contactId) {
       await this.contactsService.findOne(contactId, auth.agencyId)
+      await this.verifyContactAccess(contactId, auth)
     }
     if (tripGroupId) {
       await this.tripGroupAccessService.verifyReadAccess(tripGroupId, auth)
