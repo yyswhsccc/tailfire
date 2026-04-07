@@ -28,10 +28,12 @@ export function getInviteTemplate({
         Hi ${firstName},<br><br>
         ${inviterText} to join the Phoenix Voyages team. Click the button below to set up your account.
       </p>
-      <a href="${inviteLink}"
-         style="display: inline-block; padding: 14px 28px; background: #0d9488; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 16px;">
-        Accept Invitation
-      </a>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${inviteLink}"
+           style="display: inline-block; padding: 16px 48px; background: #0d9488; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 18px; letter-spacing: 0.3px; box-shadow: 0 2px 4px rgba(13, 148, 136, 0.3);">
+          Accept Invitation
+        </a>
+      </div>
       <p style="margin: 24px 0 0; color: #71717a; font-size: 14px; line-height: 1.5;">
         This invitation link will expire in 24 hours. If you didn't expect this invitation, you can safely ignore this email.
       </p>
