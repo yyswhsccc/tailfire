@@ -20,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useContact, useUpdateContact, useContactTrips, useContactBookings, useSendPortalInvite } from '@/hooks/use-contacts'
 import { useUser } from '@/hooks/use-user'
 import { ContactShareRequestButton } from './_components/contact-share-request-button'
+import { PendingAccessRequests } from './_components/pending-access-requests'
 import { useContactTags, useUpdateContactTags, useCreateAndAssignContactTag } from '@/hooks/use-tags'
 import { TagInput } from '@/components/ui/tag-input'
 import { useTasks } from '@/hooks/use-tasks'
@@ -201,7 +202,7 @@ export default function ContactDetailPage() {
   const contactId = params?.id as string
   const { toast } = useToast()
 
-  const { isAdmin } = useUser()
+  const { isAdmin, userId } = useUser()
   const { data: contact, isLoading, error } = useContact(contactId)
   const isBasicAccess = contact?._accessLevel === 'basic' && !isAdmin
   // Gate detail hooks: pass null until contact loads or when basic-access to prevent 403s
@@ -616,6 +617,11 @@ export default function ContactDetailPage() {
                   initialStatus={contact._shareRequestStatus}
                 />
               </div>
+            )}
+
+            {/* Pending access requests banner — visible to owner and admins */}
+            {(isAdmin || contact.ownerId === userId) && (
+              <PendingAccessRequests contactId={contactId} />
             )}
 
             {!isBasicAccess && (
