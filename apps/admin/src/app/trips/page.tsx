@@ -92,7 +92,7 @@ function TripsPage() {
   }, [urlSearch])
 
   // Fetch trips with server-side filtering
-  const { data, isPending, error, refetch } = useTrips(filters)
+  const { data, isPending, isFetching, error, refetch } = useTrips(filters)
 
   // Bulk operation mutations
   const bulkDelete = useBulkDeleteTrips()
@@ -323,11 +323,18 @@ function TripsPage() {
             <TripsKanban trips={trips} />
           ) : (
             <>
-              <TripsDataTable
-                trips={trips}
-                selectedIds={selectedIds}
-                onSelectionChange={setSelectedIds}
-              />
+              <div className="relative">
+                {isFetching && !isPending && (
+                  <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center pointer-events-none">
+                    <div className="h-6 w-6 border-2 border-ash-300 border-t-phoenix-gold-500 rounded-full animate-spin" />
+                  </div>
+                )}
+                <TripsDataTable
+                  trips={trips}
+                  selectedIds={selectedIds}
+                  onSelectionChange={setSelectedIds}
+                />
+              </div>
               {data?.pagination && data.pagination.totalPages > 1 && (
                 <TripsPagination
                   page={data.pagination.page}
