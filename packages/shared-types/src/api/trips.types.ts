@@ -275,12 +275,16 @@ export interface TripFilterDto {
   tags?: string[] // Match any of these tags
   tripGroupId?: string // Filter by trip group
   ungrouped?: boolean // Filter to trips not in any group
+  unassigned?: boolean // Filter to trips with no owner
+  hasBookings?: 'yes' | 'no' // Filter by whether trip has booked activities
 
   // Date filters
   startDateFrom?: string
   startDateTo?: string
   endDateFrom?: string
   endDateTo?: string
+  createdAtFrom?: string
+  createdAtTo?: string
 
   // Sorting
   sortBy?: 'name' | 'startDate' | 'endDate' | 'status' | 'createdAt' | 'updatedAt'
