@@ -50,6 +50,12 @@ const CONTEXT_SUGGESTIONS: Record<string, (name: string) => string[]> = {
     `Help me take advantage of this`,
     `What else is included?`,
   ],
+  advisor: (name) => [
+    `What trips does ${name} recommend?`,
+    `Tell me about ${name}'s group cruise`,
+    `Help me plan a trip with ${name}`,
+    `What makes ${name} special?`,
+  ],
 };
 
 export function ChatSuggestionChips({ onSelect }: ChatSuggestionChipsProps) {
