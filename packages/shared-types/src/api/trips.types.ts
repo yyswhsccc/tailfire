@@ -744,6 +744,43 @@ export interface UpdateTripOwnerDto {
   ownerId: string | null // null = only valid for inbound trips
 }
 
+/**
+ * Result of trip reassignment with contact cascade
+ */
+export interface ReassignCascadeResult {
+  trip: TripResponseDto
+  cascade: {
+    contactsAssigned: number
+    contactsSkipped: { contactName: string; currentOwner: string }[]
+  }
+}
+
+/**
+ * Bulk reassign trips request
+ */
+export interface BulkReassignTripsDto {
+  tripIds: string[]
+  newOwnerId: string
+}
+
+/**
+ * Bulk reassign preview result
+ */
+export interface BulkReassignPreviewDto {
+  tripsCount: number
+  contactsToAssign: { id: string; name: string; reason: 'unowned' | 'inactive_owner' }[]
+  contactsToSkip: { id: string; name: string; currentOwnerName: string }[]
+}
+
+/**
+ * Bulk reassign execution result
+ */
+export interface BulkReassignResultDto {
+  tripsReassigned: number
+  contactsAssigned: number
+  contactsSkipped: { contactName: string; currentOwner: string }[]
+}
+
 // ============================================================================
 // CANCELLATION
 // ============================================================================

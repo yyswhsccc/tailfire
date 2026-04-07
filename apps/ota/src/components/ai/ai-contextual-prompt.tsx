@@ -16,6 +16,7 @@ const SUGGESTIONS: Record<EntityType, (name: string) => string> = {
   cruise_line: (name) => `Exploring ${name}? I can compare ships and find deals`,
   region:      (name) => `Dreaming of ${name}? Let me build your perfect itinerary`,
   deal:        (_name) => `Want to take advantage of this offer? I can help you plan`,
+  advisor:     (name) => `${name} can help you plan the perfect trip. Ask me anything!`,
 }
 
 const PROMPTS: Record<EntityType, (name: string) => string> = {
@@ -25,6 +26,7 @@ const PROMPTS: Record<EntityType, (name: string) => string> = {
   cruise_line: (name) => `Help me compare ships and find deals with ${name}`,
   region:      (name) => `Help me build a perfect itinerary for ${name}`,
   deal:        (name) => `Help me take advantage of this deal: ${name}`,
+  advisor:     (name) => `I'm on ${name}'s page — help me plan a trip!`,
 }
 
 export function AiContextualPrompt({ entityType, entityName, suggestion }: AiContextualPromptProps) {

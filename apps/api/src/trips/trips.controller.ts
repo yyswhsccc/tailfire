@@ -50,6 +50,7 @@ import {
   type BulkTripOperationResult,
   type TripFilterOptionsResponseDto,
 } from './dto'
+import { BulkReassignTripsDto } from './dto/bulk-reassign.dto'
 import type {
   TripResponseDto,
   PaginatedTripsResponseDto,
@@ -173,6 +174,42 @@ export class TripsController {
     @Body() dto: BulkChangeStatusDto,
   ): Promise<BulkTripOperationResult> {
     return this.tripsService.bulkChangeStatus(dto.tripIds, dto.status, auth.userId, auth, this.tripAccessService)
+  }
+
+  /**
+   * Preview bulk trip reassignment
+   * POST /trips/bulk-reassign/preview
+   *
+   * Returns a summary of what would change without applying.
+   * Admin only.
+   */
+  @Post('bulk-reassign/preview')
+  async bulkReassignPreview(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: BulkReassignTripsDto,
+  ) {
+    if (auth.role !== 'admin') {
+      throw new ForbiddenException('Only admins can bulk reassign trips')
+    }
+    return this.tripsService.bulkReassignPreview(dto.tripIds, dto.newOwnerId, auth.agencyId)
+  }
+
+  /**
+   * Bulk reassign trips to a new owner
+   * POST /trips/bulk-reassign
+   *
+   * Reassigns multiple trips and cascades ownership to related entities.
+   * Admin only.
+   */
+  @Post('bulk-reassign')
+  async bulkReassign(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: BulkReassignTripsDto,
+  ) {
+    if (auth.role !== 'admin') {
+      throw new ForbiddenException('Only admins can bulk reassign trips')
+    }
+    return this.tripsService.bulkReassign(dto.tripIds, dto.newOwnerId, auth.agencyId)
   }
 
   // ============================================================================
@@ -872,6 +909,10 @@ export class TripsController {
     @Body() updateTripDto: UpdateTripDto,
   ): Promise<TripResponseDto> {
     await this.tripAccessService.verifyWriteAccess(id, auth)
+    // Non-admins cannot change trip ownership via generic update
+    if (auth.role !== 'admin' && 'ownerId' in updateTripDto) {
+      delete (updateTripDto as any).ownerId
+    }
     return this.tripsService.update(id, updateTripDto)
   }
 
@@ -942,11 +983,11 @@ export class TripsController {
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdateTripOwnerDto,
-  ): Promise<TripResponseDto> {
+  ) {
     if (auth.role !== 'admin') {
       throw new ForbiddenException('Only admins can re-assign trip ownership')
     }
-    return this.tripsService.updateOwner(id, dto.ownerId)
+    return this.tripsService.updateOwner(id, dto.ownerId, auth.agencyId)
   }
 
   // ============================================================================
