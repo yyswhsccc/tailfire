@@ -349,6 +349,41 @@ export function useBulkChangeStatus() {
   })
 }
 
+/**
+ * Preview bulk trip reassignment
+ * Returns counts and contact assignment details without making changes
+ */
+export function useBulkReassignPreview() {
+  return useMutation({
+    mutationFn: (data: { tripIds: string[]; newOwnerId: string }) =>
+      api.post<{
+        tripsCount: number
+        contactsToAssign: Array<{ id: string; name: string }>
+        contactsToSkip: Array<{ id: string; name: string; currentOwnerName: string }>
+      }>('/trips/bulk-reassign/preview', data),
+  })
+}
+
+/**
+ * Execute bulk trip reassignment
+ * Reassigns trips and auto-assigns unowned traveler contacts
+ */
+export function useBulkReassignTrips() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { tripIds: string[]; newOwnerId: string }) =>
+      api.post<{
+        tripsReassigned: number
+        contactsAssigned: number
+        contactsSkipped: Array<{ id: string; name: string; reason: string }>
+      }>('/trips/bulk-reassign', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: tripKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+    },
+  })
+}
+
 // ============================================================================
 // PUBLISH / UNPUBLISH / DUPLICATE
 // ============================================================================

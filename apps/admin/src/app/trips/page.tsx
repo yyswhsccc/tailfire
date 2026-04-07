@@ -22,6 +22,7 @@ import {
   type TripsViewMode,
 } from '@/components/trips'
 import { TripFormDialog } from './_components/trip-form-dialog'
+import { BulkReassignDialog } from './_components/bulk-reassign-dialog'
 import { GroupsTable } from './_components/groups-table'
 import { GroupFormDialog } from './_components/group-form-dialog'
 import { Input } from '@/components/ui/input'
@@ -68,6 +69,7 @@ function TripsPage() {
     localStorage.setItem('trips-view-mode', mode)
   }, [])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [reassignDialogOpen, setReassignDialogOpen] = useState(false)
   const { toast } = useToast()
 
   // Filter state - all filtering is now server-side
@@ -275,6 +277,7 @@ function TripsPage() {
                 onArchive={handleBulkArchive}
                 onUnarchive={handleBulkUnarchive}
                 onChangeStatus={handleBulkChangeStatus}
+                onReassign={() => setReassignDialogOpen(true)}
                 onClearSelection={() => setSelectedIds(new Set())}
                 isDeleting={bulkDelete.isPending}
                 isArchiving={bulkArchive.isPending}
@@ -352,6 +355,14 @@ function TripsPage() {
         open={groupDialogOpen}
         onOpenChange={setGroupDialogOpen}
         mode="create"
+      />
+
+      {/* Bulk Reassign Dialog */}
+      <BulkReassignDialog
+        open={reassignDialogOpen}
+        onOpenChange={setReassignDialogOpen}
+        selectedTripIds={[...selectedIds]}
+        onComplete={() => setSelectedIds(new Set())}
       />
     </DashboardLayout>
   )

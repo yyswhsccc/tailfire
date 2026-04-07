@@ -104,6 +104,7 @@ export async function POST(request: Request) {
       oneLiner?: string; bestMonths?: string; budgetTier?: string;
       typicalStay?: string; tags?: string; highlights?: string;
       currency?: string; travelTip?: string;
+      metadata?: Record<string, unknown>;
     } | undefined = body.pageContext
 
     // Read cookies for advisor attribution and session context
@@ -166,6 +167,15 @@ export async function POST(request: Request) {
       if (pageContext.highlights) lines.push(`Highlights: ${pageContext.highlights}`)
       if (pageContext.currency) lines.push(`Currency: ${pageContext.currency}`)
       if (pageContext.travelTip) lines.push(`Insider tip: ${pageContext.travelTip}`)
+
+      if (pageContext?.type === 'advisor' && pageContext?.metadata) {
+        const m = pageContext.metadata as Record<string, unknown>
+        if (m.title) lines.push(`Title: ${m.title}`)
+        if (m.specialties) lines.push(`Specializes in: ${m.specialties}`)
+        if (m.destinations) lines.push(`Expert destinations: ${m.destinations}`)
+        lines.push(`When helping this visitor, reference ${pageContext.name.split(' ')[0]} by name.`)
+        lines.push(`All leads go to ${pageContext.name.split(' ')[0]}.`)
+      }
 
       lines.push('Use this context naturally — reference what they\'re looking at without being asked.')
       pageContextSection = '\n\n--- Current Page ---\n' + lines.join('\n')

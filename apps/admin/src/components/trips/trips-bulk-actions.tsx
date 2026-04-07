@@ -1,6 +1,6 @@
 'use client'
 
-import { Trash2, Archive, ArchiveX, ArrowRight } from 'lucide-react'
+import { Trash2, Archive, ArchiveX, ArrowRight, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -17,6 +17,7 @@ interface TripsBulkActionsProps {
   onArchive: () => void
   onUnarchive: () => void
   onChangeStatus: (status: TripStatus) => void
+  onReassign?: () => void
   onClearSelection: () => void
   isDeleting?: boolean
   isArchiving?: boolean
@@ -31,6 +32,7 @@ export function TripsBulkActions({
   onArchive,
   onUnarchive,
   onChangeStatus,
+  onReassign,
   onClearSelection,
   isDeleting,
   isArchiving,
@@ -72,6 +74,20 @@ export function TripsBulkActions({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Reassign */}
+      {onReassign && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onReassign}
+          disabled={isProcessing}
+          className="text-phoenix-gold-700 hover:text-phoenix-gold-800 hover:bg-phoenix-gold-100"
+        >
+          <Users className="mr-2 h-4 w-4" />
+          Reassign
+        </Button>
+      )}
 
       {/* Archive/Unarchive */}
       <DropdownMenu>
