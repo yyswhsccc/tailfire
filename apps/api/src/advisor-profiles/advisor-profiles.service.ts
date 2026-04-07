@@ -158,6 +158,22 @@ export class AdvisorProfilesService {
   }
 
   // ============================================================================
+  // ADMIN — Get advisor profile for the current authenticated user
+  // ============================================================================
+
+  async findByUserId(userId: string): Promise<AdvisorProfile | null> {
+    const { advisorProfiles } = this.db.schema
+
+    const [profile] = await this.db.client
+      .select()
+      .from(advisorProfiles)
+      .where(eq(advisorProfiles.userId, userId))
+      .limit(1)
+
+    return profile ?? null
+  }
+
+  // ============================================================================
   // ADMIN — Create an advisor profile
   // ============================================================================
 
