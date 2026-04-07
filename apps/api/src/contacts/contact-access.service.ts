@@ -247,7 +247,7 @@ export class ContactAccessService {
     }
 
     // Fetch share request status
-    let shareRequestStatus: string = 'none'
+    let shareRequestStatus: 'none' | 'pending' | 'approved' | 'denied' = 'none'
     if (auth.role !== 'admin') {
       const [request] = await this.db.client
         .select({ status: this.db.schema.contactShareRequests.status })
@@ -260,7 +260,7 @@ export class ContactAccessService {
         )
         .limit(1)
       if (request) {
-        shareRequestStatus = request.status
+        shareRequestStatus = request.status as typeof shareRequestStatus
       }
     }
 
@@ -300,7 +300,7 @@ export class ContactAccessService {
 
     // Batch fetch pending share requests for current user
     const contactIds = contacts.map(c => c.id)
-    const shareRequestMap = new Map<string, string>()
+    const shareRequestMap = new Map<string, 'none' | 'pending' | 'approved' | 'denied'>()
     if (contactIds.length > 0 && auth.role !== 'admin') {
       const requests = await this.db.client
         .select({
@@ -316,8 +316,9 @@ export class ContactAccessService {
         )
 
       for (const req of requests) {
-        if (!shareRequestMap.has(req.contactId) || req.status === 'pending') {
-          shareRequestMap.set(req.contactId, req.status)
+        const status = req.status as 'none' | 'pending' | 'approved' | 'denied'
+        if (!shareRequestMap.has(req.contactId) || status === 'pending') {
+          shareRequestMap.set(req.contactId, status)
         }
       }
     }
@@ -326,7 +327,7 @@ export class ContactAccessService {
     if (auth.role === 'admin') {
       return contacts.map((c) => {
         const ownerName = c.ownerId ? (ownerNameMap.get(c.ownerId) || null) : null
-        return { ...c, _ownerName: ownerName, _shareRequestStatus: 'none' as string, _accessLevel: 'full' as const }
+        return { ...c, _ownerName: ownerName, _shareRequestStatus: 'none' as const, _accessLevel: 'full' as const }
       })
     }
 
