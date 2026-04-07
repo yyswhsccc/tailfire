@@ -345,6 +345,48 @@ export class TripsService {
       conditions.push(isNull(this.db.schema.trips.tripGroupId))
     }
 
+    // Unassigned filter — trips with no owner
+    if (filters.unassigned) {
+      conditions.push(isNull(this.db.schema.trips.ownerId))
+    }
+
+    // Has bookings filter — trips with/without booked activities
+    if (filters.hasBookings === 'yes') {
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1 FROM itinerary_activities ia
+          JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+          JOIN itineraries itin ON itin.id = iday.itinerary_id
+          WHERE itin.trip_id = trips.id
+          AND ia.booking_status = 'booked'
+          AND ia.activity_type NOT IN ('port_info', 'tour_day')
+        )`,
+      )
+    } else if (filters.hasBookings === 'no') {
+      conditions.push(
+        sql`NOT EXISTS (
+          SELECT 1 FROM itinerary_activities ia
+          JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+          JOIN itineraries itin ON itin.id = iday.itinerary_id
+          WHERE itin.trip_id = trips.id
+          AND ia.booking_status = 'booked'
+          AND ia.activity_type NOT IN ('port_info', 'tour_day')
+        )`,
+      )
+    }
+
+    // Created at range filters
+    if (filters.createdAtFrom) {
+      conditions.push(
+        sql`${this.db.schema.trips.createdAt} >= ${filters.createdAtFrom}`,
+      )
+    }
+    if (filters.createdAtTo) {
+      conditions.push(
+        sql`${this.db.schema.trips.createdAt} <= ${filters.createdAtTo + 'T23:59:59Z'}`,
+      )
+    }
+
     // Sorting
     const sortBy = filters.sortBy || 'createdAt'
     const sortOrder = filters.sortOrder || 'desc'
