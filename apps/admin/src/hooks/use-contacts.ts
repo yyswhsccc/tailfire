@@ -49,6 +49,7 @@ export function useContacts(filters: ContactFilterDto = {}) {
       if (filters.sortOrder) params.append('sortOrder', filters.sortOrder)
       if (filters.hasPassport !== undefined) params.append('hasPassport', filters.hasPassport.toString())
       if (filters.passportExpiring !== undefined) params.append('passportExpiring', filters.passportExpiring.toString())
+      if (filters.scope) params.append('scope', filters.scope)
 
       return api.get<PaginatedContactsResponseDto>(
         `/contacts?${params.toString()}`
