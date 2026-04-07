@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Check } from 'lucide-react'
+import { X, Check, UserCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -17,7 +17,16 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useTripFilterOptions } from '@/hooks/use-trips'
+import { useUsers } from '@/hooks/use-users'
 import { cn } from '@/lib/utils'
 import type { TripFilterDto } from '@tailfire/shared-types/api'
 import { TRIP_STATUS_LABELS } from '@/lib/trip-status-constants'
@@ -41,14 +50,23 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
   const [tripTypeOpen, setTripTypeOpen] = useState(false)
   const [groupOpen, setGroupOpen] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
+  const [agentOpen, setAgentOpen] = useState(false)
   const { data: filterOptions } = useTripFilterOptions()
+  const { data: usersData } = useUsers({ status: 'active', limit: 100 })
+  const users = usersData?.users ?? []
 
   const activeFilterCount = [
     filters.status,
     filters.tripType,
     filters.tripGroupId,
+    filters.ownerId,
+    filters.unassigned,
+    filters.hasBookings,
     filters.isArchived !== undefined,
     (filters.tags?.length ?? 0) > 0,
+    filters.startDateFrom || filters.startDateTo,
+    filters.endDateFrom || filters.endDateTo,
+    filters.createdAtFrom || filters.createdAtTo,
   ].filter(Boolean).length
 
   const handleStatusSelect = (status: string) => {
@@ -93,11 +111,22 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
       search: filters.search,
       sortBy: filters.sortBy,
       sortOrder: filters.sortOrder,
+      ownerId: undefined,
+      unassigned: undefined,
+      hasBookings: undefined,
+      startDateFrom: undefined,
+      startDateTo: undefined,
+      endDateFrom: undefined,
+      endDateTo: undefined,
+      createdAtFrom: undefined,
+      createdAtTo: undefined,
+      isArchived: undefined,
+      primaryContactId: undefined,
     })
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {/* Status Filter */}
       <Popover open={statusOpen} onOpenChange={setStatusOpen}>
         <PopoverTrigger asChild>
@@ -274,6 +303,78 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
         </Popover>
       )}
 
+      {/* Assigned Agent */}
+      <Popover open={agentOpen} onOpenChange={setAgentOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className={cn('gap-1', filters.ownerId && 'border-blue-500 text-blue-700')}>
+            <UserCircle className="h-4 w-4" />
+            Agent
+            {filters.ownerId && <span className="ml-1 rounded bg-blue-100 px-1 text-xs">{1}</span>}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[220px] p-2" align="start">
+          <Command>
+            <CommandInput placeholder="Search agents..." />
+            <CommandList>
+              <CommandEmpty>No agents found</CommandEmpty>
+              <CommandGroup>
+                {users.map((user) => (
+                  <CommandItem
+                    key={user.id}
+                    onSelect={() => {
+                      onFiltersChange({ ...filters, ownerId: filters.ownerId === user.id ? undefined : user.id, unassigned: undefined, page: 1 })
+                      setAgentOpen(false)
+                    }}
+                  >
+                    <Check className={cn('mr-2 h-4 w-4', filters.ownerId === user.id ? 'opacity-100' : 'opacity-0')} />
+                    {[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      {/* Unassigned */}
+      <label className="flex items-center gap-2 text-sm text-ash-700">
+        <Checkbox
+          checked={!!filters.unassigned}
+          onCheckedChange={(checked) =>
+            onFiltersChange({ ...filters, unassigned: checked ? true : undefined, ownerId: checked ? undefined : filters.ownerId, page: 1 })
+          }
+        />
+        Unassigned
+      </label>
+
+      {/* Has Bookings */}
+      <Select
+        value={filters.hasBookings || 'any'}
+        onValueChange={(value) =>
+          onFiltersChange({ ...filters, hasBookings: value === 'any' ? undefined : value as 'yes' | 'no', page: 1 })
+        }
+      >
+        <SelectTrigger className="h-8 w-[150px] text-sm">
+          <SelectValue placeholder="Bookings" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="any">Any Bookings</SelectItem>
+          <SelectItem value="yes">Has Bookings</SelectItem>
+          <SelectItem value="no">No Bookings</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Show Archived */}
+      <label className="flex items-center gap-2 text-sm text-ash-700">
+        <Checkbox
+          checked={filters.isArchived === true}
+          onCheckedChange={(checked) =>
+            onFiltersChange({ ...filters, isArchived: checked ? true : undefined, page: 1 })
+          }
+        />
+        Archived
+      </label>
+
       {/* Clear Filters */}
       {activeFilterCount > 0 && (
         <Button
@@ -286,6 +387,61 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
           Clear ({activeFilterCount})
         </Button>
       )}
+
+      {/* Date Range Filters — full-width row */}
+      {/* Start Date Range */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-ash-500 w-16 flex-shrink-0">Departs:</span>
+        <input
+          type="date"
+          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
+          value={filters.startDateFrom || ''}
+          onChange={(e) => onFiltersChange({ ...filters, startDateFrom: e.target.value || undefined, page: 1 })}
+        />
+        <span className="text-xs text-ash-400">&mdash;</span>
+        <input
+          type="date"
+          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
+          value={filters.startDateTo || ''}
+          onChange={(e) => onFiltersChange({ ...filters, startDateTo: e.target.value || undefined, page: 1 })}
+        />
+      </div>
+
+      {/* End Date Range */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-ash-500 w-16 flex-shrink-0">Returns:</span>
+        <input
+          type="date"
+          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
+          value={filters.endDateFrom || ''}
+          onChange={(e) => onFiltersChange({ ...filters, endDateFrom: e.target.value || undefined, page: 1 })}
+        />
+        <span className="text-xs text-ash-400">&mdash;</span>
+        <input
+          type="date"
+          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
+          value={filters.endDateTo || ''}
+          onChange={(e) => onFiltersChange({ ...filters, endDateTo: e.target.value || undefined, page: 1 })}
+        />
+      </div>
+
+      {/* Created Date Range */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-ash-500 w-16 flex-shrink-0">Created:</span>
+        <input
+          type="date"
+          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
+          value={filters.createdAtFrom || ''}
+          onChange={(e) => onFiltersChange({ ...filters, createdAtFrom: e.target.value || undefined, page: 1 })}
+        />
+        <span className="text-xs text-ash-400">&mdash;</span>
+        <input
+          type="date"
+          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
+          value={filters.createdAtTo || ''}
+          onChange={(e) => onFiltersChange({ ...filters, createdAtTo: e.target.value || undefined, page: 1 })}
+        />
+      </div>
     </div>
   )
 }

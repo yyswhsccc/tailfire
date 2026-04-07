@@ -28,25 +28,26 @@ The backend DTO (`trip-filter.dto.ts`) already supports 11 filter types. The fro
 ### Need Backend + Frontend
 | Filter | Notes |
 |--------|-------|
-| **Has Bookings** | New backend filter — trips with at least one booked activity |
-| **Created Date Range** | New backend fields — `createdAtFrom`, `createdAtTo` |
+| **Has Bookings** | New backend filter — EXISTS on `itinerary_activities.booking_status = 'booked'` (pattern from `trip-lifecycle.service.ts:140`). String tri-state: `'yes' \| 'no'` (not boolean — query builder drops false). |
+| **Created Date Range** | New backend fields — `createdAtFrom`, `createdAtTo`. `createdAt` is timestamptz, so `createdAtTo` must use `<= '{date}T23:59:59Z'` for inclusive end-of-day. |
+| **Unassigned** | New backend field — `unassigned: boolean`. Cannot use `ownerId=null` because query builder drops null values and DTO only accepts UUID. |
 
 ### Frontend Filter Panel Additions
 
 Add these to `trips-filter-panel.tsx`:
 
-1. **Assigned Agent** — User dropdown (from `useUsers`). Include "Unassigned" option that sends `ownerId=null`.
+1. **Assigned Agent** — User dropdown (from `useUsers`). Separate "Unassigned" checkbox that sends `unassigned=true` (NOT `ownerId=null`).
 2. **Start Date Range** — Two date pickers (from/to)
 3. **End Date Range** — Two date pickers (from/to)
 4. **Created Date Range** — Two date pickers (from/to)
-5. **Primary Contact** — Contact search input (from contacts API)
-6. **Has Bookings** — Toggle (yes/no/any)
-7. **Archived** — Toggle (show archived)
+5. **Primary Contact** — Async contact search input (from contacts API)
+6. **Has Bookings** — Select with options: Any (default), Yes, No (string values, not boolean)
+7. **Archived** — Toggle (exact filter, not "show archived too")
 
 ### Files
 | File | Change |
 |------|--------|
-| `apps/api/src/trips/dto/trip-filter.dto.ts` | Add `createdAtFrom`, `createdAtTo`, `hasBookings` |
+| `apps/api/src/trips/dto/trip-filter.dto.ts` | Add `createdAtFrom`, `createdAtTo`, `hasBookings`, `unassigned` |
 | `apps/api/src/trips/trips.service.ts` | Add created date + has bookings filter conditions |
 | `packages/shared-types/src/api/trips.types.ts` | Add new filter fields to TripFilterDto interface |
 | `apps/admin/src/components/trips/trips-filter-panel.tsx` | Add all new filter UI controls |
@@ -60,28 +61,25 @@ Add these to `trips-filter-panel.tsx`:
 
 When a trip is reassigned (single or bulk), the receiving agent gets an email with raw JSON content instead of formatted HTML.
 
-### Root Cause
+### Root Cause (confirmed by Codex)
 
-The `trip.updated` event handler in `notification-events.listener.ts` (lines 113-147) calls `NotificationService.send()` with:
-- `title: 'Trip Assigned to You'`
-- `body: 'Trip "{tripName}" has been assigned to you'`
-- `data: { tripId, tripName, previousOwnerId }` (JSON payload)
-
-`NotificationService.send()` routes to email based on user preferences. The email channel likely renders the `data` field as part of the email body, resulting in raw JSON.
+`notification.service.ts:555` literally appends `<pre>{JSON.stringify(data)}</pre>` to the email body. The `trip.updated` event handler passes `data: { tripId, tripName, previousOwnerId }` which gets serialized as raw JSON in the email.
 
 ### Fix for Single Reassign
 
-Create a proper `trip-reassignment.template.ts` email template. When the `trip.updated` event fires with an ownerId change, send the email using this template instead of the generic notification-to-email path.
+1. Create a proper `trip-reassignment.template.ts` email template with HTML formatting
+2. In the `trip.updated` notification listener, use the template for ownerId changes instead of the generic notification-to-email path
+3. **Thread `auth.userId` through `reassignTripOwner()`** so the template can show "{adminName} assigned trip..." (currently `actorId` is null)
 
 ### Fix for Bulk Reassign
 
-Currently `bulkReassign()` calls `reassignTripOwner()` per trip, each emitting a `trip.updated` event → individual notification per trip → individual email per trip.
+Currently `bulkReassign()` calls `reassignTripOwner()` per trip, each emitting a `trip.updated` event → individual notification + email per trip.
 
 **Fix:**
-1. Add a `suppressNotifications` flag to `reassignTripOwner()`
-2. `bulkReassign()` passes `suppressNotifications: true` for each trip
-3. After all trips are processed, emit ONE `trips.bulk_reassigned` event with the full summary
-4. Notification listener handles `trips.bulk_reassigned` → sends one summary email to the receiving agent and one to the admin who triggered it
+1. Add a `suppressAssignmentNotification` flag to `reassignTripOwner()` — **do NOT suppress `trip.updated` entirely** (activity logs depend on it). Only suppress the assignment notification/email.
+2. `bulkReassign()` passes `suppressAssignmentNotification: true` for each trip
+3. After all trips are processed, send ONE summary notification + email to the receiving agent and admin
+4. Thread `auth.userId` through `bulkReassign()` for actor context in email template
 
 ### Email Templates Needed
 

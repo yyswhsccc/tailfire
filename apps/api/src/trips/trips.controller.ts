@@ -209,7 +209,7 @@ export class TripsController {
     if (auth.role !== 'admin') {
       throw new ForbiddenException('Only admins can bulk reassign trips')
     }
-    return this.tripsService.bulkReassign(dto.tripIds, dto.newOwnerId, auth.agencyId)
+    return this.tripsService.bulkReassign(dto.tripIds, dto.newOwnerId, auth.agencyId, auth.userId)
   }
 
   // ============================================================================
@@ -987,7 +987,7 @@ export class TripsController {
     if (auth.role !== 'admin') {
       throw new ForbiddenException('Only admins can re-assign trip ownership')
     }
-    return this.tripsService.updateOwner(id, dto.ownerId, auth.agencyId)
+    return this.tripsService.updateOwner(id, dto.ownerId, auth.agencyId, auth.userId)
   }
 
   // ============================================================================

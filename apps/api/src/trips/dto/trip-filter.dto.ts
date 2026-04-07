@@ -88,6 +88,16 @@ export class TripFilterDto {
   @IsBoolean()
   ungrouped?: boolean
 
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  unassigned?: boolean
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['yes', 'no'])
+  hasBookings?: 'yes' | 'no'
+
   // Date filters
   @IsOptional()
   @IsDateString()
@@ -104,6 +114,14 @@ export class TripFilterDto {
   @IsOptional()
   @IsDateString()
   endDateTo?: string
+
+  @IsOptional()
+  @IsString()
+  createdAtFrom?: string
+
+  @IsOptional()
+  @IsString()
+  createdAtTo?: string
 
   // Sorting
   @IsOptional()
