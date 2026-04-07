@@ -241,6 +241,9 @@ export interface ContactFilterDto {
   contactType?: 'lead' | 'client'
   contactStatus?: string[]
 
+  // Scope
+  scope?: 'mine' | 'all'
+
   // Sorting
   sortBy?: 'firstName' | 'lastName' | 'email' | 'contactType' | 'contactStatus' | 'dateOfBirth' | 'createdAt' | 'updatedAt'
   sortOrder?: 'asc' | 'desc'
@@ -370,7 +373,9 @@ export interface ContactResponseDto {
   updatedAt: string // ISO timestamp
 
   // Access level indicator (set by ContactAccessService.applyAccessControl)
-  _accessLevel?: 'basic' | 'full'
+  _accessLevel?: 'full' | 'basic'
+  _ownerName?: string | null
+  _shareRequestStatus?: 'none' | 'pending' | 'approved' | 'denied' | null
 }
 
 /**
