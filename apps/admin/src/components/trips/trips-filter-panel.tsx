@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Check, UserCircle } from 'lucide-react'
+import { X, Check, UserCircle, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -51,6 +51,7 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
   const [groupOpen, setGroupOpen] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
   const [agentOpen, setAgentOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const { data: filterOptions } = useTripFilterOptions()
   const { data: usersData } = useUsers({ status: 'active', limit: 100 })
   const users = usersData?.users ?? []
@@ -336,44 +337,16 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
         </PopoverContent>
       </Popover>
 
-      {/* Unassigned */}
-      <label className="flex items-center gap-2 text-sm text-ash-700">
-        <Checkbox
-          checked={!!filters.unassigned}
-          onCheckedChange={(checked) =>
-            onFiltersChange({ ...filters, unassigned: checked ? true : undefined, ownerId: checked ? undefined : filters.ownerId, page: 1 })
-          }
-        />
-        Unassigned
-      </label>
-
-      {/* Has Bookings */}
-      <Select
-        value={filters.hasBookings || 'any'}
-        onValueChange={(value) =>
-          onFiltersChange({ ...filters, hasBookings: value === 'any' ? undefined : value as 'yes' | 'no', page: 1 })
-        }
+      {/* More Filters Toggle */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setMoreOpen(!moreOpen)}
+        className={cn(moreOpen && 'border-phoenix-gold-500 bg-phoenix-gold-50')}
       >
-        <SelectTrigger className="h-8 w-[150px] text-sm">
-          <SelectValue placeholder="Bookings" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">Any Bookings</SelectItem>
-          <SelectItem value="yes">Has Bookings</SelectItem>
-          <SelectItem value="no">No Bookings</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {/* Show Archived */}
-      <label className="flex items-center gap-2 text-sm text-ash-700">
-        <Checkbox
-          checked={filters.isArchived === true}
-          onCheckedChange={(checked) =>
-            onFiltersChange({ ...filters, isArchived: checked ? true : undefined, page: 1 })
-          }
-        />
-        Archived
-      </label>
+        <SlidersHorizontal className="mr-1 h-3.5 w-3.5" />
+        More
+      </Button>
 
       {/* Clear Filters */}
       {activeFilterCount > 0 && (
@@ -388,60 +361,106 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
         </Button>
       )}
 
-      {/* Date Range Filters — full-width row */}
-      {/* Start Date Range */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-ash-500 w-16 flex-shrink-0">Departs:</span>
-        <input
-          type="date"
-          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
-          value={filters.startDateFrom || ''}
-          onChange={(e) => onFiltersChange({ ...filters, startDateFrom: e.target.value || undefined, page: 1 })}
-        />
-        <span className="text-xs text-ash-400">&mdash;</span>
-        <input
-          type="date"
-          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
-          value={filters.startDateTo || ''}
-          onChange={(e) => onFiltersChange({ ...filters, startDateTo: e.target.value || undefined, page: 1 })}
-        />
-      </div>
+      {/* Expanded Filters */}
+      {moreOpen && (
+        <div className="w-full border-t border-ash-200 pt-3 mt-1 flex flex-wrap items-center gap-3">
+          {/* Unassigned */}
+          <label className="flex items-center gap-2 text-sm text-ash-700">
+            <Checkbox
+              checked={!!filters.unassigned}
+              onCheckedChange={(checked) =>
+                onFiltersChange({ ...filters, unassigned: checked ? true : undefined, ownerId: checked ? undefined : filters.ownerId, page: 1 })
+              }
+            />
+            Unassigned
+          </label>
 
-      {/* End Date Range */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-ash-500 w-16 flex-shrink-0">Returns:</span>
-        <input
-          type="date"
-          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
-          value={filters.endDateFrom || ''}
-          onChange={(e) => onFiltersChange({ ...filters, endDateFrom: e.target.value || undefined, page: 1 })}
-        />
-        <span className="text-xs text-ash-400">&mdash;</span>
-        <input
-          type="date"
-          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
-          value={filters.endDateTo || ''}
-          onChange={(e) => onFiltersChange({ ...filters, endDateTo: e.target.value || undefined, page: 1 })}
-        />
-      </div>
+          {/* Has Bookings */}
+          <Select
+            value={filters.hasBookings || 'any'}
+            onValueChange={(value) =>
+              onFiltersChange({ ...filters, hasBookings: value === 'any' ? undefined : value as 'yes' | 'no', page: 1 })
+            }
+          >
+            <SelectTrigger className="h-8 w-[150px] text-sm">
+              <SelectValue placeholder="Bookings" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any Bookings</SelectItem>
+              <SelectItem value="yes">Has Bookings</SelectItem>
+              <SelectItem value="no">No Bookings</SelectItem>
+            </SelectContent>
+          </Select>
 
-      {/* Created Date Range */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-ash-500 w-16 flex-shrink-0">Created:</span>
-        <input
-          type="date"
-          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
-          value={filters.createdAtFrom || ''}
-          onChange={(e) => onFiltersChange({ ...filters, createdAtFrom: e.target.value || undefined, page: 1 })}
-        />
-        <span className="text-xs text-ash-400">&mdash;</span>
-        <input
-          type="date"
-          className="h-8 rounded-md border border-ash-200 px-2 text-xs w-[130px]"
-          value={filters.createdAtTo || ''}
-          onChange={(e) => onFiltersChange({ ...filters, createdAtTo: e.target.value || undefined, page: 1 })}
-        />
-      </div>
+          {/* Show Archived */}
+          <label className="flex items-center gap-2 text-sm text-ash-700">
+            <Checkbox
+              checked={filters.isArchived === true}
+              onCheckedChange={(checked) =>
+                onFiltersChange({ ...filters, isArchived: checked ? true : undefined, page: 1 })
+              }
+            />
+            Archived
+          </label>
+
+          {/* Date Ranges */}
+          <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-3 mt-1">
+            {/* Start Date Range */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-ash-500 w-16 flex-shrink-0">Departs:</span>
+              <input
+                type="date"
+                className="h-8 rounded-md border border-ash-200 px-2 text-xs flex-1 min-w-0"
+                value={filters.startDateFrom || ''}
+                onChange={(e) => onFiltersChange({ ...filters, startDateFrom: e.target.value || undefined, page: 1 })}
+              />
+              <span className="text-xs text-ash-400">&mdash;</span>
+              <input
+                type="date"
+                className="h-8 rounded-md border border-ash-200 px-2 text-xs flex-1 min-w-0"
+                value={filters.startDateTo || ''}
+                onChange={(e) => onFiltersChange({ ...filters, startDateTo: e.target.value || undefined, page: 1 })}
+              />
+            </div>
+
+            {/* End Date Range */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-ash-500 w-16 flex-shrink-0">Returns:</span>
+              <input
+                type="date"
+                className="h-8 rounded-md border border-ash-200 px-2 text-xs flex-1 min-w-0"
+                value={filters.endDateFrom || ''}
+                onChange={(e) => onFiltersChange({ ...filters, endDateFrom: e.target.value || undefined, page: 1 })}
+              />
+              <span className="text-xs text-ash-400">&mdash;</span>
+              <input
+                type="date"
+                className="h-8 rounded-md border border-ash-200 px-2 text-xs flex-1 min-w-0"
+                value={filters.endDateTo || ''}
+                onChange={(e) => onFiltersChange({ ...filters, endDateTo: e.target.value || undefined, page: 1 })}
+              />
+            </div>
+
+            {/* Created Date Range */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-ash-500 w-16 flex-shrink-0">Created:</span>
+              <input
+                type="date"
+                className="h-8 rounded-md border border-ash-200 px-2 text-xs flex-1 min-w-0"
+                value={filters.createdAtFrom || ''}
+                onChange={(e) => onFiltersChange({ ...filters, createdAtFrom: e.target.value || undefined, page: 1 })}
+              />
+              <span className="text-xs text-ash-400">&mdash;</span>
+              <input
+                type="date"
+                className="h-8 rounded-md border border-ash-200 px-2 text-xs flex-1 min-w-0"
+                value={filters.createdAtTo || ''}
+                onChange={(e) => onFiltersChange({ ...filters, createdAtTo: e.target.value || undefined, page: 1 })}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
