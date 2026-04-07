@@ -127,7 +127,8 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
       {/* Status Filter */}
       <Popover open={statusOpen} onOpenChange={setStatusOpen}>
         <PopoverTrigger asChild>
@@ -361,9 +362,11 @@ export function TripsFilterPanel({ filters, onFiltersChange }: TripsFilterPanelP
         </Button>
       )}
 
-      {/* Expanded Filters */}
+      </div>
+
+      {/* Expanded Filters — separate row below primary filters */}
       {moreOpen && (
-        <div className="w-full border-t border-ash-200 pt-3 mt-1 flex flex-wrap items-center gap-3">
+        <div className="border-t border-ash-200 pt-3 flex flex-wrap items-center gap-3">
           {/* Unassigned */}
           <label className="flex items-center gap-2 text-sm text-ash-700">
             <Checkbox
