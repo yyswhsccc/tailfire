@@ -6,6 +6,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { OnEvent } from '@nestjs/event-emitter'
 import { eq } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
@@ -54,6 +55,7 @@ export class NotificationEventsListener {
     private readonly db: DatabaseService,
     private readonly notificationService: NotificationService,
     private readonly emailService: EmailService,
+    private readonly configService: ConfigService,
   ) {}
 
   // =========================================================================
@@ -117,6 +119,9 @@ export class NotificationEventsListener {
     // Check if owner changed
     if (!changes?.ownerId) return
 
+    // Skip assignment notification if suppressed (bulk sends summary instead)
+    if (changes?.suppressAssignmentNotification) return
+
     const newOwnerId = changes.ownerId as string
 
     // Don't notify if the new owner made the change themselves
@@ -129,12 +134,14 @@ export class NotificationEventsListener {
     const trip = await this.getTrip(tripId)
     if (!trip) return
 
+    // Send in-app notification only (email handled by dedicated template below)
     await this.notificationService.send({
       userId: newOwnerId,
       category: 'assignment',
       title: 'Trip Assigned to You',
       body: `Trip "${tripName}" has been assigned to you`,
       actionUrl: `/trips/${tripId}`,
+      forceChannels: ['platform'],
       data: {
         tripId,
         tripName,
@@ -144,6 +151,42 @@ export class NotificationEventsListener {
     })
 
     this.logger.debug(`Sent trip.assigned notification to user ${newOwnerId} for trip ${tripId}`)
+
+    // Send formatted reassignment email (instead of generic notification email with JSON)
+    try {
+      const adminUrl = this.configService.get<string>('ADMIN_URL') || ''
+      // Get actor name
+      let adminName = 'An admin'
+      if (actorId) {
+        const [actor] = await this.db.client
+          .select({ firstName: this.db.schema.userProfiles.firstName, lastName: this.db.schema.userProfiles.lastName })
+          .from(this.db.schema.userProfiles)
+          .where(eq(this.db.schema.userProfiles.id, actorId))
+          .limit(1)
+        if (actor) {
+          adminName = [actor.firstName, actor.lastName].filter(Boolean).join(' ') || 'An admin'
+        }
+      }
+      // Get new owner email
+      const [newOwner] = await this.db.client
+        .select({ email: this.db.schema.userProfiles.email })
+        .from(this.db.schema.userProfiles)
+        .where(eq(this.db.schema.userProfiles.id, newOwnerId))
+        .limit(1)
+
+      if (newOwner?.email) {
+        await this.emailService.sendTripReassignmentEmail(
+          newOwner.email,
+          tripName,
+          adminName,
+          0, // contactsAssigned not available in single event
+          `${adminUrl}/trips/${tripId}`,
+          trip.agencyId,
+        )
+      }
+    } catch (e) {
+      this.logger.warn('Failed to send trip reassignment email', e)
+    }
   }
 
   /**
@@ -321,6 +364,59 @@ export class NotificationEventsListener {
         const message = error instanceof Error ? error.message : String(error)
         this.logger.error(`Failed to send cancellation email for trip ${event.tripId}: ${message}`)
       }
+    }
+  }
+
+  /**
+   * Handle trips.bulk_reassigned event
+   * Send a single summary email when multiple trips are reassigned at once
+   */
+  @OnEvent('trips.bulk_reassigned')
+  async handleBulkReassigned(event: {
+    tripIds: string[]
+    newOwnerId: string
+    actorId: string
+    agencyId: string
+    tripsReassigned: number
+    contactsAssigned: number
+    contactsSkipped: { contactName: string; currentOwner: string }[]
+    tripNames: string[]
+  }): Promise<void> {
+    try {
+      const adminUrl = this.configService.get<string>('ADMIN_URL') || ''
+
+      const [newOwner] = await this.db.client
+        .select({ email: this.db.schema.userProfiles.email })
+        .from(this.db.schema.userProfiles)
+        .where(eq(this.db.schema.userProfiles.id, event.newOwnerId))
+        .limit(1)
+
+      if (!newOwner?.email) return
+
+      let adminName = 'An admin'
+      const [actor] = await this.db.client
+        .select({ firstName: this.db.schema.userProfiles.firstName, lastName: this.db.schema.userProfiles.lastName })
+        .from(this.db.schema.userProfiles)
+        .where(eq(this.db.schema.userProfiles.id, event.actorId))
+        .limit(1)
+      if (actor) {
+        adminName = [actor.firstName, actor.lastName].filter(Boolean).join(' ') || 'An admin'
+      }
+
+      await this.emailService.sendBulkReassignmentEmail(
+        newOwner.email,
+        adminName,
+        event.tripsReassigned,
+        event.tripNames,
+        event.contactsAssigned,
+        event.contactsSkipped.length,
+        `${adminUrl}/trips?ownerId=${event.newOwnerId}`,
+        event.agencyId,
+      )
+
+      this.logger.debug(`Sent bulk reassignment email to ${newOwner.email} for ${event.tripsReassigned} trips`)
+    } catch (e) {
+      this.logger.warn('Failed to send bulk reassignment email', e)
     }
   }
 
