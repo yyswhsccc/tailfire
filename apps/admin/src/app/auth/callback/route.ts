@@ -55,7 +55,7 @@ export async function GET(request: Request) {
           // Don't block invite flow if activation fails
           console.warn('User activation failed (may already be active):', e)
         }
-        return NextResponse.redirect(`${origin}/profile?setup=true`)
+        return NextResponse.redirect(`${origin}/auth/set-password`)
       }
       // For recovery, redirect to password reset
       if (type === 'recovery') {
