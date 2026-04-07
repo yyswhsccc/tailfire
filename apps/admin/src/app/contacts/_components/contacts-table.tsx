@@ -1,7 +1,7 @@
 'use client'
 
 import { format } from 'date-fns'
-import { ChevronUp, ChevronDown } from 'lucide-react'
+import { ChevronUp, ChevronDown, Lock } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -252,6 +252,9 @@ export function ContactsTable({
 
             {/* 10. Tags */}
             <TableHead className={thClass}>Tags</TableHead>
+
+            {/* 11. Owner */}
+            <TableHead className={`${thClass} w-[130px]`}>Owner</TableHead>
           </TableRow>
         </TableHeader>
 
@@ -263,7 +266,7 @@ export function ContactsTable({
           {!isLoading && contacts.length === 0 && (
             <TableRow>
               <TableCell
-                colSpan={10}
+                colSpan={11}
                 className="h-32 text-center text-sm text-ash-500"
               >
                 No contacts found
@@ -317,13 +320,17 @@ export function ContactsTable({
 
                   {/* 3. Status */}
                   <TableCell className="w-[120px] px-4 py-2">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        STATUS_STYLES[contact.contactStatus] ?? 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {formatStatusLabel(contact.contactStatus)}
-                    </span>
+                    {contact.contactStatus ? (
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          STATUS_STYLES[contact.contactStatus] ?? 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {formatStatusLabel(contact.contactStatus)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-ash-400">{'\u2014'}</span>
+                    )}
                   </TableCell>
 
                   {/* 4. Type */}
@@ -412,6 +419,20 @@ export function ContactsTable({
                         </Badge>
                       )}
                     </div>
+                  </TableCell>
+
+                  {/* 11. Owner */}
+                  <TableCell className="w-[130px] px-4 py-2">
+                    {contact._accessLevel === 'basic' ? (
+                      <div className="flex items-center gap-1.5 text-ash-400">
+                        <Lock className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="text-xs truncate">{contact._ownerName || 'Unassigned'}</span>
+                      </div>
+                    ) : contact._ownerName ? (
+                      <span className="text-xs text-ash-500 truncate">{contact._ownerName}</span>
+                    ) : (
+                      <span className="text-xs text-ash-400">{'\u2014'}</span>
+                    )}
                   </TableCell>
                 </TableRow>
               )
