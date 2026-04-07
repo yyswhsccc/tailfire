@@ -51,24 +51,46 @@ Add "Reassign" button alongside existing bulk actions (tag, status, delete, merg
 
 ## Backend
 
+### Prerequisite: Consolidate Owner-Change Logic
+
+> **Codex finding:** The trip overview UI currently uses generic `PATCH /trips/:id` (which allows ownerId changes without admin check), not the dedicated `PATCH /trips/:id/owner`. The dedicated endpoint also misses collaborator sync logic that the generic update does.
+
+**Fix first:**
+1. Extract a shared `reassignTripOwner(tripId, newOwnerId, auth)` method in `trips.service.ts`
+2. This method: updates ownerId, syncs lead collaborator, cascades to contacts, returns summary
+3. Both `PATCH /trips/:id/owner` (admin-only) and generic `PATCH /trips/:id` (when ownerId changes) call this method
+4. **Remove ownerId from `UpdateTripDto`** for non-admin users — only admins can change trip ownership
+5. Use a **transaction** for the trip update + contact cascade
+
+### Contact Collection for Cascade
+
+Collect contacts via `UNION DISTINCT`:
+- `trip_travelers.contact_id` (all travelers on the trip)
+- `trips.primary_contact_id` (if set)
+- **Exclude** `trip_travelers.emergency_contact_id`
+
+Deduplicate across trips in bulk operations — report unique contacts, not per-trip rows.
+
+### Inactive Owner Definition
+
+A contact owner is considered **inactive** if:
+- `user_profiles.status != 'active'` OR `user_profiles.isActive = false`
+
 ### Modified Endpoint: `PATCH /trips/:id/owner`
 
-Currently: Sets `trips.ownerId` only.
+Uses the shared `reassignTripOwner()` method. Returns:
 
-**Enhancement:** After setting trip owner, cascade to traveler contacts:
-
-```
-1. Update trips.ownerId = newOwnerId
-2. Get all trip_travelers for this trip → get contact IDs
-3. For each contact:
-   a. If contact.ownerId IS NULL → SET contact.ownerId = newOwnerId
-   b. If contact.ownerId exists → check user_profiles.status for that owner
-      - If status != 'active' → SET contact.ownerId = newOwnerId
-      - If status == 'active' → skip (add to skipped list)
-4. Return { tripsReassigned: 1, contactsAssigned: N, contactsSkipped: [...] }
+```typescript
+{
+  trip: TripResponseDto
+  cascade: {
+    contactsAssigned: number
+    contactsSkipped: { contactName: string, currentOwner: string }[]
+  }
+}
 ```
 
-### New Endpoint: `POST /admin/trips/bulk-reassign/preview`
+### New Endpoint: `POST /trips/bulk-reassign/preview` (@AdminOnly)
 
 **Input:** `{ tripIds: string[], newOwnerId: string }`
 **Output:**
@@ -80,9 +102,9 @@ Currently: Sets `trips.ownerId` only.
 }
 ```
 
-Dry-run only — no mutations. Computes what would happen.
+Dry-run only — no mutations. Reports unique contacts across all selected trips.
 
-### New Endpoint: `POST /admin/trips/bulk-reassign`
+### New Endpoint: `POST /trips/bulk-reassign` (@AdminOnly)
 
 **Input:** `{ tripIds: string[], newOwnerId: string }`
 **Output:**
@@ -124,9 +146,9 @@ export interface BulkReassignResultDto {
 ### Backend
 | File | Change |
 |------|--------|
-| `packages/shared-types/src/api/trips.types.ts` | Add BulkReassign DTOs |
-| `apps/api/src/trips/trips.service.ts` | Add `reassignWithCascade()`, `bulkReassignPreview()`, `bulkReassign()` methods |
-| `apps/api/src/trips/trips.controller.ts` | Modify `PATCH /:id/owner`, add `POST /admin/trips/bulk-reassign/preview` and `POST /admin/trips/bulk-reassign` |
+| `packages/shared-types/src/api/trips.types.ts` | Add BulkReassign DTOs, remove ownerId from UpdateTripDto for non-admin |
+| `apps/api/src/trips/trips.service.ts` | Extract shared `reassignTripOwner()`, add `bulkReassignPreview()`, `bulkReassign()` |
+| `apps/api/src/trips/trips.controller.ts` | Modify `PATCH /:id/owner`, add `POST /trips/bulk-reassign/preview` and `POST /trips/bulk-reassign` (@AdminOnly), gate ownerId in generic update |
 
 ### Frontend
 | File | Change |
