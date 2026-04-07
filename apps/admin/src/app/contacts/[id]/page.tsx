@@ -230,7 +230,9 @@ export default function ContactDetailPage() {
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<TaskResponseDto | null>(null)
   const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useTasks(
-    gatedContactId ? { contactId: gatedContactId, sortBy: 'dueDate', sortOrder: 'asc', limit: 50 } : {},
+    gatedContactId
+      ? { contactId: gatedContactId, sortBy: 'dueDate', sortOrder: 'asc', limit: 50 }
+      : { contactId: 'none', limit: 0 },
   )
   const contactTasks = tasksData?.data ?? []
 
@@ -547,11 +549,13 @@ export default function ContactDetailPage() {
                     {/* Badges */}
                     <div className="flex items-center gap-2 pt-1 flex-wrap">
                       {/* Contact Type Badge */}
-                      <Badge
-                        variant={contact.contactType === 'lead' ? 'inbound' : 'secondary'}
-                      >
-                        {contact.contactType === 'lead' ? 'Lead' : 'Client'}
-                      </Badge>
+                      {contact.contactType && (
+                        <Badge
+                          variant={contact.contactType === 'lead' ? 'inbound' : 'secondary'}
+                        >
+                          {contact.contactType === 'lead' ? 'Lead' : 'Client'}
+                        </Badge>
+                      )}
 
                       {/* Lifecycle Status Badge (skip for leads — already shown by Contact Type Badge) */}
                       {contact.contactType !== 'lead' && contact.contactStatus && (
