@@ -19,31 +19,23 @@ import type { AuthContext } from '../auth/auth.types'
 import type { ContactResponseDto } from '../../../../packages/shared-types/src/api'
 
 /**
- * Sensitive fields to strip for non-full-access users.
- * Basic view = Name, Email, Phone, Address only.
+ * Fields visible to basic-access users.
+ * All other fields are nulled (not omitted) to preserve DTO shape.
  */
-export const SENSITIVE_FIELDS = [
-  'passportNumber',
-  'passportExpiry',
-  'passportCountry',
-  'passportIssueDate',
-  'nationality',
-  'redressNumber',
-  'knownTravelerNumber',
-  'dateOfBirth',
-  'dietaryRequirements',
-  'mobilityRequirements',
-  'trustBalanceCad',
-  'trustBalanceUsd',
-  'marketingEmailOptIn',
-  'marketingEmailOptInAt',
-  'marketingSmsOptIn',
-  'marketingSmsOptInAt',
-  'marketingPhoneOptIn',
-  'marketingPhoneOptInAt',
-  'marketingOptInSource',
-  'marketingOptOutAt',
-  'marketingOptOutReason',
+export const BASIC_VIEW_ALLOWED_FIELDS = [
+  'id',
+  'firstName',
+  'lastName',
+  'email',
+  'phone',
+  'ownerId',
+  'agencyId',
+  'isActive',
+  'createdAt',
+  'updatedAt',
+  '_accessLevel',
+  '_ownerName',
+  '_shareRequestStatus',
 ] as const
 
 export interface ContactAccessResult {
@@ -211,21 +203,21 @@ export class ContactAccessService {
   }
 
   /**
-   * Filter sensitive fields from a contact based on access level
+   * Filter contact fields based on access level using an allowlist.
+   * Non-allowed fields are set to null (not omitted) to preserve DTO shape.
    */
-  filterSensitiveFields(
-    contact: ContactResponseDto,
-    canAccessSensitive: boolean,
-  ): ContactResponseDto {
-    if (canAccessSensitive) {
-      return contact
-    }
-
-    // Strip sensitive fields
+  filterToBasicView(contact: ContactResponseDto): ContactResponseDto {
     const filtered = { ...contact }
-    for (const field of SENSITIVE_FIELDS) {
-      if (field in filtered) {
-        ;(filtered as Record<string, unknown>)[field] = null
+    const allowedSet = new Set<string>(BASIC_VIEW_ALLOWED_FIELDS)
+
+    for (const key of Object.keys(filtered)) {
+      if (!allowedSet.has(key)) {
+        const value = (filtered as Record<string, unknown>)[key]
+        if (Array.isArray(value)) {
+          ;(filtered as Record<string, unknown>)[key] = []
+        } else {
+          ;(filtered as Record<string, unknown>)[key] = null
+        }
       }
     }
     return filtered
@@ -240,8 +232,10 @@ export class ContactAccessService {
     auth: AuthContext,
   ): Promise<ContactResponseDto> {
     const access = await this.canAccessSensitiveData(contact.id, auth)
-    const filtered = this.filterSensitiveFields(contact, access.canAccessSensitive)
-    return { ...filtered, _accessLevel: access.canAccessSensitive ? 'full' : 'basic' }
+    if (access.canAccessSensitive) {
+      return { ...contact, _accessLevel: 'full' as const }
+    }
+    return { ...this.filterToBasicView(contact), _accessLevel: 'basic' as const }
   }
 
   /**
@@ -282,8 +276,8 @@ export class ContactAccessService {
         return { ...contact, _accessLevel: 'full' as const }
       }
 
-      // Basic access only
-      return { ...this.filterSensitiveFields(contact, false), _accessLevel: 'basic' as const }
+      // Basic access only — apply allowlist filter
+      return { ...this.filterToBasicView(contact), _accessLevel: 'basic' as const }
     })
   }
 
