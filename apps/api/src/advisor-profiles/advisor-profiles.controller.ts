@@ -107,6 +107,17 @@ export class AdvisorProfilesController {
   // ============================================================================
 
   /**
+   * Get the advisor profile for the currently authenticated user.
+   * GET /advisor-profiles/me
+   */
+  @Get('me')
+  @ApiOperation({ summary: 'Get advisor profile for the current user (admin)' })
+  @ApiResponse({ status: 200, description: 'Advisor profile for the current user, or null' })
+  async getMyAdvisorProfile(@GetAuthContext() auth: AuthContext) {
+    return this.advisorProfilesService.findByUserId(auth.userId)
+  }
+
+  /**
    * Create a new advisor profile.
    * POST /advisor-profiles
    */

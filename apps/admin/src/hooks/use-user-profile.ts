@@ -19,9 +19,28 @@ export const userProfileKeys = {
   public: (id: string) => [...userProfileKeys.all, 'public', id] as const,
 }
 
+// Advisor profile query keys
+export const advisorProfileKeys = {
+  all: ['advisorProfile'] as const,
+  me: () => [...advisorProfileKeys.all, 'me'] as const,
+}
+
 // ============================================================================
 // QUERIES
 // ============================================================================
+
+/**
+ * Fetch the advisor profile linked to the current authenticated user.
+ * Returns null if no advisor profile exists for this user.
+ */
+export function useMyAdvisorProfile() {
+  return useQuery({
+    queryKey: advisorProfileKeys.me(),
+    queryFn: () => api.get<{ id: string; slug: string; isPublished: boolean } | null>('/advisor-profiles/me'),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 1,
+  })
+}
 
 /**
  * Fetch current user's full profile

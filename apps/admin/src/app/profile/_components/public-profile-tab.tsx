@@ -15,7 +15,10 @@ import {
   useUpdateMyProfile,
   useUploadAvatar,
   useDeleteAvatar,
+  useMyAdvisorProfile,
 } from '@/hooks/use-user-profile'
+
+const OTA_URL = process.env.NEXT_PUBLIC_OTA_URL || 'https://ota.phoenixvoyages.ca'
 import { UserAvatar } from '@/components/user/user-avatar'
 import { AvatarCropDialog } from './avatar-crop-dialog'
 import { useProfileForm } from './profile-form-context'
@@ -47,6 +50,7 @@ interface PublicProfileFormData {
 export function PublicProfileTab() {
   const { toast } = useToast()
   const { data: profile, isLoading } = useMyProfile()
+  const { data: advisorProfile } = useMyAdvisorProfile()
   const updateProfile = useUpdateMyProfile()
   const uploadAvatar = useUploadAvatar()
   const deleteAvatar = useDeleteAvatar()
@@ -501,6 +505,53 @@ export function PublicProfileTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* My Storefront URL */}
+      {advisorProfile && (
+        <Card className="border-[#C59746]/20 bg-[#C59746]/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              My Storefront
+            </CardTitle>
+            <CardDescription>
+              Share this link with clients and prospects. All visitors who use this link will be attributed to you.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={`${OTA_URL}/advisor/${advisorProfile.slug}`}
+                className="font-mono text-sm"
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${OTA_URL}/advisor/${advisorProfile.slug}`)
+                  toast({ title: 'Copied!', description: 'Storefront URL copied to clipboard' })
+                }}
+              >
+                Copy
+              </Button>
+            </div>
+            <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
+              <a
+                href={`${OTA_URL}/advisor/${advisorProfile.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#C59746] hover:underline"
+              >
+                Preview storefront →
+              </a>
+              <span>·</span>
+              <span>Referral code: <code className="rounded bg-muted px-1">{advisorProfile.slug}</code></span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Submit Button */}
       <div className="flex justify-end">
