@@ -3,7 +3,7 @@
  */
 
 import { Test, TestingModule } from '@nestjs/testing'
-import { ContactAccessService, SENSITIVE_FIELDS } from './contact-access.service'
+import { ContactAccessService, BASIC_VIEW_ALLOWED_FIELDS } from './contact-access.service'
 import { DatabaseService } from '../db/database.service'
 import type { AuthContext } from '../auth/auth.types'
 
@@ -291,16 +291,16 @@ describe('ContactAccessService', () => {
       expect(result.marketingEmailOptIn).toBeNull()
     })
 
-    it('should contain all expected sensitive fields', () => {
-      expect(SENSITIVE_FIELDS).toContain('passportNumber')
-      expect(SENSITIVE_FIELDS).toContain('passportExpiry')
-      expect(SENSITIVE_FIELDS).toContain('passportCountry')
-      expect(SENSITIVE_FIELDS).toContain('dateOfBirth')
-      expect(SENSITIVE_FIELDS).toContain('dietaryRequirements')
-      expect(SENSITIVE_FIELDS).toContain('mobilityRequirements')
-      expect(SENSITIVE_FIELDS).toContain('trustBalanceCad')
-      expect(SENSITIVE_FIELDS).toContain('marketingEmailOptIn')
-      expect(SENSITIVE_FIELDS.length).toBe(21)
+    it('should contain all expected allowed fields for basic view', () => {
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('id')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('firstName')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('lastName')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('email')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('phone')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('ownerId')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('_accessLevel')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('_ownerName')
+      expect(BASIC_VIEW_ALLOWED_FIELDS).toContain('_shareRequestStatus')
     })
   })
 
