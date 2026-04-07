@@ -857,7 +857,7 @@ export class TripsService {
    * Can set to any user in the agency or null (only if status is 'inbound')
    * Now delegates to reassignTripOwner for non-null owners to get contact cascade.
    */
-  async updateOwner(id: string, ownerId: string | null, agencyId: string) {
+  async updateOwner(id: string, ownerId: string | null, agencyId: string, actorId?: string) {
     if (ownerId === null) {
       // Null owner — just update, no cascade
       const [existingTrip] = await this.db.client
@@ -878,7 +878,7 @@ export class TripsService {
       return { trip: this.mapToResponseDto(trip!), cascade: { contactsAssigned: 0, contactsSkipped: [] } }
     }
 
-    const cascade = await this.reassignTripOwner(id, ownerId, agencyId)
+    const cascade = await this.reassignTripOwner(id, ownerId, agencyId, { actorId })
     const [updatedTrip] = await this.db.client
       .select().from(this.db.schema.trips)
       .where(eq(this.db.schema.trips.id, id)).limit(1)
@@ -904,6 +904,7 @@ export class TripsService {
     tripId: string,
     newOwnerId: string,
     agencyId: string,
+    options?: { actorId?: string; suppressAssignmentNotification?: boolean },
   ): Promise<{ contactsAssigned: number; contactsSkipped: { contactName: string; currentOwner: string }[] }> {
     // 1. Get existing trip
     const [existingTrip] = await this.db.client
@@ -1024,7 +1025,10 @@ export class TripsService {
     // 2e. Emit trip.updated event
     this.eventEmitter.emit(
       'trip.updated',
-      new TripUpdatedEvent(existingTrip.id, existingTrip.name, null, { ownerId: newOwnerId }),
+      new TripUpdatedEvent(tripId, existingTrip.name, options?.actorId || null, {
+        ownerId: newOwnerId,
+        suppressAssignmentNotification: options?.suppressAssignmentNotification,
+      }),
     )
 
     return { contactsAssigned, contactsSkipped }
@@ -1502,13 +1506,24 @@ export class TripsService {
    * Iterates over all trips, calling reassignTripOwner for each,
    * and deduplicates skipped-contact reports across trips.
    */
-  async bulkReassign(tripIds: string[], newOwnerId: string, agencyId: string) {
+  async bulkReassign(tripIds: string[], newOwnerId: string, agencyId: string, actorId: string) {
     let totalContactsAssigned = 0
     const allSkipped: { contactName: string; currentOwner: string }[] = []
     const processedSkipKeys = new Set<string>()
+    const tripNames: string[] = []
 
     for (const tripId of tripIds) {
-      const { contactsAssigned, contactsSkipped } = await this.reassignTripOwner(tripId, newOwnerId, agencyId)
+      const [trip] = await this.db.client
+        .select({ name: this.db.schema.trips.name })
+        .from(this.db.schema.trips)
+        .where(eq(this.db.schema.trips.id, tripId))
+        .limit(1)
+      if (trip?.name) tripNames.push(trip.name)
+
+      const { contactsAssigned, contactsSkipped } = await this.reassignTripOwner(
+        tripId, newOwnerId, agencyId,
+        { actorId, suppressAssignmentNotification: true },
+      )
       totalContactsAssigned += contactsAssigned
       for (const s of contactsSkipped) {
         const key = `${s.contactName}|${s.currentOwner}`
@@ -1518,6 +1533,17 @@ export class TripsService {
         }
       }
     }
+
+    this.eventEmitter.emit('trips.bulk_reassigned', {
+      tripIds,
+      newOwnerId,
+      actorId,
+      agencyId,
+      tripsReassigned: tripIds.length,
+      contactsAssigned: totalContactsAssigned,
+      contactsSkipped: allSkipped,
+      tripNames,
+    })
 
     return { tripsReassigned: tripIds.length, contactsAssigned: totalContactsAssigned, contactsSkipped: allSkipped }
   }
