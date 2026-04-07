@@ -45,22 +45,26 @@ export default function WelcomePage() {
   const firstName = profile?.firstName || 'there'
 
   const [buttonError, setButtonError] = useState<string | null>(null)
+  const [isNavigating, setIsNavigating] = useState(false)
 
   const handleGetStarted = async () => {
+    if (isNavigating) return
+    setIsNavigating(true)
     setButtonError(null)
     try {
       await updateProfile.mutateAsync({
         platformPreferences: {
-          ...(profile?.platformPreferences || {}),
           onboardingCompletedAt: new Date().toISOString(),
         },
       })
-      router.replace('/dashboard')
     } catch (error) {
+      // Log but don't block — navigate anyway
       const msg = error instanceof Error ? error.message : String(error)
-      console.error('Onboarding error:', msg)
+      console.error('Onboarding save error (non-blocking):', msg)
       setButtonError(msg)
     }
+    // Always navigate, even if save failed — prevents loop
+    router.replace('/dashboard')
   }
 
   return (
@@ -122,9 +126,9 @@ export default function WelcomePage() {
           <Button
             size="lg"
             onClick={handleGetStarted}
-            disabled={updateProfile.isPending}
+            disabled={isNavigating || updateProfile.isPending}
           >
-            {updateProfile.isPending ? 'Setting up...' : 'Get Started'}
+            {isNavigating || updateProfile.isPending ? 'Setting up...' : 'Get Started'}
           </Button>
           {buttonError && (
             <p className="text-sm text-red-600">{buttonError}</p>

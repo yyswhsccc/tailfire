@@ -21,17 +21,18 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { data: profile, isLoading } = useMyProfile()
+  const { data: profile, isLoading, isFetching } = useMyProfile()
 
   useEffect(() => {
-    if (isLoading || !profile) return
+    // Wait for initial load AND any refetch to settle before redirecting
+    if (isLoading || isFetching || !profile) return
     if (isExempt(pathname)) return
 
     const onboardingDone = profile.platformPreferences?.onboardingCompletedAt
     if (!onboardingDone) {
       router.replace('/welcome')
     }
-  }, [profile, isLoading, pathname, router])
+  }, [profile, isLoading, isFetching, pathname, router])
 
   return (
     <div className="min-h-screen bg-ash-50">
