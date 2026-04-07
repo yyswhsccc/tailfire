@@ -28,7 +28,7 @@ async function fetchAdvisor(slug: string): Promise<AdvisorProfile | null> {
 async function fetchAdvisorTrips(slug: string): Promise<PublishedTrip[]> {
   try {
     return await publicFetch<PublishedTrip[]>(
-      `/advisor-profiles/by-slug/${slug}/published-trips`,
+      `/advisor-profiles/by-slug/${slug}/trips`,
       { next: { tags: [`advisor-${slug}-trips`] } },
     );
   } catch {

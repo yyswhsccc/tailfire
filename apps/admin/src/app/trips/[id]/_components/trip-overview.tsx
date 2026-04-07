@@ -22,6 +22,7 @@ import { useUsers } from '@/hooks/use-users'
 import { useItineraries } from '@/hooks/use-itineraries'
 import { useTripTags, useUpdateTripTags, useCreateAndAssignTripTag } from '@/hooks/use-tags'
 import { EditTravelersDialog } from './edit-travelers-dialog'
+import { toast } from 'sonner'
 
 interface TripOverviewProps {
   trip: TripResponseDto
@@ -453,7 +454,14 @@ export function TripOverview({ trip }: TripOverviewProps) {
               <Select
                 value={trip.ownerId || ''}
                 onValueChange={(value) => {
-                  handleUpdateSetting('ownerId', value || null)
+                  updateTrip.mutate(
+                    { id: trip.id, data: { ownerId: value || null } as any },
+                    {
+                      onSuccess: () => {
+                        toast.success('Trip owner updated. Contact assignments will be updated automatically.')
+                      },
+                    },
+                  )
                 }}
               >
                 <SelectTrigger id="assigned-agent">

@@ -1382,7 +1382,7 @@ export class TripsService {
    * Collects unique contacts across all selected trips, classifies each
    * by cascade policy, and returns a preview of what would happen.
    */
-  async bulkReassignPreview(tripIds: string[], newOwnerId: string, agencyId: string) {
+  async bulkReassignPreview(tripIds: string[], newOwnerId: string, _agencyId: string) {
     const contactMap = new Map<string, { id: string; firstName: string | null; lastName: string | null; ownerId: string | null }>()
 
     for (const tripId of tripIds) {
@@ -1908,6 +1908,10 @@ export class TripsService {
       actorId,
       metadata: { shareToken },
     })
+
+    if (!updated) {
+      throw new NotFoundException(`Trip ${id} not found`)
+    }
 
     // Auto-set primary contact to 'quoted' if they're still in 'prospecting'
     if (updated.primaryContactId) {
