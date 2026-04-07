@@ -31,7 +31,7 @@ export function AdvisorContactForm({ advisorName, advisorSlug }: AdvisorContactF
           email: email.trim(),
           phone: phone.trim() || undefined,
           message: message.trim() || undefined,
-          source: 'advisor_contact_form',
+          source: 'advisor_inquiry',
           advisorSlug,
         }),
       })

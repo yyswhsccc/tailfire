@@ -30,11 +30,9 @@ export function middleware(request: NextRequest) {
   const advisorSlug = extractAdvisorSlug(request)
 
   if (advisorSlug) {
-    // Set referral cookie only if one is not already present
-    const existingRef = request.cookies.get('ota_ref')?.value
-    if (!existingRef) {
-      response.cookies.set('ota_ref', advisorSlug, cookieOptions)
-    }
+    // Always overwrite ota_ref when visiting an advisor page or using ?ref=
+    // The most recent advisor interaction gets attribution (last-touch)
+    response.cookies.set('ota_ref', advisorSlug, cookieOptions)
   }
 
   // Ensure an anonymous session cookie exists
