@@ -47,13 +47,18 @@ export default function WelcomePage() {
     updateProfile.mutate(
       {
         platformPreferences: {
-          ...profile?.platformPreferences,
+          ...(profile?.platformPreferences || {}),
           onboardingCompletedAt: new Date().toISOString(),
         },
       },
       {
         onSuccess: () => {
-          router.push('/dashboard')
+          router.replace('/dashboard')
+        },
+        onError: (error) => {
+          console.error('Failed to complete onboarding:', error)
+          // Navigate anyway — don't block the user
+          router.replace('/dashboard')
         },
       },
     )
