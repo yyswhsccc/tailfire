@@ -101,8 +101,11 @@ export class ContactsController {
    * Returns tag names actually in use on contacts (visibility-scoped).
    */
   @Get('filter-options')
-  async getFilterOptions(@GetAuthContext() auth: AuthContext): Promise<{ tags: string[] }> {
-    return this.contactsService.getContactFilterOptions(auth.agencyId, auth.userId)
+  async getFilterOptions(
+    @GetAuthContext() auth: AuthContext,
+    @Query('scope') scope?: 'mine' | 'all',
+  ): Promise<{ tags: string[] }> {
+    return this.contactsService.getContactFilterOptions(auth.agencyId, auth.userId, scope)
   }
 
   /**

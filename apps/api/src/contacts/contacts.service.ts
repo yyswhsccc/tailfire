@@ -160,6 +160,22 @@ export class ContactsService {
     // Always filter by agency
     conditions.push(eq(this.db.schema.contacts.agencyId, agencyId))
 
+    // Scope filter: 'mine' = owned + full shares, 'all' = agency-wide
+    const scope = filters.scope || 'all'
+    if (scope === 'mine' && userId) {
+      conditions.push(
+        sql`(
+          ${this.db.schema.contacts.ownerId} = ${userId}
+          OR EXISTS (
+            SELECT 1 FROM contact_shares cs
+            WHERE cs.contact_id = contacts.id
+            AND cs.shared_with_user_id = ${userId}
+            AND cs.access_level = 'full'
+          )
+        )`,
+      )
+    }
+
     // Filter by active status when explicitly requested; show all when omitted
     if (filters.isActive !== undefined) {
       conditions.push(eq(this.db.schema.contacts.isActive, filters.isActive))
@@ -961,21 +977,37 @@ export class ContactsService {
    *
    * Returns tag names actually in use on contacts (visibility-scoped).
    */
-  async getContactFilterOptions(agencyId: string, userId: string): Promise<{ tags: string[] }> {
+  async getContactFilterOptions(agencyId: string, userId: string, scope?: 'mine' | 'all'): Promise<{ tags: string[] }> {
+    const conditions = [
+      eq(this.db.schema.contacts.agencyId, agencyId),
+      eq(this.db.schema.contacts.isActive, true),
+      eq(this.db.schema.tags.agencyId, agencyId),
+      or(
+        eq(this.db.schema.tags.type, 'system'),
+        and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, userId)),
+      ),
+    ]
+
+    if (scope === 'mine') {
+      conditions.push(
+        sql`(
+          ${this.db.schema.contacts.ownerId} = ${userId}
+          OR EXISTS (
+            SELECT 1 FROM contact_shares cs
+            WHERE cs.contact_id = contacts.id
+            AND cs.shared_with_user_id = ${userId}
+            AND cs.access_level = 'full'
+          )
+        )`,
+      )
+    }
+
     const tagsResult = await this.db.client
       .selectDistinct({ tag: this.db.schema.tags.name })
       .from(this.db.schema.tags)
       .innerJoin(this.db.schema.contactTags, eq(this.db.schema.tags.id, this.db.schema.contactTags.tagId))
       .innerJoin(this.db.schema.contacts, eq(this.db.schema.contacts.id, this.db.schema.contactTags.contactId))
-      .where(and(
-        eq(this.db.schema.contacts.agencyId, agencyId),
-        eq(this.db.schema.contacts.isActive, true),
-        eq(this.db.schema.tags.agencyId, agencyId),
-        or(
-          eq(this.db.schema.tags.type, 'system'),
-          and(eq(this.db.schema.tags.type, 'agent'), eq(this.db.schema.tags.createdBy, userId)),
-        ),
-      ))
+      .where(and(...conditions))
 
     const tags = tagsResult
       .map(r => r.tag)
