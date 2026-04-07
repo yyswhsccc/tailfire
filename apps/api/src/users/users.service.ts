@@ -311,16 +311,19 @@ export class UsersService {
         },
       })
 
-      if (linkError || !linkData.properties?.action_link) {
+      if (linkError || !linkData.properties?.hashed_token) {
         this.logger.error(`Failed to generate invite link: ${linkError?.message}`)
         throw new InternalServerErrorException('Failed to generate invitation')
       }
+
+      // Build direct PKCE link to our callback (bypasses Supabase verify + hash fragment)
+      const inviteLink = `${adminUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=invite`
 
       // Send branded email via Resend (no rollback needed for existing users)
       try {
         await this.emailService.sendInviteEmail(
           dto.email,
-          linkData.properties.action_link,
+          inviteLink,
           dto.firstName,
           agencyId,
           inviterName,
@@ -374,12 +377,15 @@ export class UsersService {
       },
     })
 
-    if (linkError || !linkData.properties?.action_link) {
+    if (linkError || !linkData.properties?.hashed_token) {
       // Rollback: delete the created user
       await this.supabaseAdmin.auth.admin.deleteUser(userData.user.id)
       this.logger.error(`Failed to generate invite link: ${linkError?.message}`)
       throw new InternalServerErrorException('Failed to generate invitation')
     }
+
+    // Build direct PKCE link to our callback (bypasses Supabase verify + hash fragment)
+    const inviteLink = `${adminUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=invite`
 
     // Step 3: Create user profile (with rollback on failure)
     try {
@@ -407,7 +413,7 @@ export class UsersService {
     try {
       await this.emailService.sendInviteEmail(
         dto.email,
-        linkData.properties.action_link,
+        inviteLink,
         dto.firstName,
         agencyId,
         inviterName,
@@ -607,10 +613,13 @@ export class UsersService {
       },
     })
 
-    if (linkError || !linkData.properties?.action_link) {
+    if (linkError || !linkData.properties?.hashed_token) {
       this.logger.error(`Failed to generate invite link: ${linkError?.message}`)
       throw new InternalServerErrorException('Failed to resend invitation')
     }
+
+    // Build direct PKCE link to our callback (bypasses Supabase verify + hash fragment)
+    const inviteLink = `${adminUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=invite`
 
     // Get inviter name if available
     let inviterName = 'Your Agency'
@@ -625,7 +634,7 @@ export class UsersService {
     // Send branded email
     await this.emailService.sendInviteEmail(
       user.email,
-      linkData.properties.action_link,
+      inviteLink,
       user.firstName || 'there',
       agencyId,
       inviterName,
