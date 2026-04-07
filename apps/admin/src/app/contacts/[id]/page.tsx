@@ -204,10 +204,12 @@ export default function ContactDetailPage() {
   const { isAdmin } = useUser()
   const { data: contact, isLoading, error } = useContact(contactId)
   const isBasicAccess = contact?._accessLevel === 'basic' && !isAdmin
-  const { data: contactTrips = [], isLoading: tripsLoading } = useContactTrips(contactId)
-  const { data: contactBookings = [], isLoading: bookingsLoading } = useContactBookings(contactId)
+  // Gate detail hooks: pass null until contact loads or when basic-access to prevent 403s
+  const gatedContactId = contact && !isBasicAccess ? contactId : null
+  const { data: contactTrips = [], isLoading: tripsLoading } = useContactTrips(gatedContactId)
+  const { data: contactBookings = [], isLoading: bookingsLoading } = useContactBookings(gatedContactId)
   const updateContact = useUpdateContact()
-  const { data: contactTags = [] } = useContactTags(contactId)
+  const { data: contactTags = [] } = useContactTags(gatedContactId)
   const updateContactTags = useUpdateContactTags()
   const createAndAssignContactTag = useCreateAndAssignContactTag()
 
@@ -228,12 +230,12 @@ export default function ContactDetailPage() {
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<TaskResponseDto | null>(null)
   const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useTasks(
-    { contactId, sortBy: 'dueDate', sortOrder: 'asc', limit: 50 },
+    gatedContactId ? { contactId: gatedContactId, sortBy: 'dueDate', sortOrder: 'asc', limit: 50 } : {},
   )
   const contactTasks = tasksData?.data ?? []
 
   // Payment state
-  const { data: contactPayments = [], isLoading: paymentsLoading } = useContactPaymentTransactions(contactId)
+  const { data: contactPayments = [], isLoading: paymentsLoading } = useContactPaymentTransactions(gatedContactId)
   const [selectedPaymentTx, setSelectedPaymentTx] = useState<ContactPaymentTransactionDto | null>(null)
   const [paymentDetailOpen, setPaymentDetailOpen] = useState(false)
   const [paymentDeleteConfirm, setPaymentDeleteConfirm] = useState(false)
@@ -535,6 +537,11 @@ export default function ContactDetailPage() {
                     {/* Email - only show if exists */}
                     {contact.email && (
                       <p className="text-sm text-ash-600">{contact.email}</p>
+                    )}
+
+                    {/* Phone in header for quick access (especially useful for basic-access contacts) */}
+                    {contact.phone && (
+                      <p className="text-sm text-ash-500">{contact.phone}</p>
                     )}
 
                     {/* Badges */}

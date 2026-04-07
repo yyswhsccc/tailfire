@@ -168,20 +168,21 @@ export function ContactsTable({
   const currentMonth = new Date().getMonth()
 
   // ---- Select-all logic ---------------------------------------------------
-  const allSelected = contacts.length > 0 && contacts.every((c) => selectedIds.has(c.id))
-  const someSelected = contacts.some((c) => selectedIds.has(c.id))
+  const selectableContacts = contacts.filter((c) => c._accessLevel !== 'basic')
+  const allSelected = selectableContacts.length > 0 && selectableContacts.every((c) => selectedIds.has(c.id))
+  const someSelected = selectableContacts.some((c) => selectedIds.has(c.id))
   const headerChecked = allSelected ? true : someSelected ? 'indeterminate' as const : false
 
   function handleSelectAll() {
     if (allSelected) {
-      // Deselect all visible
+      // Deselect all visible (selectable only)
       const next = new Set(selectedIds)
-      for (const c of contacts) next.delete(c.id)
+      for (const c of selectableContacts) next.delete(c.id)
       onSelectionChange(next)
     } else {
-      // Select all visible
+      // Select all visible (selectable only)
       const next = new Set(selectedIds)
-      for (const c of contacts) next.add(c.id)
+      for (const c of selectableContacts) next.add(c.id)
       onSelectionChange(next)
     }
   }
@@ -296,12 +297,16 @@ export function ContactsTable({
                 >
                   {/* 1. Checkbox */}
                   <TableCell className="w-[40px] px-4 py-2">
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => handleToggleOne(contact.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label={`Select ${contact.displayName}`}
-                    />
+                    {contact._accessLevel === 'basic' ? (
+                      <Checkbox disabled className="opacity-30" />
+                    ) : (
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => handleToggleOne(contact.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Select ${contact.displayName}`}
+                      />
+                    )}
                   </TableCell>
 
                   {/* 2. Name + Avatar */}
@@ -335,14 +340,18 @@ export function ContactsTable({
 
                   {/* 4. Type */}
                   <TableCell className="w-[80px] px-4 py-2">
-                    {contact.contactType === 'client' ? (
-                      <Badge variant="default" className="text-xs">
-                        Client
-                      </Badge>
+                    {contact.contactType ? (
+                      contact.contactType === 'client' ? (
+                        <Badge variant="default" className="text-xs">
+                          Client
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          Lead
+                        </Badge>
+                      )
                     ) : (
-                      <Badge variant="outline" className="text-xs">
-                        Lead
-                      </Badge>
+                      <span className="text-xs text-ash-400">{'\u2014'}</span>
                     )}
                   </TableCell>
 
