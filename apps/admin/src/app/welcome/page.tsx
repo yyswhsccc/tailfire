@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMyProfile, useUpdateMyProfile } from '@/hooks/use-user-profile'
 import { Button } from '@/components/ui/button'
@@ -43,25 +44,23 @@ export default function WelcomePage() {
 
   const firstName = profile?.firstName || 'there'
 
-  const handleGetStarted = () => {
-    updateProfile.mutate(
-      {
+  const [buttonError, setButtonError] = useState<string | null>(null)
+
+  const handleGetStarted = async () => {
+    setButtonError(null)
+    try {
+      await updateProfile.mutateAsync({
         platformPreferences: {
           ...(profile?.platformPreferences || {}),
           onboardingCompletedAt: new Date().toISOString(),
         },
-      },
-      {
-        onSuccess: () => {
-          router.replace('/dashboard')
-        },
-        onError: (error) => {
-          console.error('Failed to complete onboarding:', error)
-          // Navigate anyway — don't block the user
-          router.replace('/dashboard')
-        },
-      },
-    )
+      })
+      router.replace('/dashboard')
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      console.error('Onboarding error:', msg)
+      setButtonError(msg)
+    }
   }
 
   return (
@@ -119,7 +118,7 @@ export default function WelcomePage() {
         </Card>
 
         {/* Get Started Button */}
-        <div className="text-center">
+        <div className="text-center space-y-2">
           <Button
             size="lg"
             onClick={handleGetStarted}
@@ -127,6 +126,9 @@ export default function WelcomePage() {
           >
             {updateProfile.isPending ? 'Setting up...' : 'Get Started'}
           </Button>
+          {buttonError && (
+            <p className="text-sm text-red-600">{buttonError}</p>
+          )}
         </div>
       </div>
     </div>
