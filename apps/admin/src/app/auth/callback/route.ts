@@ -37,8 +37,24 @@ export async function GET(request: Request) {
     })
 
     if (!error) {
-      // For invites, redirect to profile setup
+      // For invites, activate the pending user then redirect to profile setup
       if (type === 'invite') {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.access_token) {
+            const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1').trim()
+            await fetch(`${apiUrl}/user-profiles/me/activate`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+          }
+        } catch (e) {
+          // Don't block invite flow if activation fails
+          console.warn('User activation failed (may already be active):', e)
+        }
         return NextResponse.redirect(`${origin}/profile?setup=true`)
       }
       // For recovery, redirect to password reset
