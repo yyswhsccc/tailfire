@@ -33,6 +33,15 @@ export const BASIC_VIEW_ALLOWED_FIELDS = [
   'isActive',
   'createdAt',
   'updatedAt',
+  // Display fields needed by table/kanban to render without crashing
+  'contactStatus',
+  'contactType',
+  'displayName',
+  'nextTripName',
+  'nextTripDate',
+  'relationshipCount',
+  'tags',
+  // Access metadata
   '_accessLevel',
   '_ownerName',
   '_shareRequestStatus',

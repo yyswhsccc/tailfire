@@ -158,7 +158,13 @@ export class ContactsController {
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ) {
-    // Verify contact exists and user has access
+    // Verify contact access — basic access users cannot see activity
+    if (auth.role !== 'admin') {
+      const accessResult = await this.contactAccessService.canAccessSensitiveData(id, auth)
+      if (!accessResult.canAccessSensitive) {
+        throw new ForbiddenException('Full contact access required to view activity')
+      }
+    }
     await this.contactsService.findOne(id, auth.agencyId)
     // Get accessible trip IDs for the current user
     const accessibleTripIds = await this.tripAccessService.getAccessibleTripIds(auth)
