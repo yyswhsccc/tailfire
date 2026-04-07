@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Lock, Loader2, CheckCircle, Flame, Shield } from 'lucide-react'
+import { Lock, Loader2, CheckCircle, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -51,9 +51,8 @@ export default function SetPasswordPage() {
         setError(updateError.message)
         return
       }
-      // Password set — continue to profile setup
       router.replace('/profile?setup=true')
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred. Please try again.')
     } finally {
       setIsSubmitting(false)
@@ -61,108 +60,166 @@ export default function SetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left side - Form */}
-      <div className="flex w-full flex-col justify-center px-8 lg:w-1/2 lg:px-16">
-        <div className="mx-auto w-full max-w-md space-y-8">
-          <div className="flex items-center gap-3">
-            <Image src="/logo.svg" alt="Tailfire" width={32} height={32} />
-            <div>
-              <h1 className="text-xl font-semibold text-ash-900">Set Your Password</h1>
-              <p className="text-sm text-ash-500">Create a password to secure your account</p>
+    <div className="min-h-screen flex">
+      {/* Left Column - Form */}
+      <div className="flex-1 flex items-center justify-center bg-white px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          {/* Logo */}
+          <div className="flex flex-col items-center space-y-3">
+            <Image
+              src="/logo.png"
+              alt="Tailfire"
+              width={64}
+              height={64}
+              className="h-16 w-16"
+            />
+            <div className="text-center">
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                Tailfire
+              </h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Travel Agency Management Platform
+              </p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+          {/* Welcome Text */}
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold text-slate-800">
+              Set Your Password
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Create a password to secure your account
+            </p>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">New Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-ash-400" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  className="pl-10"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value)
-                    setValidationError(null)
-                  }}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-ash-400" />
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  placeholder="Confirm your password"
-                  className="pl-10"
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value)
-                    setValidationError(null)
-                  }}
-                  required
-                />
-              </div>
-            </div>
-
-            {validationError && (
-              <p className="text-sm text-red-600">{validationError}</p>
-            )}
-
-            <div className="rounded-lg border border-ash-200 bg-ash-50 p-3">
-              <div className="flex items-center gap-2 text-xs text-ash-500">
-                <Shield className="h-3.5 w-3.5" />
-                <span>Password requirements:</span>
-              </div>
-              <ul className="mt-1.5 space-y-0.5 text-xs text-ash-500">
-                <li className={password.length >= 8 ? 'text-green-600' : ''}>
-                  {password.length >= 8 ? <CheckCircle className="mr-1 inline h-3 w-3" /> : '•'} At least 8 characters
-                </li>
-                <li className={/[A-Z]/.test(password) ? 'text-green-600' : ''}>
-                  {/[A-Z]/.test(password) ? <CheckCircle className="mr-1 inline h-3 w-3" /> : '•'} One uppercase letter
-                </li>
-                <li className={/[a-z]/.test(password) ? 'text-green-600' : ''}>
-                  {/[a-z]/.test(password) ? <CheckCircle className="mr-1 inline h-3 w-3" /> : '•'} One lowercase letter
-                </li>
-                <li className={/[0-9]/.test(password) ? 'text-green-600' : ''}>
-                  {/[0-9]/.test(password) ? <CheckCircle className="mr-1 inline h-3 w-3" /> : '•'} One number
-                </li>
-              </ul>
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Setting password...
-                </>
-              ) : (
-                'Set Password & Continue'
+          {/* Form Card */}
+          <div className="bg-white rounded-lg shadow-lg p-8 border border-slate-100">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
-            </Button>
-          </form>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">New Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    className="pl-10"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value)
+                      setValidationError(null)
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    placeholder="Confirm your password"
+                    className="pl-10"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value)
+                      setValidationError(null)
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              {validationError && (
+                <p className="text-sm text-red-600">{validationError}</p>
+              )}
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Shield className="h-3.5 w-3.5" />
+                  <span>Password requirements:</span>
+                </div>
+                <ul className="mt-1.5 space-y-0.5 text-xs text-slate-500">
+                  <li className={password.length >= 8 ? 'text-green-600' : ''}>
+                    {password.length >= 8 ? <CheckCircle className="mr-1 inline h-3 w-3" /> : <span className="mr-1">&#x2022;</span>} At least 8 characters
+                  </li>
+                  <li className={/[A-Z]/.test(password) ? 'text-green-600' : ''}>
+                    {/[A-Z]/.test(password) ? <CheckCircle className="mr-1 inline h-3 w-3" /> : <span className="mr-1">&#x2022;</span>} One uppercase letter
+                  </li>
+                  <li className={/[a-z]/.test(password) ? 'text-green-600' : ''}>
+                    {/[a-z]/.test(password) ? <CheckCircle className="mr-1 inline h-3 w-3" /> : <span className="mr-1">&#x2022;</span>} One lowercase letter
+                  </li>
+                  <li className={/[0-9]/.test(password) ? 'text-green-600' : ''}>
+                    {/[0-9]/.test(password) ? <CheckCircle className="mr-1 inline h-3 w-3" /> : <span className="mr-1">&#x2022;</span>} One number
+                  </li>
+                </ul>
+              </div>
+
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Setting password...
+                  </>
+                ) : (
+                  'Set Password & Continue'
+                )}
+              </Button>
+            </form>
+          </div>
+
+          {/* Footer */}
+          <p className="text-center text-xs text-slate-400">
+            &copy; {new Date().getFullYear()} Tailfire. All rights reserved.
+          </p>
         </div>
       </div>
 
-      {/* Right side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 lg:items-center lg:justify-center lg:bg-gradient-to-br lg:from-teal-600 lg:to-teal-800">
-        <div className="text-center text-white">
-          <Flame className="mx-auto h-16 w-16 mb-4 opacity-80" />
-          <h2 className="text-2xl font-semibold">Welcome to Tailfire</h2>
-          <p className="mt-2 text-teal-100">Set your password to get started</p>
+      {/* Right Column - Hero Image (matches login page exactly) */}
+      <div className="hidden lg:block lg:flex-1 relative bg-gradient-to-br from-orange-400 to-orange-600">
+        <Image
+          src="/beach-sunset.jpg"
+          alt="Tropical beach at sunset with palm trees silhouetted against orange sky"
+          fill
+          className="object-cover"
+          priority
+          quality={85}
+          sizes="50vw"
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 88, 12, 0.15) 100%)'
+          }}
+        />
+        <div className="absolute bottom-12 left-12 right-12 text-white">
+          <h2
+            className="text-4xl font-bold mb-2 uppercase tracking-wide"
+            style={{
+              fontFamily: 'serif',
+              textShadow: '2px 2px 4px rgba(0,0,0,0.5)'
+            }}
+          >
+            Ignite Your Journey
+          </h2>
+          <p
+            className="text-lg"
+            style={{
+              textShadow: '1px 1px 2px rgba(0,0,0,0.5)'
+            }}
+          >
+            Streamline bookings, delight travelers, grow your travel business.
+          </p>
         </div>
       </div>
     </div>
