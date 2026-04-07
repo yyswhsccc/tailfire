@@ -10,7 +10,7 @@
  */
 
 import { Injectable } from '@nestjs/common'
-import { and, eq, gte, lte, or, ne, isNotNull, inArray } from 'drizzle-orm'
+import { and, eq, gte, lte, or, ne, isNotNull, inArray, sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TripAccessService } from '../trips/trip-access.service'
 import { CalendarEventsService } from '../calendar-events/calendar-events.service'
@@ -565,10 +565,21 @@ export class CalendarService {
       conditions.push(eq(this.db.schema.contacts.id, query.contactId))
     }
 
+    // Non-admin users only see birthdays for contacts they own or have shared access to
+    if (auth.role !== 'admin') {
+      conditions.push(
+        sql`(
+          ${this.db.schema.contacts.ownerId} = ${auth.userId}
+          OR EXISTS (
+            SELECT 1 FROM contact_shares cs
+            WHERE cs.contact_id = contacts.id
+            AND cs.shared_with_user_id = ${auth.userId}
+          )
+        )`,
+      )
+    }
+
     // Get contacts with birthdays
-    // Note: Contacts have basic agency-wide visibility (name only),
-    // so all agency users can see birthday names. Sensitive data is filtered
-    // by ContactAccessService when viewing full contact details.
     const contacts = await this.db.client
       .select({
         id: this.db.schema.contacts.id,
