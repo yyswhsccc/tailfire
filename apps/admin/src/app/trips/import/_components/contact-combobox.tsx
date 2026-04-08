@@ -54,7 +54,11 @@ export function ContactCombobox({
 
   // When the popover opens and there's no user input yet, seed search with
   // passengerName so the most relevant results appear immediately.
-  const effectiveSearch = debouncedSearch || (open ? (passengerName ?? '') : '')
+  // Normalize passengerName — FusionAPI returns ALL CAPS which may not match search
+  const normalizedPassengerName = passengerName
+    ? passengerName.toLowerCase().replace(/(?:^|\s)\w/g, (c) => c.toUpperCase())
+    : ''
+  const effectiveSearch = debouncedSearch || (open ? normalizedPassengerName : '')
 
   const { data: contactsData, isLoading } = useContacts({
     search: effectiveSearch || undefined,
