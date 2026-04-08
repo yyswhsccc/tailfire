@@ -36,9 +36,8 @@ export interface ImportPreviewResponse {
     supplier?: string
     itinerary?: ImportItineraryPort[]
     pricing?: {
-      grossPrice?: string | number
-      netPrice?: string | number
-      price?: string | number
+      grossPrice?: number | null
+      netPrice?: number | null
       currency?: string
     }
     dining: Record<string, unknown> | null
