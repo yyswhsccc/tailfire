@@ -63,7 +63,7 @@ export class ImportBookingService {
   // Preview
   // ============================================================================
 
-  async preview(dto: ImportBookingPreviewDto, _auth: AuthContext) {
+  async preview(dto: ImportBookingPreviewDto, auth: AuthContext) {
     const lineid = await this.resolveLineid(dto)
 
     const response = await this.fusionApiService.importBooking({
@@ -87,7 +87,28 @@ export class ImportBookingService {
     }
 
     const result = this.normalizeImportResult(rawResult)
-    return this.formatPreviewResponse(result, dto.bookingReference, lineid)
+    const cruiseItem = result.cruiseitem
+    const [existingImport, contactMatches] = await Promise.all([
+      this.findExistingImportWithName(dto.bookingReference, auth.agencyId, result.bookingid),
+      this.suggestContactMatches(result.passengers, auth),
+    ])
+
+    // Check if any matched travelers already have overlapping cruise bookings
+    const travelerConflicts = await this.checkTravelerConflicts(
+      contactMatches,
+      cruiseItem.startdate,
+      cruiseItem.enddate,
+      cruiseItem.ship?.name,
+      auth.agencyId,
+    )
+
+    const previewResponse = await this.formatPreviewResponse(result, dto.bookingReference, lineid)
+    return {
+      ...previewResponse,
+      existingImport,
+      contactMatches,
+      travelerConflicts,
+    }
   }
 
   // ============================================================================
@@ -136,6 +157,7 @@ export class ImportBookingService {
     const passengerContactMap = await this.matchOrCreateContacts(
       result.passengers,
       auth,
+      dto.contactOverrides,
     )
 
     // 5. Create or use existing trip
@@ -419,13 +441,83 @@ export class ImportBookingService {
     bookingReference: string,
     agencyId: string,
   ): Promise<{ tripId: string } | null> {
-    // Query custom_cruise_details joined to activities → days → itineraries → trips
-    // to find an existing import scoped by agency + source + fusionBookingRef.
-    // Using source='traveltek' + fusionBookingRef prevents false matches when the
-    // same booking reference exists across different cruise lines or sources.
-    const result = await this.db.client
+    // Check by fusionBookingRef (traveltek source) first, then by bookingNumber (any source)
+    const joinChain = () =>
+      this.db.client
+        .select({ tripId: this.db.schema.trips.id })
+        .from(customCruiseDetails)
+        .innerJoin(this.db.schema.itineraryActivities, eq(customCruiseDetails.activityId, this.db.schema.itineraryActivities.id))
+        .innerJoin(this.db.schema.itineraryDays, eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id))
+        .innerJoin(this.db.schema.itineraries, eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id))
+        .innerJoin(this.db.schema.trips, eq(this.db.schema.itineraries.tripId, this.db.schema.trips.id))
+
+    // 1. Match by fusionBookingRef (traveltek imports)
+    const byFusionRef = await joinChain()
+      .where(and(
+        eq(customCruiseDetails.source, 'traveltek'),
+        eq(customCruiseDetails.fusionBookingRef, bookingReference),
+        eq(this.db.schema.trips.agencyId, agencyId),
+      ))
+      .limit(1)
+    if (byFusionRef[0]) return byFusionRef[0]
+
+    // 2. Match by bookingNumber (any source — catches TES, OCR, manual imports)
+    const byBookingNumber = await joinChain()
+      .where(and(
+        eq(customCruiseDetails.bookingNumber, bookingReference),
+        eq(this.db.schema.trips.agencyId, agencyId),
+      ))
+      .limit(1)
+
+    return byBookingNumber[0] || null
+  }
+
+  private async findExistingImportWithName(
+    bookingReference: string,
+    agencyId: string,
+    traveltekBookingId?: number | null,
+  ): Promise<{ tripId: string; tripName: string } | null> {
+    // If traveltekBookingId is provided, try matching by it first (more specific)
+    if (traveltekBookingId) {
+      const byBookingId = await this.db.client
+        .select({
+          tripId: this.db.schema.trips.id,
+          tripName: this.db.schema.trips.name,
+        })
+        .from(customCruiseDetails)
+        .innerJoin(
+          this.db.schema.itineraryActivities,
+          eq(customCruiseDetails.activityId, this.db.schema.itineraryActivities.id),
+        )
+        .innerJoin(
+          this.db.schema.itineraryDays,
+          eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id),
+        )
+        .innerJoin(
+          this.db.schema.itineraries,
+          eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id),
+        )
+        .innerJoin(
+          this.db.schema.trips,
+          eq(this.db.schema.itineraries.tripId, this.db.schema.trips.id),
+        )
+        .where(
+          and(
+            eq(customCruiseDetails.source, 'traveltek'),
+            eq(customCruiseDetails.traveltekBookingId, traveltekBookingId),
+            eq(this.db.schema.trips.agencyId, agencyId),
+          ),
+        )
+        .limit(1)
+
+      if (byBookingId[0]) return byBookingId[0]
+    }
+
+    // Fall back to fusionBookingRef match (traveltek source only)
+    const byFusionRef = await this.db.client
       .select({
         tripId: this.db.schema.trips.id,
+        tripName: this.db.schema.trips.name,
       })
       .from(customCruiseDetails)
       .innerJoin(
@@ -453,16 +545,183 @@ export class ImportBookingService {
       )
       .limit(1)
 
-    return result[0] || null
+    if (byFusionRef[0]) return byFusionRef[0]
+
+    // Final fallback: match by bookingNumber across ANY source (catches TES imports, OCR imports, etc.)
+    const byBookingNumber = await this.db.client
+      .select({
+        tripId: this.db.schema.trips.id,
+        tripName: this.db.schema.trips.name,
+      })
+      .from(customCruiseDetails)
+      .innerJoin(
+        this.db.schema.itineraryActivities,
+        eq(customCruiseDetails.activityId, this.db.schema.itineraryActivities.id),
+      )
+      .innerJoin(
+        this.db.schema.itineraryDays,
+        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id),
+      )
+      .innerJoin(
+        this.db.schema.itineraries,
+        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id),
+      )
+      .innerJoin(
+        this.db.schema.trips,
+        eq(this.db.schema.itineraries.tripId, this.db.schema.trips.id),
+      )
+      .where(
+        and(
+          eq(customCruiseDetails.bookingNumber, bookingReference),
+          eq(this.db.schema.trips.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    return byBookingNumber[0] || null
+  }
+
+  /**
+   * Check if any matched contacts already have booked cruise activities with overlapping dates.
+   * Returns warnings (not hard blocks) — same ship = "already has cabin", different ship = "conflicting cruise".
+   */
+  private async checkTravelerConflicts(
+    contactMatches: Array<{ paxno: number; firstName: string; lastName: string; matchedContactId: string | null }>,
+    startDate: string,
+    endDate: string,
+    shipName: string | undefined,
+    agencyId: string,
+  ): Promise<Array<{
+    paxno: number
+    travelerName: string
+    conflictTripId: string
+    conflictTripName: string
+    conflictShipName: string | null
+    sameShip: boolean
+  }>> {
+    const conflicts: Array<{
+      paxno: number; travelerName: string; conflictTripId: string
+      conflictTripName: string; conflictShipName: string | null; sameShip: boolean
+    }> = []
+
+    const matchedContacts = contactMatches.filter(m => m.matchedContactId)
+    if (matchedContacts.length === 0) return conflicts
+
+    for (const match of matchedContacts) {
+      // Find cruise activities this contact is linked to via trip_travelers → activity_travelers
+      const existingCruises = await this.db.client
+        .select({
+          tripId: this.db.schema.trips.id,
+          tripName: this.db.schema.trips.name,
+          shipName: customCruiseDetails.shipName,
+          departureDate: customCruiseDetails.departureDate,
+          arrivalDate: customCruiseDetails.arrivalDate,
+        })
+        .from(this.db.schema.tripTravelers)
+        .innerJoin(
+          this.db.schema.activityTravelers,
+          eq(this.db.schema.activityTravelers.tripTravelerId, this.db.schema.tripTravelers.id),
+        )
+        .innerJoin(
+          this.db.schema.itineraryActivities,
+          eq(this.db.schema.activityTravelers.activityId, this.db.schema.itineraryActivities.id),
+        )
+        .innerJoin(
+          customCruiseDetails,
+          eq(customCruiseDetails.activityId, this.db.schema.itineraryActivities.id),
+        )
+        .innerJoin(
+          this.db.schema.trips,
+          eq(this.db.schema.tripTravelers.tripId, this.db.schema.trips.id),
+        )
+        .where(
+          and(
+            eq(this.db.schema.tripTravelers.contactId, match.matchedContactId!),
+            eq(this.db.schema.trips.agencyId, agencyId),
+            // Overlapping dates: existing cruise starts before import ends AND ends after import starts
+            sql`${customCruiseDetails.departureDate} <= ${endDate}`,
+            sql`${customCruiseDetails.arrivalDate} >= ${startDate}`,
+          ),
+        )
+        .limit(5)
+
+      for (const cruise of existingCruises) {
+        const isSameShip = !!(shipName && cruise.shipName &&
+          cruise.shipName.toLowerCase() === shipName.toLowerCase())
+
+        conflicts.push({
+          paxno: match.paxno,
+          travelerName: `${match.firstName} ${match.lastName}`,
+          conflictTripId: cruise.tripId,
+          conflictTripName: cruise.tripName,
+          conflictShipName: cruise.shipName,
+          sameShip: isSameShip,
+        })
+      }
+    }
+
+    return conflicts
   }
 
   private async matchOrCreateContacts(
     passengers: ImportBookingPassenger[],
     auth: AuthContext,
+    contactOverrides?: Record<number, string | null>,
   ): Promise<Map<number, string>> {
     const map = new Map<number, string>()
 
     for (const pax of passengers) {
+      // Check for user override first
+      if (contactOverrides && pax.paxno in contactOverrides) {
+        const overrideId = contactOverrides[pax.paxno]
+        if (overrideId) {
+          // Validate UUID format before querying the database
+          if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(overrideId)) {
+            this.logger.warn(`Invalid contact override format for paxno ${pax.paxno}: ${overrideId}`)
+            // Fall through to auto-match
+          } else {
+            // Validate the contact exists and belongs to this agency
+            const [contact] = await this.db.client
+              .select({ id: this.db.schema.contacts.id })
+              .from(this.db.schema.contacts)
+              .where(
+                and(
+                  eq(this.db.schema.contacts.id, overrideId),
+                  eq(this.db.schema.contacts.agencyId, auth.agencyId),
+                ),
+              )
+              .limit(1)
+            if (contact) {
+              map.set(pax.paxno, contact.id)
+              continue
+            }
+            this.logger.warn(`Contact override ${overrideId} not found for paxno ${pax.paxno}, falling back to auto-match`)
+          }
+        } else {
+          // null = force create new contact (skip auto-match)
+          const firstName = this.titleCase(pax.firstname)
+          const lastName = this.titleCase(pax.lastname)
+          const dob = pax.dob && /^\d{4}-\d{2}-\d{2}$/.test(pax.dob) ? pax.dob : null
+          const contact = await this.contactsService.create(
+            {
+              firstName,
+              lastName,
+              middleName: pax.middlename ? this.titleCase(pax.middlename) : undefined,
+              prefix: this.normalizePrefix(pax.title),
+              dateOfBirth: dob || undefined,
+              gender: this.normalizeGender(pax.gender),
+              nationality: this.sanitizeNationality(pax.nationality),
+              contactType: 'client',
+              becameClientAt: new Date().toISOString(),
+            },
+            auth.agencyId,
+            auth.userId,
+          )
+          map.set(pax.paxno, contact.id)
+          continue
+        }
+      }
+
       // Normalize names to title case (API data is often ALL CAPS)
       const firstName = this.titleCase(pax.firstname)
       const lastName = this.titleCase(pax.lastname)
@@ -547,6 +806,74 @@ export class ImportBookingService {
     }
 
     return map
+  }
+
+  private async suggestContactMatches(
+    passengers: ImportBookingPassenger[],
+    auth: AuthContext,
+  ): Promise<Array<{
+    paxno: number
+    firstName: string
+    lastName: string
+    matchedContactId: string | null
+    matchedContactName: string | null
+    isNewContact: boolean
+  }>> {
+    const results: Array<{
+      paxno: number
+      firstName: string
+      lastName: string
+      matchedContactId: string | null
+      matchedContactName: string | null
+      isNewContact: boolean
+    }> = []
+
+    for (const pax of passengers) {
+      const firstName = this.titleCase(pax.firstname)
+      const lastName = this.titleCase(pax.lastname)
+
+      const rawDob = pax.dob || null
+      const dob = rawDob && /^\d{4}-\d{2}-\d{2}$/.test(rawDob) && !isNaN(Date.parse(rawDob))
+        ? rawDob
+        : null
+
+      const nameMatches = await this.db.client
+        .select({
+          id: this.db.schema.contacts.id,
+          firstName: this.db.schema.contacts.firstName,
+          lastName: this.db.schema.contacts.lastName,
+          dateOfBirth: this.db.schema.contacts.dateOfBirth,
+        })
+        .from(this.db.schema.contacts)
+        .where(
+          and(
+            eq(this.db.schema.contacts.agencyId, auth.agencyId),
+            sql`LOWER(${this.db.schema.contacts.firstName}) = LOWER(${firstName})`,
+            sql`LOWER(${this.db.schema.contacts.lastName}) = LOWER(${lastName})`,
+          ),
+        )
+        .limit(10)
+
+      // Disambiguate: prefer DOB match, then any name match
+      let matched = nameMatches[0] || null
+      if (dob && nameMatches.length > 1) {
+        const dobMatch = nameMatches.find((c) => c.dateOfBirth === dob)
+        if (dobMatch) matched = dobMatch
+      }
+
+      results.push({
+        paxno: pax.paxno,
+        firstName,
+        lastName,
+        matchedContactId: matched ? matched.id : null,
+        matchedContactName: matched
+          ? `${matched.firstName} ${matched.lastName}`.trim()
+          : null,
+        isNewContact: !matched,
+      })
+    }
+
+    return results
   }
 
   private mapToCruiseDetails(

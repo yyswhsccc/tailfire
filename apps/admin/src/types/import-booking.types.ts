@@ -9,6 +9,7 @@ export interface ImportPreviewRequest {
 export interface ImportConfirmRequest extends ImportPreviewRequest {
   tripName?: string
   existingTripId?: string
+  contactOverrides?: Record<number, string | null>
 }
 
 // Preview response (matches formatPreviewResponse output)
@@ -61,6 +62,9 @@ export interface ImportPreviewResponse {
     shipClass: string | null
     shipImageUrl: string | null
   }
+  existingImport?: { tripId: string; tripName: string } | null
+  contactMatches?: ImportContactMatch[]
+  travelerConflicts?: ImportTravelerConflict[]
 }
 
 export interface ImportItineraryPort {
@@ -84,6 +88,24 @@ export interface ImportPassenger {
   age: number
   nationality: string
   paxtype: string
+}
+
+export interface ImportContactMatch {
+  paxno: number
+  firstName: string
+  lastName: string
+  matchedContactId: string | null
+  matchedContactName: string | null
+  isNewContact: boolean
+}
+
+export interface ImportTravelerConflict {
+  paxno: number
+  travelerName: string
+  conflictTripId: string
+  conflictTripName: string
+  conflictShipName: string | null
+  sameShip: boolean
 }
 
 export interface ImportConfirmResponse {
