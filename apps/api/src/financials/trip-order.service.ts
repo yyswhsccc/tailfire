@@ -1009,15 +1009,29 @@ export class TripOrderService {
         type: p.type || 'adult',
         dateOfBirth: p.dateOfBirth,
       })),
-      bookings: (bookingDetails || []).map((b) => ({
-        title: b.title || 'Booking',
-        booking_type: b.booking_type || 'other',
-        vendor_confirmation: b.vendor_confirmation || null,
-        start_date: b.start_date,
-        end_date: b.end_date,
-        amount: Number(b.amount || b.base_price || 0),
-        currency: b.currency || orderData.service_details?.currency || 'CAD',
-      })),
+      bookings: (bookingDetails || []).flatMap((b) => {
+        const parent = {
+          title: b.title || 'Booking',
+          booking_type: b.booking_type || 'other',
+          vendor_confirmation: b.vendor_confirmation || null,
+          start_date: b.start_date,
+          end_date: b.end_date,
+          amount: Number(b.amount || b.base_price || 0),
+          currency: b.currency || orderData.service_details?.currency || 'CAD',
+        }
+        // Flatten package children as "Included" sub-items
+        if (b.included_items?.length) {
+          const children = b.included_items.map((child) => ({
+            title: `  └ ${child.name}`,
+            booking_type: child.type,
+            vendor_confirmation: null,
+            amount: -1, // sentinel for "Included"
+            currency: parent.currency,
+          }))
+          return [parent, ...children]
+        }
+        return [parent]
+      }),
     }
   }
 
