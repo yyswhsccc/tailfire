@@ -925,7 +925,7 @@ export class TripOrderService {
           const children = b.includedItems.map((child: any) => ({
             title: `  └ ${child.name}`,
             booking_type: child.type,
-            vendor_confirmation: null,
+            vendor_confirmation: child.confirmationNumber || null,
             amount: -1, // sentinel for "Included" — formatCurrency will render this
             currency: b.currency || 'CAD',
             _isIncluded: true,
@@ -1024,7 +1024,7 @@ export class TripOrderService {
           const children = b.included_items.map((child) => ({
             title: `  └ ${child.name}`,
             booking_type: child.type,
-            vendor_confirmation: null,
+            vendor_confirmation: child.confirmationNumber || null,
             amount: -1, // sentinel for "Included"
             currency: parent.currency,
           }))
@@ -1255,7 +1255,7 @@ export class TripOrderService {
 
         // Fetch child activities (e.g. flights, transfers, hotel inside a package)
         const children = await this.db.client.execute(sql`
-          SELECT ia.id, ia.name, ia.activity_type
+          SELECT ia.id, ia.name, ia.activity_type, ia.confirmation_number
           FROM itinerary_activities ia
           WHERE ia.parent_activity_id = ${a.id}
           ORDER BY ia.start_datetime ASC NULLS LAST, ia.sequence_order ASC
@@ -1289,7 +1289,11 @@ export class TripOrderService {
               : null,
           // Child activities included in this package (displayed as "Included" sub-items)
           includedItems: children.length > 0
-            ? children.map((c: any) => ({ name: c.name, type: c.activity_type }))
+            ? children.map((c: any) => ({
+                name: c.name,
+                type: c.activity_type,
+                confirmationNumber: c.confirmation_number || null,
+              }))
             : undefined,
         }
       })
