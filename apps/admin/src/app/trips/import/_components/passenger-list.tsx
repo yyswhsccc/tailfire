@@ -40,8 +40,8 @@ export function PassengerList({
       {passengers.map((pax) => {
         const match = contactMatches?.find((m) => m.paxno === pax.paxno)
         const currentValue = pax.paxno in contactOverrides
-          ? contactOverrides[pax.paxno]
-          : match?.matchedContactId ?? null
+          ? (contactOverrides[pax.paxno] ?? null)
+          : (match?.matchedContactId ?? null)
 
         return (
           <div

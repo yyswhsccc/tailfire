@@ -61,7 +61,7 @@ export function ContactCombobox({
     scope: 'all',
   })
 
-  const contacts = contactsData?.contacts ?? []
+  const contacts = contactsData?.data ?? []
 
   // Resolve the display label for the trigger button
   const triggerLabel = React.useMemo(() => {
