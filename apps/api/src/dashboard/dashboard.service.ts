@@ -463,6 +463,7 @@ export class DashboardService {
         (SELECT count(*)::int FROM trip_travelers tt WHERE tt.trip_id = t.id) AS traveler_count
       FROM trips t
       WHERE ${tripFilter}
+        AND t.status NOT IN ('cancelled')
       ORDER BY t.updated_at DESC
       LIMIT 4
     `)
@@ -584,6 +585,9 @@ export class DashboardService {
       ? sql`epi.agency_id = ${agencyId}`
       : sql`epi.agency_id = ${agencyId} AND t.id IN ${this.sqlIdList(tripIds)}`
 
+    // Commission flows B2B from supplier to agency — not collected from client.
+    // Subtract each payment item's proportional commission share from the remaining amount
+    // so commission doesn't inflate what appears "overdue" to the client.
     const result = await this.db.client.execute(sql`
       SELECT
         epi.id,
@@ -593,7 +597,14 @@ export class DashboardService {
         epi.expected_amount_cents,
         epi.paid_amount_cents,
         epi.due_date,
-        CASE WHEN epi.due_date IS NOT NULL AND epi.due_date::date < CURRENT_DATE THEN true ELSE false END AS is_overdue
+        CASE WHEN epi.due_date IS NOT NULL AND epi.due_date::date < CURRENT_DATE THEN true ELSE false END AS is_overdue,
+        COALESCE(ap.commission_total_cents, 0) AS commission_cents,
+        COALESCE(ap.total_price_cents, 0) AS total_price_cents,
+        -- Commission share for this payment item (proportional to its share of the total)
+        CASE WHEN COALESCE(ap.total_price_cents, 0) > 0
+          THEN ROUND(COALESCE(ap.commission_total_cents, 0)::numeric * epi.expected_amount_cents::numeric / ap.total_price_cents::numeric)
+          ELSE 0
+        END AS commission_share_cents
       FROM expected_payment_items epi
       JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
       JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
@@ -604,22 +615,37 @@ export class DashboardService {
       WHERE ${tripFilter}
         AND epi.paid_amount_cents < epi.expected_amount_cents
         AND epi.status IN ('pending', 'partial', 'overdue')
+        AND t.status NOT IN ('cancelled')
       ORDER BY
         CASE WHEN epi.due_date IS NOT NULL AND epi.due_date::date < CURRENT_DATE THEN 0 ELSE 1 END,
         epi.due_date ASC NULLS LAST
-      LIMIT 5
+      LIMIT 10
     `)
 
-    return (result as any[]).map((row: any) => ({
-      id: row.id,
-      tripId: row.trip_id,
-      tripName: row.trip_name || '',
-      description: row.description || '',
-      expectedAmountCents: Number(row.expected_amount_cents ?? 0),
-      paidAmountCents: Number(row.paid_amount_cents ?? 0),
-      dueDate: row.due_date ? String(row.due_date) : '',
-      isOverdue: row.is_overdue === true || row.is_overdue === 't',
-    }))
+    return (result as any[])
+      .map((row: any) => {
+        const expected = Number(row.expected_amount_cents ?? 0)
+        const paid = Number(row.paid_amount_cents ?? 0)
+        const commissionShare = Number(row.commission_share_cents ?? 0)
+        // Client owes: expected minus commission share (commission is B2B, not client-owed)
+        const clientExpected = Math.max(0, expected - commissionShare)
+        const clientRemaining = Math.max(0, clientExpected - paid)
+        return {
+          id: row.id,
+          tripId: row.trip_id,
+          tripName: row.trip_name || '',
+          description: row.description || '',
+          expectedAmountCents: clientExpected,
+          paidAmountCents: paid,
+          dueDate: row.due_date ? String(row.due_date) : '',
+          isOverdue: row.is_overdue === true || row.is_overdue === 't',
+          _clientRemaining: clientRemaining,
+        }
+      })
+      // Filter out items that are fully paid when commission is excluded
+      .filter((item) => item._clientRemaining > 0)
+      .map(({ _clientRemaining, ...rest }) => rest)
+      .slice(0, 5)
   }
 
   // ===================================================================
