@@ -19,8 +19,9 @@ export class HandlebarsRendererService implements OnModuleInit {
       return defaultValue
     })
 
-    // {{formatCurrency amount currency}}
+    // {{formatCurrency amount currency}} — returns "Included" for sentinel value -1 (package children)
     this.handlebars.registerHelper('formatCurrency', (amount: number, currency?: string) => {
+      if (amount === -1) return 'Included'
       const curr = typeof currency === 'string' ? currency : 'USD'
       const formatted = new Intl.NumberFormat('en-US', {
         style: 'decimal',
