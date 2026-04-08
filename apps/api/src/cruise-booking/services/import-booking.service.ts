@@ -63,7 +63,7 @@ export class ImportBookingService {
   // Preview
   // ============================================================================
 
-  async preview(dto: ImportBookingPreviewDto, _auth: AuthContext) {
+  async preview(dto: ImportBookingPreviewDto, auth: AuthContext) {
     const lineid = await this.resolveLineid(dto)
 
     const response = await this.fusionApiService.importBooking({
@@ -87,7 +87,16 @@ export class ImportBookingService {
     }
 
     const result = this.normalizeImportResult(rawResult)
-    return this.formatPreviewResponse(result, dto.bookingReference, lineid)
+    const [existingImport, contactMatches] = await Promise.all([
+      this.findExistingImportWithName(dto.bookingReference, auth.agencyId),
+      this.suggestContactMatches(result.passengers, auth),
+    ])
+    const previewResponse = await this.formatPreviewResponse(result, dto.bookingReference, lineid)
+    return {
+      ...previewResponse,
+      existingImport,
+      contactMatches,
+    }
   }
 
   // ============================================================================
@@ -426,6 +435,44 @@ export class ImportBookingService {
     const result = await this.db.client
       .select({
         tripId: this.db.schema.trips.id,
+      })
+      .from(customCruiseDetails)
+      .innerJoin(
+        this.db.schema.itineraryActivities,
+        eq(customCruiseDetails.activityId, this.db.schema.itineraryActivities.id),
+      )
+      .innerJoin(
+        this.db.schema.itineraryDays,
+        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id),
+      )
+      .innerJoin(
+        this.db.schema.itineraries,
+        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id),
+      )
+      .innerJoin(
+        this.db.schema.trips,
+        eq(this.db.schema.itineraries.tripId, this.db.schema.trips.id),
+      )
+      .where(
+        and(
+          eq(customCruiseDetails.source, 'traveltek'),
+          eq(customCruiseDetails.fusionBookingRef, bookingReference),
+          eq(this.db.schema.trips.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    return result[0] || null
+  }
+
+  private async findExistingImportWithName(
+    bookingReference: string,
+    agencyId: string,
+  ): Promise<{ tripId: string; tripName: string } | null> {
+    const result = await this.db.client
+      .select({
+        tripId: this.db.schema.trips.id,
+        tripName: this.db.schema.trips.name,
       })
       .from(customCruiseDetails)
       .innerJoin(
