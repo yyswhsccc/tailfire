@@ -464,6 +464,7 @@ export class DashboardService {
       FROM trips t
       WHERE ${tripFilter}
         AND t.status NOT IN ('cancelled')
+        AND t.deleted_at IS NULL
       ORDER BY t.updated_at DESC
       LIMIT 4
     `)
@@ -616,6 +617,7 @@ export class DashboardService {
         AND epi.paid_amount_cents < epi.expected_amount_cents
         AND epi.status IN ('pending', 'partial', 'overdue')
         AND t.status NOT IN ('cancelled')
+        AND t.deleted_at IS NULL
       ORDER BY
         CASE WHEN epi.due_date IS NOT NULL AND epi.due_date::date < CURRENT_DATE THEN 0 ELSE 1 END,
         epi.due_date ASC NULLS LAST
