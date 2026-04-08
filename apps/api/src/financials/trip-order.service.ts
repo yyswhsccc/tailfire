@@ -905,20 +905,35 @@ export class TripOrderService {
         dateOfBirth: p.dateOfBirth,
         email: p.email,
       })),
-      bookings: bookings.map((b) => ({
-        title: b.title || 'Booking',
-        booking_type: b.bookingType || 'other',
-        vendor_confirmation: b.vendorConfirmation || null,
-        start_date: b.startDate,
-        end_date: b.endDate,
-        amount: Number(b.totalPrice || 0),
-        currency: b.currency || 'CAD',
-        cancellation_policy: b.cancellationPolicy || null,
-        non_refundable: b.nonRefundableDeposit ?? false,
-        net_price: b.netPrice ?? null,
-        supplier: b.supplier || null,
-        per_passenger_breakdown: b.perPassengerBreakdown || null,
-      })),
+      bookings: bookings.flatMap((b) => {
+        const parent = {
+          title: b.title || 'Booking',
+          booking_type: b.bookingType || 'other',
+          vendor_confirmation: b.vendorConfirmation || null,
+          start_date: b.startDate,
+          end_date: b.endDate,
+          amount: Number(b.totalPrice || 0),
+          currency: b.currency || 'CAD',
+          cancellation_policy: b.cancellationPolicy || null,
+          non_refundable: b.nonRefundableDeposit ?? false,
+          net_price: b.netPrice ?? null,
+          supplier: b.supplier || null,
+          per_passenger_breakdown: b.perPassengerBreakdown || null,
+        }
+        // Flatten package children as "Included" sub-items
+        if (b.includedItems?.length > 0) {
+          const children = b.includedItems.map((child: any) => ({
+            title: `  └ ${child.name}`,
+            booking_type: child.type,
+            vendor_confirmation: null,
+            amount: -1, // sentinel for "Included" — formatCurrency will render this
+            currency: b.currency || 'CAD',
+            _isIncluded: true,
+          }))
+          return [parent, ...children]
+        }
+        return [parent]
+      }),
     }
   }
 
@@ -1224,6 +1239,14 @@ export class TripOrderService {
         const netPriceCents = a.net_price_cents ? Number(a.net_price_cents) : null
         const pricingBreakdown = a.pricing_breakdown_json
 
+        // Fetch child activities (e.g. flights, transfers, hotel inside a package)
+        const children = await this.db.client.execute(sql`
+          SELECT ia.id, ia.name, ia.activity_type
+          FROM itinerary_activities ia
+          WHERE ia.parent_activity_id = ${a.id}
+          ORDER BY ia.start_datetime ASC NULLS LAST, ia.sequence_order ASC
+        `) as any[]
+
         return {
           id: a.id,
           title: a.name,
@@ -1250,6 +1273,10 @@ export class TripOrderService {
                   total: p.totalCents ? p.totalCents / 100 : (p.total || 0),
                 }))
               : null,
+          // Child activities included in this package (displayed as "Included" sub-items)
+          includedItems: children.length > 0
+            ? children.map((c: any) => ({ name: c.name, type: c.activity_type }))
+            : undefined,
         }
       })
     )
@@ -1564,6 +1591,8 @@ export class TripOrderService {
       net_price: booking.netPrice ?? undefined,
       supplier: booking.supplier || undefined,
       per_passenger_breakdown: booking.perPassengerBreakdown || undefined,
+      // Child activities included in this package
+      included_items: booking.includedItems || undefined,
     } as TripOrderBookingDetail))
   }
 
