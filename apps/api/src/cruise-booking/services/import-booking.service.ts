@@ -174,12 +174,22 @@ export class ImportBookingService {
     // 8. Build and create custom cruise activity
     const rawCruiseDetails = this.mapToCruiseDetails(cruiseItem, dto.bookingReference, result)
     const cruiseDetails = await this.enrichFromCatalog(rawCruiseDetails, cruiseItem) as CustomCruiseDetailsDto
-    // Total charge = sum of ALL breakdown items (cruise fare + taxes + port charges).
-    // Falls back to nettprice (cruise fare only) if breakdown is empty.
+    // Total charge (Gross) = sum of ALL breakdown items (fares + taxes + discounts).
+    // Falls back to nettprice if breakdown is empty.
     const totalPriceCents = this.calculateTotalChargeCents(cruiseItem.breakdown || [], cruiseItem.nettprice)
-    const commissionCents = result.commission
-      ? Math.round(result.commission * 100)
-      : null
+    const nettPriceCents = this.parsePriceToCents(cruiseItem.nettprice)
+
+    // Commission: prefer calculated (Gross - Net) over API value, since Traveltek's
+    // commission field often doesn't match the agent invoice commission.
+    // Traveltek's nettprice = what the agency pays (Net Charges on invoice).
+    // Commission = Gross Charges - Net Charges.
+    let commissionCents: number | null = null
+    if (totalPriceCents !== null && nettPriceCents !== null && totalPriceCents > nettPriceCents) {
+      commissionCents = totalPriceCents - nettPriceCents
+    } else if (result.commission) {
+      commissionCents = Math.round(result.commission * 100)
+    }
+
     const taxesAndFeesCents = this.extractTaxesAndFeesCents(cruiseItem.breakdown || [], totalPriceCents)
 
     this.logger.log({
@@ -188,7 +198,8 @@ export class ImportBookingService {
       nettprice: cruiseItem.nettprice,
       grossprice: cruiseItem.grossprice,
       breakdownTotal: totalPriceCents,
-      commission: result.commission,
+      apiCommission: result.commission,
+      calculatedCommission: commissionCents,
       taxesAndFees: taxesAndFeesCents,
       breakdownItemCount: cruiseItem.breakdown?.length ?? 0,
     })
@@ -657,20 +668,27 @@ export class ImportBookingService {
         supplier: cruiseItem.suppliername,
         itinerary: cruiseItem.itinerary,
         pricing: (() => {
-          // Total charge = sum of ALL breakdown items (cruise fare + taxes + port charges).
-          // Falls back to nettprice (cruise fare only) if breakdown is empty.
+          // Gross = sum of ALL breakdown items (fares + taxes + discounts).
           const totalChargeCents = this.calculateTotalChargeCents(
             cruiseItem.breakdown || [],
             cruiseItem.nettprice,
           )
           const totalCharge = totalChargeCents !== null ? totalChargeCents / 100 : null
-          // Net = Total charge - Commission
-          const netPrice = totalCharge !== null && result.commission
-            ? totalCharge - result.commission
-            : null
+          const nettPrice = this.parsePriceToCents(cruiseItem.nettprice)
+          // Commission = Gross - nettprice (nettprice = agency Net Charges)
+          // Falls back to API commission if we can't calculate
+          let commission: number | null = null
+          if (totalChargeCents !== null && nettPrice !== null && totalChargeCents > nettPrice) {
+            commission = (totalChargeCents - nettPrice) / 100
+          } else if (result.commission) {
+            commission = result.commission
+          }
+          // Net = nettprice (what the agency pays the cruise line)
+          const netPrice = nettPrice !== null ? nettPrice / 100 : null
           return {
             grossPrice: totalCharge,
             netPrice,
+            commission,
             currency: cruiseItem.scurrency,
           }
         })(),
@@ -860,8 +878,9 @@ export class ImportBookingService {
 
   /**
    * Calculate total charge from ALL breakdown items (commissionable + non-commissionable).
-   * This is the real "total charge" the client pays, including taxes/port charges.
-   * Falls back to nettprice (cruise fare only) if breakdown is empty.
+   * This is the real "total charge" (Gross Charges) the client pays, including
+   * cruise fare, taxes, port charges, gratuities, AND discounts (negative items like BOGO/Savings).
+   * Falls back to nettprice if breakdown is empty.
    */
   private calculateTotalChargeCents(
     breakdown: ImportBookingBreakdownItem[],
@@ -871,9 +890,8 @@ export class ImportBookingService {
       let sum = 0
       for (const item of breakdown) {
         const itemCents = this.parsePriceToCents(item.itemprice) ?? 0
-        if (itemCents > 0) {
-          sum += itemCents * (item.quantity ?? 1)
-        }
+        // Include ALL items — positives (fares, taxes) AND negatives (discounts, savings)
+        sum += itemCents * (item.quantity ?? 1)
       }
       if (sum > 0) return sum
     }

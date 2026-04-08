@@ -38,6 +38,7 @@ export interface ImportPreviewResponse {
     pricing?: {
       grossPrice?: number | null
       netPrice?: number | null
+      commission?: number | null
       currency?: string
     }
     dining: Record<string, unknown> | null
