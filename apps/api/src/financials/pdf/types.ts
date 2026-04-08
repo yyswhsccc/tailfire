@@ -48,7 +48,7 @@ export interface TripOrderBookingDetail {
     total: number
   }>
   /** Child activities included in this package (displayed as "Included" sub-items) */
-  included_items?: Array<{ name: string; type: string }>
+  included_items?: Array<{ name: string; type: string; confirmationNumber?: string | null }>
 }
 
 /**
