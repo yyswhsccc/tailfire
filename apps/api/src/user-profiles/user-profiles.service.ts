@@ -74,6 +74,7 @@ export class UserProfilesService {
   async updateMyProfile(
     userId: string,
     dto: UpdateUserProfileDto,
+    role: 'admin' | 'user' = 'user',
   ): Promise<UserProfileResponseDto> {
     const { userProfiles } = this.db.schema
 
@@ -95,12 +96,16 @@ export class UserProfilesService {
     if (dto.platformPreferences !== undefined) updateData.platformPreferences = dto.platformPreferences
     if (dto.licensingInfo !== undefined) updateData.licensingInfo = dto.licensingInfo
     if (dto.commissionSettings !== undefined) {
-      // Service-level guard: percentage splitValue must be <= 100
-      const cs = dto.commissionSettings
-      if (cs.splitType === 'percentage' && cs.splitValue !== undefined && cs.splitValue > 100) {
-        throw new BadRequestException('Commission split percentage cannot exceed 100%')
+      if (role !== 'admin') {
+        this.logger.warn(`Non-admin user ${userId} attempted to update commission settings — ignoring`)
+      } else {
+        // Service-level guard: percentage splitValue must be <= 100
+        const cs = dto.commissionSettings
+        if (cs.splitType === 'percentage' && cs.splitValue !== undefined && cs.splitValue > 100) {
+          throw new BadRequestException('Commission split percentage cannot exceed 100%')
+        }
+        updateData.commissionSettings = dto.commissionSettings
       }
-      updateData.commissionSettings = dto.commissionSettings
     }
     if (dto.isPublicProfile !== undefined) updateData.isPublicProfile = dto.isPublicProfile
 

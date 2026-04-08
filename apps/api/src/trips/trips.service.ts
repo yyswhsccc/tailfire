@@ -622,6 +622,16 @@ export class TripsService {
       }
     }
 
+    // Prevent date changes on departed trips
+    if (
+      (dto.startDate !== undefined || dto.endDate !== undefined) &&
+      (existingTrip.status === 'travelling' || existingTrip.status === 'travelled')
+    ) {
+      throw new BadRequestException(
+        `Cannot edit dates for trips in "${existingTrip.status}" status`
+      )
+    }
+
     // Validate ownerId changes
     if ('ownerId' in dto) {
       // Can only set ownerId to null if status is or will be 'inbound'

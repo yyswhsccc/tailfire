@@ -405,12 +405,18 @@ export function OcrPreview({
             {extraction.cruise.nights && (
               <DataRow label="Duration" value={`${extraction.cruise.nights} nights`} />
             )}
-            {extraction.cruise.totalPriceCents && (
-              <DataRow label="Gross" value={formatPrice(extraction.cruise.totalPriceCents, extraction.cruise.currency)} />
-            )}
-            {extraction.cruise.netPriceCents && (
-              <DataRow label="Net" value={formatPrice(extraction.cruise.netPriceCents, extraction.cruise.currency)} />
-            )}
+            {(() => {
+              // Sanity check: if OCR extracted net > total, they're swapped
+              let gross = extraction.cruise.totalPriceCents
+              let net = extraction.cruise.netPriceCents
+              if (gross && net && net > gross) [gross, net] = [net, gross]
+              return (
+                <>
+                  {gross && <DataRow label="Gross" value={formatPrice(gross, extraction.cruise.currency)} />}
+                  {net && <DataRow label="Net" value={formatPrice(net, extraction.cruise.currency)} />}
+                </>
+              )
+            })()}
             {extraction.cruise.commissionCents && (
               <DataRow label="Commission" value={formatPrice(extraction.cruise.commissionCents, extraction.cruise.currency)} />
             )}

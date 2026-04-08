@@ -174,13 +174,35 @@ export class ImportBookingService {
     // 8. Build and create custom cruise activity
     const rawCruiseDetails = this.mapToCruiseDetails(cruiseItem, dto.bookingReference, result)
     const cruiseDetails = await this.enrichFromCatalog(rawCruiseDetails, cruiseItem) as CustomCruiseDetailsDto
-    // Traveltek uses reversed terminology: their "nettprice" = client selling price (our gross/total),
-    // their "grossprice" = agency/wholesale cost (our net). Swap to match standard convention.
-    const totalPriceCents = this.parsePriceToCents(cruiseItem.nettprice)
-    const commissionCents = result.commission
-      ? Math.round(result.commission * 100)
-      : null
+    // Total charge (Gross) = sum of ALL breakdown items (fares + taxes + discounts).
+    // Falls back to nettprice if breakdown is empty.
+    const totalPriceCents = this.calculateTotalChargeCents(cruiseItem.breakdown || [], cruiseItem.nettprice)
+    const nettPriceCents = this.parsePriceToCents(cruiseItem.nettprice)
+
+    // Commission: prefer calculated (Gross - Net) over API value, since Traveltek's
+    // commission field often doesn't match the agent invoice commission.
+    // Traveltek's nettprice = what the agency pays (Net Charges on invoice).
+    // Commission = Gross Charges - Net Charges.
+    let commissionCents: number | null = null
+    if (totalPriceCents !== null && nettPriceCents !== null && totalPriceCents > nettPriceCents) {
+      commissionCents = totalPriceCents - nettPriceCents
+    } else if (result.commission) {
+      commissionCents = Math.round(result.commission * 100)
+    }
+
     const taxesAndFeesCents = this.extractTaxesAndFeesCents(cruiseItem.breakdown || [], totalPriceCents)
+
+    this.logger.log({
+      message: 'Import pricing breakdown',
+      bookingReference: dto.bookingReference,
+      nettprice: cruiseItem.nettprice,
+      grossprice: cruiseItem.grossprice,
+      breakdownTotal: totalPriceCents,
+      apiCommission: result.commission,
+      calculatedCommission: commissionCents,
+      taxesAndFees: taxesAndFeesCents,
+      breakdownItemCount: cruiseItem.breakdown?.length ?? 0,
+    })
 
     const cruiseActivity = await this.componentOrchestrationService.createCustomCruise({
       itineraryDayId: departureDay.id,
@@ -253,10 +275,11 @@ export class ImportBookingService {
           pricingUpdate.pricingType = 'per_person'
         }
 
-        // Universal booking fields — grossprice is agency cost (our net) in Traveltek terminology
-        const netPriceCents = this.parsePriceToCents(cruiseItem.grossprice)
-        if (netPriceCents !== null) {
-          pricingUpdate.netPriceCents = netPriceCents
+        // Net = Total charge - Commission (not grossprice which is wholesale/agency cost)
+        if (totalPriceCents !== null && commissionCents !== null) {
+          pricingUpdate.netPriceCents = totalPriceCents - commissionCents
+        } else if (totalPriceCents !== null) {
+          pricingUpdate.netPriceCents = totalPriceCents
         }
         if (cruiseItem.paymentinfo?.nonrefundabledeposit === 1) {
           pricingUpdate.nonRefundableDeposit = true
@@ -609,6 +632,25 @@ export class ImportBookingService {
     const rawDetails = this.mapToCruiseDetails(cruiseItem, bookingReference, result)
     const enriched = await this.enrichFromCatalog(rawDetails, cruiseItem)
 
+    // Log raw pricing data from FusionAPI for debugging
+    this.logger.log({
+      message: 'Import preview pricing debug',
+      bookingReference,
+      nettprice: cruiseItem.nettprice,
+      grossprice: cruiseItem.grossprice,
+      price: cruiseItem.price,
+      sprice: cruiseItem.sprice,
+      commission: result.commission,
+      passengerCount: result.passengers?.length ?? 0,
+      breakdownItems: (cruiseItem.breakdown || []).map(b => ({
+        category: b.category,
+        description: b.description,
+        itemprice: b.itemprice,
+        quantity: b.quantity,
+        commissionable: b.commissionable,
+      })),
+    })
+
     return {
       bookingReference,
       lineid,
@@ -625,14 +667,31 @@ export class ImportBookingService {
         cabin: cruiseItem.cabin,
         supplier: cruiseItem.suppliername,
         itinerary: cruiseItem.itinerary,
-        pricing: {
-          // Traveltek uses reversed terminology: their "grossprice" = agency/wholesale cost,
-          // their "nettprice" = client selling price. We swap to match standard travel convention.
-          grossPrice: cruiseItem.nettprice,
-          netPrice: cruiseItem.grossprice,
-          price: cruiseItem.price,
-          currency: cruiseItem.scurrency,
-        },
+        pricing: (() => {
+          // Gross = sum of ALL breakdown items (fares + taxes + discounts).
+          const totalChargeCents = this.calculateTotalChargeCents(
+            cruiseItem.breakdown || [],
+            cruiseItem.nettprice,
+          )
+          const totalCharge = totalChargeCents !== null ? totalChargeCents / 100 : null
+          const nettPrice = this.parsePriceToCents(cruiseItem.nettprice)
+          // Commission = Gross - nettprice (nettprice = agency Net Charges)
+          // Falls back to API commission if we can't calculate
+          let commission: number | null = null
+          if (totalChargeCents !== null && nettPrice !== null && totalChargeCents > nettPrice) {
+            commission = (totalChargeCents - nettPrice) / 100
+          } else if (result.commission) {
+            commission = result.commission
+          }
+          // Net = nettprice (what the agency pays the cruise line)
+          const netPrice = nettPrice !== null ? nettPrice / 100 : null
+          return {
+            grossPrice: totalCharge,
+            netPrice,
+            commission,
+            currency: cruiseItem.scurrency,
+          }
+        })(),
         dining: cruiseItem.dining,
         selectedExtras: this.normalizeExtras(cruiseItem.selectedextras),
         selectedPromotions: cruiseItem.selectedpromotions &&
@@ -815,6 +874,28 @@ export class ImportBookingService {
     const num = typeof price === 'string' ? parseFloat(price) : price
     if (isNaN(num)) return null
     return Math.round(num * 100)
+  }
+
+  /**
+   * Calculate total charge from ALL breakdown items (commissionable + non-commissionable).
+   * This is the real "total charge" (Gross Charges) the client pays, including
+   * cruise fare, taxes, port charges, gratuities, AND discounts (negative items like BOGO/Savings).
+   * Falls back to nettprice if breakdown is empty.
+   */
+  private calculateTotalChargeCents(
+    breakdown: ImportBookingBreakdownItem[],
+    nettPriceFallback: string | number | undefined,
+  ): number | null {
+    if (breakdown?.length) {
+      let sum = 0
+      for (const item of breakdown) {
+        const itemCents = this.parsePriceToCents(item.itemprice) ?? 0
+        // Include ALL items — positives (fares, taxes) AND negatives (discounts, savings)
+        sum += itemCents * (item.quantity ?? 1)
+      }
+      if (sum > 0) return sum
+    }
+    return this.parsePriceToCents(nettPriceFallback)
   }
 
   /**
@@ -1093,8 +1174,20 @@ export class ImportBookingService {
       throw new BadRequestException('Cruise data missing required fields (startdate, enddate, codetocruiseid)')
     }
 
-    // Normalize passengers to a validated array
-    const passengers = Array.isArray(rawResult.passengers) ? rawResult.passengers : []
+    // Normalize passengers — check multiple response locations
+    let passengers: ImportBookingPassenger[] = []
+    if (Array.isArray(rawResult.passengers) && rawResult.passengers.length > 0) {
+      passengers = rawResult.passengers
+    } else if (Array.isArray(rawResult.bookingdetails?.passengers) && rawResult.bookingdetails.passengers.length > 0) {
+      passengers = rawResult.bookingdetails.passengers
+    }
+    if (passengers.length === 0) {
+      this.logger.warn({
+        message: 'No passengers found in import response',
+        topLevelKeys: Object.keys(rawResult),
+        bookingDetailsKeys: rawResult.bookingdetails ? Object.keys(rawResult.bookingdetails) : null,
+      })
+    }
 
     // Normalize commission to a finite number
     let commission = 0

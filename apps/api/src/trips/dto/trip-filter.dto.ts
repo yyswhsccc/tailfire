@@ -46,11 +46,11 @@ export class TripFilterDto {
   tripType?: 'leisure' | 'business' | 'group' | 'honeymoon' | 'corporate' | 'custom'
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   ownerId?: string
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   primaryContactId?: string
 
   @IsOptional()
