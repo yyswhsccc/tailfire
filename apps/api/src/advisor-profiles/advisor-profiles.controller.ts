@@ -20,12 +20,14 @@ import {
   HttpStatus,
   ParseUUIDPipe,
   NotFoundException,
+  UseGuards,
 } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger'
+import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiHeader } from '@nestjs/swagger'
 import { Public } from '../auth/decorators/public.decorator'
 import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
+import { InternalApiKeyGuard } from '../cruise-import/guards/internal-api-key.guard'
 import { AdvisorProfilesService } from './advisor-profiles.service'
 import { CreateAdvisorProfileDto } from './dto/create-advisor-profile.dto'
 import { UpdateAdvisorProfileDto } from './dto/update-advisor-profile.dto'
@@ -100,6 +102,30 @@ export class AdvisorProfilesController {
   @ApiResponse({ status: 200, description: "Advisor's published trips" })
   async getAdvisorTrips(@Param('slug') slug: string) {
     return this.advisorProfilesService.getAdvisorTrips(slug)
+  }
+
+  // ============================================================================
+  // INTERNAL ENDPOINT (API key auth — batch sync)
+  // ============================================================================
+
+  /**
+   * Sync advisor profiles from user_profiles.
+   * Creates an advisor profile for every active user that doesn't already have one.
+   * POST /advisor-profiles/sync-from-users
+   * Auth: x-internal-api-key header
+   */
+  @Post('sync-from-users')
+  @Public() // Bypass JWT auth
+  @UseGuards(InternalApiKeyGuard) // Require internal API key instead
+  @ApiOperation({ summary: 'Sync advisor profiles from user profiles (internal API key)' })
+  @ApiHeader({
+    name: 'x-internal-api-key',
+    description: 'Internal API key for batch sync operations',
+    required: true,
+  })
+  @ApiResponse({ status: 200, description: 'Sync results with created/skipped counts' })
+  async syncFromUsers() {
+    return this.advisorProfilesService.syncFromUserProfiles()
   }
 
   // ============================================================================
