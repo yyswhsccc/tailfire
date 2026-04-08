@@ -621,6 +621,25 @@ export class ImportBookingService {
     const rawDetails = this.mapToCruiseDetails(cruiseItem, bookingReference, result)
     const enriched = await this.enrichFromCatalog(rawDetails, cruiseItem)
 
+    // Log raw pricing data from FusionAPI for debugging
+    this.logger.log({
+      message: 'Import preview pricing debug',
+      bookingReference,
+      nettprice: cruiseItem.nettprice,
+      grossprice: cruiseItem.grossprice,
+      price: cruiseItem.price,
+      sprice: cruiseItem.sprice,
+      commission: result.commission,
+      passengerCount: result.passengers?.length ?? 0,
+      breakdownItems: (cruiseItem.breakdown || []).map(b => ({
+        category: b.category,
+        description: b.description,
+        itemprice: b.itemprice,
+        quantity: b.quantity,
+        commissionable: b.commissionable,
+      })),
+    })
+
     return {
       bookingReference,
       lineid,
@@ -1137,8 +1156,20 @@ export class ImportBookingService {
       throw new BadRequestException('Cruise data missing required fields (startdate, enddate, codetocruiseid)')
     }
 
-    // Normalize passengers to a validated array
-    const passengers = Array.isArray(rawResult.passengers) ? rawResult.passengers : []
+    // Normalize passengers — check multiple response locations
+    let passengers: ImportBookingPassenger[] = []
+    if (Array.isArray(rawResult.passengers) && rawResult.passengers.length > 0) {
+      passengers = rawResult.passengers
+    } else if (Array.isArray(rawResult.bookingdetails?.passengers) && rawResult.bookingdetails.passengers.length > 0) {
+      passengers = rawResult.bookingdetails.passengers
+    }
+    if (passengers.length === 0) {
+      this.logger.warn({
+        message: 'No passengers found in import response',
+        topLevelKeys: Object.keys(rawResult),
+        bookingDetailsKeys: rawResult.bookingdetails ? Object.keys(rawResult.bookingdetails) : null,
+      })
+    }
 
     // Normalize commission to a finite number
     let commission = 0

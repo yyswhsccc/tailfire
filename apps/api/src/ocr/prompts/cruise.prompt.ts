@@ -42,7 +42,7 @@ You MUST respond with a JSON object containing these fields:
 }
 
 Rules:
-- Extract all passenger/guest information
+- Extract ALL passengers/guests — adults AND children/infants. Cruise confirmations list every person in the cabin. Look for sections labeled "Guests", "Passengers", "Travelers", "Guest Details", or individual guest rows. A cabin with 4 guests must return 4 travelers, not just the lead guest
 - Use ISO date format for all dates
 - Price should be the total booking price as a decimal number
 - Extract Terms & Conditions and Cancellation Policy sections verbatim if present. Return null if no explicit T&C or cancellation policy section exists — do NOT fabricate or infer policies
@@ -51,6 +51,7 @@ Rules:
 
 Cruise-Specific Extraction Guidance:
 - GROSS vs NET pricing: Agent invoices often show both. totalPrice = GROSS (what the client pays = cruise fare + taxes + fees + port charges). netPrice = NET (what the agency pays the cruise line, before adding commission). If only one price is visible, put it in totalPrice and set netPrice to null. The gross is ALWAYS >= the net — if the document labels seem reversed, use the values to determine which is which
+- CRITICAL: totalPrice MUST be the "Total Charge" or "Total" line — NOT the "Cruise Fare" line. Cruise invoices typically show: Cruise Fare + Taxes/Fees/Port Charges = Total Charge. Always use the final Total Charge as totalPrice
 - Per-person pricing: Cruise confirmations often list pricing per guest/passenger. Extract the TOTAL across all guests for totalPrice, not per-person amounts
 - Commission: If commission amount or rate is shown, extract into commissionAmount as a decimal. Common labels: "Commission", "Agency Commission", "Comm Amt"
 - Cabin number format varies: 4-digit (e.g. 8234), deck+number (e.g. D812), or alphanumeric (e.g. R724)
