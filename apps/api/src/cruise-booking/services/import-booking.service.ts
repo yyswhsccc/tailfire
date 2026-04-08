@@ -88,7 +88,7 @@ export class ImportBookingService {
 
     const result = this.normalizeImportResult(rawResult)
     const [existingImport, contactMatches] = await Promise.all([
-      this.findExistingImportWithName(dto.bookingReference, auth.agencyId),
+      this.findExistingImportWithName(dto.bookingReference, auth.agencyId, result.bookingid),
       this.suggestContactMatches(result.passengers, auth),
     ])
     const previewResponse = await this.formatPreviewResponse(result, dto.bookingReference, lineid)
@@ -469,7 +469,45 @@ export class ImportBookingService {
   private async findExistingImportWithName(
     bookingReference: string,
     agencyId: string,
+    traveltekBookingId?: number | null,
   ): Promise<{ tripId: string; tripName: string } | null> {
+    // If traveltekBookingId is provided, try matching by it first (more specific)
+    if (traveltekBookingId) {
+      const byBookingId = await this.db.client
+        .select({
+          tripId: this.db.schema.trips.id,
+          tripName: this.db.schema.trips.name,
+        })
+        .from(customCruiseDetails)
+        .innerJoin(
+          this.db.schema.itineraryActivities,
+          eq(customCruiseDetails.activityId, this.db.schema.itineraryActivities.id),
+        )
+        .innerJoin(
+          this.db.schema.itineraryDays,
+          eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id),
+        )
+        .innerJoin(
+          this.db.schema.itineraries,
+          eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id),
+        )
+        .innerJoin(
+          this.db.schema.trips,
+          eq(this.db.schema.itineraries.tripId, this.db.schema.trips.id),
+        )
+        .where(
+          and(
+            eq(customCruiseDetails.source, 'traveltek'),
+            eq(customCruiseDetails.traveltekBookingId, traveltekBookingId),
+            eq(this.db.schema.trips.agencyId, agencyId),
+          ),
+        )
+        .limit(1)
+
+      if (byBookingId[0]) return byBookingId[0]
+    }
+
+    // Fall back to fusionBookingRef match
     const result = await this.db.client
       .select({
         tripId: this.db.schema.trips.id,
@@ -516,22 +554,28 @@ export class ImportBookingService {
       if (contactOverrides && pax.paxno in contactOverrides) {
         const overrideId = contactOverrides[pax.paxno]
         if (overrideId) {
-          // Validate the contact exists and belongs to this agency
-          const [contact] = await this.db.client
-            .select({ id: this.db.schema.contacts.id })
-            .from(this.db.schema.contacts)
-            .where(
-              and(
-                eq(this.db.schema.contacts.id, overrideId),
-                eq(this.db.schema.contacts.agencyId, auth.agencyId),
-              ),
-            )
-            .limit(1)
-          if (contact) {
-            map.set(pax.paxno, contact.id)
-            continue
+          // Validate UUID format before querying the database
+          if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(overrideId)) {
+            this.logger.warn(`Invalid contact override format for paxno ${pax.paxno}: ${overrideId}`)
+            // Fall through to auto-match
+          } else {
+            // Validate the contact exists and belongs to this agency
+            const [contact] = await this.db.client
+              .select({ id: this.db.schema.contacts.id })
+              .from(this.db.schema.contacts)
+              .where(
+                and(
+                  eq(this.db.schema.contacts.id, overrideId),
+                  eq(this.db.schema.contacts.agencyId, auth.agencyId),
+                ),
+              )
+              .limit(1)
+            if (contact) {
+              map.set(pax.paxno, contact.id)
+              continue
+            }
+            this.logger.warn(`Contact override ${overrideId} not found for paxno ${pax.paxno}, falling back to auto-match`)
           }
-          this.logger.warn(`Contact override ${overrideId} not found for paxno ${pax.paxno}, falling back to auto-match`)
         } else {
           // null = force create new contact (skip auto-match)
           const firstName = this.titleCase(pax.firstname)

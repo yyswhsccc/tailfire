@@ -45,6 +45,7 @@ export function ContactCombobox({
   const [open, setOpen] = React.useState(false)
   const [searchInput, setSearchInput] = React.useState('')
   const [debouncedSearch, setDebouncedSearch] = React.useState('')
+  const [cachedLabel, setCachedLabel] = React.useState<string | null>(null)
 
   // Debounce search input to reduce API calls
   const debouncedSetSearch = useDebouncedCallback((val: string) => {
@@ -71,11 +72,14 @@ export function ContactCombobox({
     const found = contacts.find((c) => c.id === value)
     if (found) return found.displayName
 
+    // Fall back to cached label from the last selection
+    if (cachedLabel) return cachedLabel
+
     // Fall back to the initialDisplayName provided by the parent
     if (initialDisplayName) return initialDisplayName
 
     return value // last resort: show the raw UUID
-  }, [value, contacts, initialDisplayName])
+  }, [value, contacts, cachedLabel, initialDisplayName])
 
   const handleSearchChange = (val: string) => {
     setSearchInput(val)
@@ -83,6 +87,9 @@ export function ContactCombobox({
   }
 
   const handleSelectContact = (contactId: string) => {
+    // Cache the display name so it persists after search clears
+    const selected = contacts.find((c) => c.id === contactId)
+    if (selected) setCachedLabel(selected.displayName)
     onChange(contactId)
     setOpen(false)
     setSearchInput('')
