@@ -39,6 +39,7 @@ export interface TripOrderBookingDetail {
   currency?: string
   // TICO-required financial details
   cancellation_policy?: string
+  terms_and_conditions?: string
   non_refundable?: boolean
   net_price?: number
   supplier?: string
