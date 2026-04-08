@@ -87,15 +87,27 @@ export class ImportBookingService {
     }
 
     const result = this.normalizeImportResult(rawResult)
+    const cruiseItem = result.cruiseitem
     const [existingImport, contactMatches] = await Promise.all([
       this.findExistingImportWithName(dto.bookingReference, auth.agencyId, result.bookingid),
       this.suggestContactMatches(result.passengers, auth),
     ])
+
+    // Check if any matched travelers already have overlapping cruise bookings
+    const travelerConflicts = await this.checkTravelerConflicts(
+      contactMatches,
+      cruiseItem.startdate,
+      cruiseItem.enddate,
+      cruiseItem.ship?.name,
+      auth.agencyId,
+    )
+
     const previewResponse = await this.formatPreviewResponse(result, dto.bookingReference, lineid)
     return {
       ...previewResponse,
       existingImport,
       contactMatches,
+      travelerConflicts,
     }
   }
 
@@ -567,6 +579,88 @@ export class ImportBookingService {
       .limit(1)
 
     return byBookingNumber[0] || null
+  }
+
+  /**
+   * Check if any matched contacts already have booked cruise activities with overlapping dates.
+   * Returns warnings (not hard blocks) — same ship = "already has cabin", different ship = "conflicting cruise".
+   */
+  private async checkTravelerConflicts(
+    contactMatches: Array<{ paxno: number; firstName: string; lastName: string; matchedContactId: string | null }>,
+    startDate: string,
+    endDate: string,
+    shipName: string | undefined,
+    agencyId: string,
+  ): Promise<Array<{
+    paxno: number
+    travelerName: string
+    conflictTripId: string
+    conflictTripName: string
+    conflictShipName: string | null
+    sameShip: boolean
+  }>> {
+    const conflicts: Array<{
+      paxno: number; travelerName: string; conflictTripId: string
+      conflictTripName: string; conflictShipName: string | null; sameShip: boolean
+    }> = []
+
+    const matchedContacts = contactMatches.filter(m => m.matchedContactId)
+    if (matchedContacts.length === 0) return conflicts
+
+    for (const match of matchedContacts) {
+      // Find cruise activities this contact is linked to via trip_travelers → activity_travelers
+      const existingCruises = await this.db.client
+        .select({
+          tripId: this.db.schema.trips.id,
+          tripName: this.db.schema.trips.name,
+          shipName: customCruiseDetails.shipName,
+          departureDate: customCruiseDetails.departureDate,
+          arrivalDate: customCruiseDetails.arrivalDate,
+        })
+        .from(this.db.schema.tripTravelers)
+        .innerJoin(
+          this.db.schema.activityTravelers,
+          eq(this.db.schema.activityTravelers.tripTravelerId, this.db.schema.tripTravelers.id),
+        )
+        .innerJoin(
+          this.db.schema.itineraryActivities,
+          eq(this.db.schema.activityTravelers.activityId, this.db.schema.itineraryActivities.id),
+        )
+        .innerJoin(
+          customCruiseDetails,
+          eq(customCruiseDetails.activityId, this.db.schema.itineraryActivities.id),
+        )
+        .innerJoin(
+          this.db.schema.trips,
+          eq(this.db.schema.tripTravelers.tripId, this.db.schema.trips.id),
+        )
+        .where(
+          and(
+            eq(this.db.schema.tripTravelers.contactId, match.matchedContactId!),
+            eq(this.db.schema.trips.agencyId, agencyId),
+            // Overlapping dates: existing cruise starts before import ends AND ends after import starts
+            sql`${customCruiseDetails.departureDate} <= ${endDate}`,
+            sql`${customCruiseDetails.arrivalDate} >= ${startDate}`,
+          ),
+        )
+        .limit(5)
+
+      for (const cruise of existingCruises) {
+        const isSameShip = !!(shipName && cruise.shipName &&
+          cruise.shipName.toLowerCase() === shipName.toLowerCase())
+
+        conflicts.push({
+          paxno: match.paxno,
+          travelerName: `${match.firstName} ${match.lastName}`,
+          conflictTripId: cruise.tripId,
+          conflictTripName: cruise.tripName,
+          conflictShipName: cruise.shipName,
+          sameShip: isSameShip,
+        })
+      }
+    }
+
+    return conflicts
   }
 
   private async matchOrCreateContacts(

@@ -64,6 +64,7 @@ export interface ImportPreviewResponse {
   }
   existingImport?: { tripId: string; tripName: string } | null
   contactMatches?: ImportContactMatch[]
+  travelerConflicts?: ImportTravelerConflict[]
 }
 
 export interface ImportItineraryPort {
@@ -96,6 +97,15 @@ export interface ImportContactMatch {
   matchedContactId: string | null
   matchedContactName: string | null
   isNewContact: boolean
+}
+
+export interface ImportTravelerConflict {
+  paxno: number
+  travelerName: string
+  conflictTripId: string
+  conflictTripName: string
+  conflictShipName: string | null
+  sameShip: boolean
 }
 
 export interface ImportConfirmResponse {
