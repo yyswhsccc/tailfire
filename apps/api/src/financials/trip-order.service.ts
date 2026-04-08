@@ -902,8 +902,7 @@ export class TripOrderService {
         firstName: p.firstName,
         lastName: p.lastName,
         type: p.passengerType || 'adult',
-        dateOfBirth: p.dateOfBirth,
-        email: p.email,
+        // DOB excluded from invoice for privacy
       })),
       bookings: bookings.flatMap((b) => {
         const parent = {
@@ -1007,7 +1006,7 @@ export class TripOrderService {
         firstName: p.firstName,
         lastName: p.lastName,
         type: p.type || 'adult',
-        dateOfBirth: p.dateOfBirth,
+        // DOB excluded from invoice for privacy
       })),
       bookings: (bookingDetails || []).flatMap((b) => {
         const parent = {
