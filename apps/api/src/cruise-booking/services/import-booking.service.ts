@@ -429,41 +429,35 @@ export class ImportBookingService {
     bookingReference: string,
     agencyId: string,
   ): Promise<{ tripId: string } | null> {
-    // Query custom_cruise_details joined to activities → days → itineraries → trips
-    // to find an existing import scoped by agency + source + fusionBookingRef.
-    // Using source='traveltek' + fusionBookingRef prevents false matches when the
-    // same booking reference exists across different cruise lines or sources.
-    const result = await this.db.client
-      .select({
-        tripId: this.db.schema.trips.id,
-      })
-      .from(customCruiseDetails)
-      .innerJoin(
-        this.db.schema.itineraryActivities,
-        eq(customCruiseDetails.activityId, this.db.schema.itineraryActivities.id),
-      )
-      .innerJoin(
-        this.db.schema.itineraryDays,
-        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id),
-      )
-      .innerJoin(
-        this.db.schema.itineraries,
-        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id),
-      )
-      .innerJoin(
-        this.db.schema.trips,
-        eq(this.db.schema.itineraries.tripId, this.db.schema.trips.id),
-      )
-      .where(
-        and(
-          eq(customCruiseDetails.source, 'traveltek'),
-          eq(customCruiseDetails.fusionBookingRef, bookingReference),
-          eq(this.db.schema.trips.agencyId, agencyId),
-        ),
-      )
+    // Check by fusionBookingRef (traveltek source) first, then by bookingNumber (any source)
+    const joinChain = () =>
+      this.db.client
+        .select({ tripId: this.db.schema.trips.id })
+        .from(customCruiseDetails)
+        .innerJoin(this.db.schema.itineraryActivities, eq(customCruiseDetails.activityId, this.db.schema.itineraryActivities.id))
+        .innerJoin(this.db.schema.itineraryDays, eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id))
+        .innerJoin(this.db.schema.itineraries, eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id))
+        .innerJoin(this.db.schema.trips, eq(this.db.schema.itineraries.tripId, this.db.schema.trips.id))
+
+    // 1. Match by fusionBookingRef (traveltek imports)
+    const byFusionRef = await joinChain()
+      .where(and(
+        eq(customCruiseDetails.source, 'traveltek'),
+        eq(customCruiseDetails.fusionBookingRef, bookingReference),
+        eq(this.db.schema.trips.agencyId, agencyId),
+      ))
+      .limit(1)
+    if (byFusionRef[0]) return byFusionRef[0]
+
+    // 2. Match by bookingNumber (any source — catches TES, OCR, manual imports)
+    const byBookingNumber = await joinChain()
+      .where(and(
+        eq(customCruiseDetails.bookingNumber, bookingReference),
+        eq(this.db.schema.trips.agencyId, agencyId),
+      ))
       .limit(1)
 
-    return result[0] || null
+    return byBookingNumber[0] || null
   }
 
   private async findExistingImportWithName(
@@ -507,8 +501,8 @@ export class ImportBookingService {
       if (byBookingId[0]) return byBookingId[0]
     }
 
-    // Fall back to fusionBookingRef match
-    const result = await this.db.client
+    // Fall back to fusionBookingRef match (traveltek source only)
+    const byFusionRef = await this.db.client
       .select({
         tripId: this.db.schema.trips.id,
         tripName: this.db.schema.trips.name,
@@ -539,7 +533,40 @@ export class ImportBookingService {
       )
       .limit(1)
 
-    return result[0] || null
+    if (byFusionRef[0]) return byFusionRef[0]
+
+    // Final fallback: match by bookingNumber across ANY source (catches TES imports, OCR imports, etc.)
+    const byBookingNumber = await this.db.client
+      .select({
+        tripId: this.db.schema.trips.id,
+        tripName: this.db.schema.trips.name,
+      })
+      .from(customCruiseDetails)
+      .innerJoin(
+        this.db.schema.itineraryActivities,
+        eq(customCruiseDetails.activityId, this.db.schema.itineraryActivities.id),
+      )
+      .innerJoin(
+        this.db.schema.itineraryDays,
+        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id),
+      )
+      .innerJoin(
+        this.db.schema.itineraries,
+        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id),
+      )
+      .innerJoin(
+        this.db.schema.trips,
+        eq(this.db.schema.itineraries.tripId, this.db.schema.trips.id),
+      )
+      .where(
+        and(
+          eq(customCruiseDetails.bookingNumber, bookingReference),
+          eq(this.db.schema.trips.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    return byBookingNumber[0] || null
   }
 
   private async matchOrCreateContacts(
