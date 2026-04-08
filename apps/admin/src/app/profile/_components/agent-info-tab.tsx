@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { useMyProfile, useUpdateMyProfile } from '@/hooks/use-user-profile'
+import { useUser } from '@/hooks/use-user'
 import { useProfileForm } from './profile-form-context'
 import type { UpdateUserProfileDto } from '@tailfire/shared-types/api'
 
@@ -36,6 +37,7 @@ interface AgentInfoFormData {
 
 export function AgentInfoTab() {
   const { toast } = useToast()
+  const { isAdmin } = useUser()
   const { data: profile, isLoading } = useMyProfile()
   const updateProfile = useUpdateMyProfile()
   const { registerForm, unregisterForm, notifyPendingChange, isSubmitting } = useProfileForm()
@@ -115,7 +117,8 @@ export function AgentInfoTab() {
         emergencyContactName: data.emergencyContactName || undefined,
         emergencyContactPhone: data.emergencyContactPhone || undefined,
         licensingInfo,
-        commissionSettings,
+        // Only admins can update commission settings
+        ...(isAdmin ? { commissionSettings } : {}),
       }
 
       await updateProfile.mutateAsync(updateData)
@@ -236,7 +239,11 @@ export function AgentInfoTab() {
       <Card>
         <CardHeader>
           <CardTitle>Commission Settings</CardTitle>
-          <CardDescription>Default commission rates and split configurations</CardDescription>
+          <CardDescription>
+            {isAdmin
+              ? 'Default commission rates and split configurations'
+              : 'Commission settings are managed by your agency administrator'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -249,6 +256,7 @@ export function AgentInfoTab() {
               step="0.1"
               {...form.register('commissionSettings.defaultRate')}
               placeholder="10"
+              disabled={!isAdmin}
             />
             <p className="text-xs text-muted-foreground">
               Your standard commission percentage for bookings
@@ -265,6 +273,7 @@ export function AgentInfoTab() {
                     key={`splitType-${field.value}`}
                     value={field.value || undefined}
                     onValueChange={field.onChange}
+                    disabled={!isAdmin}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select split type" />
@@ -290,16 +299,18 @@ export function AgentInfoTab() {
                 step="0.01"
                 {...form.register('commissionSettings.splitValue')}
                 placeholder={form.watch('commissionSettings.splitType') === 'percentage' ? '50' : '100'}
-                disabled={form.watch('commissionSettings.splitType') === 'system_controlled'}
+                disabled={!isAdmin || form.watch('commissionSettings.splitType') === 'system_controlled'}
               />
               {form.watch('commissionSettings.splitType') === 'system_controlled' && (
                 <p className="text-xs text-muted-foreground">Split value is managed by the system</p>
               )}
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Configure how commissions are split with your agency
-          </p>
+          {!isAdmin && (
+            <p className="text-xs text-muted-foreground text-amber-500">
+              Contact your administrator to change commission settings
+            </p>
+          )}
         </CardContent>
       </Card>
 

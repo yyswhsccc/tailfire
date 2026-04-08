@@ -66,7 +66,7 @@ export class UserProfilesController {
     @GetAuthContext() auth: AuthContext,
     @Body() dto: UpdateUserProfileDto,
   ): Promise<UserProfileResponseDto> {
-    return this.userProfilesService.updateMyProfile(auth.userId, dto)
+    return this.userProfilesService.updateMyProfile(auth.userId, dto, auth.role)
   }
 
   /**

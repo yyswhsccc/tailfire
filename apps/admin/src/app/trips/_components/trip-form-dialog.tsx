@@ -622,7 +622,7 @@ export function TripFormDialog({
                 toLabel="Travel End Date"
                 showDuration
                 formatDuration={(days) => `${days} night${days !== 1 ? 's' : ''}`}
-                disabled={form.watch('addDatesLater')}
+                disabled={form.watch('addDatesLater') || trip?.status === 'travelling' || trip?.status === 'travelled'}
                 fromPlaceholder="YYYY-MM-DD"
                 toPlaceholder="YYYY-MM-DD"
               />
