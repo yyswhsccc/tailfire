@@ -240,11 +240,11 @@ export function BookingPreview({
                   </span>
                 </div>
               )}
-              {preview.commission > 0 && (
+              {(cruise.pricing.commission ?? preview.commission) > 0 && (
                 <div>
                   <span className="text-ash-500">Commission: </span>
                   <span className="font-medium text-green-700">
-                    {formatCurrency(preview.commission, currency)}
+                    {formatCurrency(cruise.pricing.commission ?? preview.commission, currency)}
                   </span>
                 </div>
               )}
