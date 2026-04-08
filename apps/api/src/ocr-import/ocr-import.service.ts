@@ -700,9 +700,25 @@ export class OcrImportService {
     )
 
     // Persist net price and commission if extracted
-    if (activity.activityPricingId && (cruise.netPriceCents || cruise.commissionCents)) {
+    // Sanity check: if net > total, the OCR extraction swapped them — fix it
+    let correctedNet = cruise.netPriceCents
+    let correctedTotal = cruise.totalPriceCents
+    if (correctedNet && correctedTotal && correctedNet > correctedTotal) {
+      this.logger.warn({
+        message: 'OCR cruise net > total — swapping values',
+        originalTotal: correctedTotal,
+        originalNet: correctedNet,
+      })
+      ;[correctedTotal, correctedNet] = [correctedNet, correctedTotal]
+      // Update the activity's total price with the corrected value
+      await this.db.client
+        .update(schema.activityPricing)
+        .set({ totalPriceCents: correctedTotal })
+        .where(eq(schema.activityPricing.activityId, activity.id))
+    }
+    if (activity.activityPricingId && (correctedNet || cruise.commissionCents)) {
       const pricingUpdate: Record<string, unknown> = {}
-      if (cruise.netPriceCents) pricingUpdate.netPriceCents = cruise.netPriceCents
+      if (correctedNet) pricingUpdate.netPriceCents = correctedNet
       if (cruise.commissionCents) pricingUpdate.commissionTotalCents = cruise.commissionCents
       await this.db.client
         .update(schema.activityPricing)

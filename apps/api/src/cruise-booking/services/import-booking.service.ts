@@ -174,13 +174,24 @@ export class ImportBookingService {
     // 8. Build and create custom cruise activity
     const rawCruiseDetails = this.mapToCruiseDetails(cruiseItem, dto.bookingReference, result)
     const cruiseDetails = await this.enrichFromCatalog(rawCruiseDetails, cruiseItem) as CustomCruiseDetailsDto
-    // Traveltek uses reversed terminology: their "nettprice" = client selling price (our gross/total),
-    // their "grossprice" = agency/wholesale cost (our net). Swap to match standard convention.
-    const totalPriceCents = this.parsePriceToCents(cruiseItem.nettprice)
+    // Total charge = sum of ALL breakdown items (cruise fare + taxes + port charges).
+    // Falls back to nettprice (cruise fare only) if breakdown is empty.
+    const totalPriceCents = this.calculateTotalChargeCents(cruiseItem.breakdown || [], cruiseItem.nettprice)
     const commissionCents = result.commission
       ? Math.round(result.commission * 100)
       : null
     const taxesAndFeesCents = this.extractTaxesAndFeesCents(cruiseItem.breakdown || [], totalPriceCents)
+
+    this.logger.log({
+      message: 'Import pricing breakdown',
+      bookingReference: dto.bookingReference,
+      nettprice: cruiseItem.nettprice,
+      grossprice: cruiseItem.grossprice,
+      breakdownTotal: totalPriceCents,
+      commission: result.commission,
+      taxesAndFees: taxesAndFeesCents,
+      breakdownItemCount: cruiseItem.breakdown?.length ?? 0,
+    })
 
     const cruiseActivity = await this.componentOrchestrationService.createCustomCruise({
       itineraryDayId: departureDay.id,
@@ -253,10 +264,11 @@ export class ImportBookingService {
           pricingUpdate.pricingType = 'per_person'
         }
 
-        // Universal booking fields — grossprice is agency cost (our net) in Traveltek terminology
-        const netPriceCents = this.parsePriceToCents(cruiseItem.grossprice)
-        if (netPriceCents !== null) {
-          pricingUpdate.netPriceCents = netPriceCents
+        // Net = Total charge - Commission (not grossprice which is wholesale/agency cost)
+        if (totalPriceCents !== null && commissionCents !== null) {
+          pricingUpdate.netPriceCents = totalPriceCents - commissionCents
+        } else if (totalPriceCents !== null) {
+          pricingUpdate.netPriceCents = totalPriceCents
         }
         if (cruiseItem.paymentinfo?.nonrefundabledeposit === 1) {
           pricingUpdate.nonRefundableDeposit = true
@@ -625,14 +637,24 @@ export class ImportBookingService {
         cabin: cruiseItem.cabin,
         supplier: cruiseItem.suppliername,
         itinerary: cruiseItem.itinerary,
-        pricing: {
-          // Traveltek uses reversed terminology: their "grossprice" = agency/wholesale cost,
-          // their "nettprice" = client selling price. We swap to match standard travel convention.
-          grossPrice: cruiseItem.nettprice,
-          netPrice: cruiseItem.grossprice,
-          price: cruiseItem.price,
-          currency: cruiseItem.scurrency,
-        },
+        pricing: (() => {
+          // Total charge = sum of ALL breakdown items (cruise fare + taxes + port charges).
+          // Falls back to nettprice (cruise fare only) if breakdown is empty.
+          const totalChargeCents = this.calculateTotalChargeCents(
+            cruiseItem.breakdown || [],
+            cruiseItem.nettprice,
+          )
+          const totalCharge = totalChargeCents !== null ? totalChargeCents / 100 : null
+          // Net = Total charge - Commission
+          const netPrice = totalCharge !== null && result.commission
+            ? totalCharge - result.commission
+            : null
+          return {
+            grossPrice: totalCharge,
+            netPrice,
+            currency: cruiseItem.scurrency,
+          }
+        })(),
         dining: cruiseItem.dining,
         selectedExtras: this.normalizeExtras(cruiseItem.selectedextras),
         selectedPromotions: cruiseItem.selectedpromotions &&
@@ -815,6 +837,28 @@ export class ImportBookingService {
     const num = typeof price === 'string' ? parseFloat(price) : price
     if (isNaN(num)) return null
     return Math.round(num * 100)
+  }
+
+  /**
+   * Calculate total charge from ALL breakdown items (commissionable + non-commissionable).
+   * This is the real "total charge" the client pays, including taxes/port charges.
+   * Falls back to nettprice (cruise fare only) if breakdown is empty.
+   */
+  private calculateTotalChargeCents(
+    breakdown: ImportBookingBreakdownItem[],
+    nettPriceFallback: string | number | undefined,
+  ): number | null {
+    if (breakdown?.length) {
+      let sum = 0
+      for (const item of breakdown) {
+        const itemCents = this.parsePriceToCents(item.itemprice) ?? 0
+        if (itemCents > 0) {
+          sum += itemCents * (item.quantity ?? 1)
+        }
+      }
+      if (sum > 0) return sum
+    }
+    return this.parsePriceToCents(nettPriceFallback)
   }
 
   /**
