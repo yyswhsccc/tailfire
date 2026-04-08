@@ -123,6 +123,28 @@ export function BookingPreview({
           </p>
         </div>
       )}
+      {/* Traveler Conflict Warnings */}
+      {preview.travelerConflicts && preview.travelerConflicts.length > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 space-y-2">
+          <span className="text-amber-700 font-medium">Traveler scheduling conflicts</span>
+          {preview.travelerConflicts.map((conflict, i) => (
+            <p key={i} className="text-sm text-amber-600">
+              <span className="font-medium">{conflict.travelerName}</span>
+              {conflict.sameShip
+                ? ' already has a cabin on this ship in '
+                : ` is booked on ${conflict.conflictShipName || 'another cruise'} during these dates in `}
+              <a
+                href={`/trips/${conflict.conflictTripId}`}
+                className="font-medium underline hover:text-amber-800"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {conflict.conflictTripName}
+              </a>
+            </p>
+          ))}
+        </div>
+      )}
       {/* Cruise Details */}
       <Card>
         <CardHeader>
