@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -327,7 +329,7 @@ export function ContactFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => { if (form.formState.isDirty) e.preventDefault() }}>
         <DialogHeader>
           <DialogTitle>
             {mode === 'create' ? 'Create New Contact' : 'Edit Contact'}
