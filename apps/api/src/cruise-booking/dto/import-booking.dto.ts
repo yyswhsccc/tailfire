@@ -50,4 +50,10 @@ export class ImportBookingConfirmDto extends ImportBookingPreviewDto {
   @IsOptional()
   @IsUUID()
   existingTripId?: string
+
+  @ApiPropertyOptional({
+    description: 'Map paxno → contactId (UUID to link, null to create new). Omitted paxno falls back to auto-match.',
+  })
+  @IsOptional()
+  contactOverrides?: Record<number, string | null>
 }

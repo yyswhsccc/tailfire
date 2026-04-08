@@ -145,6 +145,7 @@ export class ImportBookingService {
     const passengerContactMap = await this.matchOrCreateContacts(
       result.passengers,
       auth,
+      dto.contactOverrides,
     )
 
     // 5. Create or use existing trip
@@ -506,10 +507,56 @@ export class ImportBookingService {
   private async matchOrCreateContacts(
     passengers: ImportBookingPassenger[],
     auth: AuthContext,
+    contactOverrides?: Record<number, string | null>,
   ): Promise<Map<number, string>> {
     const map = new Map<number, string>()
 
     for (const pax of passengers) {
+      // Check for user override first
+      if (contactOverrides && pax.paxno in contactOverrides) {
+        const overrideId = contactOverrides[pax.paxno]
+        if (overrideId) {
+          // Validate the contact exists and belongs to this agency
+          const [contact] = await this.db.client
+            .select({ id: this.db.schema.contacts.id })
+            .from(this.db.schema.contacts)
+            .where(
+              and(
+                eq(this.db.schema.contacts.id, overrideId),
+                eq(this.db.schema.contacts.agencyId, auth.agencyId),
+              ),
+            )
+            .limit(1)
+          if (contact) {
+            map.set(pax.paxno, contact.id)
+            continue
+          }
+          this.logger.warn(`Contact override ${overrideId} not found for paxno ${pax.paxno}, falling back to auto-match`)
+        } else {
+          // null = force create new contact (skip auto-match)
+          const firstName = this.titleCase(pax.firstname)
+          const lastName = this.titleCase(pax.lastname)
+          const dob = pax.dob && /^\d{4}-\d{2}-\d{2}$/.test(pax.dob) ? pax.dob : null
+          const contact = await this.contactsService.create(
+            {
+              firstName,
+              lastName,
+              middleName: pax.middlename ? this.titleCase(pax.middlename) : undefined,
+              prefix: this.normalizePrefix(pax.title),
+              dateOfBirth: dob || undefined,
+              gender: this.normalizeGender(pax.gender),
+              nationality: this.sanitizeNationality(pax.nationality),
+              contactType: 'client',
+              becameClientAt: new Date().toISOString(),
+            },
+            auth.agencyId,
+            auth.userId,
+          )
+          map.set(pax.paxno, contact.id)
+          continue
+        }
+      }
+
       // Normalize names to title case (API data is often ALL CAPS)
       const firstName = this.titleCase(pax.firstname)
       const lastName = this.titleCase(pax.lastname)
