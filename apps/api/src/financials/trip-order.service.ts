@@ -914,6 +914,7 @@ export class TripOrderService {
           amount: Number(b.totalPrice || 0),
           currency: b.currency || 'CAD',
           cancellation_policy: b.cancellationPolicy || null,
+          terms_and_conditions: b.termsAndConditions || null,
           non_refundable: b.nonRefundableDeposit ?? false,
           net_price: b.netPrice ?? null,
           supplier: b.supplier || null,
@@ -1017,6 +1018,9 @@ export class TripOrderService {
           end_date: b.end_date,
           amount: Number(b.amount || b.base_price || 0),
           currency: b.currency || orderData.service_details?.currency || 'CAD',
+          cancellation_policy: b.cancellation_policy || null,
+          terms_and_conditions: b.terms_and_conditions || null,
+          supplier: b.supplier || null,
         }
         // Flatten package children as "Included" sub-items
         if (b.included_items?.length) {
@@ -1202,6 +1206,7 @@ export class TripOrderService {
   private async getTripBookings(tripId: string) {
     // Query itinerary activities with their pricing and financial details
     // Must check both itinerary chain AND direct trip_id for floating packages
+    // Also JOIN suppliers to pull default T&C when activity-level T&C is empty
     const activities = await this.db.client.execute(sql`
       SELECT
         ia.id,
@@ -1213,12 +1218,16 @@ export class TripOrderService {
         ap.total_price_cents,
         ap.currency,
         ap.cancellation_policy,
+        ap.terms_and_conditions,
         ap.non_refundable_deposit,
         ap.net_price_cents,
         ap.pricing_breakdown_json,
-        ap.supplier
+        ap.supplier,
+        s.default_terms_and_conditions AS supplier_terms,
+        s.default_cancellation_policy AS supplier_cancellation
       FROM itinerary_activities ia
       LEFT JOIN activity_pricing ap ON ap.activity_id = ia.id
+      LEFT JOIN suppliers s ON s.name = ap.supplier AND s.agency_id = ia.agency_id
       LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
       LEFT JOIN itineraries i ON i.id = iday.itinerary_id
       WHERE ia.parent_activity_id IS NULL
@@ -1269,7 +1278,9 @@ export class TripOrderService {
           endDate: a.end_datetime ? new Date(a.end_datetime).toISOString().split('T')[0] : null,
           totalPrice: totalPriceCents / 100,
           currency: a.currency || 'CAD',
-          cancellationPolicy: a.cancellation_policy || null,
+          // Fall back to supplier defaults from Library when activity-level T&C are empty
+          cancellationPolicy: a.cancellation_policy || a.supplier_cancellation || null,
+          termsAndConditions: a.terms_and_conditions || a.supplier_terms || null,
           nonRefundableDeposit: a.non_refundable_deposit ?? false,
           netPrice: netPriceCents ? netPriceCents / 100 : null,
           supplier: a.supplier || null,
@@ -1604,6 +1615,7 @@ export class TripOrderService {
       currency: booking.currency || 'CAD',
       // TICO-required financial details
       cancellation_policy: booking.cancellationPolicy || undefined,
+      terms_and_conditions: booking.termsAndConditions || undefined,
       non_refundable: booking.nonRefundableDeposit ?? false,
       net_price: booking.netPrice ?? undefined,
       supplier: booking.supplier || undefined,
