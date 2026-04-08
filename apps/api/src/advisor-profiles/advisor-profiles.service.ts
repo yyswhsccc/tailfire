@@ -375,4 +375,140 @@ export class AdvisorProfilesService {
 
     return updated!
   }
+
+  // ============================================================================
+  // ADMIN — Sync advisor profiles from user_profiles (batch create)
+  // ============================================================================
+
+  async syncFromUserProfiles(): Promise<{
+    created: number
+    skipped: number
+    errors: { userId: string; error: string }[]
+  }> {
+    const { advisorProfiles, userProfiles } = this.db.schema
+
+    // 1. Get all active user profiles
+    const activeUsers = await this.db.client
+      .select({
+        id: userProfiles.id,
+        firstName: userProfiles.firstName,
+        lastName: userProfiles.lastName,
+        bio: userProfiles.bio,
+        avatarUrl: userProfiles.avatarUrl,
+        agencyId: userProfiles.agencyId,
+      })
+      .from(userProfiles)
+      .where(
+        and(
+          eq(userProfiles.isActive, true),
+          eq(userProfiles.status, 'active'),
+        ),
+      )
+
+    // 2. Get all existing advisor profile userIds to skip
+    const existingProfiles = await this.db.client
+      .select({ userId: advisorProfiles.userId })
+      .from(advisorProfiles)
+
+    const existingUserIds = new Set(existingProfiles.map((p) => p.userId))
+
+    // 3. Filter to users who don't already have an advisor profile
+    const usersToCreate = activeUsers.filter((u) => !existingUserIds.has(u.id))
+
+    if (usersToCreate.length === 0) {
+      this.logger.log('Advisor profile sync: all users already have profiles')
+      return { created: 0, skipped: activeUsers.length, errors: [] }
+    }
+
+    // 4. Get all existing slugs to handle duplicates
+    const existingSlugs = await this.db.client
+      .select({ slug: advisorProfiles.slug })
+      .from(advisorProfiles)
+
+    const slugSet = new Set(existingSlugs.map((s) => s.slug))
+
+    // 5. Create profiles one by one (to handle slug uniqueness gracefully)
+    let created = 0
+    const errors: { userId: string; error: string }[] = []
+
+    for (const user of usersToCreate) {
+      try {
+        const baseSlug = this.generateSlug(user.firstName, user.lastName)
+        const slug = this.deduplicateSlug(baseSlug, slugSet)
+        slugSet.add(slug) // Track for subsequent iterations
+
+        await this.db.client.insert(advisorProfiles).values({
+          userId: user.id,
+          agencyId: user.agencyId,
+          slug,
+          displayName: [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Travel Advisor',
+          title: 'Travel Advisor',
+          bio: user.bio ?? null,
+          photoUrl: user.avatarUrl ?? null,
+          specialties: [],
+          languages: [],
+          destinations: [],
+          isPublished: true,
+        })
+
+        created++
+        this.logger.log(`Advisor profile created for user ${user.id} (slug=${slug})`)
+      } catch (err: any) {
+        this.logger.error(`Failed to create advisor profile for user ${user.id}: ${err.message}`)
+        errors.push({ userId: user.id, error: err.message })
+      }
+    }
+
+    this.logger.log(
+      `Advisor profile sync complete: ${created} created, ${existingUserIds.size} skipped, ${errors.length} errors`,
+    )
+
+    // Invalidate OTA ISR cache if we created any profiles
+    if (created > 0) {
+      this.otaRevalidation.revalidateTag('advisors')
+    }
+
+    return {
+      created,
+      skipped: existingUserIds.size,
+      errors,
+    }
+  }
+
+  // ============================================================================
+  // PRIVATE — Slug generation helpers
+  // ============================================================================
+
+  /**
+   * Generate a URL-friendly slug from first + last name.
+   * e.g., "Sarah Mitchell" -> "sarah-mitchell"
+   */
+  private generateSlug(firstName?: string | null, lastName?: string | null): string {
+    const parts = [firstName, lastName].filter(Boolean).map((s) =>
+      s!
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, ''),
+    )
+
+    return parts.join('-') || 'advisor'
+  }
+
+  /**
+   * Ensure slug uniqueness by appending a counter if needed.
+   * e.g., "sarah-mitchell" -> "sarah-mitchell-2" if the base already exists.
+   */
+  private deduplicateSlug(baseSlug: string, existingSlugs: Set<string>): string {
+    if (!existingSlugs.has(baseSlug)) {
+      return baseSlug
+    }
+
+    let counter = 2
+    while (existingSlugs.has(`${baseSlug}-${counter}`)) {
+      counter++
+    }
+
+    return `${baseSlug}-${counter}`
+  }
 }
