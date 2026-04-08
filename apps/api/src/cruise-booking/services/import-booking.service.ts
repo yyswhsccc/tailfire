@@ -549,6 +549,74 @@ export class ImportBookingService {
     return map
   }
 
+  private async suggestContactMatches(
+    passengers: ImportBookingPassenger[],
+    auth: AuthContext,
+  ): Promise<Array<{
+    paxno: number
+    firstName: string
+    lastName: string
+    matchedContactId: string | null
+    matchedContactName: string | null
+    isNewContact: boolean
+  }>> {
+    const results: Array<{
+      paxno: number
+      firstName: string
+      lastName: string
+      matchedContactId: string | null
+      matchedContactName: string | null
+      isNewContact: boolean
+    }> = []
+
+    for (const pax of passengers) {
+      const firstName = this.titleCase(pax.firstname)
+      const lastName = this.titleCase(pax.lastname)
+
+      const rawDob = pax.dob || null
+      const dob = rawDob && /^\d{4}-\d{2}-\d{2}$/.test(rawDob) && !isNaN(Date.parse(rawDob))
+        ? rawDob
+        : null
+
+      const nameMatches = await this.db.client
+        .select({
+          id: this.db.schema.contacts.id,
+          firstName: this.db.schema.contacts.firstName,
+          lastName: this.db.schema.contacts.lastName,
+          dateOfBirth: this.db.schema.contacts.dateOfBirth,
+        })
+        .from(this.db.schema.contacts)
+        .where(
+          and(
+            eq(this.db.schema.contacts.agencyId, auth.agencyId),
+            sql`LOWER(${this.db.schema.contacts.firstName}) = LOWER(${firstName})`,
+            sql`LOWER(${this.db.schema.contacts.lastName}) = LOWER(${lastName})`,
+          ),
+        )
+        .limit(10)
+
+      // Disambiguate: prefer DOB match, then any name match
+      let matched = nameMatches[0] || null
+      if (dob && nameMatches.length > 1) {
+        const dobMatch = nameMatches.find((c) => c.dateOfBirth === dob)
+        if (dobMatch) matched = dobMatch
+      }
+
+      results.push({
+        paxno: pax.paxno,
+        firstName,
+        lastName,
+        matchedContactId: matched ? matched.id : null,
+        matchedContactName: matched
+          ? `${matched.firstName} ${matched.lastName}`.trim()
+          : null,
+        isNewContact: !matched,
+      })
+    }
+
+    return results
+  }
+
   private mapToCruiseDetails(
     cruiseItem: ImportBookingCruiseItem,
     bookingReference: string,
