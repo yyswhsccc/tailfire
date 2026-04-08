@@ -53,6 +53,19 @@ export function BookingPreview({
   const confirmMutation = useImportConfirm()
   const { toast } = useToast()
 
+  const [contactOverrides, setContactOverrides] = useState<Record<number, string | null>>(() => {
+    // Pre-initialize from contact match suggestions
+    const initial: Record<number, string | null> = {}
+    if (preview.contactMatches) {
+      for (const match of preview.contactMatches) {
+        initial[match.paxno] = match.matchedContactId
+      }
+    }
+    return initial
+  })
+
+  const isAlreadyImported = !!preview.existingImport
+
   const { cruise, passengers, catalog } = preview
   const currency = cruise.pricing?.currency || request.currency || 'CAD'
   const shipName = cruise.ship?.name ?? 'Unknown ship'
@@ -65,6 +78,7 @@ export function BookingPreview({
         ...request,
         tripName: existingTripId ? undefined : tripName.trim() || undefined,
         existingTripId,
+        contactOverrides,
       })
 
       if (result.alreadyImported) {
@@ -99,6 +113,25 @@ export function BookingPreview({
 
   return (
     <div className="space-y-6 max-w-4xl">
+      {/* Dedup Warning */}
+      {preview.existingImport && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-700 font-medium">This booking was already imported</span>
+          </div>
+          <p className="mt-1 text-sm text-amber-600">
+            Booking {preview.bookingReference} exists in trip{' '}
+            <a
+              href={`/trips/${preview.existingImport.tripId}`}
+              className="font-medium underline hover:text-amber-800"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {preview.existingImport.tripName}
+            </a>
+          </p>
+        </div>
+      )}
       {/* Cruise Details */}
       <Card>
         <CardHeader>
@@ -208,7 +241,14 @@ export function BookingPreview({
             <CardTitle>Passengers ({passengers.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <PassengerList passengers={passengers} />
+            <PassengerList
+              passengers={passengers}
+              contactMatches={preview.contactMatches}
+              contactOverrides={contactOverrides}
+              onContactOverrideChange={(paxno, contactId) =>
+                setContactOverrides((prev) => ({ ...prev, [paxno]: contactId }))
+              }
+            />
           </CardContent>
         </Card>
       )}
@@ -282,7 +322,7 @@ export function BookingPreview({
         <Button variant="outline" onClick={onBack} disabled={confirmMutation.isPending}>
           Back
         </Button>
-        <Button onClick={handleConfirm} disabled={confirmMutation.isPending}>
+        <Button onClick={handleConfirm} disabled={confirmMutation.isPending || isAlreadyImported}>
           {confirmMutation.isPending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
