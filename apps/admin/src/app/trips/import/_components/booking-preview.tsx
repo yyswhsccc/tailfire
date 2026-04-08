@@ -53,16 +53,7 @@ export function BookingPreview({
   const confirmMutation = useImportConfirm()
   const { toast } = useToast()
 
-  const [contactOverrides, setContactOverrides] = useState<Record<number, string | null>>(() => {
-    // Pre-initialize from contact match suggestions
-    const initial: Record<number, string | null> = {}
-    if (preview.contactMatches) {
-      for (const match of preview.contactMatches) {
-        initial[match.paxno] = match.matchedContactId
-      }
-    }
-    return initial
-  })
+  const [contactOverrides, setContactOverrides] = useState<Record<number, string | null>>({})
 
   const isAlreadyImported = !!preview.existingImport
 
