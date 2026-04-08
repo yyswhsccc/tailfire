@@ -103,50 +103,46 @@ export class FinancialSummaryService {
     totalInTripCurrencyCents: number
     byActivity: ActivityCostSummaryDto[]
   }> {
-    // Get all TOP-LEVEL activities for the trip via itineraries
-    // LEFT JOIN with activity_pricing to get authoritative pricing data
-    // Exclude child activities (e.g. port_info under cruises) — they're informational, not billable
-    const activities = await this.db.client
-      .select({
-        activityId: this.db.schema.itineraryActivities.id,
-        activityName: this.db.schema.itineraryActivities.name,
-        activityType: this.db.schema.itineraryActivities.activityType,
-        // Read from activity_pricing (authoritative source)
-        totalPriceCents: this.db.schema.activityPricing.totalPriceCents,
-        pricingCurrency: this.db.schema.activityPricing.currency,
-      })
-      .from(this.db.schema.itineraryActivities)
-      .leftJoin(
-        this.db.schema.activityPricing,
-        eq(this.db.schema.activityPricing.activityId, this.db.schema.itineraryActivities.id)
-      )
-      .innerJoin(
-        this.db.schema.itineraryDays,
-        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id)
-      )
-      .innerJoin(
-        this.db.schema.itineraries,
-        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
-      )
-      .where(
-        and(
-          eq(this.db.schema.itineraries.tripId, tripId),
-          isNull(this.db.schema.itineraryActivities.parentActivityId)
+    // Get all TOP-LEVEL activities for the trip via itineraries OR direct trip_id reference.
+    // Floating packages (e.g. TES imports) use itinerary_activities.trip_id directly
+    // instead of the itinerary chain. Must check both paths.
+    // LEFT JOIN with activity_pricing to get authoritative pricing data.
+    // Exclude child activities (e.g. port_info under cruises) — they're informational, not billable.
+    const ia = this.db.schema.itineraryActivities
+    const ap = this.db.schema.activityPricing
+    const activities = await this.db.client.execute(sql`
+      SELECT
+        ia.id AS activity_id,
+        ia.name AS activity_name,
+        ia.activity_type,
+        ap.total_price_cents,
+        ap.currency AS pricing_currency
+      FROM itinerary_activities ia
+      LEFT JOIN activity_pricing ap ON ap.activity_id = ia.id
+      LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+      LEFT JOIN itineraries i ON i.id = iday.itinerary_id
+      WHERE ia.parent_activity_id IS NULL
+        AND (
+          i.trip_id = ${tripId}
+          OR ia.trip_id = ${tripId}
         )
-      )
+    `) as any[]
 
     const byActivity: ActivityCostSummaryDto[] = []
     let totalCents = 0
     let totalInTripCurrencyCents = 0
 
     for (const activity of activities) {
-      // Use pricing data with null guards - default to trip currency and 0
-      const activityCurrency = activity.pricingCurrency ?? tripCurrency
-      const costCents = activity.totalPriceCents ?? 0
+      // Raw SQL returns snake_case column names
+      const activityId = activity.activity_id
+      const activityName = activity.activity_name
+      const activityType = activity.activity_type
+      const activityCurrency = activity.pricing_currency ?? tripCurrency
+      const costCents = Number(activity.total_price_cents ?? 0)
 
       // Log warning if activity has no pricing row
-      if (activity.totalPriceCents === null) {
-        this.logger.warn(`Activity ${activity.activityId} has no pricing row - using $0`)
+      if (activity.total_price_cents === null) {
+        this.logger.warn(`Activity ${activityId} has no pricing row - using $0`)
       }
 
       // Convert to trip currency if different
@@ -164,7 +160,7 @@ export class FinancialSummaryService {
       const [splitCount] = await this.db.client
         .select({ count: sql<number>`count(*)::int` })
         .from(this.db.schema.activityTravellerSplits)
-        .where(eq(this.db.schema.activityTravellerSplits.activityId, activity.activityId))
+        .where(eq(this.db.schema.activityTravellerSplits.activityId, activityId))
 
       const hasSplits = (splitCount?.count ?? 0) > 0
 
@@ -174,15 +170,15 @@ export class FinancialSummaryService {
         const [firstSplit] = await this.db.client
           .select({ splitType: this.db.schema.activityTravellerSplits.splitType })
           .from(this.db.schema.activityTravellerSplits)
-          .where(eq(this.db.schema.activityTravellerSplits.activityId, activity.activityId))
+          .where(eq(this.db.schema.activityTravellerSplits.activityId, activityId))
           .limit(1)
         splitType = firstSplit?.splitType ?? null
       }
 
       byActivity.push({
-        activityId: activity.activityId,
-        activityName: activity.activityName,
-        activityType: activity.activityType,
+        activityId,
+        activityName,
+        activityType,
         totalCostCents: costCents,
         currency: activityCurrency,
         totalInTripCurrencyCents: costInTripCurrencyCents,
