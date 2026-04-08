@@ -2804,14 +2804,21 @@ export class ActivitiesService {
     const grandTotal = Number(result?.grand_total_cents ?? 0)
     const bookedTotal = Number(result?.booked_total_cents ?? 0)
     const totalCollected = Number(result?.total_collected_cents ?? 0)
+    const expectedCommission = Number(result?.expected_commission_cents ?? 0)
+
+    // Outstanding = what the CLIENT still owes, NOT including commission.
+    // Commission flows B2B from supplier to agency — it's never collected from the client.
+    // Client owes: Gross - Commission (= Net) minus what they've already paid.
+    const clientOwes = bookedTotal - expectedCommission
+    const outstanding = Math.max(0, clientOwes - totalCollected)
 
     return {
       totalPackages: Number(result?.total_packages ?? 0),
       grandTotalCents: grandTotal,
       bookedTotalCents: bookedTotal,
       totalCollectedCents: totalCollected,
-      outstandingCents: bookedTotal - totalCollected,
-      expectedCommissionCents: Number(result?.expected_commission_cents ?? 0),
+      outstandingCents: outstanding,
+      expectedCommissionCents: expectedCommission,
       pendingCommissionCents: Number(result?.pending_commission_cents ?? 0),
     }
   }
