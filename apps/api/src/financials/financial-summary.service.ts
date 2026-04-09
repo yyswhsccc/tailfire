@@ -108,10 +108,8 @@ export class FinancialSummaryService {
     // instead of the itinerary chain. Must check both paths.
     // LEFT JOIN with activity_pricing to get authoritative pricing data.
     // Exclude child activities (e.g. port_info under cruises) — they're informational, not billable.
-    const ia = this.db.schema.itineraryActivities
-    const ap = this.db.schema.activityPricing
     const activities = await this.db.client.execute(sql`
-      SELECT
+      SELECT DISTINCT ON (ia.id)
         ia.id AS activity_id,
         ia.name AS activity_name,
         ia.activity_type,
@@ -126,6 +124,7 @@ export class FinancialSummaryService {
           i.trip_id = ${tripId}
           OR ia.trip_id = ${tripId}
         )
+      ORDER BY ia.id
     `) as any[]
 
     const byActivity: ActivityCostSummaryDto[] = []

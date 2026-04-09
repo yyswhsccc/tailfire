@@ -1,66 +1,39 @@
 # Agent Guide: Build And Propose An Itinerary
 
-This article explains how agents create itinerary options, prepare them for client review, and publish proposal versions.
+This article explains how agents build itinerary options, prepare them for client review, and publish client-visible proposal snapshots.
 
 ## What To Know First
 
-- A trip can have more than one itinerary option.
-- An itinerary has its own workflow status: `Draft`, `Proposing`, `Approved`, or `Archived`.
-- Publishing creates a client-facing snapshot. That snapshot is separate from your live working edits.
-- Trip stage is separate from itinerary status. A trip can remain `Planning` even after an itinerary is approved.
+- a trip can have more than one itinerary option
+- itinerary status is separate from trip stage
+- the working area is the **Itinerary** tab
+- **Publish to Client** creates a versioned snapshot on the shared proposal link
 
 ## Typical Workflow
 
-1. Open the trip and go to the itinerary area.
-2. Create the first itinerary, or import one from `Library > Itinerary Templates`.
-3. Add days, then build the trip with activities and packages.
-4. Duplicate the itinerary if you want to offer multiple options.
-5. Save strong reusable versions as templates when they may help future trips.
-6. Move the itinerary to `Proposing` when it is ready for client review.
-7. Use `Publish to Client` to create the proposal version the client will actually see.
-8. When the client selects and approves an option, the winning itinerary should be the one that moves to `Approved`.
-9. Archive retired options so the working set stays clean.
+1. Open the trip and go to the **Itinerary** tab.
+2. Click **Create** for a blank itinerary or **Import** to pull one from the library.
+3. Build days, activities, and packages.
+4. Move the itinerary to **Proposing** when it is ready for client review.
+5. Use **Publish to Client** to create the version the client actually sees.
+6. Republish after later client-visible edits.
+7. Move the winning option to **Approved** and archive the retired ones.
 
-## Building Good Itinerary Options
+## Status Rules
 
-- Give each option a clear name.
-- Keep each option focused on a distinct client choice, not minor internal variations.
-- Use packages when a group of activities should be managed together.
-- Save mature itinerary structures to the library instead of rebuilding them from scratch.
+- **Draft**: internal work
+- **Proposing**: active client review
+- **Approved**: selected option
+- **Archived**: retired option
 
-## Publishing And Proposal Versions
+## Important Distinctions
 
-Publishing matters because the client sees the published snapshot, not every live draft edit.
-
-When you publish:
-
-- Tailfire creates a versioned snapshot of the itinerary.
-- You can include a change summary.
-- Version history stays available for review.
-
-After you publish:
-
-- If you keep editing the itinerary, those changes stay unpublished until you publish again.
-- A small unpublished-changes indicator can appear on the itinerary option.
-- Republish after any client-visible change that should appear on the shared proposal.
-
-## Practical Rules
-
-- `Draft` is for internal work.
-- `Proposing` is for options you are actively sending or presenting to the client.
-- `Approved` is for the client-selected option.
-- `Archived` is for options you no longer want in the active set.
-- Client approval does not mean the supplier has been booked yet.
-
-## Common Mistakes To Avoid
-
-- Do not assume changing the itinerary automatically updates the client-facing proposal. Publish again when needed.
-- Do not leave old options in `Proposing` if the client has already chosen a winner.
-- Do not confuse a published proposal with supplier booking. Those are separate steps.
+- Publishing does not automatically book anything with a supplier.
+- A trip can still be in **Planning** while an itinerary is **Proposing** or **Approved**.
+- The shared proposal link shows the published snapshot, not every live edit.
 
 ## Related Articles
 
 - [Create A Trip](./Agent-Guide-Create-A-Trip.md)
-- [Template System](./Agent-Guide-Template-System.md)
 - [Record Supplier Bookings](./Agent-Guide-Record-Supplier-Bookings.md)
 - [Trip Workflow](./Trip-Workflow.md)

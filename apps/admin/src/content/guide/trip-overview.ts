@@ -1,57 +1,44 @@
 export const content = `
 ## Inside a Trip
 
-The trip detail page is your workspace for managing every aspect of a client's journey. The **Overview** tab shows the essential details at a glance.
+The trip detail page is the workspace for the full client file. The **Overview** tab shows the core trip details and is usually the first place to review ownership, dates, and travelers.
 
 ## Trip Status
 
-Every trip has a status that reflects where it is in the lifecycle:
-
 | Status | Meaning |
-|--------|---------|
-| **Planning** | Active planning, proposals, and client review |
-| **Active** | At least one activity has been booked with a supplier |
+| --- | --- |
+| **Inbound** | Early intake, qualification, or newly created trip work |
+| **Planning** | Active planning, itinerary building, and proposal work |
+| **Active** | Supplier-booked work now exists on the trip |
 | **Travelling** | The trip is currently in progress |
-| **Travelled** | The trip has been completed |
+| **Travelled** | The trip has completed |
 | **Cancelled** | The trip was cancelled |
 
-> **Tip:** You do not manually set a trip to **Active**. Tailfire automatically promotes a trip from Planning to Active when the first activity is booked. Similarly, **Travelling** and **Travelled** are set automatically based on trip dates.
+Important behavior:
+
+- **Inbound** and **Planning** are the manual starting states.
+- **Active**, **Travelling**, and **Travelled** are system-driven lifecycle states.
 
 ## Overview Tab
 
-The overview tab displays:
+The overview tab displays the trip's key details, including:
 
-- **Trip Name** and **Cover Photo**
-- **Trip Dates** (start and end)
-- **Trip Status** badge
-- **Primary Contact** — the main client for this trip
-- **Assigned Agent** — the advisor managing the trip
-- **Travelers** — everyone on this trip
-- **Trip Group** — if part of a group departure
-- **Tags** — applied organizational tags
-- **Trip Type** and **Timezone**
+- trip name and cover photo
+- dates and status
+- primary contact and assigned agent
+- travelers, trip group, tags, trip type, and timezone
 
 ## Managing Travelers
 
-1. Click **Add Traveler** on the overview tab.
-2. Search for an existing contact or create a new one.
-3. The traveler is linked to the trip and appears in the travelers list.
-
-Travelers added here become available for passport checks, payment recording, and insurance tracking across the trip.
-
-## Editing Trip Details
-
-Click any editable field on the overview to update it. Changes save automatically.
-
-- Update dates to adjust the itinerary day range
-- Change the assigned agent to transfer ownership
-- Add or remove tags at any time
+1. Click **Add Traveler** from the trip workspace.
+2. Link an existing contact or create a new one.
+3. Review the traveler list for completeness before moving into booking-heavy work.
 
 ## Trip Tabs
 
-Beyond the overview, the trip detail page includes tabs for:
+The current trip workspace includes these tabs:
 
-**Itineraries**, **Tasks**, **Payments**, **Insurance**, **Service Fees**, **Documents**, **Emails**, **Comments**, and **Activity Log**
+**Overview**, **Itinerary**, **Tasks**, **Bookings**, **Payments**, **Insurance**, **Service Fees**, **Documents**, **Emails**, **Forms**, **Notes**, **Automations**, **Activity**, **Travelers**, and **Media**
 
-Each tab is covered in its own guide section.
+Each tab covers a different part of the file. The **Itinerary** tab handles proposal options, while **Bookings** is where supplier-booked work is tracked separately.
 `

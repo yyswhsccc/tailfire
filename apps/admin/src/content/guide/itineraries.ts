@@ -1,55 +1,49 @@
 export const content = `
 ## Building Itineraries
 
-An itinerary is the day-by-day plan for a trip. Each trip can have multiple itinerary options, letting you present different choices to your client.
+An itinerary is the day-by-day proposal for a trip. Each trip can have more than one itinerary option so you can compare different client-facing proposals.
 
 ## Creating an Itinerary
 
-1. Open the trip and go to the **Itineraries** tab.
-2. Click **New Itinerary** or import one from **Library > Itinerary Templates**.
-3. Give the itinerary a clear, descriptive name (e.g., "10-Day Italy Classic" or "Option B: Extended Stay").
+1. Open the trip and go to the **Itinerary** tab.
+2. Click **Create** for a blank option or **Import** to pull an itinerary template from the library.
+3. Give the itinerary a clear name.
 
 ## Adding Days and Activities
 
-1. Click **Add Day** to create a new itinerary day.
-2. Drag and drop activities from the **Build your trip** sidebar into any day.
-3. Choose from **Trip Components** (Flight, Lodging, Tour, etc.) or **Library Items** (pre-built templates).
-4. Reorder activities within a day or between days using drag and drop.
-
-> **Tip:** Use the most specific component type available. It makes pricing, booking, and reporting cleaner downstream.
+- Add itinerary days as needed.
+- Build each day with activities, packages, and other trip components.
+- Duplicate strong options when you want a quick variation.
+- Use **Save as Template** when an itinerary should become reusable library content.
 
 ## Itinerary Statuses
 
 | Status | Meaning |
-|--------|---------|
-| **Draft** | Internal work in progress — not visible to clients |
-| **Proposing** | Actively being presented to the client |
-| **Approved** | The client has selected this option |
-| **Archived** | Retired option, kept for reference |
+| --- | --- |
+| **Draft** | Internal work in progress |
+| **Proposing** | Ready for active client review |
+| **Approved** | Client-selected winning option |
+| **Archived** | Retired option kept for reference |
 
-## Publishing to the Client Portal
+## Publishing To The Client
 
-Publishing creates a snapshot that the client sees — your live edits are not visible until you publish.
+**Publish to Client** creates a versioned snapshot for the client-facing proposal.
 
-1. Move the itinerary to **Proposing** when it is ready for client review.
-2. Click **Publish to Client** to create the proposal version.
-3. Optionally add a change summary describing what is new.
-4. After publishing, continue editing — changes stay unpublished until you publish again.
+When you publish:
 
-> **Warning:** Editing an itinerary does NOT automatically update the client-facing proposal. Always re-publish after making client-visible changes.
+1. Tailfire creates the next proposal version.
+2. The published snapshot becomes visible on the shared proposal link.
+3. You can include a change summary.
 
-## Working with Multiple Options
+Important rule:
 
-- Duplicate an itinerary to create a variation quickly.
-- Present multiple options in **Proposing** status simultaneously.
-- When the client selects a winner, move it to **Approved** and archive the others.
-- Only one itinerary per trip should be **Approved** at a time.
+- live edits are not automatically visible to the client
+- after client-visible changes, publish again to update the shared proposal
 
-## Saving Templates
+## Practical Rules
 
-Built a great itinerary? Save it for future trips:
-
-1. Open the itinerary you want to reuse.
-2. Click **Save as Template**.
-3. Name it and store it in the library.
+- Trip stage and itinerary status are separate.
+- A trip can still be in **Planning** while an itinerary is **Proposing** or **Approved**.
+- Publishing an itinerary does not record a supplier booking.
+- Keep only active client options in **Proposing**; archive stale alternatives.
 `
