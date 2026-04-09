@@ -210,14 +210,36 @@ export function createTools(ctx: ToolContext = {}) {
     }),
     execute: async ({ destination, departureDate, returnDate, cruiseLine }) => {
       try {
-        // Use the cruise-repository catalog endpoint (already public via catalog API key)
-        // The catalog uses `q` for text search (ship, port, cruise names) — not region names
-        // For best results, combine destination + cruise line into q param
-        const searchTerms = [destination, cruiseLine].filter(Boolean).join(' ')
+        // Resolve cruise line name → ID for proper filtering (q search doesn't match cruise line names)
+        let cruiseLineId: string | undefined
+        if (cruiseLine) {
+          try {
+            const lines = await catalogFetch<any[]>('/cruise-repository/lines')
+            const match = (Array.isArray(lines) ? lines : []).find(
+              (l: any) => l.name?.toLowerCase().includes(cruiseLine!.toLowerCase())
+            )
+            if (match) cruiseLineId = match.id
+          } catch { /* fall back to q search */ }
+        }
+
+        // Resolve destination/region name → regionId
+        let regionId: string | undefined
+        if (destination) {
+          try {
+            const regions = await catalogFetch<any[]>('/cruise-repository/regions')
+            const match = (Array.isArray(regions) ? regions : []).find(
+              (r: any) => r.name?.toLowerCase().includes(destination!.toLowerCase())
+            )
+            if (match) regionId = match.id
+          } catch { /* ignore */ }
+        }
+
         const qs = buildQuery({
           ...(departureDate && { sailDateFrom: departureDate }),
           ...(returnDate && { sailDateTo: returnDate }),
-          ...(searchTerms && { q: searchTerms }),
+          ...(cruiseLineId && { cruiseLineId }),
+          ...(regionId && { regionId }),
+          ...(!cruiseLineId && !regionId && destination && { q: destination }),
           page: 1,
           pageSize: 5,
         })
