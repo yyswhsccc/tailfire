@@ -108,10 +108,8 @@ export class FinancialSummaryService {
     // instead of the itinerary chain. Must check both paths.
     // LEFT JOIN with activity_pricing to get authoritative pricing data.
     // Exclude child activities (e.g. port_info under cruises) — they're informational, not billable.
-    const ia = this.db.schema.itineraryActivities
-    const ap = this.db.schema.activityPricing
     const activities = await this.db.client.execute(sql`
-      SELECT
+      SELECT DISTINCT ON (ia.id)
         ia.id AS activity_id,
         ia.name AS activity_name,
         ia.activity_type,
@@ -126,6 +124,7 @@ export class FinancialSummaryService {
           i.trip_id = ${tripId}
           OR ia.trip_id = ${tripId}
         )
+      ORDER BY ia.id
     `) as any[]
 
     const byActivity: ActivityCostSummaryDto[] = []
@@ -412,39 +411,29 @@ export class FinancialSummaryService {
     receivedTotalCents: number
     pendingTotalCents: number
   }> {
-    // Get commission data from component_pricing table (expected commission)
-    // joined with commission_tracking (actual received status)
-    const pricingData = await this.db.client
-      .select({
-        pricingId: this.db.schema.activityPricing.id,
-        commissionTotalCents: this.db.schema.activityPricing.commissionTotalCents,
-      })
-      .from(this.db.schema.activityPricing)
-      .innerJoin(
-        this.db.schema.itineraryActivities,
-        eq(this.db.schema.activityPricing.activityId, this.db.schema.itineraryActivities.id)
-      )
-      .innerJoin(
-        this.db.schema.itineraryDays,
-        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id)
-      )
-      .innerJoin(
-        this.db.schema.itineraries,
-        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
-      )
-      .where(
-        and(
-          eq(this.db.schema.itineraries.tripId, tripId),
-          isNull(this.db.schema.itineraryActivities.parentActivityId)
-        )
-      )
+    // Use LEFT JOIN + OR ia.trip_id pattern to capture floating packages
+    // (e.g. TES imports) that use itinerary_activities.trip_id directly
+    // instead of the itinerary chain.
+    const pricingData = (await this.db.client.execute(sql`
+      SELECT DISTINCT ON (ap.id)
+        ap.id AS pricing_id,
+        ap.commission_total_cents
+      FROM activity_pricing ap
+      JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+      LEFT JOIN itineraries i ON i.id = iday.itinerary_id
+      WHERE ia.parent_activity_id IS NULL
+        AND (i.trip_id = ${tripId} OR ia.trip_id = ${tripId})
+      ORDER BY ap.id
+    `)) as any[]
 
     let expectedTotalCents = 0
     let receivedTotalCents = 0
 
     for (const pricing of pricingData) {
-      // commissionTotalCents is stored as integer (cents)
-      const commissionCents = pricing.commissionTotalCents ?? 0
+      // Raw SQL returns snake_case column names
+      const pricingId = pricing.pricing_id
+      const commissionCents = Number(pricing.commission_total_cents ?? 0)
       expectedTotalCents += commissionCents
 
       // Check commission tracking for received status
@@ -454,7 +443,7 @@ export class FinancialSummaryService {
           commissionStatus: this.db.schema.commissionTracking.commissionStatus,
         })
         .from(this.db.schema.commissionTracking)
-        .where(eq(this.db.schema.commissionTracking.activityPricingId, pricing.pricingId))
+        .where(eq(this.db.schema.commissionTracking.activityPricingId, pricingId))
 
       for (const tracking of trackingRecords) {
         if (tracking.commissionStatus === 'received') {

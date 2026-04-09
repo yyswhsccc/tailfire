@@ -1,66 +1,47 @@
 export const content = `
 ## Library
 
-The **Library** is your agency's shared resource hub. It holds reusable templates, reference content, and configuration data that speeds up trip building and keeps your team consistent.
+The **Library** is Tailfire's shared reuse layer for itinerary templates, package templates, supplier records, tags, and communication templates.
 
 ## Library Sections
 
 ### Travel Activities
 
-- **Itinerary Templates** — reusable full itinerary structures with days and activities
-- **Package Templates** — reusable activity bundles (add-on experiences, pre/post cruise packages)
-- **Cruises** — cruise catalog for searching and referencing cruise options
-- **Tours** — tour catalog for research and reference
+- **Itinerary Templates**: reusable trip structures
+- **Package Templates**: reusable activity bundles
+- **Cruises**: cruise catalog research surface
+- **Tours**: tour catalog research surface
 
 ### Trip Components
 
-- **Suppliers** — your supplier directory for linking to activities and tracking bookings
-- **Loyalty Programs** — airline, hotel, and other reward programs to link to contacts
-- **Payment Schedules** — saved payment schedule templates for common booking terms
+- **Suppliers**
+- **Loyalty Programs**
+- **Payment Schedules**
 
 ### Organization
 
-- **Tags** — create and manage tags for organizing trips and contacts
+- **Tags**
 
 ### Communications
 
-- **Templates** — document templates for trip orders, payments, proposals, and emails
-- **Notifications** — automation and notification email templates
+- **Templates**
+- **Notifications**
 
 ## Using Itinerary Templates
 
-1. Navigate to **Library > Itinerary Templates**.
-2. Click a template to preview its structure.
-3. To apply a template to a trip, open the trip's **Itineraries** tab and select **Import from Library**.
-4. Choose the template. Tailfire creates a new itinerary based on the template structure with dates adjusted to the trip.
+1. Open **Library > Itinerary Templates**.
+2. Review the template you want to reuse.
+3. Open a trip's **Itinerary** tab.
+4. Click **Import**.
+5. Choose the library template to create a new itinerary from it.
 
-## Using Package Templates
+## Saving New Templates
 
-1. Navigate to **Library > Package Templates**.
-2. To insert a package into an itinerary, drag it from the library sidebar in the itinerary builder.
-3. The package and its child activities are created on the selected day.
+- Build or refine an itinerary inside a trip.
+- Use **Save as Template** when the structure is mature enough to reuse.
+- Keep names clear so the team can tell library templates apart quickly.
 
-## Saving Content to the Library
+## Practical Tip
 
-From any trip:
-
-1. Open the itinerary or package you want to save.
-2. Click **Save as Template**.
-3. Enter a clear **Name** and optional **Description**.
-4. The template is stored in the library for all agents to use.
-
-> **Tip:** Save mature, well-structured itineraries as templates. It prevents rebuilding the same framework from scratch for similar trips.
-
-## Document Templates
-
-Under **Library > Templates**, manage formatted document outputs:
-
-- **Trip Order** — booking confirmation documents
-- **Payment** — payment-related documents
-- **Proposal** — client proposal formatting
-- **Email** — email content templates
-
-System templates are read-only but can be forked into an agency copy for customization.
-
-> **Tip:** Do not confuse itinerary templates (trip structures) with document templates (formatted outputs). They live in different sections and serve different purposes.
+Do not confuse itinerary templates with document templates. Itinerary templates help you build trip structure; document templates control formatted outputs like emails and proposal documents.
 `

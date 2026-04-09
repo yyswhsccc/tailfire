@@ -4,43 +4,23 @@ Tailfire is a single-agency, multi-branch travel platform organized as a monorep
 
 ## Deployable Apps
 
-- `admin`: B2B advisor and back-office dashboard
-- `api`: centralized backend API, validation, auth, and business logic
+- `admin`: advisor and back-office dashboard
+- `api`: centralized backend API for validation, auth enforcement, and business logic
 - `client`: traveler portal and shared proposal access flows
-- `ota`: public storefront and marketing surface
+- `ota`: public discovery, AI concierge, advisor attribution, and trip-request surface
 
 ## Shared Packages
 
-- `database`: Drizzle schema, migrations, and database helpers
-- `shared-types`: DTOs, shared contracts, and API types
-- `api-client`: shared fetch client
+- `database`: Drizzle schema and migrations
+- `shared-types`: DTOs, validators, and shared contracts
+- `api-client`: reusable fetch primitives
 - `trip-proposal-ui`: shared proposal presentation layer
-- `ui-public`: shared UI primitives
-- `config`: TypeScript and ESLint config
+- `ui-public`: shared public UI primitives
+- `config`: shared TypeScript, ESLint, and port config
 
-## Architectural Principles
+## Architectural Rules
 
-- Frontend apps use Supabase Auth for identity flows, but business data flows through the NestJS API.
-- Authorization, validation, and business rules are enforced centrally in the API.
-- Cruise and tour catalog data are shared across surfaces.
-- Canonical docs under `docs/` are the repo source of truth; historical plan/spec files are supporting context only.
-
-## Lifecycle And Workflow
-
-The most important current architecture clarification is the separation of:
-
-- trip stage
-- itinerary status
-- activity booking and fulfillment
-- proposal versioning
-
-That model is documented here:
-
-- [Trip Workflow](./Trip-Workflow.md)
-- [Canonical Trip Workflow Doc](https://github.com/Systemsaholic/tailfire/blob/main/docs/TRIP_WORKFLOW.md)
-
-## Canonical References
-
-- [Architecture](https://github.com/Systemsaholic/tailfire/blob/main/docs/ARCHITECTURE.md)
-- [Database Architecture](https://github.com/Systemsaholic/tailfire/blob/main/docs/DATABASE_ARCHITECTURE.md)
-- [Security](https://github.com/Systemsaholic/tailfire/blob/main/docs/SECURITY.md)
+- Frontend apps do not own business rules; the API does.
+- Shared workflow terminology lives in `packages/shared-types` and the canonical docs.
+- Trip stage, itinerary status, supplier booking, and proposal publishing are separate concepts and should stay documented that way.
+- The OTA is more than marketing content now, but it still converts through advisor-led flows rather than direct checkout.

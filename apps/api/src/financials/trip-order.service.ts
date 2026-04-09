@@ -902,23 +902,38 @@ export class TripOrderService {
         firstName: p.firstName,
         lastName: p.lastName,
         type: p.passengerType || 'adult',
-        dateOfBirth: p.dateOfBirth,
-        email: p.email,
+        // DOB excluded from invoice for privacy
       })),
-      bookings: bookings.map((b) => ({
-        title: b.title || 'Booking',
-        booking_type: b.bookingType || 'other',
-        vendor_confirmation: b.vendorConfirmation || null,
-        start_date: b.startDate,
-        end_date: b.endDate,
-        amount: Number(b.totalPrice || 0),
-        currency: b.currency || 'CAD',
-        cancellation_policy: b.cancellationPolicy || null,
-        non_refundable: b.nonRefundableDeposit ?? false,
-        net_price: b.netPrice ?? null,
-        supplier: b.supplier || null,
-        per_passenger_breakdown: b.perPassengerBreakdown || null,
-      })),
+      bookings: bookings.flatMap((b) => {
+        const parent = {
+          title: b.title || 'Booking',
+          booking_type: b.bookingType || 'other',
+          vendor_confirmation: b.vendorConfirmation || null,
+          start_date: b.startDate,
+          end_date: b.endDate,
+          amount: Number(b.totalPrice || 0),
+          currency: b.currency || 'CAD',
+          cancellation_policy: b.cancellationPolicy || null,
+          terms_and_conditions: b.termsAndConditions || null,
+          non_refundable: b.nonRefundableDeposit ?? false,
+          net_price: b.netPrice ?? null,
+          supplier: b.supplier || null,
+          per_passenger_breakdown: b.perPassengerBreakdown || null,
+        }
+        // Flatten package children as "Included" sub-items
+        if (b.includedItems?.length > 0) {
+          const children = b.includedItems.map((child: any) => ({
+            title: `  └ ${child.name}`,
+            booking_type: child.type,
+            vendor_confirmation: child.confirmationNumber || null,
+            amount: -1, // sentinel for "Included" — formatCurrency will render this
+            currency: b.currency || 'CAD',
+            _isIncluded: true,
+          }))
+          return [parent, ...children]
+        }
+        return [parent]
+      }),
     }
   }
 
@@ -992,17 +1007,34 @@ export class TripOrderService {
         firstName: p.firstName,
         lastName: p.lastName,
         type: p.type || 'adult',
-        dateOfBirth: p.dateOfBirth,
+        // DOB excluded from invoice for privacy
       })),
-      bookings: (bookingDetails || []).map((b) => ({
-        title: b.title || 'Booking',
-        booking_type: b.booking_type || 'other',
-        vendor_confirmation: b.vendor_confirmation || null,
-        start_date: b.start_date,
-        end_date: b.end_date,
-        amount: Number(b.amount || b.base_price || 0),
-        currency: b.currency || orderData.service_details?.currency || 'CAD',
-      })),
+      bookings: (bookingDetails || []).flatMap((b) => {
+        const parent = {
+          title: b.title || 'Booking',
+          booking_type: b.booking_type || 'other',
+          vendor_confirmation: b.vendor_confirmation || null,
+          start_date: b.start_date,
+          end_date: b.end_date,
+          amount: Number(b.amount || b.base_price || 0),
+          currency: b.currency || orderData.service_details?.currency || 'CAD',
+          cancellation_policy: b.cancellation_policy || null,
+          terms_and_conditions: b.terms_and_conditions || null,
+          supplier: b.supplier || null,
+        }
+        // Flatten package children as "Included" sub-items
+        if (b.included_items?.length) {
+          const children = b.included_items.map((child) => ({
+            title: `  └ ${child.name}`,
+            booking_type: child.type,
+            vendor_confirmation: child.confirmationNumber || null,
+            amount: -1, // sentinel for "Included"
+            currency: parent.currency,
+          }))
+          return [parent, ...children]
+        }
+        return [parent]
+      }),
     }
   }
 
@@ -1173,36 +1205,35 @@ export class TripOrderService {
 
   private async getTripBookings(tripId: string) {
     // Query itinerary activities with their pricing and financial details
-    const activities = await this.db.client
-      .select({
-        id: this.db.schema.itineraryActivities.id,
-        name: this.db.schema.itineraryActivities.name,
-        activityType: this.db.schema.itineraryActivities.activityType,
-        confirmationNumber: this.db.schema.itineraryActivities.confirmationNumber,
-        startDatetime: this.db.schema.itineraryActivities.startDatetime,
-        endDatetime: this.db.schema.itineraryActivities.endDatetime,
-        totalPriceCents: this.db.schema.activityPricing.totalPriceCents,
-        currency: this.db.schema.activityPricing.currency,
-        cancellationPolicy: this.db.schema.activityPricing.cancellationPolicy,
-        nonRefundableDeposit: this.db.schema.activityPricing.nonRefundableDeposit,
-        netPriceCents: this.db.schema.activityPricing.netPriceCents,
-        pricingBreakdownJson: this.db.schema.activityPricing.pricingBreakdownJson,
-        supplier: this.db.schema.activityPricing.supplier,
-      })
-      .from(this.db.schema.itineraryActivities)
-      .innerJoin(
-        this.db.schema.itineraryDays,
-        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id)
-      )
-      .innerJoin(
-        this.db.schema.itineraries,
-        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
-      )
-      .leftJoin(
-        this.db.schema.activityPricing,
-        eq(this.db.schema.activityPricing.activityId, this.db.schema.itineraryActivities.id)
-      )
-      .where(eq(this.db.schema.itineraries.tripId, tripId))
+    // Must check both itinerary chain AND direct trip_id for floating packages
+    // Also JOIN suppliers to pull default T&C when activity-level T&C is empty
+    const activities = await this.db.client.execute(sql`
+      SELECT DISTINCT ON (ia.id)
+        ia.id,
+        ia.name,
+        ia.activity_type,
+        ia.confirmation_number,
+        ia.start_datetime,
+        ia.end_datetime,
+        ap.total_price_cents,
+        ap.currency,
+        ap.cancellation_policy,
+        ap.terms_and_conditions,
+        ap.non_refundable_deposit,
+        ap.net_price_cents,
+        ap.pricing_breakdown_json,
+        ap.supplier,
+        s.default_terms_and_conditions AS supplier_terms,
+        s.default_cancellation_policy AS supplier_cancellation
+      FROM itinerary_activities ia
+      LEFT JOIN activity_pricing ap ON ap.activity_id = ia.id
+      LEFT JOIN suppliers s ON s.name = ap.supplier
+      LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+      LEFT JOIN itineraries i ON i.id = iday.itinerary_id
+      WHERE ia.parent_activity_id IS NULL
+        AND (i.trip_id = ${tripId} OR ia.trip_id = ${tripId})
+      ORDER BY ia.id
+    `) as any[]
 
     // For each activity, get per-passenger pricing from traveler_bookings
     const bookingsWithPassengers = await Promise.all(
@@ -1226,18 +1257,33 @@ export class TripOrderService {
           )
           .where(eq(this.db.schema.travelerBookings.activityId, a.id))
 
+        // Raw SQL returns snake_case
+        const totalPriceCents = Number(a.total_price_cents ?? 0)
+        const netPriceCents = a.net_price_cents ? Number(a.net_price_cents) : null
+        const pricingBreakdown = a.pricing_breakdown_json
+
+        // Fetch child activities (e.g. flights, transfers, hotel inside a package)
+        const children = await this.db.client.execute(sql`
+          SELECT ia.id, ia.name, ia.activity_type, ia.confirmation_number
+          FROM itinerary_activities ia
+          WHERE ia.parent_activity_id = ${a.id}
+          ORDER BY ia.start_datetime ASC NULLS LAST, ia.sequence_order ASC
+        `) as any[]
+
         return {
           id: a.id,
           title: a.name,
-          bookingType: a.activityType,
-          vendorConfirmation: a.confirmationNumber,
-          startDate: a.startDatetime ? new Date(a.startDatetime).toISOString().split('T')[0] : null,
-          endDate: a.endDatetime ? new Date(a.endDatetime).toISOString().split('T')[0] : null,
-          totalPrice: a.totalPriceCents ? a.totalPriceCents / 100 : 0,
+          bookingType: a.activity_type,
+          vendorConfirmation: a.confirmation_number,
+          startDate: a.start_datetime ? new Date(a.start_datetime).toISOString().split('T')[0] : null,
+          endDate: a.end_datetime ? new Date(a.end_datetime).toISOString().split('T')[0] : null,
+          totalPrice: totalPriceCents / 100,
           currency: a.currency || 'CAD',
-          cancellationPolicy: a.cancellationPolicy || null,
-          nonRefundableDeposit: a.nonRefundableDeposit ?? false,
-          netPrice: a.netPriceCents ? a.netPriceCents / 100 : null,
+          // Fall back to supplier defaults from Library when activity-level T&C are empty
+          cancellationPolicy: a.cancellation_policy || a.supplier_cancellation || null,
+          termsAndConditions: a.terms_and_conditions || a.supplier_terms || null,
+          nonRefundableDeposit: a.non_refundable_deposit ?? false,
+          netPrice: netPriceCents ? netPriceCents / 100 : null,
           supplier: a.supplier || null,
           perPassengerBreakdown: travelerBookings.length > 0
             ? travelerBookings.map((tb) => ({
@@ -1245,13 +1291,21 @@ export class TripOrderService {
                 passengerName: [tb.firstName, tb.lastName].filter(Boolean).join(' '),
                 total: tb.priceCents ? tb.priceCents / 100 : 0,
               }))
-            : a.pricingBreakdownJson
-              ? (a.pricingBreakdownJson as any[]).map((p: any) => ({
+            : pricingBreakdown
+              ? (pricingBreakdown as any[]).map((p: any) => ({
                   passengerId: p.travelerId || p.id,
                   passengerName: p.name || p.travelerName || 'Passenger',
                   total: p.totalCents ? p.totalCents / 100 : (p.total || 0),
                 }))
               : null,
+          // Child activities included in this package (displayed as "Included" sub-items)
+          includedItems: children.length > 0
+            ? children.map((c: any) => ({
+                name: c.name,
+                type: c.activity_type,
+                confirmationNumber: c.confirmation_number || null,
+              }))
+            : undefined,
         }
       })
     )
@@ -1261,53 +1315,37 @@ export class TripOrderService {
 
   private async getTripPayments(tripId: string) {
     // Join through: payment_transactions → expected_payment_items → payment_schedule_config
-    //   → activity_pricing → itinerary_activities → itinerary_days → itineraries (where trip_id)
-    const transactions = await this.db.client
-      .select({
-        id: this.db.schema.paymentTransactions.id,
-        amountCents: this.db.schema.paymentTransactions.amountCents,
-        transactionType: this.db.schema.paymentTransactions.transactionType,
-        paymentMethod: this.db.schema.paymentTransactions.paymentMethod,
-        transactionDate: this.db.schema.paymentTransactions.transactionDate,
-        referenceNumber: this.db.schema.paymentTransactions.referenceNumber,
-        notes: this.db.schema.paymentTransactions.notes,
-      })
-      .from(this.db.schema.paymentTransactions)
-      .innerJoin(
-        this.db.schema.expectedPaymentItems,
-        eq(this.db.schema.paymentTransactions.expectedPaymentItemId, this.db.schema.expectedPaymentItems.id)
-      )
-      .innerJoin(
-        this.db.schema.paymentScheduleConfig,
-        eq(this.db.schema.expectedPaymentItems.paymentScheduleConfigId, this.db.schema.paymentScheduleConfig.id)
-      )
-      .innerJoin(
-        this.db.schema.activityPricing,
-        eq(this.db.schema.paymentScheduleConfig.activityPricingId, this.db.schema.activityPricing.id)
-      )
-      .innerJoin(
-        this.db.schema.itineraryActivities,
-        eq(this.db.schema.activityPricing.activityId, this.db.schema.itineraryActivities.id)
-      )
-      .innerJoin(
-        this.db.schema.itineraryDays,
-        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id)
-      )
-      .innerJoin(
-        this.db.schema.itineraries,
-        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
-      )
-      .where(eq(this.db.schema.itineraries.tripId, tripId))
+    //   → activity_pricing → itinerary_activities → (itineraries chain OR direct trip_id)
+    // Must use LEFT JOIN for itinerary chain + OR for floating activities
+    const transactions = await this.db.client.execute(sql`
+      SELECT DISTINCT ON (ptx.id)
+        ptx.id,
+        ptx.amount_cents,
+        ptx.transaction_type,
+        ptx.payment_method,
+        ptx.transaction_date,
+        ptx.reference_number,
+        ptx.notes
+      FROM payment_transactions ptx
+      JOIN expected_payment_items epi ON epi.id = ptx.expected_payment_item_id
+      JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
+      JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
+      JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+      LEFT JOIN itineraries i ON i.id = iday.itinerary_id
+      WHERE (i.trip_id = ${tripId} OR ia.trip_id = ${tripId})
+      ORDER BY ptx.id
+    `) as any[]
 
     // Map transaction_type to the status format expected by buildPaymentSummary
-    return transactions.map((t) => ({
+    return transactions.map((t: any) => ({
       id: t.id,
-      amount: t.amountCents / 100,
-      paymentDate: t.transactionDate ? new Date(t.transactionDate).toISOString().split('T')[0] : null,
-      paymentMethodType: t.paymentMethod,
-      status: t.transactionType === 'payment' ? 'processed'
-            : t.transactionType === 'refund' ? 'refunded'
-            : 'processed', // adjustments treated as processed
+      amount: Number(t.amount_cents) / 100,
+      paymentDate: t.transaction_date ? new Date(t.transaction_date).toISOString().split('T')[0] : null,
+      paymentMethodType: t.payment_method,
+      status: t.transaction_type === 'payment' ? 'processed'
+            : t.transaction_type === 'refund' ? 'refunded'
+            : 'processed',
       notes: t.notes,
     }))
   }
@@ -1318,50 +1356,36 @@ export class TripOrderService {
    */
   private async getTripPaymentScheduleInfo(tripId: string): Promise<TripOrderPaymentScheduleSummary> {
     // Get expected payment items with their schedule config and activity name
-    const items = await this.db.client
-      .select({
-        itemId: this.db.schema.expectedPaymentItems.id,
-        paymentName: this.db.schema.expectedPaymentItems.paymentName,
-        expectedAmountCents: this.db.schema.expectedPaymentItems.expectedAmountCents,
-        paidAmountCents: this.db.schema.expectedPaymentItems.paidAmountCents,
-        dueDate: this.db.schema.expectedPaymentItems.dueDate,
-        status: this.db.schema.expectedPaymentItems.status,
-        sequenceOrder: this.db.schema.expectedPaymentItems.sequenceOrder,
-        scheduleType: this.db.schema.paymentScheduleConfig.scheduleType,
-        nonRefundableAmountCents: this.db.schema.paymentScheduleConfig.nonRefundableAmountCents,
-        depositAmountCents: this.db.schema.paymentScheduleConfig.depositAmountCents,
-        activityName: this.db.schema.itineraryActivities.name,
-      })
-      .from(this.db.schema.expectedPaymentItems)
-      .innerJoin(
-        this.db.schema.paymentScheduleConfig,
-        eq(this.db.schema.expectedPaymentItems.paymentScheduleConfigId, this.db.schema.paymentScheduleConfig.id)
-      )
-      .innerJoin(
-        this.db.schema.activityPricing,
-        eq(this.db.schema.paymentScheduleConfig.activityPricingId, this.db.schema.activityPricing.id)
-      )
-      .innerJoin(
-        this.db.schema.itineraryActivities,
-        eq(this.db.schema.activityPricing.activityId, this.db.schema.itineraryActivities.id)
-      )
-      .innerJoin(
-        this.db.schema.itineraryDays,
-        eq(this.db.schema.itineraryActivities.itineraryDayId, this.db.schema.itineraryDays.id)
-      )
-      .innerJoin(
-        this.db.schema.itineraries,
-        eq(this.db.schema.itineraryDays.itineraryId, this.db.schema.itineraries.id)
-      )
-      .where(eq(this.db.schema.itineraries.tripId, tripId))
+    // Must check both itinerary chain AND direct trip_id for floating packages
+    const items = await this.db.client.execute(sql`
+      SELECT
+        epi.id AS item_id,
+        epi.payment_name,
+        epi.expected_amount_cents,
+        epi.paid_amount_cents,
+        epi.due_date,
+        epi.status,
+        epi.sequence_order,
+        psc.schedule_type,
+        psc.non_refundable_amount_cents,
+        psc.deposit_amount_cents,
+        ia.name AS activity_name
+      FROM expected_payment_items epi
+      JOIN payment_schedule_config psc ON psc.id = epi.payment_schedule_config_id
+      JOIN activity_pricing ap ON ap.id = psc.component_pricing_id
+      JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+      LEFT JOIN itineraries i ON i.id = iday.itinerary_id
+      WHERE (i.trip_id = ${tripId} OR ia.trip_id = ${tripId})
+    `) as any[]
 
     let totalScheduledAmount = 0
     let totalPendingAmount = 0
     let totalPaidFromSchedule = 0
 
-    const scheduleItems = items.map((item) => {
-      const expected = item.expectedAmountCents / 100
-      const paid = (item.paidAmountCents ?? 0) / 100
+    const scheduleItems = items.map((item: any) => {
+      const expected = Number(item.expected_amount_cents ?? 0) / 100
+      const paid = Number(item.paid_amount_cents ?? 0) / 100
       totalScheduledAmount += expected
       totalPaidFromSchedule += paid
       if (item.status === 'pending' || item.status === 'partial' || item.status === 'overdue') {
@@ -1370,15 +1394,16 @@ export class TripOrderService {
 
       // Build TICO disclosure for non-refundable deposits
       let disclosureText: string | undefined
-      if (item.nonRefundableAmountCents && item.nonRefundableAmountCents > 0) {
-        const nonRefundable = item.nonRefundableAmountCents / 100
+      const nonRefCents = Number(item.non_refundable_amount_cents ?? 0)
+      if (nonRefCents > 0) {
+        const nonRefundable = nonRefCents / 100
         disclosureText = `Includes $${nonRefundable.toFixed(2)} non-refundable`
       }
 
       return {
-        booking_title: item.activityName || 'Booking',
-        description: item.paymentName,
-        due_date: item.dueDate || '',
+        booking_title: item.activity_name || 'Booking',
+        description: item.payment_name,
+        due_date: item.due_date || '',
         amount: expected,
         amount_paid: paid,
         status: item.status,
@@ -1592,10 +1617,13 @@ export class TripOrderService {
       currency: booking.currency || 'CAD',
       // TICO-required financial details
       cancellation_policy: booking.cancellationPolicy || undefined,
+      terms_and_conditions: booking.termsAndConditions || undefined,
       non_refundable: booking.nonRefundableDeposit ?? false,
       net_price: booking.netPrice ?? undefined,
       supplier: booking.supplier || undefined,
       per_passenger_breakdown: booking.perPassengerBreakdown || undefined,
+      // Child activities included in this package
+      included_items: booking.includedItems || undefined,
     } as TripOrderBookingDetail))
   }
 

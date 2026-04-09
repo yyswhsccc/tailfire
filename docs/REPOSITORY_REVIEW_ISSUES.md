@@ -1,29 +1,69 @@
 # Repository Review Issues
 
-Review date: 2026-03-24
+Review date: 2026-04-07
 
-Scope: open issues observed while reconciling the docs and local wiki/user guide with the current `tailfire/` codebase. No product code was changed in this pass.
+Scope: canonical repo docs, OTA-facing docs, wiki/help-center pages, and the shipped admin help content were reviewed against the current `main` checkout. Historical plan and spec files were not refreshed.
 
 ## Priority 1
 
-### 1. OTA storefront is still disconnected from live platform data
+### 1. OTA conversion is still advisor-led, not self-serve transactional
 
 Evidence:
 
-- `apps/ota/src/data/trips.ts`
-- `apps/ota/src/lib/api.ts`
+- `apps/ota/src/app/search/all-inclusives/page.tsx`
+- `apps/ota/src/app/api/trip-requests/route.ts`
+- `apps/ota/src/app/my-trip/[id]/page.tsx`
 
 Why it matters:
 
-- Search and trip detail pages are still driven by local demo data.
-- Inquiry, profile, and tracking helpers are placeholders that only resolve locally.
-- Public behavior can drift from the real platform and cannot exercise backend flows end to end.
+- The public site can support discovery, chat, and trip requests, but it is not a live end-to-end checkout flow.
+- Docs and marketing copy can overstate what the OTA currently converts on its own.
 
 Suggested next step:
 
-- Replace local trip fixtures and placeholder helpers with API-backed queries and mutations.
+- Decide whether the product should stay advisor-led or gain a real self-serve checkout path, then align the OTA UX and docs to that decision.
 
-### 2. CI/CD is deploy-only; there is no pre-merge validation workflow
+### 2. OTA public forms and legal pages are still partial
+
+Evidence:
+
+- `apps/ota/src/components/layout/contact-form.tsx`
+- `apps/ota/src/app/join/page.tsx`
+- `apps/ota/src/app/join/register/page.tsx`
+- `apps/ota/src/app/(marketing)/privacy/page.tsx`
+- `apps/ota/src/app/(marketing)/terms/page.tsx`
+
+Why it matters:
+
+- Contact and join flows present submit actions without a verified backend submission path.
+- Privacy and terms pages still carry placeholder legal banners.
+
+Suggested next step:
+
+- Wire the public forms to supported backend endpoints and replace the placeholder legal copy with finalized content.
+
+### 3. OTA sitemap and structured-data coverage lag the live discovery surface
+
+Evidence:
+
+- `apps/ota/src/app/sitemap.ts`
+- `apps/ota/src/lib/structured-data.ts`
+- `apps/ota/src/app/destinations/`
+- `apps/ota/src/app/regions/`
+- `apps/ota/src/app/cruise-lines/`
+- `apps/ota/src/app/ships/`
+- `apps/ota/src/app/cruises/`
+
+Why it matters:
+
+- The app serves more discovery routes than the sitemap and JSON-LD currently describe.
+- Metadata drift hurts search coverage and makes the OTA look less complete than the route tree actually is.
+
+Suggested next step:
+
+- Expand sitemap and structured-data generation to cover the current discovery entities and their canonical slugs.
+
+### 4. CI/CD is deploy-only; there is no pre-merge validation workflow
 
 Evidence:
 
@@ -33,276 +73,114 @@ Evidence:
 
 Why it matters:
 
-- The repo can deploy without a dedicated PR gate for install, lint, typecheck, and tests.
-- Regressions are more likely to reach preview or production before they are caught.
+- Code can reach preview or production without a dedicated pull-request gate for install, lint, typecheck, and tests.
+- Failures surface late, after deployment steps have already started.
 
 Suggested next step:
 
-- Add a PR workflow that runs install, lint, typecheck, and the current test suite before deploy workflows proceed.
-
-### 3. Proposal UI is only partially shared, which risks preview vs published drift
-
-Evidence:
-
-- `apps/admin/src/app/trips/[id]/preview/page.tsx` uses `@tailfire/trip-proposal-ui`
-- `apps/client/src/app/shared/trips/[token]/_components/` still contains a parallel local proposal implementation
-
-Why it matters:
-
-- Admin preview and client-facing proposal rendering are not on one shared surface.
-- UI and behavior drift can still happen between the preview and the published/share flow.
-
-Suggested next step:
-
-- Consolidate the client shared-trip route onto `@tailfire/trip-proposal-ui` or explicitly retire the package.
-
-### 4. Trip lifecycle guardrails still do not match the documented target model
-
-Evidence:
-
-- `apps/api/src/trips/trip-lifecycle.service.ts` promotes `planning -> active` when booked-count is greater than zero
-- the same service demotes `active -> planning` when booked-count returns to zero
-- `packages/shared-types/src/api/trip-status-transitions.ts` still allows `active -> planning`
-
-Why it matters:
-
-- The trip stage can flap backward automatically if bookings are removed or edited.
-- That conflicts with the documented guardrail that backward movement should be explicit and audited.
-- Automations and activity logs become harder to reason about when the lifecycle can silently reverse.
-
-Suggested next step:
-
-- Make backward lifecycle movement explicit, then align the transition map, lifecycle service, and admin controls to that rule.
-
-### 5. Supplier booking is still inconsistent between standalone activities and packages
-
-Evidence:
-
-- `apps/api/src/trips/activity-bookings.service.ts` marks standalone activities booked through the dedicated bookings endpoint
-- `apps/admin/src/hooks/use-bookings.ts` marks packages booked by patching `/activities/:id`
-- the package mutation currently sends `proposalStatus: 'approved'` together with `bookingStatus: 'booked'`
-- `apps/admin/src/components/packages/mark-as-booked-modal.tsx` exposes `paymentStatus`, but `apps/admin/src/hooks/use-bookings.ts` does not send it
-
-Why it matters:
-
-- Recording a supplier booking is still not one consistent command path.
-- Package booking currently conflates proposal approval and supplier booking in a way the standalone path does not.
-- The UI collects financial detail that the mutation then drops.
-
-Suggested next step:
-
-- Move both standalone and package booking onto one canonical booking contract with the same required payload and side effects.
+- Add a PR workflow that runs the current minimum validation bar before deploy workflows become the next line of defense.
 
 ## Priority 2
 
-### 6. The API package advertises an E2E test command, but its referenced config file is missing
+### 5. Preview API deployment depends on a generated Railway URL
 
 Evidence:
 
-- `apps/api/package.json` defines `test:e2e` as `jest --config ./test/jest-e2e.json`
-- `apps/api/test/jest-e2e.json` is missing
-- no `apps/api/test/` directory exists
+- `.github/workflows/deploy-preview.yml`
 
 Why it matters:
 
-- The repo presents API E2E coverage that is not currently runnable as wired.
-- Contributors can waste time assuming the command is part of the validation bar when it fails immediately.
+- The preview workflow health check is pinned to `https://api-dev-dev-13dd.up.railway.app/api/v1/health`.
+- Generated URLs are brittle and easy to forget when infrastructure changes.
 
 Suggested next step:
 
-- Restore the missing API E2E harness or remove the stale script.
+- Move preview health checks to a stable alias or make the workflow derive the deployed URL dynamically.
 
-### 7. Automated validation coverage is uneven across apps and packages
+### 6. The API package advertises an E2E command, but the harness is missing
 
 Evidence:
 
-- `apps/client/package.json` has no `test` script
-- `apps/ota/package.json` has no `test` script and no `typecheck` script
-- `packages/database/package.json` has no `test` script even though `packages/database/src/__tests__/cruise-data-smoke.test.ts` exists
-- `packages/api-client/package.json` has no build/test scripts
-- `packages/ui-public/package.json` has no `test` script
-- `packages/trip-proposal-ui/package.json` has no scripts
+- `apps/api/package.json`
+- missing `apps/api/test/jest-e2e.json`
 
 Why it matters:
 
-- Important surfaces are outside automated protection.
-- Root `pnpm test` only covers workspaces that expose a `test` script, which can create a false sense of coverage.
+- Contributors can reasonably expect API E2E coverage to be runnable when the script is present.
+- The command currently fails before providing any validation value.
 
 Suggested next step:
 
-- Define a minimum validation bar per workspace and enforce it through root scripts and CI.
+- Restore the missing harness or remove the stale script until the E2E path is real again.
 
-### 8. Generated `tsconfig.tsbuildinfo` files are tracked in git
+### 7. Automated validation coverage is still uneven across apps and packages
+
+Evidence:
+
+- `apps/client/package.json`
+- `apps/ota/package.json`
+- `packages/database/package.json`
+- `packages/api-client/package.json`
+- `packages/ui-public/package.json`
+- `packages/trip-proposal-ui/package.json`
+
+Why it matters:
+
+- Root validation skips large parts of the repo because missing scripts are treated as absent work rather than failures.
+- OTA, client, and several shared-package changes can land without tests.
+
+Suggested next step:
+
+- Define a minimum validation contract per workspace and expose it through root scripts and CI.
+
+### 8. Proposal UI is only partially shared between admin preview and client rendering
+
+Evidence:
+
+- `apps/admin/src/app/trips/[id]/preview/page.tsx`
+- `packages/trip-proposal-ui/`
+- `apps/client/src/app/shared/trips/[token]/_components/`
+
+Why it matters:
+
+- Admin preview and client-facing proposal rendering can drift if they continue to evolve on different component surfaces.
+
+Suggested next step:
+
+- Consolidate the shared-trip client route onto `@tailfire/trip-proposal-ui` or retire the package explicitly.
+
+## Priority 3
+
+### 9. Root `pnpm dev` still assumes local Redis tooling
+
+Evidence:
+
+- `package.json`
+- `apps/api/src/automation/automation.module.ts`
+
+Why it matters:
+
+- The root `predev` hook assumes `redis-cli` and `redis-server` even though the API itself supports an explicit `REDIS_URL`.
+- This makes local startup more brittle than runtime behavior needs to be.
+
+Suggested next step:
+
+- Make the root startup path honor `REDIS_URL` before probing localhost or document a supported no-local-Redis flow in scripts.
+
+### 10. Generated `tsconfig.tsbuildinfo` files are tracked in git
 
 Evidence:
 
 - `apps/admin/tsconfig.tsbuildinfo`
+- `apps/client/tsconfig.tsbuildinfo`
+- `apps/ota/tsconfig.tsbuildinfo`
 - `packages/database/tsconfig.tsbuildinfo`
 - `packages/shared-types/tsconfig.tsbuildinfo`
 
 Why it matters:
 
-- Generated artifacts create noisy diffs and unrelated churn.
-- Review signal drops when build output is mixed into feature work.
+- Generated artifacts create noisy diffs and hide real review signal.
 
 Suggested next step:
 
-- Stop tracking these files and ignore them unless there is a deliberate reason to version them.
-
-### 9. Parts of the API bypass package boundaries and import shared types from source paths directly
-
-Evidence:
-
-- `apps/api/src/calendar/calendar.controller.ts`
-- `apps/api/src/tasks/tasks.controller.ts`
-- `apps/api/src/contacts/contacts.controller.ts`
-- `apps/api/src/trips/trips.controller.ts`
-- additional matches from `rg "packages/shared-types/src/api" apps/api/src`
-
-Why it matters:
-
-- These imports couple the API to the internal file layout of `packages/shared-types`.
-- Refactors inside the shared package become riskier than they need to be.
-
-Suggested next step:
-
-- Normalize imports onto `@tailfire/shared-types` or an exported package subpath.
-
-### 10. Migration history uses mixed naming conventions and manual journal assumptions
-
-Evidence:
-
-- `docs/MIGRATIONS.md`
-- `packages/database/src/migrations/`
-
-Why it matters:
-
-- The repo mixes numbered migrations and timestamped migrations.
-- That increases onboarding and audit confusion.
-
-Suggested next step:
-
-- Standardize the forward naming convention and document how legacy files should be treated.
-
-### 11. The API env example is stale for the current external-provider setup
-
-Evidence:
-
-- `apps/api/.env.example` still documents older Traveltek keys
-- `apps/api/src/cruise-booking/services/traveltek-auth.service.ts` requires `TRAVELTEK_API_URL`, `TRAVELTEK_USERNAME`, `TRAVELTEK_PASSWORD`, and `TRAVELTEK_SID`
-- `apps/api/src/api-credentials/credential-resolver.service.ts` expects env-backed provider secrets such as `AMADEUS_CLIENT_ID`, `AMADEUS_CLIENT_SECRET`, `AERODATABOX_RAPIDAPI_KEY`, `GOOGLE_PLACES_API_KEY`, `BOOKING_RAPIDAPI_KEY`, and `OPENAI_API_KEY`
-
-Why it matters:
-
-- Local setup and environment provisioning can follow the wrong provider model.
-- External-provider drift tends to surface as slow, confusing runtime failures.
-
-Suggested next step:
-
-- Align `apps/api/.env.example` with the current provider surface or generate env docs from provider metadata.
-
-### 12. The admin API-credentials status page does not accurately report env-only provider availability
-
-Evidence:
-
-- `apps/api/src/api-credentials/credential-resolver.service.ts` is the current source of truth for env-only providers
-- `apps/api/src/api-credentials/api-credentials.service.ts` metadata still keys off database records
-- `apps/admin/src/app/settings/api-credentials/page.tsx` renders that metadata
-
-Why it matters:
-
-- Env-backed providers can appear as "Not Configured" in the admin UI even when they are live.
-
-Suggested next step:
-
-- Build provider metadata from `CredentialResolverService` instead of database presence alone for env-only providers.
-
-### 13. Booking.com hotel enrichment is still wired to database credentials even though the provider policy is env-only
-
-Evidence:
-
-- `apps/api/src/external-apis/providers/hotels/hotels.controller.ts` calls `ApiCredentialsService.getDecryptedCredentials(ApiProvider.BOOKING_COM)`
-- `apps/api/src/api-credentials/credential-resolver.service.ts` marks `BOOKING_COM` as `env-only`
-- `apps/admin/src/app/settings/api-credentials/_components/credential-form-dialog.tsx` hides env-only providers from manual credential creation
-
-Why it matters:
-
-- The hotel-enrichment route can silently fail in the standard env-backed setup.
-- Operators have no supported UI path to satisfy the database-credential dependency this route still expects.
-
-Suggested next step:
-
-- Switch the enrichment path to `CredentialResolverService`, or explicitly move Booking.com back to a supported database-managed policy.
-
-### 14. Globus support is described inconsistently between the live proxy and the import pipeline
-
-Evidence:
-
-- `apps/api/src/globus/types/globus-api.types.ts` includes `Globus`, `Cosmos`, and `Monograms`
-- `apps/api/src/globus/` describes all three brands as supported
-- `apps/api/src/tour-import/tour-import.types.ts` limits import support to `Globus` and `Cosmos`
-- `apps/api/src/tour-import/tour-import.service.ts` comments still mention `Monograms`
-
-Why it matters:
-
-- Readers cannot tell whether `Monograms` is supported, unsupported, or unfinished.
-- Catalog coverage can drift between live search and persisted import behavior.
-
-Suggested next step:
-
-- Decide the supported Globus brand set, then align code comments, types, endpoints, and docs.
-
-### 15. The root `pnpm dev` flow assumes local Redis tooling even though the API also supports `REDIS_URL`
-
-Evidence:
-
-- `package.json` defines `predev` as `redis-cli ping > /dev/null 2>&1 || redis-server --daemonize yes`
-- `apps/api/src/automation/automation.module.ts` already supports explicit `REDIS_URL`
-
-Why it matters:
-
-- Local onboarding can fail before the apps start if `redis-cli` or `redis-server` is not installed.
-- This is surprising in environments where developers expect a provided `REDIS_URL` to be sufficient.
-
-Suggested next step:
-
-- Make the root dev preflight honor `REDIS_URL` before probing localhost, or remove the side effect and document Redis startup as explicit.
-
-### 16. Flight segment search input guidance can still duplicate the airline code
-
-Evidence:
-
-- `apps/admin/src/app/trips/[id]/_components/flight-form.tsx` concatenates `airline + flightNumber` before searching
-- the same form still shows the flight-number placeholder as `e.g., AC860`
-
-Why it matters:
-
-- Selecting airline `AC` and then typing `AC860` yields `ACAC860`.
-- The search flow is easier to misuse than it needs to be.
-
-Suggested next step:
-
-- Show a numeric-only example in the flight-number field, or sanitize duplicated airline prefixes before searching.
-
-## Priority 3
-
-### 17. Several navigable product areas are still placeholders or partial implementations
-
-Evidence:
-
-- `apps/admin/src/app/reporting/page.tsx`
-- `apps/admin/src/app/destinations/page.tsx`
-- `apps/admin/src/app/settings/page.tsx`
-- `apps/admin/src/app/profile/page.tsx`
-- `apps/client/src/app/(dashboard)/messages/page.tsx`
-- `apps/client/src/app/(dashboard)/payments/page.tsx`
-- `apps/client/src/app/(dashboard)/preferences/page.tsx`
-- `apps/client/src/app/(dashboard)/settings/page.tsx`
-
-Why it matters:
-
-- Some routes are visible and navigable but still "coming soon" or incomplete.
-
-Suggested next step:
-
-- Decide which sections should remain visible as placeholders and which should be hidden until functional.
+- Stop tracking these files and ignore them unless there is a deliberate reason to version build artifacts.

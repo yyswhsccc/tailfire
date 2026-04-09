@@ -39,6 +39,7 @@ export interface TripOrderBookingDetail {
   currency?: string
   // TICO-required financial details
   cancellation_policy?: string
+  terms_and_conditions?: string
   non_refundable?: boolean
   net_price?: number
   supplier?: string
@@ -47,6 +48,8 @@ export interface TripOrderBookingDetail {
     passengerName: string
     total: number
   }>
+  /** Child activities included in this package (displayed as "Included" sub-items) */
+  included_items?: Array<{ name: string; type: string; confirmationNumber?: string | null }>
 }
 
 /**

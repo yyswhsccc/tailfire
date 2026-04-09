@@ -210,14 +210,38 @@ export function createTools(ctx: ToolContext = {}) {
     }),
     execute: async ({ destination, departureDate, returnDate, cruiseLine }) => {
       try {
-        // Use the cruise-repository catalog endpoint (already public via catalog API key)
-        // The catalog uses `q` for text search (ship, port, cruise names) — not region names
-        // For best results, combine destination + cruise line into q param
-        const searchTerms = [destination, cruiseLine].filter(Boolean).join(' ')
+        // Resolve cruise line name → ID for proper filtering
+        let cruiseLineId: string | undefined
+        if (cruiseLine) {
+          try {
+            const lines = await catalogFetch<any[]>('/cruise-repository/lines')
+            const match = (Array.isArray(lines) ? lines : []).find(
+              (l: any) => l.name?.toLowerCase().includes(cruiseLine!.toLowerCase())
+            )
+            if (match) cruiseLineId = match.id
+          } catch { /* ignore — fall back to q search */ }
+        }
+
+        // Resolve destination/region name → regionId for proper filtering
+        let regionId: string | undefined
+        if (destination) {
+          try {
+            const regions = await catalogFetch<any[]>('/cruise-repository/regions')
+            const match = (Array.isArray(regions) ? regions : []).find(
+              (r: any) => r.name?.toLowerCase().includes(destination!.toLowerCase())
+            )
+            if (match) regionId = match.id
+          } catch { /* ignore */ }
+        }
+
+        // Build query with proper filter params instead of putting everything in q
         const qs = buildQuery({
           ...(departureDate && { sailDateFrom: departureDate }),
           ...(returnDate && { sailDateTo: returnDate }),
-          ...(searchTerms && { q: searchTerms }),
+          ...(cruiseLineId && { cruiseLineId }),
+          ...(regionId && { regionId }),
+          // Only use q for text search if we couldn't resolve to IDs
+          ...(!cruiseLineId && !regionId && destination && { q: destination }),
           page: 1,
           pageSize: 5,
         })

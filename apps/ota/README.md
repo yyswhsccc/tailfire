@@ -1,34 +1,47 @@
 # @tailfire/ota
 
-Next.js public storefront and marketing surface for Phoenix Voyages.
+Next.js public discovery surface for Phoenix Voyages. The OTA currently combines marketing content, catalog-backed discovery, AI chat, advisor attribution, trip-request capture, and a traveler-facing `my-trip` experience.
 
-## Current Scope
+## Current Route Surface
 
-The OTA app is primarily a public-facing experience with landing, discovery, and brochure-style trip detail pages.
+The tracked app includes these route areas:
 
-Current route areas include:
+- marketing pages: home, about, contact, privacy, and terms
+- discovery pages: deals, destinations, regions, cruise lines, ships, cruises, and advisors
+- search flows: cruises, flights, hotels, tours, and all-inclusives
+- recruitment pages under `/join/*`
+- traveler access under `/my-trip/[id]`
+- app routes under `/api/*` for airports, chat, destinations, health, revalidation, and trip requests
 
-- home page
-- search
-- trip detail by slug
-- advisors
-- about
-- contact
-- privacy
-- terms
-- auth callback
+## Data And Runtime Model
 
-## Current Data Sources
+- Server components and route handlers call the NestJS API through the app-local helpers in `src/lib/api.ts`.
+- `src/lib/api.ts` exposes `publicFetch`, `catalogFetch`, and `serviceFetch` for public, catalog-key, and OTA service-key requests.
+- `src/app/api/chat/route.ts` uses `AI_MODEL_ID` and falls back to `gpt-4o-mini` when unset.
+- `src/app/my-trip/[id]/page.tsx` supports both shared-token access (`?token=`) and identified access via the `ota_session` cookie with contact fallback checks.
+- `/search/all-inclusives` embeds the Softvoyage widget, but bookings are still serviced by Phoenix Voyages advisors.
 
-Several important flows are still local or placeholder-driven:
+## Environment
 
-- trip search and trip detail pages use local data in `src/data/trips.ts`
-- advisor content uses local data in `src/data/consultants.ts`
-- inquiry, profile, and tracking helpers in `src/lib/api.ts` are placeholder functions that log locally instead of calling the NestJS API
+Copy `apps/ota/.env.example` to `apps/ota/.env.local`.
 
-This means the OTA is not yet a fully API-backed storefront.
+Current variables in the tracked example:
 
-## Development Commands
+- `NEXT_PUBLIC_API_URL`
+- `API_URL`
+- `NEXT_PUBLIC_SITE_URL`
+- `CLIENT_PORTAL_URL`
+- `OTA_SERVICE_KEY`
+- `CATALOG_API_KEY`
+- `REVALIDATION_SECRET`
+- `AI_MODEL_ID`
+- `OPENAI_API_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- optional `UPSTASH_REDIS_REST_URL`
+- optional `UPSTASH_REDIS_REST_TOKEN`
+
+## Scripts
 
 Run from `apps/ota`:
 
@@ -39,28 +52,17 @@ pnpm start
 pnpm lint
 ```
 
-This workspace currently has no `typecheck` or `test` script.
+This workspace does not currently define `typecheck` or `test` scripts.
 
-## Environment
+## Current Caveats
 
-Copy `apps/ota/.env.example` to `apps/ota/.env.local`.
-
-The example includes:
-
-- `NEXT_PUBLIC_API_URL`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-Even with those values present, many current OTA flows remain local/mock-backed.
-
-## Practical Reality
-
-- The app is useful for UI iteration and content exploration.
-- It is not yet the same thing as a live end-to-end booking storefront.
-- Search and lead capture work should be treated carefully because the current implementation can suggest more backend integration than actually exists.
+- OTA discovery is API-backed, but conversion is still advisor-led rather than self-serve checkout.
+- The public contact and join forms are presentational today; they are not wired to a live submission backend yet.
+- Privacy and terms pages still contain placeholder legal copy pending completion.
+- `sitemap.ts` and `structured-data.ts` do not yet cover the full live discovery surface.
 
 ## Related Docs
 
 - [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md)
-- [`../../docs/LOCAL_DEV.md`](../../docs/LOCAL_DEV.md)
+- [`../../docs/ENVIRONMENTS.md`](../../docs/ENVIRONMENTS.md)
 - [`../../docs/REPOSITORY_REVIEW_ISSUES.md`](../../docs/REPOSITORY_REVIEW_ISSUES.md)

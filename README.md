@@ -1,123 +1,86 @@
 # Tailfire Monorepo
 
-Next-generation travel agency management platform built with Turborepo, pnpm workspaces, and modern tooling.
+Tailfire is the Phoenix Voyages monorepo. It uses pnpm workspaces and Turborepo to run an API-first travel platform: Next.js frontends handle presentation and Supabase auth, while business data and workflow logic flow through the NestJS API.
 
-## Structure
+## Workspace Layout
 
 ```
 tailfire/
 ├── apps/
-│   ├── admin/     # B2B Admin Dashboard (Next.js) - Port 3100
-│   ├── api/       # Backend API (NestJS) - Port 3101
-│   ├── client/    # Customer-facing app (Next.js) - Port 3103
-│   └── ota/       # OTA booking platform (Next.js) - Port 3102
+│   ├── admin/   # Advisor and operations dashboard
+│   ├── api/     # NestJS backend API
+│   ├── client/  # Traveler portal and shared proposal access
+│   └── ota/     # Public discovery, AI concierge, and advisor-led storefront
 ├── packages/
-│   ├── config/    # ESLint & TypeScript configs
-│   ├── database/  # Drizzle ORM schema & migrations
-│   ├── shared-types/  # TypeScript type definitions
-│   ├── api-client/    # API client library
-│   └── ui-public/     # Shared UI components
-└── docs/          # Project documentation
+│   ├── api-client/
+│   ├── config/
+│   ├── database/
+│   ├── shared-types/
+│   ├── trip-proposal-ui/
+│   └── ui-public/
+└── docs/
 ```
-
-## Architecture
-
-Tailfire is designed as a **single-agency, multi-branch** platform:
-
-- **Single Agency**: One travel agency organization (Phoenix Voyages)
-- **Multiple Branches**: Support for future expansion to multiple physical or virtual branch locations
-- **Centralized Management**: Admin dashboard manages all branches from a single interface
-- **Shared Catalog**: All branches access the same cruise/tour catalog data
-- **Branch-Scoped Data**: Bookings, clients, and transactions are scoped to individual branches
-
-This is **not** a multi-tenant SaaS platform. The codebase serves a single agency with the flexibility to scale across multiple branches while maintaining centralized control.
 
 ## Quick Start
 
 ```bash
-# Install dependencies
 pnpm install
 
-# Configure environment
 cp apps/api/.env.example apps/api/.env
 cp apps/admin/.env.example apps/admin/.env.local
-# Edit with your Supabase credentials
+cp apps/client/.env.example apps/client/.env.local
+cp apps/ota/.env.example apps/ota/.env.local
 
-# Run migrations (first time)
 cd apps/api && pnpm db:migrate && cd ../..
 
-# Start all apps
 pnpm dev
 ```
 
-## Documentation
+`pnpm dev` runs the root `predev` hook first. Today that hook probes local Redis with `redis-cli` and may try to start `redis-server`, so filtered app commands are often easier on machines without local Redis tooling.
 
-| Document | Description |
-|----------|-------------|
-| [Architecture](./docs/ARCHITECTURE.md) | System design, data flow, key decisions |
-| [Security Model](./docs/SECURITY.md) | Authentication, authorization, RLS |
-| [Database Architecture](./docs/DATABASE_ARCHITECTURE.md) | Schema, FDW, migrations |
-| [Local Development](./docs/LOCAL_DEV.md) | Ports, startup commands, database setup |
-| [Environment Configuration](./docs/ENVIRONMENTS.md) | Domains, CORS, environment variables |
-| [CI/CD Pipeline](./docs/CI_CD.md) | GitHub Actions, deployment flow |
-| [API Deployment](./docs/DEPLOYMENT_API.md) | Railway settings, health checks |
-| [Testing Guide](./docs/TESTING.md) | Test frameworks, patterns, CI integration |
+## Canonical Docs
 
-### App-Specific Documentation
+| Document | Purpose |
+| --- | --- |
+| [Docs Index](./docs/README.md) | Canonical doc entry point |
+| [Architecture](./docs/ARCHITECTURE.md) | Current app, package, and data-flow model |
+| [Local Development](./docs/LOCAL_DEV.md) | Working local setup paths, ports, and caveats |
+| [Environments](./docs/ENVIRONMENTS.md) | Environment mapping, frontend envs, and CORS behavior |
+| [Testing](./docs/TESTING.md) | Current scripts, coverage boundaries, and gaps |
+| [CI/CD](./docs/CI_CD.md) | What the tracked GitHub Actions workflows actually do |
+| [API Deployment](./docs/DEPLOYMENT_API.md) | Railway API deployment behavior |
+| [Repository Review Issues](./docs/REPOSITORY_REVIEW_ISSUES.md) | Open platform and doc-audit findings |
 
-| App | Documentation |
-|-----|---------------|
-| [API](./apps/api/README.md) | NestJS backend, database, storage providers |
-| [Admin](./apps/admin/README.md) | B2B dashboard, state management, components |
-| [Database](./packages/database/README.md) | Schema, migrations, Drizzle ORM |
-| [Shared Types](./packages/shared-types/README.md) | Type definitions, API contracts |
+## App And Package Docs
 
-### Operational Guides
+| Surface | Documentation |
+| --- | --- |
+| API | [apps/api/README.md](./apps/api/README.md) |
+| Admin | [apps/admin/README.md](./apps/admin/README.md) |
+| Client | [apps/client/README.md](./apps/client/README.md) |
+| OTA | [apps/ota/README.md](./apps/ota/README.md) |
+| Database | [packages/database/README.md](./packages/database/README.md) |
+| Shared Types | [packages/shared-types/README.md](./packages/shared-types/README.md) |
+| API Client | [packages/api-client/README.md](./packages/api-client/README.md) |
+| UI Public | [packages/ui-public/README.md](./packages/ui-public/README.md) |
+| Trip Proposal UI | [packages/trip-proposal-ui/README.md](./packages/trip-proposal-ui/README.md) |
 
-| Guide | Description |
-|-------|-------------|
-| [Seed Runbook](./scripts/SEED-RUNBOOK.md) | Database seeding for dev/prod |
-| [FDW Setup](./apps/ota/supabase/FDW_SETUP.md) | Catalog data access via Foreign Data Wrapper |
-| [Migrations](./packages/database/MIGRATIONS.md) | Migration conventions and workflow |
-| [Release Checklist](./docs/RELEASE_CHECKLIST.md) | Local-first release flow |
+## Environment Summary
 
-## Deployment
+| Environment | Branch | Deployment Path |
+| --- | --- | --- |
+| Local | local worktree | `pnpm dev` or filtered app commands on `localhost:3100-3103` |
+| Preview | `preview` | `deploy-preview.yml` migrates Preview DB, deploys Railway `api-dev`, deploys Vercel previews, and aliases admin preview to `tf-demo.phoenixvoyages.ca` |
+| Production | `main` | `deploy-prod.yml` migrates Prod DB, deploys Railway `api-prod`, and targets `api.tailfire.ca`, `tailfire.phoenixvoyages.ca`, `ota.phoenixvoyages.ca`, and `client.phoenixvoyages.ca` |
 
-```
-Feature Branch → preview branch → main branch
-                      ↓                ↓
-              Dev Environment    Production
-```
+Preview is not a fixed mirror of the old `*-dev.phoenixvoyages.ca` setup. The tracked workflow waits on a generated Railway URL for the API and uses Vercel preview deployments, with only the admin alias pinned in the workflow.
 
-| Environment | Git Branch | CI Workflow | Platforms |
-|-------------|------------|-------------|-----------|
-| **Development** | `preview` | `deploy-preview.yml` | Railway (`api-dev`), Vercel Preview |
-| **Production** | `main` | `deploy-prod.yml` | Railway (`api-prod`), Vercel Production |
-
-### Production Domains
-
-- **API**: `api.tailfire.ca`
-- **Admin**: `tailfire.phoenixvoyages.ca`
-- **OTA**: `ota.phoenixvoyages.ca`
-- **Client**: `client.phoenixvoyages.ca`
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| **Monorepo** | Turborepo + pnpm workspaces |
-| **Backend** | NestJS 10+, Drizzle ORM |
-| **Frontend** | Next.js 15, shadcn/ui, TanStack Query |
-| **Database** | Supabase PostgreSQL |
-| **Auth** | Supabase Auth + JWT |
-| **Storage** | Cloudflare R2 (Supabase Storage as fallback) |
-
-## Scripts
+## Common Commands
 
 ```bash
-pnpm dev          # Start all apps in dev mode
-pnpm build        # Build all packages
-pnpm lint         # Run ESLint
-pnpm typecheck    # Run TypeScript type checking
-pnpm test         # Run tests
+pnpm dev
+pnpm build
+pnpm lint
+pnpm typecheck
+pnpm test
 ```
