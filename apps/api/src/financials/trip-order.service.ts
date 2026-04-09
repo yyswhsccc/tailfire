@@ -1208,7 +1208,7 @@ export class TripOrderService {
     // Must check both itinerary chain AND direct trip_id for floating packages
     // Also JOIN suppliers to pull default T&C when activity-level T&C is empty
     const activities = await this.db.client.execute(sql`
-      SELECT
+      SELECT DISTINCT ON (ia.id)
         ia.id,
         ia.name,
         ia.activity_type,
@@ -1232,6 +1232,7 @@ export class TripOrderService {
       LEFT JOIN itineraries i ON i.id = iday.itinerary_id
       WHERE ia.parent_activity_id IS NULL
         AND (i.trip_id = ${tripId} OR ia.trip_id = ${tripId})
+      ORDER BY ia.id
     `) as any[]
 
     // For each activity, get per-passenger pricing from traveler_bookings
@@ -1317,7 +1318,7 @@ export class TripOrderService {
     //   → activity_pricing → itinerary_activities → (itineraries chain OR direct trip_id)
     // Must use LEFT JOIN for itinerary chain + OR for floating activities
     const transactions = await this.db.client.execute(sql`
-      SELECT
+      SELECT DISTINCT ON (ptx.id)
         ptx.id,
         ptx.amount_cents,
         ptx.transaction_type,
@@ -1333,6 +1334,7 @@ export class TripOrderService {
       LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
       LEFT JOIN itineraries i ON i.id = iday.itinerary_id
       WHERE (i.trip_id = ${tripId} OR ia.trip_id = ${tripId})
+      ORDER BY ptx.id
     `) as any[]
 
     // Map transaction_type to the status format expected by buildPaymentSummary
