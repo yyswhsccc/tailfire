@@ -335,6 +335,7 @@ export class DashboardService {
       FROM trips t
       WHERE ${tripFilter}
         AND t.status IN ('active', 'travelling', 'travelled')
+        AND t.deleted_at IS NULL
         AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
         AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
     `)
@@ -354,6 +355,7 @@ export class DashboardService {
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
           AND t.status IN ('active', 'travelling', 'travelled')
+          AND t.deleted_at IS NULL
           AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
           AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
       `)
@@ -369,6 +371,7 @@ export class DashboardService {
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
           AND t.status IN ('active', 'travelling', 'travelled')
+          AND t.deleted_at IS NULL
           AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
           AND coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
           AND t.id IN ${tripIdList}
@@ -406,6 +409,7 @@ export class DashboardService {
           AND cc.check_date >= ${startIso}::date
           AND cc.check_date <= ${endIso}::date
           AND t.id IN ${tripIdList}
+          AND t.deleted_at IS NULL
       `)
       commissionDollars = Number((commResult as any)[0]?.commission ?? 0)
     }
@@ -509,6 +513,7 @@ export class DashboardService {
         AND t.start_date >= CURRENT_DATE
         AND t.start_date <= CURRENT_DATE + INTERVAL '30 days'
         AND t.status IN ('active', 'travelling')
+        AND t.deleted_at IS NULL
       ORDER BY t.start_date ASC
       LIMIT 4
     `)
@@ -693,6 +698,7 @@ export class DashboardService {
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
           AND t.status IN ('active', 'travelling', 'travelled')
+          AND t.deleted_at IS NULL
           AND extract(year FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at)) = ${year}
         GROUP BY extract(month FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at))
       `) as any[]
@@ -711,6 +717,7 @@ export class DashboardService {
         JOIN trips t ON t.id = itin.trip_id
         WHERE ap.agency_id = ${agencyId}
           AND t.status IN ('active', 'travelling', 'travelled')
+          AND t.deleted_at IS NULL
           AND extract(year FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at)) = ${year}
           AND t.id IN ${tripIdList}
         GROUP BY extract(month FROM coalesce(ia.booking_date, t.booking_date::timestamptz, t.created_at))
@@ -787,6 +794,7 @@ export class DashboardService {
           AND cc.status = 'accepted'
           AND extract(year FROM cc.check_date) = ${year}
           AND t.id IN ${tripIdList}
+          AND t.deleted_at IS NULL
         GROUP BY extract(month FROM cc.check_date)
       `) as any[]
     }
@@ -869,6 +877,7 @@ export class DashboardService {
           AND pt.transaction_date >= ${startIso}::timestamptz
           AND pt.transaction_date <= ${endIso}::timestamptz
           AND t.owner_id IS NOT NULL
+          AND t.deleted_at IS NULL
         GROUP BY t.owner_id
       ),
       agent_bookings AS (
@@ -878,6 +887,7 @@ export class DashboardService {
         FROM trips t
         WHERE t.agency_id = ${agencyId}
           AND t.status IN ('active', 'travelling', 'travelled')
+          AND t.deleted_at IS NULL
           AND t.created_at >= ${startIso}::timestamptz
           AND t.created_at <= ${endIso}::timestamptz
           AND t.owner_id IS NOT NULL
@@ -943,6 +953,7 @@ export class DashboardService {
       JOIN trips t ON t.id = COALESCE(itin.trip_id, ia.trip_id)
       WHERE ${tripFilter}
         AND t.status IN ('active', 'travelling', 'travelled')
+        AND t.deleted_at IS NULL
         AND ia.booking_status = 'booked'
         AND ia.activity_type NOT IN ('port_info', 'tour_day')
         AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
@@ -961,6 +972,7 @@ export class DashboardService {
       JOIN trips t ON t.id = COALESCE(itin.trip_id, ia.trip_id)
       WHERE ${tripFilter}
         AND t.status IN ('active', 'travelling', 'travelled')
+        AND t.deleted_at IS NULL
         AND ia.booking_status = 'booked'
         AND ia.activity_type NOT IN ('port_info', 'tour_day')
         AND t.start_date >= ${startIso}::date
@@ -1011,6 +1023,7 @@ export class DashboardService {
       JOIN trips t ON t.id = tt.trip_id
       WHERE ${tripFilter}
         AND t.status IN ('active', 'travelling', 'travelled')
+        AND t.deleted_at IS NULL
         AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
         AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
     `)
@@ -1025,6 +1038,7 @@ export class DashboardService {
       WHERE ${tripFilter}
         AND tti.status IN ('selected_package', 'has_own_insurance')
         AND t.status IN ('active', 'travelling', 'travelled')
+        AND t.deleted_at IS NULL
         AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startIso}::timestamptz
         AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endIso}::timestamptz
     `)
