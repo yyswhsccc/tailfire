@@ -1227,7 +1227,7 @@ export class TripOrderService {
         s.default_cancellation_policy AS supplier_cancellation
       FROM itinerary_activities ia
       LEFT JOIN activity_pricing ap ON ap.activity_id = ia.id
-      LEFT JOIN suppliers s ON s.name = ap.supplier AND s.agency_id = ia.agency_id
+      LEFT JOIN suppliers s ON s.name = ap.supplier
       LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
       LEFT JOIN itineraries i ON i.id = iday.itinerary_id
       WHERE ia.parent_activity_id IS NULL
