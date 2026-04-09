@@ -210,7 +210,7 @@ export function createTools(ctx: ToolContext = {}) {
     }),
     execute: async ({ destination, departureDate, returnDate, cruiseLine }) => {
       try {
-        // Resolve cruise line name → ID for proper filtering (q search doesn't match cruise line names)
+        // Resolve cruise line name → ID for proper filtering
         let cruiseLineId: string | undefined
         if (cruiseLine) {
           try {
@@ -219,10 +219,10 @@ export function createTools(ctx: ToolContext = {}) {
               (l: any) => l.name?.toLowerCase().includes(cruiseLine!.toLowerCase())
             )
             if (match) cruiseLineId = match.id
-          } catch { /* fall back to q search */ }
+          } catch { /* ignore — fall back to q search */ }
         }
 
-        // Resolve destination/region name → regionId
+        // Resolve destination/region name → regionId for proper filtering
         let regionId: string | undefined
         if (destination) {
           try {
@@ -234,11 +234,13 @@ export function createTools(ctx: ToolContext = {}) {
           } catch { /* ignore */ }
         }
 
+        // Build query with proper filter params instead of putting everything in q
         const qs = buildQuery({
           ...(departureDate && { sailDateFrom: departureDate }),
           ...(returnDate && { sailDateTo: returnDate }),
           ...(cruiseLineId && { cruiseLineId }),
           ...(regionId && { regionId }),
+          // Only use q for text search if we couldn't resolve to IDs
           ...(!cruiseLineId && !regionId && destination && { q: destination }),
           page: 1,
           pageSize: 5,
