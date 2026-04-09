@@ -98,7 +98,17 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const messages: UIMessage[] = body.messages
+    const rawMessages = body.messages as any[]
+
+    // Normalize messages — handle both v5 (content) and v6 (parts) format
+    const messages: UIMessage[] = rawMessages?.map((m: any) => {
+      if (m.parts) return m  // Already v6 format
+      // Convert v5 content string to v6 parts format
+      return {
+        ...m,
+        parts: m.content ? [{ type: 'text', text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }] : [],
+      }
+    }) ?? []
     const pageContext: {
       type?: string; name?: string; slug?: string;
       oneLiner?: string; bestMonths?: string; budgetTier?: string;
@@ -196,7 +206,7 @@ export async function POST(request: Request) {
 
     return result.toUIMessageStreamResponse()
   } catch (error) {
-    console.warn('[api/chat] Request failed:', (error as Error)?.message || 'unknown error')
+    console.warn('[api/chat] Request failed:', (error as Error)?.message || 'unknown error', (error as Error)?.stack?.split('\n').slice(0, 3).join(' '))
     return new Response(
       JSON.stringify({ error: 'An error occurred while processing your request.' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },
