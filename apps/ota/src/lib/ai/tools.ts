@@ -263,6 +263,7 @@ export function createTools(ctx: ToolContext = {}) {
         const items = data.items ?? []
         return {
           cruises: items.map((c) => ({
+            id: c.id,
             cruiseLine: c.cruiseLine?.name ?? 'Unknown',
             ship: c.ship?.name ?? 'Unknown',
             shipImage: c.ship?.imageUrl ?? null,
