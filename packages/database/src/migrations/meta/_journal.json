@@ -1352,6 +1352,13 @@
       "when": 1775670000000,
       "tag": "20260408180000_trip_order_supplier_terms",
       "breakpoints": true
+    },
+    {
+      "idx": 193,
+      "version": "7",
+      "when": 1775822400000,
+      "tag": "20260410120000_backfill_activity_pricing_supplier",
+      "breakpoints": true
     }
   ]
 }
