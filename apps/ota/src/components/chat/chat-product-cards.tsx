@@ -80,6 +80,7 @@ function parsePriceToCents(price: string | null | undefined): number | null {
 
 interface CruiseOutput {
   cruises?: Array<{
+    id: string;
     cruiseLine: string;
     ship: string;
     shipImage?: string | null;
@@ -111,7 +112,7 @@ function CruiseResults({ data }: { data: unknown }) {
           <CruiseProductCard
             key={i}
             variant="compact"
-            id={`chat-cruise-${i}`}
+            id={c.id || `chat-cruise-${i}`}
             name={c.itinerary || `${c.nights}-Night Cruise`}
             shipName={c.ship}
             shipImageUrl={c.shipImage ?? null}
