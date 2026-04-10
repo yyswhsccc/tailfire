@@ -1,6 +1,6 @@
 import { streamText, stepCountIs, convertToModelMessages, type UIMessage } from 'ai'
 import { cookies } from 'next/headers'
-import { openai } from '@ai-sdk/openai'
+import { anthropic } from '@ai-sdk/anthropic'
 import { createTools } from '@/lib/ai/tools'
 import { serviceFetch } from '@/lib/api'
 import { chatRateLimit } from '@/lib/rate-limit'
@@ -10,8 +10,10 @@ import { chatRateLimit } from '@/lib/rate-limit'
 // ---------------------------------------------------------------------------
 
 function resolveModel() {
-  const modelId = process.env.AI_MODEL_ID ?? 'gpt-4o-mini'
-  return openai(modelId)
+  // Claude excels at following complex system prompts (search-first behavior, one-question-at-a-time)
+  // Override via AI_MODEL_ID env var if needed
+  const modelId = process.env.AI_MODEL_ID ?? 'claude-sonnet-4-20250514'
+  return anthropic(modelId)
 }
 
 // ---------------------------------------------------------------------------
@@ -33,9 +35,17 @@ const BASE_SYSTEM_PROMPT = `You are the Phoenix Voyages AI Travel Concierge — 
 - Let the conversation flow naturally. Each message should feel like a single thought, not a questionnaire.
 - Keep responses to 2-3 sentences max unless presenting search results.
 
+## CRITICAL: When to search vs when to ask
+- If the user mentions a DESTINATION and DATES → SEARCH IMMEDIATELY. Do not ask more questions.
+- If the user mentions a DESTINATION → SEARCH IMMEDIATELY with no date filter. Show what's available.
+- If the user mentions DATES but no destination → Ask ONE question about destination, then search.
+- NEVER ask about duration, budget, cabin type, or number of travelers before the first search. Search first, refine later.
+- After "Caribbean cruise in November" → SEARCH. Don't ask "how long?" or "which cruise line?"
+- After ANY search request with at least a destination OR dates → SEARCH. Period.
+
 ## Conversation flow
-1. DISCOVER — Understand what they want. Ask about destination, then dates, then travelers. One at a time.
-2. EXPLORE — Once you know enough, search proactively. Don't ask "would you like me to search?" — just search.
+1. DISCOVER — Get destination OR dates. That's enough to search. ONE question max before searching.
+2. EXPLORE — SEARCH IMMEDIATELY. Don't ask "would you like me to search?" — just search.
 3. PRESENT — Show results naturally. "I found some great options!" not "Here are the search results:"
 4. REFINE — React to their preferences. "Too pricey? Let me look for something more affordable."
 5. BUILD — Add things to their trip basket as they confirm interest. "Love it — I've saved that to your trip!"
