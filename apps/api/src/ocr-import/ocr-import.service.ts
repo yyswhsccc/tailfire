@@ -423,6 +423,7 @@ export class OcrImportService {
       bookingStatus: 'booked',
       currency: flight.currency || 'CAD',
       totalPriceCents: flight.totalPriceCents || undefined,
+      supplier: supplier?.name || flight.airline || undefined,
       flightDetails: {
         airline: flight.airline || undefined,
         flightNumber: firstSegment.flightNumber || undefined,
@@ -542,6 +543,7 @@ export class OcrImportService {
       bookingStatus: 'booked',
       currency: lodging.currency || 'CAD',
       totalPriceCents: lodging.totalPriceCents || undefined,
+      supplier: supplier?.name || lodging.propertyName || undefined,
       address: lodging.address || undefined,
       lodgingDetails: {
         propertyName: lodging.propertyName || undefined,
@@ -668,6 +670,7 @@ export class OcrImportService {
       bookingStatus: 'booked',
       currency: cruise.currency || 'CAD',
       totalPriceCents: cruise.totalPriceCents || undefined,
+      supplier: supplier?.name || cruise.cruiseLineName || undefined,
       customCruiseDetails: {
         cruiseLineName: cruise.cruiseLineName || null,
         shipName: cruise.shipName || null,
@@ -1061,6 +1064,7 @@ export class OcrImportService {
       bookingStatus: 'booked',
       currency: transport.currency || 'CAD',
       totalPriceCents: transport.totalPriceCents || undefined,
+      supplier: supplier?.name || transport.companyName || undefined,
       transportationDetails: {
         subtype: this.mapTransportationType(transport.transportationType) as 'transfer' | 'car_rental' | 'private_car' | 'taxi' | 'shuttle' | 'train' | 'ferry' | 'bus' | 'limousine',
         providerName: transport.companyName || undefined,
@@ -1145,6 +1149,7 @@ export class OcrImportService {
       bookingStatus: 'booked',
       currency: dining.currency || 'CAD',
       totalPriceCents: dining.totalPriceCents || undefined,
+      supplier: supplier?.name || dining.restaurantName || undefined,
       address: dining.address || undefined,
       diningDetails: {
         restaurantName: dining.restaurantName || undefined,
@@ -1349,8 +1354,9 @@ export class OcrImportService {
       )
     }
 
-    // 9. Update pricing with per-person breakdown if available
-    if (pkg.perPersonPricing?.length > 0 || pkg.commissionAmount != null || pkg.taxesAndFees != null) {
+    // 9. Update pricing with per-person breakdown, supplier, and other fields if available
+    const packageSupplierName = supplier?.name || pkg.supplierName || null
+    if (pkg.perPersonPricing?.length > 0 || pkg.commissionAmount != null || pkg.taxesAndFees != null || packageSupplierName) {
       try {
         const updateData: Partial<typeof schema.activityPricing.$inferInsert> = {}
         if (pkg.perPersonPricing?.length > 0) {
@@ -1365,6 +1371,9 @@ export class OcrImportService {
         }
         if (pkg.taxesAndFees != null) {
           updateData.taxesAndFeesCents = Math.round(pkg.taxesAndFees * 100)
+        }
+        if (packageSupplierName) {
+          updateData.supplier = packageSupplierName
         }
 
         await this.db.client
