@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Mail, CheckCircle2, Pen } from 'lucide-react'
 import {
@@ -19,6 +19,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useToast } from '@/hooks/use-toast'
 import { useMyProfile, useUpdateMyProfile } from '@/hooks/use-user-profile'
 import {
+  useEmailAccounts,
   useCreateEmailAccount,
   useTestEmailConnection,
 } from '@/hooks/use-email-accounts'
@@ -45,11 +46,19 @@ export function EmailSetupWizard() {
   const [isSaving, setIsSaving] = useState(false)
 
   const { data: profile, isLoading: profileLoading } = useMyProfile()
+  const { data: existingAccounts } = useEmailAccounts()
   const updateProfile = useUpdateMyProfile()
   const createAccount = useCreateEmailAccount()
   const testConnection = useTestEmailConnection()
   const { toast } = useToast()
   const router = useRouter()
+
+  // Skip to signature step if email account already exists
+  useEffect(() => {
+    if ((existingAccounts?.length ?? 0) > 0 && step === 'connect') {
+      setStep('signature')
+    }
+  }, [existingAccounts, step])
 
   const email = profile?.email ?? ''
   const agencyConfig = profile?.agencyBusinessConfig
@@ -104,6 +113,11 @@ export function EmailSetupWizard() {
       setStep('signature')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'An unexpected error occurred.'
+      // If account already exists (duplicate), just proceed to signature
+      if (message.includes('duplicate') || message.includes('already exists') || message.includes('unique constraint')) {
+        setStep('signature')
+        return
+      }
       setError(message)
     } finally {
       setIsConnecting(false)
