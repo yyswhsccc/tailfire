@@ -96,22 +96,43 @@ This function is used:
 
 The email senders (`smtp-send.service.ts`, `email.service.ts`) continue to use `signatureHtml` as-is — no changes to the send path.
 
-### Data Sources (V1 — Phoenix Voyages)
+### Data Sources
 
-| Signature Field | Source |
-|----------------|--------|
-| Name | `user_profiles.firstName` + `lastName` |
-| Designations | `user_profiles.licensingInfo.ticoNumber` or free text from profile |
-| Title | Hardcoded "Travel Advisor" (or from advisor profile if available) |
-| MicroSite URL | Derived from advisor profile slug if exists |
-| Avatar | `user_profiles.avatarUrl` |
-| Company Name | Hardcoded: "Phoenix Voyages" |
-| Phone | Hardcoded: "(855) 383-5771" |
-| Extension | From `user_profiles.publicPhone` or agent info if available |
-| Address | Hardcoded: "600 Du Golf Rd, Hammond ON K0A2A0" |
-| TICO | Hardcoded: "50028032" |
+| Signature Field | Source | Status |
+|----------------|--------|--------|
+| Name | `user_profiles.firstName` + `lastName` | Exists |
+| Designations | `user_profiles.designations` | **NEW field** (varchar, e.g., "CTC, ACC") |
+| Title | `user_profiles.jobTitle` | **NEW field** (varchar, default "Travel Advisor") |
+| Extension | `user_profiles.phoneExtension` | **NEW field** (varchar, e.g., "101") |
+| MicroSite URL | `advisor_profiles.slug` → full URL | Exists (fetch via API) |
+| Avatar | `user_profiles.avatarUrl` | Exists |
+| Company Name | `BusinessConfiguration.company_name` | Exists (via `getBusinessConfiguration`) |
+| Phone | `BusinessConfiguration.toll_free` or `phone` | Exists |
+| Address | `BusinessConfiguration.full_address` | Exists |
+| TICO | `BusinessConfiguration.tico_registration` | Exists |
 
-Future: replace hardcoded values with `agency_settings` / `businessConfig` fields.
+### New Fields on user_profiles
+
+Migration adds 3 columns to `user_profiles`:
+
+```sql
+ALTER TABLE user_profiles ADD COLUMN designations VARCHAR(255);
+ALTER TABLE user_profiles ADD COLUMN job_title VARCHAR(100) DEFAULT 'Travel Advisor';
+ALTER TABLE user_profiles ADD COLUMN phone_extension VARCHAR(20);
+```
+
+These are also added to:
+- `UserProfileResponseDto` in shared-types
+- `UpdateUserProfileDto` in shared-types
+- `update-user-profile.dto.ts` validation in API
+- Agent Info tab on the profile page (editable)
+
+### Agency Business Config API
+
+The `BusinessConfiguration` data already exists (used by trip-order PDF). Add a lightweight endpoint or reuse the existing `getBusinessConfiguration()` method to expose it for the frontend signature builder:
+
+- `GET /agency-settings/business-config` — returns company_name, phone, toll_free, full_address, tico_registration
+- OR: include it in the existing `/user-profiles/me` response as `agencyConfig` (simpler)
 
 ## 4. Server Configuration
 
@@ -132,21 +153,24 @@ Custom domain email support is deferred behind a feature flag (hidden for now).
 
 ## 5. Files to Modify/Create
 
+### Database
+- **Create**: migration adding `designations`, `job_title`, `phone_extension` to `user_profiles`
+
 ### Frontend (apps/admin/src/)
 - **Create**: `app/profile/_components/email-setup-wizard.tsx` — two-step wizard component
 - **Create**: `lib/email/build-signature-html.ts` — shared signature HTML builder (client-side)
 - **Modify**: `app/profile/page.tsx` — detect `setup=true` and render wizard instead of tabs
 - **Modify**: `app/profile/_components/email-tab.tsx` — pre-fill server details for @phoenixvoyages.ca, add signature management section (reuses signature builder)
+- **Modify**: `app/profile/_components/agent-info-tab.tsx` — add designations, job title, phone extension fields
 - **Modify**: `app/profile/_components/preferences-tab.tsx` — remove signature editing from here (move to email tab)
 
 ### Backend (apps/api/src/)
-- No backend changes needed — existing endpoints support everything:
-  - `POST /email-accounts/test-connection` — test IMAP
-  - `POST /email-accounts` — create account
-  - `PUT /user-profiles/me` — save emailSignatureConfig + platformPreferences
+- **Modify**: `user-profiles/user-profiles.service.ts` — handle new profile fields
+- **Modify**: `user-profiles/dto/update-user-profile.dto.ts` — add new field validation
+- **Add**: endpoint or field to expose agency BusinessConfiguration to frontend for signature builder
 
-### Shared
-- No shared type changes needed — emailSignatureConfig accepts loose JSONB
+### Shared Types
+- **Modify**: `packages/shared-types/src/api/user-profiles.types.ts` — add `designations`, `jobTitle`, `phoneExtension` to response and update DTOs
 
 ## 6. Profile Email Tab Improvements (Post-Onboarding)
 
@@ -173,4 +197,4 @@ On wizard completion (Step 2 save):
 - Custom domain email (deferred, feature flagged)
 - Changes to email send path (senders already use signatureHtml)
 - New backend endpoints
-- Agency settings for business details (hardcoded for V1)
+- New agency settings UI (business config is read-only for agents, admin-managed)
