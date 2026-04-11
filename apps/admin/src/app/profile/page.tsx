@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -16,6 +17,7 @@ import { PreferencesTab } from './_components/preferences-tab'
 import { NotificationsTab } from './_components/notifications-tab'
 import { SecurityTab } from './_components/security-tab'
 import { EmailTab } from './_components/email-tab'
+import { EmailSetupWizard } from './_components/email-setup-wizard'
 
 function ProfilePageHeader() {
   const { data: profile, isLoading } = useMyProfile()
@@ -158,13 +160,26 @@ function ProfilePageLoading() {
   )
 }
 
+function ProfilePageRouter() {
+  const searchParams = useSearchParams()
+  const isSetup = searchParams.get('setup') === 'true'
+
+  if (isSetup) {
+    return <EmailSetupWizard />
+  }
+
+  return (
+    <ProfileFormProvider defaultTab="public">
+      <ProfileContent />
+    </ProfileFormProvider>
+  )
+}
+
 export default function ProfilePage() {
   return (
     <DashboardLayout>
       <Suspense fallback={<ProfilePageLoading />}>
-        <ProfileFormProvider defaultTab="public">
-          <ProfileContent />
-        </ProfileFormProvider>
+        <ProfilePageRouter />
       </Suspense>
     </DashboardLayout>
   )
