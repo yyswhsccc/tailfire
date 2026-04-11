@@ -64,6 +64,9 @@ export interface UserProfileResponseDto {
   avatarUrl: string | null
   bio: string | null
   publicPhone: string | null
+  designations: string | null
+  jobTitle: string | null
+  phoneExtension: string | null
   officeAddress: AddressDto | null
   socialMediaLinks: SocialMediaLinksDto
   emergencyContactName: string | null
@@ -107,6 +110,9 @@ export interface UpdateUserProfileDto {
   lastName?: string
   bio?: string
   publicPhone?: string
+  designations?: string
+  jobTitle?: string
+  phoneExtension?: string
   officeAddress?: AddressDto | null
   socialMediaLinks?: SocialMediaLinksDto
   emergencyContactName?: string
