@@ -1072,6 +1072,11 @@ export class TripOrderService {
       .select({
         logoUrl: this.db.schema.agencySettings.logoUrl,
         primaryColor: this.db.schema.agencySettings.primaryColor,
+        companyPhone: this.db.schema.agencySettings.companyPhone,
+        companyTollFree: this.db.schema.agencySettings.companyTollFree,
+        companyEmail: this.db.schema.agencySettings.companyEmail,
+        companyAddress: this.db.schema.agencySettings.companyAddress,
+        ticoRegistration: this.db.schema.agencySettings.ticoRegistration,
       })
       .from(this.db.schema.agencySettings)
       .where(eq(this.db.schema.agencySettings.agencyId, agencyId))
@@ -1089,6 +1094,11 @@ export class TripOrderService {
     return {
       ...defaultConfig,
       company_name: agency?.name || defaultConfig.company_name,
+      full_address: settings?.companyAddress || defaultConfig.full_address,
+      phone: settings?.companyPhone || defaultConfig.phone,
+      toll_free: settings?.companyTollFree || defaultConfig.toll_free,
+      email: settings?.companyEmail || defaultConfig.email,
+      tico_registration: settings?.ticoRegistration || defaultConfig.tico_registration,
       logo_url: settings?.logoUrl || undefined,
       primary_color: settings?.primaryColor || defaultConfig.primary_color,
     }
