@@ -20,6 +20,21 @@ export class EmailAccountsService {
     private readonly encryptionService: EncryptionService,
   ) {}
 
+  // Server defaults per email domain — enforced server-side regardless of client input
+  private static readonly DOMAIN_SERVER_DEFAULTS: Record<string, {
+    imapHost: string; imapPort: number; imapTls: boolean
+    smtpHost: string; smtpPort: number; smtpTls: boolean
+  }> = {
+    'phoenixvoyages.ca': {
+      imapHost: 'mail.phoenixvoyages.ca',
+      imapPort: 993,
+      imapTls: true,
+      smtpHost: 'mail.phoenixvoyages.ca',
+      smtpPort: 465,
+      smtpTls: true,
+    },
+  }
+
   async create(
     userId: string,
     agencyId: string,
@@ -27,6 +42,10 @@ export class EmailAccountsService {
   ): Promise<EmailAccountResponseDto> {
     // Validate domain against agency allowed domains
     await this.validateDomain(agencyId, dto.emailAddress)
+
+    // Override server settings with domain defaults if available
+    const domain = dto.emailAddress.split('@')[1]?.toLowerCase()
+    const domainDefaults = domain ? EmailAccountsService.DOMAIN_SERVER_DEFAULTS[domain] : undefined
 
     // Encrypt credentials
     const encrypted = this.encryptionService.encryptObject({
@@ -41,12 +60,12 @@ export class EmailAccountsService {
         agencyId,
         emailAddress: dto.emailAddress,
         displayName: dto.displayName,
-        imapHost: dto.imapHost,
-        imapPort: dto.imapPort ?? 993,
-        imapTls: dto.imapTls ?? true,
-        smtpHost: dto.smtpHost,
-        smtpPort: dto.smtpPort ?? 465,
-        smtpTls: dto.smtpTls ?? true,
+        imapHost: domainDefaults?.imapHost ?? dto.imapHost,
+        imapPort: domainDefaults?.imapPort ?? dto.imapPort ?? 993,
+        imapTls: domainDefaults?.imapTls ?? dto.imapTls ?? true,
+        smtpHost: domainDefaults?.smtpHost ?? dto.smtpHost,
+        smtpPort: domainDefaults?.smtpPort ?? dto.smtpPort ?? 465,
+        smtpTls: domainDefaults?.smtpTls ?? dto.smtpTls ?? true,
         credentials: encrypted,
       })
       .returning()
