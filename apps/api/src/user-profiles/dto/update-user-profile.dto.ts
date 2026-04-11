@@ -216,6 +216,18 @@ export class UpdateUserProfileDto {
   commissionSettings?: CommissionSettingsDto
 
   @IsOptional()
+  @IsString()
+  designations?: string
+
+  @IsOptional()
+  @IsString()
+  jobTitle?: string
+
+  @IsOptional()
+  @IsString()
+  phoneExtension?: string
+
+  @IsOptional()
   @IsBoolean()
   isPublicProfile?: boolean
 }
