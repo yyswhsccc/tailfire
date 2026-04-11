@@ -23,6 +23,8 @@ export interface EmailSignatureConfigDto {
   enabled?: boolean
   signatureHtml?: string
   includeInReplies?: boolean
+  tagline?: string
+  showAvatar?: boolean
 }
 
 export interface PlatformPreferencesDto {
