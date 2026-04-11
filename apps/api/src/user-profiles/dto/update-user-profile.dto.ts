@@ -91,6 +91,15 @@ export class EmailSignatureConfigDto {
   @IsOptional()
   @IsBoolean()
   includeInReplies?: boolean
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  tagline?: string
+
+  @IsOptional()
+  @IsBoolean()
+  showAvatar?: boolean
 }
 
 export class PlatformPreferencesDto {
