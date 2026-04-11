@@ -17,6 +17,7 @@ import type {
   PlatformPreferencesDto,
   LicensingInfoDto,
   CommissionSettingsDto,
+  AgencyBusinessConfigDto,
 } from '@tailfire/shared-types'
 import type { UpdateUserProfileDto } from './dto'
 
@@ -52,6 +53,42 @@ export class UserProfilesService {
   }
 
   /**
+   * Get agency business configuration from agency_settings + agencies tables
+   */
+  async getAgencyBusinessConfig(agencyId: string): Promise<AgencyBusinessConfigDto> {
+    const { agencySettings, agencies } = this.db.schema
+
+    const [settings] = await this.db.client
+      .select({
+        companyPhone: agencySettings.companyPhone,
+        companyTollFree: agencySettings.companyTollFree,
+        companyEmail: agencySettings.companyEmail,
+        companyAddress: agencySettings.companyAddress,
+        ticoRegistration: agencySettings.ticoRegistration,
+        logoUrl: agencySettings.logoUrl,
+      })
+      .from(agencySettings)
+      .where(eq(agencySettings.agencyId, agencyId))
+      .limit(1)
+
+    const [agency] = await this.db.client
+      .select({ name: agencies.name })
+      .from(agencies)
+      .where(eq(agencies.id, agencyId))
+      .limit(1)
+
+    return {
+      agencyName: agency?.name ?? null,
+      companyPhone: settings?.companyPhone ?? null,
+      companyTollFree: settings?.companyTollFree ?? null,
+      companyEmail: settings?.companyEmail ?? null,
+      companyAddress: settings?.companyAddress ?? null,
+      ticoRegistration: settings?.ticoRegistration ?? null,
+      logoUrl: settings?.logoUrl ?? null,
+    }
+  }
+
+  /**
    * Get current user's full profile
    */
   async getMyProfile(userId: string): Promise<UserProfileResponseDto> {
@@ -65,7 +102,12 @@ export class UserProfilesService {
       throw new NotFoundException('Profile not found')
     }
 
-    return this.normalizeProfile(profile)
+    const agencyBusinessConfig = await this.getAgencyBusinessConfig(profile.agencyId)
+
+    return {
+      ...this.normalizeProfile(profile),
+      agencyBusinessConfig,
+    }
   }
 
   /**
@@ -107,6 +149,9 @@ export class UserProfilesService {
         updateData.commissionSettings = dto.commissionSettings
       }
     }
+    if (dto.designations !== undefined) updateData.designations = dto.designations
+    if (dto.jobTitle !== undefined) updateData.jobTitle = dto.jobTitle
+    if (dto.phoneExtension !== undefined) updateData.phoneExtension = dto.phoneExtension
     if (dto.isPublicProfile !== undefined) updateData.isPublicProfile = dto.isPublicProfile
 
     const [updated] = await this.db.client

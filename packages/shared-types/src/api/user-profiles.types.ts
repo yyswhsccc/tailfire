@@ -45,6 +45,20 @@ export interface CommissionSettingsDto {
 }
 
 // ============================================================================
+// Agency Business Config (embedded in profile response)
+// ============================================================================
+
+export interface AgencyBusinessConfigDto {
+  agencyName: string | null
+  companyPhone: string | null
+  companyTollFree: string | null
+  companyEmail: string | null
+  companyAddress: string | null
+  ticoRegistration: string | null
+  logoUrl: string | null
+}
+
+// ============================================================================
 // Response DTOs
 // ============================================================================
 
@@ -78,6 +92,7 @@ export interface UserProfileResponseDto {
   lastLoginAt: string | null
   createdAt: string
   updatedAt: string
+  agencyBusinessConfig?: AgencyBusinessConfigDto
 }
 
 /**
