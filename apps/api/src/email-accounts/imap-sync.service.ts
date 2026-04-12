@@ -609,7 +609,8 @@ export class ImapSyncService {
 
       // UIDVALIDITY check — if the server has reassigned UIDs, our cursors are
       // stale and we must wipe synced data for this folder and start over.
-      const serverUidValidity = client.mailbox?.uidValidity
+      // Note: ImapFlow may return BigInt — always convert to Number for JSONB compatibility
+      const serverUidValidity = client.mailbox?.uidValidity != null ? Number(client.mailbox.uidValidity) : undefined
       if (folderState.uidValidity && serverUidValidity && serverUidValidity !== folderState.uidValidity) {
         this.logger.warn(`UIDVALIDITY changed for ${folderPath}. Resetting cursors.`)
         await this.db.client
@@ -696,7 +697,7 @@ export class ImapSyncService {
         ...folderState,
         lastUid: Math.max(folderState.lastUid ?? 0, highestPersistedUid),
         lastSyncAt: new Date().toISOString(),
-        uidValidity: client.mailbox?.uidValidity ?? folderState.uidValidity,
+        uidValidity: client.mailbox?.uidValidity != null ? Number(client.mailbox.uidValidity) : folderState.uidValidity,
       }
 
       if (mode === 'hydrate_recent' || mode === 'hydrate_older') {
