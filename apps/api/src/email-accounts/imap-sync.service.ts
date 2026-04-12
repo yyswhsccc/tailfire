@@ -683,7 +683,7 @@ export class ImapSyncService {
           .set({
             imapUid: Number(msg.uid),
             folder,
-            date: msg.internalDate ?? (envelope?.date ? new Date(envelope.date) : null),
+            date: envelope?.date ? new Date(envelope.date) : (msg.internalDate ?? null),
             isSeen: flags.has('\\Seen'),
             isFlagged: flags.has('\\Flagged'),
             isAnswered: flags.has('\\Answered'),
@@ -736,7 +736,7 @@ export class ImapSyncService {
         toAddresses,
         ccAddresses,
         subject: envelope?.subject,
-        date: msg.internalDate ?? (envelope?.date ? new Date(envelope.date) : null),
+        date: envelope?.date ? new Date(envelope.date) : (msg.internalDate ?? null),
         isSeen: flags.has('\\Seen'),
         isFlagged: flags.has('\\Flagged'),
         isAnswered: flags.has('\\Answered'),
