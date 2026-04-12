@@ -63,15 +63,24 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
   const [newFolderName, setNewFolderName] = useState('')
   const [targetFolder, setTargetFolder] = useState<EmailFolderDto | null>(null)
   const [renameTo, setRenameTo] = useState('')
+  const [createParentPath, setCreateParentPath] = useState<string | null>(null)
 
   function handleCreate() {
     if (!newFolderName.trim()) return
-    createFolder.mutate(newFolderName.trim(), {
+    const fullPath = createParentPath ? `${createParentPath}/${newFolderName.trim()}` : newFolderName.trim()
+    createFolder.mutate(fullPath, {
       onSuccess: () => {
         setShowCreateDialog(false)
         setNewFolderName('')
+        setCreateParentPath(null)
       },
     })
+  }
+
+  function handleCreateSubFolder(parentFolder: EmailFolderDto) {
+    setCreateParentPath(parentFolder.path)
+    setNewFolderName('')
+    setShowCreateDialog(true)
   }
 
   function handleRename() {
@@ -112,6 +121,7 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
               folder={folder}
               isActive={folder.path === activeFolder}
               onSelectFolder={onSelectFolder}
+              onCreateSubFolder={handleCreateSubFolder}
               onRename={(f) => {
                 setTargetFolder(f)
                 setRenameTo(f.name)
@@ -126,7 +136,11 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
 
           {/* New Folder button */}
           <button
-            onClick={() => setShowCreateDialog(true)}
+            onClick={() => {
+              setCreateParentPath(null)
+              setNewFolderName('')
+              setShowCreateDialog(true)
+            }}
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
           >
             <FolderPlus className="h-4 w-4" />
@@ -136,15 +150,23 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
       </div>
 
       {/* Create Folder Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      <Dialog open={showCreateDialog} onOpenChange={(open) => {
+        setShowCreateDialog(open)
+        if (!open) setCreateParentPath(null)
+      }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Create Folder</DialogTitle>
+            <DialogTitle>{createParentPath ? 'Create Sub-Folder' : 'Create Folder'}</DialogTitle>
           </DialogHeader>
+          {createParentPath && (
+            <p className="text-xs text-muted-foreground">
+              Inside: {createParentPath}
+            </p>
+          )}
           <Input
             value={newFolderName}
             onChange={(e) => setNewFolderName(e.target.value)}
-            placeholder="Folder name"
+            placeholder={createParentPath ? 'Sub-folder name' : 'Folder name'}
             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             autoFocus
           />
@@ -221,12 +243,14 @@ function DroppableFolderItem({
   folder,
   isActive,
   onSelectFolder,
+  onCreateSubFolder,
   onRename,
   onDelete,
 }: {
   folder: EmailFolderDto
   isActive: boolean
   onSelectFolder: (path: string) => void
+  onCreateSubFolder: (folder: EmailFolderDto) => void
   onRename: (folder: EmailFolderDto) => void
   onDelete: (folder: EmailFolderDto) => void
 }) {
@@ -274,7 +298,11 @@ function DroppableFolderItem({
                 <MoreHorizontal className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenuContent align="end" side="bottom" sideOffset={4} className="w-44">
+              <DropdownMenuItem onClick={() => onCreateSubFolder(folder)}>
+                <FolderPlus className="mr-2 h-3.5 w-3.5" />
+                Add Sub-Folder
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onRename(folder)}>
                 <Pencil className="mr-2 h-3.5 w-3.5" />
                 Rename
