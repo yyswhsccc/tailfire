@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
+import { useDebouncedCallback } from '@/hooks/use-debounce'
 import { DndContext, DragOverlay, type DragStartEvent, type DragEndEvent } from '@dnd-kit/core'
 import { AlertTriangle, Loader2, Pencil, RefreshCw, Mail, Search } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
@@ -14,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useEmailAccounts } from '@/hooks/use-email-accounts'
-import { useEmailFolders, useEmails, useSyncEmails, useMoveEmail } from '@/hooks/use-emails'
+import { useEmailFolders, useInfiniteEmails, useSyncEmails, useMoveEmail } from '@/hooks/use-emails'
 import { useEmailStore, type EmailSortBy } from '@/stores/email.store'
 import { useDndSensors, dndCollisionDetection, type EmailDragData, type FolderDropData } from '@/lib/dnd-config'
 import { FolderSidebar } from './_components/folder-sidebar'
@@ -39,19 +40,37 @@ export default function EmailInboxPage() {
   const setSortBy = useEmailStore((s) => s.setSortBy)
   const openCompose = useEmailStore((s) => s.openCompose)
 
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const debouncedSetSearch = useDebouncedCallback((value: string) => {
+    setDebouncedSearch(value)
+    setSelectedEmailId(null)
+  }, 300)
+
   const { data: folders, error: foldersError } = useEmailFolders(accountId)
   const isImapAuthError = activeAccount?.lastSyncError === 'IMAP_AUTH_FAILED'
     || (foldersError && 'code' in foldersError && (foldersError as any).code === 'IMAP_AUTH_FAILED')
-  const { data: emailsData, isLoading: emailsLoading } = useEmails(accountId, {
-    folder: activeFolder,
-    search: search || undefined,
-  })
+  const {
+    data: infiniteData,
+    isLoading: emailsLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteEmails(accountId, { folder: activeFolder, search: debouncedSearch || undefined })
   const syncEmails = useSyncEmails(accountId)
   const moveEmail = useMoveEmail(accountId)
 
+  // Flatten infinite pages
+  const allEmails = useMemo(
+    () => infiniteData?.pages.flatMap(p => p.emails) ?? [],
+    [infiniteData]
+  )
+
+  // Total count from first page
+  const totalCount = infiniteData?.pages[0]?.total ?? 0
+
   // Client-side sorting
   const sortedEmails = useMemo(() => {
-    const emails = [...(emailsData?.emails || [])]
+    const emails = [...allEmails]
     switch (sortBy) {
       case 'date-desc':
         return emails.sort((a, b) =>
@@ -74,7 +93,7 @@ export default function EmailInboxPage() {
       default:
         return emails
     }
-  }, [emailsData?.emails, sortBy])
+  }, [allEmails, sortBy])
 
   // DnD state
   const sensors = useDndSensors()
@@ -152,8 +171,8 @@ export default function EmailInboxPage() {
       >
         <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-lg border">
           {/* Folder Sidebar */}
-          <div className="w-52 flex-shrink-0 border-r bg-muted/20 p-3">
-            <div className="mb-3 flex items-center justify-between">
+          <div className="w-52 flex-shrink-0 border-r bg-muted/20 p-3 min-h-0 flex flex-col">
+            <div className="mb-3 flex items-center justify-between flex-shrink-0">
               <h3 className="text-sm font-semibold">Folders</h3>
               <div className="flex gap-0.5">
                 <Button
@@ -178,7 +197,7 @@ export default function EmailInboxPage() {
               </div>
             </div>
             {isImapAuthError && (
-              <div className="mb-3 rounded-md border border-destructive/50 bg-destructive/10 p-2.5">
+              <div className="mb-3 rounded-md border border-destructive/50 bg-destructive/10 p-2.5 flex-shrink-0">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                   <div className="text-xs">
@@ -209,13 +228,16 @@ export default function EmailInboxPage() {
                 <Input
                   placeholder="Search emails..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value)
+                    debouncedSetSearch(e.target.value)
+                  }}
                   className="h-9 pl-9"
                 />
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
-                  {emailsData?.total ?? sortedEmails.length} email{(emailsData?.total ?? sortedEmails.length) !== 1 ? 's' : ''}
+                  {totalCount || sortedEmails.length} email{(totalCount || sortedEmails.length) !== 1 ? 's' : ''}
                 </span>
                 <Select value={sortBy} onValueChange={(v) => setSortBy(v as EmailSortBy)}>
                   <SelectTrigger className="h-7 w-[140px] text-xs">
@@ -242,6 +264,10 @@ export default function EmailInboxPage() {
                   emails={sortedEmails}
                   selectedEmailId={selectedEmailId}
                   onSelectEmail={setSelectedEmailId}
+                  sortBy={sortBy}
+                  hasNextPage={hasNextPage}
+                  isFetchingNextPage={isFetchingNextPage}
+                  fetchNextPage={fetchNextPage}
                 />
               )}
             </div>

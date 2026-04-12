@@ -331,8 +331,59 @@ export class EmailAccountsService {
         .offset(offset),
     ])
 
+    // Batch-resolve sender display names from CRM contacts
+    const [accountRow] = await this.db.client
+      .select({ agencyId: this.db.schema.emailAccounts.agencyId })
+      .from(this.db.schema.emailAccounts)
+      .where(eq(this.db.schema.emailAccounts.id, accountId))
+      .limit(1)
+
+    const resolvedFromNameMap = new Map<string, string>()
+
+    if (accountRow && emails.length > 0) {
+      const uniqueAddresses = [
+        ...new Set(
+          emails
+            .map((e) => e.fromAddress?.toLowerCase())
+            .filter((a): a is string => Boolean(a)),
+        ),
+      ]
+
+      if (uniqueAddresses.length > 0) {
+        const matchedContacts = await this.db.client
+          .select({
+            email: this.db.schema.contacts.email,
+            firstName: this.db.schema.contacts.firstName,
+            lastName: this.db.schema.contacts.lastName,
+          })
+          .from(this.db.schema.contacts)
+          .where(
+            and(
+              eq(this.db.schema.contacts.agencyId, accountRow.agencyId),
+              sql`LOWER(${this.db.schema.contacts.email}) IN (${sql.join(
+                uniqueAddresses.map((a) => sql`${a}`),
+                sql`, `,
+              )})`,
+            ),
+          )
+
+        for (const contact of matchedContacts) {
+          if (contact.email) {
+            const fullName = [contact.firstName, contact.lastName]
+              .filter(Boolean)
+              .join(' ')
+            if (fullName) {
+              resolvedFromNameMap.set(contact.email.toLowerCase(), fullName)
+            }
+          }
+        }
+      }
+    }
+
     return {
-      emails: emails.map((e) => this.formatEmailResponse(e)),
+      emails: emails.map((e) =>
+        this.formatEmailResponse(e, resolvedFromNameMap),
+      ),
       total: countResult[0]?.count ?? 0,
     }
   }
@@ -502,7 +553,15 @@ export class EmailAccountsService {
     }
   }
 
-  private formatEmailResponse(email: any): SyncedEmailResponseDto {
+  private formatEmailResponse(
+    email: any,
+    resolvedFromNameMap?: Map<string, string>,
+  ): SyncedEmailResponseDto {
+    const resolvedFromName =
+      resolvedFromNameMap && email.fromAddress
+        ? (resolvedFromNameMap.get(email.fromAddress.toLowerCase()) ?? null)
+        : null
+
     return {
       id: email.id,
       emailAccountId: email.emailAccountId,
@@ -510,6 +569,7 @@ export class EmailAccountsService {
       folder: email.folder,
       fromAddress: email.fromAddress,
       fromName: email.fromName,
+      resolvedFromName,
       toAddresses: (email.toAddresses as any[]) ?? [],
       ccAddresses: (email.ccAddresses as any[]) ?? [],
       subject: email.subject,

@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type {
   SyncedEmailResponseDto,
@@ -27,6 +27,11 @@ export const emailLogKeys = {
   list: (contactId: string, search?: string) =>
     [...emailLogKeys.all, contactId, search] as const,
   detail: (logId: string) => [...emailLogKeys.all, 'detail', logId] as const,
+}
+
+export const infiniteEmailKeys = {
+  list: (accountId: string, folder: string, search?: string) =>
+    ['emails-infinite', accountId, folder, search] as const,
 }
 
 export const emailKeys = {
@@ -101,6 +106,34 @@ export function useEmailLogDetail(logId: string | null) {
     queryKey: emailLogKeys.detail(logId || ''),
     queryFn: () => api.get<EmailLogResponse>(`/emails/logs/${logId}`),
     enabled: !!logId,
+  })
+}
+
+export function useInfiniteEmails(
+  accountId: string | null,
+  filters: { folder?: string; search?: string; limit?: number },
+) {
+  const folder = filters.folder || 'INBOX'
+  const limit = filters.limit || 50
+
+  return useInfiniteQuery({
+    queryKey: infiniteEmailKeys.list(accountId || '', folder, filters.search),
+    queryFn: async ({ pageParam = 1 }) => {
+      const params = new URLSearchParams()
+      params.set('folder', folder)
+      if (filters.search) params.set('search', filters.search)
+      params.set('page', String(pageParam))
+      params.set('limit', String(limit))
+      return api.get<{ emails: SyncedEmailResponseDto[]; total: number }>(
+        `/email-accounts/${accountId}/emails?${params.toString()}`,
+      )
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.emails.length, 0)
+      return loaded < lastPage.total ? allPages.length + 1 : undefined
+    },
+    enabled: !!accountId,
   })
 }
 
