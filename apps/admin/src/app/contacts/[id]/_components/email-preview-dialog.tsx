@@ -50,8 +50,8 @@ export function EmailPreviewDialog({
   const bodyHtml = source === 'agent' ? agentEmail?.bodyHtml : systemEmail?.bodyHtml
   const bodyText = source === 'agent' ? agentEmail?.bodyText : systemEmail?.bodyText
 
-  const sanitizedHtml = useMemo(() => {
-    if (!bodyHtml) return null
+  const { html: sanitizedHtml } = useMemo(() => {
+    if (!bodyHtml) return { html: '', hasBlockedImages: false }
     return sanitizeEmailHtml(bodyHtml)
   }, [bodyHtml])
 
@@ -118,7 +118,7 @@ export function EmailPreviewDialog({
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : sanitizedHtml ? (
+          ) : sanitizedHtml && bodyHtml ? (
             <div
               className="prose prose-sm max-w-none dark:prose-invert"
               dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
