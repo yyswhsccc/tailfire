@@ -208,8 +208,42 @@ export function useUpdateEmailFlags(accountId: string | null) {
         flags,
       )
     },
-    onSuccess: () => {
+    onMutate: async (params) => {
+      // Optimistic update — apply flag changes immediately in both regular and infinite caches
+      const { emailId, ...flags } = params
+
+      // Update regular query caches (useEmails consumers)
+      const regularCache = queryClient.getQueriesData<{ emails: SyncedEmailResponseDto[]; total: number }>({
+        queryKey: [...emailKeys.all, accountId || ''],
+      })
+      for (const [key, data] of regularCache) {
+        if (!data?.emails) continue
+        const updated = data.emails.map((e) =>
+          e.id === emailId ? { ...e, ...flags } : e
+        )
+        queryClient.setQueryData(key, { ...data, emails: updated })
+      }
+
+      // Update infinite query caches (useInfiniteEmails consumers)
+      queryClient.setQueriesData<{ pages: { emails: SyncedEmailResponseDto[]; total: number }[]; pageParams: number[] }>(
+        { queryKey: ['emails-infinite'] },
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              emails: page.emails.map((e) =>
+                e.id === emailId ? { ...e, ...flags } : e
+              ),
+            })),
+          }
+        }
+      )
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['emails-infinite'] })
     },
   })
 }
