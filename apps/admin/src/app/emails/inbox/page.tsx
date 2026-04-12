@@ -63,6 +63,7 @@ export default function EmailInboxPage() {
   const syncFolder = useSyncFolder(accountId)
   const moveEmail = useMoveEmail(accountId)
   const [folderSyncState, setFolderSyncState] = useState<Record<string, { lastSyncAt?: number; historyExhausted?: boolean }>>({})
+  const [syncErrorFolder, setSyncErrorFolder] = useState<string | null>(null)
 
   // Flatten infinite pages
   const allEmails = useMemo(
@@ -83,6 +84,7 @@ export default function EmailInboxPage() {
     if (!isStale) return
 
     const mode = state?.lastSyncAt ? 'incremental' : 'hydrate_recent'
+    setSyncErrorFolder(null)
     syncFolder.mutate({ folder: activeFolder, mode, batchSize: 50 }, {
       onSuccess: (result) => {
         setFolderSyncState(prev => ({
@@ -93,12 +95,16 @@ export default function EmailInboxPage() {
           },
         }))
       },
+      onError: () => {
+        setSyncErrorFolder(activeFolder)
+      },
     })
   }, [activeFolder, accountId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hydrate older emails from IMAP when scroll exhausts DB pages
   useEffect(() => {
     if (hasNextPage || folderExhausted || !accountId || syncFolder.isPending || emailsLoading) return
+    if (syncErrorFolder === activeFolder) return // Don't hydrate if folder sync already failed
     // All DB pages loaded but IMAP may have more — hydrate older batch
     const loaded = infiniteData?.pages.flatMap(p => p.emails).length ?? 0
     if (loaded === 0) return // Don't hydrate if nothing loaded yet
@@ -112,6 +118,9 @@ export default function EmailInboxPage() {
             historyExhausted: result.historyExhausted ?? false,
           },
         }))
+      },
+      onError: () => {
+        setSyncErrorFolder(activeFolder)
       },
     })
   }, [hasNextPage, folderExhausted]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -145,6 +154,7 @@ export default function EmailInboxPage() {
 
   // Manual refresh — folder-scoped
   function handleRefresh() {
+    setSyncErrorFolder(null)
     syncFolder.mutate({ folder: activeFolder, mode: 'incremental' }, {
       onSuccess: () => {
         setFolderSyncState(prev => ({
