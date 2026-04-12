@@ -21,6 +21,9 @@ import { useProfileForm } from './profile-form-context'
 import type { UpdateUserProfileDto } from '@tailfire/shared-types/api'
 
 interface AgentInfoFormData {
+  designations: string
+  jobTitle: string
+  phoneExtension: string
   emergencyContactName: string
   emergencyContactPhone: string
   licensingInfo: {
@@ -44,6 +47,9 @@ export function AgentInfoTab() {
 
   const form = useForm<AgentInfoFormData>({
     defaultValues: {
+      designations: '',
+      jobTitle: '',
+      phoneExtension: '',
       emergencyContactName: '',
       emergencyContactPhone: '',
       licensingInfo: {
@@ -63,6 +69,9 @@ export function AgentInfoTab() {
   useEffect(() => {
     if (profile) {
       form.reset({
+        designations: profile.designations || '',
+        jobTitle: profile.jobTitle || 'Travel Advisor',
+        phoneExtension: profile.phoneExtension || '',
         emergencyContactName: profile.emergencyContactName || '',
         emergencyContactPhone: profile.emergencyContactPhone || '',
         licensingInfo: {
@@ -114,6 +123,9 @@ export function AgentInfoTab() {
         : undefined
 
       const updateData: UpdateUserProfileDto = {
+        designations: data.designations || undefined,
+        jobTitle: data.jobTitle || undefined,
+        phoneExtension: data.phoneExtension || undefined,
         emergencyContactName: data.emergencyContactName || undefined,
         emergencyContactPhone: data.emergencyContactPhone || undefined,
         licensingInfo,
@@ -168,6 +180,47 @@ export function AgentInfoTab() {
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      {/* Agent Identity */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Agent Identity</CardTitle>
+          <CardDescription>
+            Professional details used in your email signature and public profile
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="jobTitle">Job Title</Label>
+              <Input
+                id="jobTitle"
+                {...form.register('jobTitle')}
+                placeholder="Travel Advisor"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="designations">Designations</Label>
+              <Input
+                id="designations"
+                {...form.register('designations')}
+                placeholder="CTC, ACC"
+              />
+              <p className="text-xs text-muted-foreground">
+                Professional designations (comma-separated)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phoneExtension">Phone Extension</Label>
+              <Input
+                id="phoneExtension"
+                {...form.register('phoneExtension')}
+                placeholder="101"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Emergency Contact */}
       <Card>
         <CardHeader>

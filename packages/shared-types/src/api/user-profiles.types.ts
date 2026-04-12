@@ -23,6 +23,8 @@ export interface EmailSignatureConfigDto {
   enabled?: boolean
   signatureHtml?: string
   includeInReplies?: boolean
+  tagline?: string
+  showAvatar?: boolean
 }
 
 export interface PlatformPreferencesDto {
@@ -45,6 +47,20 @@ export interface CommissionSettingsDto {
 }
 
 // ============================================================================
+// Agency Business Config (embedded in profile response)
+// ============================================================================
+
+export interface AgencyBusinessConfigDto {
+  agencyName: string | null
+  companyPhone: string | null
+  companyTollFree: string | null
+  companyEmail: string | null
+  companyAddress: string | null
+  ticoRegistration: string | null
+  logoUrl: string | null
+}
+
+// ============================================================================
 // Response DTOs
 // ============================================================================
 
@@ -64,6 +80,9 @@ export interface UserProfileResponseDto {
   avatarUrl: string | null
   bio: string | null
   publicPhone: string | null
+  designations: string | null
+  jobTitle: string | null
+  phoneExtension: string | null
   officeAddress: AddressDto | null
   socialMediaLinks: SocialMediaLinksDto
   emergencyContactName: string | null
@@ -75,6 +94,7 @@ export interface UserProfileResponseDto {
   lastLoginAt: string | null
   createdAt: string
   updatedAt: string
+  agencyBusinessConfig?: AgencyBusinessConfigDto
 }
 
 /**
@@ -107,6 +127,9 @@ export interface UpdateUserProfileDto {
   lastName?: string
   bio?: string
   publicPhone?: string
+  designations?: string
+  jobTitle?: string
+  phoneExtension?: string
   officeAddress?: AddressDto | null
   socialMediaLinks?: SocialMediaLinksDto
   emergencyContactName?: string

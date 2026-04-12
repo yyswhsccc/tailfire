@@ -63,6 +63,9 @@ export const userProfiles = pgTable('user_profiles', {
   avatarStoragePath: text('avatar_storage_path'), // R2 path for deletion (server-only)
   bio: text('bio'),
   publicPhone: varchar('public_phone', { length: 50 }),
+  designations: varchar('designations', { length: 255 }),
+  jobTitle: varchar('job_title', { length: 100 }).default('Travel Advisor'),
+  phoneExtension: varchar('phone_extension', { length: 20 }),
   officeAddress: jsonb('office_address'), // Nullable, no default
 
   // Social Media Links (default empty object)

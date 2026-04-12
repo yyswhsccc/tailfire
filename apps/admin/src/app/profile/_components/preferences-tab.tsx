@@ -13,8 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { useMyProfile, useUpdateMyProfile } from '@/hooks/use-user-profile'
 import { useProfileForm } from './profile-form-context'
@@ -24,9 +22,6 @@ interface PreferencesFormData {
   theme: 'light' | 'dark' | 'system'
   timezone: string
   dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD'
-  emailSignatureEnabled: boolean
-  emailSignatureHtml: string
-  emailSignatureIncludeInReplies: boolean
 }
 
 const COMMON_TIMEZONES = [
@@ -50,9 +45,6 @@ export function PreferencesTab() {
       theme: 'system',
       timezone: 'America/Toronto',
       dateFormat: 'MM/DD/YYYY',
-      emailSignatureEnabled: false,
-      emailSignatureHtml: '',
-      emailSignatureIncludeInReplies: false,
     },
   })
 
@@ -63,10 +55,6 @@ export function PreferencesTab() {
         theme: profile.platformPreferences?.theme || 'system',
         timezone: profile.platformPreferences?.timezone || 'America/Toronto',
         dateFormat: profile.platformPreferences?.dateFormat || 'MM/DD/YYYY',
-        emailSignatureEnabled: profile.emailSignatureConfig?.enabled || false,
-        emailSignatureHtml: profile.emailSignatureConfig?.signatureHtml || '',
-        emailSignatureIncludeInReplies:
-          profile.emailSignatureConfig?.includeInReplies || false,
       })
     }
   }, [profile, form])
@@ -78,11 +66,6 @@ export function PreferencesTab() {
           theme: data.theme,
           timezone: data.timezone,
           dateFormat: data.dateFormat,
-        },
-        emailSignatureConfig: {
-          enabled: data.emailSignatureEnabled,
-          signatureHtml: data.emailSignatureHtml || undefined,
-          includeInReplies: data.emailSignatureIncludeInReplies,
         },
       }
 
@@ -211,57 +194,10 @@ export function PreferencesTab() {
       <Card>
         <CardHeader>
           <CardTitle>Email Signature</CardTitle>
-          <CardDescription>Configure your email signature for client communications</CardDescription>
+          <CardDescription>
+            Email signature is now managed in the Email tab
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="emailSignatureEnabled">Enable Email Signature</Label>
-              <p className="text-sm text-muted-foreground">
-                Automatically append your signature to outgoing emails
-              </p>
-            </div>
-            <Switch
-              id="emailSignatureEnabled"
-              checked={form.watch('emailSignatureEnabled')}
-              onCheckedChange={(checked) => form.setValue('emailSignatureEnabled', checked)}
-            />
-          </div>
-
-          {form.watch('emailSignatureEnabled') && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="emailSignatureHtml">Signature Content</Label>
-                <Textarea
-                  id="emailSignatureHtml"
-                  {...form.register('emailSignatureHtml')}
-                  placeholder="Enter your email signature..."
-                  rows={6}
-                />
-                <p className="text-xs text-muted-foreground">
-                  You can use basic HTML formatting. Your signature will be added at the
-                  bottom of your emails.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="emailSignatureIncludeInReplies">Include in Replies</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Add signature when replying to emails
-                  </p>
-                </div>
-                <Switch
-                  id="emailSignatureIncludeInReplies"
-                  checked={form.watch('emailSignatureIncludeInReplies')}
-                  onCheckedChange={(checked) =>
-                    form.setValue('emailSignatureIncludeInReplies', checked)
-                  }
-                />
-              </div>
-            </>
-          )}
-        </CardContent>
       </Card>
 
       {/* Submit Button */}

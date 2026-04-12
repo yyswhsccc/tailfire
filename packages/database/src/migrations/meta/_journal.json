@@ -1359,6 +1359,13 @@
       "when": 1775822400000,
       "tag": "20260410120000_backfill_activity_pricing_supplier",
       "breakpoints": true
+    },
+    {
+      "idx": 194,
+      "version": "7",
+      "when": 1775908800000,
+      "tag": "20260411120000_add_profile_and_agency_business_fields",
+      "breakpoints": true
     }
   ]
 }

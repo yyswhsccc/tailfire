@@ -280,6 +280,13 @@ export const agencySettings = pgTable(
     logoUrl: text('logo_url'),
     primaryColor: varchar('primary_color', { length: 7 }), // Hex color
 
+    // Business details for invoices and signatures
+    companyPhone: varchar('company_phone', { length: 50 }),
+    companyTollFree: varchar('company_toll_free', { length: 50 }),
+    companyEmail: varchar('company_email', { length: 255 }),
+    companyAddress: text('company_address'),
+    ticoRegistration: varchar('tico_registration', { length: 50 }),
+
     // Email Integration Settings
     emailAllowedDomains: jsonb('email_allowed_domains').default([]), // string[] — empty = no restriction
     emailComplianceFooter: text('email_compliance_footer'), // HTML footer for all outbound emails

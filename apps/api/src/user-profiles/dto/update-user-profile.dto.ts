@@ -91,6 +91,15 @@ export class EmailSignatureConfigDto {
   @IsOptional()
   @IsBoolean()
   includeInReplies?: boolean
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  tagline?: string
+
+  @IsOptional()
+  @IsBoolean()
+  showAvatar?: boolean
 }
 
 export class PlatformPreferencesDto {
@@ -214,6 +223,18 @@ export class UpdateUserProfileDto {
   @ValidateNested()
   @Type(() => CommissionSettingsDto)
   commissionSettings?: CommissionSettingsDto
+
+  @IsOptional()
+  @IsString()
+  designations?: string
+
+  @IsOptional()
+  @IsString()
+  jobTitle?: string
+
+  @IsOptional()
+  @IsString()
+  phoneExtension?: string
 
   @IsOptional()
   @IsBoolean()

@@ -1,15 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
-import { Loader2, Mail, Plug, CheckCircle2, Info } from 'lucide-react'
+import { Loader2, Mail, Plug, CheckCircle2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Textarea } from '@/components/ui/textarea'
 import {
   useEmailAccounts,
   useCreateEmailAccount,
@@ -17,6 +18,8 @@ import {
   useTestEmailConnection,
   useDeleteEmailAccount,
 } from '@/hooks/use-email-accounts'
+import { useMyProfile, useUpdateMyProfile } from '@/hooks/use-user-profile'
+import { buildSignatureHtml } from '@/lib/email/build-signature-html'
 import type { CreateEmailAccountDto } from '@tailfire/shared-types/api'
 
 interface EmailFormValues {
@@ -34,25 +37,50 @@ interface EmailFormValues {
 
 export function EmailTab() {
   const { data: accounts, isLoading } = useEmailAccounts()
+  const { data: profile } = useMyProfile()
+  const updateProfile = useUpdateMyProfile()
   const createAccount = useCreateEmailAccount()
   const testConnection = useTestEmailConnection()
   const deleteAccount = useDeleteEmailAccount()
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
 
+  const isPhoenixDomain = profile?.email?.endsWith('@phoenixvoyages.ca')
+
   const form = useForm<EmailFormValues>({
     defaultValues: {
-      emailAddress: '',
+      emailAddress: profile?.email || '',
       displayName: '',
-      imapHost: '',
+      imapHost: 'mail.phoenixvoyages.ca',
       imapPort: 993,
       imapTls: true,
-      smtpHost: '',
+      smtpHost: 'mail.phoenixvoyages.ca',
       smtpPort: 465,
       smtpTls: true,
-      username: '',
+      username: profile?.email || '',
       password: '',
     },
   })
+
+  // Pre-fill from profile when it loads
+  useEffect(() => {
+    if (profile?.email) {
+      form.setValue('emailAddress', profile.email)
+      form.setValue('username', profile.email)
+    }
+  }, [profile?.email])
+
+  // Signature state
+  const [tagline, setTagline] = useState(profile?.emailSignatureConfig?.tagline || '')
+  const [showAvatar, setShowAvatar] = useState(profile?.emailSignatureConfig?.showAvatar ?? false)
+  const [isSavingSignature, setIsSavingSignature] = useState(false)
+
+  // Sync signature state when profile loads
+  useEffect(() => {
+    if (profile) {
+      setTagline(profile.emailSignatureConfig?.tagline || '')
+      setShowAvatar(profile.emailSignatureConfig?.showAvatar ?? false)
+    }
+  }, [profile?.emailSignatureConfig?.tagline, profile?.emailSignatureConfig?.showAvatar])
 
   const updateAccount = useUpdateEmailAccount(editingAccountId || '')
 
@@ -105,6 +133,56 @@ export function EmailTab() {
       })
     }
   }
+
+  const handleUpdateSignature = async () => {
+    if (!profile) return
+    setIsSavingSignature(true)
+    try {
+      const signatureHtml = buildSignatureHtml({
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        designations: profile.designations,
+        jobTitle: profile.jobTitle,
+        phoneExtension: profile.phoneExtension,
+        avatarUrl: profile.avatarUrl,
+        microSiteUrl: undefined,
+        companyName: profile.agencyBusinessConfig?.agencyName || '',
+        companyPhone: profile.agencyBusinessConfig?.companyPhone,
+        companyAddress: profile.agencyBusinessConfig?.companyAddress,
+        ticoRegistration: profile.agencyBusinessConfig?.ticoRegistration,
+        tagline: tagline || undefined,
+        showAvatar,
+      })
+      await updateProfile.mutateAsync({
+        emailSignatureConfig: {
+          ...profile.emailSignatureConfig,
+          tagline: tagline || undefined,
+          showAvatar,
+          signatureHtml,
+        },
+      })
+    } finally {
+      setIsSavingSignature(false)
+    }
+  }
+
+  const signaturePreviewHtml = profile
+    ? buildSignatureHtml({
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        designations: profile.designations,
+        jobTitle: profile.jobTitle,
+        phoneExtension: profile.phoneExtension,
+        avatarUrl: showAvatar ? (profile.avatarUrl ?? undefined) : undefined,
+        microSiteUrl: undefined,
+        companyName: profile.agencyBusinessConfig?.agencyName || '',
+        companyPhone: profile.agencyBusinessConfig?.companyPhone,
+        companyAddress: profile.agencyBusinessConfig?.companyAddress,
+        ticoRegistration: profile.agencyBusinessConfig?.ticoRegistration,
+        tagline: tagline || undefined,
+        showAvatar,
+      })
+    : ''
 
   if (isLoading) {
     return (
@@ -208,7 +286,7 @@ export function EmailTab() {
                   id="emailAddress"
                   type="email"
                   placeholder="you@company.com"
-                  disabled={!!editingAccountId}
+                  disabled={!!editingAccountId || isPhoenixDomain}
                   {...form.register('emailAddress', { required: true })}
                 />
               </div>
@@ -231,6 +309,7 @@ export function EmailTab() {
                   <Input
                     id="imapHost"
                     placeholder="mail.company.com"
+                    disabled={isPhoenixDomain}
                     {...form.register('imapHost', { required: true })}
                   />
                 </div>
@@ -239,6 +318,7 @@ export function EmailTab() {
                   <Input
                     id="imapPort"
                     type="number"
+                    disabled={isPhoenixDomain}
                     {...form.register('imapPort', { valueAsNumber: true })}
                   />
                 </div>
@@ -246,6 +326,7 @@ export function EmailTab() {
                   <Switch
                     id="imapTls"
                     checked={form.watch('imapTls')}
+                    disabled={isPhoenixDomain}
                     onCheckedChange={(v) => form.setValue('imapTls', v)}
                   />
                   <Label htmlFor="imapTls">TLS/SSL</Label>
@@ -262,6 +343,7 @@ export function EmailTab() {
                   <Input
                     id="smtpHost"
                     placeholder="mail.company.com"
+                    disabled={isPhoenixDomain}
                     {...form.register('smtpHost', { required: true })}
                   />
                 </div>
@@ -270,6 +352,7 @@ export function EmailTab() {
                   <Input
                     id="smtpPort"
                     type="number"
+                    disabled={isPhoenixDomain}
                     {...form.register('smtpPort', { valueAsNumber: true })}
                   />
                 </div>
@@ -277,6 +360,7 @@ export function EmailTab() {
                   <Switch
                     id="smtpTls"
                     checked={form.watch('smtpTls')}
+                    disabled={isPhoenixDomain}
                     onCheckedChange={(v) => form.setValue('smtpTls', v)}
                   />
                   <Label htmlFor="smtpTls">TLS/SSL</Label>
@@ -293,6 +377,7 @@ export function EmailTab() {
                   <Input
                     id="username"
                     placeholder="you@company.com"
+                    disabled={isPhoenixDomain}
                     {...form.register('username', { required: !editingAccountId })}
                   />
                 </div>
@@ -337,18 +422,53 @@ export function EmailTab() {
               )}
             </div>
           </form>
+        </CardContent>
+      </Card>
 
-          {/* Signature link */}
-          <Alert className="mt-6">
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              To edit your email signature, go to{' '}
-              <a href="/profile?tab=preferences" className="font-medium underline">
-                Preferences &gt; Email Signature
-              </a>
-              .
-            </AlertDescription>
-          </Alert>
+      {/* Email Signature */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Email Signature</CardTitle>
+          <CardDescription>
+            Customize and preview your email signature for client communications.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Live preview */}
+          <div className="space-y-2">
+            <Label>Preview</Label>
+            <div
+              className="rounded-md border bg-white p-4 text-sm"
+              dangerouslySetInnerHTML={{ __html: signaturePreviewHtml }}
+            />
+          </div>
+
+          {/* Avatar toggle */}
+          <div className="flex items-center gap-3">
+            <Checkbox
+              id="showAvatar"
+              checked={showAvatar}
+              onCheckedChange={(checked) => setShowAvatar(checked === true)}
+            />
+            <Label htmlFor="showAvatar">Show profile photo in signature</Label>
+          </div>
+
+          {/* Tagline */}
+          <div className="space-y-2">
+            <Label htmlFor="tagline">Tagline</Label>
+            <Textarea
+              id="tagline"
+              value={tagline}
+              onChange={(e) => setTagline(e.target.value)}
+              placeholder="e.g. Crafting journeys that matter"
+              rows={2}
+            />
+          </div>
+
+          <Button onClick={handleUpdateSignature} disabled={isSavingSignature}>
+            {isSavingSignature && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Update Signature
+          </Button>
         </CardContent>
       </Card>
     </div>
