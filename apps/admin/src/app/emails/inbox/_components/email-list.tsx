@@ -166,8 +166,8 @@ function DraggableEmailItem({
           {displayName}
         </span>
         <div className="flex flex-shrink-0 items-center gap-1">
-          {/* Hover action buttons */}
-          <div className="flex items-center gap-0.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto">
+          {/* Hover action buttons — hidden from layout until hover */}
+          <div className="hidden items-center gap-0.5 group-hover:flex">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
