@@ -79,7 +79,7 @@ export function EmailList({ accountId, activeFolder, emails, selectedEmailId, on
   return (
     <TooltipProvider delayDuration={400}>
       <div className="divide-y">
-        {items.map((item, idx) => {
+        {items.map((item) => {
           if (item.type === 'separator') {
             return (
               <div key={`sep-${item.label}`} className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-muted-foreground border-b">
