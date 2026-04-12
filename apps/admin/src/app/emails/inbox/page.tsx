@@ -146,7 +146,7 @@ export default function EmailInboxPage() {
   // Manual refresh — folder-scoped
   function handleRefresh() {
     syncFolder.mutate({ folder: activeFolder, mode: 'incremental' }, {
-      onSuccess: (result) => {
+      onSuccess: () => {
         setFolderSyncState(prev => ({
           ...prev,
           [activeFolder]: { ...prev[activeFolder], lastSyncAt: Date.now() },
