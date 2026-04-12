@@ -73,70 +73,27 @@ export class ImapSyncService {
 
       await client.connect()
 
-      // Sync INBOX (primary folder for Phase 1)
-      const lock = await client.getMailboxLock('INBOX')
-      try {
-        const syncState = (account.syncState as any) ?? {}
-        const folderState = syncState?.folders?.INBOX ?? {}
-        const lastUid = folderState.lastUid ?? 0
+      // Determine folders to sync
+      const foldersToSync = ['INBOX']
+      const sentPath = await this.findSentFolder(client)
+      if (sentPath) foldersToSync.push(sentPath)
 
-        // Check if there are potentially new messages before fetching
-        const mailboxStatus = client.mailbox
-        const uidNext = mailboxStatus && typeof mailboxStatus === 'object'
-          ? Number((mailboxStatus as any).uidNext)
-          : undefined
-
-        let highestPersistedUid = lastUid
-
-        if (uidNext && uidNext <= lastUid + 1) {
-          this.logger.debug(`No new messages in INBOX (uidNext=${uidNext}, lastUid=${lastUid})`)
-        } else {
-          // Fetch new messages (metadata only — no body)
-          const fetchRange = lastUid > 0 ? `${lastUid + 1}:*` : '1:*'
-          this.logger.debug(`Fetching UIDs ${fetchRange} from INBOX (lastUid=${lastUid}, uidNext=${uidNext})`)
-          for await (const msg of client.fetch(fetchRange, {
-            envelope: true,
-            bodyStructure: true,
-            flags: true,
-            uid: true,
-          })) {
-            if (Number(msg.uid) <= lastUid) continue
-
-            try {
-              await this.upsertEmailFromImap(accountId, account.agencyId, 'INBOX', msg)
-              highestPersistedUid = Math.max(highestPersistedUid, Number(msg.uid))
-              newMessages++
-              const from = msg.envelope?.from?.[0]
-              if (from) {
-                newSenders.push(from.name || from.address || 'Unknown')
-              }
-            } catch (err: any) {
-              this.logger.error(`Failed to upsert UID ${msg.uid}: ${err.message}`, err.stack)
-              errors.push(`UID ${msg.uid}: ${err.message}`)
-            }
-          }
-        }
-
-        // Update sync state — use highestPersistedUid so failed messages are
-        // re-fetched on the next sync (we never advance past an unconfirmed UID)
-        const uidValidity = mailboxStatus && typeof mailboxStatus === 'object'
-          ? Number((mailboxStatus as any).uidValidity)
-          : undefined
-        await this.emailAccountsService.updateSyncState(accountId, {
-          ...syncState,
-          folders: {
-            ...syncState.folders,
-            INBOX: {
-              uidValidity,
-              lastUid: highestPersistedUid,
-            },
-          },
-        })
-      } finally {
-        lock.release()
+      for (const folderPath of foldersToSync) {
+        // Re-read sync state for each folder so prior folder updates are visible
+        const freshAccount = await this.emailAccountsService.getAccountById(accountId)
+        const currentSyncState = (freshAccount.syncState as any) ?? {}
+        const result = await this.syncFolder(client, accountId, account.agencyId, currentSyncState, folderPath)
+        newMessages += result.newMessages
+        newSenders.push(...result.newSenders)
+        errors.push(...result.errors)
       }
 
       await client.logout()
+
+      // Backfill NULL dates from synced_at for any previously synced emails
+      await this.db.client.execute(
+        sql`UPDATE ${this.db.schema.syncedEmails} SET date = synced_at WHERE date IS NULL AND ${this.db.schema.syncedEmails.emailAccountId} = ${accountId}`,
+      )
     } catch (error: any) {
       const detail = error.responseText || error.responseStatus || error.message
       this.logger.error(`Sync failed for account ${accountId}: ${detail}`, error.stack)
@@ -570,6 +527,98 @@ export class ImapSyncService {
     return client
   }
 
+  /**
+   * Sync a single IMAP folder — fetches new messages and upserts them.
+   */
+  private async syncFolder(
+    client: any,
+    accountId: string,
+    agencyId: string,
+    syncState: any,
+    folderPath: string,
+  ): Promise<{ newMessages: number; newSenders: string[]; errors: string[] }> {
+    let newMessages = 0
+    const newSenders: string[] = []
+    const errors: string[] = []
+
+    const lock = await client.getMailboxLock(folderPath)
+    try {
+      const folderState = syncState?.folders?.[folderPath] ?? {}
+      const lastUid = folderState.lastUid ?? 0
+
+      // Check if there are potentially new messages before fetching
+      const mailboxStatus = client.mailbox
+      const uidNext = mailboxStatus && typeof mailboxStatus === 'object'
+        ? Number((mailboxStatus as any).uidNext)
+        : undefined
+
+      let highestPersistedUid = lastUid
+
+      if (uidNext && uidNext <= lastUid + 1) {
+        this.logger.debug(`No new messages in ${folderPath} (uidNext=${uidNext}, lastUid=${lastUid})`)
+      } else {
+        // Fetch new messages (metadata only — no body)
+        const fetchRange = lastUid > 0 ? `${lastUid + 1}:*` : '1:*'
+        this.logger.debug(`Fetching UIDs ${fetchRange} from ${folderPath} (lastUid=${lastUid}, uidNext=${uidNext})`)
+        for await (const msg of client.fetch(fetchRange, {
+          envelope: true,
+          bodyStructure: true,
+          flags: true,
+          uid: true,
+          internalDate: true,
+        })) {
+          if (Number(msg.uid) <= lastUid) continue
+
+          try {
+            await this.upsertEmailFromImap(accountId, agencyId, folderPath, msg)
+            highestPersistedUid = Math.max(highestPersistedUid, Number(msg.uid))
+            newMessages++
+            const from = msg.envelope?.from?.[0]
+            if (from) {
+              newSenders.push(from.name || from.address || 'Unknown')
+            }
+          } catch (err: any) {
+            this.logger.error(`Failed to upsert UID ${msg.uid} in ${folderPath}: ${err.message}`, err.stack)
+            errors.push(`${folderPath} UID ${msg.uid}: ${err.message}`)
+          }
+        }
+      }
+
+      // Update sync state — use highestPersistedUid so failed messages are
+      // re-fetched on the next sync (we never advance past an unconfirmed UID)
+      const uidValidity = mailboxStatus && typeof mailboxStatus === 'object'
+        ? Number((mailboxStatus as any).uidValidity)
+        : undefined
+      await this.emailAccountsService.updateSyncState(accountId, {
+        ...syncState,
+        folders: {
+          ...syncState.folders,
+          [folderPath]: {
+            uidValidity,
+            lastUid: highestPersistedUid,
+          },
+        },
+      })
+    } finally {
+      lock.release()
+    }
+
+    return { newMessages, newSenders, errors }
+  }
+
+  /**
+   * Find the Sent folder path by looking for the \\Sent specialUse flag.
+   */
+  private async findSentFolder(client: any): Promise<string | null> {
+    try {
+      const folders = await client.list()
+      const sent = folders.find((f: any) => f.specialUse === '\\Sent')
+      return sent?.path ?? null
+    } catch {
+      return null
+    }
+  }
+
   private async upsertEmailFromImap(
     accountId: string,
     agencyId: string,
@@ -634,6 +683,7 @@ export class ImapSyncService {
           .set({
             imapUid: Number(msg.uid),
             folder,
+            date: msg.internalDate ?? (envelope?.date ? new Date(envelope.date) : null),
             isSeen: flags.has('\\Seen'),
             isFlagged: flags.has('\\Flagged'),
             isAnswered: flags.has('\\Answered'),
@@ -686,7 +736,7 @@ export class ImapSyncService {
         toAddresses,
         ccAddresses,
         subject: envelope?.subject,
-        date: envelope?.date ? new Date(envelope.date) : null,
+        date: msg.internalDate ?? (envelope?.date ? new Date(envelope.date) : null),
         isSeen: flags.has('\\Seen'),
         isFlagged: flags.has('\\Flagged'),
         isAnswered: flags.has('\\Answered'),
