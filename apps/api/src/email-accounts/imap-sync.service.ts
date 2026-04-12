@@ -646,7 +646,9 @@ export class ImapSyncService {
           if (uidNext && uidNext <= effectiveLastUid + 1) {
             this.logger.debug(`No new messages in ${folderPath} (uidNext=${uidNext}, lastUid=${effectiveLastUid})`)
           } else {
-            fetchRange = `${effectiveLastUid + 1}:*`
+            // Cap incremental fetch to avoid pulling entire backlog
+            const end = uidNext ? Math.min(uidNext - 1, effectiveLastUid + batchSize) : effectiveLastUid + batchSize
+            fetchRange = `${effectiveLastUid + 1}:${end}`
             skipLowUid = effectiveLastUid
           }
         } else {
@@ -716,7 +718,11 @@ export class ImapSyncService {
             updatedFolderState.oldestSyncedUid = lowestPersistedUid
           }
         }
-        if (lowestPersistedUid <= 1 || newMessages < batchSize) {
+        // Mark exhausted based on cursor position, not row count.
+        // UID gaps from deletions/expunges can yield fewer messages than batchSize
+        // even when older mail still exists.
+        const effectiveOldest = updatedFolderState.oldestSyncedUid ?? lowestPersistedUid
+        if (effectiveOldest <= 1 || (mode === 'hydrate_older' && fetchRange && fetchRange.startsWith('1:'))) {
           updatedFolderState.historyExhausted = true
           historyExhausted = true
         }

@@ -72,8 +72,15 @@ export function EmailList({ accountId, activeFolder, emails, selectedEmailId, on
 
   if (emails.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-        No emails in this folder.
+      <div className="flex flex-col items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+        {isSyncingFolder ? (
+          <>
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>Loading emails...</span>
+          </>
+        ) : (
+          'No emails in this folder.'
+        )}
       </div>
     )
   }

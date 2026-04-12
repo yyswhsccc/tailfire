@@ -11,7 +11,6 @@ import type {
   SyncedEmailResponseDto,
   SyncedEmailDetailDto,
   EmailFolderDto,
-  SyncResultDto,
   EmailLogResponse,
   PaginatedEmailLogsResponse,
 } from '@tailfire/shared-types/api'
@@ -461,13 +460,14 @@ export function useSyncEmails(accountId: string | null) {
   return useMutation({
     mutationFn: () => {
       if (!accountId) throw new Error('No account selected')
-      return api.post<SyncResultDto>(`/email-accounts/${accountId}/sync`, {})
+      return api.post<{ fetched: number; folder: string; historyExhausted?: boolean }>(`/email-accounts/${accountId}/sync`, {})
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['emails-infinite'] })
       toast({
         title: 'Sync complete',
-        description: `${result.newMessages} new message(s) synced.`,
+        description: `${result.fetched} new message(s) synced.`,
       })
     },
     onError: (error: any) => {
