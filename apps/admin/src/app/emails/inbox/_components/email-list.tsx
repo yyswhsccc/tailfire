@@ -1,9 +1,11 @@
 'use client'
 
+import { useRef, useEffect } from 'react'
 import { format, isToday, isYesterday, isThisYear } from 'date-fns'
 import { useDraggable } from '@dnd-kit/core'
-import { Mail, MailOpen, Paperclip, Star, Trash2 } from 'lucide-react'
+import { Loader2, Mail, MailOpen, Paperclip, Star, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { groupEmailsByPeriod } from '@/lib/email/group-emails-by-period'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -22,6 +24,10 @@ interface EmailListProps {
   emails: SyncedEmailResponseDto[]
   selectedEmailId: string | null
   onSelectEmail: (emailId: string) => void
+  sortBy?: string
+  hasNextPage?: boolean
+  isFetchingNextPage?: boolean
+  fetchNextPage?: () => void
 }
 
 function formatEmailDate(dateStr: string | null): string {
@@ -38,9 +44,29 @@ function formatEmailDateFull(dateStr: string | null): string {
   return format(new Date(dateStr), 'MMM d, yyyy h:mm a')
 }
 
-export function EmailList({ accountId, activeFolder, emails, selectedEmailId, onSelectEmail }: EmailListProps) {
+export function EmailList({ accountId, activeFolder, emails, selectedEmailId, onSelectEmail, sortBy, hasNextPage, isFetchingNextPage, fetchNextPage }: EmailListProps) {
   const updateFlags = useUpdateEmailFlags(accountId)
   const deleteEmail = useDeleteEmail(accountId)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!sentinelRef.current || !hasNextPage || !fetchNextPage) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          fetchNextPage()
+        }
+      },
+      { threshold: 0.1 }
+    )
+    observer.observe(sentinelRef.current)
+    return () => observer.disconnect()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  const isDateSorted = !sortBy || sortBy === 'date-desc' || sortBy === 'date-asc'
+  const items = isDateSorted
+    ? groupEmailsByPeriod(emails)
+    : emails.map(e => ({ type: 'email' as const, email: e }))
 
   if (emails.length === 0) {
     return (
@@ -53,18 +79,34 @@ export function EmailList({ accountId, activeFolder, emails, selectedEmailId, on
   return (
     <TooltipProvider delayDuration={400}>
       <div className="divide-y">
-        {emails.map((email) => (
-          <DraggableEmailItem
-            key={email.id}
-            email={email}
-            isSelected={email.id === selectedEmailId}
-            accountId={accountId}
-            activeFolder={activeFolder}
-            onSelectEmail={onSelectEmail}
-            updateFlags={updateFlags}
-            deleteEmail={deleteEmail}
-          />
-        ))}
+        {items.map((item) => {
+          if (item.type === 'separator') {
+            return (
+              <div key={`sep-${item.label}`} className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-muted-foreground border-b">
+                {item.label}
+              </div>
+            )
+          }
+          return (
+            <DraggableEmailItem
+              key={item.email.id}
+              email={item.email}
+              isSelected={item.email.id === selectedEmailId}
+              accountId={accountId}
+              activeFolder={activeFolder}
+              onSelectEmail={onSelectEmail}
+              updateFlags={updateFlags}
+              deleteEmail={deleteEmail}
+            />
+          )
+        })}
+        {/* Infinite scroll sentinel */}
+        <div ref={sentinelRef} className="h-1" />
+        {isFetchingNextPage && (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        )}
       </div>
     </TooltipProvider>
   )
@@ -94,7 +136,7 @@ function DraggableEmailItem({
 
   const displayName = email.isOutbound
     ? email.toAddresses[0]?.name || email.toAddresses[0]?.address || 'Unknown'
-    : email.fromName || email.fromAddress || 'Unknown'
+    : email.resolvedFromName || email.fromName || email.fromAddress || 'Unknown'
 
   return (
     <div
@@ -124,8 +166,8 @@ function DraggableEmailItem({
           {displayName}
         </span>
         <div className="flex flex-shrink-0 items-center gap-1">
-          {/* Hover action buttons */}
-          <div className="flex items-center gap-0.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto">
+          {/* Hover action buttons — hidden from layout until hover */}
+          <div className="hidden items-center gap-0.5 group-hover:flex">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -141,9 +183,9 @@ function DraggableEmailItem({
                   }}
                 >
                   {email.isSeen ? (
-                    <Mail className="h-3.5 w-3.5" />
-                  ) : (
                     <MailOpen className="h-3.5 w-3.5" />
+                  ) : (
+                    <Mail className="h-3.5 w-3.5" />
                   )}
                 </Button>
               </TooltipTrigger>
@@ -219,7 +261,7 @@ function DraggableEmailItem({
         <span
           className={cn(
             'truncate text-sm',
-            !email.isSeen ? 'font-medium text-foreground' : 'text-foreground',
+            !email.isSeen ? 'font-semibold text-foreground' : 'text-muted-foreground',
           )}
         >
           {email.subject || '(no subject)'}
@@ -235,7 +277,10 @@ function DraggableEmailItem({
       </div>
 
       {email.snippet && (
-        <p className="truncate text-xs text-muted-foreground">{email.snippet}</p>
+        <p className={cn(
+          'truncate text-xs',
+          !email.isSeen ? 'text-foreground/70' : 'text-muted-foreground',
+        )}>{email.snippet}</p>
       )}
     </div>
   )

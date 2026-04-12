@@ -104,34 +104,36 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
 
   return (
     <>
-      <nav className="space-y-1">
-        {folders.map((folder) => (
-          <DroppableFolderItem
-            key={folder.path}
-            folder={folder}
-            isActive={folder.path === activeFolder}
-            onSelectFolder={onSelectFolder}
-            onRename={(f) => {
-              setTargetFolder(f)
-              setRenameTo(f.name)
-              setShowRenameDialog(true)
-            }}
-            onDelete={(f) => {
-              setTargetFolder(f)
-              setShowDeleteConfirm(true)
-            }}
-          />
-        ))}
+      <div className="flex flex-col min-h-0 h-full">
+        <nav className="flex-1 overflow-y-auto min-h-0 space-y-1">
+          {folders.map((folder) => (
+            <DroppableFolderItem
+              key={folder.path}
+              folder={folder}
+              isActive={folder.path === activeFolder}
+              onSelectFolder={onSelectFolder}
+              onRename={(f) => {
+                setTargetFolder(f)
+                setRenameTo(f.name)
+                setShowRenameDialog(true)
+              }}
+              onDelete={(f) => {
+                setTargetFolder(f)
+                setShowDeleteConfirm(true)
+              }}
+            />
+          ))}
 
-        {/* New Folder button */}
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
-        >
-          <FolderPlus className="h-4 w-4" />
-          New Folder
-        </button>
-      </nav>
+          {/* New Folder button */}
+          <button
+            onClick={() => setShowCreateDialog(true)}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+          >
+            <FolderPlus className="h-4 w-4" />
+            New Folder
+          </button>
+        </nav>
+      </div>
 
       {/* Create Folder Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>

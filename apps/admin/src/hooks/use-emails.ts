@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type {
   SyncedEmailResponseDto,
@@ -27,6 +27,11 @@ export const emailLogKeys = {
   list: (contactId: string, search?: string) =>
     [...emailLogKeys.all, contactId, search] as const,
   detail: (logId: string) => [...emailLogKeys.all, 'detail', logId] as const,
+}
+
+export const infiniteEmailKeys = {
+  list: (accountId: string, folder: string, search?: string) =>
+    ['emails-infinite', accountId, folder, search] as const,
 }
 
 export const emailKeys = {
@@ -104,6 +109,34 @@ export function useEmailLogDetail(logId: string | null) {
   })
 }
 
+export function useInfiniteEmails(
+  accountId: string | null,
+  filters: { folder?: string; search?: string; limit?: number },
+) {
+  const folder = filters.folder || 'INBOX'
+  const limit = filters.limit || 50
+
+  return useInfiniteQuery({
+    queryKey: infiniteEmailKeys.list(accountId || '', folder, filters.search),
+    queryFn: async ({ pageParam = 1 }) => {
+      const params = new URLSearchParams()
+      params.set('folder', folder)
+      if (filters.search) params.set('search', filters.search)
+      params.set('page', String(pageParam))
+      params.set('limit', String(limit))
+      return api.get<{ emails: SyncedEmailResponseDto[]; total: number }>(
+        `/email-accounts/${accountId}/emails?${params.toString()}`,
+      )
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p) => sum + p.emails.length, 0)
+      return loaded < lastPage.total ? allPages.length + 1 : undefined
+    },
+    enabled: !!accountId,
+  })
+}
+
 /**
  * Lightweight hook for top nav unread badge.
  * Fetches accounts + INBOX folder unseen count with 60s stale time.
@@ -175,8 +208,42 @@ export function useUpdateEmailFlags(accountId: string | null) {
         flags,
       )
     },
-    onSuccess: () => {
+    onMutate: async (params) => {
+      // Optimistic update — apply flag changes immediately in both regular and infinite caches
+      const { emailId, ...flags } = params
+
+      // Update regular query caches (useEmails consumers)
+      const regularCache = queryClient.getQueriesData<{ emails: SyncedEmailResponseDto[]; total: number }>({
+        queryKey: [...emailKeys.all, accountId || ''],
+      })
+      for (const [key, data] of regularCache) {
+        if (!data?.emails) continue
+        const updated = data.emails.map((e) =>
+          e.id === emailId ? { ...e, ...flags } : e
+        )
+        queryClient.setQueryData(key, { ...data, emails: updated })
+      }
+
+      // Update infinite query caches (useInfiniteEmails consumers)
+      queryClient.setQueriesData<{ pages: { emails: SyncedEmailResponseDto[]; total: number }[]; pageParams: number[] }>(
+        { queryKey: ['emails-infinite'] },
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              emails: page.emails.map((e) =>
+                e.id === emailId ? { ...e, ...flags } : e
+              ),
+            })),
+          }
+        }
+      )
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['emails-infinite'] })
     },
   })
 }
