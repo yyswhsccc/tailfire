@@ -183,6 +183,7 @@ export function useSendEmail(accountId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['emails-infinite'] })
       toast({ title: 'Email sent' })
     },
     onError: (error: Error) => {
