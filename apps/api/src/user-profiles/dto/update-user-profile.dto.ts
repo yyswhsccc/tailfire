@@ -119,6 +119,13 @@ export class PlatformPreferencesDto {
   @IsOptional()
   @IsString()
   onboardingCompletedAt?: string | null
+
+  @IsOptional()
+  trustedImageDomains?: string[]
+
+  @IsOptional()
+  @IsObject()
+  emailPaneWidths?: Record<string, number>
 }
 
 export class LicensingInfoDto {
