@@ -19,6 +19,7 @@ export const QUEUES = {
   DOCUMENT_RENDER: 'document-render',
   EMAIL_SYNC: 'email-sync',
   VACATION_SEARCH: 'vacation-search',
+  EMAIL_WRITEBACK: 'email-writeback',
 } as const
 
 // Alias for backward compatibility
@@ -91,6 +92,9 @@ export const JOB_TYPES = {
   // Vacation pricing jobs
   VACATION_SEARCH: 'vacation_search',
   VACATION_HOTEL_ENRICHMENT: 'vacation_hotel_enrichment',
+
+  // Email writeback jobs (queue registered in EmailAccountsModule)
+  EMAIL_WRITEBACK_FLAGS: 'email.writeback.flags',
 } as const
 
 export type JobType = (typeof JOB_TYPES)[keyof typeof JOB_TYPES]

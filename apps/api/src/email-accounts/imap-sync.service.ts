@@ -73,66 +73,27 @@ export class ImapSyncService {
 
       await client.connect()
 
-      // Sync INBOX (primary folder for Phase 1)
-      const lock = await client.getMailboxLock('INBOX')
-      try {
-        const syncState = (account.syncState as any) ?? {}
-        const folderState = syncState?.folders?.INBOX ?? {}
-        const lastUid = folderState.lastUid ?? 0
+      // Determine folders to sync
+      const foldersToSync = ['INBOX']
+      const sentPath = await this.findSentFolder(client)
+      if (sentPath) foldersToSync.push(sentPath)
 
-        // Check if there are potentially new messages before fetching
-        const mailboxStatus = client.mailbox
-        const uidNext = mailboxStatus && typeof mailboxStatus === 'object'
-          ? Number((mailboxStatus as any).uidNext)
-          : undefined
-
-        if (uidNext && uidNext <= lastUid + 1) {
-          this.logger.debug(`No new messages in INBOX (uidNext=${uidNext}, lastUid=${lastUid})`)
-        } else {
-          // Fetch new messages (metadata only — no body)
-          const fetchRange = lastUid > 0 ? `${lastUid + 1}:*` : '1:*'
-          this.logger.debug(`Fetching UIDs ${fetchRange} from INBOX (lastUid=${lastUid}, uidNext=${uidNext})`)
-          for await (const msg of client.fetch(fetchRange, {
-            envelope: true,
-            bodyStructure: true,
-            flags: true,
-            uid: true,
-          })) {
-            if (Number(msg.uid) <= lastUid) continue
-
-            try {
-              await this.upsertEmailFromImap(accountId, account.agencyId, 'INBOX', msg)
-              newMessages++
-              const from = msg.envelope?.from?.[0]
-              if (from) {
-                newSenders.push(from.name || from.address || 'Unknown')
-              }
-            } catch (err: any) {
-              this.logger.error(`Failed to upsert UID ${msg.uid}: ${err.message}`, err.stack)
-              errors.push(`UID ${msg.uid}: ${err.message}`)
-            }
-          }
-        }
-
-        // Update sync state
-        const uidValidity = mailboxStatus && typeof mailboxStatus === 'object'
-          ? Number((mailboxStatus as any).uidValidity)
-          : undefined
-        await this.emailAccountsService.updateSyncState(accountId, {
-          ...syncState,
-          folders: {
-            ...syncState.folders,
-            INBOX: {
-              uidValidity,
-              lastUid: uidNext ? uidNext - 1 : lastUid,
-            },
-          },
-        })
-      } finally {
-        lock.release()
+      for (const folderPath of foldersToSync) {
+        // Re-read sync state for each folder so prior folder updates are visible
+        const freshAccount = await this.emailAccountsService.getAccountById(accountId)
+        const currentSyncState = (freshAccount.syncState as any) ?? {}
+        const result = await this.syncFolder(client, accountId, account.agencyId, currentSyncState, folderPath)
+        newMessages += result.newMessages
+        newSenders.push(...result.newSenders)
+        errors.push(...result.errors)
       }
 
       await client.logout()
+
+      // Backfill NULL dates from synced_at for any previously synced emails
+      await this.db.client.execute(
+        sql`UPDATE ${this.db.schema.syncedEmails} SET date = synced_at WHERE date IS NULL AND ${this.db.schema.syncedEmails.emailAccountId} = ${accountId}`,
+      )
     } catch (error: any) {
       const detail = error.responseText || error.responseStatus || error.message
       this.logger.error(`Sync failed for account ${accountId}: ${detail}`, error.stack)
@@ -566,6 +527,98 @@ export class ImapSyncService {
     return client
   }
 
+  /**
+   * Sync a single IMAP folder — fetches new messages and upserts them.
+   */
+  private async syncFolder(
+    client: any,
+    accountId: string,
+    agencyId: string,
+    syncState: any,
+    folderPath: string,
+  ): Promise<{ newMessages: number; newSenders: string[]; errors: string[] }> {
+    let newMessages = 0
+    const newSenders: string[] = []
+    const errors: string[] = []
+
+    const lock = await client.getMailboxLock(folderPath)
+    try {
+      const folderState = syncState?.folders?.[folderPath] ?? {}
+      const lastUid = folderState.lastUid ?? 0
+
+      // Check if there are potentially new messages before fetching
+      const mailboxStatus = client.mailbox
+      const uidNext = mailboxStatus && typeof mailboxStatus === 'object'
+        ? Number((mailboxStatus as any).uidNext)
+        : undefined
+
+      let highestPersistedUid = lastUid
+
+      if (uidNext && uidNext <= lastUid + 1) {
+        this.logger.debug(`No new messages in ${folderPath} (uidNext=${uidNext}, lastUid=${lastUid})`)
+      } else {
+        // Fetch new messages (metadata only — no body)
+        const fetchRange = lastUid > 0 ? `${lastUid + 1}:*` : '1:*'
+        this.logger.debug(`Fetching UIDs ${fetchRange} from ${folderPath} (lastUid=${lastUid}, uidNext=${uidNext})`)
+        for await (const msg of client.fetch(fetchRange, {
+          envelope: true,
+          bodyStructure: true,
+          flags: true,
+          uid: true,
+          internalDate: true,
+        })) {
+          if (Number(msg.uid) <= lastUid) continue
+
+          try {
+            await this.upsertEmailFromImap(accountId, agencyId, folderPath, msg)
+            highestPersistedUid = Math.max(highestPersistedUid, Number(msg.uid))
+            newMessages++
+            const from = msg.envelope?.from?.[0]
+            if (from) {
+              newSenders.push(from.name || from.address || 'Unknown')
+            }
+          } catch (err: any) {
+            this.logger.error(`Failed to upsert UID ${msg.uid} in ${folderPath}: ${err.message}`, err.stack)
+            errors.push(`${folderPath} UID ${msg.uid}: ${err.message}`)
+          }
+        }
+      }
+
+      // Update sync state — use highestPersistedUid so failed messages are
+      // re-fetched on the next sync (we never advance past an unconfirmed UID)
+      const uidValidity = mailboxStatus && typeof mailboxStatus === 'object'
+        ? Number((mailboxStatus as any).uidValidity)
+        : undefined
+      await this.emailAccountsService.updateSyncState(accountId, {
+        ...syncState,
+        folders: {
+          ...syncState.folders,
+          [folderPath]: {
+            uidValidity,
+            lastUid: highestPersistedUid,
+          },
+        },
+      })
+    } finally {
+      lock.release()
+    }
+
+    return { newMessages, newSenders, errors }
+  }
+
+  /**
+   * Find the Sent folder path by looking for the \\Sent specialUse flag.
+   */
+  private async findSentFolder(client: any): Promise<string | null> {
+    try {
+      const folders = await client.list()
+      const sent = folders.find((f: any) => f.specialUse === '\\Sent')
+      return sent?.path ?? null
+    } catch {
+      return null
+    }
+  }
+
   private async upsertEmailFromImap(
     accountId: string,
     agencyId: string,
@@ -592,8 +645,11 @@ export class ImapSyncService {
 
     const matchedContactIds = await this.matchContacts(agencyId, allAddresses)
 
-    // Compute thread ID
-    const threadId = await this.computeThreadId(accountId, envelope?.messageId, envelope?.inReplyTo)
+    // Compute thread ID — considers inReplyTo and References header
+    const referencesRaw = Array.isArray(envelope?.references)
+      ? envelope.references.join(' ')
+      : envelope?.references
+    const threadId = await this.computeThreadId(accountId, envelope?.messageId, envelope?.inReplyTo, referencesRaw)
 
     // Determine outbound direction
     const account = await this.emailAccountsService.getAccountById(accountId)
@@ -602,7 +658,10 @@ export class ImapSyncService {
     // Dedup: Check if this outbound message was already saved by sendRaw (imapUid=null)
     if (envelope?.messageId) {
       const [existing] = await this.db.client
-        .select({ id: this.db.schema.syncedEmails.id })
+        .select({
+          id: this.db.schema.syncedEmails.id,
+          threadId: this.db.schema.syncedEmails.threadId,
+        })
         .from(this.db.schema.syncedEmails)
         .where(
           and(
@@ -614,18 +673,24 @@ export class ImapSyncService {
         .limit(1)
 
       if (existing) {
+        // Preserve the existing threadId if it is already set; otherwise use
+        // the threadId we just computed (which may have backfilled a parent).
+        const resolvedThreadId = existing.threadId ?? threadId
+
         // Update the provisional row with the real IMAP UID and flags
         await this.db.client
           .update(this.db.schema.syncedEmails)
           .set({
             imapUid: Number(msg.uid),
             folder,
+            date: msg.internalDate ?? (envelope?.date ? new Date(envelope.date) : null),
             isSeen: flags.has('\\Seen'),
             isFlagged: flags.has('\\Flagged'),
             isAnswered: flags.has('\\Answered'),
             isDraft: flags.has('\\Draft'),
             hasAttachments: attachments.length > 0,
             sizeBytes: msg.size != null ? Number(msg.size) : null,
+            threadId: resolvedThreadId,
             updatedAt: new Date(),
           })
           .where(eq(this.db.schema.syncedEmails.id, existing.id))
@@ -671,7 +736,7 @@ export class ImapSyncService {
         toAddresses,
         ccAddresses,
         subject: envelope?.subject,
-        date: envelope?.date ? new Date(envelope.date) : null,
+        date: msg.internalDate ?? (envelope?.date ? new Date(envelope.date) : null),
         isSeen: flags.has('\\Seen'),
         isFlagged: flags.has('\\Flagged'),
         isAnswered: flags.has('\\Answered'),
@@ -763,28 +828,58 @@ export class ImapSyncService {
 
   private async computeThreadId(
     accountId: string,
-    _messageId?: string,
+    messageId?: string,
     inReplyTo?: string,
-  ): Promise<string | null> {
-    if (!inReplyTo) return null
-
-    // Look for existing email with matching messageId
-    const [existing] = await this.db.client
-      .select({ threadId: this.db.schema.syncedEmails.threadId })
-      .from(this.db.schema.syncedEmails)
-      .where(
-        and(
-          eq(this.db.schema.syncedEmails.emailAccountId, accountId),
-          eq(this.db.schema.syncedEmails.messageId, inReplyTo),
-        ),
-      )
-      .limit(1)
-
-    if (existing?.threadId) {
-      return existing.threadId
+    referencesHeader?: string,
+  ): Promise<string> {
+    // Build a list of candidate parent message-IDs to search for
+    const candidateIds: string[] = []
+    if (inReplyTo) candidateIds.push(inReplyTo)
+    if (referencesHeader) {
+      // References is a space-separated list of message-IDs
+      const refs = referencesHeader.split(/\s+/).filter(Boolean)
+      for (const ref of refs) {
+        if (!candidateIds.includes(ref)) candidateIds.push(ref)
+      }
     }
 
-    // Generate a new thread ID (first email in the thread)
+    if (candidateIds.length > 0) {
+      // Look for any existing email whose messageId matches one of the candidates
+      const [existing] = await this.db.client
+        .select({
+          id: this.db.schema.syncedEmails.id,
+          threadId: this.db.schema.syncedEmails.threadId,
+        })
+        .from(this.db.schema.syncedEmails)
+        .where(
+          and(
+            eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+            sql`${this.db.schema.syncedEmails.messageId} IN (${sql.join(
+              candidateIds.map((id) => sql`${id}`),
+              sql`, `,
+            )})`,
+          ),
+        )
+        .limit(1)
+
+      if (existing) {
+        if (existing.threadId) {
+          // Matched email already belongs to a thread — join it
+          return existing.threadId
+        }
+
+        // Matched email exists but has no threadId yet — create a thread and
+        // backfill the matched email so the whole conversation is linked
+        const newThreadId = crypto.randomUUID()
+        await this.db.client
+          .update(this.db.schema.syncedEmails)
+          .set({ threadId: newThreadId, updatedAt: new Date() })
+          .where(eq(this.db.schema.syncedEmails.id, existing.id))
+        return newThreadId
+      }
+    }
+
+    // No parent found — this message starts a new thread
     return crypto.randomUUID()
   }
 }

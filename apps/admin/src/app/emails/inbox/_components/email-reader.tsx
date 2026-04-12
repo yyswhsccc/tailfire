@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import {
   Download,
@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/tooltip'
 import { sanitizeEmailHtml } from '@/lib/sanitize-email-html'
 import { useEmailDetail, useUpdateEmailFlags, useDeleteEmail } from '@/hooks/use-emails'
+import { useMyProfile, useUpdateMyProfile } from '@/hooks/use-user-profile'
 import { useEmailStore } from '@/stores/email.store'
 import { ContactMatchBanner } from './contact-match-banner'
 import { MoveToFolderDropdown } from './move-to-folder-dropdown'
@@ -52,6 +53,12 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
   const deleteEmail = useDeleteEmail(accountId)
   const openCompose = useEmailStore((s) => s.openCompose)
   const setSelectedEmailId = useEmailStore((s) => s.setSelectedEmailId)
+  const [forceShowImages, setForceShowImages] = useState(false)
+  const { data: profile } = useMyProfile()
+  const updateProfile = useUpdateMyProfile()
+
+  // Reset forceShowImages when email changes
+  useEffect(() => setForceShowImages(false), [emailId])
 
   // Auto-mark as read when email is opened
   useEffect(() => {
@@ -60,10 +67,29 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
     }
   }, [email?.id, email?.isSeen]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sanitizedHtml = useMemo(() => {
-    if (!email?.bodyHtml) return null
-    return sanitizeEmailHtml(email.bodyHtml)
-  }, [email?.bodyHtml])
+  const trustedDomains = (profile?.platformPreferences as any)?.trustedImageDomains ?? []
+  const senderDomain = email?.fromAddress?.split('@')[1]?.toLowerCase()
+
+  const { html: sanitizedBody, hasBlockedImages } = useMemo(() => {
+    if (!email?.bodyHtml) return { html: '', hasBlockedImages: false }
+    return sanitizeEmailHtml(email.bodyHtml, {
+      trustedDomains,
+      allowAllImages: forceShowImages,
+    })
+  }, [email?.bodyHtml, trustedDomains, forceShowImages]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleTrustDomain(domain: string) {
+    const current = (profile?.platformPreferences as any)?.trustedImageDomains ?? []
+    if (!current.includes(domain)) {
+      updateProfile.mutate({
+        platformPreferences: {
+          ...(profile?.platformPreferences as object),
+          trustedImageDomains: [...current, domain],
+        },
+      })
+    }
+    setForceShowImages(true)
+  }
 
   if (isLoading) {
     return (
@@ -259,10 +285,23 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-4">
-        {sanitizedHtml ? (
+        {hasBlockedImages && !forceShowImages && (
+          <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 mb-3">
+            <span className="flex-1">Images from this sender are hidden for privacy.</span>
+            <Button variant="link" size="sm" className="h-auto p-0 text-amber-700 underline" onClick={() => setForceShowImages(true)}>
+              Load images
+            </Button>
+            {senderDomain && (
+              <Button variant="link" size="sm" className="h-auto p-0 text-amber-700 underline" onClick={() => handleTrustDomain(senderDomain)}>
+                Always load from @{senderDomain}
+              </Button>
+            )}
+          </div>
+        )}
+        {sanitizedBody && email.bodyHtml ? (
           <div
             className="prose prose-sm max-w-none dark:prose-invert"
-            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizedBody }}
           />
         ) : email.bodyText ? (
           <pre className="whitespace-pre-wrap text-sm">{email.bodyText}</pre>
