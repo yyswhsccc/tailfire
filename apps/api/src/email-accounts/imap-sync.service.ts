@@ -95,12 +95,13 @@ export class ImapSyncService {
       const detail = error.responseText || error.responseStatus || error.message
       this.logger.error(`Sync failed for account ${accountId}: ${detail}`, error.stack)
       await this.handleImapAuthFailure(error, accountId, (account.syncState as Record<string, unknown>) ?? {})
+      const errorDetail = error.responseText ? `${error.message}: ${error.responseText}` : error.message
       await this.emailAccountsService.updateSyncState(
         accountId,
         (account.syncState as Record<string, unknown>) ?? {},
-        error.message,
+        errorDetail,
       )
-      errors.push(error.message)
+      errors.push(errorDetail)
     }
 
     // Notify account owner of new emails
@@ -511,6 +512,7 @@ export class ImapSyncService {
       })
 
       await client.connect()
+      this.logger.debug(`On-demand sync: connected to ${account.imapHost} for ${folder} (mode=${mode})`)
       try {
         const result = await this.syncFolder(client, accountId, account.agencyId, syncState, folder, { mode, batchSize })
         // syncFolder already persists sync state — no need to call updateSyncState again
@@ -522,6 +524,10 @@ export class ImapSyncService {
       const detail = error.responseText || error.responseStatus || error.message
       this.logger.error(`On-demand sync failed for ${folder} (account ${accountId}): ${detail}`, error.stack)
       await this.handleImapAuthFailure(error, accountId, syncState)
+      // Enrich error message with IMAP server response for better Sentry visibility
+      if (error.responseText && error.message === 'Command failed') {
+        error.message = `IMAP command failed: ${error.responseText}`
+      }
       throw error
     }
   }
