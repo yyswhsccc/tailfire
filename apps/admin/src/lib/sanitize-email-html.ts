@@ -26,15 +26,21 @@ export function sanitizeEmailHtml(html: string, options?: SanitizeOptions): { ht
     ADD_ATTR: ['target'],
   })
 
-  if (options?.allowAllImages) {
-    return { html: clean, hasBlockedImages: false }
-  }
-
-  // Parse and strip remote images
+  // Parse DOM for link rewriting and image blocking
   const parser = typeof window !== 'undefined' ? new DOMParser() : null
   if (!parser) return { html: clean, hasBlockedImages: false }
 
   const doc = parser.parseFromString(clean, 'text/html')
+
+  // Force all links to open in a new tab
+  doc.querySelectorAll('a[href]').forEach((a) => {
+    a.setAttribute('target', '_blank')
+    a.setAttribute('rel', 'noopener noreferrer')
+  })
+
+  if (options?.allowAllImages) {
+    return { html: doc.body.innerHTML, hasBlockedImages: false }
+  }
 
   // Block remote img[src]
   doc.querySelectorAll('img[src]').forEach((img) => {
