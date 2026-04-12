@@ -314,15 +314,16 @@ function FolderTreeItem({
   onDelete: (folder: EmailFolderDto) => void
 }) {
   const hasChildren = node.children.length > 0
-  const isExpanded = expandedFolders.has(node.folder.path)
+  const isInbox = node.folder.specialUse === '\\Inbox' || node.folder.path === 'INBOX'
+  const isExpanded = isInbox || expandedFolders.has(node.folder.path)
 
   return (
     <div>
       <div className="flex items-center" style={{ paddingLeft: `${node.depth * 16}px` }}>
-        {/* Expand/collapse chevron for parents */}
+        {/* Expand/collapse chevron for parents (INBOX always expanded) */}
         {hasChildren ? (
           <button
-            onClick={(e) => { e.stopPropagation(); onToggleExpanded(node.folder.path) }}
+            onClick={(e) => { e.stopPropagation(); if (!isInbox) onToggleExpanded(node.folder.path) }}
             className="flex-shrink-0 p-0.5 text-muted-foreground hover:text-foreground"
           >
             {isExpanded ? (
