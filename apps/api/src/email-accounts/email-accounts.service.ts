@@ -1,7 +1,11 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
+import { Injectable, BadRequestException, NotFoundException, HttpException, HttpStatus, Logger } from '@nestjs/common'
+import { InjectQueue } from '@nestjs/bullmq'
+import { Queue } from 'bullmq'
 import { eq, and, ne, sql, desc, asc, ilike, or } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { EncryptionService } from '../common/encryption/encryption.service'
+import { QUEUES } from '../automation/automation.types'
+import { ImapWriteService } from './imap-write.service'
 import { CreateEmailAccountDto } from './dto/create-email-account.dto'
 import { UpdateEmailAccountDto } from './dto/update-email-account.dto'
 import { EmailFilterDto } from './dto/email-filter.dto'
@@ -14,10 +18,13 @@ import type {
 
 @Injectable()
 export class EmailAccountsService {
+  private readonly logger = new Logger(EmailAccountsService.name)
 
   constructor(
     private readonly db: DatabaseService,
     private readonly encryptionService: EncryptionService,
+    @InjectQueue(QUEUES.EMAIL_WRITEBACK) private readonly writebackQueue: Queue,
+    private readonly imapWriteService: ImapWriteService,
   ) {}
 
   // Server defaults per email domain — enforced server-side regardless of client input
@@ -455,6 +462,34 @@ export class EmailAccountsService {
       .returning()
 
     if (!updated) throw new NotFoundException('Email not found')
+
+    // Queue IMAP flag write-back (fire-and-forget)
+    // Only for inbound emails with a valid IMAP UID
+    const emailRow = await this.db.client
+      .select({
+        imapUid: this.db.schema.syncedEmails.imapUid,
+        folder: this.db.schema.syncedEmails.folder,
+        isOutbound: this.db.schema.syncedEmails.isOutbound,
+      })
+      .from(this.db.schema.syncedEmails)
+      .where(eq(this.db.schema.syncedEmails.id, emailId))
+      .limit(1)
+
+    const email = emailRow[0]
+    if (email?.imapUid && !email.isOutbound) {
+      this.writebackQueue
+        .add('email.writeback.flags', {
+          type: 'flags',
+          accountId,
+          uid: email.imapUid,
+          folder: email.folder,
+          flags,
+        })
+        .catch((err) =>
+          this.logger.warn(`Failed to queue flag writeback: ${err.message}`),
+        )
+    }
+
     return this.formatEmailResponse(updated)
   }
 
@@ -465,17 +500,94 @@ export class EmailAccountsService {
   ): Promise<void> {
     await this.findOne(accountId, userId)
 
-    const result = await this.db.client
-      .delete(this.db.schema.syncedEmails)
+    // 1. Get email details
+    const [email] = await this.db.client
+      .select({
+        id: this.db.schema.syncedEmails.id,
+        imapUid: this.db.schema.syncedEmails.imapUid,
+        folder: this.db.schema.syncedEmails.folder,
+        isOutbound: this.db.schema.syncedEmails.isOutbound,
+      })
+      .from(this.db.schema.syncedEmails)
       .where(
         and(
           eq(this.db.schema.syncedEmails.id, emailId),
           eq(this.db.schema.syncedEmails.emailAccountId, accountId),
         ),
       )
-      .returning({ id: this.db.schema.syncedEmails.id })
+      .limit(1)
 
-    if (result.length === 0) throw new NotFoundException('Email not found')
+    if (!email) throw new NotFoundException('Email not found')
+
+    // 2. IMAP delete first (move to Trash) if has UID and not outbound
+    if (email.imapUid && !email.isOutbound) {
+      try {
+        await this.imapWriteService.deleteMessage(accountId, email.imapUid, email.folder)
+      } catch (err: any) {
+        this.logger.error(`IMAP delete failed: ${err.message}`)
+        throw new HttpException('Failed to delete email on mail server', HttpStatus.BAD_GATEWAY)
+      }
+    }
+
+    // 3. Delete from DB only after IMAP succeeds
+    await this.db.client
+      .delete(this.db.schema.syncedEmails)
+      .where(eq(this.db.schema.syncedEmails.id, emailId))
+  }
+
+  async moveEmail(
+    accountId: string,
+    emailId: string,
+    userId: string,
+    targetFolder: string,
+  ): Promise<void> {
+    await this.findOne(accountId, userId)
+
+    // 1. Get email details
+    const [email] = await this.db.client
+      .select({
+        id: this.db.schema.syncedEmails.id,
+        imapUid: this.db.schema.syncedEmails.imapUid,
+        folder: this.db.schema.syncedEmails.folder,
+        isOutbound: this.db.schema.syncedEmails.isOutbound,
+      })
+      .from(this.db.schema.syncedEmails)
+      .where(
+        and(
+          eq(this.db.schema.syncedEmails.id, emailId),
+          eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+        ),
+      )
+      .limit(1)
+
+    if (!email) throw new NotFoundException('Email not found')
+
+    // 2. IMAP move first (if has UID and not outbound)
+    let newUid = email.imapUid
+    if (email.imapUid && !email.isOutbound) {
+      try {
+        const result = await this.imapWriteService.moveMessage(
+          accountId,
+          email.imapUid,
+          email.folder,
+          targetFolder,
+        )
+        newUid = result.newUid ?? email.imapUid
+      } catch (err: any) {
+        this.logger.error(`IMAP move failed: ${err.message}`)
+        throw new HttpException('Failed to move email on mail server', HttpStatus.BAD_GATEWAY)
+      }
+    }
+
+    // 3. Update DB only after IMAP succeeds
+    await this.db.client
+      .update(this.db.schema.syncedEmails)
+      .set({
+        folder: targetFolder,
+        imapUid: newUid,
+        updatedAt: new Date(),
+      })
+      .where(eq(this.db.schema.syncedEmails.id, emailId))
   }
 
   async batchUpdateFlags(

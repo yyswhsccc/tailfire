@@ -200,8 +200,7 @@ export class EmailAccountsController {
     @Param('emailId') emailId: string,
     @Body() body: { folder: string },
   ): Promise<void> {
-    await this.emailAccountsService.findOne(id, auth.userId)
-    return this.imapSyncService.moveEmail(id, emailId, body.folder)
+    return this.emailAccountsService.moveEmail(id, emailId, auth.userId, body.folder)
   }
 
   /**
