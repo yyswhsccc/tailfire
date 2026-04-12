@@ -28,6 +28,8 @@ interface EmailListProps {
   hasNextPage?: boolean
   isFetchingNextPage?: boolean
   fetchNextPage?: () => void
+  isSyncingFolder?: boolean
+  folderExhausted?: boolean
 }
 
 function formatEmailDate(dateStr: string | null): string {
@@ -44,7 +46,7 @@ function formatEmailDateFull(dateStr: string | null): string {
   return format(new Date(dateStr), 'MMM d, yyyy h:mm a')
 }
 
-export function EmailList({ accountId, activeFolder, emails, selectedEmailId, onSelectEmail, sortBy, hasNextPage, isFetchingNextPage, fetchNextPage }: EmailListProps) {
+export function EmailList({ accountId, activeFolder, emails, selectedEmailId, onSelectEmail, sortBy, hasNextPage, isFetchingNextPage, fetchNextPage, isSyncingFolder, folderExhausted }: EmailListProps) {
   const updateFlags = useUpdateEmailFlags(accountId)
   const deleteEmail = useDeleteEmail(accountId)
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -105,6 +107,17 @@ export function EmailList({ accountId, activeFolder, emails, selectedEmailId, on
         {isFetchingNextPage && (
           <div className="flex items-center justify-center py-4">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {!hasNextPage && !folderExhausted && isSyncingFolder && (
+          <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            Loading older emails from server...
+          </div>
+        )}
+        {!hasNextPage && folderExhausted && (
+          <div className="text-center py-4 text-xs text-muted-foreground">
+            All emails loaded
           </div>
         )}
       </div>

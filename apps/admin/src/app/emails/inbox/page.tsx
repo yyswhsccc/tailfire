@@ -97,6 +97,26 @@ export default function EmailInboxPage() {
     })
   }, [activeFolder, accountId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Hydrate older emails from IMAP when scroll exhausts DB pages
+  useEffect(() => {
+    if (hasNextPage || folderExhausted || !accountId || syncFolder.isPending || emailsLoading) return
+    // All DB pages loaded but IMAP may have more — hydrate older batch
+    const loaded = infiniteData?.pages.flatMap(p => p.emails).length ?? 0
+    if (loaded === 0) return // Don't hydrate if nothing loaded yet
+
+    syncFolder.mutate({ folder: activeFolder, mode: 'hydrate_older', batchSize: 50 }, {
+      onSuccess: (result) => {
+        setFolderSyncState(prev => ({
+          ...prev,
+          [activeFolder]: {
+            ...prev[activeFolder],
+            historyExhausted: result.historyExhausted ?? false,
+          },
+        }))
+      },
+    })
+  }, [hasNextPage, folderExhausted]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Client-side sorting
   const sortedEmails = useMemo(() => {
     const emails = [...allEmails]
@@ -311,6 +331,8 @@ export default function EmailInboxPage() {
                       hasNextPage={hasNextPage}
                       isFetchingNextPage={isFetchingNextPage}
                       fetchNextPage={fetchNextPage}
+                      isSyncingFolder={syncFolder.isPending}
+                      folderExhausted={folderExhausted}
                     />
                   )}
                 </div>
