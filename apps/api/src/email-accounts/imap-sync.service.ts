@@ -501,21 +501,28 @@ export class ImapSyncService {
     const credentials = await this.emailAccountsService.getDecryptedCredentials(accountId)
     const syncState = (account.syncState as any) ?? {}
 
-    const client = await this.createImapClient({
-      host: account.imapHost,
-      port: account.imapPort,
-      secure: account.imapTls,
-      user: credentials.username,
-      pass: credentials.password,
-    })
-
-    await client.connect()
     try {
-      const result = await this.syncFolder(client, accountId, account.agencyId, syncState, folder, { mode, batchSize })
-      await this.emailAccountsService.updateSyncState(accountId, syncState)
-      return { fetched: result.newMessages, folder, historyExhausted: result.historyExhausted }
-    } finally {
-      await client.logout()
+      const client = await this.createImapClient({
+        host: account.imapHost,
+        port: account.imapPort,
+        secure: account.imapTls,
+        user: credentials.username,
+        pass: credentials.password,
+      })
+
+      await client.connect()
+      try {
+        const result = await this.syncFolder(client, accountId, account.agencyId, syncState, folder, { mode, batchSize })
+        // syncFolder already persists sync state — no need to call updateSyncState again
+        return { fetched: result.newMessages, folder, historyExhausted: result.historyExhausted }
+      } finally {
+        await client.logout()
+      }
+    } catch (error: any) {
+      const detail = error.responseText || error.responseStatus || error.message
+      this.logger.error(`On-demand sync failed for ${folder} (account ${accountId}): ${detail}`, error.stack)
+      await this.handleImapAuthFailure(error, accountId, syncState)
+      throw error
     }
   }
 
