@@ -397,6 +397,24 @@ export function useMoveEmail(accountId: string | null) {
   })
 }
 
+export function useSyncFolder(accountId: string | null) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: { folder?: string; mode?: 'incremental' | 'hydrate_recent' | 'hydrate_older'; batchSize?: number }) => {
+      if (!accountId) throw new Error('No account selected')
+      return api.post<{ fetched: number; folder: string; historyExhausted?: boolean }>(
+        `/email-accounts/${accountId}/sync`,
+        params,
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['emails-infinite'] })
+      queryClient.invalidateQueries({ queryKey: emailKeys.all })
+    },
+  })
+}
+
 export function useSyncEmails(accountId: string | null) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
