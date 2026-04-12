@@ -151,15 +151,25 @@ export function ResizablePaneLayout({
   const dragStartX = React.useRef(0)
   const dragStartWidth = React.useRef(0)
 
-  // Fire onLayoutChange when layout state changes
+  // Stable ref for onLayoutChange to avoid re-render loops
+  const onLayoutChangeRef = React.useRef(onLayoutChange)
+  onLayoutChangeRef.current = onLayoutChange
+
+  // Fire onLayoutChange when layout state changes (user-initiated only)
+  const isInitialRender = React.useRef(true)
   React.useEffect(() => {
-    onLayoutChange?.({
+    // Skip the initial render to avoid loop with persisted initialLayout
+    if (isInitialRender.current) {
+      isInitialRender.current = false
+      return
+    }
+    onLayoutChangeRef.current?.({
       leftWidth,
       centerWidth,
       leftCollapsed,
       centerCollapsed,
     })
-  }, [leftWidth, centerWidth, leftCollapsed, centerCollapsed, onLayoutChange])
+  }, [leftWidth, centerWidth, leftCollapsed, centerCollapsed])
 
   // Handle mouse drag
   React.useEffect(() => {
