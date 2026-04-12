@@ -243,7 +243,7 @@ export function ResizablePaneLayout({
         />
       ) : (
         <div
-          className="flex-shrink-0 overflow-hidden"
+          className="flex-shrink-0 overflow-hidden flex flex-col"
           style={{ width: leftWidth }}
         >
           {left.children}
@@ -269,7 +269,7 @@ export function ResizablePaneLayout({
         />
       ) : (
         <div
-          className="flex-shrink-0 overflow-hidden"
+          className="flex-shrink-0 overflow-hidden flex flex-col"
           style={{ width: centerWidth }}
         >
           {center.children}
@@ -287,7 +287,7 @@ export function ResizablePaneLayout({
       />
 
       {/* Right pane (fills remaining space) */}
-      <div className="flex-1 min-w-0 overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
         {right.children}
       </div>
     </div>
