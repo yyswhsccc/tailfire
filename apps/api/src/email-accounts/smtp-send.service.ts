@@ -132,7 +132,7 @@ export class SmtpSendService {
           agencyId: account.agencyId,
           messageId: info.messageId,
           imapUid: null, // Outbound — no IMAP UID (excluded from unique partial index)
-          folder: 'Sent',
+          folder: 'INBOX.Sent',
           inReplyTo: inReplyTo ?? null,
           referencesHeader: references ?? null,
           fromAddress: account.emailAddress,
