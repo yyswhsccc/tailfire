@@ -679,7 +679,7 @@ export class ImapSyncService {
           flags: true,
           uid: true,
           internalDate: true,
-        })) {
+        }, { uid: true })) {
           if (skipLowUid > 0 && Number(msg.uid) <= skipLowUid) continue
 
           try {
