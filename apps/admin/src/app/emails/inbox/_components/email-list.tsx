@@ -183,9 +183,9 @@ function DraggableEmailItem({
                   }}
                 >
                   {email.isSeen ? (
-                    <Mail className="h-3.5 w-3.5" />
-                  ) : (
                     <MailOpen className="h-3.5 w-3.5" />
+                  ) : (
+                    <Mail className="h-3.5 w-3.5" />
                   )}
                 </Button>
               </TooltipTrigger>
@@ -261,7 +261,7 @@ function DraggableEmailItem({
         <span
           className={cn(
             'truncate text-sm',
-            !email.isSeen ? 'font-medium text-foreground' : 'text-foreground',
+            !email.isSeen ? 'font-semibold text-foreground' : 'text-muted-foreground',
           )}
         >
           {email.subject || '(no subject)'}
@@ -277,7 +277,10 @@ function DraggableEmailItem({
       </div>
 
       {email.snippet && (
-        <p className="truncate text-xs text-muted-foreground">{email.snippet}</p>
+        <p className={cn(
+          'truncate text-xs',
+          !email.isSeen ? 'text-foreground/70' : 'text-muted-foreground',
+        )}>{email.snippet}</p>
       )}
     </div>
   )
