@@ -292,7 +292,7 @@ function DroppableFolderItem({
               <Button
                 variant="ghost"
                 size="icon"
-                className="hidden h-5 w-5 group-hover:flex"
+                className="h-5 w-5 opacity-0 group-hover:opacity-100"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className="h-3 w-3" />
