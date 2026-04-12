@@ -90,6 +90,7 @@ export interface SyncedEmailResponseDto {
   folder: string
   fromAddress: string | null
   fromName: string | null
+  resolvedFromName?: string | null
   toAddresses: EmailAddressDto[]
   ccAddresses: EmailAddressDto[]
   subject: string | null
