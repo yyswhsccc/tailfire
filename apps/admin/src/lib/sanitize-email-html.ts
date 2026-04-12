@@ -4,6 +4,7 @@ const REMOTE_URL_PATTERN = /^https?:\/\//i
 
 interface SanitizeOptions {
   trustedDomains?: string[]
+  senderDomain?: string
   allowAllImages?: boolean
 }
 
@@ -38,7 +39,12 @@ export function sanitizeEmailHtml(html: string, options?: SanitizeOptions): { ht
     a.setAttribute('rel', 'noopener noreferrer')
   })
 
-  if (options?.allowAllImages) {
+  // If sender domain is trusted, allow all images from this sender
+  const senderTrusted = options?.senderDomain && options?.trustedDomains?.some(
+    d => options.senderDomain === d || options.senderDomain!.endsWith(`.${d}`)
+  )
+
+  if (options?.allowAllImages || senderTrusted) {
     return { html: doc.body.innerHTML, hasBlockedImages: false }
   }
 
