@@ -259,11 +259,12 @@ export function useDeleteEmail(accountId: string | null) {
     },
     onMutate: async (emailId) => {
       await queryClient.cancelQueries({ queryKey: emailKeys.all })
+      await queryClient.cancelQueries({ queryKey: ['emails-infinite'] })
 
+      // Optimistic remove from regular caches
       const cache = queryClient.getQueriesData<{ emails: SyncedEmailResponseDto[]; total: number }>({
         queryKey: [...emailKeys.all, accountId || ''],
       })
-
       for (const [key, data] of cache) {
         if (!data?.emails) continue
         const filtered = data.emails.filter((e) => e.id !== emailId)
@@ -271,6 +272,22 @@ export function useDeleteEmail(accountId: string | null) {
           queryClient.setQueryData(key, { emails: filtered, total: Math.max(0, data.total - 1) })
         }
       }
+
+      // Optimistic remove from infinite caches
+      queryClient.setQueriesData<{ pages: { emails: SyncedEmailResponseDto[]; total: number }[]; pageParams: number[] }>(
+        { queryKey: ['emails-infinite'] },
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              emails: page.emails.filter((e) => e.id !== emailId),
+              total: Math.max(0, page.total - 1),
+            })),
+          }
+        }
+      )
 
       return { cache }
     },
@@ -280,6 +297,7 @@ export function useDeleteEmail(accountId: string | null) {
           queryClient.setQueryData(key, data)
         }
       }
+      queryClient.invalidateQueries({ queryKey: ['emails-infinite'] })
       toast({
         title: 'Failed to delete email',
         description: _error.message,
@@ -288,6 +306,7 @@ export function useDeleteEmail(accountId: string | null) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['emails-infinite'] })
       toast({ title: 'Email deleted' })
     },
   })
@@ -364,13 +383,14 @@ export function useMoveEmail(accountId: string | null) {
     onMutate: async ({ emailId }) => {
       // Cancel in-flight queries so they don't overwrite our optimistic update
       await queryClient.cancelQueries({ queryKey: emailKeys.all })
+      await queryClient.cancelQueries({ queryKey: ['emails-infinite'] })
 
-      // Snapshot all email list caches that contain this email
+      // Snapshot regular email list caches
       const cache = queryClient.getQueriesData<{ emails: SyncedEmailResponseDto[]; total: number }>({
         queryKey: [...emailKeys.all, accountId || ''],
       })
 
-      // Optimistically remove the email from every cached list
+      // Optimistically remove from regular caches
       for (const [key, data] of cache) {
         if (!data?.emails) continue
         const filtered = data.emails.filter((e) => e.id !== emailId)
@@ -379,20 +399,39 @@ export function useMoveEmail(accountId: string | null) {
         }
       }
 
+      // Optimistically remove from infinite email caches
+      queryClient.setQueriesData<{ pages: { emails: SyncedEmailResponseDto[]; total: number }[]; pageParams: number[] }>(
+        { queryKey: ['emails-infinite'] },
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              emails: page.emails.filter((e) => e.id !== emailId),
+              total: Math.max(0, page.total - 1),
+            })),
+          }
+        }
+      )
+
       return { cache }
     },
     onError: (_error, _vars, context) => {
-      // Rollback: restore all cached lists
+      // Rollback regular caches
       if (context?.cache) {
         for (const [key, data] of context.cache) {
           queryClient.setQueryData(key, data)
         }
       }
+      // Invalidate infinite to refetch correct state
+      queryClient.invalidateQueries({ queryKey: ['emails-infinite'] })
       toast({ title: 'Failed to move email', description: _error.message, variant: 'destructive' })
     },
     onSettled: () => {
       // Refetch to reconcile with server state
       queryClient.invalidateQueries({ queryKey: emailKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['emails-infinite'] })
     },
   })
 }
