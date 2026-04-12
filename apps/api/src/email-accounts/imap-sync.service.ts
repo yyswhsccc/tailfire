@@ -86,6 +86,8 @@ export class ImapSyncService {
           ? Number((mailboxStatus as any).uidNext)
           : undefined
 
+        let highestPersistedUid = lastUid
+
         if (uidNext && uidNext <= lastUid + 1) {
           this.logger.debug(`No new messages in INBOX (uidNext=${uidNext}, lastUid=${lastUid})`)
         } else {
@@ -102,6 +104,7 @@ export class ImapSyncService {
 
             try {
               await this.upsertEmailFromImap(accountId, account.agencyId, 'INBOX', msg)
+              highestPersistedUid = Math.max(highestPersistedUid, Number(msg.uid))
               newMessages++
               const from = msg.envelope?.from?.[0]
               if (from) {
@@ -114,7 +117,8 @@ export class ImapSyncService {
           }
         }
 
-        // Update sync state
+        // Update sync state — use highestPersistedUid so failed messages are
+        // re-fetched on the next sync (we never advance past an unconfirmed UID)
         const uidValidity = mailboxStatus && typeof mailboxStatus === 'object'
           ? Number((mailboxStatus as any).uidValidity)
           : undefined
@@ -124,7 +128,7 @@ export class ImapSyncService {
             ...syncState.folders,
             INBOX: {
               uidValidity,
-              lastUid: uidNext ? uidNext - 1 : lastUid,
+              lastUid: highestPersistedUid,
             },
           },
         })
@@ -592,8 +596,11 @@ export class ImapSyncService {
 
     const matchedContactIds = await this.matchContacts(agencyId, allAddresses)
 
-    // Compute thread ID
-    const threadId = await this.computeThreadId(accountId, envelope?.messageId, envelope?.inReplyTo)
+    // Compute thread ID — considers inReplyTo and References header
+    const referencesRaw = Array.isArray(envelope?.references)
+      ? envelope.references.join(' ')
+      : envelope?.references
+    const threadId = await this.computeThreadId(accountId, envelope?.messageId, envelope?.inReplyTo, referencesRaw)
 
     // Determine outbound direction
     const account = await this.emailAccountsService.getAccountById(accountId)
@@ -602,7 +609,10 @@ export class ImapSyncService {
     // Dedup: Check if this outbound message was already saved by sendRaw (imapUid=null)
     if (envelope?.messageId) {
       const [existing] = await this.db.client
-        .select({ id: this.db.schema.syncedEmails.id })
+        .select({
+          id: this.db.schema.syncedEmails.id,
+          threadId: this.db.schema.syncedEmails.threadId,
+        })
         .from(this.db.schema.syncedEmails)
         .where(
           and(
@@ -614,6 +624,10 @@ export class ImapSyncService {
         .limit(1)
 
       if (existing) {
+        // Preserve the existing threadId if it is already set; otherwise use
+        // the threadId we just computed (which may have backfilled a parent).
+        const resolvedThreadId = existing.threadId ?? threadId
+
         // Update the provisional row with the real IMAP UID and flags
         await this.db.client
           .update(this.db.schema.syncedEmails)
@@ -626,6 +640,7 @@ export class ImapSyncService {
             isDraft: flags.has('\\Draft'),
             hasAttachments: attachments.length > 0,
             sizeBytes: msg.size != null ? Number(msg.size) : null,
+            threadId: resolvedThreadId,
             updatedAt: new Date(),
           })
           .where(eq(this.db.schema.syncedEmails.id, existing.id))
@@ -763,28 +778,58 @@ export class ImapSyncService {
 
   private async computeThreadId(
     accountId: string,
-    _messageId?: string,
+    messageId?: string,
     inReplyTo?: string,
-  ): Promise<string | null> {
-    if (!inReplyTo) return null
-
-    // Look for existing email with matching messageId
-    const [existing] = await this.db.client
-      .select({ threadId: this.db.schema.syncedEmails.threadId })
-      .from(this.db.schema.syncedEmails)
-      .where(
-        and(
-          eq(this.db.schema.syncedEmails.emailAccountId, accountId),
-          eq(this.db.schema.syncedEmails.messageId, inReplyTo),
-        ),
-      )
-      .limit(1)
-
-    if (existing?.threadId) {
-      return existing.threadId
+    referencesHeader?: string,
+  ): Promise<string> {
+    // Build a list of candidate parent message-IDs to search for
+    const candidateIds: string[] = []
+    if (inReplyTo) candidateIds.push(inReplyTo)
+    if (referencesHeader) {
+      // References is a space-separated list of message-IDs
+      const refs = referencesHeader.split(/\s+/).filter(Boolean)
+      for (const ref of refs) {
+        if (!candidateIds.includes(ref)) candidateIds.push(ref)
+      }
     }
 
-    // Generate a new thread ID (first email in the thread)
+    if (candidateIds.length > 0) {
+      // Look for any existing email whose messageId matches one of the candidates
+      const [existing] = await this.db.client
+        .select({
+          id: this.db.schema.syncedEmails.id,
+          threadId: this.db.schema.syncedEmails.threadId,
+        })
+        .from(this.db.schema.syncedEmails)
+        .where(
+          and(
+            eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+            sql`${this.db.schema.syncedEmails.messageId} IN (${sql.join(
+              candidateIds.map((id) => sql`${id}`),
+              sql`, `,
+            )})`,
+          ),
+        )
+        .limit(1)
+
+      if (existing) {
+        if (existing.threadId) {
+          // Matched email already belongs to a thread — join it
+          return existing.threadId
+        }
+
+        // Matched email exists but has no threadId yet — create a thread and
+        // backfill the matched email so the whole conversation is linked
+        const newThreadId = crypto.randomUUID()
+        await this.db.client
+          .update(this.db.schema.syncedEmails)
+          .set({ threadId: newThreadId, updatedAt: new Date() })
+          .where(eq(this.db.schema.syncedEmails.id, existing.id))
+        return newThreadId
+      }
+    }
+
+    // No parent found — this message starts a new thread
     return crypto.randomUUID()
   }
 }
