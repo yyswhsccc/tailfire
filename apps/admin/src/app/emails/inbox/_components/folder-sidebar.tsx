@@ -67,7 +67,8 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
 
   function handleCreate() {
     if (!newFolderName.trim()) return
-    const fullPath = createParentPath ? `${createParentPath}/${newFolderName.trim()}` : newFolderName.trim()
+    // IMAP hierarchy separator — cPanel/Dovecot uses '.' not '/'
+    const fullPath = createParentPath ? `${createParentPath}.${newFolderName.trim()}` : newFolderName.trim()
     createFolder.mutate(fullPath, {
       onSuccess: () => {
         setShowCreateDialog(false)
@@ -292,7 +293,7 @@ function DroppableFolderItem({
               <Button
                 variant="ghost"
                 size="icon"
-                className="hidden h-5 w-5 group-hover:flex"
+                className="h-5 w-5 opacity-0 group-hover:opacity-100"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className="h-3 w-3" />
