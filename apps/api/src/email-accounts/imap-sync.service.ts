@@ -607,6 +607,16 @@ export class ImapSyncService {
   }
 
   /**
+   * Safely parse an IMAP date value (envelope.date or internalDate).
+   * Returns null if the value is missing, empty, or produces an Invalid Date.
+   */
+  private normalizeImapDate(value: unknown): Date | null {
+    if (!value) return null
+    const d = value instanceof Date ? value : new Date(String(value))
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+
+  /**
    * Find the Sent folder path by looking for the \\Sent specialUse flag.
    */
   private async findSentFolder(client: any): Promise<string | null> {
@@ -627,6 +637,11 @@ export class ImapSyncService {
   ): Promise<void> {
     const envelope = msg.envelope
     const flags = msg.flags ?? new Set()
+
+    // Safely parse date — envelope.date can be an unparseable string
+    const headerDate = this.normalizeImapDate(envelope?.date)
+    const receivedDate = this.normalizeImapDate(msg.internalDate)
+    const emailDate = headerDate ?? receivedDate
 
     // Extract addresses
     const from = envelope?.from?.[0]
@@ -683,7 +698,7 @@ export class ImapSyncService {
           .set({
             imapUid: Number(msg.uid),
             folder,
-            date: envelope?.date ? new Date(envelope.date) : (msg.internalDate ?? null),
+            date: emailDate,
             isSeen: flags.has('\\Seen'),
             isFlagged: flags.has('\\Flagged'),
             isAnswered: flags.has('\\Answered'),
@@ -736,7 +751,7 @@ export class ImapSyncService {
         toAddresses,
         ccAddresses,
         subject: envelope?.subject,
-        date: envelope?.date ? new Date(envelope.date) : (msg.internalDate ?? null),
+        date: emailDate,
         isSeen: flags.has('\\Seen'),
         isFlagged: flags.has('\\Flagged'),
         isAnswered: flags.has('\\Answered'),
