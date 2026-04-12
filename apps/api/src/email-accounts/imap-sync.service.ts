@@ -73,20 +73,17 @@ export class ImapSyncService {
 
       await client.connect()
 
-      // Determine folders to sync
-      const foldersToSync = ['INBOX']
-      const sentPath = await this.findSentFolder(client)
-      if (sentPath) foldersToSync.push(sentPath)
-
-      for (const folderPath of foldersToSync) {
-        // Re-read sync state for each folder so prior folder updates are visible
-        const freshAccount = await this.emailAccountsService.getAccountById(accountId)
-        const currentSyncState = (freshAccount.syncState as any) ?? {}
-        const result = await this.syncFolder(client, accountId, account.agencyId, currentSyncState, folderPath)
-        newMessages += result.newMessages
-        newSenders.push(...result.newSenders)
-        errors.push(...result.errors)
-      }
+      // Background sync: INBOX only, incremental, bounded to 100 messages.
+      // Sent and other folders sync on-demand when the user opens them.
+      const freshAccount = await this.emailAccountsService.getAccountById(accountId)
+      const currentSyncState = (freshAccount.syncState as any) ?? {}
+      const result = await this.syncFolder(client, accountId, account.agencyId, currentSyncState, 'INBOX', {
+        mode: 'incremental',
+        batchSize: 100,
+      })
+      newMessages += result.newMessages
+      newSenders.push(...result.newSenders)
+      errors.push(...result.errors)
 
       await client.logout()
 
@@ -479,6 +476,38 @@ export class ImapSyncService {
       this.logger.error(`Attachment fetch failed for ${attachmentId}: ${detail}`, error.stack)
       await this.handleImapAuthFailure(error, accountId)
       throw error
+    }
+  }
+
+  /**
+   * Sync a single folder on demand (called from controller/frontend).
+   * Handles connection lifecycle and sync state persistence.
+   */
+  async syncFolderOnDemand(
+    accountId: string,
+    folder: string,
+    mode: 'incremental' | 'hydrate_recent' | 'hydrate_older',
+    batchSize?: number,
+  ): Promise<{ fetched: number; folder: string; historyExhausted?: boolean }> {
+    const account = await this.emailAccountsService.getAccountById(accountId)
+    const credentials = await this.emailAccountsService.getDecryptedCredentials(accountId)
+    const syncState = (account.syncState as any) ?? {}
+
+    const client = await this.createImapClient({
+      host: account.imapHost,
+      port: account.imapPort,
+      secure: account.imapTls,
+      user: credentials.username,
+      pass: credentials.password,
+    })
+
+    await client.connect()
+    try {
+      const result = await this.syncFolder(client, accountId, account.agencyId, syncState, folder, { mode, batchSize })
+      await this.emailAccountsService.updateSyncState(accountId, syncState)
+      return { fetched: result.newMessages, folder, historyExhausted: result.historyExhausted }
+    } finally {
+      await client.logout()
     }
   }
 

@@ -33,7 +33,6 @@ import type {
   SyncedEmailDetailDto,
   TestConnectionResultDto,
   EmailFolderDto,
-  SyncResultDto,
 } from '@tailfire/shared-types'
 
 @ApiTags('Email Accounts')
@@ -120,18 +119,24 @@ export class EmailAccountsController {
   }
 
   /**
-   * Trigger on-demand sync for an account
+   * Trigger on-demand sync for an account (folder-scoped, with mode support)
    * POST /email-accounts/:id/sync
    */
   @Post(':id/sync')
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async triggerSync(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
-  ): Promise<SyncResultDto> {
+    @Body() dto?: { folder?: string; mode?: 'incremental' | 'hydrate_recent' | 'hydrate_older'; batchSize?: number },
+  ): Promise<{ fetched: number; folder: string; historyExhausted?: boolean }> {
     await this.emailAccountsService.findOne(id, auth.userId)
-    return this.imapSyncService.syncAccount(id)
+    return this.imapSyncService.syncFolderOnDemand(
+      id,
+      dto?.folder ?? 'INBOX',
+      dto?.mode ?? 'incremental',
+      dto?.batchSize,
+    )
   }
 
   /**
