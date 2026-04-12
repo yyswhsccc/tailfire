@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useEmailAccounts } from '@/hooks/use-email-accounts'
-import { useEmailFolders, useInfiniteEmails, useSyncEmails, useSyncFolder, useMoveEmail } from '@/hooks/use-emails'
+import { useEmailFolders, useInfiniteEmails, useSyncFolder, useMoveEmail } from '@/hooks/use-emails'
 import { useEmailLayout } from '@/hooks/use-email-layout'
 import { useEmailStore, type EmailSortBy } from '@/stores/email.store'
 import { useDndSensors, dndCollisionDetection, type EmailDragData, type FolderDropData } from '@/lib/dnd-config'
@@ -60,7 +60,6 @@ export default function EmailInboxPage() {
     hasNextPage,
     fetchNextPage,
   } = useInfiniteEmails(accountId, { folder: activeFolder, search: debouncedSearch || undefined })
-  const syncEmails = useSyncEmails(accountId)
   const syncFolder = useSyncFolder(accountId)
   const moveEmail = useMoveEmail(accountId)
   const [folderSyncState, setFolderSyncState] = useState<Record<string, { lastSyncAt?: number; historyExhausted?: boolean }>>({})
@@ -143,6 +142,18 @@ export default function EmailInboxPage() {
         return emails
     }
   }, [allEmails, sortBy])
+
+  // Manual refresh — folder-scoped
+  function handleRefresh() {
+    syncFolder.mutate({ folder: activeFolder, mode: 'incremental' }, {
+      onSuccess: (result) => {
+        setFolderSyncState(prev => ({
+          ...prev,
+          [activeFolder]: { ...prev[activeFolder], lastSyncAt: Date.now() },
+        }))
+      },
+    })
+  }
 
   // DnD state
   const sensors = useDndSensors()
@@ -245,11 +256,11 @@ export default function EmailInboxPage() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => syncEmails.mutate()}
-                      disabled={syncEmails.isPending}
+                      onClick={handleRefresh}
+                      disabled={syncFolder.isPending}
                       title="Sync emails"
                     >
-                      <RefreshCw className={`h-3.5 w-3.5 ${syncEmails.isPending ? 'animate-spin' : ''}`} />
+                      <RefreshCw className={`h-3.5 w-3.5 ${syncFolder.isPending ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
                 </div>
