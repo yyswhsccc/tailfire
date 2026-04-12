@@ -171,8 +171,8 @@ export default function EmailInboxPage() {
       >
         <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-lg border">
           {/* Folder Sidebar */}
-          <div className="w-52 flex-shrink-0 border-r bg-muted/20 p-3">
-            <div className="mb-3 flex items-center justify-between">
+          <div className="w-52 flex-shrink-0 border-r bg-muted/20 p-3 min-h-0 flex flex-col">
+            <div className="mb-3 flex items-center justify-between flex-shrink-0">
               <h3 className="text-sm font-semibold">Folders</h3>
               <div className="flex gap-0.5">
                 <Button
@@ -197,7 +197,7 @@ export default function EmailInboxPage() {
               </div>
             </div>
             {isImapAuthError && (
-              <div className="mb-3 rounded-md border border-destructive/50 bg-destructive/10 p-2.5">
+              <div className="mb-3 rounded-md border border-destructive/50 bg-destructive/10 p-2.5 flex-shrink-0">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                   <div className="text-xs">
