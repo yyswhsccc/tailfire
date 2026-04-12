@@ -67,7 +67,8 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
 
   function handleCreate() {
     if (!newFolderName.trim()) return
-    const fullPath = createParentPath ? `${createParentPath}/${newFolderName.trim()}` : newFolderName.trim()
+    // IMAP hierarchy separator — cPanel/Dovecot uses '.' not '/'
+    const fullPath = createParentPath ? `${createParentPath}.${newFolderName.trim()}` : newFolderName.trim()
     createFolder.mutate(fullPath, {
       onSuccess: () => {
         setShowCreateDialog(false)
