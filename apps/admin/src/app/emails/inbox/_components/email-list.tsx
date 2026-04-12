@@ -246,12 +246,12 @@ function DraggableEmailItem({
           {/* Date (hidden on hover to make room for actions) */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="text-xs text-muted-foreground group-hover:hidden">
-                {formatEmailDate(email.date)}
+              <span className="min-w-[4rem] text-right text-xs text-muted-foreground whitespace-nowrap group-hover:hidden">
+                {formatEmailDate(email.date || email.syncedAt)}
               </span>
             </TooltipTrigger>
             <TooltipContent side="left">
-              {formatEmailDateFull(email.date)}
+              {formatEmailDateFull(email.date || email.syncedAt)}
             </TooltipContent>
           </Tooltip>
         </div>
