@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useDebouncedCallback } from '@/hooks/use-debounce'
 import { DndContext, DragOverlay, type DragStartEvent, type DragEndEvent } from '@dnd-kit/core'
 import { AlertTriangle, Loader2, Pencil, RefreshCw, Mail, Search } from 'lucide-react'
@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useEmailAccounts } from '@/hooks/use-email-accounts'
-import { useEmailFolders, useInfiniteEmails, useSyncEmails, useMoveEmail } from '@/hooks/use-emails'
+import { useEmailFolders, useInfiniteEmails, useSyncEmails, useSyncFolder, useMoveEmail } from '@/hooks/use-emails'
 import { useEmailLayout } from '@/hooks/use-email-layout'
 import { useEmailStore, type EmailSortBy } from '@/stores/email.store'
 import { useDndSensors, dndCollisionDetection, type EmailDragData, type FolderDropData } from '@/lib/dnd-config'
@@ -61,7 +61,9 @@ export default function EmailInboxPage() {
     fetchNextPage,
   } = useInfiniteEmails(accountId, { folder: activeFolder, search: debouncedSearch || undefined })
   const syncEmails = useSyncEmails(accountId)
+  const syncFolder = useSyncFolder(accountId)
   const moveEmail = useMoveEmail(accountId)
+  const [folderSyncState, setFolderSyncState] = useState<Record<string, { lastSyncAt?: number; historyExhausted?: boolean }>>({})
 
   // Flatten infinite pages
   const allEmails = useMemo(
@@ -71,6 +73,29 @@ export default function EmailInboxPage() {
 
   // Total count from first page
   const totalCount = infiniteData?.pages[0]?.total ?? 0
+
+  const folderExhausted = folderSyncState[activeFolder]?.historyExhausted ?? false
+
+  // Sync folder on change if stale (>60s since last sync)
+  useEffect(() => {
+    if (!accountId || !activeFolder || syncFolder.isPending) return
+    const state = folderSyncState[activeFolder]
+    const isStale = !state?.lastSyncAt || Date.now() - state.lastSyncAt > 60000
+    if (!isStale) return
+
+    const mode = state?.lastSyncAt ? 'incremental' : 'hydrate_recent'
+    syncFolder.mutate({ folder: activeFolder, mode, batchSize: 50 }, {
+      onSuccess: (result) => {
+        setFolderSyncState(prev => ({
+          ...prev,
+          [activeFolder]: {
+            lastSyncAt: Date.now(),
+            historyExhausted: result.historyExhausted ?? prev[activeFolder]?.historyExhausted,
+          },
+        }))
+      },
+    })
+  }, [activeFolder, accountId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Client-side sorting
   const sortedEmails = useMemo(() => {
