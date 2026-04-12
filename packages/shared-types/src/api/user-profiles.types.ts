@@ -30,6 +30,12 @@ export interface PlatformPreferencesDto {
   timezone?: string
   dateFormat?: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD'
   onboardingCompletedAt?: string | null
+  emailPaneWidths?: {
+    folders?: number
+    emailList?: number
+    foldersCollapsed?: boolean
+    emailListCollapsed?: boolean
+  }
 }
 
 export interface LicensingInfoDto {
