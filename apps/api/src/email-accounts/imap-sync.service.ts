@@ -318,6 +318,14 @@ export class ImapSyncService {
             eq(this.db.schema.syncedEmails.folder, path),
           ),
         )
+      // After successful IMAP rename, migrate sync state
+      const updatedAccount = await this.emailAccountsService.getAccountById(accountId)
+      const syncState = (updatedAccount.syncState as any) ?? {}
+      if (syncState.folders?.[path]) {
+        syncState.folders[newPath] = syncState.folders[path]
+        delete syncState.folders[path]
+        await this.emailAccountsService.updateSyncState(accountId, syncState)
+      }
     } finally {
       await client.logout()
     }
