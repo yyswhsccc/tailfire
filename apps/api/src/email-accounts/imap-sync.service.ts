@@ -727,18 +727,6 @@ export class ImapSyncService {
     return Number.isNaN(d.getTime()) ? null : d
   }
 
-  /**
-   * Find the Sent folder path by looking for the \\Sent specialUse flag.
-   */
-  private async findSentFolder(client: any): Promise<string | null> {
-    try {
-      const folders = await client.list()
-      const sent = folders.find((f: any) => f.specialUse === '\\Sent')
-      return sent?.path ?? null
-    } catch {
-      return null
-    }
-  }
 
   private async upsertEmailFromImap(
     accountId: string,
