@@ -38,6 +38,7 @@ export interface PlatformPreferencesDto {
     foldersCollapsed?: boolean
     emailListCollapsed?: boolean
   }
+  trustedImageDomains?: string[]
 }
 
 export interface LicensingInfoDto {
