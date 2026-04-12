@@ -13,6 +13,8 @@ import {
   MoreHorizontal,
   Pencil,
   FolderPlus,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -52,11 +54,50 @@ const folderIcons: Record<string, React.ReactNode> = {
 // System folders that cannot be renamed or deleted
 const PROTECTED_SPECIAL_USES = ['\\Inbox', '\\Sent', '\\Drafts', '\\Trash', '\\Junk']
 
+interface FolderTreeNode {
+  folder: EmailFolderDto
+  children: FolderTreeNode[]
+  depth: number
+}
+
+/** Build a tree from flat folder list using '.' as hierarchy separator */
+function buildFolderTree(folders: EmailFolderDto[]): FolderTreeNode[] {
+  const roots: FolderTreeNode[] = []
+  const pathMap = new Map<string, FolderTreeNode>()
+
+  // Sort so parents come before children
+  const sorted = [...folders].sort((a, b) => a.path.localeCompare(b.path))
+
+  for (const folder of sorted) {
+    const parts = folder.path.split('.')
+    const depth = parts.length - 1
+    const node: FolderTreeNode = { folder, children: [], depth }
+    pathMap.set(folder.path, node)
+
+    if (depth === 0) {
+      roots.push(node)
+    } else {
+      // Find parent by joining all parts except the last
+      const parentPath = parts.slice(0, -1).join('.')
+      const parent = pathMap.get(parentPath)
+      if (parent) {
+        parent.children.push(node)
+      } else {
+        // Orphan — show at root level
+        roots.push(node)
+      }
+    }
+  }
+
+  return roots
+}
+
 export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder }: FolderSidebarProps) {
   const createFolder = useCreateFolder(accountId)
   const renameFolder = useRenameFolder(accountId)
   const deleteFolder = useDeleteFolder(accountId)
 
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -64,6 +105,17 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
   const [targetFolder, setTargetFolder] = useState<EmailFolderDto | null>(null)
   const [renameTo, setRenameTo] = useState('')
   const [createParentPath, setCreateParentPath] = useState<string | null>(null)
+
+  const folderTree = buildFolderTree(folders)
+
+  function toggleExpanded(path: string) {
+    setExpandedFolders(prev => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
 
   function handleCreate() {
     if (!newFolderName.trim()) return
@@ -115,12 +167,14 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
   return (
     <>
       <div className="flex flex-col min-h-0 h-full">
-        <nav className="flex-1 overflow-y-auto min-h-0 space-y-1">
-          {folders.map((folder) => (
-            <DroppableFolderItem
-              key={folder.path}
-              folder={folder}
-              isActive={folder.path === activeFolder}
+        <nav className="flex-1 overflow-y-auto min-h-0 space-y-0.5">
+          {folderTree.map((node) => (
+            <FolderTreeItem
+              key={node.folder.path}
+              node={node}
+              activeFolder={activeFolder}
+              expandedFolders={expandedFolders}
+              onToggleExpanded={toggleExpanded}
               onSelectFolder={onSelectFolder}
               onCreateSubFolder={handleCreateSubFolder}
               onRename={(f) => {
@@ -237,6 +291,79 @@ export function FolderSidebar({ accountId, folders, activeFolder, onSelectFolder
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+function FolderTreeItem({
+  node,
+  activeFolder,
+  expandedFolders,
+  onToggleExpanded,
+  onSelectFolder,
+  onCreateSubFolder,
+  onRename,
+  onDelete,
+}: {
+  node: FolderTreeNode
+  activeFolder: string
+  expandedFolders: Set<string>
+  onToggleExpanded: (path: string) => void
+  onSelectFolder: (path: string) => void
+  onCreateSubFolder: (folder: EmailFolderDto) => void
+  onRename: (folder: EmailFolderDto) => void
+  onDelete: (folder: EmailFolderDto) => void
+}) {
+  const hasChildren = node.children.length > 0
+  const isExpanded = expandedFolders.has(node.folder.path)
+
+  return (
+    <div>
+      <div className="flex items-center" style={{ paddingLeft: `${node.depth * 16}px` }}>
+        {/* Expand/collapse chevron for parents */}
+        {hasChildren ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleExpanded(node.folder.path) }}
+            className="flex-shrink-0 p-0.5 text-muted-foreground hover:text-foreground"
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5" />
+            )}
+          </button>
+        ) : (
+          <div className="w-4" /> /* spacer to align with chevron */
+        )}
+        <div className="flex-1 min-w-0">
+          <DroppableFolderItem
+            folder={node.folder}
+            isActive={node.folder.path === activeFolder}
+            onSelectFolder={onSelectFolder}
+            onCreateSubFolder={onCreateSubFolder}
+            onRename={onRename}
+            onDelete={onDelete}
+          />
+        </div>
+      </div>
+      {/* Render children if expanded */}
+      {hasChildren && isExpanded && (
+        <div>
+          {node.children.map((child) => (
+            <FolderTreeItem
+              key={child.folder.path}
+              node={child}
+              activeFolder={activeFolder}
+              expandedFolders={expandedFolders}
+              onToggleExpanded={onToggleExpanded}
+              onSelectFolder={onSelectFolder}
+              onCreateSubFolder={onCreateSubFolder}
+              onRename={onRename}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
