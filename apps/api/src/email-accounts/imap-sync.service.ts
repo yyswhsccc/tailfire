@@ -121,6 +121,7 @@ export class ImapSyncService {
           title,
           body,
           actionUrl: '/emails/inbox',
+          forceChannels: ['platform'], // Platform only — email channel would be circular
           data: {
             notificationType: 'email.received',
             emailAccountId: accountId,
