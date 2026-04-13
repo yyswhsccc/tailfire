@@ -10,6 +10,8 @@ export interface ComposeState {
   prefillCc?: { address: string; name?: string }[]
   prefillSubject?: string
   prefillBody?: string
+  tripId?: string
+  contactId?: string
 }
 
 interface EmailViewState {

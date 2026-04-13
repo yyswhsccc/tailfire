@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Lock, Pencil, Save, X } from 'lucide-react'
+import { ArrowLeft, Lock, Mail, Pencil, Save, X } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useContact, useUpdateContact, useContactTrips, useContactBookings, useSendPortalInvite } from '@/hooks/use-contacts'
+import { ComposePanel } from '@/components/email-composer/compose-panel'
+import { useEmailStore } from '@/stores/email.store'
 import { useUser } from '@/hooks/use-user'
 import { ContactShareRequestButton } from './_components/contact-share-request-button'
 import { PendingAccessRequests } from './_components/pending-access-requests'
@@ -539,7 +541,23 @@ export default function ContactDetailPage() {
 
                     {/* Email - only show if exists */}
                     {contact.email && (
-                      <p className="text-sm text-ash-600">{contact.email}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-ash-600">{contact.email}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => {
+                            useEmailStore.getState().openCompose({
+                              mode: 'new',
+                              contactId: contact.id,
+                              prefillTo: [{ address: contact.email!, name: contact.displayName }],
+                            })
+                          }}
+                        >
+                          <Mail className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     )}
 
                     {/* Phone in header for quick access (especially useful for basic-access contacts) */}
@@ -1775,6 +1793,7 @@ export default function ContactDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ComposePanel />
     </DashboardLayout>
   )
 }

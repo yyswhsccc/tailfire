@@ -177,6 +177,7 @@ export function useSendEmail(accountId: string | null) {
       subject: string
       bodyHtml: string
       inReplyToEmailId?: string
+      attachments?: { filename: string; storagePath: string; contentType?: string; size?: number }[]
     }) => {
       if (!accountId) throw new Error('No account selected')
       return api.post<SyncedEmailResponseDto>(`/email-accounts/${accountId}/send`, dto)

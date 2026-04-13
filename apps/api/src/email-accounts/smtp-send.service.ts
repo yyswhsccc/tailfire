@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common'
+import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { and, eq, sql } from 'drizzle-orm'
 import * as nodemailer from 'nodemailer'
@@ -7,6 +7,7 @@ import { DatabaseService } from '../db/database.service'
 import { EmailAccountsService } from './email-accounts.service'
 import { SendEmailDto } from './dto/send-email.dto'
 import { buildEmailBody } from '../common/email/build-email-body'
+import { StorageService } from '../trips/storage.service'
 import type { SyncedEmailResponseDto } from '@tailfire/shared-types'
 
 @Injectable()
@@ -17,6 +18,7 @@ export class SmtpSendService {
     private readonly db: DatabaseService,
     private readonly emailAccountsService: EmailAccountsService,
     private readonly configService: ConfigService,
+    @Optional() private readonly storageService?: StorageService,
   ) {}
 
   async send(
@@ -115,6 +117,26 @@ export class SmtpSendService {
           ...(inReplyTo ? { 'In-Reply-To': inReplyTo } : {}),
           ...(references ? { References: references } : {}),
         },
+      }
+
+      if (dto.attachments && dto.attachments.length > 0 && this.storageService) {
+        const attachmentPromises = dto.attachments.map(async (att) => {
+          try {
+            const buffer = await this.storageService!.downloadDocument(att.storagePath)
+            return {
+              filename: att.filename,
+              content: buffer,
+              contentType: att.contentType || 'application/octet-stream',
+            }
+          } catch (err: any) {
+            this.logger.warn(`Failed to download attachment ${att.filename} (${att.storagePath}): ${err.message}`)
+            return null
+          }
+        })
+        const resolved = (await Promise.all(attachmentPromises)).filter(Boolean)
+        if (resolved.length > 0) {
+          mailOptions.attachments = resolved as any[]
+        }
       }
 
       const info = await transport.sendMail(mailOptions)
