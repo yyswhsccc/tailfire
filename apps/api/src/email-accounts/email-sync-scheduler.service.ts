@@ -13,16 +13,23 @@ export class EmailSyncSchedulerService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      // Clean up any stale repeatable jobs from previous deploys
-      const repeatableJobs = await this.emailSyncQueue.getRepeatableJobs()
-      for (const job of repeatableJobs) {
-        if (job.name === 'email.dispatch_sync' || job.key?.includes('dispatch')) {
-          await this.emailSyncQueue.removeRepeatableByKey(job.key)
-          this.logger.debug(`Removed stale repeatable job: ${job.key}`)
+      // Clean up stale job schedulers from previous deploys (use new scheduler API, not legacy repeatable API)
+      const schedulers = await this.emailSyncQueue.getJobSchedulers()
+      for (const s of schedulers) {
+        if (s.id === 'email-sync-dispatcher') {
+          await this.emailSyncQueue.removeJobScheduler('email-sync-dispatcher')
+          this.logger.debug('Removed stale job scheduler: email-sync-dispatcher')
         }
       }
 
-      await this.emailSyncQueue.upsertJobScheduler(
+      // Also clean legacy repeatable jobs if any exist
+      const repeatableJobs = await this.emailSyncQueue.getRepeatableJobs()
+      for (const job of repeatableJobs) {
+        await this.emailSyncQueue.removeRepeatableByKey(job.key)
+        this.logger.debug(`Removed legacy repeatable job: ${job.key}`)
+      }
+
+      const scheduled = await this.emailSyncQueue.upsertJobScheduler(
         'email-sync-dispatcher',
         { pattern: '*/2 * * * *' }, // every 2 minutes
         {
@@ -30,9 +37,9 @@ export class EmailSyncSchedulerService implements OnModuleInit {
           data: { type: 'email.dispatch_sync' } satisfies EmailSyncJobData,
         },
       )
-      this.logger.log('Email sync dispatcher scheduled (every 2 minutes)')
+      this.logger.log(`Email sync dispatcher scheduled (every 2 minutes, next job id: ${scheduled?.id})`)
     } catch (error: any) {
-      this.logger.error(`Failed to schedule email sync dispatcher: ${error.message}`)
+      this.logger.error(`Failed to schedule email sync dispatcher: ${error.message}`, error.stack)
     }
   }
 }
