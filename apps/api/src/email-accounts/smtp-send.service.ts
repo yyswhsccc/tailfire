@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import * as nodemailer from 'nodemailer'
 import { assertPublicHost } from '../common/guards/assert-public-host'
 import { DatabaseService } from '../db/database.service'
@@ -132,7 +132,7 @@ export class SmtpSendService {
           agencyId: account.agencyId,
           messageId: info.messageId,
           imapUid: null, // Outbound — no IMAP UID (excluded from unique partial index)
-          folder: 'INBOX.Sent',
+          folder: await this.resolveSentFolder(accountId),
           inReplyTo: inReplyTo ?? null,
           referencesHeader: references ?? null,
           fromAddress: account.emailAddress,
@@ -238,6 +238,38 @@ export class SmtpSendService {
       )
     }
     return filtered
+  }
+
+  /**
+   * Resolve the Sent folder path for an account by checking existing synced emails.
+   * Falls back to common conventions if no sent mail has been synced yet.
+   */
+  private async resolveSentFolder(accountId: string): Promise<string> {
+    // Check if we already have outbound emails — use the same folder
+    const [existing] = await this.db.client
+      .select({ folder: this.db.schema.syncedEmails.folder })
+      .from(this.db.schema.syncedEmails)
+      .where(
+        and(
+          eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+          eq(this.db.schema.syncedEmails.isOutbound, true),
+        ),
+      )
+      .limit(1)
+
+    if (existing?.folder) return existing.folder
+
+    // Check sync state for known folder paths containing "Sent"
+    const account = await this.emailAccountsService.getAccountById(accountId)
+    const syncState = (account.syncState as any) ?? {}
+    const folderKeys = Object.keys(syncState.folders ?? {})
+    const sentFolder = folderKeys.find(
+      (k) => k.toLowerCase().includes('sent') && !k.toLowerCase().includes('junk'),
+    )
+    if (sentFolder) return sentFolder
+
+    // Default: cPanel/Dovecot convention
+    return 'INBOX.Sent'
   }
 
   private async matchRecipientContacts(
