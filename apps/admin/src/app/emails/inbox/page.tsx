@@ -23,7 +23,7 @@ import { useDndSensors, dndCollisionDetection, type EmailDragData, type FolderDr
 import { FolderSidebar } from './_components/folder-sidebar'
 import { EmailList } from './_components/email-list'
 import { EmailReader } from './_components/email-reader'
-import { ComposeEmailDialog } from './_components/compose-email-dialog'
+import { ComposeDialog } from '@/components/email-composer/compose-dialog'
 import type { SyncedEmailResponseDto } from '@tailfire/shared-types/api'
 
 export default function EmailInboxPage() {
@@ -35,7 +35,6 @@ export default function EmailInboxPage() {
   const selectedEmailId = useEmailStore((s) => s.selectedEmailId)
   const search = useEmailStore((s) => s.search)
   const sortBy = useEmailStore((s) => s.sortBy)
-  const compose = useEmailStore((s) => s.compose)
   const setActiveFolder = useEmailStore((s) => s.setActiveFolder)
   const setSelectedEmailId = useEmailStore((s) => s.setSelectedEmailId)
   const setSearch = useEmailStore((s) => s.setSearch)
@@ -390,9 +389,7 @@ export default function EmailInboxPage() {
       </DndContext>
 
       {/* Compose Dialog */}
-      {compose && accountId && (
-        <ComposeEmailDialog accountId={accountId} compose={compose} />
-      )}
+      {accountId && <ComposeDialog accountId={accountId} />}
     </DashboardLayout>
   )
 }
