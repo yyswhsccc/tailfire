@@ -48,6 +48,13 @@ export function sanitizeEmailHtml(html: string, options?: SanitizeOptions): { ht
     return { html: doc.body.innerHTML, hasBlockedImages: false }
   }
 
+  // Replace cid: inline images with placeholder (browser can't resolve cid: URIs)
+  doc.querySelectorAll('img[src^="cid:"]').forEach((img) => {
+    img.setAttribute('src', 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
+    img.setAttribute('alt', '[Embedded image]')
+    img.setAttribute('style', 'display:none;')
+  })
+
   // Block remote img[src]
   doc.querySelectorAll('img[src]').forEach((img) => {
     const src = img.getAttribute('src') || ''
