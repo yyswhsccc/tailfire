@@ -58,7 +58,7 @@ export function buildSignatureHtml(data: SignatureData): string {
 
   // Avatar (optional, floated left)
   if (data.showAvatar && data.avatarUrl) {
-    html += `<img src="${data.avatarUrl}" alt="${data.firstName} ${data.lastName}" style="width:60px;height:60px;border-radius:50%;float:left;margin-right:12px;margin-bottom:8px;" />`
+    html += `<img src="${data.avatarUrl}" alt="${data.firstName} ${data.lastName}" width="60" height="60" style="width:60px;height:60px;border-radius:50%;float:left;margin-right:12px;margin-bottom:8px;" />`
   }
 
   html += parts.join('<br />')
