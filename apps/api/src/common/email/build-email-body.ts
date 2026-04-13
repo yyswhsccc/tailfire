@@ -14,7 +14,7 @@ export function buildEmailBody(
   let html = contentHtml
 
   if (options.signatureHtml) {
-    html += '<br><div class="email-signature">' + options.signatureHtml + '</div>'
+    html += '<br><div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:12px;" class="email-signature">' + options.signatureHtml + '</div>'
   }
 
   if (options.complianceFooter) {
