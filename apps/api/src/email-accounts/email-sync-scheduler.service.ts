@@ -31,21 +31,13 @@ export class EmailSyncSchedulerService implements OnModuleInit {
 
       const scheduled = await this.emailSyncQueue.upsertJobScheduler(
         'email-sync-dispatcher',
-        { pattern: '*/2 * * * *' }, // every 2 minutes
+        { every: 120000 }, // every 2 minutes (use 'every' instead of cron 'pattern' for reliability)
         {
           name: 'email.dispatch_sync',
           data: { type: 'email.dispatch_sync' } satisfies EmailSyncJobData,
         },
       )
-      this.logger.log(`Email sync dispatcher scheduled (every 2 minutes, next job id: ${scheduled?.id})`)
-
-      // Diagnostic: manually add one immediate dispatch job to test if the worker picks it up
-      const testJob = await this.emailSyncQueue.add(
-        'email.dispatch_sync',
-        { type: 'email.dispatch_sync' } satisfies EmailSyncJobData,
-        { removeOnComplete: true, removeOnFail: true },
-      )
-      this.logger.log(`Diagnostic: added immediate dispatch job (id=${testJob.id})`)
+      this.logger.log(`Email sync dispatcher scheduled (every 120s, next job id: ${scheduled?.id})`)
     } catch (error: any) {
       this.logger.error(`Failed to schedule email sync dispatcher: ${error.message}`, error.stack)
     }
