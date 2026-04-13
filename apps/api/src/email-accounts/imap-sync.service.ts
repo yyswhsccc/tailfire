@@ -185,6 +185,10 @@ export class ImapSyncService {
 
       try {
         const downloadResult = await client.download(String(email.imapUid), undefined, { uid: true })
+        if (!downloadResult?.content) {
+          this.logger.warn(`No content returned for UID ${email.imapUid} in ${email.folder}`)
+          return { bodyHtml: null, bodyText: null, snippet: null }
+        }
         const chunks: Buffer[] = []
         for await (const chunk of downloadResult.content) {
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
