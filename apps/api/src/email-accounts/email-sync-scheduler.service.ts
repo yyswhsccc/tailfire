@@ -12,26 +12,12 @@ export class EmailSyncSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    this.logger.log('EmailSyncSchedulerService initializing...')
     try {
-      // Clean up stale job schedulers from previous deploys (use new scheduler API, not legacy repeatable API)
-      const schedulers = await this.emailSyncQueue.getJobSchedulers()
-      for (const s of schedulers) {
-        if (s.id === 'email-sync-dispatcher') {
-          await this.emailSyncQueue.removeJobScheduler('email-sync-dispatcher')
-          this.logger.debug('Removed stale job scheduler: email-sync-dispatcher')
-        }
-      }
-
-      // Also clean legacy repeatable jobs if any exist
-      const repeatableJobs = await this.emailSyncQueue.getRepeatableJobs()
-      for (const job of repeatableJobs) {
-        await this.emailSyncQueue.removeRepeatableByKey(job.key)
-        this.logger.debug(`Removed legacy repeatable job: ${job.key}`)
-      }
-
+      // upsertJobScheduler handles create-or-update — no manual cleanup needed
       const scheduled = await this.emailSyncQueue.upsertJobScheduler(
         'email-sync-dispatcher',
-        { every: 120000 }, // every 2 minutes (use 'every' instead of cron 'pattern' for reliability)
+        { every: 120000 }, // every 2 minutes
         {
           name: 'email.dispatch_sync',
           data: { type: 'email.dispatch_sync' } satisfies EmailSyncJobData,
