@@ -13,6 +13,15 @@ export class EmailSyncSchedulerService implements OnModuleInit {
 
   async onModuleInit() {
     try {
+      // Clean up any stale repeatable jobs from previous deploys
+      const repeatableJobs = await this.emailSyncQueue.getRepeatableJobs()
+      for (const job of repeatableJobs) {
+        if (job.name === 'email.dispatch_sync' || job.key?.includes('dispatch')) {
+          await this.emailSyncQueue.removeRepeatableByKey(job.key)
+          this.logger.debug(`Removed stale repeatable job: ${job.key}`)
+        }
+      }
+
       await this.emailSyncQueue.upsertJobScheduler(
         'email-sync-dispatcher',
         { pattern: '*/2 * * * *' }, // every 2 minutes

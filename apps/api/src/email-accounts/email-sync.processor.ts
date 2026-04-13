@@ -18,6 +18,7 @@ export class EmailSyncProcessor extends WorkerHost {
   }
 
   async process(job: Job<EmailSyncJobData>): Promise<void> {
+    this.logger.debug(`Processing job: ${job.name} (type=${job.data?.type}, id=${job.id})`)
     if (job.data.type === 'email.sync') {
       // Single account sync (on-demand or from recurring dispatcher)
       if (!job.data.emailAccountId) {
