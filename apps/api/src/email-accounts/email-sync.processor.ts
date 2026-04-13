@@ -49,8 +49,7 @@ export class EmailSyncProcessor extends WorkerHost {
           'email.sync',
           { type: 'email.sync', emailAccountId: account.id } satisfies EmailSyncJobData,
           {
-            jobId: `sync-${account.id}`,
-            removeOnComplete: { age: 3600, count: 200 },
+            removeOnComplete: true,
             removeOnFail: { age: 24 * 3600 },
           },
         )
