@@ -9,6 +9,7 @@ import {
   IsOptional,
   MaxLength,
   IsObject,
+  IsArray,
   ValidateNested,
   IsBoolean,
   IsUrl,
@@ -119,6 +120,15 @@ export class PlatformPreferencesDto {
   @IsOptional()
   @IsString()
   onboardingCompletedAt?: string | null
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  trustedImageDomains?: string[]
+
+  @IsOptional()
+  @IsObject()
+  emailPaneWidths?: Record<string, number>
 }
 
 export class LicensingInfoDto {

@@ -74,6 +74,7 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
     if (!email?.bodyHtml) return { html: '', hasBlockedImages: false }
     return sanitizeEmailHtml(email.bodyHtml, {
       trustedDomains,
+      senderDomain,
       allowAllImages: forceShowImages,
     })
   }, [email?.bodyHtml, trustedDomains, forceShowImages]) // eslint-disable-line react-hooks/exhaustive-deps

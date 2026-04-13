@@ -73,20 +73,17 @@ export class ImapSyncService {
 
       await client.connect()
 
-      // Determine folders to sync
-      const foldersToSync = ['INBOX']
-      const sentPath = await this.findSentFolder(client)
-      if (sentPath) foldersToSync.push(sentPath)
-
-      for (const folderPath of foldersToSync) {
-        // Re-read sync state for each folder so prior folder updates are visible
-        const freshAccount = await this.emailAccountsService.getAccountById(accountId)
-        const currentSyncState = (freshAccount.syncState as any) ?? {}
-        const result = await this.syncFolder(client, accountId, account.agencyId, currentSyncState, folderPath)
-        newMessages += result.newMessages
-        newSenders.push(...result.newSenders)
-        errors.push(...result.errors)
-      }
+      // Background sync: INBOX only, incremental, bounded to 100 messages.
+      // Sent and other folders sync on-demand when the user opens them.
+      const freshAccount = await this.emailAccountsService.getAccountById(accountId)
+      const currentSyncState = (freshAccount.syncState as any) ?? {}
+      const result = await this.syncFolder(client, accountId, account.agencyId, currentSyncState, 'INBOX', {
+        mode: 'incremental',
+        batchSize: 100,
+      })
+      newMessages += result.newMessages
+      newSenders.push(...result.newSenders)
+      errors.push(...result.errors)
 
       await client.logout()
 
@@ -98,16 +95,18 @@ export class ImapSyncService {
       const detail = error.responseText || error.responseStatus || error.message
       this.logger.error(`Sync failed for account ${accountId}: ${detail}`, error.stack)
       await this.handleImapAuthFailure(error, accountId, (account.syncState as Record<string, unknown>) ?? {})
+      const errorDetail = error.responseText ? `${error.message}: ${error.responseText}` : error.message
       await this.emailAccountsService.updateSyncState(
         accountId,
         (account.syncState as Record<string, unknown>) ?? {},
-        error.message,
+        errorDetail,
       )
-      errors.push(error.message)
+      errors.push(errorDetail)
     }
 
     // Notify account owner of new emails
     if (newMessages > 0) {
+      this.logger.log(`Sending notification: ${newMessages} new email(s) for user ${account.userId}`)
       try {
         const title = newMessages === 1
           ? `New email from ${newSenders[0] || 'Unknown'}`
@@ -122,14 +121,16 @@ export class ImapSyncService {
           title,
           body,
           actionUrl: '/emails/inbox',
+          forceChannels: ['platform'], // Platform only — email channel would be circular
           data: {
             notificationType: 'email.received',
             emailAccountId: accountId,
             newMessageCount: newMessages,
           },
         })
+        this.logger.log(`Notification sent successfully: "${title}"`)
       } catch (err: any) {
-        this.logger.warn(`Failed to send new email notification: ${err.message}`)
+        this.logger.warn(`Failed to send new email notification: ${err.message}`, err.stack)
       }
     }
 
@@ -321,6 +322,14 @@ export class ImapSyncService {
             eq(this.db.schema.syncedEmails.folder, path),
           ),
         )
+      // After successful IMAP rename, migrate sync state
+      const updatedAccount = await this.emailAccountsService.getAccountById(accountId)
+      const syncState = (updatedAccount.syncState as any) ?? {}
+      if (syncState.folders?.[path]) {
+        syncState.folders[newPath] = syncState.folders[path]
+        delete syncState.folders[path]
+        await this.emailAccountsService.updateSyncState(accountId, syncState)
+      }
     } finally {
       await client.logout()
     }
@@ -482,6 +491,50 @@ export class ImapSyncService {
     }
   }
 
+  /**
+   * Sync a single folder on demand (called from controller/frontend).
+   * Handles connection lifecycle and sync state persistence.
+   */
+  async syncFolderOnDemand(
+    accountId: string,
+    folder: string,
+    mode: 'incremental' | 'hydrate_recent' | 'hydrate_older',
+    batchSize?: number,
+  ): Promise<{ fetched: number; folder: string; historyExhausted?: boolean }> {
+    const account = await this.emailAccountsService.getAccountById(accountId)
+    const credentials = await this.emailAccountsService.getDecryptedCredentials(accountId)
+    const syncState = (account.syncState as any) ?? {}
+
+    try {
+      const client = await this.createImapClient({
+        host: account.imapHost,
+        port: account.imapPort,
+        secure: account.imapTls,
+        user: credentials.username,
+        pass: credentials.password,
+      })
+
+      await client.connect()
+      this.logger.debug(`On-demand sync: connected to ${account.imapHost} for ${folder} (mode=${mode})`)
+      try {
+        const result = await this.syncFolder(client, accountId, account.agencyId, syncState, folder, { mode, batchSize })
+        // syncFolder already persists sync state — no need to call updateSyncState again
+        return { fetched: result.newMessages, folder, historyExhausted: result.historyExhausted }
+      } finally {
+        await client.logout()
+      }
+    } catch (error: any) {
+      const detail = error.responseText || error.responseStatus || error.message
+      this.logger.error(`On-demand sync failed for ${folder} (account ${accountId}): ${detail}`, error.stack)
+      await this.handleImapAuthFailure(error, accountId, syncState)
+      // Enrich error message with IMAP server response for better Sentry visibility
+      if (error.responseText && error.message === 'Command failed') {
+        error.message = `IMAP command failed: ${error.responseText}`
+      }
+      throw error
+    }
+  }
+
   // ============================================================================
   // Private helpers
   // ============================================================================
@@ -528,7 +581,12 @@ export class ImapSyncService {
   }
 
   /**
-   * Sync a single IMAP folder — fetches new messages and upserts them.
+   * Sync a single IMAP folder — fetches messages and upserts them.
+   *
+   * Supports three sync modes:
+   * - `incremental` (default): fetch UIDs from lastUid+1 onwards (new mail)
+   * - `hydrate_recent`: fetch the newest `batchSize` messages from the tail
+   * - `hydrate_older`: fetch the next older batch before oldestSyncedUid
    */
   private async syncFolder(
     client: any,
@@ -536,15 +594,43 @@ export class ImapSyncService {
     agencyId: string,
     syncState: any,
     folderPath: string,
-  ): Promise<{ newMessages: number; newSenders: string[]; errors: string[] }> {
+    options?: {
+      mode?: 'incremental' | 'hydrate_recent' | 'hydrate_older'
+      batchSize?: number
+    },
+  ): Promise<{ newMessages: number; newSenders: string[]; errors: string[]; historyExhausted?: boolean }> {
+    const mode = options?.mode ?? 'incremental'
+    const batchSize = Math.min(options?.batchSize ?? 50, 100)
+
     let newMessages = 0
     const newSenders: string[] = []
     const errors: string[] = []
+    let historyExhausted = false
 
     const lock = await client.getMailboxLock(folderPath)
     try {
       const folderState = syncState?.folders?.[folderPath] ?? {}
       const lastUid = folderState.lastUid ?? 0
+      const oldestSyncedUid = folderState.oldestSyncedUid ?? 0
+      historyExhausted = folderState.historyExhausted ?? false
+      let highestPersistedUid = lastUid
+      let lowestPersistedUid = oldestSyncedUid || Infinity
+
+      // UIDVALIDITY check — if the server has reassigned UIDs, our cursors are
+      // stale and we must wipe synced data for this folder and start over.
+      // Note: ImapFlow may return BigInt — always convert to Number for JSONB compatibility
+      const serverUidValidity = client.mailbox?.uidValidity != null ? Number(client.mailbox.uidValidity) : undefined
+      if (folderState.uidValidity && serverUidValidity && serverUidValidity !== folderState.uidValidity) {
+        this.logger.warn(`UIDVALIDITY changed for ${folderPath}. Resetting cursors.`)
+        await this.db.client
+          .delete(this.db.schema.syncedEmails)
+          .where(and(
+            eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+            eq(this.db.schema.syncedEmails.folder, folderPath),
+          ))
+        // Reset folder state so subsequent logic uses fresh cursors
+        Object.assign(folderState, { lastUid: 0, oldestSyncedUid: 0, historyExhausted: false })
+      }
 
       // Check if there are potentially new messages before fetching
       const mailboxStatus = client.mailbox
@@ -552,26 +638,59 @@ export class ImapSyncService {
         ? Number((mailboxStatus as any).uidNext)
         : undefined
 
-      let highestPersistedUid = lastUid
+      // --- Compute fetchRange based on mode ---
+      let fetchRange: string | null = null
+      let skipLowUid = 0 // UIDs <= this value are skipped (already persisted)
 
-      if (uidNext && uidNext <= lastUid + 1) {
-        this.logger.debug(`No new messages in ${folderPath} (uidNext=${uidNext}, lastUid=${lastUid})`)
-      } else {
-        // Fetch new messages (metadata only — no body)
-        const fetchRange = lastUid > 0 ? `${lastUid + 1}:*` : '1:*'
-        this.logger.debug(`Fetching UIDs ${fetchRange} from ${folderPath} (lastUid=${lastUid}, uidNext=${uidNext})`)
+      if (mode === 'incremental') {
+        const effectiveLastUid = folderState.lastUid ?? 0
+        if (effectiveLastUid > 0) {
+          // Skip if server says there's nothing new
+          if (uidNext && uidNext <= effectiveLastUid + 1) {
+            this.logger.debug(`No new messages in ${folderPath} (uidNext=${uidNext}, lastUid=${effectiveLastUid})`)
+          } else {
+            // Cap incremental fetch to avoid pulling entire backlog
+            const end = uidNext ? Math.min(uidNext - 1, effectiveLastUid + batchSize) : effectiveLastUid + batchSize
+            fetchRange = `${effectiveLastUid + 1}:${end}`
+            skipLowUid = effectiveLastUid
+          }
+        } else {
+          // First sync — grab the most recent batchSize messages
+          const start = uidNext ? Math.max(1, uidNext - batchSize) : 1
+          fetchRange = `${start}:*`
+          skipLowUid = 0
+        }
+      } else if (mode === 'hydrate_recent') {
+        const start = uidNext ? Math.max(1, uidNext - batchSize) : 1
+        fetchRange = `${start}:*`
+        skipLowUid = 0
+      } else if (mode === 'hydrate_older') {
+        const effectiveOldest = folderState.oldestSyncedUid ?? 0
+        if (historyExhausted || effectiveOldest <= 1) {
+          // Nothing older to fetch
+          return { newMessages: 0, newSenders: [], errors: [], historyExhausted: true }
+        }
+        const end = effectiveOldest - 1
+        const start = Math.max(1, effectiveOldest - batchSize)
+        fetchRange = `${start}:${end}`
+        skipLowUid = 0
+      }
+
+      if (fetchRange) {
+        this.logger.debug(`[${mode}] Fetching UIDs ${fetchRange} from ${folderPath} (lastUid=${folderState.lastUid ?? 0}, oldestSyncedUid=${folderState.oldestSyncedUid ?? 0}, uidNext=${uidNext})`)
         for await (const msg of client.fetch(fetchRange, {
           envelope: true,
           bodyStructure: true,
           flags: true,
           uid: true,
           internalDate: true,
-        })) {
-          if (Number(msg.uid) <= lastUid) continue
+        }, { uid: true })) {
+          if (skipLowUid > 0 && Number(msg.uid) <= skipLowUid) continue
 
           try {
             await this.upsertEmailFromImap(accountId, agencyId, folderPath, msg)
             highestPersistedUid = Math.max(highestPersistedUid, Number(msg.uid))
+            lowestPersistedUid = Math.min(lowestPersistedUid, Number(msg.uid))
             newMessages++
             const from = msg.envelope?.from?.[0]
             if (from) {
@@ -584,26 +703,49 @@ export class ImapSyncService {
         }
       }
 
-      // Update sync state — use highestPersistedUid so failed messages are
-      // re-fetched on the next sync (we never advance past an unconfirmed UID)
-      const uidValidity = mailboxStatus && typeof mailboxStatus === 'object'
-        ? Number((mailboxStatus as any).uidValidity)
-        : undefined
+      // --- Update sync state ---
+      const updatedFolderState: any = {
+        ...folderState,
+        lastUid: Math.max(folderState.lastUid ?? 0, highestPersistedUid),
+        lastSyncAt: new Date().toISOString(),
+        uidValidity: client.mailbox?.uidValidity != null ? Number(client.mailbox.uidValidity) : folderState.uidValidity,
+      }
+
+      if (mode === 'hydrate_recent' || mode === 'hydrate_older') {
+        if (lowestPersistedUid < Infinity) {
+          updatedFolderState.oldestSyncedUid = Math.min(
+            oldestSyncedUid || Infinity,
+            lowestPersistedUid,
+          )
+          if (updatedFolderState.oldestSyncedUid === Infinity) {
+            updatedFolderState.oldestSyncedUid = lowestPersistedUid
+          }
+        }
+        // Mark exhausted based on cursor position, not row count.
+        // UID gaps from deletions/expunges can yield fewer messages than batchSize
+        // even when older mail still exists.
+        const effectiveOldest = updatedFolderState.oldestSyncedUid ?? lowestPersistedUid
+        if (effectiveOldest <= 1 || (mode === 'hydrate_older' && fetchRange && fetchRange.startsWith('1:'))) {
+          updatedFolderState.historyExhausted = true
+          historyExhausted = true
+        }
+      }
+
+      syncState.folders = syncState.folders ?? {}
+      syncState.folders[folderPath] = updatedFolderState
+
       await this.emailAccountsService.updateSyncState(accountId, {
         ...syncState,
         folders: {
           ...syncState.folders,
-          [folderPath]: {
-            uidValidity,
-            lastUid: highestPersistedUid,
-          },
+          [folderPath]: updatedFolderState,
         },
       })
     } finally {
       lock.release()
     }
 
-    return { newMessages, newSenders, errors }
+    return { newMessages, newSenders, errors, historyExhausted }
   }
 
   /**
@@ -616,18 +758,6 @@ export class ImapSyncService {
     return Number.isNaN(d.getTime()) ? null : d
   }
 
-  /**
-   * Find the Sent folder path by looking for the \\Sent specialUse flag.
-   */
-  private async findSentFolder(client: any): Promise<string | null> {
-    try {
-      const folders = await client.list()
-      const sent = folders.find((f: any) => f.specialUse === '\\Sent')
-      return sent?.path ?? null
-    } catch {
-      return null
-    }
-  }
 
   private async upsertEmailFromImap(
     accountId: string,

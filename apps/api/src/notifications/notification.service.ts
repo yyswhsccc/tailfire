@@ -424,7 +424,7 @@ export class NotificationService {
     const defaultChannels: Record<NotificationCategory, NotificationChannel[]> = {
       payment_reminders: ['email', 'platform'],
       trip_updates: ['email', 'push', 'platform'],
-      client_care: ['email'],
+      client_care: ['email', 'platform'],  // email.received uses forceChannels: ['platform'] to prevent loops
       booking_alerts: ['email', 'push', 'platform'],
       system_alerts: ['platform'],
       assignment: ['email', 'push', 'platform'],
