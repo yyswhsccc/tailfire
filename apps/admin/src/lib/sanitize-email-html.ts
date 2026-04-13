@@ -48,11 +48,19 @@ export function sanitizeEmailHtml(html: string, options?: SanitizeOptions): { ht
     return { html: doc.body.innerHTML, hasBlockedImages: false }
   }
 
-  // Replace cid: inline images with placeholder (browser can't resolve cid: URIs)
+  // Replace cid: inline images with visible placeholder (browser can't resolve cid: URIs)
   doc.querySelectorAll('img[src^="cid:"]').forEach((img) => {
-    img.setAttribute('src', 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
-    img.setAttribute('alt', '[Embedded image]')
-    img.setAttribute('style', 'display:none;')
+    img.setAttribute('src', 'data:image/svg+xml,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80">' +
+      '<rect width="120" height="80" fill="#f3f4f6" rx="4"/>' +
+      '<text x="60" y="36" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#9ca3af">Embedded</text>' +
+      '<text x="60" y="50" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#9ca3af">Image</text>' +
+      '</svg>'
+    ))
+    img.setAttribute('alt', '[Embedded image — not yet supported]')
+    img.removeAttribute('width')
+    img.removeAttribute('height')
+    img.setAttribute('style', 'max-width:120px;max-height:80px;border:1px dashed #d1d5db;border-radius:4px;')
   })
 
   // Block remote img[src]
