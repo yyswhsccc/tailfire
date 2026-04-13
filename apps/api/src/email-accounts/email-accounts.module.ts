@@ -1,9 +1,10 @@
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { BullModule } from '@nestjs/bullmq'
 import { QUEUES } from '../automation/automation.types'
 import { DatabaseModule } from '../db/database.module'
 import { EncryptionModule } from '../common/encryption/encryption.module'
 import { NotificationModule } from '../notifications/notification.module'
+import { TripsModule } from '../trips/trips.module'
 import { EmailAccountsController } from './email-accounts.controller'
 import { EmailAccountsService } from './email-accounts.service'
 import { ImapSyncService } from './imap-sync.service'
@@ -28,6 +29,7 @@ import { EmailWritebackProcessor } from './email-writeback.processor'
     DatabaseModule,
     EncryptionModule,
     NotificationModule,
+    forwardRef(() => TripsModule), // For StorageService (attachment downloads)
     BullModule.registerQueue({
       name: QUEUES.EMAIL_SYNC,
       defaultJobOptions: {
