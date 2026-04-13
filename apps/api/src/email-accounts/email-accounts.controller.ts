@@ -13,6 +13,7 @@ import {
   Res,
   StreamableFile,
   UseGuards,
+  BadRequestException,
   UseInterceptors,
   UploadedFile,
   ParseFilePipe,
@@ -27,7 +28,6 @@ import type { AuthContext } from '../auth/auth.types'
 import { EmailAccountsService } from './email-accounts.service'
 import { ImapSyncService } from './imap-sync.service'
 import { SmtpSendService } from './smtp-send.service'
-import { StorageService } from '../trips/storage.service'
 import { CreateEmailAccountDto } from './dto/create-email-account.dto'
 import { UpdateEmailAccountDto } from './dto/update-email-account.dto'
 import { TestConnectionDto } from './dto/test-connection.dto'
@@ -48,7 +48,6 @@ export class EmailAccountsController {
     private readonly emailAccountsService: EmailAccountsService,
     private readonly imapSyncService: ImapSyncService,
     private readonly smtpSendService: SmtpSendService,
-    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -335,13 +334,9 @@ export class EmailAccountsController {
     file: Express.Multer.File,
   ): Promise<{ storagePath: string; filename: string; size: number }> {
     await this.emailAccountsService.findOne(id, auth.userId)
-    const storagePath = await this.storageService.uploadDocument(
-      file.buffer,
-      `email-attachments/${auth.agencyId}`,
-      file.originalname,
-      file.mimetype,
-    )
-    return { storagePath, filename: file.originalname, size: file.size }
+    // Attachment upload requires StorageService — will be wired in Phase 2
+    // when a dedicated StorageModule is extracted from TripsModule
+    throw new BadRequestException('Attachment uploads not yet available')
   }
 
   /**

@@ -4,8 +4,6 @@ import { QUEUES } from '../automation/automation.types'
 import { DatabaseModule } from '../db/database.module'
 import { EncryptionModule } from '../common/encryption/encryption.module'
 import { NotificationModule } from '../notifications/notification.module'
-import { StorageService } from '../trips/storage.service'
-import { StorageProviderFactory } from '../storage/providers/storage-provider.factory'
 import { EmailAccountsController } from './email-accounts.controller'
 import { EmailAccountsService } from './email-accounts.service'
 import { ImapSyncService } from './imap-sync.service'
@@ -52,8 +50,6 @@ import { EmailWritebackProcessor } from './email-writeback.processor'
     EmailAccountsService,
     ImapSyncService,
     SmtpSendService,
-    StorageProviderFactory,
-    StorageService,
     EmailSyncProcessor,
     EmailSyncSchedulerService,
     ImapWriteService,
