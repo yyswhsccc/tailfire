@@ -1,62 +1,34 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common'
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
 import { QUEUES, type EmailSyncJobData } from '../automation/automation.types'
-import { EmailAccountsService } from './email-accounts.service'
-import { ImapSyncService } from './imap-sync.service'
 
 @Injectable()
-export class EmailSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
+export class EmailSyncSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(EmailSyncSchedulerService.name)
-  private intervalHandle: ReturnType<typeof setInterval> | null = null
 
   constructor(
-    private readonly emailAccountsService: EmailAccountsService,
-    private readonly imapSyncService: ImapSyncService,
+    @InjectQueue(QUEUES.EMAIL_SYNC) private readonly emailSyncQueue: Queue,
   ) {}
 
   async onModuleInit() {
-    this.logger.log('Email sync scheduler starting (setInterval, every 2 minutes)')
-
-    // Run first sync after 30s delay (let the app fully boot)
-    setTimeout(() => this.runSyncCycle(), 30_000)
-
-    // Then every 2 minutes
-    this.intervalHandle = setInterval(() => this.runSyncCycle(), 120_000)
-  }
-
-  onModuleDestroy() {
-    if (this.intervalHandle) {
-      clearInterval(this.intervalHandle)
-      this.intervalHandle = null
-    }
-  }
-
-  private async runSyncCycle() {
     try {
-      const accounts = await this.emailAccountsService.findAllActive()
-      if (accounts.length === 0) {
-        this.logger.debug('No active email accounts to sync')
-        return
-      }
-
-      this.logger.log(`Background sync: processing ${accounts.length} active email account(s)`)
-
-      for (const account of accounts) {
-        try {
-          const result = await this.imapSyncService.syncAccount(account.id)
-          if (result.newMessages > 0) {
-            this.logger.log(`Synced ${result.newMessages} new message(s) for account ${account.id}`)
-          }
-          if (result.errors.length > 0) {
-            this.logger.warn(`Sync errors for ${account.id}: ${result.errors.join('; ')}`)
-          }
-        } catch (err: any) {
-          this.logger.warn(`Sync failed for account ${account.id}: ${err.message}`)
-        }
-      }
-    } catch (err: any) {
-      this.logger.error(`Email sync cycle failed: ${err.message}`, err.stack)
+      // Use the legacy repeat API — proven reliable in AutomationService for
+      // birthday checks, payment scans, and other recurring jobs on this
+      // Railway + Upstash Redis setup.
+      await this.emailSyncQueue.add(
+        'email.dispatch_sync',
+        { type: 'email.dispatch_sync' } satisfies EmailSyncJobData,
+        {
+          repeat: { every: 120_000 }, // every 2 minutes
+          jobId: 'email-sync-dispatcher',
+          removeOnComplete: { age: 3600, count: 50 },
+          removeOnFail: { age: 24 * 3600 },
+        },
+      )
+      this.logger.log('Email sync dispatcher scheduled (every 2 minutes, legacy repeat API)')
+    } catch (error: any) {
+      this.logger.error(`Failed to schedule email sync dispatcher: ${error.message}`, error.stack)
     }
   }
 }
