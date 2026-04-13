@@ -1,41 +1,35 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common'
-import { InjectQueue } from '@nestjs/bullmq'
-import { Queue } from 'bullmq'
-import { QUEUES, type EmailSyncJobData } from '../automation/automation.types'
+import { EmailAccountsService } from './email-accounts.service'
+import { ImapSyncService } from './imap-sync.service'
 
 /**
  * Email Sync Scheduler
  *
- * Uses setInterval to trigger dispatch every 2 minutes, then enqueues
- * per-account sync jobs into the BullMQ email-sync queue. This hybrid
- * approach gives us:
- * - Reliable timing (setInterval, not dependent on Redis delayed job promotion)
- * - Worker concurrency (BullMQ workers process per-account jobs in parallel)
- * - Job deduplication (jobId prevents overlapping syncs per account)
- * - Job history/visibility (BullMQ job lifecycle)
+ * Runs background INBOX sync every 2 minutes for all active email accounts.
+ * Calls syncAccount() directly — bypasses BullMQ queuing entirely because
+ * Upstash Redis (serverless) doesn't reliably promote delayed/queued jobs.
  *
- * Note: BullMQ's repeat/scheduler APIs don't fire reliably on Upstash Redis
- * (delayed job promotion requires blocking Redis commands that serverless
- * Redis handles differently). This is documented and acceptable for the
- * current single-instance Railway deployment.
+ * Notifications are sent by syncAccount() when new messages are found.
  */
 @Injectable()
 export class EmailSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EmailSyncSchedulerService.name)
   private intervalHandle: ReturnType<typeof setInterval> | null = null
+  private running = false
 
   constructor(
-    @InjectQueue(QUEUES.EMAIL_SYNC) private readonly emailSyncQueue: Queue,
+    private readonly emailAccountsService: EmailAccountsService,
+    private readonly imapSyncService: ImapSyncService,
   ) {}
 
   async onModuleInit() {
-    this.logger.log('Email sync scheduler starting (interval + BullMQ dispatch, every 2 minutes)')
+    this.logger.log('Email sync scheduler started (every 2 minutes)')
 
-    // First dispatch after 30s (let app fully boot)
-    setTimeout(() => this.dispatchSyncJobs(), 30_000)
+    // First sync after 30s (let app boot)
+    setTimeout(() => this.runSyncCycle(), 30_000)
 
     // Then every 2 minutes
-    this.intervalHandle = setInterval(() => this.dispatchSyncJobs(), 120_000)
+    this.intervalHandle = setInterval(() => this.runSyncCycle(), 120_000)
   }
 
   onModuleDestroy() {
@@ -45,16 +39,33 @@ export class EmailSyncSchedulerService implements OnModuleInit, OnModuleDestroy 
     }
   }
 
-  private async dispatchSyncJobs() {
+  private async runSyncCycle() {
+    if (this.running) {
+      this.logger.debug('Sync cycle already in progress — skipping')
+      return
+    }
+
+    this.running = true
     try {
-      // Add a dispatch job — the EmailSyncProcessor handles it
-      await this.emailSyncQueue.add(
-        'email.dispatch_sync',
-        { type: 'email.dispatch_sync' } satisfies EmailSyncJobData,
-        { removeOnComplete: true, removeOnFail: true },
-      )
+      const accounts = await this.emailAccountsService.findAllActive()
+      if (accounts.length === 0) return
+
+      this.logger.debug(`Background sync: ${accounts.length} account(s)`)
+
+      for (const account of accounts) {
+        try {
+          const result = await this.imapSyncService.syncAccount(account.id)
+          if (result.newMessages > 0) {
+            this.logger.log(`Background sync: ${result.newMessages} new message(s) for ${account.id}`)
+          }
+        } catch (err: any) {
+          this.logger.warn(`Background sync failed for ${account.id}: ${err.message}`)
+        }
+      }
     } catch (err: any) {
-      this.logger.error(`Failed to dispatch email sync: ${err.message}`)
+      this.logger.error(`Sync cycle error: ${err.message}`, err.stack)
+    } finally {
+      this.running = false
     }
   }
 }
