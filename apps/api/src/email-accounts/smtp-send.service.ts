@@ -122,6 +122,11 @@ export class SmtpSendService {
       if (dto.attachments && dto.attachments.length > 0 && this.storageService) {
         const attachmentPromises = dto.attachments.map(async (att) => {
           try {
+            // Validate storagePath belongs to this agency (prevent cross-tenant access)
+            if (!att.storagePath.startsWith(`email-attachments/${account.agencyId}/`)) {
+              this.logger.warn(`Rejected attachment with unauthorized path: ${att.storagePath}`)
+              return null
+            }
             const buffer = await this.storageService!.downloadDocument(att.storagePath)
             return {
               filename: att.filename,
