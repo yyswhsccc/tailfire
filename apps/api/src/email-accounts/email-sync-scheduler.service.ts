@@ -38,6 +38,14 @@ export class EmailSyncSchedulerService implements OnModuleInit {
         },
       )
       this.logger.log(`Email sync dispatcher scheduled (every 2 minutes, next job id: ${scheduled?.id})`)
+
+      // Diagnostic: manually add one immediate dispatch job to test if the worker picks it up
+      const testJob = await this.emailSyncQueue.add(
+        'email.dispatch_sync',
+        { type: 'email.dispatch_sync' } satisfies EmailSyncJobData,
+        { removeOnComplete: true, removeOnFail: true },
+      )
+      this.logger.log(`Diagnostic: added immediate dispatch job (id=${testJob.id})`)
     } catch (error: any) {
       this.logger.error(`Failed to schedule email sync dispatcher: ${error.message}`, error.stack)
     }
