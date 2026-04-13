@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common'
+import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { and, eq, sql } from 'drizzle-orm'
 import * as nodemailer from 'nodemailer'
@@ -18,7 +18,7 @@ export class SmtpSendService {
     private readonly db: DatabaseService,
     private readonly emailAccountsService: EmailAccountsService,
     private readonly configService: ConfigService,
-    @Optional() private readonly storageService?: StorageService,
+    private readonly storageService: StorageService,
   ) {}
 
   async send(
@@ -119,7 +119,7 @@ export class SmtpSendService {
         },
       }
 
-      if (dto.attachments && dto.attachments.length > 0 && this.storageService) {
+      if (dto.attachments && dto.attachments.length > 0) {
         const attachmentPromises = dto.attachments.map(async (att) => {
           try {
             // Validate storagePath belongs to this agency (prevent cross-tenant access)
@@ -127,7 +127,7 @@ export class SmtpSendService {
               this.logger.warn(`Rejected attachment with unauthorized path: ${att.storagePath}`)
               return null
             }
-            const buffer = await this.storageService!.downloadDocument(att.storagePath)
+            const buffer = await this.storageService.downloadDocument(att.storagePath)
             return {
               filename: att.filename,
               content: buffer,
