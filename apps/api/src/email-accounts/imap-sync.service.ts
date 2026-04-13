@@ -106,6 +106,7 @@ export class ImapSyncService {
 
     // Notify account owner of new emails
     if (newMessages > 0) {
+      this.logger.log(`Sending notification: ${newMessages} new email(s) for user ${account.userId}`)
       try {
         const title = newMessages === 1
           ? `New email from ${newSenders[0] || 'Unknown'}`
@@ -126,8 +127,9 @@ export class ImapSyncService {
             newMessageCount: newMessages,
           },
         })
+        this.logger.log(`Notification sent successfully: "${title}"`)
       } catch (err: any) {
-        this.logger.warn(`Failed to send new email notification: ${err.message}`)
+        this.logger.warn(`Failed to send new email notification: ${err.message}`, err.stack)
       }
     }
 
