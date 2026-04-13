@@ -124,7 +124,7 @@ export class EmailAccountsController {
    */
   @Post(':id/sync')
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 30, ttl: 60000 } }) // Relaxed: frontend auto-triggers on folder change + scroll
   async triggerSync(
     @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
