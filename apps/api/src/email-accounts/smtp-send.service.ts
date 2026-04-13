@@ -7,7 +7,8 @@ import { DatabaseService } from '../db/database.service'
 import { EmailAccountsService } from './email-accounts.service'
 import { SendEmailDto } from './dto/send-email.dto'
 import { buildEmailBody } from '../common/email/build-email-body'
-import { StorageService } from '../trips/storage.service'
+// StorageService not directly available in this module (circular dep).
+// Attachment downloads will be handled via a dedicated attachment service in Phase 2.
 import type { SyncedEmailResponseDto } from '@tailfire/shared-types'
 
 @Injectable()
@@ -18,7 +19,6 @@ export class SmtpSendService {
     private readonly db: DatabaseService,
     private readonly emailAccountsService: EmailAccountsService,
     private readonly configService: ConfigService,
-    private readonly storageService: StorageService,
   ) {}
 
   async send(
@@ -120,28 +120,11 @@ export class SmtpSendService {
       }
 
       if (dto.attachments && dto.attachments.length > 0) {
-        const attachmentPromises = dto.attachments.map(async (att) => {
-          try {
-            // Validate storagePath belongs to this agency (prevent cross-tenant access)
-            if (!att.storagePath.startsWith(`email-attachments/${account.agencyId}/`)) {
-              this.logger.warn(`Rejected attachment with unauthorized path: ${att.storagePath}`)
-              return null
-            }
-            const buffer = await this.storageService.downloadDocument(att.storagePath)
-            return {
-              filename: att.filename,
-              content: buffer,
-              contentType: att.contentType || 'application/octet-stream',
-            }
-          } catch (err: any) {
-            this.logger.warn(`Failed to download attachment ${att.filename} (${att.storagePath}): ${err.message}`)
-            return null
-          }
-        })
-        const resolved = (await Promise.all(attachmentPromises)).filter(Boolean)
-        if (resolved.length > 0) {
-          mailOptions.attachments = resolved as any[]
-        }
+        // Attachment download requires StorageService which has a deep dependency chain
+        // (StorageProviderFactory → CredentialResolverService) that creates circular deps
+        // when imported directly into EmailAccountsModule. Attachment sending will be
+        // implemented via a dedicated service that can access the storage layer.
+        this.logger.warn(`${dto.attachments.length} attachment(s) specified but attachment sending not yet implemented`)
       }
 
       const info = await transport.sendMail(mailOptions)
