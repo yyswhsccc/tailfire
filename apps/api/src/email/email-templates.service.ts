@@ -303,7 +303,7 @@ export class EmailTemplatesService {
     const varPattern = /\{\{(\w+(?:\.\w+)*)(?:::.*?)?\}\}/g
     let match: RegExpExecArray | null
     while ((match = varPattern.exec(subject + bodyHtml)) !== null) {
-      unresolvedSet.add(match[1])
+      if (match[1]) unresolvedSet.add(match[1])
     }
 
     return { subject, bodyHtml, unresolvedVariables: [...unresolvedSet] }

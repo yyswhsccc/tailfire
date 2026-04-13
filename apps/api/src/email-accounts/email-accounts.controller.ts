@@ -13,7 +13,12 @@ import {
   Res,
   StreamableFile,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import type { Response } from 'express'
 import { ApiTags } from '@nestjs/swagger'
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
@@ -22,6 +27,7 @@ import type { AuthContext } from '../auth/auth.types'
 import { EmailAccountsService } from './email-accounts.service'
 import { ImapSyncService } from './imap-sync.service'
 import { SmtpSendService } from './smtp-send.service'
+import { StorageService } from '../trips/storage.service'
 import { CreateEmailAccountDto } from './dto/create-email-account.dto'
 import { UpdateEmailAccountDto } from './dto/update-email-account.dto'
 import { TestConnectionDto } from './dto/test-connection.dto'
@@ -42,6 +48,7 @@ export class EmailAccountsController {
     private readonly emailAccountsService: EmailAccountsService,
     private readonly imapSyncService: ImapSyncService,
     private readonly smtpSendService: SmtpSendService,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -307,6 +314,34 @@ export class EmailAccountsController {
     @Param('emailId') emailId: string,
   ): Promise<void> {
     return this.emailAccountsService.deleteEmail(id, emailId, auth.userId)
+  }
+
+  /**
+   * Upload an attachment for email sending
+   * POST /email-accounts/:id/attachments
+   */
+  @Post(':id/attachments')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAttachment(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ): Promise<{ storagePath: string; filename: string; size: number }> {
+    await this.emailAccountsService.findOne(id, auth.userId)
+    const storagePath = await this.storageService.uploadDocument(
+      file.buffer,
+      `email-attachments/${auth.agencyId}`,
+      file.originalname,
+      file.mimetype,
+    )
+    return { storagePath, filename: file.originalname, size: file.size }
   }
 
   /**
