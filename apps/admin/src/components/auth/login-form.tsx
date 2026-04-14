@@ -10,15 +10,26 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Mail, Lock } from 'lucide-react'
 
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  token_invalid: 'This invitation or reset link has already been used or has expired. Please log in or request a new link.',
+  callback_failed: 'Authentication failed. Please try again or contact your administrator.',
+  session_failed: 'Failed to create your session. Please try again.',
+  missing_params: 'Invalid authentication link. Please use the link from your email.',
+  invalid_callback: 'Invalid authentication response. Please try again.',
+}
+
 export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') || '/trips'
+  const authError = searchParams.get('error')
+  const [error, setError] = useState<string | null>(
+    authError ? AUTH_ERROR_MESSAGES[authError] || 'An authentication error occurred.' : null
+  )
 
   const supabase = createClient()
 
