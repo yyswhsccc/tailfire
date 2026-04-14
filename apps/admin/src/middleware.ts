@@ -9,7 +9,11 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 // Routes that redirect to /trips if already authenticated
-const authRoutes = ['/auth/login', '/auth/forgot-password', '/auth/reset-password']
+const authRoutes = ['/auth/login', '/auth/forgot-password']
+
+// Routes that require a session but should NOT redirect to /trips
+// (user must be authenticated to change password, but needs to stay on the page)
+const authenticatedAuthRoutes = ['/auth/reset-password', '/auth/set-password']
 
 // Routes that are always public (no auth checks)
 // Note: /auth/signout is a POST-only route handler, not a page
@@ -31,10 +35,19 @@ export async function middleware(request: NextRequest) {
   const { user, supabaseResponse } = await updateSession(request)
 
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
+  const isAuthenticatedAuthRoute = authenticatedAuthRoutes.some((route) => pathname.startsWith(route))
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
 
   // Public routes pass through
   if (isPublicRoute) {
+    return supabaseResponse
+  }
+
+  // Password reset/set pages: require session, but don't redirect away
+  if (isAuthenticatedAuthRoute) {
+    if (!user) {
+      return NextResponse.redirect(new URL('/auth/login', request.url))
+    }
     return supabaseResponse
   }
 
