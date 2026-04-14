@@ -59,11 +59,29 @@ export async function GET(request: Request) {
           // Don't block invite flow if activation fails
           console.warn('User activation failed (may already be active):', e)
         }
-        return NextResponse.redirect(`${origin}/auth/set-password`)
+        // Restrict session to password setup only (security: no dashboard access)
+        const inviteResponse = NextResponse.redirect(`${origin}/auth/set-password`)
+        inviteResponse.cookies.set('auth_flow', 'invite_setup', {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 60 * 30, // 30 minutes — enough to set password
+        })
+        return inviteResponse
       }
       // For recovery, redirect to password reset
       if (type === 'recovery') {
-        return NextResponse.redirect(`${origin}/auth/reset-password`)
+        // Restrict session to password reset only (security: no dashboard access)
+        const recoveryResponse = NextResponse.redirect(`${origin}/auth/reset-password`)
+        recoveryResponse.cookies.set('auth_flow', 'recovery', {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 60 * 30, // 30 minutes — enough to reset password
+        })
+        return recoveryResponse
       }
       // Default redirect
       return NextResponse.redirect(`${origin}/trips`)

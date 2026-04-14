@@ -51,6 +51,15 @@ export default function SetPasswordPage() {
         setError(updateError.message)
         return
       }
+      // Clear restricted auth_flow cookie via server signout, then re-login with new password
+      await fetch('/auth/signout', { method: 'POST', redirect: 'manual' })
+      // Sign back in with the new password to get a full (unrestricted) session
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email: (await supabase.auth.getUser()).data.user?.email || '', password })
+      if (signInError) {
+        // Fallback: redirect to login if re-auth fails
+        window.location.href = '/auth/login?message=password_set_success'
+        return
+      }
       router.replace('/profile?setup=true')
     } catch {
       setError('An unexpected error occurred. Please try again.')
