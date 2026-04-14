@@ -51,6 +51,8 @@ import { TripFormDialog } from '@/app/trips/_components/trip-form-dialog'
 import { ActivityFeed } from '@/components/trips/ActivityFeed'
 import { CancelTripDialog } from '@/components/trips/cancel-trip-dialog'
 import { ServiceFeesPanel } from '@/components/financials/service-fees-panel'
+import { ComposePanel } from '@/components/email-composer/compose-panel'
+import { useEmailStore } from '@/stores/email.store'
 import { Card } from '@/components/ui/card'
 import { TripDetailSkeleton } from '@/components/shared/loading-skeleton'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -683,6 +685,22 @@ export default function TripDetailPage() {
                 {uncancelTrip.isPending ? 'Restoring...' : 'Un-cancel Trip'}
               </Button>
             )}
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => {
+              const recipients: { address: string; name?: string }[] = []
+              if (trip.primaryContact?.email) {
+                recipients.push({ address: trip.primaryContact.email, name: trip.primaryContact.displayName })
+              }
+              useEmailStore.getState().openCompose({
+                mode: 'new',
+                tripId: trip.id,
+                contactId: trip.primaryContactId ?? undefined,
+                prefillTo: recipients,
+                prefillSubject: trip.name || '',
+              })
+            }}>
+              <Mail className="h-4 w-4" />
+              Email
+            </Button>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={handlePreview}>
               <Eye className="h-4 w-4" />
               Preview
@@ -757,6 +775,7 @@ export default function TripDetailPage() {
           trip={trip}
         />
       )}
+      <ComposePanel />
     </DetailLayout>
   )
 }

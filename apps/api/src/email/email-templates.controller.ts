@@ -239,6 +239,27 @@ export class EmailTemplatesController {
   }
 
   /**
+   * Render a template with real context data (trip, contact, agent)
+   * Returns rendered HTML + list of unresolved variables for the composer
+   */
+  @Post(':slug/render')
+  @ApiOperation({ summary: 'Render template with context' })
+  @ApiResponse({ status: 200, description: 'Template rendered successfully' })
+  @ApiResponse({ status: 404, description: 'Template not found' })
+  async renderWithContext(
+    @GetAuthContext() auth: AuthContext,
+    @Param('slug') slug: string,
+    @Body() body: { tripId?: string; contactId?: string; variables?: Record<string, string> },
+  ) {
+    return this.templatesService.renderWithContext(slug, auth.agencyId, {
+      tripId: body.tripId,
+      contactId: body.contactId,
+      agentId: auth.userId,
+      variables: body.variables,
+    })
+  }
+
+  /**
    * Send an email using a template
    */
   @Post('send')

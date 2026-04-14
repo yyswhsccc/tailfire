@@ -270,6 +270,46 @@ export class EmailTemplatesService {
   }
 
   /**
+   * Render a template with real context, apply manual variable overrides,
+   * and report any remaining unresolved variables.
+   * Used by the email composer's template picker.
+   */
+  async renderWithContext(
+    slug: string,
+    agencyId: string,
+    context: { tripId?: string; contactId?: string; agentId?: string; variables?: Record<string, string> },
+  ): Promise<{ subject: string; bodyHtml: string; unresolvedVariables: string[] }> {
+    const rendered = await this.renderTemplate(slug, {
+      agencyId,
+      tripId: context.tripId,
+      contactId: context.contactId,
+      agentId: context.agentId,
+    })
+
+    let subject = rendered.subject || ''
+    let bodyHtml = rendered.html || ''
+
+    // Apply manual variable overrides
+    if (context.variables) {
+      for (const [key, value] of Object.entries(context.variables)) {
+        const pattern = new RegExp(`\\{\\{${key}(?:::.*?)?\\}\\}`, 'g')
+        subject = subject.replace(pattern, value)
+        bodyHtml = bodyHtml.replace(pattern, value)
+      }
+    }
+
+    // Find remaining unresolved variables
+    const unresolvedSet = new Set<string>()
+    const varPattern = /\{\{(\w+(?:\.\w+)*)(?:::.*?)?\}\}/g
+    let match: RegExpExecArray | null
+    while ((match = varPattern.exec(subject + bodyHtml)) !== null) {
+      if (match[1]) unresolvedSet.add(match[1])
+    }
+
+    return { subject, bodyHtml, unresolvedVariables: [...unresolvedSet] }
+  }
+
+  /**
    * Map database row to response DTO
    */
   private mapToResponse(template: any): EmailTemplateResponse {

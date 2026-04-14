@@ -13,7 +13,13 @@ import {
   Res,
   StreamableFile,
   UseGuards,
+  BadRequestException,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import type { Response } from 'express'
 import { ApiTags } from '@nestjs/swagger'
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
@@ -307,6 +313,30 @@ export class EmailAccountsController {
     @Param('emailId') emailId: string,
   ): Promise<void> {
     return this.emailAccountsService.deleteEmail(id, emailId, auth.userId)
+  }
+
+  /**
+   * Upload an attachment for email sending
+   * POST /email-accounts/:id/attachments
+   */
+  @Post(':id/attachments')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAttachment(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ): Promise<{ storagePath: string; filename: string; size: number }> {
+    await this.emailAccountsService.findOne(id, auth.userId)
+    // Attachment upload requires StorageService — will be wired in Phase 2
+    // when a dedicated StorageModule is extracted from TripsModule
+    throw new BadRequestException('Attachment uploads not yet available')
   }
 
   /**

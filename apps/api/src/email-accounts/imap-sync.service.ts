@@ -79,7 +79,7 @@ export class ImapSyncService {
       const currentSyncState = (freshAccount.syncState as any) ?? {}
       const result = await this.syncFolder(client, accountId, account.agencyId, currentSyncState, 'INBOX', {
         mode: 'incremental',
-        batchSize: 100,
+        batchSize: 25,
       })
       newMessages += result.newMessages
       newSenders.push(...result.newSenders)
@@ -185,20 +185,17 @@ export class ImapSyncService {
 
       try {
         const downloadResult = await client.download(String(email.imapUid), undefined, { uid: true })
+        if (!downloadResult?.content) {
+          this.logger.warn(`No content returned for UID ${email.imapUid} in ${email.folder}`)
+          return { bodyHtml: null, bodyText: null, snippet: null }
+        }
         const chunks: Buffer[] = []
         for await (const chunk of downloadResult.content) {
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
         }
         const rawMessage = Buffer.concat(chunks)
 
-        // Parse with postal-mime
-        const { default: PostalMime } = await import('postal-mime')
-        const parser = new PostalMime()
-        const parsed = await parser.parse(rawMessage)
-
-        const bodyHtml = parsed.html || null
-        const bodyText = parsed.text || null
-        const snippet = bodyText ? bodyText.substring(0, 200).replace(/\s+/g, ' ').trim() : null
+        const { bodyHtml, bodyText, snippet } = await this.parseMessageSource(rawMessage)
 
         // Update the email record with body content
         await this.db.client
@@ -600,7 +597,7 @@ export class ImapSyncService {
     },
   ): Promise<{ newMessages: number; newSenders: string[]; errors: string[]; historyExhausted?: boolean }> {
     const mode = options?.mode ?? 'incremental'
-    const batchSize = Math.min(options?.batchSize ?? 50, 100)
+    const batchSize = Math.min(options?.batchSize ?? 25, 50)
 
     let newMessages = 0
     const newSenders: string[] = []
@@ -684,6 +681,8 @@ export class ImapSyncService {
           flags: true,
           uid: true,
           internalDate: true,
+          source: true,
+          size: true,
         }, { uid: true })) {
           if (skipLowUid > 0 && Number(msg.uid) <= skipLowUid) continue
 
@@ -759,6 +758,31 @@ export class ImapSyncService {
   }
 
 
+  /**
+   * Parse a raw RFC822 message source into HTML, text, and snippet.
+   * Shared by both sync (eager) and fetchEmailBody (lazy fallback).
+   */
+  private async parseMessageSource(source: Buffer | Uint8Array): Promise<{
+    bodyHtml: string | null
+    bodyText: string | null
+    snippet: string | null
+  }> {
+    try {
+      const { default: PostalMime } = await import('postal-mime')
+      const parser = new PostalMime()
+      const parsed = await parser.parse(source)
+      const bodyHtml = parsed.html || null
+      const bodyText = parsed.text || null
+      const snippet = bodyText
+        ? bodyText.substring(0, 200).replace(/\s+/g, ' ').trim()
+        : null
+      return { bodyHtml, bodyText, snippet }
+    } catch (err: any) {
+      this.logger.warn(`Failed to parse message source: ${err.message}`)
+      return { bodyHtml: null, bodyText: null, snippet: null }
+    }
+  }
+
   private async upsertEmailFromImap(
     accountId: string,
     agencyId: string,
@@ -780,6 +804,18 @@ export class ImapSyncService {
 
     // Extract attachment metadata from bodyStructure
     const attachments = this.extractAttachmentMetadata(msg.bodyStructure)
+
+    // Parse body from source (if available and under 1MB threshold)
+    let bodyHtml: string | null = null
+    let bodyText: string | null = null
+    let snippet: string | null = null
+    const MAX_SOURCE_SIZE = 1024 * 1024 // 1MB
+    if (msg.source && (!msg.size || Number(msg.size) < MAX_SOURCE_SIZE)) {
+      const parsed = await this.parseMessageSource(msg.source)
+      bodyHtml = parsed.bodyHtml
+      bodyText = parsed.bodyText
+      snippet = parsed.snippet
+    }
 
     // Match contacts by email addresses
     const allAddresses = [
@@ -829,6 +865,9 @@ export class ImapSyncService {
             imapUid: Number(msg.uid),
             folder,
             date: emailDate,
+            bodyHtml: bodyHtml ?? undefined,
+            bodyText: bodyText ?? undefined,
+            snippet: snippet ?? undefined,
             isSeen: flags.has('\\Seen'),
             isFlagged: flags.has('\\Flagged'),
             isAnswered: flags.has('\\Answered'),
@@ -881,6 +920,9 @@ export class ImapSyncService {
         toAddresses,
         ccAddresses,
         subject: envelope?.subject,
+        bodyHtml,
+        bodyText,
+        snippet,
         date: emailDate,
         isSeen: flags.has('\\Seen'),
         isFlagged: flags.has('\\Flagged'),
@@ -902,6 +944,10 @@ export class ImapSyncService {
           isFlagged: sql`EXCLUDED.is_flagged`,
           isAnswered: sql`EXCLUDED.is_answered`,
           isDraft: sql`EXCLUDED.is_draft`,
+          // Backfill body if currently null (don't overwrite existing body)
+          bodyHtml: sql`COALESCE(synced_emails.body_html, EXCLUDED.body_html)`,
+          bodyText: sql`COALESCE(synced_emails.body_text, EXCLUDED.body_text)`,
+          snippet: sql`COALESCE(synced_emails.snippet, EXCLUDED.snippet)`,
           updatedAt: new Date(),
         },
       })

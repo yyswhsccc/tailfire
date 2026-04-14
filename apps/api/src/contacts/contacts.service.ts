@@ -185,6 +185,8 @@ export class ContactsService {
       const searchCondition = or(
         ilike(this.db.schema.contacts.firstName, `%${filters.search}%`),
         ilike(this.db.schema.contacts.lastName, `%${filters.search}%`),
+        ilike(this.db.schema.contacts.preferredName, `%${filters.search}%`),
+        ilike(this.db.schema.contacts.legalFirstName, `%${filters.search}%`),
         ilike(this.db.schema.contacts.email, `%${filters.search}%`),
         ilike(this.db.schema.contacts.phone, `%${filters.search}%`),
       )

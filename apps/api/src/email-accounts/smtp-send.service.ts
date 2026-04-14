@@ -7,6 +7,8 @@ import { DatabaseService } from '../db/database.service'
 import { EmailAccountsService } from './email-accounts.service'
 import { SendEmailDto } from './dto/send-email.dto'
 import { buildEmailBody } from '../common/email/build-email-body'
+// StorageService not directly available in this module (circular dep).
+// Attachment downloads will be handled via a dedicated attachment service in Phase 2.
 import type { SyncedEmailResponseDto } from '@tailfire/shared-types'
 
 @Injectable()
@@ -115,6 +117,14 @@ export class SmtpSendService {
           ...(inReplyTo ? { 'In-Reply-To': inReplyTo } : {}),
           ...(references ? { References: references } : {}),
         },
+      }
+
+      if (dto.attachments && dto.attachments.length > 0) {
+        // Attachment download requires StorageService which has a deep dependency chain
+        // (StorageProviderFactory → CredentialResolverService) that creates circular deps
+        // when imported directly into EmailAccountsModule. Attachment sending will be
+        // implemented via a dedicated service that can access the storage layer.
+        this.logger.warn(`${dto.attachments.length} attachment(s) specified but attachment sending not yet implemented`)
       }
 
       const info = await transport.sendMail(mailOptions)

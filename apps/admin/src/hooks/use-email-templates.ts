@@ -172,3 +172,22 @@ export function useToggleTemplateStatus() {
     },
   })
 }
+
+/**
+ * Render a template with real context data (trip, contact, agent).
+ * Returns rendered HTML + unresolved variables for the composer.
+ */
+export function useRenderTemplate() {
+  return useMutation({
+    mutationFn: (params: {
+      slug: string
+      tripId?: string
+      contactId?: string
+      variables?: Record<string, string>
+    }) =>
+      api.post<{ subject: string; bodyHtml: string; unresolvedVariables: string[] }>(
+        `/email-templates/${params.slug}/render`,
+        { tripId: params.tripId, contactId: params.contactId, variables: params.variables },
+      ),
+  })
+}
