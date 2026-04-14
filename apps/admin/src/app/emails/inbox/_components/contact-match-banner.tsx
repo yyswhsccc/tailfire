@@ -9,57 +9,43 @@ import { QuickContactDialog } from '@/app/contacts/_components/quick-contact-dia
 
 interface ContactMatchBannerProps {
   matchedContactIds: string[]
-  contacts: { id: string; name: string }[]
   fromAddress?: string | null
   fromName?: string | null
 }
 
 export function ContactMatchBanner({
   matchedContactIds,
-  contacts,
   fromAddress,
   fromName,
 }: ContactMatchBannerProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
 
-  // Real-time fallback: search contacts by fromAddress when matchedContactIds is empty
+  // Always search by sender email to resolve contact names
   const { data: searchResults } = useContacts(
-    matchedContactIds.length === 0 && fromAddress
-      ? { search: fromAddress, limit: 5 }
-      : { limit: 0 },
+    fromAddress ? { search: fromAddress, limit: 5 } : { limit: 0 },
   )
 
-  // Merge: use matchedContactIds if available, otherwise use search results
-  const resolvedContacts = matchedContactIds.length > 0
-    ? matchedContactIds
-        .map((id) => contacts.find((c) => c.id === id))
-        .filter(Boolean) as { id: string; name: string }[]
-    : (searchResults?.data || [])
-        .filter((c) => c.email?.toLowerCase() === fromAddress?.toLowerCase())
-        .map((c) => ({ id: c.id, name: c.displayName || c.firstName || 'Contact' }))
+  // Find exact email match from search results
+  const matchedByEmail = (searchResults?.data || []).filter(
+    (c) => c.email?.toLowerCase() === fromAddress?.toLowerCase(),
+  )
 
-  if (resolvedContacts.length === 0 && matchedContactIds.length > 0) {
-    // We have IDs but no contact data loaded — show generic links
-    return (
-      <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs">
-        <span className="text-muted-foreground">Linked to:</span>
-        {matchedContactIds.map((id, i) => (
-          <span key={id}>
-            <Link
-              href={`/contacts/${id}`}
-              className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-            >
-              Contact
-              <ExternalLink className="h-3 w-3" />
-            </Link>
-            {i < matchedContactIds.length - 1 && (
-              <span className="text-muted-foreground">, </span>
-            )}
-          </span>
-        ))}
-      </div>
-    )
-  }
+  // Combine: matched contacts from sync + email search results
+  const resolvedContacts = matchedByEmail.length > 0
+    ? matchedByEmail.map((c) => ({
+        id: c.id,
+        name: c.displayName || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Contact',
+      }))
+    : matchedContactIds.length > 0
+      ? matchedContactIds.map((id) => {
+          // Try to find name from search results (may match on other fields)
+          const found = searchResults?.data?.find((c) => c.id === id)
+          return {
+            id,
+            name: found?.displayName || found?.firstName || 'Contact',
+          }
+        })
+      : []
 
   if (resolvedContacts.length > 0) {
     return (
@@ -81,7 +67,7 @@ export function ContactMatchBanner({
     )
   }
 
-  // Parse sender name into first/last
+  // Parse sender name into first/last for the create dialog
   const parsedName = (() => {
     if (!fromName) return {}
     const parts = fromName.split(' ')
@@ -94,7 +80,7 @@ export function ContactMatchBanner({
     return { firstName: fromName }
   })()
 
-  // No match found at all — show create button
+  // No match — show "Create Contact" button
   return (
     <>
       <div className="flex items-center justify-between rounded-md border border-dashed border-muted-foreground/30 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
