@@ -308,6 +308,8 @@ export class CalendarService {
       editable: true,
       clickable: true,
       metadata: {
+        tripId: task.tripId ?? undefined,
+        contactId: task.contactId ?? undefined,
         status: task.status,
         priority: task.priority,
       },
@@ -403,8 +405,11 @@ export class CalendarService {
         editable: false,
         clickable: true,
         metadata: {
+          tripId: trip.id,
+          tripName: trip.name,
           status: trip.status,
           referenceNumber: trip.referenceNumber,
+          contactId: trip.primaryContactId,
         },
       }
     })
@@ -532,6 +537,9 @@ export class CalendarService {
           editable: false,
           clickable: true,
           metadata: {
+            tripId: payment.tripId,
+            tripName: payment.tripName,
+            amount: payment.expectedAmountCents ? (payment.expectedAmountCents / 100).toFixed(2) : undefined,
             amountCents: payment.expectedAmountCents,
             currency: payment.currency || 'CAD',
             status: payment.status,
@@ -849,6 +857,8 @@ export class CalendarService {
         editable: false,
         clickable: true,
         metadata: {
+          tripId: a.tripId,
+          tripName: a.tripName,
           activityType: a.activityType,
           status: a.proposalStatus,
         },
