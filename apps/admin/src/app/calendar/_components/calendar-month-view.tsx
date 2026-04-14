@@ -132,7 +132,7 @@ export function CalendarMonthView({
   }, [events, excludedByDate])
 
   return (
-    <div className="flex flex-col h-full border rounded-lg overflow-hidden">
+    <div className="flex flex-col h-full border rounded-lg overflow-y-auto">
       {/* Weekday headers */}
       <div className="grid grid-cols-7 border-b bg-muted/50">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
@@ -146,7 +146,7 @@ export function CalendarMonthView({
       </div>
 
       {/* Calendar grid */}
-      <div className="flex-1 grid" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
+      <div className="flex-1 grid" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(120px, 1fr))` }}>
         {weeks.map((week, weekIndex) => {
           const layout = multiDayLayouts[weekIndex] ?? { segments: [], laneCount: 0, overflowCount: 0 }
           const laneAreaHeight = layout.laneCount > 0
