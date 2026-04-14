@@ -117,6 +117,11 @@ export async function queryBookedSales(
     ? sql`AND t.owner_id = ${options.agentId}`
     : sql``
 
+  // Optional trip type filter
+  const tripTypeFilter = options.tripType
+    ? sql`AND t.trip_type = ${options.tripType}`
+    : sql``
+
   // Count query
   const countResult = await db.client.execute(sql`
     SELECT count(DISTINCT t.id)::int AS total_rows
@@ -128,6 +133,7 @@ export async function queryBookedSales(
       AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startDate}::timestamptz
       AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endDate}::timestamptz
       ${agentFilter}
+      ${tripTypeFilter}
   `)
   const totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
 
@@ -159,6 +165,7 @@ export async function queryBookedSales(
       AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startDate}::timestamptz
       AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endDate}::timestamptz
       ${agentFilter}
+      ${tripTypeFilter}
     GROUP BY t.id, t.name, t.reference_number, t.status, t.trip_type,
              t.booking_date, t.created_at, t.start_date, t.end_date,
              up.first_name, up.last_name, c.first_name, c.last_name
@@ -237,6 +244,10 @@ export async function queryDepartedSales(
     ? sql`AND t.owner_id = ${options.agentId}`
     : sql``
 
+  const tripTypeFilter = options.tripType
+    ? sql`AND t.trip_type = ${options.tripType}`
+    : sql``
+
   // Count query
   const countResult = await db.client.execute(sql`
     SELECT count(DISTINCT t.id)::int AS total_rows
@@ -248,6 +259,7 @@ export async function queryDepartedSales(
       AND t.start_date >= ${startDate}::date
       AND t.start_date <= ${endDate}::date
       ${agentFilter}
+      ${tripTypeFilter}
   `)
   const totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
 
@@ -279,6 +291,7 @@ export async function queryDepartedSales(
       AND t.start_date >= ${startDate}::date
       AND t.start_date <= ${endDate}::date
       ${agentFilter}
+      ${tripTypeFilter}
     GROUP BY t.id, t.name, t.reference_number, t.status, t.trip_type,
              t.booking_date, t.created_at, t.start_date, t.end_date,
              up.first_name, up.last_name, c.first_name, c.last_name
