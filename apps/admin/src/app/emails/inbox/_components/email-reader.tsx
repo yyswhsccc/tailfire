@@ -278,7 +278,6 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
         {/* Contact match */}
         <ContactMatchBanner
           matchedContactIds={email.matchedContactIds}
-          contacts={[]}
           fromAddress={email.fromAddress}
           fromName={email.fromName}
         />
