@@ -681,6 +681,8 @@ export class ImapSyncService {
           flags: true,
           uid: true,
           internalDate: true,
+          source: true,
+          size: true,
         }, { uid: true })) {
           if (skipLowUid > 0 && Number(msg.uid) <= skipLowUid) continue
 
@@ -803,6 +805,18 @@ export class ImapSyncService {
     // Extract attachment metadata from bodyStructure
     const attachments = this.extractAttachmentMetadata(msg.bodyStructure)
 
+    // Parse body from source (if available and under 1MB threshold)
+    let bodyHtml: string | null = null
+    let bodyText: string | null = null
+    let snippet: string | null = null
+    const MAX_SOURCE_SIZE = 1024 * 1024 // 1MB
+    if (msg.source && (!msg.size || Number(msg.size) < MAX_SOURCE_SIZE)) {
+      const parsed = await this.parseMessageSource(msg.source)
+      bodyHtml = parsed.bodyHtml
+      bodyText = parsed.bodyText
+      snippet = parsed.snippet
+    }
+
     // Match contacts by email addresses
     const allAddresses = [
       from?.address,
@@ -851,6 +865,9 @@ export class ImapSyncService {
             imapUid: Number(msg.uid),
             folder,
             date: emailDate,
+            bodyHtml: bodyHtml ?? undefined,
+            bodyText: bodyText ?? undefined,
+            snippet: snippet ?? undefined,
             isSeen: flags.has('\\Seen'),
             isFlagged: flags.has('\\Flagged'),
             isAnswered: flags.has('\\Answered'),
@@ -903,6 +920,9 @@ export class ImapSyncService {
         toAddresses,
         ccAddresses,
         subject: envelope?.subject,
+        bodyHtml,
+        bodyText,
+        snippet,
         date: emailDate,
         isSeen: flags.has('\\Seen'),
         isFlagged: flags.has('\\Flagged'),
