@@ -195,14 +195,7 @@ export class ImapSyncService {
         }
         const rawMessage = Buffer.concat(chunks)
 
-        // Parse with postal-mime
-        const { default: PostalMime } = await import('postal-mime')
-        const parser = new PostalMime()
-        const parsed = await parser.parse(rawMessage)
-
-        const bodyHtml = parsed.html || null
-        const bodyText = parsed.text || null
-        const snippet = bodyText ? bodyText.substring(0, 200).replace(/\s+/g, ' ').trim() : null
+        const { bodyHtml, bodyText, snippet } = await this.parseMessageSource(rawMessage)
 
         // Update the email record with body content
         await this.db.client
@@ -762,6 +755,31 @@ export class ImapSyncService {
     return Number.isNaN(d.getTime()) ? null : d
   }
 
+
+  /**
+   * Parse a raw RFC822 message source into HTML, text, and snippet.
+   * Shared by both sync (eager) and fetchEmailBody (lazy fallback).
+   */
+  private async parseMessageSource(source: Buffer | Uint8Array): Promise<{
+    bodyHtml: string | null
+    bodyText: string | null
+    snippet: string | null
+  }> {
+    try {
+      const { default: PostalMime } = await import('postal-mime')
+      const parser = new PostalMime()
+      const parsed = await parser.parse(source)
+      const bodyHtml = parsed.html || null
+      const bodyText = parsed.text || null
+      const snippet = bodyText
+        ? bodyText.substring(0, 200).replace(/\s+/g, ' ').trim()
+        : null
+      return { bodyHtml, bodyText, snippet }
+    } catch (err: any) {
+      this.logger.warn(`Failed to parse message source: ${err.message}`)
+      return { bodyHtml: null, bodyText: null, snippet: null }
+    }
+  }
 
   private async upsertEmailFromImap(
     accountId: string,
