@@ -38,6 +38,24 @@ export async function middleware(request: NextRequest) {
   const isAuthenticatedAuthRoute = authenticatedAuthRoutes.some((route) => pathname.startsWith(route))
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
 
+  // Check for restricted auth flow (recovery or invite — session can only access password pages)
+  const authFlow = request.cookies.get('auth_flow')?.value
+  if (authFlow && user) {
+    const allowedPaths = authFlow === 'recovery'
+      ? ['/auth/reset-password', '/auth/signout']
+      : ['/auth/set-password', '/profile', '/auth/signout']
+
+    const isAllowed = allowedPaths.some((p) => pathname.startsWith(p))
+      || isPublicRoute
+
+    if (!isAllowed) {
+      // Restricted session trying to access dashboard — redirect back to password page
+      const redirectPath = authFlow === 'recovery' ? '/auth/reset-password' : '/auth/set-password'
+      return NextResponse.redirect(new URL(redirectPath, request.url))
+    }
+    return supabaseResponse
+  }
+
   // Public routes pass through
   if (isPublicRoute) {
     return supabaseResponse

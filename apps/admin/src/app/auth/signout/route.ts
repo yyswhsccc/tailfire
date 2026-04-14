@@ -12,7 +12,10 @@ export async function POST(request: Request) {
   await supabase.auth.signOut()
 
   const url = new URL('/auth/login', request.url)
-  return NextResponse.redirect(url, {
-    status: 302,
-  })
+  const response = NextResponse.redirect(url, { status: 302 })
+
+  // Clear restricted auth flow cookie (recovery/invite_setup) on signout
+  response.cookies.delete('auth_flow')
+
+  return response
 }
