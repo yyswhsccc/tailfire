@@ -79,7 +79,7 @@ export class ImapSyncService {
       const currentSyncState = (freshAccount.syncState as any) ?? {}
       const result = await this.syncFolder(client, accountId, account.agencyId, currentSyncState, 'INBOX', {
         mode: 'incremental',
-        batchSize: 100,
+        batchSize: 25,
       })
       newMessages += result.newMessages
       newSenders.push(...result.newSenders)
@@ -597,7 +597,7 @@ export class ImapSyncService {
     },
   ): Promise<{ newMessages: number; newSenders: string[]; errors: string[]; historyExhausted?: boolean }> {
     const mode = options?.mode ?? 'incremental'
-    const batchSize = Math.min(options?.batchSize ?? 50, 100)
+    const batchSize = Math.min(options?.batchSize ?? 25, 50)
 
     let newMessages = 0
     const newSenders: string[] = []

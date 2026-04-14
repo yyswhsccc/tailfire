@@ -308,7 +308,7 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
           <pre className="whitespace-pre-wrap text-sm">{email.bodyText}</pre>
         ) : (
           <p className="text-sm text-muted-foreground italic">
-            Email body not yet loaded. Loading...
+            Email body unavailable.
           </p>
         )}
       </div>
