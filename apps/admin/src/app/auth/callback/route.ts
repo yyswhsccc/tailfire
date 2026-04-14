@@ -36,6 +36,10 @@ export async function GET(request: Request) {
       type: type as 'invite' | 'recovery' | 'email',
     })
 
+    if (error) {
+      console.error(`[auth/callback] verifyOtp failed for type=${type}: ${error.message} (status=${error.status})`)
+    }
+
     if (!error) {
       // For invites, activate the pending user then redirect to profile setup
       if (type === 'invite') {
