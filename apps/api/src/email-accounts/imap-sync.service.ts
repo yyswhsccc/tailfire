@@ -944,6 +944,10 @@ export class ImapSyncService {
           isFlagged: sql`EXCLUDED.is_flagged`,
           isAnswered: sql`EXCLUDED.is_answered`,
           isDraft: sql`EXCLUDED.is_draft`,
+          // Backfill body if currently null (don't overwrite existing body)
+          bodyHtml: sql`COALESCE(synced_emails.body_html, EXCLUDED.body_html)`,
+          bodyText: sql`COALESCE(synced_emails.body_text, EXCLUDED.body_text)`,
+          snippet: sql`COALESCE(synced_emails.snippet, EXCLUDED.snippet)`,
           updatedAt: new Date(),
         },
       })
