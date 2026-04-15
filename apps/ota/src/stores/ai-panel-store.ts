@@ -18,6 +18,13 @@ interface JourneyItem {
   addedAt: string
 }
 
+interface BrowsingHistoryEntry {
+  type: string
+  name: string
+  slug: string
+  timestamp: number
+}
+
 interface AiPanelState {
   // Panel state
   isOpen: boolean
@@ -30,6 +37,9 @@ interface AiPanelState {
   // Journey tracker (saved/hearted items)
   journeyItems: JourneyItem[]
 
+  // Browsing history (recently visited entity pages)
+  browsingHistory: BrowsingHistoryEntry[]
+
   // Actions
   open: (opts?: { prefill?: string }) => void
   close: () => void
@@ -37,6 +47,7 @@ interface AiPanelState {
   setPageContext: (ctx: PageContext) => void
   clearPageContext: () => void
   setSessionId: (id: string) => void
+  addPageVisit: (entry: Omit<BrowsingHistoryEntry, 'timestamp'>) => void
 
   // Journey item actions
   addJourneyItem: (item: Omit<JourneyItem, 'id' | 'addedAt' | 'hearted'>) => void
@@ -48,6 +59,7 @@ interface AiPanelState {
 export const useAiPanelStore = create<AiPanelState>((set) => ({
   isOpen: false,
   journeyItems: [],
+  browsingHistory: [],
 
   open: (opts) => set({ isOpen: true, prefill: opts?.prefill }),
   close: () => set({ isOpen: false, prefill: undefined }),
@@ -56,6 +68,16 @@ export const useAiPanelStore = create<AiPanelState>((set) => ({
   setPageContext: (ctx) => set({ pageContext: ctx }),
   clearPageContext: () => set({ pageContext: undefined }),
   setSessionId: (id) => set({ sessionId: id }),
+
+  addPageVisit: ({ type, slug, name }) =>
+    set((s) => {
+      const filtered = s.browsingHistory.filter(
+        (e) => !(e.type === type && e.slug === slug),
+      )
+      return {
+        browsingHistory: [{ type, slug, name, timestamp: Date.now() }, ...filtered].slice(0, 10),
+      }
+    }),
 
   addJourneyItem: (item) =>
     set((s) => {
