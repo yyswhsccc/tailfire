@@ -110,10 +110,12 @@ export function ReportFilters({ slug, filters, onChange, isAdmin }: ReportFilter
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="vacation">Vacation</SelectItem>
-            <SelectItem value="cruise">Cruise</SelectItem>
+            <SelectItem value="leisure">Leisure</SelectItem>
+            <SelectItem value="business">Business</SelectItem>
             <SelectItem value="group">Group</SelectItem>
+            <SelectItem value="honeymoon">Honeymoon</SelectItem>
             <SelectItem value="corporate">Corporate</SelectItem>
+            <SelectItem value="custom">Custom</SelectItem>
           </SelectContent>
         </Select>
       )}
