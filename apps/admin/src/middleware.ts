@@ -15,6 +15,9 @@ const authRoutes = ['/auth/login', '/auth/forgot-password', '/auth/reset-passwor
 // Note: /auth/signout is a POST-only route handler, not a page
 const publicRoutes = ['/auth/callback']
 
+// Routes accessible by pending users (before password is set)
+const pendingAllowedRoutes = ['/auth/set-password', '/auth/callback']
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -28,7 +31,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const { user, supabaseResponse } = await updateSession(request)
+  const { user, userStatus, supabaseResponse } = await updateSession(request)
 
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
@@ -59,6 +62,14 @@ export async function middleware(request: NextRequest) {
     const redirectUrl = new URL('/auth/login', request.url)
     redirectUrl.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(redirectUrl)
+  }
+
+  // Pending users must set their password before accessing the app
+  if (userStatus === 'pending') {
+    const isPendingAllowed = pendingAllowedRoutes.some((route) => pathname.startsWith(route))
+    if (!isPendingAllowed) {
+      return NextResponse.redirect(new URL('/auth/set-password', request.url))
+    }
   }
 
   return supabaseResponse

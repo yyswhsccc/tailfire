@@ -43,5 +43,18 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  return { user, supabaseResponse }
+  // Extract user_status from JWT claims for pending-user detection
+  let userStatus: string | null = null
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.access_token) {
+    try {
+      const parts = session.access_token.split('.')
+      if (parts[1]) {
+        const claims = JSON.parse(atob(parts[1]))
+        userStatus = claims.user_status ?? null
+      }
+    } catch { /* ignore decode errors */ }
+  }
+
+  return { user, userStatus, supabaseResponse }
 }
