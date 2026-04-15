@@ -72,11 +72,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
       setClaims(extractClaims(session))
       setIsLoading(false)
+
+      // Record login timestamp on sign-in (fire-and-forget)
+      if (event === 'SIGNED_IN' && session?.access_token) {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+        fetch(`${apiUrl}/user-profiles/me/record-login`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        }).catch(() => {/* non-critical */})
+      }
     })
 
     return () => subscription.unsubscribe()

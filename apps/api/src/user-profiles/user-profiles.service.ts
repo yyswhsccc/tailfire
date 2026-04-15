@@ -47,6 +47,7 @@ export class UserProfilesService {
       commissionSettings: (profile.commissionSettings as CommissionSettingsDto) ?? {},
       // Format timestamps
       lastLoginAt: profile.lastLoginAt?.toISOString() ?? null,
+      lastSeenAt: profile.lastSeenAt?.toISOString() ?? null,
       createdAt: profile.createdAt.toISOString(),
       updatedAt: profile.updatedAt.toISOString(),
     }
@@ -261,6 +262,14 @@ export class UserProfilesService {
    * Activate pending user account (called after first login)
    * Returns true if activated, false if already active
    */
+  async recordLogin(userId: string): Promise<void> {
+    const now = new Date()
+    await this.db.client
+      .update(this.db.schema.userProfiles)
+      .set({ lastLoginAt: now, lastSeenAt: now })
+      .where(eq(this.db.schema.userProfiles.id, userId))
+  }
+
   async activateMyAccount(userId: string): Promise<{ activated: boolean }> {
     const { userProfiles } = this.db.schema
 

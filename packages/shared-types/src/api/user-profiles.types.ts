@@ -99,6 +99,7 @@ export interface UserProfileResponseDto {
   licensingInfo: LicensingInfoDto
   commissionSettings: CommissionSettingsDto
   lastLoginAt: string | null
+  lastSeenAt: string | null
   createdAt: string
   updatedAt: string
   agencyBusinessConfig?: AgencyBusinessConfigDto
