@@ -231,7 +231,9 @@ function parseDates(text: string): TravelDates | undefined {
   // ISO date pattern: 2026-11-15 or 2026/11/15
   const isoMatch = text.match(/\b(202\d|203\d)[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])\b/)
   if (isoMatch) {
-    const [, yr, mo, dy] = isoMatch
+    const yr = isoMatch[1]!
+    const mo = isoMatch[2]!
+    const dy = isoMatch[3]!
     return {
       raw: isoMatch[0],
       isoDate: `${yr}-${mo}-${dy}`,
@@ -248,8 +250,8 @@ function parseDates(text: string): TravelDates | undefined {
   )
   const myMatch = lower.match(monthYearPattern)
   if (myMatch) {
-    const monthNum = MONTH_NAMES[myMatch[1].toLowerCase()] ?? 1
-    const year = parseInt(myMatch[2], 10)
+    const monthNum = MONTH_NAMES[myMatch[1]!.toLowerCase()] ?? 1
+    const year = parseInt(myMatch[2]!, 10)
     return {
       raw: myMatch[0],
       isoDate: `${year}-${String(monthNum).padStart(2, '0')}-01`,
@@ -266,7 +268,7 @@ function parseDates(text: string): TravelDates | undefined {
   )
   const moMatch = lower.match(monthOnlyPattern)
   if (moMatch) {
-    const monthNum = MONTH_NAMES[moMatch[1].toLowerCase()]
+    const monthNum = MONTH_NAMES[moMatch[1]!.toLowerCase()]
     if (monthNum) {
       return {
         raw: moMatch[0].trim(),
@@ -313,7 +315,7 @@ function parseTravelers(text: string): TravelerInfo | undefined {
   // "family of N"
   const familyOfMatch = lower.match(/family of (\d+)/)
   if (familyOfMatch) {
-    const total = parseInt(familyOfMatch[1], 10)
+    const total = parseInt(familyOfMatch[1]!, 10)
     const adults = Math.max(2, Math.floor(total / 2))
     const children = total - adults
     return { totalCount: total, adults, children, groupType: 'family' }
@@ -322,30 +324,30 @@ function parseTravelers(text: string): TravelerInfo | undefined {
   // "N adults and M kids/children"
   const adultKidsMatch = lower.match(/(\d+)\s*adults?\s+and\s+(\d+)\s*(?:kids?|children|child)/)
   if (adultKidsMatch) {
-    const adults = parseInt(adultKidsMatch[1], 10)
-    const children = parseInt(adultKidsMatch[2], 10)
+    const adults = parseInt(adultKidsMatch[1]!, 10)
+    const children = parseInt(adultKidsMatch[2]!, 10)
     return { totalCount: adults + children, adults, children, groupType: children > 0 ? 'family' : 'group' }
   }
 
   // "M kids/children and N adults"
   const kidsAdultMatch = lower.match(/(\d+)\s*(?:kids?|children|child)\s+and\s+(\d+)\s*adults?/)
   if (kidsAdultMatch) {
-    const children = parseInt(kidsAdultMatch[1], 10)
-    const adults = parseInt(kidsAdultMatch[2], 10)
+    const children = parseInt(kidsAdultMatch[1]!, 10)
+    const adults = parseInt(kidsAdultMatch[2]!, 10)
     return { totalCount: adults + children, adults, children, groupType: 'family' }
   }
 
   // "N adults"
   const adultsMatch = lower.match(/(\d+)\s*adults?/)
   if (adultsMatch) {
-    const adults = parseInt(adultsMatch[1], 10)
+    const adults = parseInt(adultsMatch[1]!, 10)
     return { totalCount: adults, adults, children: 0, groupType: adults > 2 ? 'group' : adults === 2 ? 'couple' : 'solo' }
   }
 
   // "N kids / children / people / travellers"
   const kidsMatch = lower.match(/(\d+)\s*(?:kids?|children|child)/)
   if (kidsMatch) {
-    const children = parseInt(kidsMatch[1], 10)
+    const children = parseInt(kidsMatch[1]!, 10)
     // Assume 2 adults if only kids count mentioned
     return { totalCount: 2 + children, adults: 2, children, groupType: 'family' }
   }
@@ -353,14 +355,14 @@ function parseTravelers(text: string): TravelerInfo | undefined {
   // "N people / travellers / passengers / friends / of us"
   const groupMatch = lower.match(/(\d+)\s*(?:people|person|travell?ers?|passengers?|friends?|of us|pax)\b/)
   if (groupMatch) {
-    const total = parseInt(groupMatch[1], 10)
+    const total = parseInt(groupMatch[1]!, 10)
     return { totalCount: total, adults: total, children: 0, groupType: total >= 5 ? 'group' : total === 2 ? 'couple' : total === 1 ? 'solo' : 'group' }
   }
 
   // "a group of N"
   const groupOfMatch = lower.match(/a?\s*group of (\d+)/)
   if (groupOfMatch) {
-    const total = parseInt(groupOfMatch[1], 10)
+    const total = parseInt(groupOfMatch[1]!, 10)
     return { totalCount: total, adults: total, children: 0, groupType: 'group' }
   }
 
@@ -374,13 +376,13 @@ function parseOrigin(text: string): string | undefined {
   // Explicit IATA codes near "from": "flying from YOW", "departing from YYZ"
   const iataFromMatch = text.match(/\b(?:from|departing|flying from|leaving from)\s+([A-Z]{3})\b/)
   if (iataFromMatch) {
-    return iataFromMatch[1].toUpperCase()
+    return iataFromMatch[1]!.toUpperCase()
   }
 
   // Standalone IATA code pattern (3 uppercase letters) near travel prepositions
   const iataMatch = text.match(/\bfrom\s+([A-Z]{3})\b/)
   if (iataMatch) {
-    return iataMatch[1].toUpperCase()
+    return iataMatch[1]!.toUpperCase()
   }
 
   // Canadian city names near "from"
@@ -412,7 +414,7 @@ function parseBudget(text: string): BudgetInfo | undefined {
   // Dollar amount: $3,000 or $3000 or 3000 dollars
   const dollarMatch = text.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*[Kk]?/)
   if (dollarMatch) {
-    let amount = parseFloat(dollarMatch[1].replace(/,/g, ''))
+    let amount = parseFloat(dollarMatch[1]!.replace(/,/g, ''))
     if (dollarMatch[0].toLowerCase().endsWith('k')) amount *= 1000
     if (amount < 3000) {
       return { tier: 'budget', amountDollars: amount }
@@ -426,7 +428,7 @@ function parseBudget(text: string): BudgetInfo | undefined {
   // "Xk budget" e.g. "$5k" or "5k"
   const kMatch = text.match(/(\d+(?:\.\d+)?)\s*[Kk]\b/)
   if (kMatch) {
-    const amount = parseFloat(kMatch[1]) * 1000
+    const amount = parseFloat(kMatch[1]!) * 1000
     if (amount < 3000) {
       return { tier: 'budget', amountDollars: amount }
     } else if (amount < 7000) {

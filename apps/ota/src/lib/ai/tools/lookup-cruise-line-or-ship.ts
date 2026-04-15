@@ -60,43 +60,41 @@ export const lookupCruiseLineOrShip = tool({
       }
     }
 
-    // Try ship lookup unless type is explicitly 'line'
-    if (type !== 'line') {
-      try {
-        const ships = await catalogFetch<ShipSummary[]>('/cruise-repository/ships')
-        const match = (Array.isArray(ships) ? ships : []).find(
-          (s) =>
-            s.name?.toLowerCase().includes(q) ||
-            q.includes(s.name?.toLowerCase() ?? '')
-        )
-        if (match) {
-          try {
-            const detail = await catalogFetch<ShipDetail>(
-              `/cruise-repository/ships/by-slug/${match.slug}`
-            )
-            return {
-              found: true as const,
-              type: 'ship' as const,
-              name: detail.name,
-              slug: detail.slug,
-              cruiseLine: detail.cruiseLine?.name,
-              cruiseLineSlug: detail.cruiseLine?.slug,
-              imageUrl: detail.imageUrl,
-              shipClass: detail.shipClass,
-              yearBuilt: detail.yearBuilt,
-              passengerCapacity: detail.passengerCapacity,
-              tonnage: detail.tonnage,
-              crewCount: detail.crewCount,
-              amenities: detail.amenities ?? [],
-              upcomingSailings: detail.upcomingSailingCount,
-            }
-          } catch {
-            // detail fetch failed — fall through
+    // Try ship lookup (type is 'ship' or undefined at this point — 'line' returned above)
+    try {
+      const ships = await catalogFetch<ShipSummary[]>('/cruise-repository/ships')
+      const match = (Array.isArray(ships) ? ships : []).find(
+        (s) =>
+          s.name?.toLowerCase().includes(q) ||
+          q.includes(s.name?.toLowerCase() ?? '')
+      )
+      if (match) {
+        try {
+          const detail = await catalogFetch<ShipDetail>(
+            `/cruise-repository/ships/by-slug/${match.slug}`
+          )
+          return {
+            found: true as const,
+            type: 'ship' as const,
+            name: detail.name,
+            slug: detail.slug,
+            cruiseLine: detail.cruiseLine?.name,
+            cruiseLineSlug: detail.cruiseLine?.slug,
+            imageUrl: detail.imageUrl,
+            shipClass: detail.shipClass,
+            yearBuilt: detail.yearBuilt,
+            passengerCapacity: detail.passengerCapacity,
+            tonnage: detail.tonnage,
+            crewCount: detail.crewCount,
+            amenities: detail.amenities ?? [],
+            upcomingSailings: detail.upcomingSailingCount,
           }
+        } catch {
+          // detail fetch failed — fall through
         }
-      } catch {
-        // ships fetch failed — fall through
       }
+    } catch {
+      // ships fetch failed — fall through
     }
 
     return {

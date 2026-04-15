@@ -1,70 +1,82 @@
 import { streamText, stepCountIs, convertToModelMessages, type UIMessage } from 'ai'
 import { cookies } from 'next/headers'
-import { openai } from '@ai-sdk/openai'
+import { anthropic } from '@ai-sdk/anthropic'
 import { createTools } from '@/lib/ai/tools'
 import { serviceFetch } from '@/lib/api'
 import { chatRateLimit } from '@/lib/rate-limit'
+import { extractConversationFacts, formatConversationContext } from '@/lib/ai/conversation-state'
 
 // ---------------------------------------------------------------------------
 // Model selection
 // ---------------------------------------------------------------------------
 
 function resolveModel() {
-  const modelId = process.env.AI_MODEL_ID ?? 'gpt-4o-mini'
-  return openai(modelId)
+  const modelId = process.env.AI_MODEL_ID ?? 'claude-sonnet-4-20250514'
+  return anthropic(modelId)
 }
 
 // ---------------------------------------------------------------------------
-// System prompt for the AI Concierge
+// System prompt — structured hierarchy with decision tree
 // ---------------------------------------------------------------------------
 
 const BASE_SYSTEM_PROMPT = `You are the Phoenix Voyages AI Travel Concierge — a warm, knowledgeable travel advisor who helps people dream, explore, and plan trips.
 
-## Your personality
-- You're like a well-traveled friend who happens to know everything about cruises, flights, and destinations
+## 1. Your personality
+- You're like a well-traveled friend who happens to know everything about cruises, flights, and destinations.
 - Warm but not sycophantic. Knowledgeable but not lecturing. Enthusiastic but not salesy.
-- You represent a premium Canadian travel agency — professional yet personal
+- You represent a premium Canadian travel agency — professional yet personal.
 - Use natural language, not bullet-point lists. Write like you're texting a friend, not writing a report.
-
-## CRITICAL: One thing at a time
-- NEVER ask multiple questions in one message. Ask ONE question, wait for the answer, then build on it.
-- BAD: "Where would you like to go? When are you thinking of traveling? How many people? What's your budget?"
-- GOOD: "Where are you dreaming of going?" → (wait) → "Nice! When are you thinking of traveling?" → (wait) → "And who's joining you on this adventure?"
-- Let the conversation flow naturally. Each message should feel like a single thought, not a questionnaire.
-- Keep responses to 2-3 sentences max unless presenting search results.
-
-## Conversation flow
-1. DISCOVER — Understand what they want. Ask about destination, then dates, then travelers. One at a time.
-2. EXPLORE — Once you know enough, search proactively. Don't ask "would you like me to search?" — just search.
-3. PRESENT — Show results naturally. "I found some great options!" not "Here are the search results:"
-4. REFINE — React to their preferences. "Too pricey? Let me look for something more affordable."
-5. BUILD — Add things to their trip basket as they confirm interest. "Love it — I've saved that to your trip!"
-6. CONNECT — When ready to book, warmly introduce the advisor. "Our travel advisor Sarah can lock in these rates for you."
-
-## Using tools
-- Search PROACTIVELY when you have enough info. Don't ask permission to search.
-- When presenting results, highlight what makes each option special — don't just list specs.
-- After showing results, ask ONE follow-up: "Any of these catch your eye?" or "Want me to dig deeper into any of these?"
-- Use manageTripBasket immediately when they express interest — "Added! 🎉" feels great.
-- Don't explain your capabilities upfront. Show, don't tell.
-
-## What NOT to do
-- Don't dump all your capabilities in the first message
-- Don't ask "How can I help you today?" — that's generic. Be contextual.
-- Don't present results as numbered lists with every spec. Pick the highlights.
-- Don't say "I can search for flights, hotels, cruises, and tours" — just DO it when relevant
-- Don't caveat every price with "prices are estimates and may change" — say it once, lightly
-- Never fabricate data — only share what your tools return
-
-## Context awareness
-- If the consumer is on a specific destination page, you already know where they're interested in — reference it!
-- If they have items in their basket, build on that: "Since you're already looking at that Caribbean cruise..."
 - Prices are in CAD. You're based in Ontario, Canada. TICO-registered.
 
-## When to connect with an advisor
-- Complex requests (multi-city, groups, special needs) → suggest advisor naturally
-- Ready to book → warm handoff: "Want me to connect you with one of our advisors to finalize?"
-- Don't push advisor connection too early — let them explore first`
+## 2. Knowledge protocol
+- Before answering ANY question about a destination, cruise line, or ship — check your Conversation Context and Current Page context first.
+- If the answer isn't there, call the relevant lookup tool (lookupDestination or lookupCruiseLineOrShip).
+- While the lookup runs, say something warm: "Ooh, great question — let me pull up what we know about that..." or "One sec, let me check on that for you..."
+- Ground ALL destination/cruise answers in our data first. If our data doesn't cover it, supplement with general knowledge naturally.
+- If the question is about something we SHOULD have and don't, say so honestly and offer to connect with an advisor.
+- NEVER fabricate specific data (prices, dates, availability) — only share what your tools return.
+
+## 3. Conversation state
+- Read the Conversation Context block carefully every turn. It contains facts extracted from earlier in this conversation.
+- NEVER ask for information that's already in the Conversation Context.
+- If you know their dates, don't ask when they're traveling. If you know they're a couple, don't ask how many.
+- New facts the user shares will appear in the next turn's context automatically.
+
+## 4. Tool decision tree
+- User mentions a DESTINATION → call lookupDestination FIRST, then searchCruises with the destination
+- User mentions a DESTINATION + DATES → lookupDestination + searchCruises (and searchFlights + searchHotels if you have origin airport)
+- User asks about a cruise line or ship → call lookupCruiseLineOrShip
+- User asks about tours/activities → call browseTours
+- User says "book", "advisor", or "talk to someone" → call requestAdvisor (collect email first)
+- User expresses interest in a result → call manageTripBasket to save it
+- NEVER call searchFlights without an origin airport AND departure date
+- NEVER call searchHotels without check-in AND check-out dates
+- You CAN call multiple tools in one turn when you have enough info for each
+
+## 5. Conversational filler
+- When calling a lookup or search tool, always lead with a brief warm phrase BEFORE the tool call
+- Examples: "Ooh, Jamaica — let me see what we've got..." / "Great choice! Let me pull up the details..." / "On it! Give me one sec..."
+- NEVER say "I'm searching the database" or "Let me call the API" or "Checking our system"
+- Keep it natural and human
+
+## 6. Context awareness
+- If the user has browsing history, reference it naturally: "I see you've been exploring the Mediterranean..."
+- If they have items in their basket, build on that: "Since you've already saved that Caribbean cruise..."
+- If they're on an entity page, reference it: "Since you're looking at Jamaica right now..."
+- If on an advisor page, use the advisor's name and route all leads to them
+
+## 7. One thing at a time
+- NEVER ask multiple questions in one message. Ask ONE question, wait for the answer, then build on it.
+- Keep responses to 2-3 sentences max unless presenting search results.
+- Let the conversation flow naturally. Each message should feel like a single thought, not a questionnaire.
+
+## 8. What NOT to do
+- Don't dump all your capabilities in the first message
+- Don't ask "How can I help you today?" — be contextual based on browsing history and page context
+- Don't present results as numbered lists with every spec. Pick the highlights.
+- Don't caveat every price with "prices are estimates" — say it once, lightly
+- Don't push advisor connection too early — let them explore first
+- Don't explain your capabilities upfront. Show, don't tell.`
 
 // ---------------------------------------------------------------------------
 // POST handler
@@ -72,9 +84,7 @@ const BASE_SYSTEM_PROMPT = `You are the Phoenix Voyages AI Travel Concierge — 
 
 export async function POST(request: Request) {
   try {
-    // ---------------------------------------------------------------------------
-    // Rate limiting — no-op when Upstash is not configured (local dev)
-    // ---------------------------------------------------------------------------
+    // Rate limiting
     if (chatRateLimit) {
       const ip =
         request.headers.get('x-forwarded-for') ??
@@ -102,20 +112,15 @@ export async function POST(request: Request) {
 
     // Normalize messages — handle both v5 (content) and v6 (parts) format
     const messages: UIMessage[] = rawMessages?.map((m: any) => {
-      if (m.parts) return m  // Already v6 format
-      // Convert v5 content string to v6 parts format
+      if (m.parts) return m
       return {
         ...m,
         parts: m.content ? [{ type: 'text', text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }] : [],
       }
     }) ?? []
-    const pageContext: {
-      type?: string; name?: string; slug?: string;
-      oneLiner?: string; bestMonths?: string; budgetTier?: string;
-      typicalStay?: string; tags?: string; highlights?: string;
-      currency?: string; travelTip?: string;
-      metadata?: Record<string, unknown>;
-    } | undefined = body.pageContext
+
+    const pageContext: Record<string, unknown> | undefined = body.pageContext
+    const browsingHistory: Array<{ type: string; name: string; slug: string }> | undefined = body.browsingHistory
 
     // Read cookies for advisor attribution and session context
     const cookieStore = await cookies()
@@ -126,8 +131,22 @@ export async function POST(request: Request) {
     const tools = createTools({ advisorSlug: refCookie })
 
     // -----------------------------------------------------------------------
-    // Build basket context — if the consumer has an active trip basket,
-    // summarise it so the AI can reference saved items naturally
+    // 1. Extract conversation facts
+    // -----------------------------------------------------------------------
+    const facts = extractConversationFacts(messages)
+    const conversationContext = formatConversationContext(facts)
+
+    // -----------------------------------------------------------------------
+    // 2. Build browsing history context
+    // -----------------------------------------------------------------------
+    let browsingContext = ''
+    if (browsingHistory && browsingHistory.length > 0) {
+      const items = browsingHistory.map((e) => `${e.name} (${e.type})`).join(', ')
+      browsingContext = `\n\n--- Browsing History ---\nRecently viewed: ${items}\n--- End Browsing ---`
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. Build basket context
     // -----------------------------------------------------------------------
     let basketContext = ''
     if (sessionId) {
@@ -145,55 +164,81 @@ export async function POST(request: Request) {
         >(`/ota/trip-requests/by-session/${sessionId}`)
 
         if (drafts && drafts.length > 0) {
-          const lines: string[] = ['\n\n--- Current Trip Basket ---']
+          const lines: string[] = ['\n\n--- Trip Basket ---']
           for (const draft of drafts) {
             const title = draft.title || 'Untitled Trip'
             const components = draft.components ?? []
-            lines.push(`Trip: "${title}" (${components.length} component${components.length === 1 ? '' : 's'})`)
+            lines.push(`Trip: "${title}" (${components.length} item${components.length === 1 ? '' : 's'})`)
             for (const c of components) {
               const label = c.display?.title ?? c.type
               const price = c.display?.price ? ` — ${c.display.price}` : ''
-              lines.push(`  - [${c.type}] ${label}${price} (id: ${c.id})`)
+              lines.push(`  - [${c.type}] ${label}${price}`)
             }
           }
           lines.push('--- End Basket ---')
           basketContext = lines.join('\n')
         }
       } catch {
-        // Basket fetch failed (no basket, API down) — continue without context
+        // Basket fetch failed — continue without context
       }
     }
 
-    // Build page context section — include enriched metadata when available
+    // -----------------------------------------------------------------------
+    // 4. Build page context — now includes full enriched metadata
+    // -----------------------------------------------------------------------
     let pageContextSection = ''
     if (pageContext?.type && pageContext?.name) {
-      const lines = [`The consumer is currently viewing: ${pageContext.name} (${pageContext.type} page, slug: ${pageContext.slug || 'unknown'})`]
+      const meta = (pageContext.metadata ?? {}) as Record<string, unknown>
+      const lines = [`\n\n--- Current Page ---\nCurrently viewing: ${pageContext.name} (${pageContext.type} page, slug: ${pageContext.slug || 'unknown'})`]
 
-      if (pageContext.oneLiner) lines.push(`Known for: ${pageContext.oneLiner}`)
-      if (pageContext.bestMonths) lines.push(`Best months: ${pageContext.bestMonths}`)
-      if (pageContext.budgetTier) lines.push(`Budget: ${pageContext.budgetTier}`)
-      if (pageContext.typicalStay) lines.push(`Typical stay: ${pageContext.typicalStay}`)
-      if (pageContext.tags) lines.push(`Tags: ${pageContext.tags}`)
-      if (pageContext.highlights) lines.push(`Highlights: ${pageContext.highlights}`)
-      if (pageContext.currency) lines.push(`Currency: ${pageContext.currency}`)
-      if (pageContext.travelTip) lines.push(`Insider tip: ${pageContext.travelTip}`)
+      // Destination metadata
+      if (meta.oneLiner) lines.push(`Known for: ${meta.oneLiner}`)
+      if (meta.travelDescription) lines.push(`Guide: ${meta.travelDescription}`)
+      if (Array.isArray(meta.bestMonths) && meta.bestMonths.length > 0) lines.push(`Best months: ${meta.bestMonths.join(', ')}`)
+      if (meta.budgetTier) lines.push(`Budget: ${meta.budgetTier}`)
+      if (meta.typicalStay) lines.push(`Typical stay: ${meta.typicalStay}`)
+      if (Array.isArray(meta.tags) && meta.tags.length > 0) lines.push(`Tags: ${meta.tags.join(', ')}`)
+      if (Array.isArray(meta.highlights) && meta.highlights.length > 0) lines.push(`Highlights: ${meta.highlights.join(', ')}`)
+      if (meta.currencyName) lines.push(`Currency: ${meta.currency} (${meta.currencyName})`)
+      else if (meta.currency) lines.push(`Currency: ${meta.currency}`)
+      if (Array.isArray(meta.languages) && meta.languages.length > 0) lines.push(`Languages: ${meta.languages.join(', ')}`)
+      if (meta.airportIata) lines.push(`Airport: ${meta.airportIata}`)
+      if (Array.isArray(meta.travelTips) && meta.travelTips.length > 0) lines.push(`Tips: ${meta.travelTips.join('; ')}`)
+      if (Array.isArray(meta.vibeWords) && meta.vibeWords.length > 0) lines.push(`Vibe: ${meta.vibeWords.join(', ')}`)
 
-      if (pageContext?.type === 'advisor' && pageContext?.metadata) {
-        const m = pageContext.metadata as Record<string, unknown>
-        if (m.title) lines.push(`Title: ${m.title}`)
-        if (m.specialties) lines.push(`Specializes in: ${m.specialties}`)
-        if (m.destinations) lines.push(`Expert destinations: ${m.destinations}`)
-        lines.push(`When helping this visitor, reference ${pageContext.name.split(' ')[0]} by name.`)
-        lines.push(`All leads go to ${pageContext.name.split(' ')[0]}.`)
+      // Ship metadata
+      if (meta.cruiseLine) lines.push(`Cruise line: ${meta.cruiseLine}`)
+      if (meta.shipClass) lines.push(`Ship class: ${meta.shipClass}`)
+      if (meta.yearBuilt) lines.push(`Year built: ${meta.yearBuilt}`)
+      if (meta.passengerCapacity) lines.push(`Capacity: ${meta.passengerCapacity} passengers`)
+      if (meta.upcomingSailings) lines.push(`Upcoming sailings: ${meta.upcomingSailings}`)
+
+      // Cruise line metadata
+      if (meta.shipCount) lines.push(`Fleet: ${meta.shipCount} ships`)
+      if (meta.sailingCount) lines.push(`Total sailings: ${meta.sailingCount}`)
+      if (Array.isArray(meta.ships) && meta.ships.length > 0) lines.push(`Ships: ${meta.ships.slice(0, 8).join(', ')}`)
+
+      // Advisor metadata
+      if (pageContext.type === 'advisor' && meta) {
+        if (meta.title) lines.push(`Title: ${meta.title}`)
+        if (meta.specialties) lines.push(`Specializes in: ${meta.specialties}`)
+        if (meta.destinations) lines.push(`Expert destinations: ${meta.destinations}`)
+        const firstName = String(pageContext.name).split(' ')[0]
+        lines.push(`When helping this visitor, reference ${firstName} by name.`)
+        lines.push(`All leads go to ${firstName}.`)
       }
 
       lines.push('Use this context naturally — reference what they\'re looking at without being asked.')
-      pageContextSection = '\n\n--- Current Page ---\n' + lines.join('\n')
+      lines.push('--- End Page ---')
+      pageContextSection = lines.join('\n')
     }
 
-    const systemPrompt = BASE_SYSTEM_PROMPT + pageContextSection + basketContext
+    // -----------------------------------------------------------------------
+    // 5. Assemble final system prompt
+    // -----------------------------------------------------------------------
+    const systemPrompt = BASE_SYSTEM_PROMPT + conversationContext + browsingContext + pageContextSection + basketContext
 
-    // Convert UI messages to model messages (strips UI metadata, extracts tool results)
+    // Convert UI messages to model messages
     const modelMessages = await convertToModelMessages(messages)
 
     const result = streamText({
@@ -201,7 +246,7 @@ export async function POST(request: Request) {
       system: systemPrompt,
       messages: modelMessages,
       tools,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(8),
     })
 
     return result.toUIMessageStreamResponse()
