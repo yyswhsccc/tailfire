@@ -647,6 +647,7 @@ function mapTourToCustomTour(
   startDatetime: string | null
   endDatetime: string | null
   timezone: string
+  supplier: string
   customTourDetails: {
     tourId: string
     operatorCode: string
