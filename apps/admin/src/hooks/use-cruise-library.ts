@@ -531,6 +531,7 @@ export function mapSailingToCustomCruise(
     pricingType: 'per_person',
     currency: 'CAD',
     totalPriceCents: cheapestPrice,
+    supplier: sailing.cruiseLine.name,
     customCruiseDetails,
   }
 }
