@@ -185,7 +185,7 @@ export class ImapSyncService {
 
       try {
         const downloadResult = await client.download(String(email.imapUid), undefined, { uid: true })
-        if (!downloadResult?.content) {
+        if (!downloadResult?.content || typeof downloadResult.content[Symbol.asyncIterator] !== 'function') {
           this.logger.warn(`No content returned for UID ${email.imapUid} in ${email.folder}`)
           return { bodyHtml: null, bodyText: null, snippet: null }
         }
@@ -466,6 +466,9 @@ export class ImapSyncService {
           attachment.imapPartId || undefined,
           { uid: true },
         )
+        if (!downloadResult?.content || typeof downloadResult.content[Symbol.asyncIterator] !== 'function') {
+          throw new NotFoundException('Attachment content not available from IMAP server')
+        }
         const chunks: Buffer[] = []
         for await (const chunk of downloadResult.content) {
           chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
