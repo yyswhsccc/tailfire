@@ -6,7 +6,7 @@
  */
 
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common'
-import { eq, and, or } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { StorageService } from '../trips/storage.service'
 import type {
@@ -264,20 +264,11 @@ export class UserProfilesService {
    */
   async recordLogin(userId: string): Promise<void> {
     const now = new Date()
-    // Also activate pending users on login — if they can authenticate,
-    // they've completed the invite flow. Locked users stay locked.
+    // Only update timestamps — activation happens after password is set
     await this.db.client
       .update(this.db.schema.userProfiles)
-      .set({ lastLoginAt: now, lastSeenAt: now, status: 'active' })
-      .where(
-        and(
-          eq(this.db.schema.userProfiles.id, userId),
-          or(
-            eq(this.db.schema.userProfiles.status, 'active'),
-            eq(this.db.schema.userProfiles.status, 'pending'),
-          ),
-        ),
-      )
+      .set({ lastLoginAt: now, lastSeenAt: now })
+      .where(eq(this.db.schema.userProfiles.id, userId))
   }
 
   async activateMyAccount(userId: string): Promise<{ activated: boolean }> {

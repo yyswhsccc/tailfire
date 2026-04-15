@@ -41,24 +41,9 @@ export async function GET(request: Request) {
     }
 
     if (!error) {
-      // For invites, activate the pending user then redirect to profile setup
+      // For invites, redirect to set-password (user stays pending until password is set)
       if (type === 'invite') {
-        try {
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session?.access_token) {
-            const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1').trim()
-            await fetch(`${apiUrl}/user-profiles/me/activate`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json',
-              },
-            })
-          }
-        } catch (e) {
-          // Don't block invite flow if activation fails
-          console.warn('User activation failed (may already be active):', e)
-        }
+        // No activation here — user stays pending until password is set
         // Restrict session to password setup only (security: no dashboard access)
         const inviteResponse = NextResponse.redirect(`${origin}/auth/set-password`)
         inviteResponse.cookies.set('auth_flow', 'invite_setup', {
@@ -201,26 +186,10 @@ function getHashHandlerHtml(origin: string): string {
             return
           }
 
-          // Activate pending user (idempotent - safe if already active)
-          try {
-            const { data: { session } } = await supabase.auth.getSession()
-            if (session?.access_token) {
-              await fetch(apiUrl + '/user-profiles/me/activate', {
-                method: 'POST',
-                headers: {
-                  'Authorization': 'Bearer ' + session.access_token,
-                  'Content-Type': 'application/json',
-                },
-              })
-            }
-          } catch (e) {
-            // Log but don't fail - user may already be active
-            console.warn('Activation call failed (may be expected):', e)
-          }
-
           // Redirect based on flow type
+          // Invite/signup users go to set-password (stay pending until password is set)
           if (type === 'invite' || type === 'signup') {
-            window.location.href = origin + '/profile?setup=true'
+            window.location.href = origin + '/auth/set-password'
           } else if (type === 'recovery') {
             window.location.href = origin + '/auth/reset-password'
           } else {

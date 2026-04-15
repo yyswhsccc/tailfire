@@ -51,15 +51,28 @@ export default function SetPasswordPage() {
         setError(updateError.message)
         return
       }
-      // Clear restricted auth_flow cookie via server signout, then re-login with new password
+
+      // Activate the pending account now that password is set
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+        await fetch(`${apiUrl}/user-profiles/me/activate`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+      }
+
+      // Clear restricted auth_flow cookie and get fresh session with active status
       await fetch('/auth/signout', { method: 'POST', redirect: 'manual' })
-      // Sign back in with the new password to get a full (unrestricted) session
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email: (await supabase.auth.getUser()).data.user?.email || '', password })
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: (await supabase.auth.getUser()).data.user?.email || '',
+        password,
+      })
       if (signInError) {
-        // Fallback: redirect to login if re-auth fails
         window.location.href = '/auth/login?message=password_set_success'
         return
       }
+
       router.replace('/profile?setup=true')
     } catch {
       setError('An unexpected error occurred. Please try again.')
