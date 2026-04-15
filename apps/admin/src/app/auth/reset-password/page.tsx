@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Lock, ArrowLeft, CheckCircle, Loader2, AlertCircle, Flame, Shield } from 'lucide-react'
@@ -14,7 +13,6 @@ import { createClient } from '@/lib/supabase/client'
 type PageState = 'loading' | 'ready' | 'success' | 'error'
 
 export default function ResetPasswordPage() {
-  const router = useRouter()
   const supabase = createClient()
 
   const [pageState, setPageState] = useState<PageState>('loading')
