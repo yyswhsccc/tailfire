@@ -548,6 +548,19 @@ export class ImapSyncService {
         HttpStatus.BAD_GATEWAY,
       )
     }
+    // Connection-level failures (timeout, refused, DNS, reset) — mark so scheduler skips retries
+    if (
+      error.code === 'ETIMEDOUT' ||
+      error.code === 'ECONNREFUSED' ||
+      error.code === 'ECONNRESET' ||
+      error.code === 'ENOTFOUND' ||
+      error.code === 'EAI_AGAIN' ||
+      error.message?.includes('Connection timed out') ||
+      error.message?.includes('getaddrinfo')
+    ) {
+      const msg = `IMAP_CONNECTION_FAILED: ${error.code || error.message}`
+      await this.emailAccountsService.updateSyncState(accountId, syncState ?? {}, msg)
+    }
   }
 
   /**
@@ -569,6 +582,9 @@ export class ImapSyncService {
       secure: config.secure,
       auth: { user: config.user, pass: config.pass },
       logger: false,
+      connectionTimeout: 15_000,  // 15s to establish TCP connection
+      greetTimeout: 15_000,       // 15s to receive server greeting
+      socketTimeout: 30_000,      // 30s inactivity timeout on socket
     })
     // Prevent unhandled 'error' event from crashing the process
     client.on('error', (err: Error) => {

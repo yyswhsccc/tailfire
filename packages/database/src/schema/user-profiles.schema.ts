@@ -57,6 +57,7 @@ export const userProfiles = pgTable('user_profiles', {
 
   // Activity Tracking
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
 
   // Avatar & Public Profile
   avatarUrl: text('avatar_url'),
