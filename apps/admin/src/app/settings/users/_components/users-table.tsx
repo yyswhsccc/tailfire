@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import {
   ColumnDef,
   RowSelectionState,
@@ -76,7 +77,10 @@ export function UsersTable({
 }: UsersTableProps) {
   const { isOnline } = usePresence()
 
-  const columns: ColumnDef<UserListItemDto>[] = [
+  // Memoize columns to prevent infinite re-renders — useReactTable
+  // recomputes when the columns reference changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const columns: ColumnDef<UserListItemDto>[] = useMemo(() => [
     {
       id: 'select',
       header: ({ table }) => (
@@ -241,7 +245,7 @@ export function UsersTable({
         )
       },
     },
-  ]
+  ], [currentUserId, isCurrentUserAdmin, isOnline, onEdit, onLock, onUnlock, onActivate, onDelete, onResendInvite, onImpersonate])
 
   const table = useReactTable({
     data: users,
