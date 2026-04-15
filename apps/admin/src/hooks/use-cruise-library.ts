@@ -823,6 +823,15 @@ export function useAddCruiseToItinerary(defaultItineraryId?: string) {
         return
       }
 
+      // Duplicate cruise - not an error, just a no-op
+      if (error instanceof Error && error.message.includes('already exists on this day')) {
+        toast({
+          title: 'Cruise already added',
+          description: 'This cruise is already on the itinerary.',
+        })
+        return
+      }
+
       console.error('Failed to add cruise to itinerary:', error)
       toast({
         title: 'Error',
