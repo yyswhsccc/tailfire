@@ -19,6 +19,8 @@ const TOOL_LABELS: Record<string, string> = {
   requestAdvisor: "advisor request",
   manageTripBasket: "trip basket",
   captureIdentity: "identity",
+  lookupDestination: "destination info",
+  lookupCruiseLineOrShip: "cruise info",
 };
 
 /** Tool names that render as rich product cards */
@@ -27,6 +29,12 @@ const SEARCH_TOOLS = new Set([
   "searchFlights",
   "searchHotels",
   "browseTours",
+]);
+
+/** Tool names whose UI is hidden entirely — the AI's filler text provides feedback */
+const INTERNAL_TOOLS = new Set([
+  'lookupDestination',
+  'lookupCruiseLineOrShip',
 ]);
 
 function toolLabel(partType: string): string {
@@ -138,6 +146,8 @@ export function ChatPanel({ messages, status, onSend, onClose }: ChatPanelProps)
           message.parts.forEach((part, idx) => {
             if (part.type.startsWith("tool-")) {
               const toolName = part.type.replace(/^tool-/, "");
+              // Internal knowledge tools are hidden from the UI entirely
+              if (INTERNAL_TOOLS.has(toolName)) return;
               const state = (part as { state?: string }).state;
               const output = (part as { output?: unknown }).output;
               if (
