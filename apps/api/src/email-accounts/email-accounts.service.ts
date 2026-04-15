@@ -235,7 +235,9 @@ export class EmailAccountsService {
           eq(this.db.schema.emailAccounts.isActive, true),
           or(
             sql`${this.db.schema.emailAccounts.lastSyncError} IS NULL`,
-            ne(this.db.schema.emailAccounts.lastSyncError, 'IMAP_AUTH_FAILED'),
+            // Exclude accounts with persistent failures (auth or connection)
+            // These need user action (password reset, host fix) before retrying
+            sql`${this.db.schema.emailAccounts.lastSyncError} NOT LIKE 'IMAP_AUTH_%' AND ${this.db.schema.emailAccounts.lastSyncError} NOT LIKE 'IMAP_CONNECTION_%'`,
           ),
         ),
       )

@@ -167,7 +167,7 @@ export function CruiseDetailModal({
   }, [sailing, addCruiseMutation, onAddedToItinerary, onClose, router])
 
   const handleAddToItinerary = async () => {
-    if (!sailing || !tripContext) return
+    if (!sailing || !tripContext || addCruiseMutation.isPending) return
 
     try {
       // The mutation will automatically place the cruise on the day matching the departure date

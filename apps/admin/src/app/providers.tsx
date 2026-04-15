@@ -8,6 +8,7 @@ import { GlobalLoadingOverlay } from '@/components/ui/loading-overlay'
 import { Toaster } from '@/components/ui/toaster'
 import { AuthProvider } from '@/providers/auth-provider'
 import { NotificationsProvider } from '@/providers/notifications-provider'
+import { PresenceProvider } from '@/providers/presence-provider'
 import { ConsoleCaptureProvider } from '@/providers/console-capture-provider'
 import { ImpersonationBanner } from '@/components/impersonation/impersonation-banner'
 
@@ -48,6 +49,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <AuthProvider>
         <ImpersonationBanner />
         <NotificationsProvider>
+        <PresenceProvider>
           <LoadingProvider>
             <ConfirmationDialogProvider>
               {children}
@@ -60,6 +62,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             )}
             </ConfirmationDialogProvider>
           </LoadingProvider>
+        </PresenceProvider>
         </NotificationsProvider>
         </AuthProvider>
       </ConsoleCaptureProvider>

@@ -647,6 +647,7 @@ function mapTourToCustomTour(
   startDatetime: string | null
   endDatetime: string | null
   timezone: string
+  supplier: string
   customTourDetails: {
     tourId: string
     operatorCode: string
@@ -695,6 +696,7 @@ function mapTourToCustomTour(
     startDatetime,
     endDatetime,
     timezone: 'UTC',
+    supplier: tour.operatorCode.charAt(0).toUpperCase() + tour.operatorCode.slice(1),
     customTourDetails: {
       tourId: tour.id,
       operatorCode: tour.operatorCode,

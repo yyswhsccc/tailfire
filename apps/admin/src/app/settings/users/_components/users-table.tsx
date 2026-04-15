@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/table'
 import { UserStatusBadge } from './user-status-badge'
 import { getRoleDisplayName } from '@/lib/constants/roles'
+import { usePresence } from '@/providers/presence-provider'
 
 interface UsersTableProps {
   users: UserListItemDto[]
@@ -73,6 +74,8 @@ export function UsersTable({
   rowSelection,
   onRowSelectionChange,
 }: UsersTableProps) {
+  const { isOnline } = usePresence()
+
   const columns: ColumnDef<UserListItemDto>[] = [
     {
       id: 'select',
@@ -108,8 +111,13 @@ export function UsersTable({
       cell: ({ row }) => {
         const user = row.original
         const isCurrentUser = user.id === currentUserId
+        const online = isOnline(user.id)
         return (
           <div className="flex items-center gap-2">
+            <span
+              className={`inline-block h-2 w-2 rounded-full flex-shrink-0 ${online ? 'bg-green-500' : 'bg-gray-300'}`}
+              title={online ? 'Online' : 'Offline'}
+            />
             <div className="text-sm font-medium text-gray-900">
               {formatName(user.firstName, user.lastName)}
             </div>

@@ -531,6 +531,7 @@ export function mapSailingToCustomCruise(
     pricingType: 'per_person',
     currency: 'CAD',
     totalPriceCents: cheapestPrice,
+    supplier: sailing.cruiseLine.name,
     customCruiseDetails,
   }
 }
@@ -819,6 +820,15 @@ export function useAddCruiseToItinerary(defaultItineraryId?: string) {
 
       // Don't show toast for date mismatch errors - handled by confirmation dialog
       if (error instanceof Error && error.message.includes('do not fit within itinerary dates')) {
+        return
+      }
+
+      // Duplicate cruise - not an error, just a no-op
+      if (error instanceof Error && error.message.includes('already exists on this day')) {
+        toast({
+          title: 'Cruise already added',
+          description: 'This cruise is already on the itinerary.',
+        })
         return
       }
 

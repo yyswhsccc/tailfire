@@ -118,6 +118,18 @@ export class UserProfilesController {
   }
 
   /**
+   * Record login timestamp for current user
+   * POST /user-profiles/me/record-login
+   */
+  @Post('me/record-login')
+  @AllowPendingUser()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Record login timestamp' })
+  async recordLogin(@GetAuthContext() auth: AuthContext): Promise<void> {
+    await this.userProfilesService.recordLogin(auth.userId)
+  }
+
+  /**
    * Activate pending user account (after first login)
    * POST /user-profiles/me/activate
    */
