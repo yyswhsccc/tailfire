@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useCalendarStore } from '@/stores/calendar.store'
 import { useCalendarEvents, useCalendarDateRange } from '@/hooks/use-calendar'
+import { useUser } from '@/hooks/use-user'
 import { CalendarToolbar } from './calendar-toolbar'
 import { CalendarMonthView } from './calendar-month-view'
 import { CalendarWeekView } from './calendar-week-view'
@@ -18,8 +19,16 @@ interface CalendarViewProps {
 }
 
 export function CalendarView({ userOptions = [], isAdmin = false }: CalendarViewProps) {
-  const { currentView, currentDate, selectedUserId, enabledEventTypes, setDate, setView } =
+  const { currentView, currentDate, selectedUserId, enabledEventTypes, setDate, setView, setSelectedUser } =
     useCalendarStore()
+  const { userId } = useUser()
+
+  // Default to current user's events — admins can switch to "All Users" explicitly
+  useEffect(() => {
+    if (!selectedUserId && userId) {
+      setSelectedUser(userId)
+    }
+  }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
