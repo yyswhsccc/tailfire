@@ -432,6 +432,11 @@ export class NotificationEventsListener {
   async handlePaymentOverdue(event: PaymentOverdueEvent): Promise<void> {
     const { tripId, tripName, paymentItemId, paymentName, amountDue, daysOverdue } = event
 
+    if (!tripId) {
+      this.logger.warn(`payment.overdue event missing tripId (paymentItemId: ${paymentItemId})`)
+      return
+    }
+
     const trip = await this.getTrip(tripId)
     if (!trip || !trip.ownerId) return
 
