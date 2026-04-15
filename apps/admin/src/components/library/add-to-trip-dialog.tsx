@@ -106,6 +106,7 @@ export function AddToTripDialog({
    * - 2+ itineraries -> show itinerary picker
    */
   const handleTripSelect = async (tripId: string) => {
+    if (processingTripId) return // Prevent double-click race
     setProcessingTripId(tripId)
 
     try {

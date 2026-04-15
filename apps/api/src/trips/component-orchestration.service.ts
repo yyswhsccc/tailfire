@@ -5,7 +5,7 @@
  * Ensures atomic create/update/delete operations across base + detail tables.
  */
 
-import { Injectable, BadRequestException, Logger } from '@nestjs/common'
+import { Injectable, BadRequestException, ConflictException, Logger } from '@nestjs/common'
 import { tourItineraryDays } from '@tailfire/database'
 import { asc } from 'drizzle-orm'
 import * as Sentry from '@sentry/nestjs'
@@ -1888,6 +1888,28 @@ export class ComponentOrchestrationService {
    * Optimized: Constructs DTO from returned insert data instead of re-fetching
    */
   async createCustomCruise(dto: CreateCustomCruiseComponentDto): Promise<CustomCruiseComponentDto> {
+    // Duplicate guard: prevent creating the same cruise twice on the same day
+    if (dto.itineraryDayId && dto.customCruiseDetails?.traveltekCruiseId) {
+      const [existing] = await this.db.client
+        .select({ id: this.db.schema.itineraryActivities.id })
+        .from(this.db.schema.itineraryActivities)
+        .innerJoin(
+          this.db.schema.customCruiseDetails,
+          eq(this.db.schema.customCruiseDetails.activityId, this.db.schema.itineraryActivities.id),
+        )
+        .where(
+          and(
+            eq(this.db.schema.itineraryActivities.itineraryDayId, dto.itineraryDayId),
+            eq(this.db.schema.itineraryActivities.activityType, 'custom_cruise'),
+            eq(this.db.schema.customCruiseDetails.traveltekCruiseId, dto.customCruiseDetails.traveltekCruiseId),
+          ),
+        )
+        .limit(1)
+      if (existing) {
+        throw new ConflictException('This cruise already exists on this day')
+      }
+    }
+
     // Get agencyId from itinerary day for RLS
     const agencyId = await this.getAgencyIdFromDayId(dto.itineraryDayId)
 
