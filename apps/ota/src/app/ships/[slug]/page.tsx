@@ -45,6 +45,17 @@ export default async function ShipHubPage({ params }: Props) {
     destinations,
   })
 
+  const metadata: Record<string, unknown> = {
+    cruiseLine: ship.cruiseLine.name,
+    shipClass: ship.shipClass,
+    yearBuilt: ship.yearBuilt,
+    passengerCapacity: ship.passengerCapacity,
+    tonnage: ship.tonnage,
+    crewCount: ship.crewCount,
+    amenities: ship.amenities,
+    upcomingSailings: ship.upcomingSailingCount,
+  }
+
   return (
     <HubScaffold
       hero={shipAdapter.heroData(ship)}
@@ -53,6 +64,7 @@ export default async function ShipHubPage({ params }: Props) {
       aiContext={shipAdapter.aiContext(ship)}
       entityType="ship"
       entitySlug={slug}
+      metadata={metadata}
     />
   )
 }
