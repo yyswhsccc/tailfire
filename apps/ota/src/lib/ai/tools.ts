@@ -1,6 +1,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { serviceFetch, catalogFetch } from '@/lib/api'
+import { lookupDestination } from '@/lib/ai/tools/lookup-destination'
 
 // ---------------------------------------------------------------------------
 // Types for API responses — aligned with actual backend contracts
@@ -559,6 +560,7 @@ export function createTools(ctx: ToolContext = {}) {
   })
 
   return {
+    lookupDestination,
     searchFlights,
     searchHotels,
     searchCruises,
