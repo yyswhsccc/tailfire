@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import { MoreVertical, MapPin, Clock, Calendar, CalendarDays, Pencil, Copy, Trash2, Check, X, MessageSquare } from 'lucide-react'
 import type { TripResponseDto, ItineraryResponseDto } from '@tailfire/shared-types/api'
 import { useItineraryDaysWithActivities } from '@/hooks/use-itinerary-days'
@@ -52,6 +51,7 @@ import {
 } from '@/lib/itinerary-styles'
 import { getActivityTypeMetadata, filterItineraryActivities } from '@/lib/activity-constants'
 import { ActivityIconBadge } from '@/components/ui/activity-icon-badge'
+import { ActivityThumbnail } from './activity-thumbnail'
 import { parseISODate } from '@/lib/date-utils'
 import { formatCurrency } from '@/lib/pricing/currency-helpers'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
@@ -493,19 +493,7 @@ export function ItineraryTableView({ trip, itinerary, responseMap, commentCounts
                 <TableCell className="py-2">
                   <div className="flex items-center gap-2">
                     {/* Thumbnail or Icon */}
-                    {row.activity.thumbnail ? (
-                      <div className="relative w-8 h-8 rounded-md overflow-hidden flex-shrink-0">
-                        <Image
-                          src={row.activity.thumbnail}
-                          alt={row.activity.name}
-                          fill
-                          className="object-cover"
-                          sizes="32px"
-                        />
-                      </div>
-                    ) : (
-                      <ActivityIconBadge type={row.activity.activityType} size="sm" />
-                    )}
+                    <ActivityThumbnail src={row.activity.thumbnail} alt={row.activity.name} activityType={row.activity.activityType} size="md" />
                     <div className="flex flex-col gap-0.5 min-w-0">
                       <span className="font-medium text-sm text-ash-900 truncate max-w-[250px]" title={row.activity.name}>
                         {row.activity.name}
