@@ -1439,44 +1439,58 @@ export class TripsService {
    * by cascade policy, and returns a preview of what would happen.
    */
   async bulkReassignPreview(tripIds: string[], newOwnerId: string, _agencyId: string) {
-    const contactMap = new Map<string, { id: string; firstName: string | null; lastName: string | null; ownerId: string | null }>()
+    if (tripIds.length === 0) return { tripsCount: 0, contactsToAssign: [], contactsToSkip: [] }
 
-    for (const tripId of tripIds) {
-      const travelers = await this.db.client
-        .selectDistinct({ contactId: this.db.schema.tripTravelers.contactId })
-        .from(this.db.schema.tripTravelers)
-        .where(eq(this.db.schema.tripTravelers.tripId, tripId))
+    // Batch: fetch all travelers and primary contacts in 2 queries instead of 2N
+    const allTravelers = await this.db.client
+      .selectDistinct({ contactId: this.db.schema.tripTravelers.contactId })
+      .from(this.db.schema.tripTravelers)
+      .where(inArray(this.db.schema.tripTravelers.tripId, tripIds))
 
-      const [trip] = await this.db.client
-        .select({ primaryContactId: this.db.schema.trips.primaryContactId })
-        .from(this.db.schema.trips)
-        .where(eq(this.db.schema.trips.id, tripId))
-        .limit(1)
+    const tripsWithPrimary = await this.db.client
+      .select({ primaryContactId: this.db.schema.trips.primaryContactId })
+      .from(this.db.schema.trips)
+      .where(inArray(this.db.schema.trips.id, tripIds))
 
-      const ids = new Set(travelers.map(t => t.contactId))
-      if (trip?.primaryContactId) ids.add(trip.primaryContactId)
+    const contactIds = new Set(allTravelers.map(t => t.contactId))
+    for (const t of tripsWithPrimary) {
+      if (t.primaryContactId) contactIds.add(t.primaryContactId)
+    }
 
-      for (const cid of ids) {
-        if (!contactMap.has(cid)) {
-          const [contact] = await this.db.client
-            .select({
-              id: this.db.schema.contacts.id,
-              firstName: this.db.schema.contacts.firstName,
-              lastName: this.db.schema.contacts.lastName,
-              ownerId: this.db.schema.contacts.ownerId,
-            })
-            .from(this.db.schema.contacts)
-            .where(eq(this.db.schema.contacts.id, cid))
-            .limit(1)
-          if (contact) contactMap.set(cid, contact)
-        }
-      }
+    if (contactIds.size === 0) return { tripsCount: tripIds.length, contactsToAssign: [], contactsToSkip: [] }
+
+    // Batch: fetch all contacts in 1 query instead of M
+    const contacts = await this.db.client
+      .select({
+        id: this.db.schema.contacts.id,
+        firstName: this.db.schema.contacts.firstName,
+        lastName: this.db.schema.contacts.lastName,
+        ownerId: this.db.schema.contacts.ownerId,
+      })
+      .from(this.db.schema.contacts)
+      .where(inArray(this.db.schema.contacts.id, [...contactIds]))
+
+    // Batch: fetch all distinct owner profiles in 1 query instead of M
+    const ownerIds = [...new Set(contacts.map(c => c.ownerId).filter((id): id is string => !!id && id !== newOwnerId))]
+    const ownerMap = new Map<string, { status: string | null; isActive: boolean | null; firstName: string | null; lastName: string | null }>()
+    if (ownerIds.length > 0) {
+      const owners = await this.db.client
+        .select({
+          id: this.db.schema.userProfiles.id,
+          status: this.db.schema.userProfiles.status,
+          isActive: this.db.schema.userProfiles.isActive,
+          firstName: this.db.schema.userProfiles.firstName,
+          lastName: this.db.schema.userProfiles.lastName,
+        })
+        .from(this.db.schema.userProfiles)
+        .where(inArray(this.db.schema.userProfiles.id, ownerIds))
+      for (const o of owners) ownerMap.set(o.id, o)
     }
 
     const contactsToAssign: { id: string; name: string; reason: 'unowned' | 'inactive_owner' }[] = []
     const contactsToSkip: { id: string; name: string; currentOwnerName: string }[] = []
 
-    for (const contact of contactMap.values()) {
+    for (const contact of contacts) {
       if (contact.ownerId === newOwnerId) continue
       const name = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Unknown'
 
@@ -1485,17 +1499,7 @@ export class TripsService {
         continue
       }
 
-      const [owner] = await this.db.client
-        .select({
-          status: this.db.schema.userProfiles.status,
-          isActive: this.db.schema.userProfiles.isActive,
-          firstName: this.db.schema.userProfiles.firstName,
-          lastName: this.db.schema.userProfiles.lastName,
-        })
-        .from(this.db.schema.userProfiles)
-        .where(eq(this.db.schema.userProfiles.id, contact.ownerId))
-        .limit(1)
-
+      const owner = ownerMap.get(contact.ownerId)
       if (!owner || owner.status !== 'active' || !owner.isActive) {
         contactsToAssign.push({ id: contact.id, name, reason: 'inactive_owner' })
       } else {
@@ -1520,16 +1524,18 @@ export class TripsService {
     let totalContactsAssigned = 0
     const allSkipped: { contactName: string; currentOwner: string }[] = []
     const processedSkipKeys = new Set<string>()
-    const tripNames: string[] = []
+
+    // Batch fetch all trip names in 1 query instead of N
+    const trips = tripIds.length > 0
+      ? await this.db.client
+          .select({ id: this.db.schema.trips.id, name: this.db.schema.trips.name })
+          .from(this.db.schema.trips)
+          .where(inArray(this.db.schema.trips.id, tripIds))
+      : []
+    const tripNameMap = new Map(trips.map(t => [t.id, t.name]))
+    const tripNames = tripIds.map(id => tripNameMap.get(id)).filter((n): n is string => !!n)
 
     for (const tripId of tripIds) {
-      const [trip] = await this.db.client
-        .select({ name: this.db.schema.trips.name })
-        .from(this.db.schema.trips)
-        .where(eq(this.db.schema.trips.id, tripId))
-        .limit(1)
-      if (trip?.name) tripNames.push(trip.name)
-
       const { contactsAssigned, contactsSkipped } = await this.reassignTripOwner(
         tripId, newOwnerId, agencyId,
         { actorId, suppressAssignmentNotification: true },
