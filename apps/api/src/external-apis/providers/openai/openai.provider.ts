@@ -88,7 +88,12 @@ export class OpenAiProvider implements OnModuleInit {
 
     let content: Record<string, unknown>
     try {
-      content = JSON.parse(rawContent)
+      // Strip markdown code fences that OpenAI sometimes wraps around JSON
+      let jsonStr = rawContent.trim()
+      if (jsonStr.startsWith('```')) {
+        jsonStr = jsonStr.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '')
+      }
+      content = JSON.parse(jsonStr)
     } catch {
       this.logger.error({ message: 'Failed to parse OpenAI JSON response', rawContent: rawContent.substring(0, 500) })
       throw new Error('OpenAI returned invalid JSON')

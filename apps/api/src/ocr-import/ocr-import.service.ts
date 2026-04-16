@@ -2396,17 +2396,32 @@ export class OcrImportService {
         travelersMatched++
       }
 
-      // Create trip traveler
-      const tripTraveler = await this.tripTravelersService.create(
-        tripId,
-        {
-          contactId: contactId!,
-          role: i === 0 ? 'primary_contact' : 'limited_access',
-          travelerType: 'adult',
-        } as CreateTripTravelerDto,
-        auth,
-      )
-      travelerIds.push(tripTraveler.id)
+      // Check if contact is already a traveler on this trip (avoid duplicate key violation)
+      const [existing] = await this.db.client
+        .select({ id: this.db.schema.tripTravelers.id })
+        .from(this.db.schema.tripTravelers)
+        .where(
+          and(
+            eq(this.db.schema.tripTravelers.tripId, tripId),
+            eq(this.db.schema.tripTravelers.contactId, contactId!),
+          ),
+        )
+        .limit(1)
+
+      if (existing) {
+        travelerIds.push(existing.id)
+      } else {
+        const tripTraveler = await this.tripTravelersService.create(
+          tripId,
+          {
+            contactId: contactId!,
+            role: i === 0 ? 'primary_contact' : 'limited_access',
+            travelerType: 'adult',
+          } as CreateTripTravelerDto,
+          auth,
+        )
+        travelerIds.push(tripTraveler.id)
+      }
     }
 
     // Link travelers to activity
