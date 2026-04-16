@@ -9,7 +9,7 @@ import { SettingsTabsLayout } from './_components/settings-tabs-layout'
 const BUILD_INFO = {
   timestamp: process.env.NEXT_PUBLIC_BUILD_TIMESTAMP || new Date().toISOString(),
   environment: process.env.NODE_ENV || 'development',
-  apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1',
+  apiUrl: process.env.NEXT_PUBLIC_API_URL || '/api/v1',
 }
 
 interface SettingsCategoryCard {

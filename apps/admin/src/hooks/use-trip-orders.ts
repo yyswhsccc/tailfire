@@ -238,7 +238,7 @@ export function useDownloadStoredTripOrder() {
 
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
 
       // Get auth headers from supabase session
       const { createClient } = await import('@/lib/supabase/client')
@@ -298,7 +298,7 @@ export function usePreviewStoredTripOrder() {
 
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
 
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
