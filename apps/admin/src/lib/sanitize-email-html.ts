@@ -25,6 +25,8 @@ export function sanitizeEmailHtml(html: string, options?: SanitizeOptions): { ht
     ],
     ALLOW_DATA_ATTR: false,
     ADD_ATTR: ['target'],
+    // Allow data: URIs for resolved CID inline images (base64-encoded by backend)
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
   })
 
   // Parse DOM for link rewriting and image blocking
@@ -48,7 +50,8 @@ export function sanitizeEmailHtml(html: string, options?: SanitizeOptions): { ht
     return { html: doc.body.innerHTML, hasBlockedImages: false }
   }
 
-  // Replace cid: inline images with visible placeholder (browser can't resolve cid: URIs)
+  // Handle CID inline images: resolved ones have data: URIs (pass through),
+  // unresolved ones still have cid: scheme (show placeholder)
   doc.querySelectorAll('img[src^="cid:"]').forEach((img) => {
     img.setAttribute('src', 'data:image/svg+xml,' + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80">' +
@@ -57,7 +60,7 @@ export function sanitizeEmailHtml(html: string, options?: SanitizeOptions): { ht
       '<text x="60" y="50" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#9ca3af">Image</text>' +
       '</svg>'
     ))
-    img.setAttribute('alt', '[Embedded image — not yet supported]')
+    img.setAttribute('alt', '[Embedded image]')
     img.removeAttribute('width')
     img.removeAttribute('height')
     img.setAttribute('style', 'max-width:120px;max-height:80px;border:1px dashed #d1d5db;border-radius:4px;')
