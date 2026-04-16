@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Image from 'next/image'
 import { GripVertical, Pencil, Trash2, MoreHorizontal, Package, Check, X, MessageSquare, CalendarDays, ArrowRightLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
@@ -37,7 +36,7 @@ import { useDeleteActivity, useUpdateActivity } from '@/hooks/use-activities'
 import { useDeleteFlight } from '@/hooks/use-flights'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ActivityIconBadge } from '@/components/ui/activity-icon-badge'
+import { ActivityThumbnail } from './activity-thumbnail'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import type { CruiseColorSet } from '@/lib/cruise-color-utils'
 import type { ClientActivityResponseType } from '@tailfire/shared-types/api'
@@ -168,19 +167,7 @@ export function ActivityListItem({ itineraryId, activity, dayId, dayDate: _dayDa
         </TooltipProvider>
 
         {/* Activity Thumbnail or Icon */}
-        {activity.thumbnail ? (
-          <div className="relative w-7 h-7 rounded-md overflow-hidden flex-shrink-0">
-            <Image
-              src={activity.thumbnail}
-              alt={activity.name}
-              fill
-              className="object-cover"
-              sizes="28px"
-            />
-          </div>
-        ) : (
-          <ActivityIconBadge type={activity.activityType} size="sm" />
-        )}
+        <ActivityThumbnail src={activity.thumbnail} alt={activity.name} activityType={activity.activityType} />
 
         {/* Activity Details */}
         <div className="flex-1 min-w-0 overflow-hidden">

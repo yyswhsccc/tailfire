@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Image from 'next/image'
 import { MoreHorizontal, Pencil, Trash2, Check, X, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOCUS_VISIBLE_RING } from '@/lib/itinerary-styles'
@@ -34,7 +33,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useDeleteActivity } from '@/hooks/use-activities'
-import { ActivityIconBadge } from '@/components/ui/activity-icon-badge'
+import { ActivityThumbnail } from './activity-thumbnail'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import type { CruiseColorSet } from '@/lib/cruise-color-utils'
 import type { ClientActivityResponseType } from '@tailfire/shared-types/api'
@@ -150,19 +149,7 @@ export function SpanningActivityBar({
         {/* Sticky container for image, name, badges, and actions - visible when scrolling */}
         <div className={cn("sticky left-3 flex items-center gap-2 bg-gradient-to-r pr-6 z-10 rounded-l-md", cruiseColor ? cruiseColor.stickyGradient : 'from-phoenix-gold-50 via-phoenix-gold-50/95 to-phoenix-gold-50/0')}>
           {/* Activity Thumbnail or Icon */}
-          {activity.thumbnail ? (
-            <div className="relative w-8 h-8 rounded-md overflow-hidden flex-shrink-0 border border-phoenix-gold-200">
-              <Image
-                src={activity.thumbnail}
-                alt={activity.name}
-                fill
-                className="object-cover"
-                sizes="32px"
-              />
-            </div>
-          ) : (
-            <ActivityIconBadge type={activity.activityType} size="sm" />
-          )}
+          <ActivityThumbnail src={activity.thumbnail} alt={activity.name} activityType={activity.activityType} size="md" />
 
           {/* Activity Name */}
           <h4
