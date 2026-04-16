@@ -139,6 +139,7 @@ export class ImapSyncService {
 
   /**
    * Fetch full email body on demand (lazy load)
+   * Retries download up to 2 times on transient IMAP failures.
    */
   async fetchEmailBody(
     accountId: string,
@@ -171,49 +172,72 @@ export class ImapSyncService {
       }
     }
 
-    try {
-      const client = await this.createImapClient({
-        host: account.imapHost,
-        port: account.imapPort,
-        secure: account.imapTls,
-        user: credentials.username,
-        pass: credentials.password,
-      })
+    const MAX_RETRIES = 2
+    let lastError: any = null
 
-      await client.connect()
-      const lock = await client.getMailboxLock(email.folder)
-
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const downloadResult = await client.download(String(email.imapUid), undefined, { uid: true })
-        if (!downloadResult?.content || typeof downloadResult.content[Symbol.asyncIterator] !== 'function') {
-          this.logger.warn(`No content returned for UID ${email.imapUid} in ${email.folder}`)
-          return { bodyHtml: null, bodyText: null, snippet: null }
+        const client = await this.createImapClient({
+          host: account.imapHost,
+          port: account.imapPort,
+          secure: account.imapTls,
+          user: credentials.username,
+          pass: credentials.password,
+        })
+
+        await client.connect()
+        const lock = await client.getMailboxLock(email.folder)
+
+        try {
+          const downloadResult = await client.download(String(email.imapUid), undefined, { uid: true })
+          if (!downloadResult?.content || typeof downloadResult.content[Symbol.asyncIterator] !== 'function') {
+            this.logger.warn(
+              `No content returned for UID ${email.imapUid} in ${email.folder} (attempt ${attempt + 1}/${MAX_RETRIES + 1})`,
+            )
+            // Retry on empty download — transient IMAP issue
+            if (attempt < MAX_RETRIES) {
+              continue
+            }
+            return { bodyHtml: null, bodyText: null, snippet: null }
+          }
+          const chunks: Buffer[] = []
+          for await (const chunk of downloadResult.content) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+          }
+          const rawMessage = Buffer.concat(chunks)
+
+          const { bodyHtml, bodyText, snippet } = await this.parseMessageSource(rawMessage)
+
+          // Update the email record with body content
+          await this.db.client
+            .update(this.db.schema.syncedEmails)
+            .set({ bodyHtml, bodyText, snippet, updatedAt: new Date() })
+            .where(eq(this.db.schema.syncedEmails.id, emailId))
+
+          return { bodyHtml, bodyText, snippet }
+        } finally {
+          lock.release()
+          await client.logout()
         }
-        const chunks: Buffer[] = []
-        for await (const chunk of downloadResult.content) {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+      } catch (error: any) {
+        lastError = error
+        // Auth failures should not be retried
+        if (error.authenticationFailed || error.code === 'AUTHENTICATIONFAILED') {
+          break
         }
-        const rawMessage = Buffer.concat(chunks)
-
-        const { bodyHtml, bodyText, snippet } = await this.parseMessageSource(rawMessage)
-
-        // Update the email record with body content
-        await this.db.client
-          .update(this.db.schema.syncedEmails)
-          .set({ bodyHtml, bodyText, snippet, updatedAt: new Date() })
-          .where(eq(this.db.schema.syncedEmails.id, emailId))
-
-        return { bodyHtml, bodyText, snippet }
-      } finally {
-        lock.release()
-        await client.logout()
+        if (attempt < MAX_RETRIES) {
+          this.logger.warn(
+            `Body fetch attempt ${attempt + 1} failed for email ${emailId}, retrying...`,
+          )
+          continue
+        }
       }
-    } catch (error: any) {
-      const detail = error.responseText || error.responseStatus || error.message
-      this.logger.error(`Body fetch failed for email ${emailId}: ${detail}`, error.stack)
-      await this.handleImapAuthFailure(error, accountId)
-      throw error
     }
+
+    const detail = lastError?.responseText || lastError?.responseStatus || lastError?.message
+    this.logger.error(`Body fetch failed for email ${emailId} after ${MAX_RETRIES + 1} attempts: ${detail}`, lastError?.stack)
+    await this.handleImapAuthFailure(lastError, accountId)
+    throw lastError
   }
 
   /**
@@ -779,6 +803,7 @@ export class ImapSyncService {
 
   /**
    * Parse a raw RFC822 message source into HTML, text, and snippet.
+   * Resolves CID inline images to data URIs so they display in the browser.
    * Shared by both sync (eager) and fetchEmailBody (lazy fallback).
    */
   private async parseMessageSource(source: Buffer | Uint8Array): Promise<{
@@ -790,11 +815,31 @@ export class ImapSyncService {
       const { default: PostalMime } = await import('postal-mime')
       const parser = new PostalMime()
       const parsed = await parser.parse(source)
-      const bodyHtml = parsed.html || null
+      let bodyHtml = parsed.html || null
       const bodyText = parsed.text || null
       const snippet = bodyText
         ? bodyText.substring(0, 200).replace(/\s+/g, ' ').trim()
         : null
+
+      // Resolve CID inline images to data URIs
+      if (bodyHtml && parsed.attachments?.length) {
+        const cidMap = new Map<string, string>()
+        for (const att of parsed.attachments) {
+          if (att.contentId && att.content) {
+            const cid = att.contentId.replace(/^<|>$/g, '')
+            const mimeType = att.mimeType || 'application/octet-stream'
+            const b64 = Buffer.from(att.content).toString('base64')
+            cidMap.set(cid, `data:${mimeType};base64,${b64}`)
+          }
+        }
+        if (cidMap.size > 0) {
+          bodyHtml = bodyHtml.replace(
+            /cid:([^"'\s)]+)/g,
+            (match, cid) => cidMap.get(cid) ?? match,
+          )
+        }
+      }
+
       return { bodyHtml, bodyText, snippet }
     } catch (err: any) {
       this.logger.warn(`Failed to parse message source: ${err.message}`)

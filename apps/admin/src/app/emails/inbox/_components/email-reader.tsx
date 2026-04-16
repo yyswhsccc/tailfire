@@ -67,7 +67,10 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
     }
   }, [email?.id, email?.isSeen]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const trustedDomains = (profile?.platformPreferences as any)?.trustedImageDomains ?? []
+  const trustedDomains = useMemo(
+    () => (profile?.platformPreferences as any)?.trustedImageDomains ?? [],
+    [(profile?.platformPreferences as any)?.trustedImageDomains], // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const senderDomain = email?.fromAddress?.split('@')[1]?.toLowerCase()
 
   const { html: sanitizedBody, hasBlockedImages } = useMemo(() => {
@@ -77,7 +80,7 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
       senderDomain,
       allowAllImages: forceShowImages,
     })
-  }, [email?.bodyHtml, trustedDomains, forceShowImages]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [email?.bodyHtml, trustedDomains, senderDomain, forceShowImages])
 
   function handleTrustDomain(domain: string) {
     const current = (profile?.platformPreferences as any)?.trustedImageDomains ?? []
