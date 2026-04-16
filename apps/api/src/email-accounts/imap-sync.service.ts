@@ -869,11 +869,11 @@ export class ImapSyncService {
     // Extract attachment metadata from bodyStructure
     const attachments = this.extractAttachmentMetadata(msg.bodyStructure)
 
-    // Parse body from source (if available and under 1MB threshold)
+    // Parse body from source (if available and under size threshold)
     let bodyHtml: string | null = null
     let bodyText: string | null = null
     let snippet: string | null = null
-    const MAX_SOURCE_SIZE = 1024 * 1024 // 1MB
+    const MAX_SOURCE_SIZE = 5 * 1024 * 1024 // 5MB — covers 99%+ of emails; outliers lazy-load
     if (msg.source && (!msg.size || Number(msg.size) < MAX_SOURCE_SIZE)) {
       const parsed = await this.parseMessageSource(msg.source)
       bodyHtml = parsed.bodyHtml

@@ -5,20 +5,26 @@ import { ExternalLink, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { useContacts } from '@/hooks/use-contacts'
+import { useLinkEmailContact } from '@/hooks/use-emails'
 import { QuickContactDialog } from '@/app/contacts/_components/quick-contact-dialog'
 
 interface ContactMatchBannerProps {
+  accountId: string
+  emailId: string
   matchedContactIds: string[]
   fromAddress?: string | null
   fromName?: string | null
 }
 
 export function ContactMatchBanner({
+  accountId,
+  emailId,
   matchedContactIds,
   fromAddress,
   fromName,
 }: ContactMatchBannerProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
+  const linkContact = useLinkEmailContact(accountId)
 
   // Always search by sender email to resolve contact names
   const { data: searchResults } = useContacts(
@@ -102,7 +108,12 @@ export function ContactMatchBanner({
           ...parsedName,
           ...(fromAddress ? { email: fromAddress } : {}),
         }}
-        onSuccess={() => setDialogOpen(false)}
+        onSuccess={(contactId) => {
+          setDialogOpen(false)
+          if (contactId) {
+            linkContact.mutate({ emailId, contactId })
+          }
+        }}
       />
     </>
   )
