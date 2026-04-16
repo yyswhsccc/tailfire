@@ -9,7 +9,7 @@ import { api } from '@/lib/api'
 import { createClient } from '@/lib/supabase/client'
 import type { ReportDefinition, ReportResponse, ReportQueryParams } from '@tailfire/shared-types/api'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
 
 // -- Query Keys --
 
