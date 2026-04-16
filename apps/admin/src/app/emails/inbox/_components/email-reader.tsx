@@ -290,6 +290,8 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
 
         {/* Contact match */}
         <ContactMatchBanner
+          accountId={accountId}
+          emailId={emailId}
           matchedContactIds={email.matchedContactIds}
           fromAddress={email.fromAddress}
           fromName={email.fromName}

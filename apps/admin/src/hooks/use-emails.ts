@@ -484,3 +484,18 @@ export function useSyncEmails(accountId: string | null) {
     },
   })
 }
+
+/**
+ * Link a contact to an email
+ */
+export function useLinkEmailContact(accountId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ emailId, contactId }: { emailId: string; contactId: string }) => {
+      await api.post(`/email-accounts/${accountId}/emails/${emailId}/link-contact`, { contactId })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: emailKeys.all })
+    },
+  })
+}
