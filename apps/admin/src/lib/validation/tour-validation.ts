@@ -320,10 +320,9 @@ export function toTourApiPayload(data: TourFormData): CreateActivityDto & {
     currency: data.currency,
     // Extended fields for pricing
     totalPriceCents: data.totalPriceCents,
-    taxesAndFeesCents: data.taxesAndFeesCents,
+    taxesCents: data.taxesAndFeesCents,
     commissionTotalCents: data.commissionTotalCents ?? 0,
     commissionSplitPercentage: data.commissionSplitPercentage ?? 0,
-    commissionExpectedDate: data.commissionExpectedDate || null,
     termsAndConditions: data.termsAndConditions || undefined,
     cancellationPolicy: data.cancellationPolicy || undefined,
     supplier: data.supplier || undefined,
