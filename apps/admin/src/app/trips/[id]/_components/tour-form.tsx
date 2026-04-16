@@ -1428,8 +1428,12 @@ export function TourForm({
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button onClick={handleSubmit} className="bg-orange-600 hover:bg-orange-700">
-          {isEditing ? 'Save Changes' : 'Create Tour'}
+        <Button
+          onClick={handleSubmit}
+          disabled={createTour.isPending || updateTour.isPending}
+          className="bg-orange-600 hover:bg-orange-700"
+        >
+          {(createTour.isPending || updateTour.isPending) ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Tour'}
         </Button>
       </div>
 
