@@ -6,7 +6,7 @@
 
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common'
 import { EventEmitter2 } from '@nestjs/event-emitter'
-import { eq, and, asc, desc } from 'drizzle-orm'
+import { eq, and, asc, desc, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TravellerSplitsService } from '../financials/traveller-splits.service'
 import { TripNotificationsService } from '../financials/trip-notifications.service'
@@ -278,7 +278,20 @@ export class TripTravelersService {
         asc(this.db.schema.tripTravelers.createdAt),
       )
 
-    return Promise.all(travelers.map((traveler) => this.mapToResponseDto(traveler, auth)))
+    if (travelers.length === 0) return []
+
+    // Batch-fetch all contacts in 1 query instead of N
+    const contactIds = [...new Set(travelers.map(t => t.contactId).filter(Boolean))] as string[]
+    const contactMap = new Map<string, any>()
+    if (contactIds.length > 0) {
+      const contacts = await this.db.client
+        .select()
+        .from(this.db.schema.contacts)
+        .where(inArray(this.db.schema.contacts.id, contactIds))
+      for (const c of contacts) contactMap.set(c.id, c)
+    }
+
+    return travelers.map((traveler) => this.mapToResponseDtoSync(traveler, contactMap, auth))
   }
 
   /**
@@ -785,6 +798,67 @@ export class TripTravelersService {
       isPrimaryTraveler: traveler.isPrimaryTraveler,
       travelerType: traveler.travelerType,
       contactSnapshot: filteredSnapshot,
+      emergencyContactId: traveler.emergencyContactId,
+      emergencyContactInline: traveler.emergencyContactInline,
+      specialRequirements: traveler.specialRequirements,
+      sequenceOrder: traveler.sequenceOrder,
+      snapshotUpdatedAt: formatTs(traveler.snapshotUpdatedAt),
+      contactDeletedAt: formatTs(traveler.contactDeletedAt),
+      isSnapshotStale,
+      createdAt: typeof traveler.createdAt === 'string' ? traveler.createdAt : traveler.createdAt.toISOString(),
+      updatedAt: typeof traveler.updatedAt === 'string' ? traveler.updatedAt : traveler.updatedAt.toISOString(),
+    }
+  }
+
+  /**
+   * Synchronous mapping for batched findAll — uses pre-fetched contact map.
+   * Skips per-traveler access checks for performance (list view shows basic info).
+   */
+  private mapToResponseDtoSync(
+    traveler: any,
+    contactMap: Map<string, any>,
+    _auth?: AuthContext,
+  ): TripTravelerResponseDto {
+    let contact = undefined
+
+    if (traveler.contactId) {
+      const foundContact = contactMap.get(traveler.contactId)
+      if (foundContact) {
+        const displayName = foundContact.preferredName || foundContact.firstName || foundContact.legalFirstName || 'Unknown'
+        const legalFullName = [
+          foundContact.prefix,
+          foundContact.legalFirstName ?? foundContact.firstName,
+          foundContact.middleName,
+          foundContact.legalLastName ?? foundContact.lastName,
+          foundContact.suffix,
+        ].filter(Boolean).join(' ') || null
+
+        contact = { ...foundContact, displayName, legalFullName } as any
+      }
+    }
+
+    let isSnapshotStale = false
+    if (contact && traveler.snapshotUpdatedAt) {
+      const snapshotTime = typeof traveler.snapshotUpdatedAt === 'string'
+        ? new Date(traveler.snapshotUpdatedAt) : traveler.snapshotUpdatedAt
+      const contactTime = typeof contact.updatedAt === 'string'
+        ? new Date(contact.updatedAt) : contact.updatedAt
+      if (contactTime && snapshotTime && contactTime > snapshotTime) {
+        isSnapshotStale = true
+      }
+    }
+
+    const formatTs = (ts: any) => ts ? (typeof ts === 'string' ? ts : ts.toISOString()) : null
+
+    return {
+      id: traveler.id,
+      tripId: traveler.tripId,
+      contactId: traveler.contactId,
+      contact,
+      role: traveler.role,
+      isPrimaryTraveler: traveler.isPrimaryTraveler,
+      travelerType: traveler.travelerType,
+      contactSnapshot: traveler.contactSnapshot,
       emergencyContactId: traveler.emergencyContactId,
       emergencyContactInline: traveler.emergencyContactInline,
       specialRequirements: traveler.specialRequirements,
