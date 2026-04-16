@@ -96,7 +96,7 @@ export async function GET(request: Request) {
  * or refactor to use an external script with a nonce/hash.
  */
 function getHashHandlerHtml(origin: string): string {
-  const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1').trim()
+  const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '/api/v1').trim()
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
   const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
 

@@ -28,7 +28,7 @@ import {
 import { ApiError } from '@/lib/api'
 
 // Default API URL
-const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
 
 /**
  * Get authorization headers with the current session token
