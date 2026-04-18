@@ -51,6 +51,20 @@ export default function SetPasswordPage() {
         setError(updateError.message)
         return
       }
+
+      // Activate the pending account now that password is set
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+        await fetch(`${apiUrl}/user-profiles/me/activate`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+      }
+
+      // Refresh session so JWT reflects new active status
+      await supabase.auth.refreshSession()
+
       router.replace('/profile?setup=true')
     } catch {
       setError('An unexpected error occurred. Please try again.')

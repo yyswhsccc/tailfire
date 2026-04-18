@@ -264,6 +264,7 @@ export class UserProfilesService {
    */
   async recordLogin(userId: string): Promise<void> {
     const now = new Date()
+    // Only update timestamps — activation happens after password is set
     await this.db.client
       .update(this.db.schema.userProfiles)
       .set({ lastLoginAt: now, lastSeenAt: now })
