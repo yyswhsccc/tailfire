@@ -222,16 +222,8 @@ export class TripAccessService {
       .from(this.db.schema.tripShares)
       .where(eq(this.db.schema.tripShares.sharedWithUserId, auth.userId))
 
-    // Get inbound trips (no owner - visible to all agency users)
-    const inboundTrips = await this.db.client
-      .select({ id: this.db.schema.trips.id })
-      .from(this.db.schema.trips)
-      .where(
-        and(
-          eq(this.db.schema.trips.agencyId, auth.agencyId),
-          eq(this.db.schema.trips.status, 'inbound'),
-        ),
-      )
+    // Inbound trips without an owner are admin-only (for assignment).
+    // Non-admin agents only see their own inbound trips via ownedTrips above.
 
     // Combine all accessible trip IDs
     const tripIds = new Set<string>()
@@ -240,9 +232,6 @@ export class TripAccessService {
     }
     for (const share of sharedTrips) {
       tripIds.add(share.tripId)
-    }
-    for (const trip of inboundTrips) {
-      tripIds.add(trip.id)
     }
 
     const accessibleTripIds = Array.from(tripIds)
