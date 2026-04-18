@@ -67,7 +67,10 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
     }
   }, [email?.id, email?.isSeen]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const trustedDomains = (profile?.platformPreferences as any)?.trustedImageDomains ?? []
+  const trustedDomains = useMemo(
+    () => (profile?.platformPreferences as any)?.trustedImageDomains ?? [],
+    [(profile?.platformPreferences as any)?.trustedImageDomains], // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const senderDomain = email?.fromAddress?.split('@')[1]?.toLowerCase()
 
   const { html: sanitizedBody, hasBlockedImages } = useMemo(() => {
@@ -77,7 +80,7 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
       senderDomain,
       allowAllImages: forceShowImages,
     })
-  }, [email?.bodyHtml, trustedDomains, forceShowImages]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [email?.bodyHtml, trustedDomains, senderDomain, forceShowImages])
 
   function handleTrustDomain(domain: string) {
     const current = (profile?.platformPreferences as any)?.trustedImageDomains ?? []
@@ -108,17 +111,25 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
     )
   }
 
+  function buildQuotedHtml(attribution: string, body: string | null) {
+    const quotedContent = body
+      ? body.replace(/\n/g, '<br>')
+      : ''
+    return `<p><br></p><hr><p>${attribution}</p><blockquote>${quotedContent}</blockquote>`
+  }
+
   function handleReply() {
     if (!email) return
     const replyTo = email.fromAddress
       ? [{ address: email.fromAddress, name: email.fromName || undefined }]
       : []
+    const attribution = `On ${email.date ? format(new Date(email.date), 'PPpp') : ''}, ${email.fromName || email.fromAddress || 'Unknown'} wrote:`
     openCompose({
       mode: 'reply',
       replyToEmailId: email.id,
       prefillTo: replyTo,
       prefillSubject: email.subject?.startsWith('Re:') ? email.subject : `Re: ${email.subject || ''}`,
-      prefillBody: `\n\n---\nOn ${email.date ? format(new Date(email.date), 'PPpp') : ''}, ${email.fromName || email.fromAddress || 'Unknown'} wrote:\n> ${(email.bodyText || '').replace(/\n/g, '\n> ')}`,
+      prefillBody: buildQuotedHtml(attribution, email.bodyText),
     })
   }
 
@@ -130,22 +141,24 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
     // Include all original To/CC except our own account
     const otherTo = email.toAddresses.filter((a: EmailAddressDto) => a.address !== email.fromAddress)
     const allCc = [...(email.ccAddresses || [])]
+    const attribution = `On ${email.date ? format(new Date(email.date), 'PPpp') : ''}, ${email.fromName || email.fromAddress || 'Unknown'} wrote:`
     openCompose({
       mode: 'replyAll',
       replyToEmailId: email.id,
       prefillTo: replyTo,
       prefillCc: [...otherTo, ...allCc],
       prefillSubject: email.subject?.startsWith('Re:') ? email.subject : `Re: ${email.subject || ''}`,
-      prefillBody: `\n\n---\nOn ${email.date ? format(new Date(email.date), 'PPpp') : ''}, ${email.fromName || email.fromAddress || 'Unknown'} wrote:\n> ${(email.bodyText || '').replace(/\n/g, '\n> ')}`,
+      prefillBody: buildQuotedHtml(attribution, email.bodyText),
     })
   }
 
   function handleForward() {
     if (!email) return
+    const attribution = `Forwarded message from ${email.fromName || email.fromAddress || 'Unknown'}:`
     openCompose({
       mode: 'forward',
       prefillSubject: email.subject?.startsWith('Fwd:') ? email.subject : `Fwd: ${email.subject || ''}`,
-      prefillBody: `\n\n---\nForwarded message from ${email.fromName || email.fromAddress || 'Unknown'}:\n\n${email.bodyText || ''}`,
+      prefillBody: buildQuotedHtml(attribution, email.bodyText),
     })
   }
 
@@ -277,6 +290,8 @@ export function EmailReader({ accountId, emailId }: EmailReaderProps) {
 
         {/* Contact match */}
         <ContactMatchBanner
+          accountId={accountId}
+          emailId={emailId}
           matchedContactIds={email.matchedContactIds}
           fromAddress={email.fromAddress}
           fromName={email.fromName}

@@ -65,7 +65,18 @@ const nextConfig: NextConfig = {
 
   // Environment variables to expose to the client
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api/v1',
+  },
+
+  // Proxy API calls through same origin to avoid CORS issues on corporate networks
+  async rewrites() {
+    const apiOrigin = process.env.API_ORIGIN || 'http://localhost:3101'
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: `${apiOrigin}/api/v1/:path*`,
+      },
+    ]
   },
 
   // Cloudflare Pages compatibility

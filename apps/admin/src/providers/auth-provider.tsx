@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Record login timestamp on sign-in (fire-and-forget)
       if (event === 'SIGNED_IN' && session?.access_token) {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
         fetch(`${apiUrl}/user-profiles/me/record-login`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.access_token}` },

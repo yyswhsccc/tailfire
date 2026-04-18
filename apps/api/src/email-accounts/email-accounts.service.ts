@@ -701,6 +701,35 @@ export class EmailAccountsService {
     }
   }
 
+  /**
+   * Link a contact to an email by adding to matchedContactIds
+   */
+  async linkContact(accountId: string, emailId: string, contactId: string, _userId: string): Promise<void> {
+    const [email] = await this.db.client
+      .select({ id: this.db.schema.syncedEmails.id, matchedContactIds: this.db.schema.syncedEmails.matchedContactIds })
+      .from(this.db.schema.syncedEmails)
+      .where(
+        and(
+          eq(this.db.schema.syncedEmails.id, emailId),
+          eq(this.db.schema.syncedEmails.emailAccountId, accountId),
+        ),
+      )
+      .limit(1)
+
+    if (!email) throw new NotFoundException('Email not found')
+
+    const existing = (email.matchedContactIds as string[]) ?? []
+    if (existing.includes(contactId)) return // Already linked
+
+    await this.db.client
+      .update(this.db.schema.syncedEmails)
+      .set({
+        matchedContactIds: [...existing, contactId],
+        updatedAt: new Date(),
+      })
+      .where(eq(this.db.schema.syncedEmails.id, emailId))
+  }
+
   private formatAttachment(attachment: any): EmailAttachmentDto {
     return {
       id: attachment.id,

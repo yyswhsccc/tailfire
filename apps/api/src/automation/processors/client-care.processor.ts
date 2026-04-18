@@ -1152,26 +1152,44 @@ ${removedTasks.map((t) => `<tr><td style="font-size:14px;color:#27272a;border-bo
   }
 
   private async handleDailyOverduePaymentScan(_agencyId?: string): Promise<void> {
-    const { expectedPaymentItems } = this.db.schema
+    const {
+      expectedPaymentItems,
+      paymentScheduleConfig,
+      activityPricing,
+      itineraryActivities,
+      itineraryDays,
+      itineraries,
+      trips,
+    } = this.db.schema
     const today = new Date()
     const todayStr = today.toISOString().slice(0, 10) // Format as YYYY-MM-DD for date comparison
 
-    // Find all pending/partial payments that are past due
+    // Find all pending/partial payments that are past due, joined to trip info
     const overdueItems = await this.db.client
       .select({
         id: expectedPaymentItems.id,
-        paymentScheduleConfigId: expectedPaymentItems.paymentScheduleConfigId,
-        status: expectedPaymentItems.status,
+        paymentName: expectedPaymentItems.paymentName,
+        expectedAmountCents: expectedPaymentItems.expectedAmountCents,
         dueDate: expectedPaymentItems.dueDate,
+        tripId: trips.id,
+        tripName: trips.name,
+        agencyId: trips.agencyId,
       })
       .from(expectedPaymentItems)
+      .innerJoin(paymentScheduleConfig, eq(expectedPaymentItems.paymentScheduleConfigId, paymentScheduleConfig.id))
+      .innerJoin(activityPricing, eq(paymentScheduleConfig.activityPricingId, activityPricing.id))
+      .innerJoin(itineraryActivities, eq(activityPricing.activityId, itineraryActivities.id))
+      .innerJoin(itineraryDays, eq(itineraryActivities.itineraryDayId, itineraryDays.id))
+      .innerJoin(itineraries, eq(itineraryDays.itineraryId, itineraries.id))
+      .innerJoin(trips, eq(itineraries.tripId, trips.id))
       .where(
         and(
           or(
             eq(expectedPaymentItems.status, 'pending'),
             eq(expectedPaymentItems.status, 'partial')
           ),
-          lte(expectedPaymentItems.dueDate, todayStr)
+          lte(expectedPaymentItems.dueDate, todayStr),
+          ne(trips.status, 'cancelled')
         )
       )
 
@@ -1185,14 +1203,22 @@ ${removedTasks.map((t) => `<tr><td style="font-size:14px;color:#27272a;border-bo
         .set({ status: 'overdue' })
         .where(eq(expectedPaymentItems.id, item.id))
 
-      // Emit event for activity logging
+      const daysOverdue = Math.floor(
+        (today.getTime() - new Date(item.dueDate!).getTime()) / (1000 * 60 * 60 * 24)
+      )
+
+      // Emit event with full payload for notification handler
       this.eventEmitter.emit('payment.overdue', {
+        tripId: item.tripId,
+        tripName: item.tripName,
+        agencyId: item.agencyId,
         paymentItemId: item.id,
-        paymentScheduleConfigId: item.paymentScheduleConfigId,
-        dueDate: item.dueDate,
+        paymentName: item.paymentName ?? 'Payment',
+        amountDue: item.expectedAmountCents ?? 0,
+        daysOverdue,
       })
 
-      this.logger.log(`Marked payment ${item.id} as overdue`)
+      this.logger.log(`Marked payment ${item.id} as overdue (trip: ${item.tripId})`)
     }
   }
 

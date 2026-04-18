@@ -1685,7 +1685,7 @@ export function CustomCruiseForm({
                             const formData = new FormData()
                             formData.append('file', file)
                             formData.append('documentType', 'cabin_image')
-                            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
+                            const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
                             const response = await fetch(`${apiUrl}/components/${activityId}/documents`, {
                               method: 'POST',
                               body: formData,

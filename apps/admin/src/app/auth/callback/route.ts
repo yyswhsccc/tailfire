@@ -39,6 +39,8 @@ export async function GET(request: Request) {
     if (!error) {
       // For invites, redirect to set-password (user stays pending until password is set)
       if (type === 'invite') {
+        // No activation here — user stays pending until password is set.
+        // Activation happens on recordLogin() after successful authentication.
         return NextResponse.redirect(`${origin}/auth/set-password`)
       }
       // For recovery, redirect to password reset
@@ -73,7 +75,7 @@ export async function GET(request: Request) {
  * or refactor to use an external script with a nonce/hash.
  */
 function getHashHandlerHtml(origin: string): string {
-  const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1').trim()
+  const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '/api/v1').trim()
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
   const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
 

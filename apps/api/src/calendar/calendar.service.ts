@@ -450,6 +450,15 @@ export class CalendarService {
       conditions.push(eq(this.db.schema.trips.id, query.tripId))
     }
 
+    // Contact filter: only show payments for trips where this contact is a traveler
+    if (query.contactId) {
+      const contactTripIds = this.db.client
+        .select({ tripId: this.db.schema.tripTravelers.tripId })
+        .from(this.db.schema.tripTravelers)
+        .where(eq(this.db.schema.tripTravelers.contactId, query.contactId))
+      conditions.push(inArray(this.db.schema.trips.id, contactTripIds))
+    }
+
     // Get payments with trip info via correct join path:
     // expectedPaymentItems → paymentScheduleConfig → activityPricing → itineraryActivities → itineraryDays → itineraries → trips
     const payments = await this.db.client

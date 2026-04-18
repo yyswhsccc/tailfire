@@ -123,28 +123,27 @@ export class TaskAccessService {
   }
 
   /**
-   * Build WHERE conditions for task queries based on user role
-   * This is used in service methods to apply RBAC at query level
+   * Build WHERE conditions for task queries based on user role.
+   * All users (including admins) see only their own tasks by default:
+   * owned, assigned to them, or created by them, plus unowned non-admin-pool tasks.
+   * Admins additionally see admin_pool tasks (system-generated).
    */
   buildAccessConditions(auth: AuthContext) {
-    // Admins see all tasks in agency
-    if (auth.role === 'admin') {
-      return eq(this.db.schema.tasks.agencyId, auth.agencyId)
-    }
+    const userScoped = or(
+      eq(this.db.schema.tasks.ownerId, auth.userId),
+      eq(this.db.schema.tasks.assigneeUserId, auth.userId),
+      eq(this.db.schema.tasks.createdBy, auth.userId),
+      and(isNull(this.db.schema.tasks.ownerId), ne(this.db.schema.tasks.assigneeType, 'admin_pool')),
+    )
 
-    // Regular users see:
-    // - Tasks they own
-    // - Tasks assigned to them
-    // - Tasks they created
-    // - Agency-wide tasks (no owner, not admin_pool)
+    // Admins also see admin_pool tasks (system-generated)
+    const visibility = auth.role === 'admin'
+      ? or(userScoped, eq(this.db.schema.tasks.assigneeType, 'admin_pool'))
+      : userScoped
+
     return and(
       eq(this.db.schema.tasks.agencyId, auth.agencyId),
-      or(
-        eq(this.db.schema.tasks.ownerId, auth.userId),
-        eq(this.db.schema.tasks.assigneeUserId, auth.userId),
-        eq(this.db.schema.tasks.createdBy, auth.userId),
-        and(isNull(this.db.schema.tasks.ownerId), ne(this.db.schema.tasks.assigneeType, 'admin_pool'))
-      )
+      visibility,
     )
   }
 }

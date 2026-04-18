@@ -267,6 +267,22 @@ export class EmailAccountsController {
   }
 
   /**
+   * Link a contact to an email
+   * POST /email-accounts/:id/emails/:emailId/link-contact
+   */
+  @Post(':id/emails/:emailId/link-contact')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async linkContact(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Param('emailId') emailId: string,
+    @Body('contactId') contactId: string,
+  ): Promise<void> {
+    if (!contactId) throw new BadRequestException('contactId is required')
+    await this.emailAccountsService.linkContact(id, emailId, contactId, auth.userId)
+  }
+
+  /**
    * Download attachment (fetches from IMAP on first access, then caches)
    * GET /email-accounts/:id/emails/:emailId/attachments/:attachmentId
    */
