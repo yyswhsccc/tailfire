@@ -50,7 +50,7 @@
     "@nestjs/throttler": "^5.0.0",
     "@octokit/rest": "^22.0.1",
     "@sentry/nestjs": "^10.44.0",
-    "@supabase/supabase-js": "^2.47.10",
+    "@supabase/supabase-js": "^2.103.3",
     "@tailfire/database": "workspace:*",
     "@tailfire/shared-types": "workspace:*",
     "@types/pdfkit": "^0.17.3",
