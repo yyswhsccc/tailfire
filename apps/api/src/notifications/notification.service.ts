@@ -140,7 +140,7 @@ export class NotificationService {
     // Email notification - for agent notifications (not contacts)
     if (channels.includes('email') && prefs?.emailEnabled) {
       promises.push(
-        this.sendAgentEmail(userId, agencyId, title, body, data)
+        this.sendAgentEmail(userId, agencyId, title, body, actionUrl)
           .then((success) => {
             results.email = { success }
           })
@@ -538,7 +538,7 @@ export class NotificationService {
     agencyId: string,
     title: string,
     body: string,
-    data?: Record<string, unknown>
+    actionUrl?: string,
   ): Promise<boolean> {
     // Get user email
     const [user] = await this.db.client
@@ -552,11 +552,18 @@ export class NotificationService {
       return false
     }
 
-    // Send simple notification email
+    // Build email HTML with optional action link
+    const adminUrl = process.env.ADMIN_URL || 'https://tailfire.phoenixvoyages.ca'
+    let html = `<p>${body}</p>`
+    if (actionUrl) {
+      const fullUrl = actionUrl.startsWith('http') ? actionUrl : `${adminUrl}${actionUrl}`
+      html += `<p style="margin-top:16px"><a href="${fullUrl}" style="display:inline-block;padding:10px 20px;background-color:#e97316;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">View Details</a></p>`
+    }
+
     const result = await this.emailService.sendEmail({
       to: [user.email],
       subject: title,
-      html: `<p>${body}</p>`,
+      html,
       agencyId,
     })
 
