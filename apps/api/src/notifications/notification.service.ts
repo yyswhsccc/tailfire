@@ -556,7 +556,7 @@ export class NotificationService {
     const result = await this.emailService.sendEmail({
       to: [user.email],
       subject: title,
-      html: `<p>${body}</p>${data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : ''}`,
+      html: `<p>${body}</p>`,
       agencyId,
     })
 
