@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.81.1",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.103.3",
     "@tailfire/api-client": "workspace:*",
     "@tailfire/shared-types": "workspace:*",
     "@tailfire/ui-public": "workspace:*",
