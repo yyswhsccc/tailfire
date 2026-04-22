@@ -799,6 +799,92 @@ export class TripOrderService {
   }
 
   /**
+   * Render group-specific PDFs (trip order + manifest) using inline templates.
+   * These don't use the DB template system since they have a different structure.
+   */
+  private async renderGroupPdf(context: Record<string, unknown>, type: 'group-trip-order' | 'group-manifest'): Promise<Buffer> {
+    await this.embedLogoAsBase64(context)
+    const html = type === 'group-trip-order'
+      ? this.getGroupTripOrderHtml(context)
+      : this.getGroupManifestHtml(context)
+    return this.puppeteerPdf.renderHtmlToPdf(html)
+  }
+
+  private getGroupTripOrderHtml(ctx: Record<string, unknown>): string {
+    const biz = ctx.business as any || {}
+    const items = ctx.group_line_items as any[] || []
+    const rows = items.map(i =>
+      `<tr><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0">${i.category}</td>
+       <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:right">${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2 }).format(i.totalPrice)} ${i.currency}</td></tr>`
+    ).join('')
+    const client = ctx.client as any
+    const clientName = client ? `${client.first_name || ''} ${client.last_name || ''}`.trim() : 'Client'
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1e293b;margin:0;padding:40px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;border-bottom:3px solid #c59746;padding-bottom:20px}
+.logo img{max-height:60px} .title{font-size:24px;font-weight:700;color:#c59746}
+table{width:100%;border-collapse:collapse;margin:20px 0} th{background:#f8fafc;padding:10px 12px;text-align:left;border-bottom:2px solid #c59746;font-size:13px;text-transform:uppercase;color:#64748b}
+.total-row td{font-weight:700;font-size:16px;border-top:2px solid #c59746;padding-top:12px}
+.meta{color:#64748b;font-size:13px;margin-bottom:4px} .section{margin:24px 0}
+.compliance{font-size:11px;color:#94a3b8;margin-top:30px;border-top:1px solid #e2e8f0;padding-top:15px}
+</style></head><body>
+<div class="header"><div class="logo">${ctx.agency_logo_base64 ? `<img src="${ctx.agency_logo_base64}" alt="Logo" style="max-height:60px">` : ''}</div>
+<div style="text-align:right"><div class="title">Group Trip Order</div>
+<div class="meta">${ctx.generated_date || ''}</div></div></div>
+<div class="section"><div class="meta">Group</div><div style="font-size:18px;font-weight:600">${ctx.group_name || ''}</div>
+${ctx.group_number ? `<div class="meta">Ref: ${ctx.group_number}</div>` : ''}
+${ctx.destination ? `<div class="meta">Destination: ${ctx.destination}</div>` : ''}
+${ctx.start_date ? `<div class="meta">${ctx.start_date}${ctx.end_date ? ' — ' + ctx.end_date : ''}</div>` : ''}</div>
+<div class="section"><div class="meta">Bill To</div><div style="font-size:16px;font-weight:600">${clientName}</div>
+${client?.email ? `<div class="meta">${client.email}</div>` : ''}</div>
+<table><thead><tr><th>Category</th><th style="text-align:right">Amount</th></tr></thead>
+<tbody>${rows}
+<tr class="total-row"><td style="padding:12px">TOTAL</td><td style="padding:12px;text-align:right">${ctx.group_grand_total_formatted || '0.00'} ${ctx.currency || 'CAD'}</td></tr>
+</tbody></table>
+<div class="meta">${ctx.group_trip_count || 0} trip(s) in this group</div>
+<div class="compliance">${biz.company_name || 'Phoenix Voyages'} — TICO Registration: ${biz.tico_registration || 'N/A'}<br>
+This document constitutes the official Trip Order as required by Ontario Regulation 26/05, §38.</div>
+</body></html>`
+  }
+
+  private getGroupManifestHtml(ctx: Record<string, unknown>): string {
+    const biz = ctx.business as any || {}
+    const travelers = ctx.travelers as any[] || []
+    const rows = travelers.map((t, i) =>
+      `<tr><td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${i + 1}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.firstName || ''} ${t.lastName || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.tripName || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.email || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.phone || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.dateOfBirth || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.passportNumber || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.passportExpiry || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.nationality || ''}</td></tr>`
+    ).join('')
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1e293b;margin:0;padding:40px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;border-bottom:3px solid #c59746;padding-bottom:20px}
+.logo img{max-height:60px} .title{font-size:24px;font-weight:700;color:#c59746}
+table{width:100%;border-collapse:collapse;margin:20px 0;font-size:11px} th{background:#f8fafc;padding:8px;text-align:left;border-bottom:2px solid #c59746;font-size:10px;text-transform:uppercase;color:#64748b}
+.meta{color:#64748b;font-size:13px;margin-bottom:4px} .section{margin:24px 0}
+.compliance{font-size:11px;color:#94a3b8;margin-top:30px;border-top:1px solid #e2e8f0;padding-top:15px}
+</style></head><body>
+<div class="header"><div class="logo">${ctx.agency_logo_base64 ? `<img src="${ctx.agency_logo_base64}" alt="Logo" style="max-height:60px">` : ''}</div>
+<div style="text-align:right"><div class="title">Group Traveler Manifest</div>
+<div class="meta">${ctx.generated_date || ''}</div></div></div>
+<div class="section"><div style="font-size:18px;font-weight:600">${ctx.group_name || ''}</div>
+${ctx.group_number ? `<div class="meta">Ref: ${ctx.group_number}</div>` : ''}
+${ctx.destination ? `<div class="meta">Destination: ${ctx.destination}</div>` : ''}
+<div class="meta">${ctx.traveler_count || 0} travelers across ${ctx.trip_count || 0} trip(s)</div></div>
+<table><thead><tr><th>#</th><th>Name</th><th>Trip</th><th>Email</th><th>Phone</th><th>DOB</th><th>Passport</th><th>Expiry</th><th>Nationality</th></tr></thead>
+<tbody>${rows}</tbody></table>
+<div class="compliance">${biz.company_name || 'Phoenix Voyages'} — Generated ${ctx.generated_date || ''}</div>
+</body></html>`
+  }
+
+  /**
    * Fetch the agency logo URL and replace it with a base64 data URI
    * so Puppeteer doesn't depend on external network access during PDF rendering.
    */
@@ -1447,12 +1533,13 @@ export class TripOrderService {
       // Group-specific: aggregated line items by activity type
       group_line_items: lineItems,
       group_grand_total: grandTotalCents / 100,
+      group_grand_total_formatted: new Intl.NumberFormat('en-US', { style: 'decimal', minimumFractionDigits: 2 }).format(grandTotalCents / 100),
       group_trip_count: groupTrips.length,
       business: businessConfig,
       generated_date: new Date().toISOString().split('T')[0],
     }
 
-    return this.renderTripOrderPdf(agencyId, context)
+    return this.renderGroupPdf(context, 'group-trip-order')
   }
 
   /**
@@ -1531,7 +1618,7 @@ export class TripOrderService {
       generated_date: new Date().toISOString().split('T')[0],
     }
 
-    return this.renderTripOrderPdf(agencyId, context)
+    return this.renderGroupPdf(context, 'group-manifest')
   }
 
   private async getTripPayments(tripId: string) {
