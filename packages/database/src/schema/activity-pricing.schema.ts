@@ -7,6 +7,7 @@
 import { pgTable, pgEnum, uuid, varchar, decimal, text, date, timestamp, integer, boolean, jsonb } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { itineraryActivities } from './activities.schema'
+import { trips } from './trips.schema'
 import { contacts } from './contacts.schema'
 import { travelerBookings } from './traveler-bookings.schema'
 
@@ -68,6 +69,9 @@ export const activityPricing = pgTable('activity_pricing', {
   termsAndConditions: text('terms_and_conditions'),
   cancellationPolicy: text('cancellation_policy'),
   supplier: varchar('supplier', { length: 255 }),
+
+  // Group billing: when set, this activity's cost rolls up to another trip in the same group
+  billedToTripId: uuid('billed_to_trip_id').references(() => trips.id, { onDelete: 'set null' }),
 
   // Universal booking fields (all activity types)
   netPriceCents: integer('net_price_cents'),
