@@ -22,6 +22,7 @@ import {
   UseInterceptors,
   UploadedFile,
   ParseUUIDPipe,
+  Res,
 } from '@nestjs/common'
 import { eq } from 'drizzle-orm'
 import { AdminOnly } from '../auth/decorators/admin-only.decorator'
@@ -35,6 +36,7 @@ import { TripLifecycleService } from './trip-lifecycle.service'
 import { TripGroupAccessService } from './trip-group-access.service'
 import { StorageService } from './storage.service'
 import { GroupBillingService } from './group-billing.service'
+import { TripOrderService } from '../financials/trip-order.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
 import { ActivitiesService } from './activities.service'
@@ -81,6 +83,7 @@ export class TripsController {
     private readonly storageService: StorageService,
     private readonly tripLifecycleService: TripLifecycleService,
     private readonly groupBillingService: GroupBillingService,
+    private readonly tripOrderService: TripOrderService,
   ) {}
 
   /**
@@ -495,6 +498,53 @@ export class TripsController {
   ) {
     await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
     return this.tripsService.getGroupSummary(groupId, auth.agencyId)
+  }
+
+  /**
+   * Generate Group Trip Order PDF
+   * POST /trips/groups/:groupId/trip-order
+   *
+   * Aggregates all activities billed to the master trip by activity type.
+   * Returns a PDF buffer.
+   */
+  @Post('groups/:groupId/trip-order')
+  async generateGroupTripOrder(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Res({ passthrough: true }) res: any,
+  ) {
+    await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
+    const pdfBuffer = await this.tripOrderService.generateGroupTripOrder(groupId, auth.agencyId)
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="group-trip-order-${groupId}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    })
+    return pdfBuffer
+  }
+
+  /**
+   * Generate Group Manifest PDF
+   * POST /trips/groups/:groupId/manifest
+   *
+   * Lists all travelers across all sub-trips with passport, contact details.
+   */
+  @Post('groups/:groupId/manifest')
+  async generateGroupManifest(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Res({ passthrough: true }) res: any,
+  ) {
+    await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
+    const pdfBuffer = await this.tripOrderService.generateGroupManifest(groupId, auth.agencyId)
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="group-manifest-${groupId}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    })
+    return pdfBuffer
   }
 
   /**

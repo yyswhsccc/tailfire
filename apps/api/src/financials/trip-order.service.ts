@@ -1328,6 +1328,212 @@ export class TripOrderService {
     return bookingsWithPassengers
   }
 
+  /**
+   * Generate a Group Trip Order PDF — aggregated by activity type.
+   * Includes all activities billed to the master trip across all sub-trips.
+   */
+  async generateGroupTripOrder(groupId: string, agencyId: string): Promise<Buffer> {
+    // Get group + master trip
+    const [group] = await this.db.client
+      .select()
+      .from(this.db.schema.tripGroups)
+      .where(and(eq(this.db.schema.tripGroups.id, groupId), eq(this.db.schema.tripGroups.agencyId, agencyId)))
+      .limit(1)
+
+    if (!group) throw new NotFoundException('Trip group not found')
+    if (!group.masterTripId) throw new BadRequestException('Group has no master trip — set one first')
+
+    const masterTripId = group.masterTripId
+
+    // Get master trip details
+    const [masterTrip] = await this.db.client
+      .select()
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.id, masterTripId))
+      .limit(1)
+
+    if (!masterTrip) throw new NotFoundException('Master trip not found')
+
+    // Get all activities billed to the master trip (across all sub-trips)
+    const activities = await this.db.client.execute(sql`
+      SELECT
+        ia.activity_type,
+        ap.total_price_cents,
+        ap.currency
+      FROM activity_pricing ap
+      JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      WHERE (ap.billed_to_trip_id = ${masterTripId}
+        OR (ap.billed_to_trip_id IS NULL AND EXISTS (
+          SELECT 1 FROM itinerary_days iday
+          JOIN itineraries i ON i.id = iday.itinerary_id
+          WHERE iday.id = ia.itinerary_day_id AND i.trip_id = ${masterTripId}
+        )))
+        AND ia.parent_activity_id IS NULL
+    `) as any[]
+
+    // Aggregate by activity type
+    const typeTotals = new Map<string, number>()
+    let grandTotalCents = 0
+    const currency = masterTrip.currency || 'CAD'
+
+    for (const a of activities) {
+      const type = a.activity_type || 'other'
+      const cents = Number(a.total_price_cents ?? 0)
+      typeTotals.set(type, (typeTotals.get(type) || 0) + cents)
+      grandTotalCents += cents
+    }
+
+    // Format type labels
+    const typeLabels: Record<string, string> = {
+      flight: 'Flights',
+      lodging: 'Hotels & Accommodations',
+      transportation: 'Transfers & Transportation',
+      tour: 'Tours & Excursions',
+      insurance: 'Travel Insurance',
+      package: 'Packages',
+      cruise: 'Cruises',
+      dining: 'Dining',
+      activity: 'Activities',
+      other: 'Other',
+    }
+
+    const lineItems = Array.from(typeTotals.entries())
+      .sort((a, b) => b[1] - a[1]) // Highest cost first
+      .map(([type, cents]) => ({
+        category: typeLabels[type] || type.charAt(0).toUpperCase() + type.slice(1),
+        totalPrice: cents / 100,
+        currency,
+      }))
+
+    // Get business config
+    const businessConfig = await this.getBusinessConfiguration(agencyId)
+
+    // Get primary contact from master trip
+    const primaryContact = masterTrip.primaryContactId
+      ? await this.db.client
+          .select({
+            firstName: this.db.schema.contacts.firstName,
+            lastName: this.db.schema.contacts.lastName,
+            email: this.db.schema.contacts.email,
+          })
+          .from(this.db.schema.contacts)
+          .where(eq(this.db.schema.contacts.id, masterTrip.primaryContactId))
+          .limit(1)
+          .then(r => r[0] || null)
+      : null
+
+    // Get all trips in the group
+    const groupTrips = await this.db.client
+      .select({ id: this.db.schema.trips.id, name: this.db.schema.trips.name })
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.tripGroupId, groupId))
+
+    // Build context for Handlebars template
+    const context: Record<string, unknown> = {
+      is_group_trip_order: true,
+      group_name: group.name,
+      group_number: group.groupNumber,
+      trip_name: masterTrip.name,
+      trip_reference: masterTrip.referenceNumber,
+      start_date: group.startDate || masterTrip.startDate,
+      end_date: group.endDate || masterTrip.endDate,
+      destination: group.destination || null,
+      currency,
+      client: primaryContact ? {
+        first_name: primaryContact.firstName,
+        last_name: primaryContact.lastName,
+        email: primaryContact.email,
+      } : null,
+      // Group-specific: aggregated line items by activity type
+      group_line_items: lineItems,
+      group_grand_total: grandTotalCents / 100,
+      group_trip_count: groupTrips.length,
+      business: businessConfig,
+      generated_date: new Date().toISOString().split('T')[0],
+    }
+
+    return this.renderTripOrderPdf(agencyId, context)
+  }
+
+  /**
+   * Generate a Group Manifest PDF — all travelers with details.
+   * Best-effort: includes passport, room, flight data when available.
+   */
+  async generateGroupManifest(groupId: string, agencyId: string): Promise<Buffer> {
+    const [group] = await this.db.client
+      .select()
+      .from(this.db.schema.tripGroups)
+      .where(and(eq(this.db.schema.tripGroups.id, groupId), eq(this.db.schema.tripGroups.agencyId, agencyId)))
+      .limit(1)
+
+    if (!group) throw new NotFoundException('Trip group not found')
+
+    // Get all trips in the group
+    const trips = await this.db.client
+      .select({
+        id: this.db.schema.trips.id,
+        name: this.db.schema.trips.name,
+        referenceNumber: this.db.schema.trips.referenceNumber,
+      })
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.tripGroupId, groupId))
+
+    // Get all travelers with contact details for each trip
+    const travelers: Array<{
+      tripName: string
+      firstName: string | null
+      lastName: string | null
+      email: string | null
+      phone: string | null
+      dateOfBirth: string | null
+      passportNumber: string | null
+      passportExpiry: string | null
+      nationality: string | null
+    }> = []
+
+    for (const trip of trips) {
+      const tripTravelers = await this.db.client
+        .select({
+          firstName: this.db.schema.contacts.firstName,
+          lastName: this.db.schema.contacts.lastName,
+          email: this.db.schema.contacts.email,
+          phone: this.db.schema.contacts.phone,
+          dateOfBirth: this.db.schema.contacts.dateOfBirth,
+          passportNumber: this.db.schema.contacts.passportNumber,
+          passportExpiry: this.db.schema.contacts.passportExpiry,
+          nationality: this.db.schema.contacts.nationality,
+        })
+        .from(this.db.schema.tripTravelers)
+        .innerJoin(
+          this.db.schema.contacts,
+          eq(this.db.schema.tripTravelers.contactId, this.db.schema.contacts.id),
+        )
+        .where(eq(this.db.schema.tripTravelers.tripId, trip.id))
+
+      for (const t of tripTravelers) {
+        travelers.push({ tripName: trip.name, ...t })
+      }
+    }
+
+    const businessConfig = await this.getBusinessConfiguration(agencyId)
+
+    const context: Record<string, unknown> = {
+      is_group_manifest: true,
+      group_name: group.name,
+      group_number: group.groupNumber,
+      destination: group.destination,
+      start_date: group.startDate,
+      end_date: group.endDate,
+      travelers,
+      traveler_count: travelers.length,
+      trip_count: trips.length,
+      business: businessConfig,
+      generated_date: new Date().toISOString().split('T')[0],
+    }
+
+    return this.renderTripOrderPdf(agencyId, context)
+  }
+
   private async getTripPayments(tripId: string) {
     // Join through: payment_transactions → expected_payment_items → payment_schedule_config
     //   → activity_pricing → itinerary_activities → (itineraries chain OR direct trip_id)
