@@ -17,11 +17,13 @@ import {
   HttpStatus,
   ForbiddenException,
   BadRequestException,
+  NotFoundException,
   UseGuards,
   UseInterceptors,
   UploadedFile,
   ParseUUIDPipe,
 } from '@nestjs/common'
+import { eq } from 'drizzle-orm'
 import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
@@ -32,6 +34,7 @@ import { TripAccessService } from './trip-access.service'
 import { TripLifecycleService } from './trip-lifecycle.service'
 import { TripGroupAccessService } from './trip-group-access.service'
 import { StorageService } from './storage.service'
+import { GroupBillingService } from './group-billing.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
 import { ActivitiesService } from './activities.service'
@@ -77,6 +80,7 @@ export class TripsController {
     private readonly paymentSchedulesService: PaymentSchedulesService,
     private readonly storageService: StorageService,
     private readonly tripLifecycleService: TripLifecycleService,
+    private readonly groupBillingService: GroupBillingService,
   ) {}
 
   /**
@@ -380,10 +384,64 @@ export class TripsController {
       startDate?: string | null
       endDate?: string | null
       status?: string
+      masterTripId?: string | null
     },
   ) {
     await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
     return this.tripsService.updateTripGroup(groupId, body, auth.agencyId, auth.userId)
+  }
+
+  /**
+   * Update billing target for an activity's pricing
+   * PATCH /trips/groups/:groupId/billing
+   *
+   * Sets which trip an activity's cost is billed to within a group.
+   */
+  @Patch('groups/:groupId/billing')
+  async updateBillingTarget(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Body() body: { activityPricingId: string; billedToTripId: string | null },
+  ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
+
+    if (body.billedToTripId) {
+      // Get the activity's trip via the pricing → activity → day → itinerary → trip chain
+      const [pricing] = await this.tripsService['db'].client
+        .select({ activityId: this.tripsService['db'].schema.activityPricing.activityId })
+        .from(this.tripsService['db'].schema.activityPricing)
+        .where(eq(this.tripsService['db'].schema.activityPricing.id, body.activityPricingId))
+        .limit(1)
+
+      if (!pricing) throw new NotFoundException('Activity pricing not found')
+
+      const valid = await this.groupBillingService.validateBillingTarget(
+        // We need the activity's tripId — resolve from activity chain
+        await this.resolveActivityTripId(pricing.activityId),
+        body.billedToTripId,
+      )
+      if (!valid) throw new BadRequestException('Billing target must be in the same group')
+    }
+
+    await this.tripsService['db'].client
+      .update(this.tripsService['db'].schema.activityPricing)
+      .set({ billedToTripId: body.billedToTripId, updatedAt: new Date() })
+      .where(eq(this.tripsService['db'].schema.activityPricing.id, body.activityPricingId))
+
+    return { success: true }
+  }
+
+  private async resolveActivityTripId(activityId: string): Promise<string> {
+    const db = this.tripsService['db']
+    const [row] = await db.client
+      .select({ tripId: db.schema.itineraries.tripId })
+      .from(db.schema.itineraryActivities)
+      .innerJoin(db.schema.itineraryDays, eq(db.schema.itineraryActivities.itineraryDayId, db.schema.itineraryDays.id))
+      .innerJoin(db.schema.itineraries, eq(db.schema.itineraryDays.itineraryId, db.schema.itineraries.id))
+      .where(eq(db.schema.itineraryActivities.id, activityId))
+      .limit(1)
+    if (!row?.tripId) throw new NotFoundException('Activity trip not found')
+    return row.tripId
   }
 
   /**

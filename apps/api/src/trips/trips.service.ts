@@ -4045,10 +4045,23 @@ export class TripsService {
       startDate?: string | null
       endDate?: string | null
       status?: string
+      masterTripId?: string | null
     },
     agencyId: string,
     actorId: string,
   ) {
+    // Validate masterTripId is in this group
+    if (data.masterTripId) {
+      const [trip] = await this.db.client
+        .select({ tripGroupId: this.db.schema.trips.tripGroupId })
+        .from(this.db.schema.trips)
+        .where(eq(this.db.schema.trips.id, data.masterTripId))
+        .limit(1)
+      if (!trip || trip.tripGroupId !== groupId) {
+        throw new BadRequestException('Master trip must be a member of this group')
+      }
+    }
+
     try {
       const [group] = await this.db.client
         .update(this.db.schema.tripGroups)
