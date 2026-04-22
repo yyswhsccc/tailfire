@@ -41,8 +41,14 @@ Consumers climb an identity ladder naturally through their interactions. No forc
 
 ### Level 2: Authenticated (Magic Link)
 - **Triggers:** Consumer clicks magic link or "Sign in" on OTA/portal
-- Supabase auth user created, `client_portal_users` record created
-- `contacts.portalUserId` linked
+- **Server-side consumer registration flow (Codex finding — does not exist today):**
+  1. OTA captures email → API call to new `POST /consumer-auth/register` endpoint
+  2. API creates/updates contact (lead) + creates Supabase auth user via `supabase.auth.admin.createUser()`
+  3. API sets JWT custom claims (`contact_id`, `agency_id`) on the new auth user
+  4. API sends magic link via `supabase.auth.admin.generateLink({ type: 'magiclink' })`
+  5. Consumer clicks link → lands in portal, authenticated
+- `contacts.portalUserId` linked to the Supabase auth user ID
+- **Note (Codex finding):** The current `client_portal_users` table is NOT populated and portal identity flows through `contacts` directly (via `contacts.portalUserId` + Supabase JWT `contact_id`). This spec follows that pattern — identity lives on `contacts`, not `client_portal_users`.
 - Full portal access: saved boards, account settings, traveler profiles, document uploads
 
 ### Level 3: Active Client
@@ -56,11 +62,17 @@ Consumers climb an identity ladder naturally through their interactions. No forc
 - **Later (Phase 6):** Add Google/Apple social login
 
 ### Domain & Cookie Setup
-- OTA: `phoenixvoyages.ca` (production), `ota-dev.phoenixvoyages.ca` (preview)
+- OTA: `ota.phoenixvoyages.ca` (production), `ota-dev.phoenixvoyages.ca` (preview)
 - Portal: `my.phoenixvoyages.ca` (production), `my-dev.phoenixvoyages.ca` (preview)
-- Supabase auth cookies scoped to `.phoenixvoyages.ca` → valid across both apps
+- Supabase auth cookies scoped to `.phoenixvoyages.ca` → valid across both subdomains
 - "Sign In" link in OTA nav → routes to `my.phoenixvoyages.ca/login`
-- Logo in portal nav → links back to `phoenixvoyages.ca`
+- Logo in portal nav → links back to `ota.phoenixvoyages.ca`
+
+### Cross-subdomain SSO (Codex finding — does not exist today)
+Auth cookies are currently host-only (no shared domain set). Phase 1 must:
+1. Set Supabase cookie domain to `.phoenixvoyages.ca` in both apps' `createServerClient()` and middleware `updateSession()` calls
+2. Add Supabase `updateSession()` to OTA middleware (currently only manages `ota_ref` and `ota_session`, does NOT refresh Supabase session)
+3. Update portal JWT strategy to handle consumers (who have `contact_id` but may not have `agency_id` in the agent-admin sense)
 
 ---
 
@@ -260,13 +272,15 @@ consumer_insights (
 )
 ```
 
-### Extended: `client_portal_users`
+### Extended: `contacts` table
 
 Add one field:
 - `auth_method TEXT DEFAULT 'magic_link'` — tracks 'magic_link', 'password', 'google', 'apple'
 
+**Note (Codex finding):** Portal identity flows through `contacts.portalUserId` + Supabase JWT claims, NOT `client_portal_users`. The `client_portal_users` table is not currently populated and is not used in the auth path. `auth_method` goes on `contacts`.
+
 ### No changes needed to:
-- `contacts` — existing passport fields, `portalUserId`, `contactType`/`contactStatus` lifecycle enums, `portalInvitedAt`/`portalActivatedAt` all already exist
+- `contacts` (other than `auth_method`) — existing passport fields, `portalUserId`, `contactType`/`contactStatus` lifecycle enums, `portalInvitedAt`/`portalActivatedAt` all exist
 - `ota_trip_requests` — existing `sessionId`, `contactId`, `components`, `status` fields cover dream board persistence
 - `ota_referrals` — existing attribution system works as-is
 
@@ -277,11 +291,12 @@ Add one field:
 Each phase delivers working value independently.
 
 ### Phase 1: Progressive Identity + Auth Foundation
-- Supabase auth for consumers (magic link flow)
+- Consumer registration API endpoint (`POST /consumer-auth/register`) — creates contact + Supabase auth user + sets JWT claims + sends magic link
 - Email capture modal on OTA (save board / submit trip triggers it)
-- `client_portal_users` creation on email capture
-- Shared auth cookies across `.phoenixvoyages.ca`
-- Portal shell: login page, dashboard skeleton, dark nav with Phoenix Voyages brand
+- Cross-subdomain cookie setup (`.phoenixvoyages.ca` domain on Supabase cookies)
+- Add Supabase `updateSession()` to OTA middleware for SSO
+- Update portal JWT strategy to handle consumer tokens (contact_id without agent-style agency_id)
+- Portal shell: login page (magic link + password), dashboard skeleton, dark nav with Phoenix Voyages brand
 - Shared `packages/ui-public` nav component (OTA + Portal mode)
 
 ### Phase 2: Dream Board Persistence + Portal Core
