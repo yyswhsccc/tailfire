@@ -7,7 +7,7 @@
  */
 
 import { Injectable } from '@nestjs/common'
-import { eq, and, isNull } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 
 @Injectable()
