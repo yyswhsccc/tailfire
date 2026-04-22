@@ -19,9 +19,10 @@ export class HandlebarsRendererService implements OnModuleInit {
       return defaultValue
     })
 
-    // {{formatCurrency amount currency}} — returns "Included" for sentinel value -1 (package children)
-    this.handlebars.registerHelper('formatCurrency', (amount: number, currency?: string) => {
+    // {{formatCurrency amount currency includedInGroupPackage}} — returns "Included" for sentinel -1, "Included in Group Package" for group-billed
+    this.handlebars.registerHelper('formatCurrency', (amount: number, currency?: string, groupFlag?: boolean) => {
       if (amount === -1) return 'Included'
+      if (groupFlag === true) return 'Included in Group Package'
       const curr = typeof currency === 'string' ? currency : 'USD'
       const formatted = new Intl.NumberFormat('en-US', {
         style: 'decimal',

@@ -1233,6 +1233,7 @@ export class TripOrderService {
         ap.net_price_cents,
         ap.pricing_breakdown_json,
         ap.supplier,
+        ap.billed_to_trip_id,
         s.default_terms_and_conditions AS supplier_terms,
         s.default_cancellation_policy AS supplier_cancellation
       FROM itinerary_activities ia
@@ -1268,9 +1269,11 @@ export class TripOrderService {
           .where(eq(this.db.schema.travelerBookings.activityId, a.id))
 
         // Raw SQL returns snake_case
-        const totalPriceCents = Number(a.total_price_cents ?? 0)
-        const netPriceCents = a.net_price_cents ? Number(a.net_price_cents) : null
-        const pricingBreakdown = a.pricing_breakdown_json
+        const billedToTripId = a.billed_to_trip_id
+        const isBilledElsewhere = billedToTripId && billedToTripId !== tripId
+        const totalPriceCents = isBilledElsewhere ? 0 : Number(a.total_price_cents ?? 0)
+        const netPriceCents = isBilledElsewhere ? null : (a.net_price_cents ? Number(a.net_price_cents) : null)
+        const pricingBreakdown = isBilledElsewhere ? null : a.pricing_breakdown_json
 
         // Fetch child activities (e.g. flights, transfers, hotel inside a package)
         const children = await this.db.client.execute(sql`
@@ -1289,6 +1292,8 @@ export class TripOrderService {
           endDate: a.end_datetime ? new Date(a.end_datetime).toISOString().split('T')[0] : null,
           totalPrice: totalPriceCents / 100,
           currency: a.currency || 'CAD',
+          // Group billing: flag items billed to another trip
+          includedInGroupPackage: isBilledElsewhere || false,
           // Fall back to supplier defaults from Library when activity-level T&C are empty
           cancellationPolicy: a.cancellation_policy || a.supplier_cancellation || null,
           termsAndConditions: a.terms_and_conditions || a.supplier_terms || null,
