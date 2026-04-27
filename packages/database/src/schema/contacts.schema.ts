@@ -154,6 +154,7 @@ export const contacts = pgTable('contacts', {
   portalInvitedAt: timestamp('portal_invited_at', { withTimezone: true }),
   portalInvitedBy: uuid('portal_invited_by'),
   portalActivatedAt: timestamp('portal_activated_at', { withTimezone: true }),
+  authMethod: text('auth_method').default('magic_link'),
 
   // Photo (portal avatar)
   photoUrl: text('photo_url'),
