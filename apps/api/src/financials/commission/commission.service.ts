@@ -718,11 +718,11 @@ export class CommissionService {
             cci.id,
             ${agent.userId},
             ${check.id},
-            ROUND(
+            GREATEST(ROUND(
               (cci.received_cents - COALESCE(ct.tax_amount_cents, 0) - COALESCE(ct.platform_fee_cents, 0))
               * COALESCE((up.commission_settings->>'splitValue')::numeric, 60) / 100
               * tc.commission_percentage / 100
-            ),
+            ), 0),
             ${userId}
           FROM commission_check_items cci
           JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
