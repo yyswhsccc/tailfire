@@ -32,10 +32,6 @@ function getMfaGraceRemaining(): number {
   return Math.max(remaining, 0)
 }
 
-export function isMfaGraceActive(): boolean {
-  return getMfaGraceRemaining() > 0 && localStorage.getItem(MFA_GRACE_KEY) !== null
-}
-
 function MfaEnrollContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
