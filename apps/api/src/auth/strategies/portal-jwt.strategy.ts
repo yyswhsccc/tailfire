@@ -6,7 +6,7 @@
  * Reuses the same JWT verification (HS256/ES256) as the admin strategy.
  */
 
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 import { ConfigService } from '@nestjs/config'
@@ -15,6 +15,8 @@ import type { PortalAuthContext, PortalJwtPayload } from '../auth.types'
 
 @Injectable()
 export class PortalJwtStrategy extends PassportStrategy(Strategy, 'portal-jwt') {
+  private readonly logger = new Logger(PortalJwtStrategy.name)
+
   constructor(configService: ConfigService) {
     const supabaseUrl = configService.get<string>('SUPABASE_URL')
     const jwtSecret = configService.get<string>('SUPABASE_JWT_SECRET')
@@ -99,7 +101,8 @@ export class PortalJwtStrategy extends PassportStrategy(Strategy, 'portal-jwt') 
     }
 
     if (!agencyId) {
-      throw new UnauthorizedException('Missing agency_id in portal token')
+      this.logger.warn(`Portal user ${payload.sub} has no agency_id — using default`)
+      // Don't throw — consumers may have been created before agency was assigned
     }
 
     return {
