@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, FileText, Home, User } from "lucide-react";
+import { Briefcase, FileText, Home, User, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   NavigationMenu,
@@ -11,12 +11,14 @@ import {
   NavigationMenuList,
 } from "@tailfire/ui-public";
 
-const navItems = [
+export const PORTAL_NAV = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/trips", label: "My Trips", icon: Briefcase },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/travelers", label: "My Profile", icon: User },
 ];
+
+const OTA_URL = process.env.NEXT_PUBLIC_OTA_URL || "https://ota.phoenixvoyages.ca";
 
 type DashboardNavProps = {
   mobile?: boolean;
@@ -29,7 +31,7 @@ export function DashboardNav({ mobile, onNavigate }: DashboardNavProps) {
   if (mobile) {
     return (
       <nav className="flex flex-col space-y-1">
-        {navItems.map((item) => {
+        {PORTAL_NAV.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
 
@@ -50,6 +52,16 @@ export function DashboardNav({ mobile, onNavigate }: DashboardNavProps) {
             </Link>
           );
         })}
+        <a
+          href={OTA_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onNavigate}
+          className="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-phoenix-text-light hover:bg-phoenix-gold/10 hover:text-phoenix-gold"
+        >
+          <ExternalLink className="h-5 w-5" />
+          <span>Browse Trips</span>
+        </a>
       </nav>
     );
   }
@@ -57,7 +69,7 @@ export function DashboardNav({ mobile, onNavigate }: DashboardNavProps) {
   return (
     <NavigationMenu>
       <NavigationMenuList className="flex gap-1">
-        {navItems.map((item) => {
+        {PORTAL_NAV.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
 

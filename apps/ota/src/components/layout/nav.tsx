@@ -137,6 +137,12 @@ export function Nav() {
         {/* Desktop CTA */}
         <div className="hidden items-center gap-2 lg:flex">
           <TripBasketIndicator />
+          <a
+            href={process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://my.phoenixvoyages.ca'}
+            className="text-sm text-[#1A1A1A] transition-colors hover:text-[#C59746]"
+          >
+            Sign In
+          </a>
           <Button
             className="bg-[#C59746] text-white hover:bg-[#B08638]"
             size="default"

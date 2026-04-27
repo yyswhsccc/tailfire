@@ -26,10 +26,13 @@ import {
   Skeleton,
 } from "@tailfire/ui-public";
 
+const OTA_URL = process.env.NEXT_PUBLIC_OTA_URL || "https://ota.phoenixvoyages.ca";
+
 const quickActions = [
-  { icon: Briefcase, label: "My Trips", href: "/trips", color: "text-blue-400" },
-  { icon: FileText, label: "Documents", href: "/documents", color: "text-orange-400" },
-  { icon: User, label: "My Profile", href: "/travelers", color: "text-purple-400" },
+  { icon: Briefcase, label: "My Trips", href: "/trips", color: "text-blue-400", external: false },
+  { icon: FileText, label: "Documents", href: "/documents", color: "text-orange-400", external: false },
+  { icon: User, label: "My Profile", href: "/travelers", color: "text-purple-400", external: false },
+  { icon: Plane, label: "Browse Trips", href: OTA_URL, color: "text-[#C59746]", external: true },
 ];
 
 function getStatusBadgeClass(status: string) {
@@ -94,21 +97,33 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {quickActions.map((action) => {
           const Icon = action.icon;
+          const cardContent = (
+            <Card className="bg-phoenix-charcoal/50 border-phoenix-gold/30 hover:border-phoenix-gold/50 transition-all cursor-pointer group h-full">
+              <CardContent className="p-4 flex flex-col items-center text-center">
+                <div className="h-12 w-12 rounded-full bg-phoenix-gold/10 flex items-center justify-center mb-3 group-hover:bg-phoenix-gold/20 transition-colors">
+                  <Icon className={`h-6 w-6 ${action.color}`} />
+                </div>
+                <span className="text-sm text-phoenix-text-light group-hover:text-white transition-colors">
+                  {action.label}
+                </span>
+              </CardContent>
+            </Card>
+          );
+
+          if (action.external) {
+            return (
+              <a key={action.href} href={action.href} target="_blank" rel="noopener noreferrer">
+                {cardContent}
+              </a>
+            );
+          }
+
           return (
             <Link key={action.href} href={action.href}>
-              <Card className="bg-phoenix-charcoal/50 border-phoenix-gold/30 hover:border-phoenix-gold/50 transition-all cursor-pointer group">
-                <CardContent className="p-4 flex flex-col items-center text-center">
-                  <div className="h-12 w-12 rounded-full bg-phoenix-gold/10 flex items-center justify-center mb-3 group-hover:bg-phoenix-gold/20 transition-colors">
-                    <Icon className={`h-6 w-6 ${action.color}`} />
-                  </div>
-                  <span className="text-sm text-phoenix-text-light group-hover:text-white transition-colors">
-                    {action.label}
-                  </span>
-                </CardContent>
-              </Card>
+              {cardContent}
             </Link>
           );
         })}

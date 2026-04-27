@@ -1373,6 +1373,13 @@
       "when": 1776388169000,
       "tag": "20260415002929_add_last_seen_at",
       "breakpoints": true
+    },
+    {
+      "idx": 196,
+      "version": "7",
+      "when": 1777247996000,
+      "tag": "20260427113956_add_contact_auth_method",
+      "breakpoints": true
     }
   ]
 }

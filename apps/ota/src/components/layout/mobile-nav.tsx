@@ -87,7 +87,14 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
           ))}
         </nav>
 
-        <SheetFooter>
+        <SheetFooter className="flex flex-col gap-2">
+          <a
+            href={process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://my.phoenixvoyages.ca'}
+            onClick={close}
+            className="flex w-full items-center justify-center rounded-lg border border-[#1A1A1A] px-6 py-2.5 text-sm font-medium text-[#1A1A1A] transition-colors hover:border-[#C59746] hover:text-[#C59746]"
+          >
+            Sign In
+          </a>
           <Button
             className="w-full bg-[#C59746] text-white hover:bg-[#B08638]"
             size="lg"
