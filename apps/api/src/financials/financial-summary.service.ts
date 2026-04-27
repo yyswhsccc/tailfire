@@ -114,7 +114,8 @@ export class FinancialSummaryService {
         ia.name AS activity_name,
         ia.activity_type,
         ap.total_price_cents,
-        ap.currency AS pricing_currency
+        ap.currency AS pricing_currency,
+        ap.billed_to_trip_id
       FROM itinerary_activities ia
       LEFT JOIN activity_pricing ap ON ap.activity_id = ia.id
       LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
@@ -137,7 +138,9 @@ export class FinancialSummaryService {
       const activityName = activity.activity_name
       const activityType = activity.activity_type
       const activityCurrency = activity.pricing_currency ?? tripCurrency
-      const costCents = Number(activity.total_price_cents ?? 0)
+      // Cross-billed activities (billed to another trip) count as $0 for this trip
+      const billedElsewhere = activity.billed_to_trip_id && activity.billed_to_trip_id !== tripId
+      const costCents = billedElsewhere ? 0 : Number(activity.total_price_cents ?? 0)
 
       // Log warning if activity has no pricing row
       if (activity.total_price_cents === null) {

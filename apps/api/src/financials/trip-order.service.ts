@@ -799,6 +799,92 @@ export class TripOrderService {
   }
 
   /**
+   * Render group-specific PDFs (trip order + manifest) using inline templates.
+   * These don't use the DB template system since they have a different structure.
+   */
+  private async renderGroupPdf(context: Record<string, unknown>, type: 'group-trip-order' | 'group-manifest'): Promise<Buffer> {
+    await this.embedLogoAsBase64(context)
+    const html = type === 'group-trip-order'
+      ? this.getGroupTripOrderHtml(context)
+      : this.getGroupManifestHtml(context)
+    return this.puppeteerPdf.renderHtmlToPdf(html)
+  }
+
+  private getGroupTripOrderHtml(ctx: Record<string, unknown>): string {
+    const biz = ctx.business as any || {}
+    const items = ctx.group_line_items as any[] || []
+    const rows = items.map(i =>
+      `<tr><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0">${i.category}</td>
+       <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:right">${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2 }).format(i.totalPrice)} ${i.currency}</td></tr>`
+    ).join('')
+    const client = ctx.client as any
+    const clientName = client ? `${client.first_name || ''} ${client.last_name || ''}`.trim() : 'Client'
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1e293b;margin:0;padding:40px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;border-bottom:3px solid #c59746;padding-bottom:20px}
+.logo img{max-height:60px} .title{font-size:24px;font-weight:700;color:#c59746}
+table{width:100%;border-collapse:collapse;margin:20px 0} th{background:#f8fafc;padding:10px 12px;text-align:left;border-bottom:2px solid #c59746;font-size:13px;text-transform:uppercase;color:#64748b}
+.total-row td{font-weight:700;font-size:16px;border-top:2px solid #c59746;padding-top:12px}
+.meta{color:#64748b;font-size:13px;margin-bottom:4px} .section{margin:24px 0}
+.compliance{font-size:11px;color:#94a3b8;margin-top:30px;border-top:1px solid #e2e8f0;padding-top:15px}
+</style></head><body>
+<div class="header"><div class="logo">${ctx.agency_logo_base64 ? `<img src="${ctx.agency_logo_base64}" alt="Logo" style="max-height:60px">` : ''}</div>
+<div style="text-align:right"><div class="title">Group Trip Order</div>
+<div class="meta">${ctx.generated_date || ''}</div></div></div>
+<div class="section"><div class="meta">Group</div><div style="font-size:18px;font-weight:600">${ctx.group_name || ''}</div>
+${ctx.group_number ? `<div class="meta">Ref: ${ctx.group_number}</div>` : ''}
+${ctx.destination ? `<div class="meta">Destination: ${ctx.destination}</div>` : ''}
+${ctx.start_date ? `<div class="meta">${ctx.start_date}${ctx.end_date ? ' — ' + ctx.end_date : ''}</div>` : ''}</div>
+<div class="section"><div class="meta">Bill To</div><div style="font-size:16px;font-weight:600">${clientName}</div>
+${client?.email ? `<div class="meta">${client.email}</div>` : ''}</div>
+<table><thead><tr><th>Category</th><th style="text-align:right">Amount</th></tr></thead>
+<tbody>${rows}
+<tr class="total-row"><td style="padding:12px">TOTAL</td><td style="padding:12px;text-align:right">${ctx.group_grand_total_formatted || '0.00'} ${ctx.currency || 'CAD'}</td></tr>
+</tbody></table>
+<div class="meta">${ctx.group_trip_count || 0} trip(s) in this group</div>
+<div class="compliance">${biz.company_name || 'Phoenix Voyages'} — TICO Registration: ${biz.tico_registration || 'N/A'}<br>
+This document constitutes the official Trip Order as required by Ontario Regulation 26/05, §38.</div>
+</body></html>`
+  }
+
+  private getGroupManifestHtml(ctx: Record<string, unknown>): string {
+    const biz = ctx.business as any || {}
+    const travelers = ctx.travelers as any[] || []
+    const rows = travelers.map((t, i) =>
+      `<tr><td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${i + 1}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.firstName || ''} ${t.lastName || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.tripName || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.email || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.phone || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.dateOfBirth || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.passportNumber || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.passportExpiry || ''}</td>
+       <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${t.nationality || ''}</td></tr>`
+    ).join('')
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1e293b;margin:0;padding:40px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;border-bottom:3px solid #c59746;padding-bottom:20px}
+.logo img{max-height:60px} .title{font-size:24px;font-weight:700;color:#c59746}
+table{width:100%;border-collapse:collapse;margin:20px 0;font-size:11px} th{background:#f8fafc;padding:8px;text-align:left;border-bottom:2px solid #c59746;font-size:10px;text-transform:uppercase;color:#64748b}
+.meta{color:#64748b;font-size:13px;margin-bottom:4px} .section{margin:24px 0}
+.compliance{font-size:11px;color:#94a3b8;margin-top:30px;border-top:1px solid #e2e8f0;padding-top:15px}
+</style></head><body>
+<div class="header"><div class="logo">${ctx.agency_logo_base64 ? `<img src="${ctx.agency_logo_base64}" alt="Logo" style="max-height:60px">` : ''}</div>
+<div style="text-align:right"><div class="title">Group Traveler Manifest</div>
+<div class="meta">${ctx.generated_date || ''}</div></div></div>
+<div class="section"><div style="font-size:18px;font-weight:600">${ctx.group_name || ''}</div>
+${ctx.group_number ? `<div class="meta">Ref: ${ctx.group_number}</div>` : ''}
+${ctx.destination ? `<div class="meta">Destination: ${ctx.destination}</div>` : ''}
+<div class="meta">${ctx.traveler_count || 0} travelers across ${ctx.trip_count || 0} trip(s)</div></div>
+<table><thead><tr><th>#</th><th>Name</th><th>Trip</th><th>Email</th><th>Phone</th><th>DOB</th><th>Passport</th><th>Expiry</th><th>Nationality</th></tr></thead>
+<tbody>${rows}</tbody></table>
+<div class="compliance">${biz.company_name || 'Phoenix Voyages'} — Generated ${ctx.generated_date || ''}</div>
+</body></html>`
+  }
+
+  /**
    * Fetch the agency logo URL and replace it with a base64 data URI
    * so Puppeteer doesn't depend on external network access during PDF rendering.
    */
@@ -1233,6 +1319,7 @@ export class TripOrderService {
         ap.net_price_cents,
         ap.pricing_breakdown_json,
         ap.supplier,
+        ap.billed_to_trip_id,
         s.default_terms_and_conditions AS supplier_terms,
         s.default_cancellation_policy AS supplier_cancellation
       FROM itinerary_activities ia
@@ -1268,9 +1355,11 @@ export class TripOrderService {
           .where(eq(this.db.schema.travelerBookings.activityId, a.id))
 
         // Raw SQL returns snake_case
-        const totalPriceCents = Number(a.total_price_cents ?? 0)
-        const netPriceCents = a.net_price_cents ? Number(a.net_price_cents) : null
-        const pricingBreakdown = a.pricing_breakdown_json
+        const billedToTripId = a.billed_to_trip_id
+        const isBilledElsewhere = billedToTripId && billedToTripId !== tripId
+        const totalPriceCents = isBilledElsewhere ? 0 : Number(a.total_price_cents ?? 0)
+        const netPriceCents = isBilledElsewhere ? null : (a.net_price_cents ? Number(a.net_price_cents) : null)
+        const pricingBreakdown = isBilledElsewhere ? null : a.pricing_breakdown_json
 
         // Fetch child activities (e.g. flights, transfers, hotel inside a package)
         const children = await this.db.client.execute(sql`
@@ -1289,6 +1378,8 @@ export class TripOrderService {
           endDate: a.end_datetime ? new Date(a.end_datetime).toISOString().split('T')[0] : null,
           totalPrice: totalPriceCents / 100,
           currency: a.currency || 'CAD',
+          // Group billing: flag items billed to another trip
+          includedInGroupPackage: isBilledElsewhere || false,
           // Fall back to supplier defaults from Library when activity-level T&C are empty
           cancellationPolicy: a.cancellation_policy || a.supplier_cancellation || null,
           termsAndConditions: a.terms_and_conditions || a.supplier_terms || null,
@@ -1321,6 +1412,213 @@ export class TripOrderService {
     )
 
     return bookingsWithPassengers
+  }
+
+  /**
+   * Generate a Group Trip Order PDF — aggregated by activity type.
+   * Includes all activities billed to the master trip across all sub-trips.
+   */
+  async generateGroupTripOrder(groupId: string, agencyId: string): Promise<Buffer> {
+    // Get group + master trip
+    const [group] = await this.db.client
+      .select()
+      .from(this.db.schema.tripGroups)
+      .where(and(eq(this.db.schema.tripGroups.id, groupId), eq(this.db.schema.tripGroups.agencyId, agencyId)))
+      .limit(1)
+
+    if (!group) throw new NotFoundException('Trip group not found')
+    if (!group.masterTripId) throw new BadRequestException('Group has no master trip — set one first')
+
+    const masterTripId = group.masterTripId
+
+    // Get master trip details
+    const [masterTrip] = await this.db.client
+      .select()
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.id, masterTripId))
+      .limit(1)
+
+    if (!masterTrip) throw new NotFoundException('Master trip not found')
+
+    // Get all activities billed to the master trip (across all sub-trips)
+    const activities = await this.db.client.execute(sql`
+      SELECT
+        ia.activity_type,
+        ap.total_price_cents,
+        ap.currency
+      FROM activity_pricing ap
+      JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      WHERE (ap.billed_to_trip_id = ${masterTripId}
+        OR (ap.billed_to_trip_id IS NULL AND EXISTS (
+          SELECT 1 FROM itinerary_days iday
+          JOIN itineraries i ON i.id = iday.itinerary_id
+          WHERE iday.id = ia.itinerary_day_id AND i.trip_id = ${masterTripId}
+        )))
+        AND ia.parent_activity_id IS NULL
+    `) as any[]
+
+    // Aggregate by activity type
+    const typeTotals = new Map<string, number>()
+    let grandTotalCents = 0
+    const currency = masterTrip.currency || 'CAD'
+
+    for (const a of activities) {
+      const type = a.activity_type || 'other'
+      const cents = Number(a.total_price_cents ?? 0)
+      typeTotals.set(type, (typeTotals.get(type) || 0) + cents)
+      grandTotalCents += cents
+    }
+
+    // Format type labels
+    const typeLabels: Record<string, string> = {
+      flight: 'Flights',
+      lodging: 'Hotels & Accommodations',
+      transportation: 'Transfers & Transportation',
+      tour: 'Tours & Excursions',
+      insurance: 'Travel Insurance',
+      package: 'Packages',
+      cruise: 'Cruises',
+      dining: 'Dining',
+      activity: 'Activities',
+      other: 'Other',
+    }
+
+    const lineItems = Array.from(typeTotals.entries())
+      .sort((a, b) => b[1] - a[1]) // Highest cost first
+      .map(([type, cents]) => ({
+        category: typeLabels[type] || type.charAt(0).toUpperCase() + type.slice(1),
+        totalPrice: cents / 100,
+        currency,
+      }))
+
+    // Get business config
+    const businessConfig = await this.getBusinessConfiguration(agencyId)
+
+    // Get primary contact from master trip
+    const primaryContact = masterTrip.primaryContactId
+      ? await this.db.client
+          .select({
+            firstName: this.db.schema.contacts.firstName,
+            lastName: this.db.schema.contacts.lastName,
+            email: this.db.schema.contacts.email,
+          })
+          .from(this.db.schema.contacts)
+          .where(eq(this.db.schema.contacts.id, masterTrip.primaryContactId))
+          .limit(1)
+          .then(r => r[0] || null)
+      : null
+
+    // Get all trips in the group
+    const groupTrips = await this.db.client
+      .select({ id: this.db.schema.trips.id, name: this.db.schema.trips.name })
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.tripGroupId, groupId))
+
+    // Build context for Handlebars template
+    const context: Record<string, unknown> = {
+      is_group_trip_order: true,
+      group_name: group.name,
+      group_number: group.groupNumber,
+      trip_name: masterTrip.name,
+      trip_reference: masterTrip.referenceNumber,
+      start_date: group.startDate || masterTrip.startDate,
+      end_date: group.endDate || masterTrip.endDate,
+      destination: group.destination || null,
+      currency,
+      client: primaryContact ? {
+        first_name: primaryContact.firstName,
+        last_name: primaryContact.lastName,
+        email: primaryContact.email,
+      } : null,
+      // Group-specific: aggregated line items by activity type
+      group_line_items: lineItems,
+      group_grand_total: grandTotalCents / 100,
+      group_grand_total_formatted: new Intl.NumberFormat('en-US', { style: 'decimal', minimumFractionDigits: 2 }).format(grandTotalCents / 100),
+      group_trip_count: groupTrips.length,
+      business: businessConfig,
+      generated_date: new Date().toISOString().split('T')[0],
+    }
+
+    return this.renderGroupPdf(context, 'group-trip-order')
+  }
+
+  /**
+   * Generate a Group Manifest PDF — all travelers with details.
+   * Best-effort: includes passport, room, flight data when available.
+   */
+  async generateGroupManifest(groupId: string, agencyId: string): Promise<Buffer> {
+    const [group] = await this.db.client
+      .select()
+      .from(this.db.schema.tripGroups)
+      .where(and(eq(this.db.schema.tripGroups.id, groupId), eq(this.db.schema.tripGroups.agencyId, agencyId)))
+      .limit(1)
+
+    if (!group) throw new NotFoundException('Trip group not found')
+
+    // Get all trips in the group
+    const trips = await this.db.client
+      .select({
+        id: this.db.schema.trips.id,
+        name: this.db.schema.trips.name,
+        referenceNumber: this.db.schema.trips.referenceNumber,
+      })
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.tripGroupId, groupId))
+
+    // Get all travelers with contact details for each trip
+    const travelers: Array<{
+      tripName: string
+      firstName: string | null
+      lastName: string | null
+      email: string | null
+      phone: string | null
+      dateOfBirth: string | null
+      passportNumber: string | null
+      passportExpiry: string | null
+      nationality: string | null
+    }> = []
+
+    for (const trip of trips) {
+      const tripTravelers = await this.db.client
+        .select({
+          firstName: this.db.schema.contacts.firstName,
+          lastName: this.db.schema.contacts.lastName,
+          email: this.db.schema.contacts.email,
+          phone: this.db.schema.contacts.phone,
+          dateOfBirth: this.db.schema.contacts.dateOfBirth,
+          passportNumber: this.db.schema.contacts.passportNumber,
+          passportExpiry: this.db.schema.contacts.passportExpiry,
+          nationality: this.db.schema.contacts.nationality,
+        })
+        .from(this.db.schema.tripTravelers)
+        .innerJoin(
+          this.db.schema.contacts,
+          eq(this.db.schema.tripTravelers.contactId, this.db.schema.contacts.id),
+        )
+        .where(eq(this.db.schema.tripTravelers.tripId, trip.id))
+
+      for (const t of tripTravelers) {
+        travelers.push({ tripName: trip.name, ...t })
+      }
+    }
+
+    const businessConfig = await this.getBusinessConfiguration(agencyId)
+
+    const context: Record<string, unknown> = {
+      is_group_manifest: true,
+      group_name: group.name,
+      group_number: group.groupNumber,
+      destination: group.destination,
+      start_date: group.startDate,
+      end_date: group.endDate,
+      travelers,
+      traveler_count: travelers.length,
+      trip_count: trips.length,
+      business: businessConfig,
+      generated_date: new Date().toISOString().split('T')[0],
+    }
+
+    return this.renderGroupPdf(context, 'group-manifest')
   }
 
   private async getTripPayments(tripId: string) {

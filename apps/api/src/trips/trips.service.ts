@@ -65,6 +65,7 @@ import type {
 } from '@tailfire/shared-types'
 import { ItinerariesService } from './itineraries.service'
 import { ItineraryVersionsService } from './itinerary-versions.service'
+import { GroupBillingService } from './group-billing.service'
 
 @Injectable()
 export class TripsService {
@@ -85,6 +86,7 @@ export class TripsService {
     private readonly itinerariesService: ItinerariesService,
     @Inject(forwardRef(() => ItineraryVersionsService))
     private readonly itineraryVersionsService: ItineraryVersionsService,
+    private readonly groupBillingService: GroupBillingService,
   ) {}
 
   /**
@@ -3919,7 +3921,7 @@ export class TripsService {
         .where(eq(this.db.schema.activityPricing.activityId, oldActivityId))
       for (const pricing of pricings) {
         const { id: _id, activityId: _actId, createdAt: _ca, updatedAt: _ua, ...data } = pricing
-        await tx.insert(this.db.schema.activityPricing).values({ ...data, activityId: newActivityId })
+        await tx.insert(this.db.schema.activityPricing).values({ ...data, activityId: newActivityId, billedToTripId: null })
       }
 
       // Activity media
@@ -4043,10 +4045,23 @@ export class TripsService {
       startDate?: string | null
       endDate?: string | null
       status?: string
+      masterTripId?: string | null
     },
     agencyId: string,
     actorId: string,
   ) {
+    // Validate masterTripId is in this group
+    if (data.masterTripId) {
+      const [trip] = await this.db.client
+        .select({ tripGroupId: this.db.schema.trips.tripGroupId })
+        .from(this.db.schema.trips)
+        .where(eq(this.db.schema.trips.id, data.masterTripId))
+        .limit(1)
+      if (!trip || trip.tripGroupId !== groupId) {
+        throw new BadRequestException('Master trip must be a member of this group')
+      }
+    }
+
     try {
       const [group] = await this.db.client
         .update(this.db.schema.tripGroups)
@@ -4450,6 +4465,9 @@ export class TripsService {
     if (!group) {
       throw new NotFoundException(`Trip group with ID ${groupId} not found`)
     }
+
+    // Clear cross-trip billing references before unlinking
+    await this.groupBillingService.handleTripRemovedFromGroup(tripId)
 
     await this.db.client
       .update(this.db.schema.trips)

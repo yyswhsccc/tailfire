@@ -9,6 +9,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common'
 import { eq, desc } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
+import { GroupBillingService } from './group-billing.service'
 import { schema } from '@tailfire/database'
 
 /**
@@ -72,7 +73,10 @@ export interface UpdateBaseComponentData {
 export class BaseComponentService {
   private readonly logger = new Logger(BaseComponentService.name)
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly groupBillingService: GroupBillingService,
+  ) {}
 
   /**
    * Get a single component by ID
@@ -173,6 +177,26 @@ export class BaseComponentService {
     // Pricing starts at 0 and is updated via the pricing API
     let activityPricing: schema.ActivityPricing | null = null
     try {
+      // Resolve group billing target from itinerary → trip → group
+      let billedToTripId: string | null = null
+      if (data.itineraryDayId) {
+        const [dayRow] = await this.db.client
+          .select({ itineraryId: this.db.schema.itineraryDays.itineraryId })
+          .from(this.db.schema.itineraryDays)
+          .where(eq(this.db.schema.itineraryDays.id, data.itineraryDayId))
+          .limit(1)
+        if (dayRow) {
+          const [itRow] = await this.db.client
+            .select({ tripId: this.db.schema.itineraries.tripId })
+            .from(this.db.schema.itineraries)
+            .where(eq(this.db.schema.itineraries.id, dayRow.itineraryId))
+            .limit(1)
+          if (itRow?.tripId) {
+            billedToTripId = await this.groupBillingService.resolveDefaultBillingTarget(itRow.tripId)
+          }
+        }
+      }
+
       const [pricing] = await this.db.client
         .insert(this.db.schema.activityPricing)
         .values({
@@ -182,6 +206,7 @@ export class BaseComponentService {
           basePrice: '0',
           currency,
           totalPriceCents: 0,
+          billedToTripId,
         })
         .returning()
       activityPricing = pricing ?? null

@@ -32,6 +32,7 @@ import type {
 import type { AuthContext } from '../auth/auth.types'
 import { TripAccessService } from './trip-access.service'
 import { DayLocationService } from './day-location.service'
+import { GroupBillingService } from './group-billing.service'
 import * as Sentry from '@sentry/nestjs'
 
 // Type for activity thumbnails map
@@ -51,6 +52,7 @@ export class ActivitiesService {
     private readonly travelerBookingsService: TravelerBookingsService,
     private readonly tripAccessService: TripAccessService,
     private readonly dayLocationService: DayLocationService,
+    private readonly groupBillingService: GroupBillingService,
   ) {}
 
   // ============================================================================
@@ -611,6 +613,11 @@ export class ActivitiesService {
     // Auto-create activity_pricing row with DTO values
     let activityPricingId: string | null = null
     try {
+      // Resolve group billing target (defaults to master trip if in a group_booking)
+      const billedToTripId = tripId
+        ? await this.groupBillingService.resolveDefaultBillingTarget(tripId)
+        : null
+
       const [pricing] = await this.db.client
         .insert(this.db.schema.activityPricing)
         .values({
@@ -624,6 +631,7 @@ export class ActivitiesService {
           commissionTotalCents: dto.commissionTotalCents ?? null,
           commissionSplitPercentage: dto.commissionSplitPercentage?.toString() ?? null,
           pricingBreakdownJson: dto.pricingBreakdownJson ?? null,
+          billedToTripId,
         })
         .onConflictDoNothing({ target: this.db.schema.activityPricing.activityId })
         .returning({ id: this.db.schema.activityPricing.id })
@@ -2009,6 +2017,8 @@ export class ActivitiesService {
         netPriceCents: source.netPriceCents,
         nonRefundableDeposit: source.nonRefundableDeposit,
         cancellationScheduleJson: source.cancellationScheduleJson,
+        // Reset billing target on copy — duplicated activities bill to own trip
+        billedToTripId: null,
       })
     }
   }
