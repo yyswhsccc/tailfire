@@ -108,8 +108,8 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // MFA enforcement (only when MFA_REQUIRED is true)
-  const mfaRequired = process.env.MFA_REQUIRED === 'true'
+  // MFA enforcement (NEXT_PUBLIC_ required for Edge middleware visibility)
+  const mfaRequired = process.env.NEXT_PUBLIC_MFA_REQUIRED === 'true'
   if (mfaRequired) {
     const isMfaExempt = mfaExemptRoutes.some((route) => pathname.startsWith(route))
     if (!isMfaExempt) {
