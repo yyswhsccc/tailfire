@@ -43,8 +43,9 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Extract user_status from JWT claims for pending-user detection
+  // Extract user_status and aal from JWT claims
   let userStatus: string | null = null
+  let aal: 'aal1' | 'aal2' | null = null
   const { data: { session } } = await supabase.auth.getSession()
   if (session?.access_token) {
     try {
@@ -52,9 +53,19 @@ export async function updateSession(request: NextRequest) {
       if (parts[1]) {
         const claims = JSON.parse(atob(parts[1]))
         userStatus = claims.user_status ?? null
+        aal = claims.aal ?? null
       }
     } catch { /* ignore decode errors */ }
   }
 
-  return { user, userStatus, supabaseResponse }
+  // Check if user has MFA factors enrolled (for middleware gating)
+  let hasMfaFactors = false
+  if (user) {
+    try {
+      const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      hasMfaFactors = data?.nextLevel === 'aal2'
+    } catch { /* ignore — MFA check non-critical */ }
+  }
+
+  return { user, userStatus, aal, hasMfaFactors, supabaseResponse }
 }

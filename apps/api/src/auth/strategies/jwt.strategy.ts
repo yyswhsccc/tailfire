@@ -119,6 +119,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       agencyId: agencyId,
       role: role,
       userStatus: payload.user_status || appMetadata.user_status || 'active',
+      aal: payload.aal || 'aal1',
     }
   }
 }

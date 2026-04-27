@@ -1,16 +1,19 @@
 import './instrument'
 import { NestFactory, Reflector } from '@nestjs/core'
-import { ValidationPipe } from '@nestjs/common'
+import { Logger, ValidationPipe } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import helmet from 'helmet'
 import { AppModule } from './app.module'
 import { runMigrations } from '@tailfire/database'
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'
 import { ImpersonationGuard } from './auth/guards/impersonation.guard'
+import { MfaGuard } from './auth/guards/mfa.guard'
 import { RolesGuard } from './auth/guards/roles.guard'
 import { DatabaseService } from './db/database.service'
 import { setupBullBoard, getQueuesFromApp } from './automation/admin/bull-board.setup'
 import { StripEmptyStringsInterceptor } from './common/interceptors/strip-empty-strings.interceptor'
+
+const logger = new Logger('Bootstrap')
 
 async function bootstrap() {
   const databaseUrl = process.env.DATABASE_URL
@@ -23,16 +26,16 @@ async function bootstrap() {
   const shouldRunMigrations = process.env.RUN_MIGRATIONS_ON_STARTUP === 'true'
 
   if (shouldRunMigrations) {
-    console.info('🔄 Running database migrations...')
+    logger.log('🔄 Running database migrations...')
     try {
       await runMigrations(databaseUrl)
-      console.info('✅ Database migrations completed')
+      logger.log('✅ Database migrations completed')
     } catch (error) {
-      console.error('❌ Migration failed:', error)
+      logger.error('❌ Migration failed:', error)
       process.exit(1)
     }
   } else {
-    console.info('⏭️  Skipping migrations (CI/CD handles production migrations)')
+    logger.log('⏭️  Skipping migrations (CI/CD handles production migrations)')
   }
 
   const app = await NestFactory.create(AppModule, {
@@ -97,11 +100,12 @@ async function bootstrap() {
     })
   )
 
-  // Global auth guards
+  // Global auth guards (execution order: JwtAuth → MFA → Impersonation → Roles)
   const reflector = app.get(Reflector)
   const dbService = app.get(DatabaseService)
   app.useGlobalGuards(
     new JwtAuthGuard(reflector),
+    new MfaGuard(reflector),
     new ImpersonationGuard(reflector, dbService),
     new RolesGuard(reflector),
   )
@@ -120,21 +124,21 @@ async function bootstrap() {
   }
 
   // Bull Board setup (queue monitoring dashboard)
-  console.info('🔧 Setting up Bull Board...')
+  logger.log('🔧 Setting up Bull Board...')
   const queues = await getQueuesFromApp(app)
   if (queues) {
-    console.info('🔧 Queues found, initializing Bull Board...')
+    logger.log('🔧 Queues found, initializing Bull Board...')
     setupBullBoard(app, queues)
   } else {
-    console.warn('⚠️ Could not get queues - Bull Board will not be available')
+    logger.warn('⚠️ Could not get queues - Bull Board will not be available')
   }
 
   const port = process.env.PORT || 3101
   await app.listen(port)
 
-  console.info(`🚀 Tailfire Beta API running on: http://localhost:${port}/${apiPrefix}`)
+  logger.log(`🚀 Tailfire Beta API running on: http://localhost:${port}/${apiPrefix}`)
   if (process.env.ENABLE_SWAGGER_DOCS === 'true') {
-    console.info(`📚 API Documentation: http://localhost:${port}/${apiPrefix}/docs`)
+    logger.log(`📚 API Documentation: http://localhost:${port}/${apiPrefix}/docs`)
   }
 }
 

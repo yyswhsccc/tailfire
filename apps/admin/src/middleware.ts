@@ -3,6 +3,7 @@
  *
  * Default-protected strategy: all routes require authentication
  * unless explicitly listed as public or auth routes.
+ * MFA enforcement: when MFA_REQUIRED=true, redirects aal1 users to verify/enroll.
  */
 
 import { type NextRequest, NextResponse } from 'next/server'
@@ -16,11 +17,13 @@ const authRoutes = ['/auth/login', '/auth/forgot-password']
 const authenticatedAuthRoutes = ['/auth/reset-password', '/auth/set-password']
 
 // Routes that are always public (no auth checks)
-// Note: /auth/signout is a POST-only route handler, not a page
 const publicRoutes = ['/auth/callback']
 
 // Routes accessible by pending users (before password is set)
 const pendingAllowedRoutes = ['/auth/set-password', '/auth/callback']
+
+// Routes exempt from MFA checks (user must access these to complete MFA)
+const mfaExemptRoutes = ['/auth/mfa-verify', '/auth/mfa-enroll', '/auth/callback', '/auth/login']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -35,7 +38,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const { user, userStatus, supabaseResponse } = await updateSession(request)
+  const { user, userStatus, aal, hasMfaFactors, supabaseResponse } = await updateSession(request)
 
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
   const isAuthenticatedAuthRoute = authenticatedAuthRoutes.some((route) => pathname.startsWith(route))
@@ -100,6 +103,28 @@ export async function middleware(request: NextRequest) {
     const isPendingAllowed = pendingAllowedRoutes.some((route) => pathname.startsWith(route))
     if (!isPendingAllowed) {
       return NextResponse.redirect(new URL('/auth/set-password', request.url))
+    }
+    // Pending users skip MFA checks — they need to activate first
+    return supabaseResponse
+  }
+
+  // MFA enforcement (only when MFA_REQUIRED is true)
+  const mfaRequired = process.env.MFA_REQUIRED === 'true'
+  if (mfaRequired) {
+    const isMfaExempt = mfaExemptRoutes.some((route) => pathname.startsWith(route))
+    if (!isMfaExempt) {
+      if (hasMfaFactors && aal === 'aal1') {
+        // Has factors but hasn't verified yet → verify page
+        const verifyUrl = new URL('/auth/mfa-verify', request.url)
+        verifyUrl.searchParams.set('redirectTo', pathname)
+        return NextResponse.redirect(verifyUrl)
+      }
+      if (!hasMfaFactors) {
+        // No factors enrolled → enrollment page
+        const enrollUrl = new URL('/auth/mfa-enroll', request.url)
+        enrollUrl.searchParams.set('redirectTo', pathname)
+        return NextResponse.redirect(enrollUrl)
+      }
     }
   }
 

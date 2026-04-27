@@ -35,6 +35,20 @@ export const FEATURE_FLAGS = {
    * Default: false (hidden)
    */
   VACATION_PACKAGES: process.env.NEXT_PUBLIC_FEATURE_VACATION_PACKAGES === 'true',
+
+  /**
+   * MFA Enforcement
+   *
+   * When true, all authenticated admin users must complete MFA (TOTP) verification.
+   * When false, MFA enrollment is available in Profile > Security but not enforced.
+   *
+   * Client-side flag controls UI display; server-side MFA_REQUIRED (non-public)
+   * controls middleware gating and API guard enforcement.
+   *
+   * Environment variable: NEXT_PUBLIC_MFA_REQUIRED
+   * Default: false (grace period — enrollment available but not enforced)
+   */
+  MFA_REQUIRED: process.env.NEXT_PUBLIC_MFA_REQUIRED === 'true',
 } as const
 
 export type FeatureFlag = keyof typeof FEATURE_FLAGS
