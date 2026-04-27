@@ -4,9 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { LogOut, Menu, User, X } from "lucide-react";
+import { LogOut, Menu, User, X, ExternalLink } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { usePortalProfile } from "@/hooks/use-portal-data";
+import phoenixLogo from "@/assets/phoenix-logo.svg";
 import {
   Button,
   Avatar,
@@ -47,14 +48,17 @@ export function DashboardHeader() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center">
+          <Link href="/" className="flex items-center gap-3">
             <Image
-              src="/logo.png"
+              src={phoenixLogo}
               alt="Phoenix Voyages"
-              width={150}
-              height={40}
-              className="h-10 w-auto"
+              width={36}
+              height={36}
+              className="h-9 w-9"
             />
+            <span className="font-display text-base font-bold tracking-[0.15em] text-white hidden sm:inline">
+              PHOENIX VOYAGES
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -63,7 +67,18 @@ export function DashboardHeader() {
           </div>
 
           {/* Right side actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* Browse Trips external link */}
+            <a
+              href={process.env.NEXT_PUBLIC_OTA_URL || "https://ota.phoenixvoyages.ca"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden md:flex items-center gap-1 text-sm text-phoenix-text-light transition-colors hover:text-phoenix-gold"
+            >
+              Browse Trips
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+
             {/* User menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
