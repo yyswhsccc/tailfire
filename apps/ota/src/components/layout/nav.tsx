@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { openChat } from "@/components/chat/chat-widget";
 import { TripBasketIndicator } from "@/components/trip-builder/trip-basket-indicator";
-import phoenixLogo from "@/assets/phoenix-logo.svg";
+// Use the gold Phoenix Voyages consumer logo
+const phoenixLogo = "/phoenix-voyages-logo.png";
 
 // Grouped navigation structure
 export interface NavItem {
