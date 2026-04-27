@@ -8,6 +8,6 @@ const SENTRY_DSN = process.env.SENTRY_DSN_API
 Sentry.init({
   dsn: SENTRY_DSN,
   environment: process.env.SENTRY_ENVIRONMENT || 'development',
-  sendDefaultPii: true,
+  sendDefaultPii: false,
   tracesSampleRate: process.env.SENTRY_ENVIRONMENT === 'production' ? 0.1 : 1.0,
 })
