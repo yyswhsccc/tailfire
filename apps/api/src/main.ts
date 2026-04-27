@@ -7,6 +7,7 @@ import { AppModule } from './app.module'
 import { runMigrations } from '@tailfire/database'
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'
 import { ImpersonationGuard } from './auth/guards/impersonation.guard'
+import { MfaGuard } from './auth/guards/mfa.guard'
 import { RolesGuard } from './auth/guards/roles.guard'
 import { DatabaseService } from './db/database.service'
 import { setupBullBoard, getQueuesFromApp } from './automation/admin/bull-board.setup'
@@ -99,11 +100,12 @@ async function bootstrap() {
     })
   )
 
-  // Global auth guards
+  // Global auth guards (execution order: JwtAuth → MFA → Impersonation → Roles)
   const reflector = app.get(Reflector)
   const dbService = app.get(DatabaseService)
   app.useGlobalGuards(
     new JwtAuthGuard(reflector),
+    new MfaGuard(reflector),
     new ImpersonationGuard(reflector, dbService),
     new RolesGuard(reflector),
   )
