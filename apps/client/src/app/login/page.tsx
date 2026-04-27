@@ -73,8 +73,10 @@ function LoginPageContent() {
     setIsLoading(false);
 
     if (otpError) {
-      if (otpError.message.includes("Signups not allowed")) {
-        setError("No portal account found for this email. Please contact your travel advisor for an invitation.");
+      if (otpError.message?.includes('Signups not allowed') || otpError.message?.includes('not allowed')) {
+        setError(
+          'No account found with this email. Start by exploring trips on our website — you can create an account when you save your dream board!'
+        );
       } else {
         setError(otpError.message);
       }
