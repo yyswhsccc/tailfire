@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,14 @@ import { useMfa } from '@/hooks/use-mfa'
 import { useAuth } from '@/providers/auth-provider'
 
 export default function MfaVerifyPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-orange-500" /></div>}>
+      <MfaVerifyContent />
+    </Suspense>
+  )
+}
+
+function MfaVerifyContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') || '/trips'
