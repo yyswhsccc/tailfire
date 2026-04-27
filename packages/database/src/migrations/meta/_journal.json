@@ -1373,6 +1373,13 @@
       "when": 1776388169000,
       "tag": "20260415002929_add_last_seen_at",
       "breakpoints": true
+    },
+    {
+      "idx": 196,
+      "version": "7",
+      "when": 1776879287987,
+      "tag": "20260422173354_add_group_billing_columns",
+      "breakpoints": true
     }
   ]
 }

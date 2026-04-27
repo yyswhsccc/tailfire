@@ -35,6 +35,7 @@ import { TravelerGroupsService } from './traveler-groups.service'
 import { ItineraryDaysService } from './itinerary-days.service'
 import { ActivitiesService } from './activities.service'
 import { BaseComponentService } from './base-component.service'
+import { GroupBillingService } from './group-billing.service'
 import { FlightDetailsService } from './flight-details.service'
 import { FlightSegmentsService } from './flight-segments.service'
 import { LodgingDetailsService } from './lodging-details.service'
@@ -149,6 +150,7 @@ import { TripAutomationsController } from './trip-automations.controller'
     ItineraryDaysService,
     ActivitiesService,
     BaseComponentService,
+    GroupBillingService,
     FlightDetailsService,
     FlightSegmentsService,
     LodgingDetailsService,
