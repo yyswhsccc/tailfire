@@ -20,6 +20,22 @@ export default function MfaEnrollPage() {
   )
 }
 
+const MFA_GRACE_KEY = 'mfa_enrollment_skipped_at'
+const MFA_GRACE_DAYS = 7
+
+function getMfaGraceRemaining(): number {
+  if (typeof window === 'undefined') return MFA_GRACE_DAYS
+  const skippedAt = localStorage.getItem(MFA_GRACE_KEY)
+  if (!skippedAt) return MFA_GRACE_DAYS
+  const elapsed = Date.now() - Number(skippedAt)
+  const remaining = MFA_GRACE_DAYS - Math.floor(elapsed / (1000 * 60 * 60 * 24))
+  return Math.max(remaining, 0)
+}
+
+export function isMfaGraceActive(): boolean {
+  return getMfaGraceRemaining() > 0 && localStorage.getItem(MFA_GRACE_KEY) !== null
+}
+
 function MfaEnrollContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -27,6 +43,8 @@ function MfaEnrollContent() {
   const { toast } = useToast()
   const { enroll, verify } = useMfa()
   const { recordLogin } = useAuth()
+  const daysRemaining = getMfaGraceRemaining()
+  const canSkip = daysRemaining > 0
 
   const [step, setStep] = useState<Step>('setup')
   const [isLoading, setIsLoading] = useState(false)
@@ -36,6 +54,18 @@ function MfaEnrollContent() {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [secretCopied, setSecretCopied] = useState(false)
+
+  const handleSkip = () => {
+    // Record that user chose to skip — they have 7 days from first skip
+    const now = String(Date.now())
+    if (!localStorage.getItem(MFA_GRACE_KEY)) {
+      localStorage.setItem(MFA_GRACE_KEY, now)
+    }
+    // Set cookie for middleware to read (httpOnly=false so JS can set it)
+    document.cookie = `mfa_skipped_at=${now}; path=/; max-age=${MFA_GRACE_DAYS * 86400}; SameSite=Lax`
+    recordLogin()
+    router.push(redirectTo)
+  }
 
   const handleSetup = async () => {
     setIsLoading(true)
@@ -130,6 +160,16 @@ function MfaEnrollContent() {
                   'Begin Setup'
                 )}
               </Button>
+
+              {canSkip && (
+                <Button
+                  variant="ghost"
+                  className="w-full text-muted-foreground"
+                  onClick={handleSkip}
+                >
+                  Set up later (you have {daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining)
+                </Button>
+              )}
             </div>
           )}
 

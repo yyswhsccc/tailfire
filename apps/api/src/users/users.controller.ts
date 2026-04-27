@@ -151,4 +151,19 @@ export class UsersController {
   ): Promise<UserInviteResponseDto> {
     return this.usersService.resendInvite(id, auth.agencyId)
   }
+
+  /**
+   * Reset MFA (unenroll all TOTP factors) for a user
+   * POST /users/:id/reset-mfa
+   * Admin only — allows admin to reset a user's 2FA when they lose their device
+   */
+  @Post(':id/reset-mfa')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset MFA for a user' })
+  async resetMfa(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<{ success: boolean; factorsRemoved: number }> {
+    return this.usersService.resetMfa(id, auth.agencyId, auth.userId)
+  }
 }
