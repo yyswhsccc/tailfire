@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, ShieldCheck, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,14 @@ import { useAuth } from '@/providers/auth-provider'
 type Step = 'setup' | 'verify' | 'complete'
 
 export default function MfaEnrollPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-orange-500" /></div>}>
+      <MfaEnrollContent />
+    </Suspense>
+  )
+}
+
+function MfaEnrollContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') || '/trips'
