@@ -120,7 +120,17 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(verifyUrl)
       }
       if (!hasMfaFactors) {
-        // No factors enrolled → enrollment page
+        // Check if user is within the 7-day grace period (skip cookie)
+        const mfaSkippedAt = request.cookies.get('mfa_skipped_at')?.value
+        if (mfaSkippedAt) {
+          const elapsed = Date.now() - Number(mfaSkippedAt)
+          const graceDays = 7
+          if (elapsed < graceDays * 24 * 60 * 60 * 1000) {
+            // Within grace period — allow access
+            return supabaseResponse
+          }
+        }
+        // No factors enrolled and no/expired grace → enrollment page
         const enrollUrl = new URL('/auth/mfa-enroll', request.url)
         enrollUrl.searchParams.set('redirectTo', pathname)
         return NextResponse.redirect(enrollUrl)
