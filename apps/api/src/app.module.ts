@@ -66,6 +66,7 @@ import { FormsModule } from './forms/forms.module'
 import { DealsModule } from './deals/deals.module'
 import { AdvisorProfilesModule } from './advisor-profiles/advisor-profiles.module'
 import { OtaModule } from './ota/ota.module'
+import { ConsumerAuthModule } from './consumer-auth/consumer-auth.module'
 import { DestinationsModule } from './destinations/destinations.module'
 
 @Module({
@@ -239,6 +240,9 @@ import { DestinationsModule } from './destinations/destinations.module'
     DealsModule,
     AdvisorProfilesModule,
     OtaModule,
+
+    // Consumer portal authentication (magic link registration)
+    ConsumerAuthModule,
 
     // Destinations normalization (unified hub for ports, cities, regions)
     DestinationsModule,
