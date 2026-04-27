@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { LogOut, Menu, User, X, ExternalLink } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { usePortalProfile } from "@/hooks/use-portal-data";
-import phoenixLogo from "@/assets/phoenix-logo.svg";
+// Use the gold Phoenix Voyages consumer logo (not the white SVG silhouette)
+const phoenixLogo = "/phoenix-voyages-logo.png";
 import {
   Button,
   Avatar,
