@@ -18,6 +18,7 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  ParseUUIDPipe,
 } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { ContactsService } from './contacts.service'
@@ -202,7 +203,7 @@ export class ContactsController {
   @Get(':id')
   async findOne(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string
+    @Param('id', ParseUUIDPipe) id: string
   ): Promise<ContactResponseDto> {
     const contact = await this.contactsService.findOne(id, auth.agencyId)
     // Apply access control filtering using ContactAccessService (includes shares)

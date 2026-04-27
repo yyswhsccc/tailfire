@@ -20,6 +20,7 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  ParseUUIDPipe,
 } from '@nestjs/common'
 import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
@@ -890,7 +891,7 @@ export class TripsController {
   @Get(':id')
   async findOne(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TripResponseDto> {
     await this.tripAccessService.verifyReadAccess(id, auth)
     return this.tripsService.findOne(id)
