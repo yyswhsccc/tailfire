@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
 
 const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days in seconds
 
@@ -15,8 +15,9 @@ function extractAdvisorSlug(request: NextRequest): string | null {
   return null
 }
 
-export function middleware(request: NextRequest) {
-  const response = NextResponse.next()
+export async function middleware(request: NextRequest) {
+  // Refresh Supabase session first so auth cookies stay valid across subdomains
+  const { supabaseResponse } = await updateSession(request)
 
   const isProduction = process.env.NODE_ENV === 'production'
   const cookieOptions = {
@@ -32,16 +33,16 @@ export function middleware(request: NextRequest) {
   if (advisorSlug) {
     // Always overwrite ota_ref when visiting an advisor page or using ?ref=
     // The most recent advisor interaction gets attribution (last-touch)
-    response.cookies.set('ota_ref', advisorSlug, cookieOptions)
+    supabaseResponse.cookies.set('ota_ref', advisorSlug, cookieOptions)
   }
 
   // Ensure an anonymous session cookie exists
   const existingSession = request.cookies.get('ota_session')?.value
   if (!existingSession) {
-    response.cookies.set('ota_session', crypto.randomUUID(), cookieOptions)
+    supabaseResponse.cookies.set('ota_session', crypto.randomUUID(), cookieOptions)
   }
 
-  return response
+  return supabaseResponse
 }
 
 export const config = {
