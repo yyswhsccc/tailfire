@@ -101,8 +101,8 @@ export class PortalJwtStrategy extends PassportStrategy(Strategy, 'portal-jwt') 
     }
 
     if (!agencyId) {
-      this.logger.warn(`Portal user ${payload.sub} has no agency_id — using default`)
-      // Don't throw — consumers may have been created before agency was assigned
+      this.logger.warn(`Portal user ${payload.sub} has no agency_id in token`)
+      throw new UnauthorizedException('Missing agency_id in portal token')
     }
 
     return {

@@ -33,8 +33,4 @@ export class RegisterConsumerDto {
   @IsString()
   advisorSlug?: string
 
-  @ApiPropertyOptional({ description: 'URL to redirect after magic link verification', example: 'https://ota.phoenixvoyages.ca/dashboard' })
-  @IsOptional()
-  @IsString()
-  redirectTo?: string
 }

@@ -5,9 +5,9 @@
  * 1. Creates or finds a contact record (contactType='lead', contactStatus='prospecting')
  * 2. Creates a Supabase auth user with app_metadata: { portal_user: true, contact_id, agency_id }
  * 3. Links contact.portalUserId to the new auth user
- * 4. Generates and returns a magic link URL
- * 5. If contact already has portalUserId, just sends a new magic link (existing user)
- * 6. Rolls back auth user creation if magic link generation fails
+ * 4. Returns a generic success message (consumer signs in via portal login)
+ *
+ * All response paths return the same shape to prevent account enumeration.
  */
 
 import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common'
@@ -17,11 +17,15 @@ import { eq } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { RegisterConsumerDto } from './dto/register-consumer.dto'
 
+/** Generic response to prevent account enumeration */
+const GENERIC_RESPONSE = {
+  message: 'If this email is associated with an account, you can sign in at my.phoenixvoyages.ca.',
+}
+
 @Injectable()
 export class ConsumerAuthService {
   private readonly logger = new Logger(ConsumerAuthService.name)
   private readonly supabaseAdmin: SupabaseClient
-  private readonly portalBaseUrl: string
 
   constructor(
     private readonly configService: ConfigService,
@@ -37,16 +41,17 @@ export class ConsumerAuthService {
     this.supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
-
-    this.portalBaseUrl = this.configService.get<string>('CLIENT_PORTAL_URL') || 'http://localhost:3102'
   }
 
   /**
-   * Register or re-authenticate a consumer.
+   * Register a consumer.
    *
-   * - New contact: creates contact + auth user + magic link
-   * - Existing contact without portal user: creates auth user + magic link
-   * - Existing contact with portal user: generates new magic link only
+   * - New contact: creates contact + auth user
+   * - Existing contact without portal user: creates auth user
+   * - Existing contact with portal user: no-op
+   *
+   * All paths return the same generic message to prevent account enumeration.
+   * The consumer signs in via the portal login page (signInWithOtp).
    */
   async registerConsumer(dto: RegisterConsumerDto) {
     const email = dto.email.toLowerCase().trim()
@@ -58,7 +63,6 @@ export class ConsumerAuthService {
 
     let contactId: string
     let portalUserId: string | null = null
-    let isExistingUser = false
 
     if (!existingContact) {
       // 2. No contact found — create a new lead
@@ -84,40 +88,14 @@ export class ConsumerAuthService {
       portalUserId = existingContact.portalUserId
 
       if (portalUserId) {
-        isExistingUser = true
-        this.logger.log(`Existing portal user found for contact ${contactId}, generating new magic link`)
+        // Already has a portal user — nothing to do, return generic response
+        this.logger.log(`Existing portal user found for contact ${contactId}`)
+        return GENERIC_RESPONSE
       }
     }
 
-    if (isExistingUser && portalUserId) {
-      // 3a. Existing user — just generate a new magic link
-      const redirectTo = dto.redirectTo || `${this.portalBaseUrl}/auth/callback`
-
-      const { data: linkData, error: linkError } = await this.supabaseAdmin.auth.admin.generateLink({
-        type: 'magiclink',
-        email,
-        options: {
-          redirectTo,
-        },
-      })
-
-      if (linkError || !linkData.properties?.hashed_token) {
-        this.logger.error(`Failed to generate magic link for existing user: ${linkError?.message}`)
-        throw new InternalServerErrorException('Failed to generate magic link')
-      }
-
-      const magicLinkUrl = this.buildMagicLinkUrl(linkData.properties.hashed_token, redirectTo)
-
-      return {
-        status: 'existing_user',
-        contactId,
-        message: 'Magic link generated for existing user',
-        magicLinkUrl,
-      }
-    }
-
-    // 3b. New user or contact without portal user — create auth user
-    const agencyId = existingContact?.agencyId || await this.getDefaultAgencyId()
+    // 3. New user or contact without portal user — create auth user
+    const agencyId = existingContact?.agencyId ?? await this.getDefaultAgencyId()
 
     const { data: userData, error: userError } = await this.supabaseAdmin.auth.admin.createUser({
       email,
@@ -140,31 +118,12 @@ export class ConsumerAuthService {
 
     const newUserId = userData.user.id
 
-    // 4. Generate magic link
-    const redirectTo = dto.redirectTo || `${this.portalBaseUrl}/auth/callback`
-
-    const { data: linkData, error: linkError } = await this.supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email,
-      options: {
-        redirectTo,
-      },
-    })
-
-    if (linkError || !linkData.properties?.hashed_token) {
-      // Rollback: delete auth user
-      await this.supabaseAdmin.auth.admin.deleteUser(newUserId)
-      this.logger.error(`Failed to generate magic link, rolled back auth user: ${linkError?.message}`)
-      throw new InternalServerErrorException('Failed to generate magic link')
-    }
-
-    // 5. Link portalUserId + portalActivatedAt on contact
+    // 4. Link portalUserId on contact (portalActivatedAt set on first login, not registration)
     try {
       await this.db.client
         .update(this.db.schema.contacts)
         .set({
           portalUserId: newUserId,
-          portalActivatedAt: new Date(),
           authMethod: 'magic_link',
           updatedAt: new Date(),
         })
@@ -176,16 +135,9 @@ export class ConsumerAuthService {
       throw new InternalServerErrorException('Failed to link portal account')
     }
 
-    const magicLinkUrl = this.buildMagicLinkUrl(linkData.properties.hashed_token, redirectTo)
-
     this.logger.log(`Consumer registered: contact=${contactId}, authUser=${newUserId}`)
 
-    return {
-      status: 'new_user',
-      contactId,
-      message: 'Portal account created and magic link generated',
-      magicLinkUrl,
-    }
+    return GENERIC_RESPONSE
   }
 
   /**
@@ -201,14 +153,5 @@ export class ConsumerAuthService {
     }
 
     return agency.id
-  }
-
-  /**
-   * Build a magic link URL with the hashed token.
-   * Uses the Supabase verify endpoint with PKCE redirect.
-   */
-  private buildMagicLinkUrl(hashedToken: string, redirectTo: string): string {
-    const supabaseUrl = this.configService.get<string>('SUPABASE_URL')
-    return `${supabaseUrl}/auth/v1/verify?token=${hashedToken}&type=magiclink&redirect_to=${encodeURIComponent(redirectTo)}`
   }
 }

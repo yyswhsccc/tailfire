@@ -77,9 +77,8 @@ export function EmailCaptureModal({
         body: JSON.stringify({
           email: email.trim(),
           firstName: firstName.trim() || undefined,
-          trigger,
-          otaSession,
-          otaRef,
+          sessionId: otaSession,
+          advisorSlug: otaRef,
         }),
       });
 
@@ -129,16 +128,23 @@ export function EmailCaptureModal({
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#C59746]/10">
               <CheckCircle className="size-8 text-[#C59746]" />
             </div>
-            <h2 className="mb-2 text-xl font-semibold text-[#1A1A1A]">Check your email!</h2>
+            <h2 className="mb-2 text-xl font-semibold text-[#1A1A1A]">You&apos;re all set!</h2>
             <p className="text-[#555]">
-              We sent a magic link to <strong>{email}</strong>.
-              Click it to sign in — no password needed.
+              Your account has been created! You can sign in at any time to access your saved trip ideas.
             </p>
+            <a
+              href="https://my.phoenixvoyages.ca"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 rounded-lg bg-[#C59746] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#B08638]"
+            >
+              Sign in to portal
+            </a>
             <button
               onClick={onClose}
-              className="mt-6 rounded-lg bg-[#C59746] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#B08638]"
+              className="mt-2 text-sm text-[#888] underline transition-colors hover:text-[#555]"
             >
-              Got it
+              Continue browsing
             </button>
           </div>
         ) : (
@@ -208,7 +214,7 @@ export function EmailCaptureModal({
               </button>
 
               <p className="text-center text-xs text-[#888]">
-                We&apos;ll send a magic link — no password required.
+                No password required — sign in via the portal.
               </p>
             </form>
           </>
