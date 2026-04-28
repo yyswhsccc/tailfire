@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Loader2, ShieldCheck, Clock, LogOut, AlertCircle } from 'lucide-react'
+import { useEffect } from 'react'
+import { Loader2, ShieldCheck, Clock, LogOut, AlertCircle, Copy, Check, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,6 +13,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/providers/auth-provider'
 import { useMyProfile } from '@/hooks/use-user-profile'
 import { createClient } from '@/lib/supabase/client'
+import { useMfa } from '@/hooks/use-mfa'
 
 interface PasswordFormData {
   newPassword: string
@@ -217,18 +219,244 @@ export function SecurityTab() {
         </CardContent>
       </Card>
 
-      {/* Future: 2FA Setup */}
+      {/* Two-Factor Authentication */}
+      <MfaSection />
+    </div>
+  )
+}
+
+// ============================================================================
+// MFA Section Component
+// ============================================================================
+
+function MfaSection() {
+  const { toast } = useToast()
+  const {
+    isEnrolled,
+    factors,
+    isLoading: mfaLoading,
+    refreshState,
+    enroll,
+    verify,
+    unenroll,
+  } = useMfa()
+
+  const [enrolling, setEnrolling] = useState(false)
+  const [qrCode, setQrCode] = useState('')
+  const [secret, setSecret] = useState('')
+  const [factorId, setFactorId] = useState('')
+  const [code, setCode] = useState('')
+  const [verifying, setVerifying] = useState(false)
+  const [error, setError] = useState('')
+  const [secretCopied, setSecretCopied] = useState(false)
+  const [removing, setRemoving] = useState(false)
+
+  useEffect(() => {
+    refreshState()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleEnroll = async () => {
+    setEnrolling(true)
+    setError('')
+    const result = await enroll('Tailfire')
+    if (!result) {
+      setError('Failed to start 2FA setup. Please try again.')
+      setEnrolling(false)
+      return
+    }
+    setFactorId(result.factorId)
+    setQrCode(result.qrCode)
+    setSecret(result.secret)
+  }
+
+  const handleVerify = async () => {
+    if (code.length !== 6) return
+    setVerifying(true)
+    setError('')
+    const success = await verify(factorId, code)
+    if (success) {
+      toast({ title: 'Two-factor authentication enabled' })
+      setEnrolling(false)
+      setQrCode('')
+      setSecret('')
+      setCode('')
+    } else {
+      setError('Invalid code. Please try again.')
+      setCode('')
+    }
+    setVerifying(false)
+  }
+
+  const handleRemove = async () => {
+    if (!factors[0]) return
+    setRemoving(true)
+    const success = await unenroll(factors[0].id)
+    if (success) {
+      toast({ title: 'Two-factor authentication removed' })
+    } else {
+      toast({ title: 'Failed to remove 2FA', variant: 'destructive' })
+    }
+    setRemoving(false)
+  }
+
+  const handleCopySecret = () => {
+    navigator.clipboard.writeText(secret)
+    setSecretCopied(true)
+    setTimeout(() => setSecretCopied(false), 2000)
+  }
+
+  if (mfaLoading) {
+    return (
       <Card>
         <CardHeader>
           <CardTitle>Two-Factor Authentication</CardTitle>
-          <CardDescription>Add an extra layer of security to your account</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Two-factor authentication will be available in a future update.
-          </p>
+        <CardContent className="flex justify-center py-6">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
-    </div>
+    )
+  }
+
+  // Enrolled state — show status + remove option
+  if (isEnrolled && !enrolling) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-green-600" />
+            Two-Factor Authentication
+          </CardTitle>
+          <CardDescription>Your account is protected with TOTP authentication</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border bg-green-50 p-4">
+            <div>
+              <p className="font-medium text-green-800">2FA is enabled</p>
+              <p className="text-sm text-green-600">
+                Authenticator app: {factors[0]?.friendly_name || 'Tailfire'}
+              </p>
+            </div>
+            <ShieldCheck className="h-8 w-8 text-green-500" />
+          </div>
+          <Button
+            variant="outline"
+            className="text-destructive hover:text-destructive"
+            onClick={handleRemove}
+            disabled={removing}
+          >
+            {removing ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Removing...</>
+            ) : (
+              <><Trash2 className="mr-2 h-4 w-4" /> Remove 2FA</>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Enrollment flow
+  if (enrolling && qrCode) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Set Up Two-Factor Authentication</CardTitle>
+          <CardDescription>Scan the QR code with your authenticator app</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-center">
+            <div className="rounded-lg border bg-white p-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrCode} alt="Scan this QR code" width={200} height={200} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Manual entry code:</Label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 rounded border bg-muted px-3 py-2 text-xs font-mono break-all">
+                {secret}
+              </code>
+              <Button variant="outline" size="sm" onClick={handleCopySecret}>
+                {secretCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Enter 6-digit code from your app:</Label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder="000000"
+              value={code}
+              onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, ''))
+                setError('')
+              }}
+              autoComplete="one-time-code"
+              className="text-center text-xl tracking-widest"
+            />
+          </div>
+
+          {error && <p className="text-sm text-destructive text-center">{error}</p>}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setEnrolling(false); setQrCode(''); setSecret(''); setCode('') }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 bg-orange-600 hover:bg-orange-700"
+              onClick={handleVerify}
+              disabled={verifying || code.length !== 6}
+            >
+              {verifying ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</>
+              ) : (
+                'Verify & Enable'
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Not enrolled — show setup button
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Two-Factor Authentication</CardTitle>
+        <CardDescription>Add an extra layer of security to your account</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+          <p className="text-sm">
+            Protect your account with a TOTP authenticator app like Google Authenticator, Authy, or 1Password.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            You&apos;ll be asked for a code each time you sign in.
+          </p>
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <Button
+          className="bg-orange-600 hover:bg-orange-700"
+          onClick={handleEnroll}
+          disabled={enrolling}
+        >
+          {enrolling ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Setting up...</>
+          ) : (
+            <><ShieldCheck className="mr-2 h-4 w-4" /> Enable Two-Factor Authentication</>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
   )
 }
