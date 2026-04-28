@@ -63,9 +63,10 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Environment variables to expose to the client
+  // Environment variables to expose to the client and Edge middleware
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api/v1',
+    NEXT_PUBLIC_MFA_REQUIRED: process.env.NEXT_PUBLIC_MFA_REQUIRED || 'false',
   },
 
   // Proxy API calls through same origin to avoid CORS issues on corporate networks
