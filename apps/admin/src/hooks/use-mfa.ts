@@ -88,22 +88,33 @@ export function useMfa() {
    * Challenge + verify a TOTP code (upgrades session to aal2)
    */
   const verify = useCallback(async (factorId: string, code: string): Promise<boolean> => {
-    // Step 1: Create a challenge
-    const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId })
-    if (challengeError || !challengeData) return false
+    try {
+      // Step 1: Create a challenge
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId })
+      if (challengeError || !challengeData) {
+        console.error('[MFA] Challenge failed:', challengeError?.message)
+        return false
+      }
 
-    // Step 2: Verify the code
-    const { error: verifyError } = await supabase.auth.mfa.verify({
-      factorId,
-      challengeId: challengeData.id,
-      code,
-    }) as AuthMFAVerifyResponse
+      // Step 2: Verify the code
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: challengeData.id,
+        code,
+      }) as AuthMFAVerifyResponse
 
-    if (verifyError) return false
+      if (verifyError) {
+        console.error('[MFA] Verify failed:', verifyError.message)
+        return false
+      }
 
-    // Session is now aal2 — refresh state
-    await refreshState()
-    return true
+      // Session is now aal2 — refresh state (don't block on this)
+      refreshState().catch(() => {})
+      return true
+    } catch (err) {
+      console.error('[MFA] Unexpected error:', err)
+      return false
+    }
   }, [supabase, refreshState])
 
   /**

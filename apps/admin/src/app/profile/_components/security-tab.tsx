@@ -273,18 +273,25 @@ function MfaSection() {
     if (code.length !== 6) return
     setVerifying(true)
     setError('')
-    const success = await verify(factorId, code)
-    if (success) {
-      toast({ title: 'Two-factor authentication enabled' })
-      setEnrolling(false)
-      setQrCode('')
-      setSecret('')
-      setCode('')
-    } else {
-      setError('Invalid code. Please try again.')
-      setCode('')
+    try {
+      const success = await verify(factorId, code)
+      if (success) {
+        toast({ title: 'Two-factor authentication enabled' })
+        // State reset may not execute if auth state change re-renders the tree
+        setEnrolling(false)
+        setQrCode('')
+        setSecret('')
+        setCode('')
+      } else {
+        setError('Invalid code. Please try again.')
+        setCode('')
+      }
+    } catch (err) {
+      console.error('[MFA] Verify error:', err)
+      setError('Verification failed. Please try again.')
+    } finally {
+      setVerifying(false)
     }
-    setVerifying(false)
   }
 
   const handleRemove = async () => {
