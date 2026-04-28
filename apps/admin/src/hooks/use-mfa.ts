@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { AuthMFAVerifyResponse, Factor } from '@supabase/supabase-js'
 
@@ -30,7 +30,7 @@ export function useMfa() {
     isLoading: false,
   })
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   /**
    * Refresh MFA state from Supabase
