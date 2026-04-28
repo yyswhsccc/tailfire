@@ -124,12 +124,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoginRecorded(false)
       }
 
-      // Record login for non-MFA sessions (no factors enrolled = aal1 is final)
+      // Record login for non-MFA sessions (no factors enrolled AND enforcement off)
       // When MFA is enrolled, record-login is called from mfa-verify page after aal2
+      // When MFA is enforced but not enrolled, record-login happens after enrollment completes
       if (event === 'SIGNED_IN' && session?.access_token) {
         const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-        if (data && data.nextLevel !== 'aal2') {
-          // No MFA factors — this is the final auth level, record login now
+        const mfaEnforced = process.env.NEXT_PUBLIC_MFA_REQUIRED === 'true'
+        if (data && data.nextLevel !== 'aal2' && !mfaEnforced) {
+          // No MFA factors and enforcement off — record login now
           const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
           fetch(`${apiUrl}/user-profiles/me/record-login`, {
             method: 'POST',
