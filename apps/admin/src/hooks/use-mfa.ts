@@ -43,13 +43,12 @@ export function useMfa() {
 
       const { data: factorsData } = await supabase.auth.mfa.listFactors()
       const totpFactors = factorsData?.totp ?? []
-      const verifiedFactors = totpFactors.filter(f => f.status === 'verified')
 
       setState({
         currentLevel: data.currentLevel,
         nextLevel: data.nextLevel,
-        factors: verifiedFactors,
-        isEnrolled: verifiedFactors.length > 0,
+        factors: totpFactors,
+        isEnrolled: totpFactors.length > 0,
         needsVerification: data.currentLevel === 'aal1' && data.nextLevel === 'aal2',
         isLoading: false,
       })
