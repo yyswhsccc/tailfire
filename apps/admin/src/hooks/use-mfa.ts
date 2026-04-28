@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { AuthMFAVerifyResponse, Factor } from '@supabase/supabase-js'
+import type { Factor } from '@supabase/supabase-js'
 
 interface MfaState {
   currentLevel: 'aal1' | 'aal2' | null
@@ -18,6 +18,45 @@ interface EnrollResult {
   qrCode: string
   secret: string
   uri: string
+}
+
+/**
+ * Get the current access token without going through the lock-protected SDK.
+ * Reads directly from the Supabase cookie storage.
+ */
+async function getAccessToken(): Promise<string | null> {
+  const supabase = createClient()
+  const { data } = await supabase.auth.getSession()
+  return data?.session?.access_token ?? null
+}
+
+/**
+ * Call Supabase Auth REST API directly, bypassing the SDK lock mechanism.
+ * This prevents lock contention between MFA operations and session refresh.
+ */
+async function mfaRestCall(path: string, body?: Record<string, unknown>): Promise<any> {
+  const token = await getAccessToken()
+  if (!token) throw new Error('No auth session')
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  const res = await fetch(`${supabaseUrl}/auth/v1${path}`, {
+    method: body ? 'POST' : 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': anonKey!,
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }))
+    throw new Error(err.message || err.msg || `MFA API error ${res.status}`)
+  }
+
+  return res.json()
 }
 
 export function useMfa() {
@@ -64,54 +103,61 @@ export function useMfa() {
    * Enroll a new TOTP factor
    */
   const enroll = useCallback(async (friendlyName?: string): Promise<EnrollResult | null> => {
-    const { data, error } = await supabase.auth.mfa.enroll({
-      factorType: 'totp',
-      friendlyName: friendlyName || 'Tailfire Authenticator',
-    })
+    try {
+      const result = await mfaRestCall('/factors', {
+        factor_type: 'totp',
+        friendly_name: friendlyName || 'Tailfire Authenticator',
+      })
 
-    if (error || !data) return null
+      if (!result?.totp) {
+        console.error('[MFA] Enroll: no TOTP data in response', result)
+        return null
+      }
 
-    // Type-narrow to TOTP response
-    const totpData = data as any
-    if (!totpData.totp) return null
-
-    return {
-      factorId: totpData.id,
-      qrCode: totpData.totp.qr_code,
-      secret: totpData.totp.secret,
-      uri: totpData.totp.uri,
+      return {
+        factorId: result.id,
+        qrCode: result.totp.qr_code,
+        secret: result.totp.secret,
+        uri: result.totp.uri,
+      }
+    } catch (err) {
+      console.error('[MFA] Enroll failed:', err)
+      return null
     }
-  }, [supabase])
+  }, [])
 
   /**
-   * Challenge + verify a TOTP code (upgrades session to aal2)
+   * Challenge + verify a TOTP code (upgrades session to aal2).
+   * Uses direct REST API calls to bypass Supabase SDK lock contention.
    */
   const verify = useCallback(async (factorId: string, code: string): Promise<boolean> => {
     try {
-      // Step 1: Create a challenge
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId })
-      if (challengeError || !challengeData) {
-        console.error('[MFA] Challenge failed:', challengeError?.message)
-        return false
-      }
+      // Step 1: Create challenge via REST
+      console.log('[MFA] Creating challenge for factor:', factorId)
+      const challengeResult = await mfaRestCall(`/factors/${factorId}/challenge`)
+      console.log('[MFA] Challenge created:', challengeResult.id)
 
-      // Step 2: Verify the code
-      const { error: verifyError } = await supabase.auth.mfa.verify({
-        factorId,
-        challengeId: challengeData.id,
+      // Step 2: Verify via REST
+      console.log('[MFA] Verifying code...')
+      const verifyResult = await mfaRestCall(`/factors/${factorId}/verify`, {
+        challenge_id: challengeResult.id,
         code,
-      }) as AuthMFAVerifyResponse
+      })
+      console.log('[MFA] Verify result:', verifyResult ? 'success' : 'failed')
 
-      if (verifyError) {
-        console.error('[MFA] Verify failed:', verifyError.message)
-        return false
+      // Session tokens updated — refresh the Supabase client session
+      if (verifyResult?.access_token) {
+        await supabase.auth.setSession({
+          access_token: verifyResult.access_token,
+          refresh_token: verifyResult.refresh_token,
+        })
       }
 
-      // Session is now aal2 — refresh state (don't block on this)
+      // Refresh state (non-blocking)
       refreshState().catch(() => {})
       return true
-    } catch (err) {
-      console.error('[MFA] Unexpected error:', err)
+    } catch (err: any) {
+      console.error('[MFA] Challenge/Verify failed:', err.message)
       return false
     }
   }, [supabase, refreshState])
@@ -120,11 +166,24 @@ export function useMfa() {
    * Unenroll a TOTP factor
    */
   const unenroll = useCallback(async (factorId: string): Promise<boolean> => {
-    const { error } = await supabase.auth.mfa.unenroll({ factorId })
-    if (error) return false
-    await refreshState()
-    return true
-  }, [supabase, refreshState])
+    try {
+      await mfaRestCall(`/factors/${factorId}`)
+      // Actually need DELETE method for unenroll
+      const token = await getAccessToken()
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${factorId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        },
+      })
+      if (!res.ok) return false
+      await refreshState()
+      return true
+    } catch {
+      return false
+    }
+  }, [refreshState])
 
   return {
     ...state,
