@@ -50,14 +50,20 @@ function MfaVerifyContent() {
     setIsVerifying(true)
     setError('')
 
-    const success = await verify(factor.id, code.trim())
-    if (success) {
-      // Record login now that MFA is complete
-      recordLogin()
-      toast({ title: 'Verified', description: 'Two-factor authentication successful' })
-      router.push(redirectTo)
-    } else {
-      setError('Invalid code. Please try again.')
+    try {
+      const success = await verify(factor.id, code.trim())
+      if (success) {
+        recordLogin()
+        toast({ title: 'Verified', description: 'Two-factor authentication successful' })
+        router.push(redirectTo)
+      } else {
+        setError('Invalid code. Please try again. Check your authenticator app for the current code.')
+        setCode('')
+        setIsVerifying(false)
+      }
+    } catch (err) {
+      console.error('[MFA Verify Page]', err)
+      setError('Verification failed. Please try again.')
       setCode('')
       setIsVerifying(false)
     }
