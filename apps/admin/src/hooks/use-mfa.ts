@@ -134,7 +134,7 @@ export function useMfa() {
     try {
       // Step 1: Create challenge via REST
       console.log('[MFA] Creating challenge for factor:', factorId)
-      const challengeResult = await mfaRestCall(`/factors/${factorId}/challenge`)
+      const challengeResult = await mfaRestCall(`/factors/${factorId}/challenge`, {})
       console.log('[MFA] Challenge created:', challengeResult.id)
 
       // Step 2: Verify via REST
