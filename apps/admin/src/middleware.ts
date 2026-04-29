@@ -64,6 +64,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
+  // Block consumer/portal users — this is the admin app, not the client portal
+  const isPortalUser = user.app_metadata?.portal_user === true
+  if (isPortalUser) {
+    const portalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://my.phoenixvoyages.ca'
+    return NextResponse.redirect(portalUrl)
+  }
+
   // Pending users must set their password before accessing the app
   if (userStatus === 'pending') {
     const isPendingAllowed = pendingAllowedRoutes.some((route) => pathname.startsWith(route))
