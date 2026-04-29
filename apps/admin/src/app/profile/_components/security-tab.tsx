@@ -327,15 +327,24 @@ function MfaSection() {
 
   const handleChangeDevice = async () => {
     if (!factors[0]) return
-    setRemoving(true)
+    setEnrolling(true)
+    setError('')
     const success = await unenroll(factors[0].id)
-    if (success) {
-      // Immediately start new enrollment
-      await handleEnroll()
-    } else {
+    if (!success) {
+      setEnrolling(false)
       toast({ title: 'Failed to remove existing factor', variant: 'destructive' })
+      return
     }
-    setRemoving(false)
+    // Start new enrollment immediately
+    const result = await enroll('Tailfire')
+    if (!result) {
+      setEnrolling(false)
+      setError('Failed to start 2FA setup. Please try again.')
+      return
+    }
+    setFactorId(result.factorId)
+    setQrCode(result.qrCode)
+    setSecret(result.secret)
   }
 
   // Enrolled state — show status + change device / remove options
