@@ -119,9 +119,15 @@ export function useMfa() {
         return null
       }
 
+      // REST API returns raw SVG; SDK returns a data: URI. Normalize.
+      const rawQr = result.totp.qr_code
+      const qrCode = rawQr.startsWith('data:')
+        ? rawQr
+        : `data:image/svg+xml;utf8,${encodeURIComponent(rawQr)}`
+
       return {
         factorId: result.id,
-        qrCode: result.totp.qr_code,
+        qrCode,
         secret: result.totp.secret,
         uri: result.totp.uri,
       }
