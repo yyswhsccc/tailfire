@@ -67,15 +67,8 @@ export function LoginForm() {
         return
       }
 
-      // Check MFA status before redirecting
-      const { data: mfaData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-      if (mfaData?.currentLevel === 'aal1' && mfaData?.nextLevel === 'aal2') {
-        // User has MFA enrolled but hasn't verified yet → MFA verify page
-        router.push(`/auth/mfa-verify?redirectTo=${encodeURIComponent(redirectTo)}`)
-        return
-      }
-
-      // Successful login - redirect (keep loading state during navigation)
+      // Successful login - redirect. Middleware handles MFA enforcement
+      // (redirects to /auth/mfa-verify or /auth/mfa-enroll as needed)
       router.push(redirectTo)
       router.refresh()
     } catch (err) {
