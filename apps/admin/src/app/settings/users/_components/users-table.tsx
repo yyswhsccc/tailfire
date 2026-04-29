@@ -9,7 +9,7 @@ import {
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { MoreVertical, Pencil, Lock, Unlock, Trash2, Mail, UserCheck, UserCog } from 'lucide-react'
+import { MoreVertical, Pencil, Lock, Unlock, Trash2, Mail, UserCheck, UserCog, ShieldOff } from 'lucide-react'
 import type { UserListItemDto } from '@tailfire/shared-types'
 import {
   DropdownMenu,
@@ -44,6 +44,7 @@ interface UsersTableProps {
   onDelete: (user: UserListItemDto) => void
   onResendInvite: (user: UserListItemDto) => void
   onImpersonate?: (user: UserListItemDto) => void
+  onResetMfa?: (user: UserListItemDto) => void
   rowSelection: RowSelectionState
   onRowSelectionChange: OnChangeFn<RowSelectionState>
 }
@@ -72,6 +73,7 @@ export function UsersTable({
   onDelete,
   onResendInvite,
   onImpersonate,
+  onResetMfa,
   rowSelection,
   onRowSelectionChange,
 }: UsersTableProps) {
@@ -200,6 +202,13 @@ export function UsersTable({
                   </DropdownMenuItem>
                 )}
 
+                {isCurrentUserAdmin && canModify && user.status === 'active' && onResetMfa && (
+                  <DropdownMenuItem onClick={() => onResetMfa(user)}>
+                    <ShieldOff className="mr-2 h-4 w-4" />
+                    Reset MFA
+                  </DropdownMenuItem>
+                )}
+
                 {user.status === 'pending' && (
                   <>
                     <DropdownMenuItem onClick={() => onResendInvite(user)}>
@@ -245,7 +254,7 @@ export function UsersTable({
         )
       },
     },
-  ], [currentUserId, isCurrentUserAdmin, isOnline, onEdit, onLock, onUnlock, onActivate, onDelete, onResendInvite, onImpersonate])
+  ], [currentUserId, isCurrentUserAdmin, isOnline, onEdit, onLock, onUnlock, onActivate, onDelete, onResendInvite, onImpersonate, onResetMfa])
 
   const table = useReactTable({
     data: users,
