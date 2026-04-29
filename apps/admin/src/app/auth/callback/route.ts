@@ -152,11 +152,11 @@ function getHashHandlerHtml(origin: string, next: string): string {
     <p class="error" id="error" style="display: none;"></p>
   </div>
   <script type="module">
-    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+    import { createBrowserClient } from 'https://esm.sh/@supabase/ssr@0.10.2'
 
     const origin = '${origin}'
     const next = '${next}'
-    const supabase = createClient('${supabaseUrl}', '${supabaseAnonKey}')
+    const supabase = createBrowserClient('${supabaseUrl}', '${supabaseAnonKey}')
 
     async function handleCallback() {
       const hash = window.location.hash
