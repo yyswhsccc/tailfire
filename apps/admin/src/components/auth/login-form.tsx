@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,7 +16,6 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') || '/trips'
 
@@ -47,10 +46,9 @@ export function LoginForm() {
         return
       }
 
-      // Successful login - redirect. Middleware handles MFA enforcement
-      // (redirects to /auth/mfa-verify or /auth/mfa-enroll as needed)
-      router.push(redirectTo)
-      router.refresh()
+      // Use a hard navigation so the browser commits the updated auth cookies
+      // before Edge middleware evaluates the protected route.
+      window.location.assign(redirectTo)
     } catch (err) {
       setError('An unexpected error occurred. Please try again.')
       setIsLoading(false)

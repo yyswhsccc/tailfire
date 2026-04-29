@@ -1,16 +1,15 @@
 'use client'
 
 import { Suspense, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Loader2, ShieldCheck, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useToast } from '@/hooks/use-toast'
 import { useMfa } from '@/hooks/use-mfa'
 import { useAuth } from '@/providers/auth-provider'
 
-type Step = 'setup' | 'verify' | 'complete'
+type Step = 'setup' | 'verify'
 
 export default function MfaEnrollPage() {
   return (
@@ -33,10 +32,8 @@ function getMfaGraceRemaining(): number {
 }
 
 function MfaEnrollContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') || '/trips'
-  const { toast } = useToast()
   const { enroll, verify } = useMfa()
   const { recordLogin } = useAuth()
   const daysRemaining = getMfaGraceRemaining()
@@ -51,6 +48,19 @@ function MfaEnrollContent() {
   const [error, setError] = useState('')
   const [secretCopied, setSecretCopied] = useState(false)
 
+  const redirectViaCallback = (accessToken: string, refreshToken: string) => {
+    const callbackUrl = new URL('/auth/callback', window.location.origin)
+    callbackUrl.searchParams.set('next', redirectTo)
+
+    const hash = new URLSearchParams({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      type: 'mfa',
+    }).toString()
+
+    window.location.assign(`${callbackUrl.toString()}#${hash}`)
+  }
+
   const handleSkip = () => {
     // Record that user chose to skip — they have 7 days from first skip
     const now = String(Date.now())
@@ -60,7 +70,7 @@ function MfaEnrollContent() {
     // Set cookie for middleware to read (httpOnly=false so JS can set it)
     document.cookie = `mfa_skipped_at=${now}; path=/; max-age=${MFA_GRACE_DAYS * 86400}; SameSite=Lax`
     recordLogin()
-    router.push(redirectTo)
+    window.location.assign(redirectTo)
   }
 
   const handleSetup = async () => {
@@ -91,11 +101,11 @@ function MfaEnrollContent() {
     setIsLoading(true)
     setError('')
 
-    const success = await verify(factorId, code.trim())
-    if (success) {
-      recordLogin()
-      setStep('complete')
+    const verifiedSession = await verify(factorId, code.trim())
+    if (verifiedSession) {
+      recordLogin(verifiedSession.accessToken)
       setIsLoading(false)
+      redirectViaCallback(verifiedSession.accessToken, verifiedSession.refreshToken)
     } else {
       setError('Invalid code. Make sure you entered the current code from your authenticator app.')
       setCode('')
@@ -107,11 +117,6 @@ function MfaEnrollContent() {
     navigator.clipboard.writeText(secret)
     setSecretCopied(true)
     setTimeout(() => setSecretCopied(false), 2000)
-  }
-
-  const handleComplete = () => {
-    toast({ title: 'Two-factor authentication enabled', description: 'Your account is now more secure.' })
-    router.push(redirectTo)
   }
 
   return (
@@ -127,7 +132,6 @@ function MfaEnrollContent() {
             <p className="text-sm text-muted-foreground">
               {step === 'setup' && 'Protect your account with an authenticator app'}
               {step === 'verify' && 'Scan the QR code with your authenticator app'}
-              {step === 'complete' && 'Two-factor authentication is now active'}
             </p>
           </div>
 
@@ -234,22 +238,6 @@ function MfaEnrollContent() {
             </div>
           )}
 
-          {/* Step 3: Complete */}
-          {step === 'complete' && (
-            <div className="space-y-4 text-center">
-              <div className="flex justify-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-                  <Check className="h-8 w-8 text-green-600" />
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Your account is now protected with two-factor authentication. You&apos;ll be asked for a code each time you sign in.
-              </p>
-              <Button onClick={handleComplete} className="w-full bg-orange-600 hover:bg-orange-700">
-                Continue to Tailfire
-              </Button>
-            </div>
-          )}
         </div>
       </div>
 
