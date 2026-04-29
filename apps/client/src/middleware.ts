@@ -36,24 +36,37 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Auth routes redirect authenticated users to home
+  // Check if authenticated user is a portal/consumer user (not an admin)
+  // Admin users have user_profiles with role='admin'|'user' but NO portal_user flag
+  // Consumer users have app_metadata.portal_user = true
+  const isPortalUser = user?.app_metadata?.portal_user === true
+  const isAdmin = user && !isPortalUser
+
+  // If logged in as admin, redirect to the admin app — this portal is for consumers only
+  if (isAdmin && !isAuthRoute) {
+    const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'https://tailfire.phoenixvoyages.ca'
+    return NextResponse.redirect(adminUrl)
+  }
+
+  // Auth routes redirect authenticated portal users to home
   if (isAuthRoute) {
-    if (user) {
+    if (user && isPortalUser) {
       return NextResponse.redirect(new URL('/', request.url))
     }
+    // Show login page for: unauthenticated users OR admin users (they need to sign in as consumer)
     return supabaseResponse
   }
 
-  // Root path handling - allow if authenticated
+  // Root path handling - allow if authenticated portal user
   if (pathname === '/') {
-    if (!user) {
+    if (!user || !isPortalUser) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
     return supabaseResponse
   }
 
-  // DEFAULT: Everything else requires authentication
-  if (!user) {
+  // DEFAULT: Everything else requires authenticated portal user
+  if (!user || !isPortalUser) {
     const redirectUrl = new URL('/login', request.url)
     redirectUrl.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(redirectUrl)
