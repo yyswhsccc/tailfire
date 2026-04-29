@@ -145,16 +145,9 @@ export function useMfa() {
       })
       console.log('[MFA] Verify result:', verifyResult ? 'success' : 'failed')
 
-      // Session tokens updated — refresh the Supabase client session
-      if (verifyResult?.access_token) {
-        await supabase.auth.setSession({
-          access_token: verifyResult.access_token,
-          refresh_token: verifyResult.refresh_token,
-        })
-      }
-
-      // Refresh state (non-blocking)
-      refreshState().catch(() => {})
+      // Session is now aal2 on the server — the next page load will
+      // pick up the new session via cookie refresh in middleware.
+      // Do NOT call setSession() here as it triggers lock contention.
       return true
     } catch (err: any) {
       console.error('[MFA] Challenge/Verify failed:', err.message)
