@@ -66,14 +66,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), [])
 
   /**
-   * Check MFA assurance level
+   * Check MFA assurance level — non-blocking with timeout
+   * The Supabase SDK MFA calls can hang due to navigator lock contention.
    */
   const checkMfaLevel = async () => {
     try {
-      const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-      if (data) {
-        setAal(data.currentLevel)
-        setMfaEnrolled(data.nextLevel === 'aal2')
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+      const check = supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      const result = await Promise.race([check, timeout])
+      if (result && 'data' in result && result.data) {
+        setAal(result.data.currentLevel)
+        setMfaEnrolled(result.data.nextLevel === 'aal2')
       }
     } catch {
       // MFA check is non-critical
@@ -99,46 +102,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       setClaims(extractClaims(session))
-      if (session) await checkMfaLevel()
       setIsLoading(false)
+      // Non-blocking MFA check — don't delay app load
+      if (session) checkMfaLevel()
     })
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
       setClaims(extractClaims(session))
       setIsLoading(false)
 
       if (session) {
-        await checkMfaLevel()
+        checkMfaLevel() // Non-blocking
       } else {
         setAal(null)
         setMfaEnrolled(false)
         setLoginRecorded(false)
       }
 
-      // Record login for non-MFA sessions (no factors enrolled AND enforcement off)
-      // When MFA is enrolled, record-login is called from mfa-verify page after aal2
-      // When MFA is enforced but not enrolled, record-login happens after enrollment completes
+      // Record login on sign-in (fire-and-forget, non-blocking)
       if (event === 'SIGNED_IN' && session?.access_token) {
-        const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-        const mfaEnforced = process.env.NEXT_PUBLIC_MFA_REQUIRED === 'true'
-        if (data && data.nextLevel !== 'aal2' && !mfaEnforced) {
-          // No MFA factors and enforcement off — record login now
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
-          fetch(`${apiUrl}/user-profiles/me/record-login`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          }).catch(() => {/* non-critical */})
-          setLoginRecorded(true)
-        }
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
+        fetch(`${apiUrl}/user-profiles/me/record-login`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        }).catch(() => {/* non-critical */})
+        setLoginRecorded(true)
       }
     })
 
