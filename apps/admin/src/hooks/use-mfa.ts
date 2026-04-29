@@ -178,9 +178,8 @@ export function useMfa() {
    */
   const unenroll = useCallback(async (factorId: string): Promise<boolean> => {
     try {
-      await mfaRestCall(`/factors/${factorId}`)
-      // Actually need DELETE method for unenroll
       const token = await getAccessToken()
+      if (!token) return false
       const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${factorId}`, {
         method: 'DELETE',
         headers: {
