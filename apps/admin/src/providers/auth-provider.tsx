@@ -21,7 +21,7 @@ interface AuthContextType {
   mfaEnrolled: boolean
   isLoading: boolean
   signOut: () => Promise<void>
-  recordLogin: () => void
+  recordLogin: (accessTokenOverride?: string) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -84,9 +84,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Record login — call this AFTER MFA verification (or when MFA is not required).
    * Moved out of SIGNED_IN event to avoid recording pre-MFA logins.
    */
-  const recordLogin = () => {
+  const recordLogin = (accessTokenOverride?: string) => {
     if (loginRecorded) return
-    const token = session?.access_token
+    const token = accessTokenOverride || session?.access_token
     if (!token) return
 
     setLoginRecorded(true)

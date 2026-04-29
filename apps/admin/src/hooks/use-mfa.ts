@@ -20,6 +20,11 @@ interface EnrollResult {
   uri: string
 }
 
+interface VerifyResult {
+  accessToken: string
+  refreshToken: string
+}
+
 /**
  * Get the current access token without going through the lock-protected SDK.
  * Reads directly from the Supabase cookie storage.
@@ -130,7 +135,7 @@ export function useMfa() {
    * Challenge + verify a TOTP code (upgrades session to aal2).
    * Uses direct REST API calls to bypass Supabase SDK lock contention.
    */
-  const verify = useCallback(async (factorId: string, code: string): Promise<boolean> => {
+  const verify = useCallback(async (factorId: string, code: string): Promise<VerifyResult | null> => {
     try {
       // Step 1: Create challenge via REST
       console.log('[MFA] Creating challenge for factor:', factorId)
@@ -145,15 +150,22 @@ export function useMfa() {
       })
       console.log('[MFA] Verify result:', verifyResult ? 'success' : 'failed')
 
-      // Session is now aal2 on the server — the next page load will
-      // pick up the new session via cookie refresh in middleware.
-      // Do NOT call setSession() here as it triggers lock contention.
-      return true
+      if (!verifyResult?.access_token || !verifyResult?.refresh_token) {
+        throw new Error('Missing upgraded session tokens after MFA verify')
+      }
+
+      // Do NOT call setSession() here — it can contend with the browser auth lock.
+      // The caller should hand these tokens to the isolated auth callback page,
+      // which can persist the upgraded aal2 session without the full app mounted.
+      return {
+        accessToken: verifyResult.access_token,
+        refreshToken: verifyResult.refresh_token,
+      }
     } catch (err: any) {
       console.error('[MFA] Challenge/Verify failed:', err.message)
-      return false
+      return null
     }
-  }, [supabase, refreshState])
+  }, [])
 
   /**
    * Unenroll a TOTP factor

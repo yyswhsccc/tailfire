@@ -58,14 +58,11 @@ export async function updateSession(request: NextRequest) {
     } catch { /* ignore decode errors */ }
   }
 
-  // Check if user has MFA factors enrolled (for middleware gating)
-  let hasMfaFactors = false
-  if (user) {
-    try {
-      const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-      hasMfaFactors = data?.nextLevel === 'aal2'
-    } catch { /* ignore — MFA check non-critical */ }
-  }
+  // Use the fresh user object from getUser() for factor detection.
+  // getAuthenticatorAssuranceLevel() without an explicit JWT reads the cached
+  // session user/factors, which can be stale after factor deletion or MFA verify.
+  const hasMfaFactors =
+    (user?.factors ?? []).some((factor) => factor.status === 'verified')
 
   return { user, userStatus, aal, hasMfaFactors, supabaseResponse }
 }

@@ -29,10 +29,30 @@ function MfaVerifyContent() {
   const [code, setCode] = useState('')
   const [isVerifying, setIsVerifying] = useState(false)
   const [error, setError] = useState('')
+  const [hasLoadedFactors, setHasLoadedFactors] = useState(false)
 
   useEffect(() => {
-    refreshState()
+    refreshState().finally(() => setHasLoadedFactors(true))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (hasLoadedFactors && !mfaLoading && factors.length === 0) {
+      router.replace(`/auth/mfa-enroll?redirectTo=${encodeURIComponent(redirectTo)}`)
+    }
+  }, [factors, hasLoadedFactors, mfaLoading, redirectTo, router])
+
+  const redirectViaCallback = (accessToken: string, refreshToken: string) => {
+    const callbackUrl = new URL('/auth/callback', window.location.origin)
+    callbackUrl.searchParams.set('next', redirectTo)
+
+    const hash = new URLSearchParams({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      type: 'mfa',
+    }).toString()
+
+    window.location.assign(`${callbackUrl.toString()}#${hash}`)
+  }
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,11 +71,11 @@ function MfaVerifyContent() {
     setError('')
 
     try {
-      const success = await verify(factor.id, code.trim())
-      if (success) {
-        recordLogin()
+      const verifiedSession = await verify(factor.id, code.trim())
+      if (verifiedSession) {
+        recordLogin(verifiedSession.accessToken)
         toast({ title: 'Verified', description: 'Two-factor authentication successful' })
-        router.push(redirectTo)
+        redirectViaCallback(verifiedSession.accessToken, verifiedSession.refreshToken)
       } else {
         setError('Invalid code. Please try again. Check your authenticator app for the current code.')
         setCode('')
