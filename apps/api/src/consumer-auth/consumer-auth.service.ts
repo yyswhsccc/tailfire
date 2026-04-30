@@ -111,8 +111,28 @@ export class ConsumerAuthService {
       },
     })
 
-    if (userError || !userData.user) {
-      this.logger.error(`Failed to create auth user: ${userError?.message}`)
+    if (userError) {
+      // Handle "User already registered" — auth user exists but wasn't linked to contact
+      if (userError.message?.includes('already been registered') || userError.message?.includes('already exists')) {
+        this.logger.warn(`Auth user already exists for ${email}, linking to contact ${contactId}`)
+        // Look up existing auth user by email
+        const { data: existingUsers } = await this.supabaseAdmin.auth.admin.listUsers()
+        const existingAuthUser = existingUsers?.users?.find((u) => u.email === email)
+        if (existingAuthUser) {
+          // Link existing auth user to contact
+          await this.db.client
+            .update(this.db.schema.contacts)
+            .set({ portalUserId: existingAuthUser.id, authMethod: 'magic_link', updatedAt: new Date() })
+            .where(eq(this.db.schema.contacts.id, contactId))
+          return GENERIC_RESPONSE
+        }
+      }
+      this.logger.error(`Failed to create auth user: ${userError.message}`)
+      throw new InternalServerErrorException('Failed to create portal account')
+    }
+
+    if (!userData.user) {
+      this.logger.error('Supabase createUser returned no user data')
       throw new InternalServerErrorException('Failed to create portal account')
     }
 
