@@ -274,22 +274,27 @@ function MfaSection() {
     setVerifying(true)
     setError('')
     try {
-      const success = await verify(factorId, code)
-      if (success) {
+      const result = await verify(factorId, code)
+      if (result) {
         toast({ title: 'Two-factor authentication enabled' })
-        // State reset may not execute if auth state change re-renders the tree
-        setEnrolling(false)
-        setQrCode('')
-        setSecret('')
-        setCode('')
+        // Persist the upgraded aal2 session via the callback page
+        // so middleware sees the new tokens in cookies
+        const callbackUrl = new URL('/auth/callback', window.location.origin)
+        callbackUrl.searchParams.set('next', '/profile')
+        const hash = new URLSearchParams({
+          access_token: result.accessToken,
+          refresh_token: result.refreshToken,
+          type: 'mfa',
+        }).toString()
+        window.location.assign(`${callbackUrl.toString()}#${hash}`)
       } else {
         setError('Invalid code. Please try again.')
         setCode('')
+        setVerifying(false)
       }
     } catch (err) {
       console.error('[MFA] Verify error:', err)
       setError('Verification failed. Please try again.')
-    } finally {
       setVerifying(false)
     }
   }
