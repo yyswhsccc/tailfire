@@ -21,7 +21,7 @@ import { EditUserDialog } from './_components/edit-user-dialog'
 import { ChangeStatusDialog } from './_components/change-status-dialog'
 import { BatchActionBar } from './_components/batch-action-bar'
 import { BatchConfirmDialog, BatchResult } from './_components/batch-confirm-dialog'
-import { useUsers, useUpdateUserStatus, useDeleteUser } from '@/hooks/use-users'
+import { useUsers, useUpdateUserStatus, useDeleteUser, useResetUserMfa } from '@/hooks/use-users'
 import { useAuthStore } from '@/stores/auth.store'
 import { useToast } from '@/hooks/use-toast'
 import { useUser } from '@/hooks/use-user'
@@ -43,6 +43,7 @@ export default function UsersSettingsPage() {
   const { start: startImpersonation } = useImpersonation()
   const updateStatus = useUpdateUserStatus()
   const deleteUser = useDeleteUser()
+  const resetMfa = useResetUserMfa()
 
   // Filter state
   const [search, setSearch] = useState('')
@@ -121,6 +122,19 @@ export default function UsersSettingsPage() {
     setSelectedUser(user)
     setStatusAction(action)
     setStatusDialogOpen(true)
+  }
+
+  const handleResetMfa = async (user: UserListItemDto) => {
+    if (!confirm(`Reset MFA for ${user.email}? They will need to set up 2FA again on next login.`)) return
+    try {
+      const result = await resetMfa.mutateAsync(user.id)
+      toast({
+        title: 'MFA Reset',
+        description: `Removed ${result.factorsRemoved} factor(s) for ${user.email}`,
+      })
+    } catch {
+      toast({ title: 'Failed to reset MFA', variant: 'destructive' })
+    }
   }
 
   const executeBatchAction = async (reason?: string): Promise<BatchResult> => {
@@ -286,6 +300,7 @@ export default function UsersSettingsPage() {
               onDelete={(user) => handleStatusAction(user, 'delete')}
               onResendInvite={(user) => handleStatusAction(user, 'resend-invite')}
               onImpersonate={(user) => startImpersonation(user.id)}
+              onResetMfa={handleResetMfa}
               rowSelection={rowSelection}
               onRowSelectionChange={setRowSelection}
             />

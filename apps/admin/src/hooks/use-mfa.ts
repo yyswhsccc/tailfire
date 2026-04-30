@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Factor } from '@supabase/supabase-js'
 
@@ -74,35 +74,59 @@ export function useMfa() {
     isLoading: false,
   })
 
-  const supabase = useMemo(() => createClient(), [])
-
   /**
-   * Refresh MFA state from Supabase
+   * Refresh MFA state via REST API (bypasses SDK navigator lock contention)
    */
   const refreshState = useCallback(async () => {
     setState(prev => ({ ...prev, isLoading: true }))
     try {
-      const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-      if (error) throw error
+      const token = await getAccessToken()
+      if (!token) throw new Error('No session')
 
-      const { data: factorsData } = await supabase.auth.mfa.listFactors()
-      const totpFactors = factorsData?.totp ?? []
+      // Decode AAL from JWT
+      const parts = token.split('.')
+      let aal: 'aal1' | 'aal2' = 'aal1'
+      if (parts[1]) {
+        try {
+          const claims = JSON.parse(atob(parts[1]))
+          aal = claims.aal || 'aal1'
+        } catch { /* ignore */ }
+      }
+
+      // List factors via REST
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      const res = await fetch(`${supabaseUrl}/auth/v1/factors`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'apikey': anonKey!,
+        },
+      })
+
+      let totpFactors: Factor[] = []
+      if (res.ok) {
+        const factors = await res.json()
+        totpFactors = (factors || []).filter((f: any) => f.factor_type === 'totp')
+      }
+
+      const isEnrolled = totpFactors.some((f) => f.status === 'verified')
+      const nextLevel = isEnrolled ? 'aal2' : 'aal1'
 
       setState({
-        currentLevel: data.currentLevel,
-        nextLevel: data.nextLevel,
+        currentLevel: aal,
+        nextLevel,
         factors: totpFactors,
-        isEnrolled: totpFactors.length > 0,
-        needsVerification: data.currentLevel === 'aal1' && data.nextLevel === 'aal2',
+        isEnrolled,
+        needsVerification: aal === 'aal1' && nextLevel === 'aal2',
         isLoading: false,
       })
 
-      return data
+      return { currentLevel: aal, nextLevel }
     } catch {
       setState(prev => ({ ...prev, isLoading: false }))
       return null
     }
-  }, [supabase])
+  }, [])
 
   /**
    * Enroll a new TOTP factor
@@ -119,9 +143,15 @@ export function useMfa() {
         return null
       }
 
+      // REST API returns raw SVG; SDK returns a data: URI. Normalize.
+      const rawQr = result.totp.qr_code
+      const qrCode = rawQr.startsWith('data:')
+        ? rawQr
+        : `data:image/svg+xml;utf8,${encodeURIComponent(rawQr)}`
+
       return {
         factorId: result.id,
-        qrCode: result.totp.qr_code,
+        qrCode,
         secret: result.totp.secret,
         uri: result.totp.uri,
       }
@@ -172,9 +202,8 @@ export function useMfa() {
    */
   const unenroll = useCallback(async (factorId: string): Promise<boolean> => {
     try {
-      await mfaRestCall(`/factors/${factorId}`)
-      // Actually need DELETE method for unenroll
       const token = await getAccessToken()
+      if (!token) return false
       const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/factors/${factorId}`, {
         method: 'DELETE',
         headers: {

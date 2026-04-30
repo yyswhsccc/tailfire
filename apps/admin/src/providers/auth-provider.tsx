@@ -128,15 +128,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoginRecorded(false)
       }
 
-      // Record login on sign-in (fire-and-forget, non-blocking)
-      if (event === 'SIGNED_IN' && session?.access_token) {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
-        fetch(`${apiUrl}/user-profiles/me/record-login`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        }).catch(() => {/* non-critical */})
-        setLoginRecorded(true)
-      }
+      // recordLogin is called explicitly by MFA pages after aal2 verification,
+      // or by non-MFA flows. Do NOT fire here — SIGNED_IN fires before MFA.
     })
 
     return () => subscription.unsubscribe()

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useEffect } from 'react'
-import { Loader2, ShieldCheck, Clock, LogOut, AlertCircle, Copy, Check, Trash2 } from 'lucide-react'
+import { Loader2, ShieldCheck, Clock, LogOut, AlertCircle, Copy, Check, Trash2, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -274,22 +274,27 @@ function MfaSection() {
     setVerifying(true)
     setError('')
     try {
-      const success = await verify(factorId, code)
-      if (success) {
+      const result = await verify(factorId, code)
+      if (result) {
         toast({ title: 'Two-factor authentication enabled' })
-        // State reset may not execute if auth state change re-renders the tree
-        setEnrolling(false)
-        setQrCode('')
-        setSecret('')
-        setCode('')
+        // Persist the upgraded aal2 session via the callback page
+        // so middleware sees the new tokens in cookies
+        const callbackUrl = new URL('/auth/callback', window.location.origin)
+        callbackUrl.searchParams.set('next', '/profile')
+        const hash = new URLSearchParams({
+          access_token: result.accessToken,
+          refresh_token: result.refreshToken,
+          type: 'mfa',
+        }).toString()
+        window.location.assign(`${callbackUrl.toString()}#${hash}`)
       } else {
         setError('Invalid code. Please try again.')
         setCode('')
+        setVerifying(false)
       }
     } catch (err) {
       console.error('[MFA] Verify error:', err)
       setError('Verification failed. Please try again.')
-    } finally {
       setVerifying(false)
     }
   }
@@ -325,7 +330,29 @@ function MfaSection() {
     )
   }
 
-  // Enrolled state — show status + remove option
+  const handleChangeDevice = async () => {
+    if (!factors[0]) return
+    setEnrolling(true)
+    setError('')
+    const success = await unenroll(factors[0].id)
+    if (!success) {
+      setEnrolling(false)
+      toast({ title: 'Failed to remove existing factor', variant: 'destructive' })
+      return
+    }
+    // Start new enrollment immediately
+    const result = await enroll('Tailfire')
+    if (!result) {
+      setEnrolling(false)
+      setError('Failed to start 2FA setup. Please try again.')
+      return
+    }
+    setFactorId(result.factorId)
+    setQrCode(result.qrCode)
+    setSecret(result.secret)
+  }
+
+  // Enrolled state — show status + change device / remove options
   if (isEnrolled && !enrolling) {
     return (
       <Card>
@@ -346,18 +373,31 @@ function MfaSection() {
             </div>
             <ShieldCheck className="h-8 w-8 text-green-500" />
           </div>
-          <Button
-            variant="outline"
-            className="text-destructive hover:text-destructive"
-            onClick={handleRemove}
-            disabled={removing}
-          >
-            {removing ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Removing...</>
-            ) : (
-              <><Trash2 className="mr-2 h-4 w-4" /> Remove 2FA</>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleChangeDevice}
+              disabled={removing}
+            >
+              {removing ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Changing...</>
+              ) : (
+                <><RefreshCw className="mr-2 h-4 w-4" /> Change Device</>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+              onClick={handleRemove}
+              disabled={removing}
+            >
+              {removing ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Removing...</>
+              ) : (
+                <><Trash2 className="mr-2 h-4 w-4" /> Remove 2FA</>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     )
