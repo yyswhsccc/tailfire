@@ -8,7 +8,7 @@
  * the real admin JWT, not the impersonated context.
  */
 
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common'
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Logger } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator'
 import { BYPASS_MFA_KEY } from '../decorators/bypass-mfa.decorator'
@@ -16,6 +16,8 @@ import type { AuthContext } from '../auth.types'
 
 @Injectable()
 export class MfaGuard implements CanActivate {
+  private readonly logger = new Logger(MfaGuard.name)
+
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
@@ -47,17 +49,13 @@ export class MfaGuard implements CanActivate {
     // Pending users skip MFA — they need to set password first
     if (user.userStatus === 'pending') return true
 
-    // Only block users who HAVE enrolled MFA factors but haven't verified this session.
-    // Supabase sets aal='aal1' for all sessions initially. After MFA verification, it becomes 'aal2'.
-    // We can't distinguish "never enrolled" from "enrolled but not verified" via JWT alone.
-    // The admin middleware handles redirecting unenrolled users to the enrollment page.
-    // This guard blocks direct API access ONLY after a user has completed MFA setup
-    // (their session should always be aal2 after that — aal1 means they bypassed the frontend).
-    // For now, log but don't block — enforcement is handled by the frontend middleware.
-    // TODO: Once all users have enrolled, tighten this to reject aal1 unconditionally.
+    // Reject aal1 sessions — user must complete MFA verification.
+    // The frontend middleware handles enrollment/grace period routing.
+    // By the time a request reaches the API, the user should have aal2
+    // (or be in grace period, which the frontend allows but the API does not).
     if (user.aal !== 'aal2') {
-      // Log for monitoring but allow through during grace/enrollment period
-      return true
+      this.logger.warn(`MFA verification required for user ${user.userId} (aal=${user.aal})`)
+      throw new ForbiddenException('MFA verification required')
     }
 
     return true

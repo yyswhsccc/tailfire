@@ -21,7 +21,8 @@ export default function MfaVerifyPage() {
 function MfaVerifyContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') || '/trips'
+  const rawRedirect = searchParams.get('redirectTo') || '/trips'
+  const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/trips'
   const { toast } = useToast()
   const { factors, refreshState, verify, isLoading: mfaLoading } = useMfa()
   const { recordLogin } = useAuth()

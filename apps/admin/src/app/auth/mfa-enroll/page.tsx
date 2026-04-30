@@ -33,7 +33,8 @@ function getMfaGraceRemaining(): number {
 
 function MfaEnrollContent() {
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') || '/trips'
+  const rawRedirect = searchParams.get('redirectTo') || '/trips'
+  const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/trips'
   const { enroll, verify } = useMfa()
   const { recordLogin } = useAuth()
   const daysRemaining = getMfaGraceRemaining()
@@ -61,14 +62,13 @@ function MfaEnrollContent() {
     window.location.assign(`${callbackUrl.toString()}#${hash}`)
   }
 
-  const handleSkip = () => {
-    // Record that user chose to skip — they have 7 days from first skip
-    const now = String(Date.now())
+  const handleSkip = async () => {
+    // Set httpOnly grace cookie via server route (unforgeable by client)
+    await fetch('/api/mfa-skip', { method: 'POST' })
+    // Track locally for UI display only
     if (!localStorage.getItem(MFA_GRACE_KEY)) {
-      localStorage.setItem(MFA_GRACE_KEY, now)
+      localStorage.setItem(MFA_GRACE_KEY, String(Date.now()))
     }
-    // Set cookie for middleware to read (httpOnly=false so JS can set it)
-    document.cookie = `mfa_skipped_at=${now}; path=/; max-age=${MFA_GRACE_DAYS * 86400}; SameSite=Lax`
     recordLogin()
     window.location.assign(redirectTo)
   }

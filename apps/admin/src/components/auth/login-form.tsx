@@ -29,7 +29,9 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
 
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') || '/trips'
+  const rawRedirect = searchParams.get('redirectTo') || '/trips'
+  // Sanitize to internal paths only — prevent open redirect
+  const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/trips'
   const authError = searchParams.get('error')
   const authMessage = searchParams.get('message')
   const [error, setError] = useState<string | null>(
