@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Lock, Loader2, CheckCircle, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,7 +10,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SetPasswordPage() {
-  const router = useRouter()
   const supabase = createClient()
 
   const [password, setPassword] = useState('')
