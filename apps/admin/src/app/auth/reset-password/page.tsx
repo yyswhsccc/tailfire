@@ -110,9 +110,10 @@ export default function ResetPasswordPage() {
 
       setPageState('success')
 
-      // Sign out via server route (clears auth_flow cookie) and redirect to login
+      // Sign out and redirect to login after brief delay
       setTimeout(() => {
         window.location.href = '/auth/login?message=password_reset_success'
+
       }, 2000)
       // Sign out server-side to clear session + auth_flow cookie
       await fetch('/auth/signout', { method: 'POST', redirect: 'manual' })
