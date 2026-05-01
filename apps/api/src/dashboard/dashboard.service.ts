@@ -284,7 +284,7 @@ export class DashboardService {
     }
   }
 
-  private getDateRanges(period: 'mtd' | 'ytd' | 'lifetime', now: Date): DateRange {
+  private getDateRanges(period: 'mtd' | 'last_month' | 'ytd' | 'lifetime', now: Date): DateRange {
     // Use Eastern Time for all date boundaries so dashboard aligns with
     // Phoenix Voyages business hours (EST/EDT), not UTC.
     const et = this.toEastern(now)
@@ -302,6 +302,18 @@ export class DashboardService {
 
       const priorStartDate = new Date(Date.UTC(et.year - 1, 0, 1))
       const priorEndDate = new Date(Date.UTC(et.year - 1, et.month, et.day))
+
+      return { startDate, endDate, priorStartDate, priorEndDate }
+    }
+
+    if (period === 'last_month') {
+      // Full previous month (1st to last day)
+      const startDate = new Date(Date.UTC(et.year, et.month - 1, 1))
+      const endDate = new Date(Date.UTC(et.year, et.month, 0, 23, 59, 59))
+
+      // Prior = two months ago
+      const priorStartDate = new Date(Date.UTC(et.year, et.month - 2, 1))
+      const priorEndDate = new Date(Date.UTC(et.year, et.month - 1, 0, 23, 59, 59))
 
       return { startDate, endDate, priorStartDate, priorEndDate }
     }
