@@ -266,34 +266,53 @@ export class DashboardService {
   // Date range helpers
   // ===================================================================
 
-  private getDateRanges(period: 'mtd' | 'ytd' | 'lifetime', now: Date): DateRange {
-    if (period === 'lifetime') {
-      const startDate = new Date(2000, 0, 1) // Far enough back to capture all data
-      const endDate = now
+  /**
+   * Convert a UTC Date to Eastern Time components.
+   * Handles EST (UTC-5) and EDT (UTC-4) automatically via Intl.
+   */
+  private toEastern(utcDate: Date): { year: number; month: number; day: number } {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(utcDate)
+    return {
+      year: Number(parts.find(p => p.type === 'year')!.value),
+      month: Number(parts.find(p => p.type === 'month')!.value) - 1, // 0-indexed
+      day: Number(parts.find(p => p.type === 'day')!.value),
+    }
+  }
 
-      // No meaningful prior period — use empty range so trends return null
+  private getDateRanges(period: 'mtd' | 'ytd' | 'lifetime', now: Date): DateRange {
+    // Use Eastern Time for all date boundaries so dashboard aligns with
+    // Phoenix Voyages business hours (EST/EDT), not UTC.
+    const et = this.toEastern(now)
+
+    if (period === 'lifetime') {
+      const startDate = new Date(2000, 0, 1)
+      const endDate = now
       const emptyDate = new Date(1999, 0, 1)
       return { startDate, endDate, priorStartDate: emptyDate, priorEndDate: emptyDate }
     }
 
     if (period === 'ytd') {
-      const startDate = new Date(now.getFullYear(), 0, 1) // Jan 1 of current year
+      const startDate = new Date(Date.UTC(et.year, 0, 1)) // Jan 1 of current year in ET
       const endDate = now
 
-      const priorStartDate = new Date(now.getFullYear() - 1, 0, 1) // Jan 1 of last year
-      const priorEndDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()) // Same day last year
+      const priorStartDate = new Date(Date.UTC(et.year - 1, 0, 1))
+      const priorEndDate = new Date(Date.UTC(et.year - 1, et.month, et.day))
 
       return { startDate, endDate, priorStartDate, priorEndDate }
     }
 
     // MTD (default)
-    const startDate = new Date(now.getFullYear(), now.getMonth(), 1) // First day of current month
+    const startDate = new Date(Date.UTC(et.year, et.month, 1)) // First day of current month in ET
     const endDate = now
 
-    // Prior = previous month (same day count)
-    const priorStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    // End of previous month
-    const priorEndDate = new Date(now.getFullYear(), now.getMonth(), 0) // Day 0 = last day of prev month
+    // Prior = previous month
+    const priorStartDate = new Date(Date.UTC(et.year, et.month - 1, 1))
+    const priorEndDate = new Date(Date.UTC(et.year, et.month, 0)) // Last day of prev month
 
     return { startDate, endDate, priorStartDate, priorEndDate }
   }
