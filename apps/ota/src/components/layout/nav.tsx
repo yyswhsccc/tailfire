@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Menu, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 import { Button } from "@/components/ui/button";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -100,6 +101,15 @@ function NavDropdown({ item }: { item: NavItem }) {
 
 export function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const portalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://my.phoenixvoyages.ca';
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsAuthenticated(!!user?.app_metadata?.portal_user);
+    });
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-white">
@@ -139,10 +149,10 @@ export function Nav() {
         <div className="hidden items-center gap-2 lg:flex">
           <TripBasketIndicator />
           <a
-            href={process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://my.phoenixvoyages.ca'}
+            href={isAuthenticated ? portalUrl : `${portalUrl}/login`}
             className="text-sm text-[#1A1A1A] transition-colors hover:text-[#C59746]"
           >
-            Sign In
+            {isAuthenticated ? 'My Account' : 'Sign In'}
           </a>
           <Button
             className="bg-[#C59746] text-white hover:bg-[#B08638]"
@@ -165,7 +175,7 @@ export function Nav() {
         </Button>
       </nav>
 
-      <MobileNav open={mobileOpen} onOpenChange={setMobileOpen} />
+      <MobileNav open={mobileOpen} onOpenChange={setMobileOpen} isAuthenticated={isAuthenticated} />
     </header>
   );
 }
