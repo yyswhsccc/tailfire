@@ -46,7 +46,7 @@ export default function DashboardPage() {
   const firstName = profile?.firstName || 'there'
 
   // Dashboard controls
-  const [period, setPeriod] = useState<'mtd' | 'ytd' | 'lifetime'>('mtd')
+  const [period, setPeriod] = useState<'mtd' | 'last_month' | 'ytd' | 'lifetime'>('mtd')
   const [chartYear, setChartYear] = useState(() => {
     const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric' }).formatToParts(new Date())
     return Number(parts.find(p => p.type === 'year')!.value)
@@ -76,7 +76,7 @@ export default function DashboardPage() {
     view: isAdmin ? view : 'personal',
   })
 
-  const periodLabel = period === 'mtd' ? 'Month to Date' : period === 'ytd' ? 'Year to Date' : 'Lifetime'
+  const periodLabel = period === 'mtd' ? 'Month to Date' : period === 'last_month' ? 'Last Month' : period === 'ytd' ? 'Year to Date' : 'Lifetime'
 
   // Initial loading state (no data yet)
   if (isPending) {
@@ -176,6 +176,14 @@ export default function DashboardPage() {
                   onClick={() => setPeriod('mtd')}
                 >
                   MTD
+                </button>
+                <button
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    period === 'last_month' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                  }`}
+                  onClick={() => setPeriod('last_month')}
+                >
+                  Last Mth
                 </button>
                 <button
                   className={`px-3 py-1.5 text-xs font-medium transition-colors ${
