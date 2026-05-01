@@ -264,11 +264,27 @@ export class UserProfilesService {
    */
   async recordLogin(userId: string): Promise<void> {
     const now = new Date()
-    // Only update timestamps — activation happens after password is set
+    const { userProfiles } = this.db.schema
+
+    // Update timestamps + auto-activate pending users as a safety net.
+    // Primary activation is in set-password, but if that call fails
+    // the user should still be activated on their first real login.
+    const [profile] = await this.db.client
+      .select({ status: userProfiles.status })
+      .from(userProfiles)
+      .where(eq(userProfiles.id, userId))
+      .limit(1)
+
+    const updates: Record<string, unknown> = { lastLoginAt: now, lastSeenAt: now }
+    if (profile?.status === 'pending') {
+      updates.status = 'active'
+      updates.updatedAt = now
+    }
+
     await this.db.client
-      .update(this.db.schema.userProfiles)
-      .set({ lastLoginAt: now, lastSeenAt: now })
-      .where(eq(this.db.schema.userProfiles.id, userId))
+      .update(userProfiles)
+      .set(updates)
+      .where(eq(userProfiles.id, userId))
   }
 
   async activateMyAccount(userId: string): Promise<{ activated: boolean }> {

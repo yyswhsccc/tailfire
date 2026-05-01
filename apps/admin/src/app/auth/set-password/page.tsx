@@ -52,14 +52,19 @@ export default function SetPasswordPage() {
         return
       }
 
-      // Activate the pending account now that password is set
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.access_token) {
+      // Activate the pending account now that password is set.
+      // Refresh session first so the token reflects the password change.
+      const { data: refreshed } = await supabase.auth.refreshSession()
+      const token = refreshed?.session?.access_token
+      if (token) {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3101/api/v1'
-        await fetch(`${apiUrl}/user-profiles/me/activate`, {
+        const resp = await fetch(`${apiUrl}/user-profiles/me/activate`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${session.access_token}` },
+          headers: { Authorization: `Bearer ${token}` },
         })
+        if (!resp.ok) {
+          console.error('[SetPassword] Activate failed:', resp.status, await resp.text().catch(() => ''))
+        }
       }
 
       // Clear restricted auth_flow cookie and get fresh session with active status
@@ -73,7 +78,8 @@ export default function SetPasswordPage() {
         return
       }
 
-      router.replace('/profile?setup=true')
+      // Hard navigate so middleware picks up the fresh session
+      window.location.assign('/profile?setup=true')
     } catch {
       setError('An unexpected error occurred. Please try again.')
     } finally {
