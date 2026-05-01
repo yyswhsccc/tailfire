@@ -3,6 +3,7 @@ import { eq, and, or, desc, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TripsService } from '../trips/trips.service'
 import { ItineraryVersionsService } from '../trips/itinerary-versions.service'
+import { OtaTripRequestsService } from '../ota/ota-trip-requests.service'
 import { SubmitFeedbackDto } from './dto/submit-feedback.dto'
 import { UpdateClientProfileDto } from './dto/update-client-profile.dto'
 
@@ -12,6 +13,7 @@ export class ClientPortalService {
     private readonly db: DatabaseService,
     private readonly tripsService: TripsService,
     private readonly itineraryVersionsService: ItineraryVersionsService,
+    private readonly otaTripRequestsService: OtaTripRequestsService,
   ) {}
 
   /**
@@ -483,6 +485,13 @@ export class ClientPortalService {
       floorPreference: contact.floorPreference,
       travelPreferences: null,
     }
+  }
+
+  /**
+   * Get all dream boards (OTA trip requests) for the authenticated contact.
+   */
+  async getMyBoards(contactId: string) {
+    return this.otaTripRequestsService.findByContact(contactId)
   }
 
   /**
