@@ -106,7 +106,7 @@ export default function ResetPasswordPage() {
       // Sign out and redirect to login after brief delay
       setTimeout(async () => {
         await supabase.auth.signOut()
-        router.push('/auth/login?message=Password updated successfully')
+        window.location.assign('/auth/login?message=password_reset_success')
       }, 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
