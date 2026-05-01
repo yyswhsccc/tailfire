@@ -211,6 +211,8 @@ export const tripGroups = pgTable('trip_groups', {
   endDate: date('end_date'),
   status: varchar('status', { length: 20 }),
   ownerId: uuid('owner_id'),
+  // Billing master: the trip in the group that receives cross-billed activity costs
+  masterTripId: uuid('master_trip_id').references(() => trips.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   createdBy: uuid('created_by'),

@@ -126,7 +126,7 @@ export const dashboardKeys = {
 // -- Hook --
 
 interface UseDashboardOverviewOptions {
-  period?: 'mtd' | 'ytd' | 'lifetime'
+  period?: 'mtd' | 'last_month' | 'ytd' | 'lifetime'
   chartYear?: number
   includeYoy?: boolean
   view?: DashboardView

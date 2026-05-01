@@ -13,13 +13,13 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const supabase = await createClient()
+  const next = searchParams.get('next') ?? '/trips'
 
   // Handle PKCE-based flows (OAuth, magic link)
   const code = searchParams.get('code')
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      const next = searchParams.get('next') ?? '/trips'
       return NextResponse.redirect(`${origin}${next}`)
     }
     return NextResponse.redirect(`${origin}/auth/login?error=callback_failed`)
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
   // No query params = likely hash fragment flow (implicit/invite with tokens in hash)
   // Return HTML page that handles hash fragments client-side
   // Hash fragments are NOT sent to server, so we serve a client-side handler
-  return new NextResponse(getHashHandlerHtml(origin), {
+  return new NextResponse(getHashHandlerHtml(origin, next), {
     headers: {
       'Content-Type': 'text/html',
       // Prevent caching of auth callback - security sensitive
@@ -74,8 +74,7 @@ export async function GET(request: Request) {
  * NOTE: If CSP is enforced, this page needs 'unsafe-inline' for scripts,
  * or refactor to use an external script with a nonce/hash.
  */
-function getHashHandlerHtml(origin: string): string {
-  const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '/api/v1').trim()
+function getHashHandlerHtml(origin: string, next: string): string {
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
   const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
 
@@ -132,11 +131,11 @@ function getHashHandlerHtml(origin: string): string {
     <p class="error" id="error" style="display: none;"></p>
   </div>
   <script type="module">
-    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+    import { createBrowserClient } from 'https://esm.sh/@supabase/ssr@0.10.2'
 
     const origin = '${origin}'
-    const apiUrl = '${apiUrl}'
-    const supabase = createClient('${supabaseUrl}', '${supabaseAnonKey}')
+    const next = '${next}'
+    const supabase = createBrowserClient('${supabaseUrl}', '${supabaseAnonKey}')
 
     async function handleCallback() {
       const hash = window.location.hash
@@ -172,7 +171,7 @@ function getHashHandlerHtml(origin: string): string {
           } else if (type === 'recovery') {
             window.location.href = origin + '/auth/reset-password'
           } else {
-            window.location.href = origin + '/trips'
+            window.location.href = origin + next
           }
         } else {
           window.location.href = origin + '/auth/login?error=invalid_callback'

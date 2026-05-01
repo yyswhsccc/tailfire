@@ -12,6 +12,7 @@ export interface AuthContext {
   agencyId: string
   role: 'admin' | 'user'
   userStatus: UserStatus
+  aal: 'aal1' | 'aal2'
 }
 
 export interface PortalAuthContext {
@@ -49,6 +50,7 @@ export interface JwtPayload {
   role: 'admin' | 'user' | 'authenticated'
   user_id?: string
   user_status?: UserStatus
+  aal?: 'aal1' | 'aal2' // Supabase MFA authenticator assurance level
   iat: number
   exp: number
   aud: string

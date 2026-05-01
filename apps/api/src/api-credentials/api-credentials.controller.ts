@@ -8,7 +8,9 @@ import {
   Param,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common'
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler'
 import { ApiTags } from '@nestjs/swagger'
 import { ApiCredentialsService } from './api-credentials.service'
 import { AdminOnly } from '../auth/decorators/admin-only.decorator'
@@ -89,9 +91,11 @@ export class ApiCredentialsController {
   /**
    * Reveal decrypted credentials
    * WARNING: Use sparingly! This exposes sensitive data.
-   * TODO: Add rate limiting and/or re-authentication requirement
+   * Rate limited: 5 reveals per minute per user.
    */
   @Post(':id/reveal')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async reveal(@Param('id') id: string): Promise<CredentialSecretsDto> {
     return this.service.reveal(id)
   }

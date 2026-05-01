@@ -43,8 +43,9 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Extract user_status from JWT claims for pending-user detection
+  // Extract user_status and aal from JWT claims
   let userStatus: string | null = null
+  let aal: 'aal1' | 'aal2' | null = null
   const { data: { session } } = await supabase.auth.getSession()
   if (session?.access_token) {
     try {
@@ -52,9 +53,16 @@ export async function updateSession(request: NextRequest) {
       if (parts[1]) {
         const claims = JSON.parse(atob(parts[1]))
         userStatus = claims.user_status ?? null
+        aal = claims.aal ?? null
       }
     } catch { /* ignore decode errors */ }
   }
 
-  return { user, userStatus, supabaseResponse }
+  // Use the fresh user object from getUser() for factor detection.
+  // getAuthenticatorAssuranceLevel() without an explicit JWT reads the cached
+  // session user/factors, which can be stale after factor deletion or MFA verify.
+  const hasMfaFactors =
+    (user?.factors ?? []).some((factor) => factor.status === 'verified')
+
+  return { user, userStatus, aal, hasMfaFactors, supabaseResponse }
 }

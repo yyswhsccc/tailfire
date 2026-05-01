@@ -17,8 +17,11 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   claims: AuthClaims | null
+  aal: 'aal1' | 'aal2' | null
+  mfaEnrolled: boolean
   isLoading: boolean
   signOut: () => Promise<void>
+  recordLogin: (accessTokenOverride?: string) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -30,7 +33,6 @@ function extractClaims(session: Session | null): AuthClaims | null {
   if (!session?.access_token) return null
 
   try {
-    // JWT structure: header.payload.signature
     const parts = session.access_token.split('.')
     if (parts.length < 2 || !parts[1]) return null
 
@@ -56,9 +58,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [claims, setClaims] = useState<AuthClaims | null>(null)
+  const [aal, setAal] = useState<'aal1' | 'aal2' | null>(null)
+  const [mfaEnrolled, setMfaEnrolled] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [loginRecorded, setLoginRecorded] = useState(false)
 
   const supabase = useMemo(() => createClient(), [])
+
+  /**
+   * Check MFA assurance level — non-blocking with timeout
+   * The Supabase SDK MFA calls can hang due to navigator lock contention.
+   */
+  const checkMfaLevel = async () => {
+    try {
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+      const check = supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      const result = await Promise.race([check, timeout])
+      if (result && 'data' in result && result.data) {
+        setAal(result.data.currentLevel)
+        setMfaEnrolled(result.data.nextLevel === 'aal2')
+      }
+    } catch {
+      // MFA check is non-critical
+    }
+  }
+
+  /**
+   * Record login — call this AFTER MFA verification (or when MFA is not required).
+   * Moved out of SIGNED_IN event to avoid recording pre-MFA logins.
+   */
+  const recordLogin = (accessTokenOverride?: string) => {
+    if (loginRecorded) return
+    const token = accessTokenOverride || session?.access_token
+    if (!token) return
+
+    setLoginRecorded(true)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
+    fetch(`${apiUrl}/user-profiles/me/record-login`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {/* non-critical */})
+  }
 
   useEffect(() => {
     // Get initial session
@@ -67,36 +107,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
       setClaims(extractClaims(session))
       setIsLoading(false)
+      // Non-blocking MFA check — don't delay app load
+      if (session) checkMfaLevel()
     })
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
       setClaims(extractClaims(session))
       setIsLoading(false)
 
-      // Record login timestamp on sign-in (fire-and-forget)
-      if (event === 'SIGNED_IN' && session?.access_token) {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
-        fetch(`${apiUrl}/user-profiles/me/record-login`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        }).catch(() => {/* non-critical */})
+      if (session) {
+        checkMfaLevel() // Non-blocking
+      } else {
+        setAal(null)
+        setMfaEnrolled(false)
+        setLoginRecorded(false)
       }
+
+      // recordLogin is called explicitly by MFA pages after aal2 verification,
+      // or by non-MFA flows. Do NOT fire here — SIGNED_IN fires before MFA.
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase])
+  }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = async () => {
     await supabase.auth.signOut()
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, claims, isLoading, signOut }}>
+    <AuthContext.Provider value={{ user, session, claims, aal, mfaEnrolled, isLoading, signOut, recordLogin }}>
       {children}
     </AuthContext.Provider>
   )

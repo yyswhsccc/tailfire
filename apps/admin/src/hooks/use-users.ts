@@ -152,3 +152,18 @@ export function useResendInvite() {
     },
   })
 }
+
+/**
+ * Reset MFA (unenroll all TOTP factors) for a user — admin only
+ */
+export function useResetUserMfa() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.post<{ success: boolean; factorsRemoved: number }>(`/users/${id}/reset-mfa`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: usersKeys.lists() })
+    },
+  })
+}

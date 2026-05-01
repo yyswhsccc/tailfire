@@ -28,6 +28,7 @@ import { ApiTags, ApiOperation, ApiConsumes } from '@nestjs/swagger'
 import { UserProfilesService } from './user-profiles.service'
 import { UpdateUserProfileDto } from './dto'
 import { AllowPendingUser } from '../auth/decorators/allow-pending.decorator'
+import { BypassMfa } from '../auth/decorators/bypass-mfa.decorator'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import { Public } from '../auth/decorators/public.decorator'
 import type { AuthContext } from '../auth/auth.types'
@@ -48,6 +49,7 @@ export class UserProfilesController {
    */
   @Get('me')
   @AllowPendingUser()
+  @BypassMfa()
   @ApiOperation({ summary: 'Get current user profile' })
   async getMyProfile(
     @GetAuthContext() auth: AuthContext,
@@ -123,6 +125,7 @@ export class UserProfilesController {
    */
   @Post('me/record-login')
   @AllowPendingUser()
+  @BypassMfa()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Record login timestamp' })
   async recordLogin(@GetAuthContext() auth: AuthContext): Promise<void> {

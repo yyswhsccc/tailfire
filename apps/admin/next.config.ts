@@ -63,9 +63,10 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Environment variables to expose to the client
+  // Environment variables to expose to the client and Edge middleware
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api/v1',
+    NEXT_PUBLIC_MFA_REQUIRED: process.env.NEXT_PUBLIC_MFA_REQUIRED || 'false',
   },
 
   // Proxy API calls through same origin to avoid CORS issues on corporate networks
@@ -75,6 +76,21 @@ const nextConfig: NextConfig = {
       {
         source: '/api/v1/:path*',
         destination: `${apiOrigin}/api/v1/:path*`,
+      },
+    ]
+  },
+
+  // Security headers (exempt /auth/callback which uses inline scripts)
+  async headers() {
+    return [
+      {
+        source: '/((?!auth/callback).*)',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        ],
       },
     ]
   },

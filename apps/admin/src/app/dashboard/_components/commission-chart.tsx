@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -42,8 +43,12 @@ export function CommissionChart({
   showProjection,
   onProjectionToggle,
 }: CommissionChartProps) {
-  const currentMonth = new Date().getMonth() + 1
-  const currentYear = new Date().getFullYear()
+  const et = useMemo(() => {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit' }).formatToParts(new Date())
+    return { month: Number(parts.find(p => p.type === 'month')!.value), year: Number(parts.find(p => p.type === 'year')!.value) }
+  }, [])
+  const currentMonth = et.month
+  const currentYear = et.year
 
   const chartData = data.map((d) => {
     const isCurrentMonth = d.month === currentMonth && year === currentYear

@@ -17,10 +17,14 @@ import {
   HttpStatus,
   ForbiddenException,
   BadRequestException,
+  NotFoundException,
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  ParseUUIDPipe,
+  Res,
 } from '@nestjs/common'
+import { eq } from 'drizzle-orm'
 import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler'
@@ -31,6 +35,8 @@ import { TripAccessService } from './trip-access.service'
 import { TripLifecycleService } from './trip-lifecycle.service'
 import { TripGroupAccessService } from './trip-group-access.service'
 import { StorageService } from './storage.service'
+import { GroupBillingService } from './group-billing.service'
+import { TripOrderService } from '../financials/trip-order.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
 import { ActivitiesService } from './activities.service'
@@ -76,6 +82,8 @@ export class TripsController {
     private readonly paymentSchedulesService: PaymentSchedulesService,
     private readonly storageService: StorageService,
     private readonly tripLifecycleService: TripLifecycleService,
+    private readonly groupBillingService: GroupBillingService,
+    private readonly tripOrderService: TripOrderService,
   ) {}
 
   /**
@@ -379,10 +387,64 @@ export class TripsController {
       startDate?: string | null
       endDate?: string | null
       status?: string
+      masterTripId?: string | null
     },
   ) {
     await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
     return this.tripsService.updateTripGroup(groupId, body, auth.agencyId, auth.userId)
+  }
+
+  /**
+   * Update billing target for an activity's pricing
+   * PATCH /trips/groups/:groupId/billing
+   *
+   * Sets which trip an activity's cost is billed to within a group.
+   */
+  @Patch('groups/:groupId/billing')
+  async updateBillingTarget(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Body() body: { activityPricingId: string; billedToTripId: string | null },
+  ) {
+    await this.tripGroupAccessService.verifyWriteAccess(groupId, auth)
+
+    if (body.billedToTripId) {
+      // Get the activity's trip via the pricing → activity → day → itinerary → trip chain
+      const [pricing] = await this.tripsService['db'].client
+        .select({ activityId: this.tripsService['db'].schema.activityPricing.activityId })
+        .from(this.tripsService['db'].schema.activityPricing)
+        .where(eq(this.tripsService['db'].schema.activityPricing.id, body.activityPricingId))
+        .limit(1)
+
+      if (!pricing) throw new NotFoundException('Activity pricing not found')
+
+      const valid = await this.groupBillingService.validateBillingTarget(
+        // We need the activity's tripId — resolve from activity chain
+        await this.resolveActivityTripId(pricing.activityId),
+        body.billedToTripId,
+      )
+      if (!valid) throw new BadRequestException('Billing target must be in the same group')
+    }
+
+    await this.tripsService['db'].client
+      .update(this.tripsService['db'].schema.activityPricing)
+      .set({ billedToTripId: body.billedToTripId, updatedAt: new Date() })
+      .where(eq(this.tripsService['db'].schema.activityPricing.id, body.activityPricingId))
+
+    return { success: true }
+  }
+
+  private async resolveActivityTripId(activityId: string): Promise<string> {
+    const db = this.tripsService['db']
+    const [row] = await db.client
+      .select({ tripId: db.schema.itineraries.tripId })
+      .from(db.schema.itineraryActivities)
+      .innerJoin(db.schema.itineraryDays, eq(db.schema.itineraryActivities.itineraryDayId, db.schema.itineraryDays.id))
+      .innerJoin(db.schema.itineraries, eq(db.schema.itineraryDays.itineraryId, db.schema.itineraries.id))
+      .where(eq(db.schema.itineraryActivities.id, activityId))
+      .limit(1)
+    if (!row?.tripId) throw new NotFoundException('Activity trip not found')
+    return row.tripId
   }
 
   /**
@@ -436,6 +498,53 @@ export class TripsController {
   ) {
     await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
     return this.tripsService.getGroupSummary(groupId, auth.agencyId)
+  }
+
+  /**
+   * Generate Group Trip Order PDF
+   * POST /trips/groups/:groupId/trip-order
+   *
+   * Aggregates all activities billed to the master trip by activity type.
+   * Returns a PDF buffer.
+   */
+  @Post('groups/:groupId/trip-order')
+  async generateGroupTripOrder(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Res({ passthrough: true }) res: any,
+  ) {
+    await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
+    const pdfBuffer = await this.tripOrderService.generateGroupTripOrder(groupId, auth.agencyId)
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="group-trip-order-${groupId}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    })
+    return pdfBuffer
+  }
+
+  /**
+   * Generate Group Manifest PDF
+   * POST /trips/groups/:groupId/manifest
+   *
+   * Lists all travelers across all sub-trips with passport, contact details.
+   */
+  @Post('groups/:groupId/manifest')
+  async generateGroupManifest(
+    @GetAuthContext() auth: AuthContext,
+    @Param('groupId') groupId: string,
+    @Res({ passthrough: true }) res: any,
+  ) {
+    await this.tripGroupAccessService.verifyReadAccess(groupId, auth)
+    const pdfBuffer = await this.tripOrderService.generateGroupManifest(groupId, auth.agencyId)
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="group-manifest-${groupId}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    })
+    return pdfBuffer
   }
 
   /**
@@ -890,7 +999,7 @@ export class TripsController {
   @Get(':id')
   async findOne(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TripResponseDto> {
     await this.tripAccessService.verifyReadAccess(id, auth)
     return this.tripsService.findOne(id)

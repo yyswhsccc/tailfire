@@ -687,6 +687,48 @@ export class UsersService {
   }
 
   /**
+   * Reset MFA for a user — unenroll all TOTP factors via Supabase Admin API.
+   */
+  async resetMfa(
+    userId: string,
+    agencyId: string,
+    actorId: string,
+  ): Promise<{ success: boolean; factorsRemoved: number }> {
+    const [user] = await this.db.client
+      .select({ id: this.db.schema.userProfiles.id, email: this.db.schema.userProfiles.email })
+      .from(this.db.schema.userProfiles)
+      .where(
+        and(
+          eq(this.db.schema.userProfiles.id, userId),
+          eq(this.db.schema.userProfiles.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!user) throw new NotFoundException(`User ${userId} not found`)
+
+    const { data: factorsData, error: listError } =
+      await this.supabaseAdmin.auth.admin.mfa.listFactors({ userId })
+
+    if (listError) {
+      this.logger.error(`Failed to list MFA factors for user ${userId}: ${listError.message}`)
+      throw new BadRequestException('Failed to list MFA factors')
+    }
+
+    const factors = factorsData?.factors ?? []
+    let removed = 0
+
+    for (const factor of factors) {
+      const { error: deleteError } =
+        await this.supabaseAdmin.auth.admin.mfa.deleteFactor({ id: factor.id, userId })
+      if (!deleteError) removed++
+    }
+
+    this.logger.log(`Admin ${actorId} reset MFA for ${user.email} — ${removed} factor(s) removed`)
+    return { success: true, factorsRemoved: removed }
+  }
+
+  /**
    * Generate a secure temporary password
    */
   private generateTempPassword(): string {

@@ -1,6 +1,8 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { serviceFetch, catalogFetch } from '@/lib/api'
+import { lookupDestination } from '@/lib/ai/tools/lookup-destination'
+import { lookupCruiseLineOrShip } from '@/lib/ai/tools/lookup-cruise-line-or-ship'
 
 // ---------------------------------------------------------------------------
 // Types for API responses — aligned with actual backend contracts
@@ -207,8 +209,9 @@ export function createTools(ctx: ToolContext = {}) {
       returnDate: z.string().optional().describe('Latest return date in YYYY-MM-DD format'),
       cruiseLine: z.string().optional().describe('Cruise line name (e.g. Royal Caribbean, Celebrity)'),
       passengers: z.number().optional().describe('Number of passengers'),
+      shipId: z.string().optional().describe('Ship UUID from lookupCruiseLineOrShip to search sailings for a specific ship'),
     }),
-    execute: async ({ destination, departureDate, returnDate, cruiseLine }) => {
+    execute: async ({ destination, departureDate, returnDate, cruiseLine, shipId }) => {
       try {
         // Resolve cruise line name → ID for proper filtering
         let cruiseLineId: string | undefined
@@ -240,6 +243,7 @@ export function createTools(ctx: ToolContext = {}) {
           ...(returnDate && { sailDateTo: returnDate }),
           ...(cruiseLineId && { cruiseLineId }),
           ...(regionId && { regionId }),
+          ...(shipId && { shipId }),
           // Only use q for text search if we couldn't resolve to IDs
           ...(!cruiseLineId && !regionId && destination && { q: destination }),
           page: 1,
@@ -559,6 +563,8 @@ export function createTools(ctx: ToolContext = {}) {
   })
 
   return {
+    lookupDestination,
+    lookupCruiseLineOrShip,
     searchFlights,
     searchHotels,
     searchCruises,
