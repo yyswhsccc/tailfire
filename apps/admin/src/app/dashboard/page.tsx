@@ -47,7 +47,10 @@ export default function DashboardPage() {
 
   // Dashboard controls
   const [period, setPeriod] = useState<'mtd' | 'ytd' | 'lifetime'>('mtd')
-  const [chartYear, setChartYear] = useState(new Date().getFullYear())
+  const [chartYear, setChartYear] = useState(() => {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric' }).formatToParts(new Date())
+    return Number(parts.find(p => p.type === 'year')!.value)
+  })
   const [includeYoy, setIncludeYoy] = useState(false)
   const [showProjection, setShowProjection] = useState(false)
   const [view, setViewState] = useState<DashboardView>('all')
