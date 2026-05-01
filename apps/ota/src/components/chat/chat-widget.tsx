@@ -12,26 +12,16 @@ import { useTripBasket } from "@/components/trip-builder/trip-basket-store";
 // ---------------------------------------------------------------------------
 // Page context ref — updated by the widget on render, read by custom fetch
 // ---------------------------------------------------------------------------
-let currentPageContext: {
-  type?: string;
-  name?: string;
-  slug?: string;
-  oneLiner?: string;
-  bestMonths?: string;
-  budgetTier?: string;
-  typicalStay?: string;
-  tags?: string;
-  highlights?: string;
-  currency?: string;
-  travelTip?: string;
-} | undefined;
+let currentPageContext: Record<string, unknown> | undefined;
+let currentBrowsingHistory: Array<{ type: string; name: string; slug: string }> = [];
 
 // Custom fetch that injects pageContext into the request body
 const contextFetch: typeof globalThis.fetch = async (input, init) => {
-  if (init?.body && typeof init.body === 'string' && currentPageContext) {
+  if (init?.body && typeof init.body === 'string') {
     try {
       const parsed = JSON.parse(init.body);
-      parsed.pageContext = currentPageContext;
+      if (currentPageContext) parsed.pageContext = currentPageContext;
+      if (currentBrowsingHistory.length > 0) parsed.browsingHistory = currentBrowsingHistory;
       init = { ...init, body: JSON.stringify(parsed) };
     } catch {
       // Not JSON — send as-is
@@ -66,31 +56,28 @@ export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const pageContext = useAiPanelStore((s) => s.pageContext);
 
-  // Sync page context to module-level ref so the custom fetch can read it
+  const browsingHistory = useAiPanelStore((s) => s.browsingHistory);
+
+  // Sync page context — pass full metadata, no flattening
   useEffect(() => {
     if (!pageContext) {
       currentPageContext = undefined;
       return;
     }
-    const meta = pageContext.metadata as Record<string, unknown> | undefined;
-    const bestMonths = meta?.bestMonths as string[] | undefined;
-    const tags = meta?.tags as string[] | undefined;
-    const highlights = meta?.highlights as string[] | undefined;
-    const travelTips = meta?.travelTips as string[] | undefined;
     currentPageContext = {
       type: pageContext.type,
       name: pageContext.name,
       slug: pageContext.slug,
-      oneLiner: (meta?.oneLiner as string) || undefined,
-      bestMonths: bestMonths?.join(', ') || undefined,
-      budgetTier: (meta?.budgetTier as string) || undefined,
-      typicalStay: (meta?.typicalStay as string) || undefined,
-      tags: tags?.join(', ') || undefined,
-      highlights: highlights?.join(', ') || undefined,
-      currency: (meta?.currencyName as string) || undefined,
-      travelTip: travelTips?.[0] || undefined,
+      metadata: pageContext.metadata,
     };
   }, [pageContext]);
+
+  // Sync browsing history — exclude current page (already in pageContext)
+  useEffect(() => {
+    currentBrowsingHistory = browsingHistory
+      .filter((e) => !(pageContext && e.type === pageContext.type && e.slug === pageContext.slug))
+      .map(({ type, name, slug }) => ({ type, name, slug }));
+  }, [browsingHistory, pageContext]);
 
   const { messages, sendMessage, status } = useChat({ transport });
 

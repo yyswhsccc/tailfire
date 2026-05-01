@@ -33,6 +33,13 @@ export default async function CruiseLineHubPage({ params }: Props) {
     notFound()
   }
 
+  const metadata: Record<string, unknown> = {
+    shipCount: line.shipCount,
+    sailingCount: line.sailingCount,
+    ships: line.ships?.map((s: { name: string }) => s.name) ?? [],
+    logoUrl: line.logoUrl,
+  }
+
   return (
     <HubScaffold
       hero={cruiseLineAdapter.heroData(line)}
@@ -41,6 +48,7 @@ export default async function CruiseLineHubPage({ params }: Props) {
       aiContext={cruiseLineAdapter.aiContext(line)}
       entityType="cruise_line"
       entitySlug={slug}
+      metadata={metadata}
     />
   )
 }
