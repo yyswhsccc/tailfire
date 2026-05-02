@@ -15,6 +15,11 @@ import { UpdateClientProfileDto } from './dto/update-client-profile.dto'
 export class ClientPortalController {
   constructor(private readonly clientPortalService: ClientPortalService) {}
 
+  @Get('my-boards')
+  async getMyBoards(@GetPortalAuth() auth: PortalAuthContext) {
+    return this.clientPortalService.getMyBoards(auth.contactId)
+  }
+
   @Get('trips')
   async getTrips(@GetPortalAuth() auth: PortalAuthContext) {
     return this.clientPortalService.getTrips(auth.contactId, auth.agencyId)

@@ -19,6 +19,7 @@ import phoenixLogo from "@/assets/phoenix-logo.svg";
 interface MobileNavProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  isAuthenticated?: boolean;
 }
 
 function MobileNavItem({ item, onClose }: { item: NavItem; onClose: () => void }) {
@@ -56,8 +57,9 @@ function MobileNavItem({ item, onClose }: { item: NavItem; onClose: () => void }
   );
 }
 
-export function MobileNav({ open, onOpenChange }: MobileNavProps) {
+export function MobileNav({ open, onOpenChange, isAuthenticated = false }: MobileNavProps) {
   const close = () => onOpenChange(false);
+  const portalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://my.phoenixvoyages.ca';
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -89,11 +91,11 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
 
         <SheetFooter className="flex flex-col gap-2">
           <a
-            href={process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://my.phoenixvoyages.ca'}
+            href={isAuthenticated ? portalUrl : `${portalUrl}/login`}
             onClick={close}
             className="flex w-full items-center justify-center rounded-lg border border-[#1A1A1A] px-6 py-2.5 text-sm font-medium text-[#1A1A1A] transition-colors hover:border-[#C59746] hover:text-[#C59746]"
           >
-            Sign In
+            {isAuthenticated ? 'My Account' : 'Sign In'}
           </a>
           <Button
             className="w-full bg-[#C59746] text-white hover:bg-[#B08638]"

@@ -13,7 +13,7 @@
 import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { eq } from 'drizzle-orm'
+import { eq, and, isNull } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { RegisterConsumerDto } from './dto/register-consumer.dto'
 
@@ -81,7 +81,7 @@ export class ConsumerAuthService {
         })
         .returning({ id: this.db.schema.contacts.id })
 
-      contactId = newContact.id
+      contactId = newContact!.id
       this.logger.log(`Created new contact ${contactId} for consumer registration`)
     } else {
       contactId = existingContact.id
@@ -124,6 +124,26 @@ export class ConsumerAuthService {
             .update(this.db.schema.contacts)
             .set({ portalUserId: existingAuthUser.id, authMethod: 'magic_link', updatedAt: new Date() })
             .where(eq(this.db.schema.contacts.id, contactId))
+
+          // Backfill contactId on any session-linked trip requests
+          if (dto.sessionId) {
+            try {
+              const { otaTripRequests } = this.db.schema
+              await this.db.client
+                .update(otaTripRequests)
+                .set({ contactId, contactEmail: email, updatedAt: new Date() })
+                .where(
+                  and(
+                    eq(otaTripRequests.sessionId, dto.sessionId),
+                    isNull(otaTripRequests.contactId),
+                  ),
+                )
+              this.logger.log(`Backfilled session ${dto.sessionId} trip requests with contactId ${contactId}`)
+            } catch (err) {
+              this.logger.warn(`Failed to backfill session trip requests: ${(err as Error).message}`)
+            }
+          }
+
           return GENERIC_RESPONSE
         }
       }
@@ -156,6 +176,25 @@ export class ConsumerAuthService {
     }
 
     this.logger.log(`Consumer registered: contact=${contactId}, authUser=${newUserId}`)
+
+    // Backfill contactId on any session-linked trip requests
+    if (dto.sessionId) {
+      try {
+        const { otaTripRequests } = this.db.schema
+        await this.db.client
+          .update(otaTripRequests)
+          .set({ contactId, contactEmail: email, updatedAt: new Date() })
+          .where(
+            and(
+              eq(otaTripRequests.sessionId, dto.sessionId),
+              isNull(otaTripRequests.contactId),
+            ),
+          )
+        this.logger.log(`Backfilled session ${dto.sessionId} trip requests with contactId ${contactId}`)
+      } catch (err) {
+        this.logger.warn(`Failed to backfill session trip requests: ${(err as Error).message}`)
+      }
+    }
 
     return GENERIC_RESPONSE
   }

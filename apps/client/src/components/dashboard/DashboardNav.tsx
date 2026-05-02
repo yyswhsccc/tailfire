@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, FileText, Home, User, ExternalLink } from "lucide-react";
+import { Briefcase, FileText, Home, User, ExternalLink, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   NavigationMenu,
@@ -13,6 +13,7 @@ import {
 
 export const PORTAL_NAV = [
   { href: "/", label: "Dashboard", icon: Home },
+  { href: "/board", label: "My Board", icon: Sparkles },
   { href: "/trips", label: "My Trips", icon: Briefcase },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/travelers", label: "My Profile", icon: User },
