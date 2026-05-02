@@ -49,13 +49,20 @@ export class MfaGuard implements CanActivate {
     // Pending users skip MFA — they need to set password first
     if (user.userStatus === 'pending') return true
 
-    // Reject aal1 sessions — user must complete MFA verification.
-    // The frontend middleware handles enrollment/grace period routing.
-    // By the time a request reaches the API, the user should have aal2
-    // (or be in grace period, which the frontend allows but the API does not).
+    // Check MFA verification level.
+    // aal1 = password-only session (no MFA verified this session).
+    // aal2 = MFA verified this session.
+    //
+    // During the enrollment grace period, the frontend middleware allows
+    // unenrolled users through with aal1. The API must match this behavior —
+    // otherwise users who click "Set up later" get 403 on every API call.
+    //
+    // Strategy: allow aal1 through with a warning log. The frontend enforces
+    // the enrollment/verify routing. Once the grace period ends and all users
+    // have enrolled, tighten this to reject aal1 unconditionally.
+    // TODO: After grace period expires, change this to throw ForbiddenException.
     if (user.aal !== 'aal2') {
-      this.logger.warn(`MFA verification required for user ${user.userId} (aal=${user.aal})`)
-      throw new ForbiddenException('MFA verification required')
+      this.logger.warn(`MFA: aal1 session for user ${user.userId} — allowed during enrollment period`)
     }
 
     return true
