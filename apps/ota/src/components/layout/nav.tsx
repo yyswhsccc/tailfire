@@ -105,10 +105,19 @@ export function Nav() {
   const portalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://my.phoenixvoyages.ca';
 
   useEffect(() => {
-    const supabase = createClient();
+    const supabase = createClient()
+
+    // Check initial state
     supabase.auth.getUser().then(({ data: { user } }) => {
-      setIsAuthenticated(!!user?.app_metadata?.portal_user);
-    });
+      setIsAuthenticated(!!user?.app_metadata?.portal_user)
+    })
+
+    // Listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session?.user?.app_metadata?.portal_user)
+    })
+
+    return () => subscription.unsubscribe()
   }, []);
 
   return (

@@ -81,7 +81,7 @@ export class ConsumerAuthService {
         })
         .returning({ id: this.db.schema.contacts.id })
 
-      contactId = newContact.id
+      contactId = newContact!.id
       this.logger.log(`Created new contact ${contactId} for consumer registration`)
     } else {
       contactId = existingContact.id

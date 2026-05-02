@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
 import { usePortalProfile, useUpdatePortalProfile } from '@/hooks/use-portal-data'
 import { Loader2, Check, Mail, Shield } from 'lucide-react'
@@ -17,14 +17,14 @@ export default function SettingsPage() {
   })
 
   // Sync form with profile data on load
-  const [initialized, setInitialized] = useState(false)
-  if (profile && !initialized) {
-    setForm({
-      preferredName: profile.preferredName || '',
-      phone: profile.phone || '',
-    })
-    setInitialized(true)
-  }
+  useEffect(() => {
+    if (profile) {
+      setForm({
+        preferredName: profile.preferredName || '',
+        phone: profile.phone || '',
+      })
+    }
+  }, [profile])
 
   async function handleSave() {
     await updateProfile.mutateAsync({

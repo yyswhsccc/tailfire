@@ -288,7 +288,12 @@ export class OtaTripRequestsService {
     const rows = await this.db.client
       .select()
       .from(otaTripRequests)
-      .where(eq(otaTripRequests.contactId, contactId))
+      .where(
+        and(
+          eq(otaTripRequests.contactId, contactId),
+          eq(otaTripRequests.status, 'draft'),
+        ),
+      )
       .orderBy(desc(otaTripRequests.updatedAt))
 
     return rows

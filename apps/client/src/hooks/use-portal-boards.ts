@@ -5,7 +5,7 @@ import { portalApi } from '@/lib/api'
 
 export interface BoardComponent {
   id: string
-  type: 'flight' | 'hotel' | 'cruise' | 'tour'
+  type: string
   data: Record<string, unknown>
   display?: {
     heroImage?: string
