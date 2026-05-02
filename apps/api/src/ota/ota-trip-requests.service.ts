@@ -16,7 +16,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, desc } from 'drizzle-orm'
 import * as crypto from 'crypto'
 import { DatabaseService } from '../db/database.service'
 import { OtaLeadsService } from './ota-leads.service'
@@ -276,6 +276,27 @@ export class OtaTripRequestsService {
           eq(otaTripRequests.status, 'draft'),
         ),
       )
+  }
+
+  // ============================================================================
+  // FIND BY CONTACT — Get all requests for an authenticated contact
+  // ============================================================================
+
+  async findByContact(contactId: string): Promise<OtaTripRequest[]> {
+    const { otaTripRequests } = this.db.schema
+
+    const rows = await this.db.client
+      .select()
+      .from(otaTripRequests)
+      .where(
+        and(
+          eq(otaTripRequests.contactId, contactId),
+          eq(otaTripRequests.status, 'draft'),
+        ),
+      )
+      .orderBy(desc(otaTripRequests.updatedAt))
+
+    return rows
   }
 
   // ============================================================================
