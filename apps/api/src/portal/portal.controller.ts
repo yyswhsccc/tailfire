@@ -24,7 +24,7 @@ import {
   BadRequestException,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
-import { ApiTags, ApiConsumes } from '@nestjs/swagger'
+import { ApiTags, ApiConsumes, ApiOperation } from '@nestjs/swagger'
 import { Public } from '../auth/decorators/public.decorator'
 import { PortalAuthGuard } from '../auth/guards/portal-auth.guard'
 import { GetPortalAuth } from '../auth/decorators/portal-auth-context.decorator'
@@ -129,6 +129,49 @@ export class PortalController {
   @Get('my-documents')
   async getDocuments(@GetPortalAuth() auth: PortalAuthContext) {
     return this.portalService.getDocumentsForPortalUser(auth.userId)
+  }
+
+  /**
+   * Upload a travel document
+   * POST /portal/my-documents
+   */
+  @Post('my-documents')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload a travel document' })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDocument(
+    @GetPortalAuth() auth: PortalAuthContext,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: /(jpg|jpeg|png|gif|webp|pdf)$/ }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @Body('documentType') documentType: string,
+  ) {
+    return this.portalService.uploadPortalDocument(
+      auth.userId,
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      documentType || 'other',
+    )
+  }
+
+  /**
+   * Delete a portal document
+   * DELETE /portal/my-documents/:id
+   */
+  @Delete('my-documents/:id')
+  @ApiOperation({ summary: 'Delete a portal document' })
+  async deleteDocument(
+    @GetPortalAuth() auth: PortalAuthContext,
+    @Param('id') documentId: string,
+  ) {
+    return this.portalService.deletePortalDocument(auth.userId, documentId)
   }
 
   // ============================================================================
