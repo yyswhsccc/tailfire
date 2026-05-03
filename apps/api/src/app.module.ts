@@ -67,6 +67,7 @@ import { DealsModule } from './deals/deals.module'
 import { AdvisorProfilesModule } from './advisor-profiles/advisor-profiles.module'
 import { OtaModule } from './ota/ota.module'
 import { ConsumerAuthModule } from './consumer-auth/consumer-auth.module'
+import { ConsumerActivityModule } from './consumer-activity/consumer-activity.module'
 import { DestinationsModule } from './destinations/destinations.module'
 
 @Module({
@@ -243,6 +244,9 @@ import { DestinationsModule } from './destinations/destinations.module'
 
     // Consumer portal authentication (magic link registration)
     ConsumerAuthModule,
+
+    // Consumer activity tracking (OTA browsing signals + purchase intelligence)
+    ConsumerActivityModule,
 
     // Destinations normalization (unified hub for ports, cities, regions)
     DestinationsModule,

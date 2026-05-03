@@ -1387,6 +1387,13 @@
       "when": 1777247996000,
       "tag": "20260427113956_add_contact_auth_method",
       "breakpoints": true
+    },
+    {
+      "idx": 198,
+      "version": "7",
+      "when": 1746273600000,
+      "tag": "20260503120000_create_consumer_activity",
+      "breakpoints": true
     }
   ]
 }

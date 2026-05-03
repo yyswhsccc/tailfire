@@ -238,3 +238,7 @@ export * from './ota-trip-requests.schema'
 
 // Contact merge support (duplicate dismissals)
 export * from './contact-duplicate-dismissals.schema'
+
+// Consumer activity tracking (OTA browsing signals + AI summaries)
+export * from './consumer-activity.schema'
+export * from './consumer-insights.schema'
