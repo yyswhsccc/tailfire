@@ -12,6 +12,7 @@ import {
   Banknote,
   Users,
   Award,
+  TrendingUp,
 } from 'lucide-react'
 import {
   Menubar,
@@ -32,6 +33,7 @@ export type ContactSection =
   | 'files'
   | 'relationships'
   | 'loyalty'
+  | 'consumer-insights'
   | 'trips'
   | 'bookings'
   | 'payments'
@@ -51,6 +53,7 @@ const navigationGroups = [
       { id: 'tasks' as const, label: 'Tasks', icon: CheckSquare },
       { id: 'relationships' as const, label: 'Relationships', icon: Users },
       { id: 'loyalty' as const, label: 'Loyalty Programs', icon: Award },
+      { id: 'consumer-insights' as const, label: 'Consumer Insights', icon: TrendingUp },
     ]
   },
   {

@@ -52,6 +52,7 @@ import { formatCurrency } from '@/lib/pricing/currency-helpers'
 import type { UpdateContactDto, TaskResponseDto, ContactPaymentTransactionDto } from '@tailfire/shared-types/api'
 import { ContactAvatar } from '@/components/contacts/contact-avatar'
 import { ContactActivityFeed } from '@/components/contacts/ContactActivityFeed'
+import { ConsumerInsights } from '@/components/contacts/ConsumerInsights'
 import { ContactNavigation, type ContactSection } from './_components/contact-navigation'
 import { ComingSoonSection } from './_components/coming-soon-section'
 import { RelationshipDialog } from './_components/relationship-dialog'
@@ -1443,6 +1444,11 @@ export default function ContactDetailPage() {
                     onAdd={handleAddLoyaltyProgram}
                     onEdit={handleEditLoyaltyProgram}
                   />
+                </div>
+              )}
+              {activeSection === 'consumer-insights' && (
+                <div className="p-6">
+                  <ConsumerInsights contactId={contactId} />
                 </div>
               )}
               {activeSection === 'notes' && (
