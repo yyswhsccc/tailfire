@@ -826,7 +826,7 @@ export class TripsController {
   @Get(':id/preview-proposal')
   async previewProposal(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.tripAccessService.verifyWriteAccess(id, auth)
     return this.tripsService.previewProposal(id)
@@ -835,7 +835,7 @@ export class TripsController {
   @Patch(':id/publish')
   async publishTrip(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.tripAccessService.verifyWriteAccess(id, auth)
     return this.tripsService.publishTrip(id, auth.userId)
@@ -852,7 +852,7 @@ export class TripsController {
   @Post(':id/publish-snapshot')
   async publishTripSnapshot(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.tripAccessService.verifyWriteAccess(id, auth)
     return this.tripsService.publishTripSnapshot(id, auth.userId)
@@ -867,7 +867,7 @@ export class TripsController {
   @Patch(':id/unpublish')
   async unpublishTrip(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.tripAccessService.verifyWriteAccess(id, auth)
     return this.tripsService.unpublishTrip(id, auth.userId)
@@ -883,7 +883,7 @@ export class TripsController {
   @Post(':id/cancel')
   async cancelTrip(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CancelTripDto,
   ): Promise<TripResponseDto> {
     await this.tripAccessService.verifyWriteAccess(id, auth)
@@ -899,7 +899,7 @@ export class TripsController {
   @Post(':id/duplicate')
   async duplicateTrip(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.tripAccessService.verifyReadAccess(id, auth)
     return this.tripsService.duplicateTrip(id, auth.userId)
@@ -917,7 +917,7 @@ export class TripsController {
   @Get(':id/locations')
   async getTripLocations(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.tripAccessService.verifyReadAccess(id, auth)
     return this.tripsService.getTripLocations(id)
@@ -934,7 +934,7 @@ export class TripsController {
   @Get(':id/booking-status')
   async getBookingStatus(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TripBookingStatusResponseDto> {
     await this.tripAccessService.verifyReadAccess(id, auth)
     return this.tripsService.getBookingStatus(id)
@@ -949,7 +949,7 @@ export class TripsController {
   @Get(':id/expected-payments')
   async getExpectedPayments(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TripExpectedPaymentDto[]> {
     await this.tripAccessService.verifyReadAccess(id, auth)
     return this.paymentSchedulesService.getExpectedPaymentsByTripId(id, auth.agencyId)
@@ -964,7 +964,7 @@ export class TripsController {
   @Get(':id/payment-transactions')
   async getPaymentTransactions(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TripPaymentTransactionDto[]> {
     await this.tripAccessService.verifyReadAccess(id, auth)
     return this.paymentSchedulesService.getTransactionsByTripId(id, auth.agencyId)
@@ -980,7 +980,7 @@ export class TripsController {
   @Get(':id/activity')
   async getActivity(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ) {
@@ -1014,7 +1014,7 @@ export class TripsController {
   @Patch(':id')
   async update(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateTripDto: UpdateTripDto,
   ): Promise<TripResponseDto> {
     await this.tripAccessService.verifyWriteAccess(id, auth)
@@ -1035,7 +1035,7 @@ export class TripsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     await this.tripAccessService.verifyWriteAccess(id, auth)
     return this.tripsService.remove(id, auth.userId)
@@ -1049,7 +1049,7 @@ export class TripsController {
   @Post(':id/restore')
   async restoreTrip(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TripResponseDto> {
     return this.tripsService.restoreTrip(id, auth.userId)
   }
@@ -1062,7 +1062,7 @@ export class TripsController {
   @Post(':id/uncancel')
   async uncancelTrip(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TripResponseDto> {
     return this.tripsService.uncancelTrip(id, auth.userId)
   }
@@ -1090,7 +1090,7 @@ export class TripsController {
   @Patch(':id/owner')
   async updateOwner(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateTripOwnerDto,
   ) {
     if (auth.role !== 'admin') {
@@ -1113,7 +1113,7 @@ export class TripsController {
   @Get(':id/packages')
   async getPackages(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') tripId: string,
+    @Param('id', ParseUUIDPipe) tripId: string,
   ): Promise<PackageResponseDto[]> {
     await this.tripAccessService.verifyReadAccess(tripId, auth)
     return this.activitiesService.findPackagesByTrip(tripId)
@@ -1129,7 +1129,7 @@ export class TripsController {
   @Get(':id/packages/totals')
   async getPackageTotals(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') tripId: string,
+    @Param('id', ParseUUIDPipe) tripId: string,
   ): Promise<TripPackageTotalsDto> {
     await this.tripAccessService.verifyReadAccess(tripId, auth)
     return this.activitiesService.getTripPackageTotals(tripId)
@@ -1145,7 +1145,7 @@ export class TripsController {
   @Get(':id/unlinked-activities')
   async getUnlinkedActivities(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') tripId: string,
+    @Param('id', ParseUUIDPipe) tripId: string,
     @Query('itineraryId') itineraryId?: string
   ): Promise<UnlinkedActivitiesResponseDto> {
     await this.tripAccessService.verifyReadAccess(tripId, auth)
@@ -1186,7 +1186,7 @@ export class TripsController {
   @HttpCode(HttpStatus.OK)
   async sendBookingConfirmation(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') tripId: string,
+    @Param('id', ParseUUIDPipe) tripId: string,
     @Body() dto: SendBookingConfirmationDto,
   ): Promise<{
     success: boolean

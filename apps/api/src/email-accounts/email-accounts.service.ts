@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, HttpException, HttpStatus, Logger } from '@nestjs/common'
+import { Injectable, BadRequestException, NotFoundException, ConflictException, HttpException, HttpStatus, Logger } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
 import { eq, and, ne, sql, desc, asc, ilike, or } from 'drizzle-orm'
@@ -60,24 +60,32 @@ export class EmailAccountsService {
       password: dto.password,
     })
 
-    const [account] = await this.db.client
-      .insert(this.db.schema.emailAccounts)
-      .values({
-        userId,
-        agencyId,
-        emailAddress: dto.emailAddress,
-        displayName: dto.displayName,
-        imapHost: domainDefaults?.imapHost ?? dto.imapHost,
-        imapPort: domainDefaults?.imapPort ?? dto.imapPort ?? 993,
-        imapTls: domainDefaults?.imapTls ?? dto.imapTls ?? true,
-        smtpHost: domainDefaults?.smtpHost ?? dto.smtpHost,
-        smtpPort: domainDefaults?.smtpPort ?? dto.smtpPort ?? 465,
-        smtpTls: domainDefaults?.smtpTls ?? dto.smtpTls ?? true,
-        credentials: encrypted,
-      })
-      .returning()
+    try {
+      const [account] = await this.db.client
+        .insert(this.db.schema.emailAccounts)
+        .values({
+          userId,
+          agencyId,
+          emailAddress: dto.emailAddress,
+          displayName: dto.displayName,
+          imapHost: domainDefaults?.imapHost ?? dto.imapHost,
+          imapPort: domainDefaults?.imapPort ?? dto.imapPort ?? 993,
+          imapTls: domainDefaults?.imapTls ?? dto.imapTls ?? true,
+          smtpHost: domainDefaults?.smtpHost ?? dto.smtpHost,
+          smtpPort: domainDefaults?.smtpPort ?? dto.smtpPort ?? 465,
+          smtpTls: domainDefaults?.smtpTls ?? dto.smtpTls ?? true,
+          credentials: encrypted,
+        })
+        .returning()
 
-    return this.formatAccountResponse(account!)
+      return this.formatAccountResponse(account!)
+    } catch (error: any) {
+      // PostgreSQL unique violation (duplicate email account)
+      if (error?.code === '23505') {
+        throw new ConflictException('Email account already exists')
+      }
+      throw error
+    }
   }
 
   async findAllForUser(userId: string): Promise<EmailAccountResponseDto[]> {

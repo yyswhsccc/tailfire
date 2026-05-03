@@ -68,12 +68,23 @@ export class ConsumerAuthService {
       // 2. No contact found — create a new lead
       const agencyId = await this.getDefaultAgencyId()
 
+      // DB has a check_has_name constraint requiring at least first_name or last_name.
+      // If neither is provided, derive first_name from email prefix.
+      let firstName = dto.firstName || null
+      const lastName = dto.lastName || null
+      if (!firstName && !lastName) {
+        const emailPrefix = email.split('@')[0] || 'Consumer'
+        // Capitalize and clean up: "jane.doe" -> "Jane"
+        firstName = emailPrefix.split(/[._-]/)[0]!
+        firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1)
+      }
+
       const [newContact] = await this.db.client
         .insert(this.db.schema.contacts)
         .values({
           email,
-          firstName: dto.firstName || null,
-          lastName: dto.lastName || null,
+          firstName,
+          lastName,
           contactType: 'lead',
           contactStatus: 'prospecting',
           authMethod: 'magic_link',
