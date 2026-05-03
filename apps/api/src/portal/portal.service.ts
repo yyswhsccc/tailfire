@@ -344,14 +344,96 @@ export class PortalService {
       .where(eq(this.db.schema.contactDocuments.contactId, contact.id))
       .orderBy(desc(this.db.schema.contactDocuments.uploadedAt))
 
-    return documents.map((doc) => ({
-      id: doc.id,
-      documentType: doc.documentType,
-      fileName: doc.fileName,
-      fileUrl: doc.fileUrl,
-      fileSize: doc.fileSize,
-      uploadedAt: doc.uploadedAt?.toISOString() ?? null,
-    }))
+    return Promise.all(
+      documents.map(async (doc) => ({
+        id: doc.id,
+        documentType: doc.documentType,
+        fileName: doc.fileName,
+        fileUrl: await this.storageService.getSignedUrl(doc.fileUrl).catch(() => doc.fileUrl),
+        fileSize: doc.fileSize,
+        uploadedAt: doc.uploadedAt?.toISOString() ?? null,
+      })),
+    )
+  }
+
+  /**
+   * Upload a travel document for the portal user's contact
+   */
+  async uploadPortalDocument(
+    portalUserId: string,
+    fileBuffer: Buffer,
+    originalName: string,
+    mimeType: string,
+    documentType: string,
+  ) {
+    const contact = await this.findContactByPortalUser(portalUserId)
+
+    const folder = `portal/${contact.id}/documents`
+    const storagePath = await this.storageService.uploadDocument(fileBuffer, folder, originalName, mimeType)
+
+    const signedUrl = await this.storageService.getSignedUrl(storagePath)
+
+    const [doc] = await this.db.client
+      .insert(this.db.schema.contactDocuments)
+      .values({
+        contactId: contact.id,
+        documentType,
+        fileName: originalName,
+        fileUrl: storagePath,
+        fileSize: fileBuffer.length,
+        uploadedAt: new Date(),
+        uploadedBy: portalUserId,
+      })
+      .returning()
+
+    this.logger.log(`Uploaded document for contact ${contact.id}: ${storagePath}`)
+
+    return {
+      id: doc!.id,
+      documentType: doc!.documentType,
+      fileName: doc!.fileName,
+      fileUrl: signedUrl,
+      fileSize: doc!.fileSize,
+      uploadedAt: doc!.uploadedAt?.toISOString() ?? null,
+    }
+  }
+
+  /**
+   * Delete a travel document owned by the portal user's contact
+   */
+  async deletePortalDocument(portalUserId: string, documentId: string) {
+    const contact = await this.findContactByPortalUser(portalUserId)
+
+    const [doc] = await this.db.client
+      .select()
+      .from(this.db.schema.contactDocuments)
+      .where(
+        and(
+          eq(this.db.schema.contactDocuments.id, documentId),
+          eq(this.db.schema.contactDocuments.contactId, contact.id),
+        ),
+      )
+      .limit(1)
+
+    if (!doc) {
+      throw new NotFoundException(`Document ${documentId} not found`)
+    }
+
+    // Delete from R2 storage
+    try {
+      await this.storageService.deleteDocument(doc.fileUrl)
+    } catch (error) {
+      this.logger.warn(`Failed to delete document from storage ${doc.fileUrl}: ${error}`)
+    }
+
+    // Delete DB record
+    await this.db.client
+      .delete(this.db.schema.contactDocuments)
+      .where(eq(this.db.schema.contactDocuments.id, documentId))
+
+    this.logger.log(`Deleted document ${documentId} for contact ${contact.id}`)
+
+    return { deleted: true }
   }
 
   // ============================================================================

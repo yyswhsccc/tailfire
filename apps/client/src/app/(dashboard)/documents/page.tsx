@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, FileText, Search, RefreshCw } from "lucide-react";
-import { usePortalDocuments } from "@/hooks/use-portal-data";
+import { ArrowLeft, Download, FileText, Search, RefreshCw, Upload, Trash2 } from "lucide-react";
+import { usePortalDocuments, useDeleteDocument } from "@/hooks/use-portal-documents";
+import { DocumentUploadModal } from "@/components/documents/document-upload-modal";
 import {
   Button,
   Card,
@@ -12,7 +13,15 @@ import {
   Skeleton,
 } from "@tailfire/ui-public";
 
-// TODO: Future feature — document upload
+const FILTER_TABS = [
+  { value: 'all', label: 'All' },
+  { value: 'passport', label: 'Passports' },
+  { value: 'visa', label: 'Visas' },
+  { value: 'travel_insurance', label: 'Insurance' },
+  { value: 'trip', label: 'Trip Docs' },
+]
+
+const TRIP_DOC_TYPES = ['contract', 'invoice', 'receipt', 'authorization']
 
 function formatFileSize(bytes: number | null): string {
   if (bytes == null || bytes === 0) return "";
@@ -32,16 +41,24 @@ function formatDate(dateStr: string | null) {
 
 export default function DocumentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [showUpload, setShowUpload] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
   const { data: documents = [], isLoading, isError, refetch } = usePortalDocuments();
+  const deleteDocument = useDeleteDocument();
 
-  const filteredDocuments = documents.filter((doc) =>
-    doc.fileName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredDocuments = documents.filter((doc) => {
+    // Search filter
+    if (searchQuery && !doc.fileName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    // Type filter
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'trip') return TRIP_DOC_TYPES.includes(doc.documentType || '');
+    return doc.documentType === activeFilter;
+  });
 
   return (
     <>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <div className="flex items-center gap-2">
             <Link href="/">
@@ -71,7 +88,30 @@ export default function DocumentsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+          <button
+            onClick={() => setShowUpload(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#C59746] px-4 py-2 text-sm font-medium text-white hover:bg-[#B08638]"
+          >
+            <Upload className="size-4" /> Upload
+          </button>
         </div>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2 mt-4 mb-8 flex-wrap">
+        {FILTER_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setActiveFilter(tab.value)}
+            className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+              activeFilter === tab.value
+                ? 'bg-[#C59746] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Content */}
@@ -111,7 +151,7 @@ export default function DocumentsPage() {
           {filteredDocuments.map((doc) => (
             <Card
               key={doc.id}
-              className="bg-phoenix-charcoal/50 border-phoenix-gold/30 hover:border-phoenix-gold/50 transition-all"
+              className="group relative bg-phoenix-charcoal/50 border-phoenix-gold/30 hover:border-phoenix-gold/50 transition-all"
             >
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
@@ -152,6 +192,16 @@ export default function DocumentsPage() {
                   </div>
                 </div>
               </CardContent>
+              <button
+                onClick={() => {
+                  if (confirm('Delete this document?')) {
+                    deleteDocument.mutate(doc.id)
+                  }
+                }}
+                className="absolute top-2 right-2 rounded-lg bg-white/80 p-1.5 text-gray-400 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+              >
+                <Trash2 className="size-4" />
+              </button>
             </Card>
           ))}
         </div>
@@ -162,10 +212,22 @@ export default function DocumentsPage() {
           <p className="text-phoenix-text-muted mt-2 max-w-md mx-auto">
             {searchQuery
               ? `No documents matching "${searchQuery}". Try adjusting your search.`
-              : "You don't have any documents yet. Your advisor will upload documents here as your trip is planned."}
+              : activeFilter !== 'all'
+              ? `No ${FILTER_TABS.find((t) => t.value === activeFilter)?.label.toLowerCase()} found.`
+              : "You don't have any documents yet. Upload one or your advisor will upload documents here as your trip is planned."}
           </p>
+          {activeFilter === 'all' && !searchQuery && (
+            <button
+              onClick={() => setShowUpload(true)}
+              className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-[#C59746] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#B08638]"
+            >
+              <Upload className="size-4" /> Upload a Document
+            </button>
+          )}
         </div>
       )}
+
+      <DocumentUploadModal isOpen={showUpload} onClose={() => setShowUpload(false)} />
     </>
   );
 }
