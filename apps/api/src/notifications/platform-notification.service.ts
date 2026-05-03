@@ -155,8 +155,11 @@ export class PlatformNotificationService {
         .limit(1)
 
       if (cursorNotification[0]) {
+        const cursorCreatedAt = cursorNotification[0].createdAt instanceof Date
+          ? cursorNotification[0].createdAt.toISOString()
+          : cursorNotification[0].createdAt
         conditions.push(
-          sql`(${this.db.schema.platformNotifications.createdAt}, ${this.db.schema.platformNotifications.id}) < (${cursorNotification[0].createdAt}, ${options.cursor})`
+          sql`(${this.db.schema.platformNotifications.createdAt}, ${this.db.schema.platformNotifications.id}) < (${cursorCreatedAt}, ${options.cursor})`
         )
       }
     }
@@ -299,7 +302,7 @@ export class PlatformNotificationService {
       .where(
         and(
           eq(this.db.schema.platformNotifications.agencyId, agencyId),
-          sql`${this.db.schema.platformNotifications.createdAt} < ${cutoffDate}`
+          sql`${this.db.schema.platformNotifications.createdAt} < ${cutoffDate.toISOString()}`
         )
       )
 

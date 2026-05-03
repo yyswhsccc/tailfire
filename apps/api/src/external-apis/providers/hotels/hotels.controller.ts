@@ -113,6 +113,23 @@ export class HotelsController {
       )
     }
 
+    // Validate cityCode format (IATA 3-letter code)
+    if (cityCode && !/^[A-Z]{3}$/i.test(cityCode)) {
+      throw new BadRequestException('cityCode must be a valid 3-letter IATA code (e.g., YOW, PAR, NYC)')
+    }
+
+    // Validate date formats if provided
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+    if (checkIn && !dateRegex.test(checkIn)) {
+      throw new BadRequestException('checkIn must be in YYYY-MM-DD format')
+    }
+    if (checkOut && !dateRegex.test(checkOut)) {
+      throw new BadRequestException('checkOut must be in YYYY-MM-DD format')
+    }
+    if (checkIn && checkOut && checkOut <= checkIn) {
+      throw new BadRequestException('checkOut must be after checkIn')
+    }
+
     this.logger.log('Hotel search request', { params })
 
     // Initialize credentials for both providers
