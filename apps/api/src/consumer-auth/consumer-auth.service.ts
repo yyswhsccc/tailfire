@@ -142,6 +142,23 @@ export class ConsumerAuthService {
             } catch (err) {
               this.logger.warn(`Failed to backfill session trip requests: ${(err as Error).message}`)
             }
+
+            // Also backfill consumer_activity events
+            try {
+              const { consumerActivity } = this.db.schema
+              await this.db.client
+                .update(consumerActivity)
+                .set({ contactId })
+                .where(
+                  and(
+                    eq(consumerActivity.sessionId, dto.sessionId),
+                    isNull(consumerActivity.contactId),
+                  ),
+                )
+              this.logger.log(`Backfilled consumer_activity for session ${dto.sessionId}`)
+            } catch (err) {
+              this.logger.warn(`Failed to backfill consumer_activity: ${(err as Error).message}`)
+            }
           }
 
           return GENERIC_RESPONSE
@@ -193,6 +210,23 @@ export class ConsumerAuthService {
         this.logger.log(`Backfilled session ${dto.sessionId} trip requests with contactId ${contactId}`)
       } catch (err) {
         this.logger.warn(`Failed to backfill session trip requests: ${(err as Error).message}`)
+      }
+
+      // Also backfill consumer_activity events
+      try {
+        const { consumerActivity } = this.db.schema
+        await this.db.client
+          .update(consumerActivity)
+          .set({ contactId })
+          .where(
+            and(
+              eq(consumerActivity.sessionId, dto.sessionId),
+              isNull(consumerActivity.contactId),
+            ),
+          )
+        this.logger.log(`Backfilled consumer_activity for session ${dto.sessionId}`)
+      } catch (err) {
+        this.logger.warn(`Failed to backfill consumer_activity: ${(err as Error).message}`)
       }
     }
 
