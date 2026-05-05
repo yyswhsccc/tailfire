@@ -4,11 +4,11 @@ import { IsString, IsOptional, IsObject } from 'class-validator'
 export class TrackEventDto {
   @ApiProperty({ description: 'OTA session ID' })
   @IsString()
-  sessionId: string
+  sessionId!: string
 
   @ApiProperty({ description: 'Event type: page_view, search, ai_chat_start, board_save' })
   @IsString()
-  event: string
+  event!: string
 
   @ApiProperty({ required: false })
   @IsOptional()

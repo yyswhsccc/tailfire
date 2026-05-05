@@ -24,7 +24,7 @@ export const consumerInsights = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    index('idx_consumer_insights_contact').on(table.contactId),
+    index('idx_consumer_insights_contact_created').on(table.contactId, table.createdAt),
   ],
 )
 

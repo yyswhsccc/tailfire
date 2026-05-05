@@ -7,7 +7,7 @@
 
 /**
  * Send a consumer activity event to the tracking API.
- * Reads the ota_session cookie and POSTs to the OTA proxy route.
+ * sessionId is injected server-side by the OTA proxy route from the ota_session cookie.
  */
 export function trackEvent(event: {
   event: string
@@ -17,19 +17,12 @@ export function trackEvent(event: {
   searchQuery?: Record<string, unknown>
   metadata?: Record<string, unknown>
 }) {
-  // Read session ID from cookie
-  const sessionId = document.cookie
-    .split('; ')
-    .find((c) => c.startsWith('ota_session='))
-    ?.split('=')[1]
-
-  if (!sessionId) return
-
   // Fire and forget — no await, no error handling
+  // sessionId is NOT sent from the browser; the proxy injects it from the httpOnly cookie
   fetch('/api/consumer-activity', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionId, ...event }),
+    body: JSON.stringify(event),
   }).catch(() => {
     // Silently ignore — tracking must never break the UI
   })

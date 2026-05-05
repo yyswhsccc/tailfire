@@ -28,7 +28,7 @@ export const consumerActivity = pgTable(
   },
   (table) => [
     index('idx_consumer_activity_session').on(table.sessionId),
-    index('idx_consumer_activity_contact').on(table.contactId),
+    index('idx_consumer_activity_contact_created').on(table.contactId, table.createdAt),
     index('idx_consumer_activity_created').on(table.createdAt),
   ],
 )

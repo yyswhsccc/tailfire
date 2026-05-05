@@ -1,6 +1,7 @@
-import { Controller, Post, Get, Body, Param, HttpCode, HttpStatus, Query } from '@nestjs/common'
-import { ApiTags, ApiOperation } from '@nestjs/swagger'
+import { Controller, Post, Get, Body, Param, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common'
+import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger'
 import { Public } from '../auth/decorators/public.decorator'
+import { OtaServiceKeyGuard } from '../ota/guards/ota-service-key.guard'
 import { ConsumerActivityService } from './consumer-activity.service'
 import { TrackEventDto } from './dto/track-event.dto'
 
@@ -11,8 +12,10 @@ export class ConsumerActivityController {
 
   @Post()
   @Public()
+  @UseGuards(OtaServiceKeyGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Track a consumer browsing event' })
+  @ApiHeader({ name: 'x-ota-service-key', description: 'OTA service-to-service key', required: true })
   async trackEvent(@Body() dto: TrackEventDto) {
     await this.service.trackEvent(dto)
   }
