@@ -183,30 +183,34 @@ export function ReportView({ slug }: ReportViewProps) {
     [],
   )
 
-  // Drilldown: clicking a supplier row filters to that supplier's individual bookings
-  const isSupplierReport = slug.includes('by-supplier')
-  const isDrilledDown = isSupplierReport && filters.supplierName && !filters.supplierName.includes(',')
+  // Generic drilldown — driven by manifest drilldown config
+  const drilldown = manifest?.drilldown
+  const isDrilledDown = drilldown ? !!filters[drilldown.filterParam] : false
+  const drilldownLabel = isDrilledDown && drilldown ? filters[drilldown.filterParam] : ''
 
   const handleRowClick = useCallback(
     (row: Record<string, unknown>) => {
-      if (!isSupplierReport) return
-      const supplierName = row.supplierName as string
-      if (supplierName && supplierName !== 'Unknown') {
-        setFilters((prev) => ({ ...prev, supplierName }))
+      if (!drilldown) return
+      const value = drilldown.useIdField
+        ? (row.id as string || row[drilldown.key] as string)
+        : (row[drilldown.key] as string)
+      if (value && value !== 'Unknown') {
+        setFilters((prev) => ({ ...prev, [drilldown.filterParam]: value }))
         setPage(1)
       }
     },
-    [isSupplierReport],
+    [drilldown],
   )
 
   const handleBackToAll = useCallback(() => {
+    if (!drilldown) return
     setFilters((prev) => {
       const next = { ...prev }
-      delete next.supplierName
+      delete next[drilldown.filterParam]
       return next
     })
     setPage(1)
-  }, [])
+  }, [drilldown])
 
   const handlePageSizeChange = useCallback(
     (value: string) => {
@@ -306,13 +310,13 @@ export function ReportView({ slug }: ReportViewProps) {
       <ReportSummaryCards items={summaryItems} />
 
       {/* Drilldown breadcrumb */}
-      {isDrilledDown && (
+      {isDrilledDown && drilldown && (
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={handleBackToAll} className="text-xs">
             <ArrowLeft className="mr-1 h-3 w-3" />
-            All Suppliers
+            {drilldown.backLabel}
           </Button>
-          <span className="text-sm font-medium">{filters.supplierName}</span>
+          <span className="text-sm font-medium">{drilldownLabel}</span>
         </div>
       )}
 
@@ -323,7 +327,7 @@ export function ReportView({ slug }: ReportViewProps) {
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSort={handleSort}
-        onRowClick={isSupplierReport && !isDrilledDown ? handleRowClick : undefined}
+        onRowClick={drilldown && !isDrilledDown ? handleRowClick : undefined}
         isLoading={isLoading}
         pageTotals={reportData?.pageTotals}
         grandTotals={reportData?.grandTotals}

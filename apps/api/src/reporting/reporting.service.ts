@@ -382,6 +382,12 @@ export class ReportingService {
       tripType: query.tripType,
       status: query.status,
       daysThreshold: query.daysThreshold,
+      clientId: query.clientId,
+      destination: query.destination,
+      pipelineStatus: query.pipelineStatus,
+      providerName: query.providerName,
+      policyType: query.policyType,
+      month: query.month,
     })
 
     // 7. Wrap in response envelope
@@ -456,6 +462,12 @@ export class ReportingService {
       tripType?: string
       status?: string
       daysThreshold?: number
+      clientId?: string
+      destination?: string
+      pipelineStatus?: string
+      providerName?: string
+      policyType?: string
+      month?: string
     },
   ): Promise<{ data: any[]; totalRows: number; summary?: Record<string, any> }> {
     const salesOpts: SalesQueryOptions = {
@@ -469,6 +481,8 @@ export class ReportingService {
       supplierName: opts.supplierName,
       tripType: opts.tripType,
       status: opts.status,
+      destination: opts.destination,
+      pipelineStatus: opts.pipelineStatus,
     }
 
     const financialOpts: FinancialQueryOptions = {
@@ -505,6 +519,7 @@ export class ReportingService {
       pageSize: opts.pageSize,
       sortBy: opts.sortBy,
       sortOrder: opts.sortOrder,
+      clientId: opts.clientId,
     }
 
     const insuranceOpts: InsuranceQueryOptions = {
@@ -515,6 +530,8 @@ export class ReportingService {
       pageSize: opts.pageSize,
       sortBy: opts.sortBy,
       sortOrder: opts.sortOrder,
+      providerName: opts.providerName,
+      policyType: opts.policyType,
     }
 
     switch (slug) {
