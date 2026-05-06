@@ -152,12 +152,15 @@ export class PortalController {
     file: Express.Multer.File,
     @Body('documentType') documentType: string,
   ) {
+    const validTypes = ['passport', 'visa', 'id_document', 'travel_insurance', 'medical', 'contract', 'invoice', 'receipt', 'authorization', 'other']
+    const safeType = validTypes.includes(documentType) ? documentType : 'other'
+
     return this.portalService.uploadPortalDocument(
       auth.userId,
       file.buffer,
       file.originalname,
       file.mimetype,
-      documentType || 'other',
+      safeType,
     )
   }
 

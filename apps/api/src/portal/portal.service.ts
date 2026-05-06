@@ -349,7 +349,7 @@ export class PortalService {
         id: doc.id,
         documentType: doc.documentType,
         fileName: doc.fileName,
-        fileUrl: await this.storageService.getSignedUrl(doc.fileUrl).catch(() => doc.fileUrl),
+        fileUrl: await this.storageService.getSignedUrl(doc.fileUrl).catch(() => null),
         fileSize: doc.fileSize,
         uploadedAt: doc.uploadedAt?.toISOString() ?? null,
       })),

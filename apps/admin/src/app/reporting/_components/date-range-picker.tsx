@@ -18,6 +18,7 @@ interface DateRangePickerProps {
 const PRESETS: { value: DatePreset; label: string }[] = [
   { value: 'mtd', label: 'MTD' },
   { value: 'ytd', label: 'YTD' },
+  { value: 'full-year', label: 'Full Year' },
   { value: 'last-month', label: 'Last Month' },
   { value: 'last-quarter', label: 'Last Quarter' },
   { value: 'q1', label: 'Q1' },
@@ -30,8 +31,12 @@ const PRESETS: { value: DatePreset; label: string }[] = [
 
 function computeDateRange(preset: DatePreset): { startDate: string; endDate: string } {
   const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth() // 0-indexed
+  // Use Eastern Time for date boundaries (consistent with dashboard)
+  const etParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now)
+  const year = Number(etParts.find(p => p.type === 'year')!.value)
+  const month = Number(etParts.find(p => p.type === 'month')!.value) - 1 // 0-indexed
 
   const fmt = (d: Date) => d.toISOString().slice(0, 10)
 
@@ -79,6 +84,11 @@ function computeDateRange(preset: DatePreset): { startDate: string; endDate: str
       return {
         startDate: fmt(new Date(year, 9, 1)),
         endDate: fmt(new Date(year, 12, 0)),
+      }
+    case 'full-year':
+      return {
+        startDate: fmt(new Date(year, 0, 1)),
+        endDate: fmt(new Date(year, 11, 31)),
       }
     case 'last-year':
       return {

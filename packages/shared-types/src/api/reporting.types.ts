@@ -17,7 +17,7 @@ export interface ReportDateRange {
   endDate: string
 }
 
-export type DatePreset = 'mtd' | 'ytd' | 'last-month' | 'last-quarter' | 'q1' | 'q2' | 'q3' | 'q4' | 'last-year' | 'custom'
+export type DatePreset = 'mtd' | 'ytd' | 'full-year' | 'last-month' | 'last-quarter' | 'q1' | 'q2' | 'q3' | 'q4' | 'last-year' | 'custom'
 
 export interface ReportQueryParams {
   startDate: string
