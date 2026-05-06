@@ -590,9 +590,17 @@ export async function querySalesBySupplier(
         : sql`total_sales_cents`
   const sortDir = options.sortOrder === 'asc' ? sql`ASC` : sql`DESC`
 
+  // Supplier join — use activity_suppliers → suppliers for real names,
+  // fall back to denormalized ap.supplier field
+  const SUPPLIER_JOIN = sql`
+    LEFT JOIN activity_suppliers asup ON asup.activity_id = ia.id AND asup.primary_supplier = true
+    LEFT JOIN suppliers s ON s.id = asup.supplier_id
+  `
+  const supplierNameExpr = sql`coalesce(s.name, ap.supplier, 'Unknown')`
+
   // Optional supplier filter
   const supplierFilter = options.supplierName
-    ? sql`AND ap.supplier ILIKE ${'%' + options.supplierName + '%'}`
+    ? sql`AND coalesce(s.name, ap.supplier) ILIKE ${'%' + options.supplierName + '%'}`
     : sql``
 
   // Count distinct supplier+type combos
@@ -600,6 +608,7 @@ export async function querySalesBySupplier(
     SELECT count(*)::int AS total_rows FROM (
       SELECT 1
       ${CANONICAL_JOIN}
+      ${SUPPLIER_JOIN}
       LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
       WHERE ${scope}
         AND t.status IN ('active', 'travelling', 'travelled')
@@ -607,7 +616,7 @@ export async function querySalesBySupplier(
         AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
         ${dateFilter}
         ${supplierFilter}
-      GROUP BY coalesce(ap.supplier, 'Unknown'), ia.activity_type
+      GROUP BY ${supplierNameExpr}, ia.activity_type
     ) sub
   `)
   const totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
@@ -615,13 +624,14 @@ export async function querySalesBySupplier(
   // Data query
   const dataResult = await db.client.execute(sql`
     SELECT
-      coalesce(ap.supplier, 'Unknown') AS supplier_name,
+      ${supplierNameExpr} AS supplier_name,
       ia.activity_type,
       count(DISTINCT ia.id)::int AS activity_count,
       coalesce(sum(ap.total_price_cents), 0)::bigint AS total_sales_cents,
       coalesce(sum(ct.gross_commission_cents), 0)::bigint AS total_commission_cents,
       coalesce(sum(ct.net_commission_cents), 0)::bigint AS net_commission_cents
     ${CANONICAL_JOIN}
+    ${SUPPLIER_JOIN}
     LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
     WHERE ${scope}
       AND t.status IN ('active', 'travelling', 'travelled')
@@ -629,7 +639,7 @@ export async function querySalesBySupplier(
       AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
       ${dateFilter}
       ${supplierFilter}
-    GROUP BY coalesce(ap.supplier, 'Unknown'), ia.activity_type
+    GROUP BY ${supplierNameExpr}, ia.activity_type
     ORDER BY ${sortCol} ${sortDir} NULLS LAST
     ${paginationSql(page, pageSize)}
   `)
@@ -647,11 +657,12 @@ export async function querySalesBySupplier(
   // Summary
   const summaryResult = await db.client.execute(sql`
     SELECT
-      count(DISTINCT coalesce(ap.supplier, 'Unknown'))::int AS supplier_count,
+      count(DISTINCT ${supplierNameExpr})::int AS supplier_count,
       count(DISTINCT ia.id)::int AS total_activities,
       coalesce(sum(ap.total_price_cents), 0)::bigint AS total_sales_cents,
       coalesce(sum(ct.gross_commission_cents), 0)::bigint AS total_commission_cents
     ${CANONICAL_JOIN}
+    ${SUPPLIER_JOIN}
     LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
     WHERE ${scope}
       AND t.status IN ('active', 'travelling', 'travelled')
