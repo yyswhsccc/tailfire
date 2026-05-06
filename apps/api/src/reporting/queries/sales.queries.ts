@@ -624,7 +624,7 @@ export async function querySalesBySupplier(
         AND ap.total_price_cents > 0
         ${dateFilter}
         ${supplierFilter}
-      GROUP BY ${supplierNameExpr}, ia.activity_type
+      GROUP BY ${supplierNameExpr}
     ) sub
   `)
   const totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
@@ -633,7 +633,6 @@ export async function querySalesBySupplier(
   const dataResult = await db.client.execute(sql`
     SELECT
       ${supplierNameExpr} AS supplier_name,
-      ia.activity_type,
       count(DISTINCT ia.id)::int AS activity_count,
       coalesce(sum(ap.total_price_cents), 0)::bigint AS total_sales_cents,
       coalesce(sum(ct.gross_commission_cents), 0)::bigint AS total_commission_cents,
@@ -648,14 +647,13 @@ export async function querySalesBySupplier(
       AND ap.total_price_cents > 0
       ${dateFilter}
       ${supplierFilter}
-    GROUP BY ${supplierNameExpr}, ia.activity_type
+    GROUP BY ${supplierNameExpr}
     ORDER BY ${sortCol} ${sortDir} NULLS LAST
     ${paginationSql(page, pageSize)}
   `)
 
   const data = (dataResult as any[]).map((row: any) => ({
     supplierName: row.supplier_name,
-    activityType: row.activity_type,
     activityCount: Number(row.activity_count ?? 0),
     totalSalesCents: Number(row.total_sales_cents ?? 0),
     commissionCents: Number(row.total_commission_cents ?? 0),
