@@ -621,6 +621,7 @@ export async function querySalesBySupplier(
         AND t.status IN ('active', 'travelling', 'travelled')
         AND ia.booking_status = 'booked'
         AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
+        AND ap.total_price_cents > 0
         ${dateFilter}
         ${supplierFilter}
       GROUP BY ${supplierNameExpr}, ia.activity_type
@@ -644,6 +645,7 @@ export async function querySalesBySupplier(
       AND t.status IN ('active', 'travelling', 'travelled')
       AND ia.booking_status = 'booked'
       AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
+      AND ap.total_price_cents > 0
       ${dateFilter}
       ${supplierFilter}
     GROUP BY ${supplierNameExpr}, ia.activity_type
@@ -675,6 +677,7 @@ export async function querySalesBySupplier(
       AND t.status IN ('active', 'travelling', 'travelled')
       AND ia.booking_status = 'booked'
       AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
+      AND ap.total_price_cents > 0
       ${dateFilter}
       ${supplierFilter}
   `)
