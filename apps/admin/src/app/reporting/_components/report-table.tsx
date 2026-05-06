@@ -25,6 +25,7 @@ interface ReportTableProps {
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
   onSort?: (columnKey: string) => void
+  onRowClick?: (row: Record<string, unknown>) => void
   isLoading?: boolean
   pageTotals?: Record<string, number | null>
   grandTotals?: Record<string, number | null>
@@ -74,6 +75,7 @@ export function ReportTable({
   sortBy,
   sortOrder,
   onSort,
+  onRowClick,
   isLoading,
   pageTotals,
   grandTotals,
@@ -159,7 +161,11 @@ export function ReportTable({
         </TableHeader>
         <TableBody>
           {data.map((row, rowIdx) => (
-            <TableRow key={rowIdx}>
+            <TableRow
+              key={rowIdx}
+              className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''}
+              onClick={() => onRowClick?.(row)}
+            >
               {columns.map((col) => {
                 const alignClass =
                   col.align === 'right'
