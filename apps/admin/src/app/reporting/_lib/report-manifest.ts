@@ -13,6 +13,17 @@ export interface ReportColumnDef {
   format?: 'currency' | 'number' | 'percent' | 'date' | 'text'
 }
 
+export interface DrilldownConfig {
+  /** The data key that acts as the drilldown identifier (e.g., 'supplierName', 'agentName') */
+  key: string
+  /** The filter param name sent to the API (e.g., 'supplierName', 'agentId') */
+  filterParam: string
+  /** Label for the breadcrumb (e.g., 'All Suppliers', 'All Agents') */
+  backLabel: string
+  /** If true, use the row's 'id' field as the filter value instead of the display value */
+  useIdField?: boolean
+}
+
 export interface ReportManifestEntry {
   columns: ReportColumnDef[]
   /** Which columns should show totals in the footer. 'sum' | 'avg' | 'count' */
@@ -23,6 +34,8 @@ export interface ReportManifestEntry {
     label: string
     format: 'currency' | 'number' | 'percent'
   }>
+  /** Drilldown configuration — makes rows clickable to show detail */
+  drilldown?: DrilldownConfig
 }
 
 // =============================================================================
@@ -81,6 +94,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   },
 
   'sales-by-agent': {
+    drilldown: { key: 'agentName', filterParam: 'agentId', backLabel: 'All Agents', useIdField: true },
     columns: [
       { key: 'agentName', label: 'Agent' },
       { key: 'bookingCount', label: 'Bookings', align: 'right', format: 'number' },
@@ -101,6 +115,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   },
 
   'sales-by-destination': {
+    drilldown: { key: 'destination', filterParam: 'destination', backLabel: 'All Destinations' },
     columns: [
       { key: 'destination', label: 'Destination' },
       { key: 'tripType', label: 'Trip Type' },
@@ -122,6 +137,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   },
 
   'booked-sales-by-supplier': {
+    drilldown: { key: 'supplierName', filterParam: 'supplierName', backLabel: 'All Suppliers' },
     columns: [
       { key: 'supplierName', label: 'Supplier' },
       { key: 'activityCount', label: 'Bookings', align: 'right', format: 'number' },
@@ -142,6 +158,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   },
 
   'departed-sales-by-supplier': {
+    drilldown: { key: 'supplierName', filterParam: 'supplierName', backLabel: 'All Suppliers' },
     columns: [
       { key: 'supplierName', label: 'Supplier' },
       { key: 'activityCount', label: 'Bookings', align: 'right', format: 'number' },
@@ -162,6 +179,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   },
 
   'booking-pipeline': {
+    drilldown: { key: 'status', filterParam: 'pipelineStatus', backLabel: 'All Statuses' },
     columns: [
       { key: 'status', label: 'Status' },
       { key: 'tripCount', label: 'Trips', align: 'right', format: 'number' },
@@ -310,6 +328,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   // ── Compliance ──────────────────────────────────────────────────────────────
 
   'ontario-gross-sales': {
+    drilldown: { key: 'month', filterParam: 'month', backLabel: 'All Months' },
     columns: [
       { key: 'month', label: 'Month' },
       { key: 'bookingCount', label: 'Bookings', align: 'right', format: 'number' },
@@ -334,6 +353,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   // ── CRM ─────────────────────────────────────────────────────────────────────
 
   'client-spending': {
+    drilldown: { key: 'clientName', filterParam: 'clientId', backLabel: 'All Clients', useIdField: true },
     columns: [
       { key: 'clientName', label: 'Client' },
       { key: 'email', label: 'Email' },
@@ -356,6 +376,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   },
 
   'repeat-clients': {
+    drilldown: { key: 'clientName', filterParam: 'clientId', backLabel: 'All Clients', useIdField: true },
     columns: [
       { key: 'clientName', label: 'Client' },
       { key: 'email', label: 'Email' },
@@ -468,6 +489,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   },
 
   'top-clients-revenue': {
+    drilldown: { key: 'clientName', filterParam: 'clientId', backLabel: 'All Clients', useIdField: true },
     columns: [
       { key: 'clientName', label: 'Client' },
       { key: 'email', label: 'Email' },
@@ -532,6 +554,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   },
 
   'insurance-revenue': {
+    drilldown: { key: 'providerName', filterParam: 'providerName', backLabel: 'All Providers' },
     columns: [
       { key: 'providerName', label: 'Provider' },
       { key: 'packageName', label: 'Package' },
@@ -555,6 +578,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   },
 
   'insurance-by-policy-type': {
+    drilldown: { key: 'policyType', filterParam: 'policyType', backLabel: 'All Policy Types' },
     columns: [
       { key: 'policyType', label: 'Policy Type' },
       { key: 'packageCount', label: 'Policies', align: 'right', format: 'number' },

@@ -54,6 +54,30 @@ export class ReportQueryDto {
   @IsInt()
   @Min(1)
   daysThreshold?: number
+
+  @IsOptional()
+  @IsString()
+  clientId?: string
+
+  @IsOptional()
+  @IsString()
+  destination?: string
+
+  @IsOptional()
+  @IsString()
+  pipelineStatus?: string
+
+  @IsOptional()
+  @IsString()
+  providerName?: string
+
+  @IsOptional()
+  @IsString()
+  policyType?: string
+
+  @IsOptional()
+  @IsString()
+  month?: string
 }
 
 export class ExportReportDto extends ReportQueryDto {

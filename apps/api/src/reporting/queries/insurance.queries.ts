@@ -32,6 +32,10 @@ export interface InsuranceQueryOptions {
   pageSize: number
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
+  /** For queryInsuranceRevenue drilldown: single provider name */
+  providerName?: string
+  /** For queryInsuranceByPolicyType drilldown: single policy type */
+  policyType?: string
 }
 
 export interface InsuranceQueryResult {
@@ -274,59 +278,127 @@ export async function queryInsuranceRevenue(
 ): Promise<InsuranceQueryResult> {
   const scope = tripScopeFilter(tripIds, agencyId)
   const { page, pageSize } = options
+  const isSingleProviderDrilldown = !!options.providerName
 
   const dateFilter = options.startDate && options.endDate
     ? sql`AND t.start_date >= ${options.startDate}::date AND t.start_date <= ${options.endDate}::date`
     : sql``
 
-  const countResult = await db.client.execute(sql`
-    SELECT count(*)::int AS total_rows FROM (
-      SELECT 1
+  const providerFilter = options.providerName
+    ? sql`AND tip.provider_name ILIKE ${'%' + options.providerName + '%'}`
+    : sql``
+
+  let data: any[]
+  let totalRows: number
+
+  if (isSingleProviderDrilldown) {
+    // Drilldown: return individual policies for a single provider
+    const countResult = await db.client.execute(sql`
+      SELECT count(*)::int AS total_rows
       FROM trip_insurance_packages tip
       JOIN trips t ON t.id = tip.trip_id
       WHERE ${scope}
         AND tip.is_active = true
         ${dateFilter}
-      GROUP BY tip.provider_name, tip.package_name
-    ) sub
-  `)
-  const totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+        ${providerFilter}
+    `)
+    totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
 
-  const dataResult = await db.client.execute(sql`
-    SELECT
-      tip.provider_name,
-      tip.package_name,
-      tip.policy_type,
-      count(DISTINCT tip.id)::int AS package_count,
-      coalesce(sum(tip.premium_cents), 0)::bigint AS total_premium_cents,
-      coalesce(sum(tip.coverage_amount_cents), 0)::bigint AS total_coverage_cents,
-      coalesce(selections.traveler_count, 0)::int AS traveler_selections
-    FROM trip_insurance_packages tip
-    JOIN trips t ON t.id = tip.trip_id
-    LEFT JOIN LATERAL (
-      SELECT count(DISTINCT tti.id) AS traveler_count
-      FROM trip_traveler_insurance tti
-      WHERE tti.selected_package_id = tip.id
-        AND tti.status = 'selected_package'
-    ) selections ON true
-    WHERE ${scope}
-      AND tip.is_active = true
-      ${dateFilter}
-    GROUP BY tip.provider_name, tip.package_name, tip.policy_type, selections.traveler_count
-    ORDER BY total_premium_cents DESC NULLS LAST
-    ${paginationSql(page, pageSize)}
-  `)
+    const detailResult = await db.client.execute(sql`
+      SELECT
+        tip.id AS package_id,
+        tip.provider_name,
+        tip.package_name,
+        tip.policy_type,
+        tip.premium_cents::bigint AS premium_cents,
+        tip.coverage_amount_cents::bigint AS coverage_amount_cents,
+        tip.deductible_cents::bigint AS deductible_cents,
+        t.id AS trip_id,
+        t.name AS trip_name,
+        t.reference_number,
+        t.start_date AS departure_date,
+        (
+          SELECT count(*)::int
+          FROM trip_traveler_insurance tti
+          WHERE tti.selected_package_id = tip.id
+            AND tti.status = 'selected_package'
+        ) AS traveler_count
+      FROM trip_insurance_packages tip
+      JOIN trips t ON t.id = tip.trip_id
+      WHERE ${scope}
+        AND tip.is_active = true
+        ${dateFilter}
+        ${providerFilter}
+      ORDER BY tip.premium_cents DESC NULLS LAST
+      ${paginationSql(page, pageSize)}
+    `)
 
-  const data = (dataResult as any[]).map((row: any) => ({
-    providerName: row.provider_name,
-    packageName: row.package_name,
-    policyType: row.policy_type,
-    packageCount: Number(row.package_count ?? 0),
-    travelerCount: Number(row.traveler_selections ?? 0),
-    totalPremiumCents: Number(row.total_premium_cents ?? 0),
-    totalCoverageCents: Number(row.total_coverage_cents ?? 0),
-    currency: 'CAD',
-  }))
+    data = (detailResult as any[]).map((row: any) => ({
+      packageId: row.package_id,
+      providerName: row.provider_name,
+      packageName: row.package_name,
+      policyType: row.policy_type,
+      tripId: row.trip_id,
+      tripName: row.trip_name,
+      referenceNumber: row.reference_number,
+      departureDate: row.departure_date ? String(row.departure_date) : null,
+      premiumCents: Number(row.premium_cents ?? 0),
+      coverageAmountCents: Number(row.coverage_amount_cents ?? 0),
+      deductibleCents: Number(row.deductible_cents ?? 0),
+      travelerCount: Number(row.traveler_count ?? 0),
+      currency: 'CAD',
+    }))
+  } else {
+    // Grouped mode: aggregate by provider + package
+    const countResult = await db.client.execute(sql`
+      SELECT count(*)::int AS total_rows FROM (
+        SELECT 1
+        FROM trip_insurance_packages tip
+        JOIN trips t ON t.id = tip.trip_id
+        WHERE ${scope}
+          AND tip.is_active = true
+          ${dateFilter}
+        GROUP BY tip.provider_name, tip.package_name
+      ) sub
+    `)
+    totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+
+    const dataResult = await db.client.execute(sql`
+      SELECT
+        tip.provider_name,
+        tip.package_name,
+        tip.policy_type,
+        count(DISTINCT tip.id)::int AS package_count,
+        coalesce(sum(tip.premium_cents), 0)::bigint AS total_premium_cents,
+        coalesce(sum(tip.coverage_amount_cents), 0)::bigint AS total_coverage_cents,
+        coalesce(selections.traveler_count, 0)::int AS traveler_selections
+      FROM trip_insurance_packages tip
+      JOIN trips t ON t.id = tip.trip_id
+      LEFT JOIN LATERAL (
+        SELECT count(DISTINCT tti.id) AS traveler_count
+        FROM trip_traveler_insurance tti
+        WHERE tti.selected_package_id = tip.id
+          AND tti.status = 'selected_package'
+      ) selections ON true
+      WHERE ${scope}
+        AND tip.is_active = true
+        ${dateFilter}
+      GROUP BY tip.provider_name, tip.package_name, tip.policy_type, selections.traveler_count
+      ORDER BY total_premium_cents DESC NULLS LAST
+      ${paginationSql(page, pageSize)}
+    `)
+
+    data = (dataResult as any[]).map((row: any) => ({
+      providerName: row.provider_name,
+      packageName: row.package_name,
+      policyType: row.policy_type,
+      packageCount: Number(row.package_count ?? 0),
+      travelerCount: Number(row.traveler_selections ?? 0),
+      totalPremiumCents: Number(row.total_premium_cents ?? 0),
+      totalCoverageCents: Number(row.total_coverage_cents ?? 0),
+      currency: 'CAD',
+    }))
+  }
 
   // Summary
   const summaryResult = await db.client.execute(sql`
@@ -345,6 +417,7 @@ export async function queryInsuranceRevenue(
     WHERE ${scope}
       AND tip.is_active = true
       ${dateFilter}
+      ${providerFilter}
   `)
   const summaryRow = (summaryResult as any[])[0]
 
@@ -375,61 +448,129 @@ export async function queryInsuranceByPolicyType(
 ): Promise<InsuranceQueryResult> {
   const scope = tripScopeFilter(tripIds, agencyId)
   const { page, pageSize } = options
+  const isSinglePolicyTypeDrilldown = !!options.policyType
 
   const dateFilter = options.startDate && options.endDate
     ? sql`AND t.start_date >= ${options.startDate}::date AND t.start_date <= ${options.endDate}::date`
     : sql``
 
-  const countResult = await db.client.execute(sql`
-    SELECT count(DISTINCT tip.policy_type)::int AS total_rows
-    FROM trip_insurance_packages tip
-    JOIN trips t ON t.id = tip.trip_id
-    WHERE ${scope}
-      AND tip.is_active = true
-      ${dateFilter}
-  `)
-  const totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+  const policyTypeFilter = options.policyType
+    ? sql`AND tip.policy_type = ${options.policyType}`
+    : sql``
 
-  const dataResult = await db.client.execute(sql`
-    SELECT
-      tip.policy_type,
-      count(DISTINCT tip.id)::int AS package_count,
-      coalesce(sum(tip.premium_cents), 0)::bigint AS total_premium_cents,
-      CASE
-        WHEN count(DISTINCT tip.id) > 0
-        THEN (coalesce(sum(tip.premium_cents), 0) / count(DISTINCT tip.id))::bigint
-        ELSE 0
-      END AS avg_premium_cents,
-      coalesce(traveler_counts.traveler_count, 0)::int AS traveler_count
-    FROM trip_insurance_packages tip
-    JOIN trips t ON t.id = tip.trip_id
-    LEFT JOIN LATERAL (
-      SELECT count(DISTINCT tti.id) AS traveler_count
-      FROM trip_traveler_insurance tti
-      WHERE tti.selected_package_id IN (
-        SELECT tip2.id FROM trip_insurance_packages tip2
-        WHERE tip2.policy_type = tip.policy_type
-          AND tip2.trip_id = tip.trip_id
-      )
-      AND tti.status = 'selected_package'
-    ) traveler_counts ON true
-    WHERE ${scope}
-      AND tip.is_active = true
-      ${dateFilter}
-    GROUP BY tip.policy_type, traveler_counts.traveler_count
-    ORDER BY total_premium_cents DESC NULLS LAST
-    ${paginationSql(page, pageSize)}
-  `)
+  let data: any[]
+  let totalRows: number
 
-  const data = (dataResult as any[]).map((row: any) => ({
-    policyType: row.policy_type,
-    packageCount: Number(row.package_count ?? 0),
-    travelerCount: Number(row.traveler_count ?? 0),
-    totalPremiumCents: Number(row.total_premium_cents ?? 0),
-    avgPremiumCents: Number(row.avg_premium_cents ?? 0),
-    penetrationRate: 0,
-    currency: 'CAD',
-  }))
+  if (isSinglePolicyTypeDrilldown) {
+    // Drilldown: return individual policies of a single type
+    const countResult = await db.client.execute(sql`
+      SELECT count(*)::int AS total_rows
+      FROM trip_insurance_packages tip
+      JOIN trips t ON t.id = tip.trip_id
+      WHERE ${scope}
+        AND tip.is_active = true
+        ${dateFilter}
+        ${policyTypeFilter}
+    `)
+    totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+
+    const detailResult = await db.client.execute(sql`
+      SELECT
+        tip.id AS package_id,
+        tip.provider_name,
+        tip.package_name,
+        tip.policy_type,
+        tip.premium_cents::bigint AS premium_cents,
+        tip.coverage_amount_cents::bigint AS coverage_amount_cents,
+        tip.deductible_cents::bigint AS deductible_cents,
+        t.id AS trip_id,
+        t.name AS trip_name,
+        t.reference_number,
+        t.start_date AS departure_date,
+        (
+          SELECT count(*)::int
+          FROM trip_traveler_insurance tti
+          WHERE tti.selected_package_id = tip.id
+            AND tti.status = 'selected_package'
+        ) AS traveler_count
+      FROM trip_insurance_packages tip
+      JOIN trips t ON t.id = tip.trip_id
+      WHERE ${scope}
+        AND tip.is_active = true
+        ${dateFilter}
+        ${policyTypeFilter}
+      ORDER BY tip.premium_cents DESC NULLS LAST
+      ${paginationSql(page, pageSize)}
+    `)
+
+    data = (detailResult as any[]).map((row: any) => ({
+      packageId: row.package_id,
+      providerName: row.provider_name,
+      packageName: row.package_name,
+      policyType: row.policy_type,
+      tripId: row.trip_id,
+      tripName: row.trip_name,
+      referenceNumber: row.reference_number,
+      departureDate: row.departure_date ? String(row.departure_date) : null,
+      premiumCents: Number(row.premium_cents ?? 0),
+      coverageAmountCents: Number(row.coverage_amount_cents ?? 0),
+      deductibleCents: Number(row.deductible_cents ?? 0),
+      travelerCount: Number(row.traveler_count ?? 0),
+      currency: 'CAD',
+    }))
+  } else {
+    // Grouped mode: aggregate by policy type
+    const countResult = await db.client.execute(sql`
+      SELECT count(DISTINCT tip.policy_type)::int AS total_rows
+      FROM trip_insurance_packages tip
+      JOIN trips t ON t.id = tip.trip_id
+      WHERE ${scope}
+        AND tip.is_active = true
+        ${dateFilter}
+    `)
+    totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+
+    const dataResult = await db.client.execute(sql`
+      SELECT
+        tip.policy_type,
+        count(DISTINCT tip.id)::int AS package_count,
+        coalesce(sum(tip.premium_cents), 0)::bigint AS total_premium_cents,
+        CASE
+          WHEN count(DISTINCT tip.id) > 0
+          THEN (coalesce(sum(tip.premium_cents), 0) / count(DISTINCT tip.id))::bigint
+          ELSE 0
+        END AS avg_premium_cents,
+        coalesce(traveler_counts.traveler_count, 0)::int AS traveler_count
+      FROM trip_insurance_packages tip
+      JOIN trips t ON t.id = tip.trip_id
+      LEFT JOIN LATERAL (
+        SELECT count(DISTINCT tti.id) AS traveler_count
+        FROM trip_traveler_insurance tti
+        WHERE tti.selected_package_id IN (
+          SELECT tip2.id FROM trip_insurance_packages tip2
+          WHERE tip2.policy_type = tip.policy_type
+            AND tip2.trip_id = tip.trip_id
+        )
+        AND tti.status = 'selected_package'
+      ) traveler_counts ON true
+      WHERE ${scope}
+        AND tip.is_active = true
+        ${dateFilter}
+      GROUP BY tip.policy_type, traveler_counts.traveler_count
+      ORDER BY total_premium_cents DESC NULLS LAST
+      ${paginationSql(page, pageSize)}
+    `)
+
+    data = (dataResult as any[]).map((row: any) => ({
+      policyType: row.policy_type,
+      packageCount: Number(row.package_count ?? 0),
+      travelerCount: Number(row.traveler_count ?? 0),
+      totalPremiumCents: Number(row.total_premium_cents ?? 0),
+      avgPremiumCents: Number(row.avg_premium_cents ?? 0),
+      penetrationRate: 0,
+      currency: 'CAD',
+    }))
+  }
 
   return { data, totalRows }
 }

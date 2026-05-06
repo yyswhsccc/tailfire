@@ -33,6 +33,8 @@ export interface CrmQueryOptions {
   pageSize: number
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
+  /** For drilldown: show individual trips for a single client */
+  clientId?: string
 }
 
 export interface CrmQueryResult {
@@ -86,6 +88,11 @@ export async function queryClientSpending(
     ? sql`t.agency_id = ${agencyId}`
     : sql`t.id IN ${sqlIdList(tripIds)}`
   const { page, pageSize } = options
+  const isSingleClientDrilldown = !!options.clientId
+
+  const clientFilter = options.clientId
+    ? sql`AND c.id = ${options.clientId}`
+    : sql``
 
   const sortCol = options.sortBy === 'totalSpendCents'
     ? sql`total_spend_cents`
@@ -96,65 +103,128 @@ export async function queryClientSpending(
         : sql`total_spend_cents`
   const sortDir = options.sortOrder === 'asc' ? sql`ASC` : sql`DESC`
 
-  const countResult = await db.client.execute(sql`
-    SELECT count(DISTINCT c.id)::int AS total_rows
-    FROM contacts c
-    JOIN trip_travelers tt ON tt.contact_id = c.id
-    JOIN trips t ON t.id = tt.trip_id
-    WHERE ${cScope}
-      AND ${tScope}
-      AND t.status IN ('active', 'travelling', 'travelled')
-  `)
-  const totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+  let data: any[]
+  let totalRows: number
 
-  const dataResult = await db.client.execute(sql`
-    SELECT
-      c.id AS contact_id,
-      c.first_name,
-      c.last_name,
-      c.email,
-      count(DISTINCT t.id)::int AS trip_count,
-      coalesce(sum(ap.total_price_cents), 0)::bigint AS total_spend_cents,
-      CASE
-        WHEN count(DISTINCT t.id) > 0
-        THEN (coalesce(sum(ap.total_price_cents), 0) / count(DISTINCT t.id))::bigint
-        ELSE 0
-      END AS avg_trip_value_cents,
-      min(t.start_date) AS first_trip_date,
-      max(t.start_date) AS last_trip_date
-    FROM contacts c
-    JOIN trip_travelers tt ON tt.contact_id = c.id
-    JOIN trips t ON t.id = tt.trip_id
-    LEFT JOIN (
+  if (isSingleClientDrilldown) {
+    // Drilldown: return individual trips for a single client
+    const countResult = await db.client.execute(sql`
+      SELECT count(DISTINCT t.id)::int AS total_rows
+      FROM contacts c
+      JOIN trip_travelers tt ON tt.contact_id = c.id
+      JOIN trips t ON t.id = tt.trip_id
+      WHERE ${cScope}
+        AND ${tScope}
+        AND t.status IN ('active', 'travelling', 'travelled')
+        ${clientFilter}
+    `)
+    totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+
+    const detailResult = await db.client.execute(sql`
       SELECT
-        COALESCE(itin2.trip_id, ia2.trip_id) AS trip_id,
-        ap2.total_price_cents
-      FROM activity_pricing ap2
-      JOIN itinerary_activities ia2 ON ia2.id = ap2.activity_id
-      LEFT JOIN itinerary_days iday2 ON iday2.id = ia2.itinerary_day_id
-      LEFT JOIN itineraries itin2 ON itin2.id = iday2.itinerary_id
-      WHERE ia2.booking_status = 'booked'
-        AND ia2.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
-    ) ap ON ap.trip_id = t.id
-    WHERE ${cScope}
-      AND ${tScope}
-      AND t.status IN ('active', 'travelling', 'travelled')
-    GROUP BY c.id, c.first_name, c.last_name, c.email
-    ORDER BY ${sortCol} ${sortDir} NULLS LAST
-    ${paginationSql(page, pageSize)}
-  `)
+        c.id AS contact_id,
+        c.first_name,
+        c.last_name,
+        t.id AS trip_id,
+        t.name AS trip_name,
+        t.reference_number,
+        t.start_date AS departure_date,
+        t.end_date,
+        coalesce(ap.trip_total_cents, 0)::bigint AS total_spend_cents
+      FROM contacts c
+      JOIN trip_travelers tt ON tt.contact_id = c.id
+      JOIN trips t ON t.id = tt.trip_id
+      LEFT JOIN LATERAL (
+        SELECT coalesce(sum(ap2.total_price_cents), 0) AS trip_total_cents
+        FROM activity_pricing ap2
+        JOIN itinerary_activities ia2 ON ia2.id = ap2.activity_id
+        LEFT JOIN itinerary_days iday2 ON iday2.id = ia2.itinerary_day_id
+        LEFT JOIN itineraries itin2 ON itin2.id = iday2.itinerary_id
+        WHERE COALESCE(itin2.trip_id, ia2.trip_id) = t.id
+          AND ia2.booking_status = 'booked'
+          AND ia2.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
+      ) ap ON true
+      WHERE ${cScope}
+        AND ${tScope}
+        AND t.status IN ('active', 'travelling', 'travelled')
+        ${clientFilter}
+      ORDER BY t.start_date DESC NULLS LAST
+      ${paginationSql(page, pageSize)}
+    `)
 
-  const data = (dataResult as any[]).map((row: any) => ({
-    contactId: row.contact_id,
-    clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
-    email: row.email,
-    tripCount: Number(row.trip_count ?? 0),
-    totalSpendCents: Number(row.total_spend_cents ?? 0),
-    avgTripValueCents: Number(row.avg_trip_value_cents ?? 0),
-    firstTripDate: row.first_trip_date ? String(row.first_trip_date) : null,
-    lastTripDate: row.last_trip_date ? String(row.last_trip_date) : null,
-    currency: 'CAD',
-  }))
+    data = (detailResult as any[]).map((row: any) => ({
+      contactId: row.contact_id,
+      clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
+      tripId: row.trip_id,
+      tripName: row.trip_name,
+      referenceNumber: row.reference_number,
+      departureDate: row.departure_date ? String(row.departure_date) : null,
+      endDate: row.end_date ? String(row.end_date) : null,
+      totalSpendCents: Number(row.total_spend_cents ?? 0),
+      currency: 'CAD',
+    }))
+  } else {
+    // Grouped mode: aggregate by client
+    const countResult = await db.client.execute(sql`
+      SELECT count(DISTINCT c.id)::int AS total_rows
+      FROM contacts c
+      JOIN trip_travelers tt ON tt.contact_id = c.id
+      JOIN trips t ON t.id = tt.trip_id
+      WHERE ${cScope}
+        AND ${tScope}
+        AND t.status IN ('active', 'travelling', 'travelled')
+    `)
+    totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+
+    const dataResult = await db.client.execute(sql`
+      SELECT
+        c.id AS contact_id,
+        c.first_name,
+        c.last_name,
+        c.email,
+        count(DISTINCT t.id)::int AS trip_count,
+        coalesce(sum(ap.total_price_cents), 0)::bigint AS total_spend_cents,
+        CASE
+          WHEN count(DISTINCT t.id) > 0
+          THEN (coalesce(sum(ap.total_price_cents), 0) / count(DISTINCT t.id))::bigint
+          ELSE 0
+        END AS avg_trip_value_cents,
+        min(t.start_date) AS first_trip_date,
+        max(t.start_date) AS last_trip_date
+      FROM contacts c
+      JOIN trip_travelers tt ON tt.contact_id = c.id
+      JOIN trips t ON t.id = tt.trip_id
+      LEFT JOIN (
+        SELECT
+          COALESCE(itin2.trip_id, ia2.trip_id) AS trip_id,
+          ap2.total_price_cents
+        FROM activity_pricing ap2
+        JOIN itinerary_activities ia2 ON ia2.id = ap2.activity_id
+        LEFT JOIN itinerary_days iday2 ON iday2.id = ia2.itinerary_day_id
+        LEFT JOIN itineraries itin2 ON itin2.id = iday2.itinerary_id
+        WHERE ia2.booking_status = 'booked'
+          AND ia2.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
+      ) ap ON ap.trip_id = t.id
+      WHERE ${cScope}
+        AND ${tScope}
+        AND t.status IN ('active', 'travelling', 'travelled')
+      GROUP BY c.id, c.first_name, c.last_name, c.email
+      ORDER BY ${sortCol} ${sortDir} NULLS LAST
+      ${paginationSql(page, pageSize)}
+    `)
+
+    data = (dataResult as any[]).map((row: any) => ({
+      contactId: row.contact_id,
+      clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
+      email: row.email,
+      tripCount: Number(row.trip_count ?? 0),
+      totalSpendCents: Number(row.total_spend_cents ?? 0),
+      avgTripValueCents: Number(row.avg_trip_value_cents ?? 0),
+      firstTripDate: row.first_trip_date ? String(row.first_trip_date) : null,
+      lastTripDate: row.last_trip_date ? String(row.last_trip_date) : null,
+      currency: 'CAD',
+    }))
+  }
 
   return { data, totalRows }
 }
@@ -177,72 +247,140 @@ export async function queryRepeatClients(
     ? sql`t.agency_id = ${agencyId}`
     : sql`t.id IN ${sqlIdList(tripIds)}`
   const { page, pageSize } = options
+  const isSingleClientDrilldown = !!options.clientId
 
-  const countResult = await db.client.execute(sql`
-    SELECT count(*)::int AS total_rows FROM (
-      SELECT 1
+  const clientFilter = options.clientId
+    ? sql`AND c.id = ${options.clientId}`
+    : sql``
+
+  let data: any[]
+  let totalRows: number
+
+  if (isSingleClientDrilldown) {
+    // Drilldown: return individual trips for a single repeat client
+    const countResult = await db.client.execute(sql`
+      SELECT count(DISTINCT t.id)::int AS total_rows
       FROM contacts c
       JOIN trip_travelers tt ON tt.contact_id = c.id
       JOIN trips t ON t.id = tt.trip_id
       WHERE ${cScope}
         AND ${tScope}
         AND t.status IN ('active', 'travelling', 'travelled')
-      GROUP BY c.id
-      HAVING count(DISTINCT t.id) >= 2
-    ) sub
-  `)
-  const totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+        ${clientFilter}
+    `)
+    totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
 
-  const dataResult = await db.client.execute(sql`
-    WITH contact_trips AS (
+    const detailResult = await db.client.execute(sql`
       SELECT
         c.id AS contact_id,
         c.first_name,
         c.last_name,
-        c.email,
         t.id AS trip_id,
-        t.start_date,
-        ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY t.start_date) AS rn,
-        LAG(t.start_date) OVER (PARTITION BY c.id ORDER BY t.start_date) AS prev_start_date
+        t.name AS trip_name,
+        t.reference_number,
+        t.start_date AS departure_date,
+        t.end_date,
+        coalesce(ap.trip_total_cents, 0)::bigint AS total_spend_cents
       FROM contacts c
       JOIN trip_travelers tt ON tt.contact_id = c.id
       JOIN trips t ON t.id = tt.trip_id
+      LEFT JOIN LATERAL (
+        SELECT coalesce(sum(ap2.total_price_cents), 0) AS trip_total_cents
+        FROM activity_pricing ap2
+        JOIN itinerary_activities ia2 ON ia2.id = ap2.activity_id
+        LEFT JOIN itinerary_days iday2 ON iday2.id = ia2.itinerary_day_id
+        LEFT JOIN itineraries itin2 ON itin2.id = iday2.itinerary_id
+        WHERE COALESCE(itin2.trip_id, ia2.trip_id) = t.id
+          AND ia2.booking_status = 'booked'
+          AND ia2.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
+      ) ap ON true
       WHERE ${cScope}
         AND ${tScope}
         AND t.status IN ('active', 'travelling', 'travelled')
-    )
-    SELECT
-      contact_id,
-      first_name,
-      last_name,
-      email,
-      count(DISTINCT trip_id)::int AS trip_count,
-      round(avg(
-        CASE WHEN prev_start_date IS NOT NULL
-          THEN (start_date::date - prev_start_date::date)
-          ELSE NULL
-        END
-      ))::int AS avg_days_between_trips,
-      min(start_date) AS first_trip_date,
-      max(start_date) AS last_trip_date
-    FROM contact_trips
-    GROUP BY contact_id, first_name, last_name, email
-    HAVING count(DISTINCT trip_id) >= 2
-    ORDER BY trip_count DESC, last_name ASC
-    ${paginationSql(page, pageSize)}
-  `)
+        ${clientFilter}
+      ORDER BY t.start_date DESC NULLS LAST
+      ${paginationSql(page, pageSize)}
+    `)
 
-  const data = (dataResult as any[]).map((row: any) => ({
-    contactId: row.contact_id,
-    clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
-    email: row.email,
-    tripCount: Number(row.trip_count ?? 0),
-    totalSpendCents: 0,
-    avgDaysBetweenTrips: row.avg_days_between_trips != null ? Number(row.avg_days_between_trips) : null,
-    firstTripDate: row.first_trip_date ? String(row.first_trip_date) : null,
-    lastTripDate: row.last_trip_date ? String(row.last_trip_date) : null,
-    currency: 'CAD',
-  }))
+    data = (detailResult as any[]).map((row: any) => ({
+      contactId: row.contact_id,
+      clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
+      tripId: row.trip_id,
+      tripName: row.trip_name,
+      referenceNumber: row.reference_number,
+      departureDate: row.departure_date ? String(row.departure_date) : null,
+      endDate: row.end_date ? String(row.end_date) : null,
+      totalSpendCents: Number(row.total_spend_cents ?? 0),
+      currency: 'CAD',
+    }))
+  } else {
+    // Grouped mode: aggregate repeat clients
+    const countResult = await db.client.execute(sql`
+      SELECT count(*)::int AS total_rows FROM (
+        SELECT 1
+        FROM contacts c
+        JOIN trip_travelers tt ON tt.contact_id = c.id
+        JOIN trips t ON t.id = tt.trip_id
+        WHERE ${cScope}
+          AND ${tScope}
+          AND t.status IN ('active', 'travelling', 'travelled')
+        GROUP BY c.id
+        HAVING count(DISTINCT t.id) >= 2
+      ) sub
+    `)
+    totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+
+    const dataResult = await db.client.execute(sql`
+      WITH contact_trips AS (
+        SELECT
+          c.id AS contact_id,
+          c.first_name,
+          c.last_name,
+          c.email,
+          t.id AS trip_id,
+          t.start_date,
+          ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY t.start_date) AS rn,
+          LAG(t.start_date) OVER (PARTITION BY c.id ORDER BY t.start_date) AS prev_start_date
+        FROM contacts c
+        JOIN trip_travelers tt ON tt.contact_id = c.id
+        JOIN trips t ON t.id = tt.trip_id
+        WHERE ${cScope}
+          AND ${tScope}
+          AND t.status IN ('active', 'travelling', 'travelled')
+      )
+      SELECT
+        contact_id,
+        first_name,
+        last_name,
+        email,
+        count(DISTINCT trip_id)::int AS trip_count,
+        round(avg(
+          CASE WHEN prev_start_date IS NOT NULL
+            THEN (start_date::date - prev_start_date::date)
+            ELSE NULL
+          END
+        ))::int AS avg_days_between_trips,
+        min(start_date) AS first_trip_date,
+        max(start_date) AS last_trip_date
+      FROM contact_trips
+      GROUP BY contact_id, first_name, last_name, email
+      HAVING count(DISTINCT trip_id) >= 2
+      ORDER BY trip_count DESC, last_name ASC
+      ${paginationSql(page, pageSize)}
+    `)
+
+    data = (dataResult as any[]).map((row: any) => ({
+      contactId: row.contact_id,
+      clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
+      email: row.email,
+      tripCount: Number(row.trip_count ?? 0),
+      totalSpendCents: 0,
+      avgDaysBetweenTrips: row.avg_days_between_trips != null ? Number(row.avg_days_between_trips) : null,
+      firstTripDate: row.first_trip_date ? String(row.first_trip_date) : null,
+      lastTripDate: row.last_trip_date ? String(row.last_trip_date) : null,
+      currency: 'CAD',
+    }))
+  }
 
   return { data, totalRows }
 }
@@ -698,68 +836,136 @@ export async function queryTopClientsRevenue(
     ? sql`t.agency_id = ${agencyId}`
     : sql`t.id IN ${sqlIdList(tripIds)}`
   const { page, pageSize } = options
+  const isSingleClientDrilldown = !!options.clientId
 
-  const countResult = await db.client.execute(sql`
-    SELECT count(DISTINCT c.id)::int AS total_rows
-    FROM contacts c
-    JOIN trip_travelers tt ON tt.contact_id = c.id
-    JOIN trips t ON t.id = tt.trip_id
-    WHERE ${cScope}
-      AND ${tScope}
-      AND t.status IN ('active', 'travelling', 'travelled')
-  `)
-  const totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+  const clientFilter = options.clientId
+    ? sql`AND c.id = ${options.clientId}`
+    : sql``
 
-  const dataResult = await db.client.execute(sql`
-    SELECT
-      c.id AS contact_id,
-      c.first_name,
-      c.last_name,
-      c.email,
-      c.phone,
-      count(DISTINCT t.id)::int AS trip_count,
-      coalesce(sum(ap.total_price_cents), 0)::bigint AS total_spend_cents,
-      CASE
-        WHEN count(DISTINCT t.id) > 0
-        THEN (coalesce(sum(ap.total_price_cents), 0) / count(DISTINCT t.id))::bigint
-        ELSE 0
-      END AS avg_trip_value_cents,
-      min(t.start_date) AS first_trip_date,
-      max(t.start_date) AS last_trip_date
-    FROM contacts c
-    JOIN trip_travelers tt ON tt.contact_id = c.id
-    JOIN trips t ON t.id = tt.trip_id
-    LEFT JOIN (
+  let data: any[]
+  let totalRows: number
+
+  if (isSingleClientDrilldown) {
+    // Drilldown: return individual trips for a single client
+    const countResult = await db.client.execute(sql`
+      SELECT count(DISTINCT t.id)::int AS total_rows
+      FROM contacts c
+      JOIN trip_travelers tt ON tt.contact_id = c.id
+      JOIN trips t ON t.id = tt.trip_id
+      WHERE ${cScope}
+        AND ${tScope}
+        AND t.status IN ('active', 'travelling', 'travelled')
+        ${clientFilter}
+    `)
+    totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+
+    const detailResult = await db.client.execute(sql`
       SELECT
-        COALESCE(itin2.trip_id, ia2.trip_id) AS trip_id,
-        ap2.total_price_cents
-      FROM activity_pricing ap2
-      JOIN itinerary_activities ia2 ON ia2.id = ap2.activity_id
-      LEFT JOIN itinerary_days iday2 ON iday2.id = ia2.itinerary_day_id
-      LEFT JOIN itineraries itin2 ON itin2.id = iday2.itinerary_id
-      WHERE ia2.booking_status = 'booked'
-        AND ia2.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
-    ) ap ON ap.trip_id = t.id
-    WHERE ${cScope}
-      AND ${tScope}
-      AND t.status IN ('active', 'travelling', 'travelled')
-    GROUP BY c.id, c.first_name, c.last_name, c.email, c.phone
-    ORDER BY total_spend_cents DESC NULLS LAST
-    ${paginationSql(page, pageSize)}
-  `)
+        c.id AS contact_id,
+        c.first_name,
+        c.last_name,
+        t.id AS trip_id,
+        t.name AS trip_name,
+        t.reference_number,
+        t.start_date AS departure_date,
+        t.end_date,
+        coalesce(ap.trip_total_cents, 0)::bigint AS total_spend_cents
+      FROM contacts c
+      JOIN trip_travelers tt ON tt.contact_id = c.id
+      JOIN trips t ON t.id = tt.trip_id
+      LEFT JOIN LATERAL (
+        SELECT coalesce(sum(ap2.total_price_cents), 0) AS trip_total_cents
+        FROM activity_pricing ap2
+        JOIN itinerary_activities ia2 ON ia2.id = ap2.activity_id
+        LEFT JOIN itinerary_days iday2 ON iday2.id = ia2.itinerary_day_id
+        LEFT JOIN itineraries itin2 ON itin2.id = iday2.itinerary_id
+        WHERE COALESCE(itin2.trip_id, ia2.trip_id) = t.id
+          AND ia2.booking_status = 'booked'
+          AND ia2.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
+      ) ap ON true
+      WHERE ${cScope}
+        AND ${tScope}
+        AND t.status IN ('active', 'travelling', 'travelled')
+        ${clientFilter}
+      ORDER BY t.start_date DESC NULLS LAST
+      ${paginationSql(page, pageSize)}
+    `)
 
-  const data = (dataResult as any[]).map((row: any) => ({
-    contactId: row.contact_id,
-    clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
-    email: row.email,
-    phone: row.phone,
-    tripCount: Number(row.trip_count ?? 0),
-    totalSpendCents: Number(row.total_spend_cents ?? 0),
-    avgTripValueCents: Number(row.avg_trip_value_cents ?? 0),
-    firstTripDate: row.first_trip_date ? String(row.first_trip_date) : null,
-    lastTripDate: row.last_trip_date ? String(row.last_trip_date) : null,
-    currency: 'CAD',
-  }))
+    data = (detailResult as any[]).map((row: any) => ({
+      contactId: row.contact_id,
+      clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
+      tripId: row.trip_id,
+      tripName: row.trip_name,
+      referenceNumber: row.reference_number,
+      departureDate: row.departure_date ? String(row.departure_date) : null,
+      endDate: row.end_date ? String(row.end_date) : null,
+      totalSpendCents: Number(row.total_spend_cents ?? 0),
+      currency: 'CAD',
+    }))
+  } else {
+    // Grouped mode: aggregate by client
+    const countResult = await db.client.execute(sql`
+      SELECT count(DISTINCT c.id)::int AS total_rows
+      FROM contacts c
+      JOIN trip_travelers tt ON tt.contact_id = c.id
+      JOIN trips t ON t.id = tt.trip_id
+      WHERE ${cScope}
+        AND ${tScope}
+        AND t.status IN ('active', 'travelling', 'travelled')
+    `)
+    totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
+
+    const dataResult = await db.client.execute(sql`
+      SELECT
+        c.id AS contact_id,
+        c.first_name,
+        c.last_name,
+        c.email,
+        c.phone,
+        count(DISTINCT t.id)::int AS trip_count,
+        coalesce(sum(ap.total_price_cents), 0)::bigint AS total_spend_cents,
+        CASE
+          WHEN count(DISTINCT t.id) > 0
+          THEN (coalesce(sum(ap.total_price_cents), 0) / count(DISTINCT t.id))::bigint
+          ELSE 0
+        END AS avg_trip_value_cents,
+        min(t.start_date) AS first_trip_date,
+        max(t.start_date) AS last_trip_date
+      FROM contacts c
+      JOIN trip_travelers tt ON tt.contact_id = c.id
+      JOIN trips t ON t.id = tt.trip_id
+      LEFT JOIN (
+        SELECT
+          COALESCE(itin2.trip_id, ia2.trip_id) AS trip_id,
+          ap2.total_price_cents
+        FROM activity_pricing ap2
+        JOIN itinerary_activities ia2 ON ia2.id = ap2.activity_id
+        LEFT JOIN itinerary_days iday2 ON iday2.id = ia2.itinerary_day_id
+        LEFT JOIN itineraries itin2 ON itin2.id = iday2.itinerary_id
+        WHERE ia2.booking_status = 'booked'
+          AND ia2.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
+      ) ap ON ap.trip_id = t.id
+      WHERE ${cScope}
+        AND ${tScope}
+        AND t.status IN ('active', 'travelling', 'travelled')
+      GROUP BY c.id, c.first_name, c.last_name, c.email, c.phone
+      ORDER BY total_spend_cents DESC NULLS LAST
+      ${paginationSql(page, pageSize)}
+    `)
+
+    data = (dataResult as any[]).map((row: any) => ({
+      contactId: row.contact_id,
+      clientName: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown',
+      email: row.email,
+      phone: row.phone,
+      tripCount: Number(row.trip_count ?? 0),
+      totalSpendCents: Number(row.total_spend_cents ?? 0),
+      avgTripValueCents: Number(row.avg_trip_value_cents ?? 0),
+      firstTripDate: row.first_trip_date ? String(row.first_trip_date) : null,
+      lastTripDate: row.last_trip_date ? String(row.last_trip_date) : null,
+      currency: 'CAD',
+    }))
+  }
 
   return { data, totalRows }
 }
