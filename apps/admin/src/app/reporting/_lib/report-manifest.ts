@@ -124,8 +124,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   'booked-sales-by-supplier': {
     columns: [
       { key: 'supplierName', label: 'Supplier' },
-      { key: 'activityType', label: 'Type' },
-      { key: 'activityCount', label: 'Items', align: 'right', format: 'number' },
+      { key: 'activityCount', label: 'Bookings', align: 'right', format: 'number' },
       { key: 'totalSalesCents', label: 'Total Sales', align: 'right', format: 'currency', mono: true },
       { key: 'commissionCents', label: 'Commission', align: 'right', format: 'currency', mono: true },
       { key: 'currency', label: 'Currency' },
@@ -145,8 +144,7 @@ export const REPORT_MANIFEST: Record<string, ReportManifestEntry> = {
   'departed-sales-by-supplier': {
     columns: [
       { key: 'supplierName', label: 'Supplier' },
-      { key: 'activityType', label: 'Type' },
-      { key: 'activityCount', label: 'Items', align: 'right', format: 'number' },
+      { key: 'activityCount', label: 'Bookings', align: 'right', format: 'number' },
       { key: 'totalSalesCents', label: 'Total Sales', align: 'right', format: 'currency', mono: true },
       { key: 'commissionCents', label: 'Commission', align: 'right', format: 'currency', mono: true },
       { key: 'currency', label: 'Currency' },
