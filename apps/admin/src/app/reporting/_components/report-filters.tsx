@@ -1,6 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { X } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -9,6 +12,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useUsers } from '@/hooks/use-users'
+import { api } from '@/lib/api'
+import { useQuery } from '@tanstack/react-query'
 
 interface ReportFiltersProps {
   slug: string
@@ -39,6 +44,8 @@ const TRIP_TYPE_SLUGS = new Set([
 /** Report slugs that support supplier name filtering */
 const SUPPLIER_FILTER_SLUGS = new Set([
   'sales-by-supplier',
+  'booked-sales-by-supplier',
+  'departed-sales-by-supplier',
 ])
 
 /** Report slugs that support daysThreshold filtering */
@@ -67,12 +74,32 @@ export function ReportFilters({ slug, filters, onChange, isAdmin }: ReportFilter
   const showTripType = TRIP_TYPE_SLUGS.has(slug)
   const showSupplier = SUPPLIER_FILTER_SLUGS.has(slug)
   const showDaysThreshold = DAYS_THRESHOLD_SLUGS.has(slug)
+  const [supplierSearch, setSupplierSearch] = useState('')
 
   // Fetch users for the agent dropdown — only fetches when showAgent is true
   const { data: usersData } = useUsers(
     showAgent ? { role: 'user', limit: 100 } : {},
   )
   const agents = showAgent ? (usersData?.users ?? []) : []
+
+  // Fetch suppliers for dropdown — only fetches when showSupplier is true
+  const { data: suppliersData } = useQuery({
+    queryKey: ['suppliers', 'list'],
+    queryFn: () => api.get<{ data: Array<{ id: string; name: string }> }>('/suppliers?limit=500'),
+    enabled: showSupplier,
+  })
+  const suppliers = showSupplier ? (suppliersData?.data ?? []) : []
+  const selectedSuppliers = (filters.supplierName ?? '').split(',').filter(Boolean)
+
+  const toggleSupplier = (name: string) => {
+    const current = new Set(selectedSuppliers)
+    if (current.has(name)) {
+      current.delete(name)
+    } else {
+      current.add(name)
+    }
+    onChange(updateFilter(filters, 'supplierName', [...current].join(',')))
+  }
 
   // If no filters are applicable, render nothing
   if (!showAgent && !showTripType && !showSupplier && !showDaysThreshold) {
@@ -121,13 +148,39 @@ export function ReportFilters({ slug, filters, onChange, isAdmin }: ReportFilter
       )}
 
       {showSupplier && (
-        <Input
-          type="text"
-          placeholder="Supplier name..."
-          className="h-8 w-[200px] text-xs"
-          value={filters.supplierName ?? ''}
-          onChange={(e) => onChange(updateFilter(filters, 'supplierName', e.target.value))}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Input
+              type="text"
+              placeholder="Search suppliers..."
+              className="h-8 w-[220px] text-xs"
+              value={supplierSearch}
+              onChange={(e) => setSupplierSearch(e.target.value)}
+            />
+            {supplierSearch && (
+              <div className="absolute z-50 mt-1 max-h-48 w-[280px] overflow-auto rounded-md border bg-popover p-1 shadow-md">
+                {suppliers
+                  .filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase()))
+                  .slice(0, 15)
+                  .map(s => (
+                    <button
+                      key={s.id}
+                      className={`w-full rounded px-2 py-1 text-left text-xs hover:bg-accent ${selectedSuppliers.includes(s.name) ? 'bg-accent font-medium' : ''}`}
+                      onClick={() => { toggleSupplier(s.name); setSupplierSearch('') }}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+          {selectedSuppliers.map(name => (
+            <Badge key={name} variant="secondary" className="text-xs gap-1">
+              {name}
+              <X className="h-3 w-3 cursor-pointer" onClick={() => toggleSupplier(name)} />
+            </Badge>
+          ))}
+        </div>
       )}
 
       {showDaysThreshold && (

@@ -598,10 +598,17 @@ export async function querySalesBySupplier(
   `
   const supplierNameExpr = sql`coalesce(s.name, ap.supplier, 'Unknown')`
 
-  // Optional supplier filter
-  const supplierFilter = options.supplierName
-    ? sql`AND coalesce(s.name, ap.supplier) ILIKE ${'%' + options.supplierName + '%'}`
-    : sql``
+  // Optional supplier filter — supports comma-separated names for multi-select
+  let supplierFilter = sql``
+  if (options.supplierName) {
+    const names = options.supplierName.split(',').map(n => n.trim()).filter(Boolean)
+    if (names.length === 1) {
+      supplierFilter = sql`AND coalesce(s.name, ap.supplier) ILIKE ${'%' + names[0] + '%'}`
+    } else if (names.length > 1) {
+      const conditions = names.map(n => sql`coalesce(s.name, ap.supplier) ILIKE ${'%' + n + '%'}`)
+      supplierFilter = sql`AND (${sql.join(conditions, sql` OR `)})`
+    }
+  }
 
   // Count distinct supplier+type combos
   const countResult = await db.client.execute(sql`
