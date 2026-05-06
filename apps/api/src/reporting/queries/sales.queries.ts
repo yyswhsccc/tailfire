@@ -600,14 +600,13 @@ export async function querySalesBySupplier(
 
   // Optional supplier filter — supports comma-separated names for multi-select
   let supplierFilter = sql``
-  if (options.supplierName) {
-    const names = options.supplierName.split(',').map(n => n.trim()).filter(Boolean)
-    if (names.length === 1) {
-      supplierFilter = sql`AND coalesce(s.name, ap.supplier) ILIKE ${'%' + names[0] + '%'}`
-    } else if (names.length > 1) {
-      const conditions = names.map(n => sql`coalesce(s.name, ap.supplier) ILIKE ${'%' + n + '%'}`)
-      supplierFilter = sql`AND (${sql.join(conditions, sql` OR `)})`
-    }
+  const filterNames = options.supplierName?.split(',').map(n => n.trim()).filter(Boolean) ?? []
+  const isSingleSupplierDrilldown = filterNames.length === 1 && !filterNames[0].includes('%')
+  if (filterNames.length === 1) {
+    supplierFilter = sql`AND coalesce(s.name, ap.supplier) ILIKE ${'%' + filterNames[0] + '%'}`
+  } else if (filterNames.length > 1) {
+    const conditions = filterNames.map(n => sql`coalesce(s.name, ap.supplier) ILIKE ${'%' + n + '%'}`)
+    supplierFilter = sql`AND (${sql.join(conditions, sql` OR `)})`
   }
 
   // Count distinct supplier+type combos
@@ -629,37 +628,74 @@ export async function querySalesBySupplier(
   `)
   const totalRows = Number((countResult as any[])[0]?.total_rows ?? 0)
 
-  // Data query
-  const dataResult = await db.client.execute(sql`
-    SELECT
-      ${supplierNameExpr} AS supplier_name,
-      count(DISTINCT ia.id)::int AS activity_count,
-      coalesce(sum(ap.total_price_cents), 0)::bigint AS total_sales_cents,
-      coalesce(sum(ct.gross_commission_cents), 0)::bigint AS total_commission_cents,
-      coalesce(sum(ct.net_commission_cents), 0)::bigint AS net_commission_cents
-    ${CANONICAL_JOIN}
-    ${SUPPLIER_JOIN}
-    LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
-    WHERE ${scope}
-      AND t.status IN ('active', 'travelling', 'travelled')
-      AND ia.booking_status = 'booked'
-      AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
-      AND ap.total_price_cents > 0
-      ${dateFilter}
-      ${supplierFilter}
-    GROUP BY ${supplierNameExpr}
-    ORDER BY ${sortCol} ${sortDir} NULLS LAST
-    ${paginationSql(page, pageSize)}
-  `)
+  // Data query — drilldown mode shows individual bookings when filtering by single supplier
+  let data: any[]
+  if (isSingleSupplierDrilldown) {
+    const detailResult = await db.client.execute(sql`
+      SELECT
+        ${supplierNameExpr} AS supplier_name,
+        ia.name AS booking_name,
+        t.name AS trip_name,
+        ia.activity_type,
+        ia.booking_date,
+        ap.total_price_cents::bigint AS total_sales_cents,
+        coalesce(ct.gross_commission_cents, 0)::bigint AS total_commission_cents
+      ${CANONICAL_JOIN}
+      ${SUPPLIER_JOIN}
+      LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
+      WHERE ${scope}
+        AND t.status IN ('active', 'travelling', 'travelled')
+        AND ia.booking_status = 'booked'
+        AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
+        AND ap.total_price_cents > 0
+        ${dateFilter}
+        ${supplierFilter}
+      ORDER BY ap.total_price_cents DESC NULLS LAST
+      ${paginationSql(page, pageSize)}
+    `)
 
-  const data = (dataResult as any[]).map((row: any) => ({
-    supplierName: row.supplier_name,
-    activityCount: Number(row.activity_count ?? 0),
-    totalSalesCents: Number(row.total_sales_cents ?? 0),
-    commissionCents: Number(row.total_commission_cents ?? 0),
-    netCommissionCents: Number(row.net_commission_cents ?? 0),
-    currency: 'CAD',
-  }))
+    data = (detailResult as any[]).map((row: any) => ({
+      supplierName: row.supplier_name,
+      bookingName: row.booking_name,
+      tripName: row.trip_name,
+      activityType: row.activity_type,
+      bookingDate: row.booking_date ? new Date(row.booking_date).toISOString().slice(0, 10) : null,
+      totalSalesCents: Number(row.total_sales_cents ?? 0),
+      commissionCents: Number(row.total_commission_cents ?? 0),
+      currency: 'CAD',
+    }))
+  } else {
+    const dataResult = await db.client.execute(sql`
+      SELECT
+        ${supplierNameExpr} AS supplier_name,
+        count(DISTINCT ia.id)::int AS activity_count,
+        coalesce(sum(ap.total_price_cents), 0)::bigint AS total_sales_cents,
+        coalesce(sum(ct.gross_commission_cents), 0)::bigint AS total_commission_cents,
+        coalesce(sum(ct.net_commission_cents), 0)::bigint AS net_commission_cents
+      ${CANONICAL_JOIN}
+      ${SUPPLIER_JOIN}
+      LEFT JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
+      WHERE ${scope}
+        AND t.status IN ('active', 'travelling', 'travelled')
+        AND ia.booking_status = 'booked'
+        AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
+        AND ap.total_price_cents > 0
+        ${dateFilter}
+        ${supplierFilter}
+      GROUP BY ${supplierNameExpr}
+      ORDER BY ${sortCol} ${sortDir} NULLS LAST
+      ${paginationSql(page, pageSize)}
+    `)
+
+    data = (dataResult as any[]).map((row: any) => ({
+      supplierName: row.supplier_name,
+      activityCount: Number(row.activity_count ?? 0),
+      totalSalesCents: Number(row.total_sales_cents ?? 0),
+      commissionCents: Number(row.total_commission_cents ?? 0),
+      netCommissionCents: Number(row.net_commission_cents ?? 0),
+      currency: 'CAD',
+    }))
+  }
 
   // Summary
   const summaryResult = await db.client.execute(sql`

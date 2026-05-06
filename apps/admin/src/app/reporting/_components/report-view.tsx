@@ -183,6 +183,31 @@ export function ReportView({ slug }: ReportViewProps) {
     [],
   )
 
+  // Drilldown: clicking a supplier row filters to that supplier's individual bookings
+  const isSupplierReport = slug.includes('by-supplier')
+  const isDrilledDown = isSupplierReport && filters.supplierName && !filters.supplierName.includes(',')
+
+  const handleRowClick = useCallback(
+    (row: Record<string, unknown>) => {
+      if (!isSupplierReport) return
+      const supplierName = row.supplierName as string
+      if (supplierName && supplierName !== 'Unknown') {
+        setFilters((prev) => ({ ...prev, supplierName }))
+        setPage(1)
+      }
+    },
+    [isSupplierReport],
+  )
+
+  const handleBackToAll = useCallback(() => {
+    setFilters((prev) => {
+      const next = { ...prev }
+      delete next.supplierName
+      return next
+    })
+    setPage(1)
+  }, [])
+
   const handlePageSizeChange = useCallback(
     (value: string) => {
       const newSize = value === 'all' ? 0 : Number(value)
@@ -280,6 +305,17 @@ export function ReportView({ slug }: ReportViewProps) {
       {/* Summary cards (top) */}
       <ReportSummaryCards items={summaryItems} />
 
+      {/* Drilldown breadcrumb */}
+      {isDrilledDown && (
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={handleBackToAll} className="text-xs">
+            <ArrowLeft className="mr-1 h-3 w-3" />
+            All Suppliers
+          </Button>
+          <span className="text-sm font-medium">{filters.supplierName}</span>
+        </div>
+      )}
+
       {/* Table */}
       <ReportTable
         columns={columns}
@@ -287,6 +323,7 @@ export function ReportView({ slug }: ReportViewProps) {
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSort={handleSort}
+        onRowClick={isSupplierReport && !isDrilledDown ? handleRowClick : undefined}
         isLoading={isLoading}
         pageTotals={reportData?.pageTotals}
         grandTotals={reportData?.grandTotals}
