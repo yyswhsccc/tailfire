@@ -1401,6 +1401,13 @@
       "when": 1746878400000,
       "tag": "20260510120000_add_consumer_composite_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 200,
+      "version": "7",
+      "when": 1746629508000,
+      "tag": "20260507154148_create_portal_messages",
+      "breakpoints": true
     }
   ]
 }
