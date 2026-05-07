@@ -30,7 +30,7 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto max-w-4xl py-8">
       <div className="flex items-center gap-3">
         <CreditCard className="size-6 text-phoenix-gold" />
         <div>
@@ -65,8 +65,8 @@ export default function PaymentsPage() {
             const currency = summary?.currency || 'CAD'
 
             return (
-              <div key={payment.id} className="rounded-xl border border-gray-200 bg-white p-6">
-                <div className="flex items-center justify-between">
+              <div key={payment.id} className="rounded-xl border border-gray-200 bg-white p-4 md:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Invoice #{payment.versionNumber}</p>
                     <p className="text-xs text-gray-400">Sent {formatDate(payment.sentAt)}</p>

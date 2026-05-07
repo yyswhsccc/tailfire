@@ -39,7 +39,7 @@ export default function MessagesPage() {
   const sortedMessages = [...(messages || [])].reverse()
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-3xl flex-col px-4 py-4">
+    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-3xl flex-col py-4">
       {/* Header */}
       <div className="flex items-center gap-3 pb-4">
         <MessageCircle className="size-6 text-phoenix-gold" />
@@ -115,7 +115,7 @@ export default function MessagesPage() {
         <button
           type="submit"
           disabled={!input.trim() || sendMessage.isPending}
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-phoenix-gold text-white hover:bg-phoenix-gold/90 disabled:opacity-50"
+          className="flex size-10 min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full bg-phoenix-gold text-white hover:bg-phoenix-gold/90 disabled:opacity-50"
         >
           {sendMessage.isPending ? (
             <Loader2 className="size-4 animate-spin" />

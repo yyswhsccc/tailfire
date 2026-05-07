@@ -198,7 +198,7 @@ export default function DocumentsPage() {
                     deleteDocument.mutate(doc.id)
                   }
                 }}
-                className="absolute top-2 right-2 rounded-lg bg-white/80 p-1.5 text-gray-400 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                className="absolute top-2 right-2 rounded-lg bg-white/80 p-2 text-gray-400 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
               >
                 <Trash2 className="size-4" />
               </button>

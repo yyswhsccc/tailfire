@@ -93,15 +93,15 @@ export default function ItineraryPage({
   return (
     <>
       {/* Header */}
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex items-start gap-2 mb-6">
         <Link href={`/trips/${tripId}`}>
-          <Button variant="ghost" size="icon" className="text-phoenix-text-muted hover:text-white">
+          <Button variant="ghost" size="icon" className="text-phoenix-text-muted hover:text-white shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-white">{itinerary.name}</h1>
-          <div className="flex items-center gap-3 mt-1">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-white md:text-2xl">{itinerary.name}</h1>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
             <Badge className={`${getStatusColor(itinerary.status)} text-white border-0`}>
               {formatStatus(itinerary.status)}
             </Badge>
