@@ -47,6 +47,24 @@ export class FlightsOffersController {
       throw new BadRequestException('origin, destination, and departureDate are required')
     }
 
+    // Amadeus Self-Service caps the search horizon at ~361 days. Anything beyond
+    // returns 'SELECTED DATE IS TOO FAR IN THE FUTURE' — short-circuit with an
+    // empty result + warning instead of hitting the API and surfacing a Sentry error.
+    const maxHorizonDays = 360
+    const departure = new Date(`${departureDate}T00:00:00Z`)
+    const today = new Date()
+    today.setUTCHours(0, 0, 0, 0)
+    const horizonDays = (departure.getTime() - today.getTime()) / 86400000
+    if (Number.isFinite(horizonDays) && horizonDays > maxHorizonDays) {
+      this.logger.log('Flight offers search skipped — beyond Amadeus horizon', {
+        origin, destination, departureDate, horizonDays,
+      })
+      return {
+        results: [],
+        warning: 'Flight pricing is not yet available for dates beyond ~12 months. Please check closer to departure.',
+      }
+    }
+
     this.logger.log('Flight offers search request', { origin, destination, departureDate })
 
     // Initialize credentials

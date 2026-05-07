@@ -267,6 +267,28 @@ export class TripLifecycleService {
       ORDER BY created_at ASC
     `) as unknown as TripRow[]
 
+    // Pre-fetch booked counts for ALL trips in one query (replaces N+1
+    // countBookedActivities() call inside the loop).
+    type BookedCountRow = { trip_id: string; count: string }
+    const bookedCountRows = await this.db.client.execute(sql`
+      SELECT
+        COALESCE(i.trip_id, ia.trip_id) AS trip_id,
+        COUNT(*) AS count
+      FROM itinerary_activities ia
+      LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
+      LEFT JOIN itineraries i ON i.id = iday.itinerary_id
+      WHERE COALESCE(i.trip_id, ia.trip_id) IS NOT NULL
+        AND ia.booking_status = 'booked'
+        AND ia.activity_type NOT IN ('port_info', 'tour_day')
+        AND (i.id IS NULL OR i.status != 'archived')
+      GROUP BY COALESCE(i.trip_id, ia.trip_id)
+    `) as unknown as BookedCountRow[]
+
+    const bookedCountByTrip = new Map<string, number>()
+    for (const row of bookedCountRows) {
+      bookedCountByTrip.set(row.trip_id, Number(row.count ?? 0))
+    }
+
     let evaluated = 0
     let promoted = 0
     let demoted = 0
@@ -274,7 +296,7 @@ export class TripLifecycleService {
 
     for (const trip of trips) {
       evaluated++
-      const bookedCount = await this.countBookedActivities(trip.id)
+      const bookedCount = bookedCountByTrip.get(trip.id) ?? 0
       const nowDate = new Date()
       const now = nowDate.toISOString()
       const startDate = trip.start_date ? new Date(trip.start_date) : null

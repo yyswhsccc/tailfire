@@ -6,7 +6,7 @@
  */
 
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { eq, and, or, ilike, gte, lte, sql, asc, desc, count } from 'drizzle-orm'
+import { eq, and, or, ilike, gte, lte, sql, asc, desc, count, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import {
   tours,
@@ -106,42 +106,62 @@ export class TourRepositoryService {
       .limit(pageSize)
       .offset(offset)
 
-    // Get first image and departure count for each tour
-    const tourSummaries: TourSummaryDto[] = await Promise.all(
-      toursData.map(async (tour) => {
-        // Get first image
-        const imageResult = await this.db.db
-          .select({ url: tourMedia.url })
-          .from(tourMedia)
-          .where(and(eq(tourMedia.tourId, tour.id), eq(tourMedia.mediaType, 'image')))
-          .orderBy(asc(tourMedia.sortOrder))
-          .limit(1)
+    // Batch-fetch first image + departure aggregates for all tours on this page
+    // (replaces a previous N+1 that ran 2 queries per tour inside Promise.all).
+    const tourIds = toursData.map((t) => t.id)
 
-        // Get departure count and lowest price
-        const depResult = await this.db.db
-          .select({
-            count: count(),
-            lowestPrice: sql<number>`MIN(${tourDepartures.basePriceCents})`,
-          })
-          .from(tourDepartures)
-          .where(and(eq(tourDepartures.tourId, tour.id), eq(tourDepartures.isActive, true)))
+    const [imageRows, depRows] = tourIds.length === 0
+      ? [[], []]
+      : await Promise.all([
+          // First image per tour: DISTINCT ON picks the lowest sort_order row per tour_id.
+          this.db.db
+            .select({
+              tourId: tourMedia.tourId,
+              url: tourMedia.url,
+              sortOrder: tourMedia.sortOrder,
+            })
+            .from(tourMedia)
+            .where(and(inArray(tourMedia.tourId, tourIds), eq(tourMedia.mediaType, 'image')))
+            .orderBy(asc(tourMedia.tourId), asc(tourMedia.sortOrder)),
+          // Departure aggregates grouped by tour.
+          this.db.db
+            .select({
+              tourId: tourDepartures.tourId,
+              count: count(),
+              lowestPrice: sql<number>`MIN(${tourDepartures.basePriceCents})`,
+            })
+            .from(tourDepartures)
+            .where(and(inArray(tourDepartures.tourId, tourIds), eq(tourDepartures.isActive, true)))
+            .groupBy(tourDepartures.tourId),
+        ])
 
-        return {
-          id: tour.id,
-          provider: tour.provider,
-          providerIdentifier: tour.providerIdentifier,
-          operatorCode: tour.operatorCode,
-          name: tour.name,
-          season: tour.season ?? undefined,
-          days: tour.days ?? undefined,
-          nights: tour.nights ?? undefined,
-          description: tour.description?.substring(0, 200) ?? undefined,
-          imageUrl: imageResult[0]?.url ?? undefined,
-          departureCount: depResult[0]?.count ?? 0,
-          lowestPriceCents: depResult[0]?.lowestPrice ?? undefined,
-        }
-      })
-    )
+    const firstImageByTour = new Map<string, string>()
+    for (const row of imageRows) {
+      if (!firstImageByTour.has(row.tourId)) firstImageByTour.set(row.tourId, row.url)
+    }
+
+    const depByTour = new Map<string, { count: number; lowestPrice: number | null }>()
+    for (const row of depRows) {
+      depByTour.set(row.tourId, { count: row.count ?? 0, lowestPrice: row.lowestPrice })
+    }
+
+    const tourSummaries: TourSummaryDto[] = toursData.map((tour) => {
+      const dep = depByTour.get(tour.id)
+      return {
+        id: tour.id,
+        provider: tour.provider,
+        providerIdentifier: tour.providerIdentifier,
+        operatorCode: tour.operatorCode,
+        name: tour.name,
+        season: tour.season ?? undefined,
+        days: tour.days ?? undefined,
+        nights: tour.nights ?? undefined,
+        description: tour.description?.substring(0, 200) ?? undefined,
+        imageUrl: firstImageByTour.get(tour.id) ?? undefined,
+        departureCount: dep?.count ?? 0,
+        lowestPriceCents: dep?.lowestPrice ?? undefined,
+      }
+    })
 
     return {
       tours: tourSummaries,
