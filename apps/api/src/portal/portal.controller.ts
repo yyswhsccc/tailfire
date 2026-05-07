@@ -236,4 +236,14 @@ export class PortalController {
   async getLoyaltyCatalog(@GetPortalAuth() auth: PortalAuthContext) {
     return this.portalService.getLoyaltyCatalog(auth.userId)
   }
+
+  /**
+   * Get payment history for authenticated consumer
+   * GET /portal/my-payments
+   */
+  @Get('my-payments')
+  @ApiOperation({ summary: 'Get payment history for authenticated consumer' })
+  async getMyPayments(@GetPortalAuth() auth: PortalAuthContext) {
+    return this.portalService.getPaymentsForPortalUser(auth.userId)
+  }
 }

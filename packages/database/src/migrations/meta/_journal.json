@@ -1391,15 +1391,22 @@
     {
       "idx": 198,
       "version": "7",
-      "when": 1746273600000,
+      "when": 1777809600000,
       "tag": "20260503120000_create_consumer_activity",
       "breakpoints": true
     },
     {
       "idx": 199,
       "version": "7",
-      "when": 1746878400000,
+      "when": 1778414400000,
       "tag": "20260510120000_add_consumer_composite_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 200,
+      "version": "7",
+      "when": 1778168508000,
+      "tag": "20260507154148_create_portal_messages",
       "breakpoints": true
     }
   ]

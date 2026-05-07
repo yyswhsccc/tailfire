@@ -69,6 +69,7 @@ import { OtaModule } from './ota/ota.module'
 import { ConsumerAuthModule } from './consumer-auth/consumer-auth.module'
 import { ConsumerActivityModule } from './consumer-activity/consumer-activity.module'
 import { DestinationsModule } from './destinations/destinations.module'
+import { PortalMessagesModule } from './portal-messages/portal-messages.module'
 
 @Module({
   imports: [
@@ -250,6 +251,9 @@ import { DestinationsModule } from './destinations/destinations.module'
 
     // Destinations normalization (unified hub for ports, cities, regions)
     DestinationsModule,
+
+    // Portal Messages (agent-client messaging via client portal)
+    PortalMessagesModule,
   ],
   controllers: [AppController],
   providers: [
