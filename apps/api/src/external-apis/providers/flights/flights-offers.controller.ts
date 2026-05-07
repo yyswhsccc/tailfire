@@ -50,14 +50,28 @@ export class FlightsOffersController {
     // Amadeus Self-Service caps the search horizon at ~361 days. Anything beyond
     // returns 'SELECTED DATE IS TOO FAR IN THE FUTURE' — short-circuit with an
     // empty result + warning instead of hitting the API and surfacing a Sentry error.
+    // Applied to both departureDate and returnDate (round-trips fail if either is too far).
     const maxHorizonDays = 360
-    const departure = new Date(`${departureDate}T00:00:00Z`)
     const today = new Date()
     today.setUTCHours(0, 0, 0, 0)
-    const horizonDays = (departure.getTime() - today.getTime()) / 86400000
-    if (Number.isFinite(horizonDays) && horizonDays > maxHorizonDays) {
+    const horizonDays = (date: string): number | null => {
+      // Strict YYYY-MM-DD validation: round-trip parse to reject invalid calendar dates.
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+      if (!m) return null
+      const ts = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+      const parsed = new Date(ts)
+      if (parsed.getUTCFullYear() !== Number(m[1])) return null
+      return (ts - today.getTime()) / 86400000
+    }
+
+    const depHorizon = horizonDays(departureDate)
+    const retHorizon = returnDate ? horizonDays(returnDate) : null
+    const beyondHorizon =
+      (depHorizon != null && depHorizon > maxHorizonDays) ||
+      (retHorizon != null && retHorizon > maxHorizonDays)
+    if (beyondHorizon) {
       this.logger.log('Flight offers search skipped — beyond Amadeus horizon', {
-        origin, destination, departureDate, horizonDays,
+        origin, destination, departureDate, returnDate, depHorizon, retHorizon,
       })
       return {
         results: [],

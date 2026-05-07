@@ -113,7 +113,8 @@ export class TourRepositoryService {
     const [imageRows, depRows] = tourIds.length === 0
       ? [[], []]
       : await Promise.all([
-          // First image per tour: DISTINCT ON picks the lowest sort_order row per tour_id.
+          // First image per tour: ordered scan + first-write-wins dedupe via Map.
+          // (Could be DISTINCT ON (tour_id) if media cardinality grows.)
           this.db.db
             .select({
               tourId: tourMedia.tourId,
