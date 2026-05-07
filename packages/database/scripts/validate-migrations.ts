@@ -107,6 +107,41 @@ function validateMigrations(): ValidationResult {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Journal `when` monotonicity guard.
+  //
+  // drizzle-orm's runtime migrator (pg-core/dialect.js) skips entries where
+  // `migration.folderMillis <= max(__drizzle_migrations.created_at)`. If a
+  // journal entry's `when` is earlier than an already-applied entry's `when`,
+  // it gets silently filtered out and reported as "already applied" — the bug
+  // that caused #274 (3 missed migrations on preview AND prod, off by 1 year).
+  //
+  // Enforce that NEW journal entries (idx > grandfather cutoff) are strictly
+  // greater than the running max-when. Pre-existing non-monotonic entries are
+  // grandfathered because they were applied successfully on all environments.
+  // -------------------------------------------------------------------------
+  const JOURNAL_MONOTONIC_CUTOFF_IDX = 200 // entries with idx > 200 must be strictly increasing
+  const JOURNAL_PATH = path.join(MIGRATIONS_DIR, 'meta', '_journal.json')
+  if (fs.existsSync(JOURNAL_PATH)) {
+    try {
+      const journal = JSON.parse(fs.readFileSync(JOURNAL_PATH, 'utf-8'))
+      const entries: Array<{ idx: number; when: number; tag: string }> = journal.entries ?? []
+      let runningMax = 0
+      for (const entry of entries) {
+        if (entry.idx > JOURNAL_MONOTONIC_CUTOFF_IDX && entry.when <= runningMax) {
+          errors.push(
+            `Journal monotonicity: idx=${entry.idx} (${entry.tag}) when=${entry.when} ` +
+            `is not strictly greater than running max ${runningMax}. ` +
+            `Drizzle's migrator filters by max(created_at) — non-monotonic entries can be silently skipped.`
+          )
+        }
+        if (entry.when > runningMax) runningMax = entry.when
+      }
+    } catch (e) {
+      errors.push(`Failed to parse _journal.json: ${(e as Error).message}`)
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
