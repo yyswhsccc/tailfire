@@ -98,6 +98,7 @@ export class PortalService {
       email: contact.email,
       phone: contact.phone,
       portalActivatedAt: contact.portalActivatedAt?.toISOString() ?? null,
+      contactStatus: contact.contactStatus,
       agent,
       // Photo
       photoUrl: contact.photoUrl ?? null,
