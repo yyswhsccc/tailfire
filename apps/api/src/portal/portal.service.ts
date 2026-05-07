@@ -611,6 +611,61 @@ export class PortalService {
   }
 
   /**
+   * Get finalized/sent trip orders for trips linked to this portal consumer.
+   * Used by GET /portal/my-payments.
+   */
+  async getPaymentsForPortalUser(portalUserId: string) {
+    // 1. Find contact
+    const [contact] = await this.db.client
+      .select({ id: this.db.schema.contacts.id })
+      .from(this.db.schema.contacts)
+      .where(eq(this.db.schema.contacts.portalUserId, portalUserId))
+      .limit(1)
+
+    if (!contact) return []
+
+    // 2. Find trips where the contact is a traveler or primary contact
+    const travelerRows = await this.db.client
+      .select({ tripId: this.db.schema.tripTravelers.tripId })
+      .from(this.db.schema.tripTravelers)
+      .where(eq(this.db.schema.tripTravelers.contactId, contact.id))
+
+    const travelerTripIds = travelerRows.map((r) => r.tripId)
+
+    // Also include trips where the contact is the primary contact
+    const primaryTrips = await this.db.client
+      .select({ id: this.db.schema.trips.id })
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.primaryContactId, contact.id))
+
+    const allTripIds = [...new Set([...travelerTripIds, ...primaryTrips.map((t) => t.id)])]
+    if (allTripIds.length === 0) return []
+
+    // 3. Get finalized and sent trip orders for those trips
+    const orders = await this.db.client
+      .select()
+      .from(this.db.schema.tripOrders)
+      .where(
+        and(
+          inArray(this.db.schema.tripOrders.tripId, allTripIds),
+          inArray(this.db.schema.tripOrders.status, ['finalized', 'sent']),
+        ),
+      )
+      .orderBy(desc(this.db.schema.tripOrders.createdAt))
+
+    // 4. Map to portal-safe response (omit internal orderData / agent audit fields)
+    return orders.map((o) => ({
+      id: o.id,
+      tripId: o.tripId,
+      versionNumber: o.versionNumber,
+      status: o.status,
+      paymentSummary: o.paymentSummary ?? null,
+      sentAt: o.sentAt?.toISOString() ?? null,
+      createdAt: o.createdAt?.toISOString() ?? null,
+    }))
+  }
+
+  /**
    * Format a contact loyalty program row to DTO
    */
   private formatLoyaltyProgram(program: any): LoyaltyProgramDto {
