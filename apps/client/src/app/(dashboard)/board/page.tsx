@@ -27,17 +27,17 @@ function ComponentCard({ component }: { component: BoardComponent }) {
       )}
       <div className="p-4">
         <div className="flex items-center gap-2">
-          <Icon className="size-4 text-[#C59746]" />
+          <Icon className="size-4 text-phoenix-gold" />
           <span className="text-xs font-medium uppercase text-gray-500">{component.type}</span>
         </div>
-        <h3 className="mt-1 text-sm font-semibold text-[#1A1A1A]">
+        <h3 className="mt-1 text-sm font-semibold text-phoenix-charcoal">
           {component.display?.title || 'Untitled'}
         </h3>
         {component.display?.subtitle && (
           <p className="mt-0.5 text-xs text-gray-500">{component.display.subtitle}</p>
         )}
         {component.display?.price && (
-          <p className="mt-2 text-sm font-bold text-[#C59746]">{formatPrice(component.display.price)}</p>
+          <p className="mt-2 text-sm font-bold text-phoenix-gold">{formatPrice(component.display.price)}</p>
         )}
       </div>
     </div>
@@ -51,12 +51,12 @@ function BoardCard({ board }: { board: PortalBoard }) {
     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[#1A1A1A]">{board.title || 'My Dream Board'}</h2>
+          <h2 className="text-lg font-semibold text-phoenix-charcoal">{board.title || 'My Dream Board'}</h2>
           <p className="mt-0.5 text-sm text-gray-500">
             {componentCount} item{componentCount !== 1 ? 's' : ''} saved
           </p>
         </div>
-        <span className="rounded-full bg-[#C59746]/10 px-3 py-1 text-xs font-medium text-[#C59746]">
+        <span className="rounded-full bg-phoenix-gold/10 px-3 py-1 text-xs font-medium text-phoenix-gold">
           {board.status}
         </span>
       </div>
@@ -73,7 +73,7 @@ function BoardCard({ board }: { board: PortalBoard }) {
           <p className="mt-2 text-sm text-gray-500">No items saved yet</p>
           <a
             href={process.env.NEXT_PUBLIC_OTA_URL || 'https://ota.phoenixvoyages.ca'}
-            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-[#C59746] hover:underline"
+            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-phoenix-gold hover:underline"
           >
             Browse trips <ExternalLink className="size-3.5" />
           </a>
@@ -90,12 +90,12 @@ export default function BoardPage() {
     <div className="mx-auto max-w-5xl px-4 py-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">My Dream Board</h1>
+          <h1 className="text-2xl font-bold text-phoenix-charcoal">My Dream Board</h1>
           <p className="mt-1 text-sm text-gray-500">Your saved trip ideas and inspiration</p>
         </div>
         <a
           href={process.env.NEXT_PUBLIC_OTA_URL || 'https://ota.phoenixvoyages.ca'}
-          className="inline-flex items-center gap-1.5 rounded-full bg-[#C59746] px-4 py-2 text-sm font-medium text-white hover:bg-[#B08638]"
+          className="inline-flex items-center gap-1.5 rounded-full bg-phoenix-gold px-4 py-2 text-sm font-medium text-white hover:bg-phoenix-gold/90"
         >
           Add more <ExternalLink className="size-3.5" />
         </a>
@@ -118,13 +118,13 @@ export default function BoardPage() {
       {boards && boards.length === 0 && (
         <div className="mt-12 text-center">
           <Sparkles className="mx-auto size-12 text-gray-200" />
-          <h2 className="mt-4 text-lg font-semibold text-[#1A1A1A]">No boards yet</h2>
+          <h2 className="mt-4 text-lg font-semibold text-phoenix-charcoal">No boards yet</h2>
           <p className="mt-2 text-sm text-gray-500">
             Start exploring destinations, cruises, and more on our travel site.
           </p>
           <a
             href={process.env.NEXT_PUBLIC_OTA_URL || 'https://ota.phoenixvoyages.ca'}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#C59746] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#B08638]"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-phoenix-gold px-6 py-2.5 text-sm font-medium text-white hover:bg-phoenix-gold/90"
           >
             Start exploring <ExternalLink className="size-3.5" />
           </a>

@@ -90,7 +90,7 @@ export default function DocumentsPage() {
           </div>
           <button
             onClick={() => setShowUpload(true)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#C59746] px-4 py-2 text-sm font-medium text-white hover:bg-[#B08638]"
+            className="inline-flex items-center gap-1.5 rounded-full bg-phoenix-gold px-4 py-2 text-sm font-medium text-white hover:bg-phoenix-gold/90"
           >
             <Upload className="size-4" /> Upload
           </button>
@@ -105,7 +105,7 @@ export default function DocumentsPage() {
             onClick={() => setActiveFilter(tab.value)}
             className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
               activeFilter === tab.value
-                ? 'bg-[#C59746] text-white'
+                ? 'bg-phoenix-gold text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -219,7 +219,7 @@ export default function DocumentsPage() {
           {activeFilter === 'all' && !searchQuery && (
             <button
               onClick={() => setShowUpload(true)}
-              className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-[#C59746] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#B08638]"
+              className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-phoenix-gold px-5 py-2.5 text-sm font-medium text-white hover:bg-phoenix-gold/90"
             >
               <Upload className="size-4" /> Upload a Document
             </button>

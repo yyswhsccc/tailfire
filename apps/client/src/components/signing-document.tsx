@@ -137,7 +137,7 @@ export function SigningDocument({
         {/* ── Document Header ── */}
         <div className="p-8 md:p-12 pb-0">
           <div className="text-center mb-8">
-            <p className="text-sm font-medium tracking-widest uppercase text-[#c59746] mb-4">
+            <p className="text-sm font-medium tracking-widest uppercase text-phoenix-gold mb-4">
               {agencyName}
             </p>
             <h1
@@ -291,7 +291,7 @@ export function SigningDocument({
             disabled={!canSubmit || isSubmitting}
             className={cn(
               'w-full h-12 text-base font-medium',
-              'bg-[#c59746] hover:bg-[#b08636] text-white',
+              'bg-phoenix-gold hover:bg-phoenix-gold/90 text-white',
             )}
           >
             {isSubmitting ? 'Submitting...' : submitLabel}
