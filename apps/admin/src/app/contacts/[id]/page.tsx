@@ -53,6 +53,7 @@ import type { UpdateContactDto, TaskResponseDto, ContactPaymentTransactionDto } 
 import { ContactAvatar } from '@/components/contacts/contact-avatar'
 import { ContactActivityFeed } from '@/components/contacts/ContactActivityFeed'
 import { ConsumerInsights } from '@/components/contacts/ConsumerInsights'
+import { ContactMessages } from '@/components/contacts/ContactMessages'
 import { ContactNavigation, type ContactSection } from './_components/contact-navigation'
 import { ComingSoonSection } from './_components/coming-soon-section'
 import { RelationshipDialog } from './_components/relationship-dialog'
@@ -1465,6 +1466,11 @@ export default function ContactDetailPage() {
                   description="Text message history with this contact."
                   icon={MessageCircle}
                 />
+              )}
+              {activeSection === 'messages' && (
+                <div className="p-6">
+                  <ContactMessages contactId={contactId} />
+                </div>
               )}
               {activeSection === 'calendar' && (
                 <ContactCalendarSection contactId={contactId} />

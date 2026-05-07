@@ -29,6 +29,7 @@ export type ContactSection =
   | 'notes'
   | 'emails'
   | 'sms'
+  | 'messages'
   | 'calendar'
   | 'files'
   | 'relationships'
@@ -63,6 +64,7 @@ const navigationGroups = [
       { id: 'notes' as const, label: 'Notes', icon: StickyNote },
       { id: 'emails' as const, label: 'Emails', icon: Mail },
       { id: 'sms' as const, label: 'SMS', icon: MessageCircle },
+      { id: 'messages' as const, label: 'Messages', icon: MessageCircle },
       { id: 'calendar' as const, label: 'Calendar', icon: Calendar },
       { id: 'files' as const, label: 'Files', icon: FileText }
     ]

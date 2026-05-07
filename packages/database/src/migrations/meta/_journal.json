@@ -1408,6 +1408,13 @@
       "when": 1746629508000,
       "tag": "20260507154148_create_portal_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 201,
+      "version": "7",
+      "when": 1746634458000,
+      "tag": "20260507161418_portal_messages_unread_index",
+      "breakpoints": true
     }
   ]
 }

@@ -16,7 +16,7 @@ function formatTime(dateStr: string) {
 }
 
 export default function MessagesPage() {
-  const { data: messages, isLoading } = usePortalMessages()
+  const { data: messages, isLoading, error } = usePortalMessages()
   const sendMessage = useSendMessage()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -57,7 +57,13 @@ export default function MessagesPage() {
           </div>
         )}
 
-        {!isLoading && sortedMessages.length === 0 && (
+        {!isLoading && error && (
+          <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600">
+            Unable to load messages. Please try again.
+          </div>
+        )}
+
+        {!isLoading && !error && sortedMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <MessageCircle className="size-10 text-gray-200" />
             <p className="mt-3 text-sm font-medium text-gray-500">No messages yet</p>
