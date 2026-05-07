@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { usePortalProfile, usePortalTrips, usePortalDocuments } from "@/hooks/use-portal-data";
+import { useUnreadCount } from "@/hooks/use-portal-messages";
+import { LifecycleHero } from "@/components/dashboard/LifecycleHero";
 import {
   Button,
   Card,
@@ -32,7 +34,7 @@ const quickActions = [
   { icon: Briefcase, label: "My Trips", href: "/trips", color: "text-blue-400", external: false },
   { icon: FileText, label: "Documents", href: "/documents", color: "text-orange-400", external: false },
   { icon: User, label: "My Profile", href: "/travelers", color: "text-purple-400", external: false },
-  { icon: Plane, label: "Browse Trips", href: OTA_URL, color: "text-[#C59746]", external: true },
+  { icon: Plane, label: "Browse Trips", href: OTA_URL, color: "text-phoenix-gold", external: true },
 ];
 
 function getStatusBadgeClass(status: string) {
@@ -70,9 +72,15 @@ export default function DashboardPage() {
   const { data: profile, isLoading: profileLoading } = usePortalProfile();
   const { data: trips = [], isLoading: tripsLoading } = usePortalTrips();
   const { data: documents = [], isLoading: docsLoading } = usePortalDocuments();
+  const { data: unreadData } = useUnreadCount();
 
   const displayName = profile?.displayName || user?.name || "Traveler";
   const firstName = displayName.split(" ")[0];
+
+  const hasUnreadMessages = (unreadData?.count ?? 0) > 0;
+  const hasProposalsToReview = trips.some((trip) =>
+    (trip as any).itineraries?.some((itin: any) => itin.status === 'proposing')
+  );
 
   const agent = profile?.agent;
   const advisorName = agent?.name || "Your Travel Advisor";
@@ -88,13 +96,21 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* Welcome Section */}
       <div>
-        <h1 className="text-3xl font-bold text-white font-display">
+        <h1 className="text-2xl font-bold text-white font-display md:text-3xl">
           Welcome back, {firstName}!
         </h1>
         <p className="text-phoenix-text-muted mt-1">
           Here&apos;s an overview of your travel plans
         </p>
       </div>
+
+      {/* Lifecycle Hero CTA */}
+      <LifecycleHero
+        contactStatus={profile?.contactStatus}
+        firstName={profile?.firstName}
+        hasUnreadMessages={hasUnreadMessages}
+        hasProposalsToReview={hasProposalsToReview}
+      />
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

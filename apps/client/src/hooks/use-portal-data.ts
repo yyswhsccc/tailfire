@@ -3,6 +3,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { portalApi, portalApiMultipart } from "@/lib/api";
 
+export type ContactStatus =
+  | 'prospecting'
+  | 'quoted'
+  | 'booked'
+  | 'traveling'
+  | 'returned'
+  | 'awaiting_next'
+  | 'inactive'
+
 export interface PortalProfile {
   id: string;
   firstName: string | null;
@@ -12,6 +21,7 @@ export interface PortalProfile {
   email: string | null;
   phone: string | null;
   portalActivatedAt: string | null;
+  contactStatus: ContactStatus | null;
   agent: {
     id: string;
     name: string;

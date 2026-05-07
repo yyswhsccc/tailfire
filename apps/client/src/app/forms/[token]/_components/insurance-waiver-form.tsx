@@ -117,15 +117,15 @@ function PackageCard({
       className={cn(
         'w-full text-left rounded-lg border-2 p-4 transition-all duration-200',
         selected
-          ? 'border-[#c59746] bg-[#c59746]/5'
-          : 'border-gray-200 bg-white hover:border-[#c59746]/40',
+          ? 'border-phoenix-gold bg-phoenix-gold/5'
+          : 'border-gray-200 bg-white hover:border-phoenix-gold/40',
       )}
     >
       <div className="flex items-start gap-3">
         <div
           className={cn(
             'mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors',
-            selected ? 'border-[#c59746] bg-[#c59746]' : 'border-gray-400',
+            selected ? 'border-phoenix-gold bg-phoenix-gold' : 'border-gray-400',
           )}
         >
           {selected && <div className="h-2 w-2 rounded-full bg-white" />}
@@ -144,7 +144,7 @@ function PackageCard({
             </div>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
-            <span className="inline-flex items-center rounded-full bg-[#c59746]/10 px-2.5 py-0.5 text-xs font-medium text-[#c59746]">
+            <span className="inline-flex items-center rounded-full bg-phoenix-gold/10 px-2.5 py-0.5 text-xs font-medium text-phoenix-gold">
               {formatPolicyType(pkg.policyType)}
             </span>
             {pkg.coverageAmountCents && (
@@ -159,7 +159,7 @@ function PackageCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="mt-2 inline-block text-xs text-[#c59746] hover:underline"
+              className="mt-2 inline-block text-xs text-phoenix-gold hover:underline"
             >
               View policy terms
             </a>
@@ -377,7 +377,7 @@ export function InsuranceWaiverForm({
         {/* ── Document Header ── */}
         <div className="p-8 md:p-12 pb-0">
           <div className="text-center mb-8">
-            <p className="text-sm font-medium tracking-widest uppercase text-[#c59746] mb-4">
+            <p className="text-sm font-medium tracking-widest uppercase text-phoenix-gold mb-4">
               {agencyName}
             </p>
             <h1
@@ -445,7 +445,7 @@ export function InsuranceWaiverForm({
                 className={cn(
                   'flex items-center gap-3 rounded-lg border-2 p-4 cursor-pointer transition-colors',
                   decision === 'purchase'
-                    ? 'border-[#c59746] bg-[#c59746]/5'
+                    ? 'border-phoenix-gold bg-phoenix-gold/5'
                     : 'border-gray-200 hover:border-gray-300',
                 )}
                 onClick={() => {
@@ -521,7 +521,7 @@ export function InsuranceWaiverForm({
               disabled={isSubmitting || !canSubmitPurchase}
               className={cn(
                 'w-full h-12 text-base font-medium',
-                'bg-[#c59746] hover:bg-[#b08636] text-white',
+                'bg-phoenix-gold hover:bg-phoenix-gold/90 text-white',
               )}
             >
               {isSubmitting ? 'Submitting...' : 'Submit Insurance Selection'}

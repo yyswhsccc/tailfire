@@ -38,26 +38,26 @@ export default function SettingsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-[#C59746]" />
+        <Loader2 className="size-6 animate-spin text-phoenix-gold" />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-[#1A1A1A]">Account Settings</h1>
+    <div className="mx-auto max-w-2xl py-8">
+      <h1 className="text-2xl font-bold text-phoenix-charcoal">Account Settings</h1>
       <p className="mt-1 text-sm text-gray-500">Manage your account preferences</p>
 
       {/* Account Info */}
       <div className="mt-8 rounded-xl border border-gray-200 bg-white p-6">
         <div className="flex items-center gap-3">
           <Mail className="size-5 text-gray-400" />
-          <h2 className="text-base font-semibold text-[#1A1A1A]">Account</h2>
+          <h2 className="text-base font-semibold text-phoenix-charcoal">Account</h2>
         </div>
         <div className="mt-4 space-y-4">
           <div>
             <label className="text-xs font-medium text-gray-500">Email</label>
-            <p className="mt-1 text-sm text-[#1A1A1A]">{user?.email}</p>
+            <p className="mt-1 text-sm text-phoenix-charcoal">{user?.email}</p>
           </div>
           <div>
             <label className="text-xs font-medium text-gray-500">Preferred Name</label>
@@ -66,7 +66,7 @@ export default function SettingsPage() {
               value={form.preferredName}
               onChange={(e) => setForm({ ...form, preferredName: e.target.value })}
               placeholder="How should we address you?"
-              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#C59746] focus:outline-none focus:ring-1 focus:ring-[#C59746]"
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-phoenix-gold focus:outline-none focus:ring-1 focus:ring-phoenix-gold"
             />
           </div>
           <div>
@@ -76,7 +76,7 @@ export default function SettingsPage() {
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
               placeholder="Your phone number"
-              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#C59746] focus:outline-none focus:ring-1 focus:ring-[#C59746]"
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-phoenix-gold focus:outline-none focus:ring-1 focus:ring-phoenix-gold"
             />
           </div>
         </div>
@@ -84,7 +84,7 @@ export default function SettingsPage() {
           <button
             onClick={handleSave}
             disabled={updateProfile.isPending}
-            className="rounded-full bg-[#C59746] px-6 py-2 text-sm font-medium text-white hover:bg-[#B08638] disabled:opacity-50"
+            className="rounded-full bg-phoenix-gold px-6 py-2 text-sm font-medium text-white hover:bg-phoenix-gold/90 disabled:opacity-50"
           >
             {updateProfile.isPending ? (
               <Loader2 className="size-4 animate-spin" />
@@ -101,7 +101,7 @@ export default function SettingsPage() {
       <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6">
         <div className="flex items-center gap-3">
           <Shield className="size-5 text-gray-400" />
-          <h2 className="text-base font-semibold text-[#1A1A1A]">Security</h2>
+          <h2 className="text-base font-semibold text-phoenix-charcoal">Security</h2>
         </div>
         <div className="mt-4">
           <p className="text-sm text-gray-600">

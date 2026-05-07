@@ -74,7 +74,7 @@ export function SigningConfirmation({
         <div className="p-8 md:p-12 text-center">
 
           {/* Agency name */}
-          <p className="text-sm font-medium tracking-widest uppercase text-[#c59746] mb-6">
+          <p className="text-sm font-medium tracking-widest uppercase text-phoenix-gold mb-6">
             {agencyName}
           </p>
 
@@ -125,7 +125,7 @@ export function SigningConfirmation({
 
               <Button
                 onClick={handleDownloadPdf}
-                className="bg-[#c59746] hover:bg-[#b08636] text-white"
+                className="bg-phoenix-gold hover:bg-phoenix-gold/90 text-white"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download PDF Copy
