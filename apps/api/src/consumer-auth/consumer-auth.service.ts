@@ -68,15 +68,15 @@ export class ConsumerAuthService {
       // 2. No contact found — create a new lead
       const agencyId = await this.getDefaultAgencyId()
 
-      // DB has a check_has_name constraint requiring at least first_name or last_name.
-      // If neither is provided, derive first_name from email prefix.
-      let firstName = dto.firstName || null
-      const lastName = dto.lastName || null
-      if (!firstName && !lastName) {
+      // DB has a check_has_name constraint requiring first_name (or legal_first_name
+      // or preferred_name) to be NOT NULL. last_name alone is not enough — derive
+      // first_name from the email prefix whenever firstName is missing.
+      let firstName = dto.firstName?.trim() || null
+      const lastName = dto.lastName?.trim() || null
+      if (!firstName) {
         const emailPrefix = email.split('@')[0] || 'Consumer'
-        // Capitalize and clean up: "jane.doe" -> "Jane"
-        firstName = emailPrefix.split(/[._-]/)[0]!
-        firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1)
+        const derived = emailPrefix.split(/[._-]/)[0] || 'Consumer'
+        firstName = derived.charAt(0).toUpperCase() + derived.slice(1)
       }
 
       const [newContact] = await this.db.client
