@@ -94,9 +94,10 @@ export default function ItineraryPage({
     <>
       {/* Header */}
       <div className="flex items-start gap-2 mb-6">
-        <Link href={`/trips/${tripId}`}>
+        <Link href={`/trips/${tripId}`} aria-label="Back to trip">
           <Button variant="ghost" size="icon" className="text-phoenix-text-muted hover:text-white shrink-0">
             <ArrowLeft className="h-5 w-5" />
+            <span className="sr-only">Back to trip</span>
           </Button>
         </Link>
         <div className="min-w-0">

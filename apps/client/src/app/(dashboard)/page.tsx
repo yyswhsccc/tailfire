@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import {
   Briefcase,
@@ -10,6 +11,7 @@ import {
   Mail,
   User,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { usePortalProfile, usePortalTrips, usePortalDocuments } from "@/hooks/use-portal-data";
 import { useUnreadCount } from "@/hooks/use-portal-messages";
@@ -69,18 +71,28 @@ function formatDate(dateStr: string | null) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: profile, isLoading: profileLoading } = usePortalProfile();
   const { data: trips = [], isLoading: tripsLoading } = usePortalTrips();
   const { data: documents = [], isLoading: docsLoading } = usePortalDocuments();
   const { data: unreadData } = useUnreadCount();
 
+  // Refresh CTA-driving data when the user returns to the tab so lifecycle
+  // transitions (advisor sends message, status changes) surface promptly.
+  useEffect(() => {
+    function onFocus() {
+      queryClient.invalidateQueries({ queryKey: ["portal", "profile"] });
+      queryClient.invalidateQueries({ queryKey: ["portal", "trips"] });
+      queryClient.invalidateQueries({ queryKey: ["portal", "messages", "unread"] });
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [queryClient]);
+
   const displayName = profile?.displayName || user?.name || "Traveler";
   const firstName = displayName.split(" ")[0];
 
   const hasUnreadMessages = (unreadData?.count ?? 0) > 0;
-  const hasProposalsToReview = trips.some((trip) =>
-    (trip as any).itineraries?.some((itin: any) => itin.status === 'proposing')
-  );
 
   const agent = profile?.agent;
   const advisorName = agent?.name || "Your Travel Advisor";
@@ -107,9 +119,7 @@ export default function DashboardPage() {
       {/* Lifecycle Hero CTA */}
       <LifecycleHero
         contactStatus={profile?.contactStatus}
-        firstName={profile?.firstName}
         hasUnreadMessages={hasUnreadMessages}
-        hasProposalsToReview={hasProposalsToReview}
       />
 
       {/* Quick Actions */}

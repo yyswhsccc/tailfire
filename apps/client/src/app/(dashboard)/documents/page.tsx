@@ -90,7 +90,8 @@ export default function DocumentsPage() {
           </div>
           <button
             onClick={() => setShowUpload(true)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-phoenix-gold px-4 py-2 text-sm font-medium text-white hover:bg-phoenix-gold/90"
+            aria-label="Upload document"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-phoenix-gold px-4 py-2 text-sm font-medium text-white hover:bg-phoenix-gold/90"
           >
             <Upload className="size-4" /> Upload
           </button>
@@ -103,7 +104,8 @@ export default function DocumentsPage() {
           <button
             key={tab.value}
             onClick={() => setActiveFilter(tab.value)}
-            className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+            aria-pressed={activeFilter === tab.value}
+            className={`min-h-[44px] rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               activeFilter === tab.value
                 ? 'bg-phoenix-gold text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -198,7 +200,8 @@ export default function DocumentsPage() {
                     deleteDocument.mutate(doc.id)
                   }
                 }}
-                className="absolute top-2 right-2 rounded-lg bg-white/80 p-2 text-gray-400 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                aria-label={`Delete ${doc.fileName}`}
+                className="absolute top-2 right-2 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-white/80 text-gray-400 opacity-100 transition-opacity hover:text-red-500 sm:opacity-0 sm:group-hover:opacity-100"
               >
                 <Trash2 className="size-4" />
               </button>
