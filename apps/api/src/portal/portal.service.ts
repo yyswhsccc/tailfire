@@ -98,6 +98,7 @@ export class PortalService {
       email: contact.email,
       phone: contact.phone,
       portalActivatedAt: contact.portalActivatedAt?.toISOString() ?? null,
+      contactStatus: contact.contactStatus,
       agent,
       // Photo
       photoUrl: contact.photoUrl ?? null,
@@ -654,15 +655,65 @@ export class PortalService {
       .orderBy(desc(this.db.schema.tripOrders.createdAt))
 
     // 4. Map to portal-safe response (omit internal orderData / agent audit fields)
-    return orders.map((o) => ({
-      id: o.id,
-      tripId: o.tripId,
-      versionNumber: o.versionNumber,
-      status: o.status,
-      paymentSummary: o.paymentSummary ?? null,
-      sentAt: o.sentAt?.toISOString() ?? null,
-      createdAt: o.createdAt?.toISOString() ?? null,
-    }))
+    // Map the stored paymentSummary shape (snake_case dollar amounts) to the portal DTO shape
+    // (camelCase cents). The stored shape comes from TripOrderPaymentSummary:
+    //   { total_payments, processed_payments, pending_payments, balance_due, payments_list[], payment_schedule }
+    // The schedule shape from getTripPaymentScheduleInfo:
+    //   { schedule_items: [{ due_date, amount (dollars), status }] }
+    return orders.map((o) => {
+      const raw = o.paymentSummary as Record<string, any> | null
+
+      let mappedSummary: {
+        totalAmountCents: number
+        paidAmountCents: number
+        remainingAmountCents: number
+        currency: 'CAD'
+        installments: Array<{ dueDate: string; amountCents: number; status: 'paid' | 'pending' | 'overdue' }>
+      } | null = null
+
+      if (raw != null) {
+        // Amounts are stored in dollars (not cents), convert to cents for the portal
+        const totalDollars = Number(raw.total_payments ?? 0)
+        const paidDollars = Number(raw.processed_payments ?? 0)
+        const remainingDollars = Number(raw.balance_due ?? Math.max(0, totalDollars - paidDollars))
+
+        // Map payment_schedule items to portal installments
+        const scheduleItems: Array<{ dueDate: string; amountCents: number; status: 'paid' | 'pending' | 'overdue' }> = []
+        const schedule = raw.payment_schedule as Record<string, any> | null
+        if (schedule?.schedule_items && Array.isArray(schedule.schedule_items)) {
+          for (const item of schedule.schedule_items) {
+            const rawStatus: string = item.status ?? 'pending'
+            const portalStatus: 'paid' | 'pending' | 'overdue' =
+              rawStatus === 'paid' ? 'paid' :
+              rawStatus === 'overdue' ? 'overdue' :
+              'pending'
+            scheduleItems.push({
+              dueDate: item.due_date ?? '',
+              amountCents: Math.round(Number(item.amount ?? 0) * 100),
+              status: portalStatus,
+            })
+          }
+        }
+
+        mappedSummary = {
+          totalAmountCents: Math.round(totalDollars * 100),
+          paidAmountCents: Math.round(paidDollars * 100),
+          remainingAmountCents: Math.round(remainingDollars * 100),
+          currency: 'CAD',
+          installments: scheduleItems,
+        }
+      }
+
+      return {
+        id: o.id,
+        tripId: o.tripId,
+        versionNumber: o.versionNumber,
+        status: o.status,
+        paymentSummary: mappedSummary,
+        sentAt: o.sentAt?.toISOString() ?? null,
+        createdAt: o.createdAt?.toISOString() ?? null,
+      }
+    })
   }
 
   /**

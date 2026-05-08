@@ -16,7 +16,7 @@ function formatTime(dateStr: string) {
 }
 
 export default function MessagesPage() {
-  const { data: messages, isLoading } = usePortalMessages()
+  const { data: messages, isLoading, error } = usePortalMessages()
   const sendMessage = useSendMessage()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -39,12 +39,12 @@ export default function MessagesPage() {
   const sortedMessages = [...(messages || [])].reverse()
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-3xl flex-col px-4 py-4">
+    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-3xl flex-col py-4">
       {/* Header */}
       <div className="flex items-center gap-3 pb-4">
-        <MessageCircle className="size-6 text-[#C59746]" />
+        <MessageCircle className="size-6 text-phoenix-gold" />
         <div>
-          <h1 className="text-xl font-bold text-[#1A1A1A]">Messages</h1>
+          <h1 className="text-xl font-bold text-phoenix-charcoal">Messages</h1>
           <p className="text-xs text-gray-500">Chat with your travel advisor</p>
         </div>
       </div>
@@ -53,11 +53,17 @@ export default function MessagesPage() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-4">
         {isLoading && (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="size-5 animate-spin text-[#C59746]" />
+            <Loader2 className="size-5 animate-spin text-phoenix-gold" />
           </div>
         )}
 
-        {!isLoading && sortedMessages.length === 0 && (
+        {!isLoading && error && (
+          <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600">
+            Unable to load messages. Please try again.
+          </div>
+        )}
+
+        {!isLoading && !error && sortedMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <MessageCircle className="size-10 text-gray-200" />
             <p className="mt-3 text-sm font-medium text-gray-500">No messages yet</p>
@@ -73,17 +79,17 @@ export default function MessagesPage() {
             return (
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                 {!isMe && (
-                  <div className="mr-2 mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-[#C59746]">
+                  <div className="mr-2 mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-phoenix-gold">
                     <User className="size-3.5 text-white" />
                   </div>
                 )}
                 <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
                   isMe
-                    ? 'bg-[#1A1A1A] text-white'
-                    : 'border border-gray-200 bg-white text-[#1A1A1A]'
+                    ? 'bg-phoenix-charcoal text-white'
+                    : 'border border-gray-200 bg-white text-phoenix-charcoal'
                 }`}>
                   {!isMe && msg.senderName && (
-                    <p className="mb-0.5 text-xs font-medium text-[#C59746]">{msg.senderName}</p>
+                    <p className="mb-0.5 text-xs font-medium text-phoenix-gold">{msg.senderName}</p>
                   )}
                   <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.body}</p>
                   <p className={`mt-1 text-xs ${isMe ? 'text-white/50' : 'text-gray-400'}`}>
@@ -104,12 +110,12 @@ export default function MessagesPage() {
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message..."
           disabled={sendMessage.isPending}
-          className="flex-1 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#1A1A1A] placeholder:text-gray-400 focus:border-[#C59746] focus:outline-none focus:ring-1 focus:ring-[#C59746] disabled:opacity-50"
+          className="flex-1 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm text-phoenix-charcoal placeholder:text-gray-400 focus:border-phoenix-gold focus:outline-none focus:ring-1 focus:ring-phoenix-gold disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={!input.trim() || sendMessage.isPending}
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#C59746] text-white hover:bg-[#B08638] disabled:opacity-50"
+          className="flex size-10 min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full bg-phoenix-gold text-white hover:bg-phoenix-gold/90 disabled:opacity-50"
         >
           {sendMessage.isPending ? (
             <Loader2 className="size-4 animate-spin" />

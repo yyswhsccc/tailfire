@@ -24,17 +24,17 @@ export default function PaymentsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-[#C59746]" />
+        <Loader2 className="size-6 animate-spin text-phoenix-gold" />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto max-w-4xl py-8">
       <div className="flex items-center gap-3">
-        <CreditCard className="size-6 text-[#C59746]" />
+        <CreditCard className="size-6 text-phoenix-gold" />
         <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">Payments</h1>
+          <h1 className="text-2xl font-bold text-phoenix-charcoal">Payments</h1>
           <p className="text-sm text-gray-500">Your trip payment history and upcoming installments</p>
         </div>
       </div>
@@ -48,7 +48,7 @@ export default function PaymentsPage() {
       {payments && payments.length === 0 && (
         <div className="mt-12 text-center">
           <CreditCard className="mx-auto size-12 text-gray-200" />
-          <h2 className="mt-4 text-lg font-semibold text-[#1A1A1A]">No payments yet</h2>
+          <h2 className="mt-4 text-lg font-semibold text-phoenix-charcoal">No payments yet</h2>
           <p className="mt-2 text-sm text-gray-500">
             Payment details will appear here once your trip is booked.
           </p>
@@ -65,14 +65,14 @@ export default function PaymentsPage() {
             const currency = summary?.currency || 'CAD'
 
             return (
-              <div key={payment.id} className="rounded-xl border border-gray-200 bg-white p-6">
-                <div className="flex items-center justify-between">
+              <div key={payment.id} className="rounded-xl border border-gray-200 bg-white p-4 md:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Invoice #{payment.versionNumber}</p>
                     <p className="text-xs text-gray-400">Sent {formatDate(payment.sentAt)}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-[#1A1A1A]">{formatCurrency(total, currency)}</p>
+                    <p className="text-lg font-bold text-phoenix-charcoal">{formatCurrency(total, currency)}</p>
                     {remaining > 0 && (
                       <p className="text-xs text-amber-600">{formatCurrency(remaining, currency)} remaining</p>
                     )}

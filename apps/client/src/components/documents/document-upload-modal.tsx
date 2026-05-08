@@ -70,7 +70,7 @@ export function DocumentUploadModal({ isOpen, onClose }: DocumentUploadModalProp
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-[#1A1A1A]">Upload Document</h3>
+            <h3 className="text-lg font-semibold text-phoenix-charcoal">Upload Document</h3>
             <button onClick={handleClose} className="rounded-lg p-1 text-gray-400 hover:text-gray-600">
               <X className="size-5" />
             </button>
@@ -83,7 +83,7 @@ export function DocumentUploadModal({ isOpen, onClose }: DocumentUploadModalProp
               <select
                 value={documentType}
                 onChange={(e) => setDocumentType(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#C59746] focus:outline-none focus:ring-1 focus:ring-[#C59746]"
+                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-phoenix-gold focus:outline-none focus:ring-1 focus:ring-phoenix-gold"
               >
                 {DOCUMENT_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
@@ -101,10 +101,10 @@ export function DocumentUploadModal({ isOpen, onClose }: DocumentUploadModalProp
                 className="hidden"
               />
               {file ? (
-                <div className="flex items-center gap-3 rounded-lg border border-[#C59746]/30 bg-[#C59746]/5 p-3">
-                  <FileText className="size-8 text-[#C59746]" />
+                <div className="flex items-center gap-3 rounded-lg border border-phoenix-gold/30 bg-phoenix-gold/5 p-3">
+                  <FileText className="size-8 text-phoenix-gold" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-[#1A1A1A]">{file.name}</p>
+                    <p className="truncate text-sm font-medium text-phoenix-charcoal">{file.name}</p>
                     <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(0)} KB</p>
                   </div>
                   <button
@@ -117,7 +117,7 @@ export function DocumentUploadModal({ isOpen, onClose }: DocumentUploadModalProp
               ) : (
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 p-8 text-center transition-colors hover:border-[#C59746]/50 hover:bg-[#C59746]/5"
+                  className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 p-8 text-center transition-colors hover:border-phoenix-gold/50 hover:bg-phoenix-gold/5"
                 >
                   <Upload className="size-8 text-gray-300" />
                   <span className="text-sm font-medium text-gray-600">Click to select a file</span>
@@ -132,7 +132,7 @@ export function DocumentUploadModal({ isOpen, onClose }: DocumentUploadModalProp
             <button
               onClick={handleUpload}
               disabled={!file || uploadMutation.isPending}
-              className="w-full rounded-full bg-[#C59746] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#B08638] disabled:opacity-50"
+              className="w-full rounded-full bg-phoenix-gold px-6 py-2.5 text-sm font-semibold text-white hover:bg-phoenix-gold/90 disabled:opacity-50"
             >
               {uploadMutation.isPending ? (
                 <span className="flex items-center justify-center gap-2">
