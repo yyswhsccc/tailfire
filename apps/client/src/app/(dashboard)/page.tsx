@@ -78,9 +78,6 @@ export default function DashboardPage() {
   const firstName = displayName.split(" ")[0];
 
   const hasUnreadMessages = (unreadData?.count ?? 0) > 0;
-  const hasProposalsToReview = trips.some((trip) =>
-    (trip as any).itineraries?.some((itin: any) => itin.status === 'proposing')
-  );
 
   const agent = profile?.agent;
   const advisorName = agent?.name || "Your Travel Advisor";
@@ -107,9 +104,7 @@ export default function DashboardPage() {
       {/* Lifecycle Hero CTA */}
       <LifecycleHero
         contactStatus={profile?.contactStatus}
-        firstName={profile?.firstName}
         hasUnreadMessages={hasUnreadMessages}
-        hasProposalsToReview={hasProposalsToReview}
       />
 
       {/* Quick Actions */}

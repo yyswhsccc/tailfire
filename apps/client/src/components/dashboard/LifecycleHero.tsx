@@ -6,10 +6,7 @@ import type { ContactStatus } from '@/hooks/use-portal-data'
 
 interface LifecycleHeroProps {
   contactStatus: ContactStatus | null | undefined
-  firstName: string | null | undefined
   hasUnreadMessages?: boolean
-  hasProposalsToReview?: boolean
-  nextTripDate?: string | null
 }
 
 interface CtaConfig {
@@ -23,7 +20,7 @@ interface CtaConfig {
 }
 
 function buildCta(props: LifecycleHeroProps): CtaConfig {
-  const { contactStatus, hasUnreadMessages, hasProposalsToReview } = props
+  const { contactStatus, hasUnreadMessages } = props
 
   if (hasUnreadMessages) {
     return {
@@ -34,18 +31,6 @@ function buildCta(props: LifecycleHeroProps): CtaConfig {
       ctaLabel: 'Open messages',
       ctaHref: '/messages',
       accent: 'ember',
-    }
-  }
-
-  if (hasProposalsToReview) {
-    return {
-      icon: Send,
-      eyebrow: 'Proposal ready',
-      title: 'Your travel proposal is ready to review',
-      body: 'Check your trips for an itinerary waiting on your decision.',
-      ctaLabel: 'View proposal',
-      ctaHref: '/trips',
-      accent: 'gold',
     }
   }
 
@@ -108,19 +93,22 @@ function buildCta(props: LifecycleHeroProps): CtaConfig {
 
 const ACCENT_STYLES = {
   gold: {
-    bg: 'bg-phoenix-gold/10',
+    iconTile: 'bg-phoenix-gold/10',
     icon: 'text-phoenix-gold',
-    cta: 'bg-phoenix-gold hover:bg-phoenix-gold/90 text-white',
+    eyebrow: 'text-phoenix-gold',
+    cta: 'bg-phoenix-charcoal hover:bg-phoenix-charcoal/90 text-white',
   },
   ember: {
-    bg: 'bg-phoenix-ember/10',
+    iconTile: 'bg-phoenix-ember/10',
     icon: 'text-phoenix-ember',
+    eyebrow: 'text-phoenix-ember',
     cta: 'bg-phoenix-ember hover:bg-phoenix-ember/90 text-white',
   },
   orange: {
-    bg: 'bg-phoenix-orange/10',
+    iconTile: 'bg-phoenix-orange/10',
     icon: 'text-phoenix-orange',
-    cta: 'bg-phoenix-orange hover:bg-phoenix-orange/90 text-white',
+    eyebrow: 'text-phoenix-ember',
+    cta: 'bg-phoenix-charcoal hover:bg-phoenix-charcoal/90 text-white',
   },
 }
 
@@ -131,16 +119,16 @@ export function LifecycleHero(props: LifecycleHeroProps) {
   const isExternal = cta.ctaHref.startsWith('http')
 
   return (
-    <section className={`rounded-3xl ${styles.bg} p-6 md:p-8`}>
+    <section className="rounded-3xl bg-white p-6 shadow-lg md:p-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-8">
         <div className="flex items-start gap-4">
           <div
-            className={`flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white/80 ${styles.icon}`}
+            className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${styles.iconTile} ${styles.icon}`}
           >
             <Icon className="size-6" />
           </div>
           <div className="space-y-1">
-            <p className={`text-xs font-semibold uppercase tracking-wider ${styles.icon}`}>
+            <p className={`text-xs font-semibold uppercase tracking-wider ${styles.eyebrow}`}>
               {cta.eyebrow}
             </p>
             <h2 className="text-xl font-semibold text-phoenix-charcoal md:text-2xl">
