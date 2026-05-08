@@ -126,6 +126,7 @@ export default function MessagesPage() {
         <button
           type="submit"
           disabled={!input.trim() || sendMessage.isPending}
+          aria-label="Send message"
           className="flex size-10 min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full bg-phoenix-gold text-white hover:bg-phoenix-gold/90 disabled:opacity-50"
         >
           {sendMessage.isPending ? (
