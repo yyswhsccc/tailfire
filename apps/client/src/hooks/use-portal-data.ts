@@ -1,16 +1,10 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { ContactStatus } from "@tailfire/shared-types";
 import { portalApi, portalApiMultipart } from "@/lib/api";
 
-export type ContactStatus =
-  | 'prospecting'
-  | 'quoted'
-  | 'booked'
-  | 'traveling'
-  | 'returned'
-  | 'awaiting_next'
-  | 'inactive'
+export type { ContactStatus };
 
 export interface PortalProfile {
   id: string;
