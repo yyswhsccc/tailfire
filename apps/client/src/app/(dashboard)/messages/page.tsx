@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { usePortalMessages, useSendMessage } from '@/hooks/use-portal-messages'
 import { MessageCircle, Send, Loader2, User } from 'lucide-react'
 
@@ -16,6 +17,7 @@ function formatTime(dateStr: string) {
 }
 
 export default function MessagesPage() {
+  const queryClient = useQueryClient()
   const { data: messages, isLoading, error } = usePortalMessages()
   const sendMessage = useSendMessage()
   const [input, setInput] = useState('')
@@ -27,6 +29,15 @@ export default function MessagesPage() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
+
+  // GET /portal/my-messages marks agent messages read server-side, so the
+  // unread badge on the dashboard is stale until the user navigates away.
+  // Invalidate on unmount to refresh it.
+  useEffect(() => {
+    return () => {
+      queryClient.invalidateQueries({ queryKey: ['portal', 'messages', 'unread'] })
+    }
+  }, [queryClient])
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault()
