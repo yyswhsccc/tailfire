@@ -15,6 +15,7 @@
     "db:studio": "drizzle-kit studio",
     "typecheck": "tsc --noEmit",
     "migrations:validate": "tsx scripts/validate-migrations.ts",
+    "migrations:validate-journal": "node scripts/validate-journal-monotonicity.mjs",
     "migrations:list": "find src/migrations -maxdepth 1 -name '*.sql' -type f | sort"
   },
   "dependencies": {

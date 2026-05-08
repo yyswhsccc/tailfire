@@ -10,7 +10,7 @@ function formatPrice(price?: string) {
 }
 
 function ComponentCard({ component }: { component: BoardComponent }) {
-  const icons = { cruise: Ship, flight: Plane, hotel: Hotel, tour: MapPin }
+  const icons: Record<string, typeof MapPin> = { cruise: Ship, flight: Plane, hotel: Hotel, tour: MapPin }
   const Icon = icons[component.type] || MapPin
 
   return (
