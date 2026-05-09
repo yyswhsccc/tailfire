@@ -63,6 +63,9 @@ export * from './ic-tax-profiles.schema'
 // IC payout authorizations (RCTI agreement consent records)
 export * from './ic-payout-authorizations.schema'
 
+// IC payout accounts (bank/e-transfer/wire destination accounts with encrypted details)
+export * from './ic-payout-accounts.schema'
+
 // Payment schedule templates (agency-scoped reusable patterns)
 export * from './payment-templates.schema'
 
