@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { trackEvent } from "@/lib/tracking";
 
 // ---------------------------------------------------------------------------
 // Domain types
@@ -195,6 +196,13 @@ export const useTripBasket = create<TripBasketState>((set, get) => ({
         drafts: [{ id: requestId, title, componentCount: 1 }],
       });
 
+      trackEvent({
+        event: "board_save",
+        entityType: firstComponent.type,
+        entityName: firstComponent.display?.title,
+        metadata: { tripRequestId: requestId, componentId: firstComponent.id, isFirstSave: true },
+      });
+
       return requestId;
     } finally {
       set({ isLoading: false });
@@ -225,6 +233,13 @@ export const useTripBasket = create<TripBasketState>((set, get) => ({
         { type: "component", id: component.id },
       ];
       set({ components: newComponents, boardOrder: newBoardOrder });
+
+      trackEvent({
+        event: "board_save",
+        entityType: component.type,
+        entityName: component.display?.title,
+        metadata: { tripRequestId: requestId, componentId: component.id },
+      });
     } finally {
       set({ isLoading: false });
     }

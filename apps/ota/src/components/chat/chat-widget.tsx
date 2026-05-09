@@ -8,6 +8,7 @@ import { Sparkles } from "lucide-react";
 import { ChatPanel } from "./chat-panel";
 import { useAiPanelStore } from "@/stores/ai-panel-store";
 import { useTripBasket } from "@/components/trip-builder/trip-basket-store";
+import { trackEvent } from "@/lib/tracking";
 
 // ---------------------------------------------------------------------------
 // Page context ref — updated by the widget on render, read by custom fetch
@@ -80,6 +81,22 @@ export default function ChatWidget() {
   }, [browsingHistory, pageContext]);
 
   const { messages, sendMessage, status } = useChat({ transport });
+
+  // Fire ai_chat_start once per page-load when the user actually engages
+  // (sends their first message). Opening the widget without sending isn't
+  // a strong enough signal to be worth surfacing on the agent timeline.
+  const chatStartFiredRef = useRef(false);
+  useEffect(() => {
+    if (!chatStartFiredRef.current && messages.length > 0) {
+      chatStartFiredRef.current = true;
+      trackEvent({
+        event: "ai_chat_start",
+        metadata: pageContext
+          ? { pageType: pageContext.type, pageSlug: pageContext.slug }
+          : undefined,
+      });
+    }
+  }, [messages.length, pageContext]);
 
   // -------------------------------------------------------------------------
   // Sync AI tool results → client-side trip basket store

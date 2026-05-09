@@ -6,6 +6,7 @@ import { serviceFetch } from "@/lib/api";
 import { HotelSearchForm } from "@/components/search/hotel-search-form";
 import { HotelProductCard, type HotelProductCardProps } from "@/components/cards/hotel-product-card";
 import { SearchResultsHeader } from "@/components/search/search-results-header";
+import { TrackSearchEvent } from "@/components/search/track-search-event";
 import { SearchPageShell } from "@/components/search/search-page-shell";
 import HotelsLoading from "./loading";
 
@@ -182,6 +183,11 @@ export default async function HotelsPage({ searchParams }: HotelsPageProps) {
           <ErrorState />
         ) : hotels ? (
           <Suspense fallback={<HotelsLoading />}>
+            <TrackSearchEvent
+              entityType="hotels"
+              query={params as Record<string, unknown>}
+              resultCount={hotels.results.length}
+            />
             <HotelResults hotels={hotels} />
           </Suspense>
         ) : (
