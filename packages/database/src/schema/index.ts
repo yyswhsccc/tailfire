@@ -60,6 +60,9 @@ export * from './agency-tax-filing-config.schema'
 // IC tax profiles (canonical IC identity: SIN/BN, GST/HST, disbursement policy)
 export * from './ic-tax-profiles.schema'
 
+// IC payout authorizations (RCTI agreement consent records)
+export * from './ic-payout-authorizations.schema'
+
 // Payment schedule templates (agency-scoped reusable patterns)
 export * from './payment-templates.schema'
 

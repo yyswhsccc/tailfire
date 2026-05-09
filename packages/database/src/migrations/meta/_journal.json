@@ -1429,6 +1429,13 @@
       "when": 1778414400003,
       "tag": "20260509203644_ic_tax_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 204,
+      "version": "7",
+      "when": 1778414400004,
+      "tag": "20260509203902_ic_payout_authorizations",
+      "breakpoints": true
     }
   ]
 }
