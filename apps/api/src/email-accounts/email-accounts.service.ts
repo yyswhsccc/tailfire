@@ -50,6 +50,25 @@ export class EmailAccountsService {
     // Validate domain against agency allowed domains
     await this.validateDomain(agencyId, dto.emailAddress)
 
+    // Pre-check for duplicate before insert. The DB has a unique constraint
+    // on (user_id, email_address) — relying on the catch alone still surfaces
+    // the underlying PostgresError to Sentry. Pre-check eliminates the noise.
+    // Sentry: API-1M.
+    const existing = await this.db.client
+      .select({ id: this.db.schema.emailAccounts.id })
+      .from(this.db.schema.emailAccounts)
+      .where(
+        and(
+          eq(this.db.schema.emailAccounts.userId, userId),
+          eq(this.db.schema.emailAccounts.emailAddress, dto.emailAddress),
+        ),
+      )
+      .limit(1)
+
+    if (existing.length > 0) {
+      throw new ConflictException('An account with this email already exists')
+    }
+
     // Override server settings with domain defaults if available
     const domain = dto.emailAddress.split('@')[1]?.toLowerCase()
     const domainDefaults = domain ? EmailAccountsService.DOMAIN_SERVER_DEFAULTS[domain] : undefined
@@ -80,9 +99,9 @@ export class EmailAccountsService {
 
       return this.formatAccountResponse(account!)
     } catch (error: any) {
-      // PostgreSQL unique violation (duplicate email account)
+      // Race condition fallback — pre-check above eliminates the common case.
       if (error?.code === '23505') {
-        throw new ConflictException('Email account already exists')
+        throw new ConflictException('An account with this email already exists')
       }
       throw error
     }
