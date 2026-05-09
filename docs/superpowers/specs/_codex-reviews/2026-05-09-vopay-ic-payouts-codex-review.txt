@@ -1,0 +1,1554 @@
+  9. The plan mentions polling but no WebSockets. Is there any real-time fallback
+  or notification mechanism?
+
+  If changes or improvements are needed, please provide clear concise
+  instructions and guidance.
+
+
+• Reviewing main for the merged Phase 5 code now. I’m checking the actual portal
+  message and payments implementations, starting from the auth path and route/
+  service query logic so the feedback is based on the live code rather than the
+  plan.
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire rev-parse
+  │ --abbrev-ref HEAD
+  └ main
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire rev-parse HEAD
+  └ fee94539131ebdc6e5f55db36dd0b3f9b85682fd
+
+• Explored
+  └ List api
+    Search portal-messages|my-messages|my-payments|payments/page.tsx|messages/
+           page.tsx|use-portal.*|portal.service|portal.controller|portal-
+auth.guard|
+           portal-jwt.strategy|portal.module|portal-messages
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire status --short
+  └  M README.md
+     M apps/admin/.env.example
+    … +13 lines
+     M wiki/Getting-Started.md
+     M wiki/Platform-Architecture.md
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• I’ve confirmed the repo is on main at fee94539131e.... Next I’m reading the
+  actual message/payment routes, their auth strategy, and the client hooks/pages
+  to validate the security and race conditions against the merged code.
+
+• Explored
+  └ Read portal-messages.service.ts, portal-messages.controller.ts, send-
+         message.dto.ts, portal-auth.guard.ts, portal-messages.schema.ts, portal-
+         jwt.strategy.ts, portal.controller.ts
+    Search my-payments|paymentSummary|trip_orders|portal/my-payments in api
+    Read portal.service.ts, use-portal-payments.ts
+
+• Ran sed -n '1,320p' /Users/alguertin/Development/tailfire-project/tailfire/apps/
+  │ client/src/app/(dashboard)/payments/page.tsx
+  └ zsh:1: no matches found: /Users/alguertin/Development/tailfire-project/
+    tailfire/apps/client/src/app/(dashboard)/payments/page.tsx
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• There’s already one substantive issue in the message controller path: it
+  resolves the authenticated contact from the portal token, but the message
+  service itself does not validate tripId against that contact beyond contactId
+  AND tripId filtering. I’m drilling into the payments query and the exact message
+  page/hook behavior next.
+
+• Explored
+  └ Read portal.service.ts, page.tsx, use-portal-messages.ts
+    Search sendFromAgent\(|portal my-messages|portal-messages|my-messages/unread|
+           unread count|messages page in api
+    Read portal-messages.module.ts
+    Search useUnreadCount\(|portal messages|my-messages in client
+    Read api.ts
+    Search portal_messages|trip_orders|trip_travelers|primaryContactId in schema
+    Search portalUserId|contact_id|agency_id|portal_user|role === 'client_portal'|
+           client_portal in api
+
+─ Worked for 1m 16s ──────────────────────────────────────────────────────────────
+
+• The main security path is clearer now: portal message reads are anchored to
+  contacts.portal_user_id = token.sub, which is the right trust boundary. I’m
+  running a quick verification pass on the touched apps and checking for any
+  hidden gaps like unused unread polling, missing agent reply exposure, and type/
+  test regressions.
+
+• Explored
+  └ Search portal messages|my-payments|my-messages|sendFromAgent|useUnreadCount|
+           PortalMessages in admin
+
+• Ran pnpm --dir /Users/alguertin/Development/tailfire-project/tailfire/apps/
+  │ client typecheck
+  └
+    > @tailfire/client@0.0.1 typecheck /Users/alguertin/Development/
+    tailfire-project/tailfire/apps/client
+    > tsc --noEmit
+
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• I’m checking one more thing before I wrap: whether the portal payments page’s
+  expected paymentSummary shape actually matches what trip orders store. That’s
+  the kind of mismatch that won’t show up as an access bug but will make the
+  feature look broken in production.
+
+• Ran pnpm --dir /Users/alguertin/Development/tailfire-project/tailfire/apps/api
+  │ typecheck
+  └
+    > @tailfire/api@1.0.0 typecheck /Users/alguertin/Development/tailfire-project/
+    … +101 lines
+          Type 'null' is not assignable to type 'string | number'.
+     ELIFECYCLE  Command failed with exit code 2.
+
+• Explored
+  └ Read trip-orders.schema.ts, trip-order.service.ts, auth.types.ts
+    Search payment_schedule|processed_payments|balance_due|total_payments|
+           totalAmountCents|remainingAmountCents|paidAmountCents|installments in
+api
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• There’s a likely portal payments regression: the endpoint passes raw
+  trip_orders.payment_summary through, but the portal page expects a completely
+  different camelCase/cents structure. I’m confirming the stored JSON shape now
+  because if that’s what shipped, the UI will show zeros and no schedule even with
+  valid data.
+
+• Waited for background terminal
+
+• Waited for background terminal
+
+• Explored
+  └ Read trip-order.service.ts
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• The verification pass found a merged-code regression in the API build:
+  portalMessages isn’t present on db.schema during typecheck, so the new service
+  doesn’t currently typecheck cleanly even before getting into runtime behavior.
+  I’m confirming whether that’s an export omission in the schema index.
+
+• Explored
+  └ Read index.ts
+    Search portal-messages|portalMessages in schema
+    Read index.ts
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire log --oneline
+  │ -n 5 -- apps/api/src/portal-messages apps/client/src/app/'(dashboard)'/
+  │ messages apps/client/src/app/'(dashboard)'/payments packages/database/src/
+  │ … +1 lines
+  └ 5005986c feat(client): portal messages page — chat-style agent-client
+    messaging with polling
+    … +5 lines
+    8f4d5c23 chore: remove mock data and add Coming Soon stubs for unimplemented
+    portal pages
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• I confirmed the source schema export exists. The API typecheck failure is likely
+  because the package build artifacts the API resolves against don’t yet include
+  portalMessages, which is still a merge-time regression even if the source file
+  is correct. I’m checking the compiled database package once, then I’ll
+  consolidate the review.
+
+• Explored
+  └ Read index.d.ts, index.js
+    Search portal-messages|portalMessages in schema
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• I have the main conclusions. I’m pulling exact line numbers for the few findings
+  that matter most so the review can point straight at the merged code rather than
+  paraphrasing it.
+
+• Explored
+  └ Read portal-messages.controller.ts, portal-messages.service.ts, page.tsx, use-
+         portal-messages.ts, portal.service.ts, portal-auth.guard.ts, portal-
+         jwt.strategy.ts, api.ts, portal-messages.schema.ts, index.js, send-
+         message.dto.ts, use-portal-payments.ts, index.ts
+
+─ Worked for 2m 43s ──────────────────────────────────────────────────────────────
+
+• Reviewed main at fee94539131ebdc6e5f55db36dd0b3f9b85682fd.
+
+  Findings
+
+  - Critical The portal payments contract is broken. The backend returns raw
+    trip_orders.payment_summary unchanged in tailfire/apps/api/src/portal/
+    portal.service.ts:656, but trip orders store snake_case dollar-based fields
+    like processed_payments, balance_due, and payment_schedule in tailfire/apps/
+    api/src/financials/trip-order.service.ts:125 and tailfire/apps/api/src/
+    financials/trip-order.service.ts:1895. The client expects camelCase cent-based
+    fields like totalAmountCents and installments in tailfire/apps/client/src/
+    hooks/use-portal-payments.ts:11 and divides by 100 in tailfire/apps/client/
+    src/app/(dashboard)/payments/page.tsx:6. On current code, valid payment data
+    will likely render as $0.00 with no schedule.
+  - High Messaging is effectively one-way. The consumer routes exist in tailfire/
+    apps/api/src/portal-messages/portal-messages.controller.ts:27, tailfire/apps/
+    api/src/portal-messages/portal-messages.controller.ts:42, and tailfire/apps/
+    api/src/portal-messages/portal-messages.controller.ts:57, but sendFromAgent()
+    only exists as a service method in tailfire/apps/api/src/portal-messages/
+    portal-messages.service.ts:43. I did not find an admin endpoint or UI using it
+    on main.
+  - Medium Read access is properly contact-scoped, but trip validation is
+    incomplete. The auth path is sound: PortalAuthGuard always enforces portal JWT
+    auth in tailfire/apps/api/src/auth/guards/portal-auth.guard.ts:14, the
+    strategy requires a portal user plus contact_id and agency_id in tailfire/
+    apps/api/src/auth/strategies/portal-jwt.strategy.ts:84, and the controller
+    resolves the contact from contacts.portal_user_id = token.sub in tailfire/
+    apps/api/src/portal-messages/portal-messages.controller.ts:70. That means one
+    consumer cannot read another consumer’s messages through tripId. But the POST
+    path accepts any UUID tripId from the consumer in tailfire/apps/api/src/
+    portal-messages/dto/send-message.dto.ts:3 and stores it without verifying trip
+    access in tailfire/apps/api/src/portal-messages/portal-messages.service.ts:25.
+    That is a data-integrity hole.
+  - Medium markAsRead is semantically wrong for trip-scoped views and long
+    threads. GET /portal/my-messages marks messages read before fetching in
+    tailfire/apps/api/src/portal-messages/portal-messages.controller.ts:33,
+    markAsRead() updates all unread agent messages for the contact with no tripId
+    filter in tailfire/apps/api/src/portal-messages/portal-messages.service.ts:67,
+    and the fetch only returns the latest 100 in tailfire/apps/api/src/portal-
+    messages/portal-messages.service.ts:16. The race you described is not the real
+    failure mode: a message arriving after the update stays unread. The real bug
+    is over-marking unread messages the consumer has not actually seen.
+  - Medium The polling path is simple and not N+1, but unread counting is
+    inefficient and there is no realtime fallback. getMessagesForContact() is one
+    query in tailfire/apps/api/src/portal-messages/portal-messages.service.ts:10,
+    so no N+1 there. But getUnreadCount() loads all unread rows and uses .length
+    in tailfire/apps/api/src/portal-messages/portal-messages.service.ts:83. The
+    table only has (contact_id, created_at) and (trip_id, created_at) indexes in
+    tailfire/packages/database/src/schema/portal-messages.schema.ts:27, which is
+    not ideal for unread-count polling.
+  - Low The client UX is thinner than the plan suggests. Messages poll every 15s
+    in tailfire/apps/client/src/hooks/use-portal-messages.ts:18, unread count
+    polls every 30s in tailfire/apps/client/src/hooks/use-portal-messages.ts:41,
+    and the schema itself documents this as “Not real-time” in tailfire/packages/
+    database/src/schema/portal-messages.schema.ts:6. I did not find any WebSocket,
+    SSE, push, email, or client unread-badge usage on main.
+  - Low The messages page has no error state. It only reads data and isLoading in
+    tailfire/apps/client/src/app/(dashboard)/messages/page.tsx:18 and falls
+    through to “No messages yet” in tailfire/apps/client/src/app/(dashboard)/
+    messages/page.tsx:60. If auth or API fetch fails, the UX looks like an empty
+    inbox.
+
+  Direct answers
+
+  1. GET /portal/my-messages is properly consumer-scoped. The route does not trust
+     a client-supplied contact id; it resolves the contact from the authenticated
+     portal user and filters by that contact.
+  2. POST /portal/my-messages does prevent senderType='agent' injection. The DTO
+     only accepts body and optional tripId, and the service hardcodes senderType:
+     'consumer'.
+  3. tripId on GET does not do a formal trip-membership check, but it also does
+     not leak other consumers’ messages because the query is contactId AND tripId.
+     The real gap is POST, where tripId is not ownership-validated at all.
+  4. GET /portal/my-payments is broadly scoped to the consumer’s trips only by
+     traveler/primary-contact association in tailfire/apps/api/src/portal/
+     portal.service.ts:627. The logic is sound enough, but it is looser than
+     getTripsForPortalUser() because it does not also agency-scope. The bigger
+     problem is the broken paymentSummary shape.
+  5. The specific race you described is not accurate. A message arriving after
+     markAsRead() will remain unread. The actual correctness issue is that opening
+     the inbox marks unrelated or not-yet-returned agent messages as read.
+  6. getMessagesForContact() has no N+1 issue. Polling cost is linear with active
+     open inboxes, and each poll currently re-fetches up to 100 rows.
+  7. getUnreadCount() should use count(*), not row materialization plus .length.
+     At scale, this becomes unnecessary load.
+  8. sendFromAgent() is not exposed through any admin endpoint or UI that I found
+     on main. That is a real hole.
+  9. There is no realtime fallback beyond polling. No WebSockets, no SSE, no
+     notifications, and no wired unread badge surfaced in the client.
+
+  Recommended changes
+
+  - Fix payments first. Either map paymentSummary into a portal DTO on the
+    backend, or change the client to consume the real stored shape. Do not pass
+    raw trip-order snapshot JSON straight through.
+  - Add trip access validation on both message read and write paths. On GET,
+    validate tripId as UUID and confirm the contact belongs to the trip. On POST,
+    reject trip IDs the consumer does not own.
+  - Change read semantics: fetch first, then mark only the returned unread agent
+    message ids as read, ideally scoped by tripId and paired with pagination.
+  - Expose an agent reply path before calling this complete. The schema and
+    service assume admin-originated writes, but the merged code does not deliver
+    them.
+  - Replace unread .select().length with count(*), and add a better unread index
+    such as a partial index on unread agent messages by contact_id.
+  - Add an error state to the portal messages page.
+
+  Verification
+
+  - pnpm --dir /Users/alguertin/Development/tailfire-project/tailfire/apps/client
+    typecheck passed.
+  - pnpm --dir /Users/alguertin/Development/tailfire-project/tailfire/apps/api
+    typecheck failed. One touched-file regression is that portalMessages exists in
+    source exports at tailfire/packages/database/src/schema/index.ts:211, but the
+    built package the API is resolving still stops before it in tailfire/packages/
+    database/dist/schema/index.js:186.
+  - I did not find tests covering portal messages or portal payments.
+
+
+› Ensure you have the most current understanding of the codebase. Revise,
+  validate and provide critical feedback for Phase 6 (PR #282 - Portal Polish),
+  just merged to main.
+
+  Phase 6 added three workstreams (NO social login - that's deferred):
+
+  ### 1. Lifecycle-Aware Dashboard Hero CTA
+  - New `apps/client/src/components/dashboard/LifecycleHero.tsx` — renders state-
+  specific CTA
+  - Maps all 7 contactStatus values + 2 priority overrides → 9 CTA variants
+  - Priority order: unread messages > proposals to review > contactStatus
+  - States covered: prospecting, quoted, booked, traveling, returned,
+  awaiting_next, inactive
+  - Each CTA has eyebrow, title, body, ctaLabel, ctaHref, accent color (gold/
+  ember/orange)
+  - API change: added `contactStatus` to `getPortalProfile()` response in `apps/
+  api/src/portal/portal.service.ts`
+  - Wired into dashboard at `apps/client/src/app/(dashboard)/page.tsx`
+  - `hasProposalsToReview` uses `(trip as any).itineraries` cast — falls back to
+  false in practice since my-trips endpoint doesn't include itineraries
+  (commented as ready for future)
+
+  ### 2. Brand Polish (54 hex replacements)
+  - Replaced hardcoded hex colors with phoenix-* Tailwind tokens across 9 files:
+    - `#C59746` → `phoenix-gold`
+    - `#1A1A1A` → `phoenix-charcoal`
+    - `#B1481A` → `phoenix-ember`
+    - `#B33939` → `phoenix-red`
+    - `#E89E4A` → `phoenix-orange`
+  - Files affected: board, messages, payments, documents, settings, document-
+  upload-modal, signing-confirmation, signing-document, insurance-waiver-form
+  - Centralized in `packages/ui-public/tailwind.preset.ts`
+
+  ### 3. Mobile Responsive Polish (10 fixes across 7 pages)
+  - Header layouts: `flex-col` → `sm:flex-row`
+  - `flex-wrap` on overflow rows
+  - Touch targets: `min-h/w-[44px]` on send button, `p-2` on icon buttons
+  - Removed redundant `px-4` where dashboard layout already provides padding
+  - Responsive text sizes added on back-nav headers
+  - `items-start` + `min-w-0` on header rows to prevent text overflow
+
+  Please validate by reading the actual code on main:
+
+  1. CORRECTNESS: Does LifecycleHero handle the case where contactStatus is null/
+  undefined gracefully? Does the priority order (unread > proposals > status)
+  make sense for users?
+
+  2. CORRECTNESS: The `hasProposalsToReview` uses `(trip as any).itineraries`
+  cast. Is this dead code that should be removed, or is it actually receiving
+  data?
+
+  3. ACCESSIBILITY: Do the new components have proper ARIA labels, focus states,
+  keyboard navigation? Are color contrast ratios on the gold/ember/orange CTAs
+  against bg/10 backgrounds WCAG AA compliant?
+
+  4. UX: Does the lifecycle CTA disappear/change appropriately when state
+  transitions occur? Is there any caching that would prevent refresh?
+
+  5. PERFORMANCE: Did the brand polish introduce any unintended Tailwind purge
+  issues? Phoenix tokens are in the preset — does the client's tailwind.config.ts
+  properly import them?
+
+  6. CONSISTENCY: Are there still hardcoded hex values that were missed? Run a
+  quick grep and report any remaining.
+
+  7. MOBILE: Are the touch target fixes adequate? WCAG recommends 44x44px
+  minimum. Are there other tiny tap targets that were missed?
+
+  8. REGRESSIONS: Did any of these changes inadvertently break existing pages?
+  Specifically check the dashboard greeting flow and the trip detail pages.
+
+  9. TYPE SAFETY: Was `ContactStatus` properly typed and exported? Are there any
+  places using string literals that should reference the type?
+
+  10. The `nextTripDate` prop on LifecycleHero accepts `string | null` but is
+  documented as "for future enhancement". Should this be removed (YAGNI) or kept?
+
+  If changes or improvements are needed, please provide clear concise
+  instructions and guidance.
+
+
+• I’m reviewing the merged Phase 6 code on main directly. I’m starting with
+  LifecycleHero, the dashboard/profile data path, and the Tailwind preset/config
+  so the feedback is anchored to the actual implementation rather than the PR
+  summary.
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire rev-parse
+  │ --abbrev-ref HEAD
+  └ preview
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire rev-parse HEAD
+  └ ee042e5470c06837315d713284e4267c52e9123b
+
+• Explored
+  └ List client
+    Search LifecycleHero|dashboard/page.tsx|use-portal-data|portal.service.ts|
+           tailwind.preset.ts|tailwind.config|trips/.*/page.tsx|trip.*page.tsx|
+           messages/page.tsx|payments/page.tsx|documents/page.tsx|settings/
+page.tsx|
+           document-upload-modal|signing-confirmation|signing-document|insurance-
+           waiver-form
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire status --short
+  └  M apps/client/tsconfig.tsbuildinfo
+     M packages/database/tsconfig.tsbuildinfo
+     M packages/shared-types/tsconfig.tsbuildinfo
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• The checked-out repo is currently on preview, not main, so I’m verifying the
+  actual main ref before I rely on the worktree contents. After that I’ll read the
+  live files and the Tailwind/token setup.
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire rev-parse main
+  └ 669adb71db2ac77c467c57782fe6e7d4487f02b1
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire log --oneline
+  │ --decorate -n 8 --all -- apps/client/src/components/dashboard/
+  │ LifecycleHero.tsx apps/client/src/app/'(dashboard)'/page.tsx apps/api/src/
+  │ … +1 lines
+  └ 68a76553 feat(client): Phoenix Voyages branded portal shell — dark nav,
+    dashboard skeleton
+    8ba8d46e fix: resolve Codex review issues — uncancel, automation transitions,
+    client portal statuses
+    695c895c fix: portal bugs, global empty-string transform, CRM date constraints
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/components/dashboard/LifecycleHero.tsx' | sed -n
+  │ '1,260p'
+  └ 'use client'
+
+    … +169 lines
+      )
+    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/page.tsx' | sed -n '1,260p'
+  └ "use client";
+
+    … +257 lines
+                <CardHeader className="flex flex-row items-center
+    justify-between">
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/hooks/use-portal-data.ts' | sed -n '1,260p'
+  └ "use client";
+
+    … +256 lines
+          }),
+        onSuccess: () => {
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/api/src/portal/portal.service.ts' | sed -n '1,180p;600,700p'
+  └ /**
+     * Portal Service
+    … +277 lines
+              totalAmountCents: Math.round(totalDollars * 100),
+              paidAmountCents: Math.round(paidDollars * 100),
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/tailwind.config.ts' | sed -n '1,220p'
+  └ import type { Config } from "tailwindcss";
+    import { phoenixPreset } from "@tailfire/ui-public/tailwind.preset";
+    … +8 lines
+
+    export default config;
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'packages/ui-public/tailwind.preset.ts' | sed -n '1,260p'
+  └ import type { Config } from "tailwindcss";
+    import animate from "tailwindcss-animate";
+    … +136 lines
+
+    export default phoenixPreset;
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• I’ve confirmed the hero/profile path and the Tailwind preset hookup. Next I’m
+  checking the portal trip response shape, the remaining hardcoded colors, and the
+  mobile-touched pages so I can separate real regressions from harmless cleanup.
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/api/src/portal/portal.service.ts' | sed -n '220,340p'
+  └       throw error
+        }
+    … +117 lines
+          throw new NotFoundException('Portal profile not found')
+        }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/trips/[tripId]/page.tsx' | sed -n
+  │ '1,280p'
+  └ "use client"
+
+    … +229 lines
+      )
+    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/trips/[tripId]/itineraries/
+  │ [itineraryId]/page.tsx' | sed -n '1,300p'
+  └ "use client"
+
+    … +248 lines
+      )
+    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire grep -nE
+  │ '#[0-9A-Fa-f]{3,8}' main -- 'apps/client/src/**/*.tsx' 'apps/client/src/**/
+  │ *.ts' 'packages/ui-public/**/*.ts' 'packages/ui-public/**/*.tsx'
+  └ main:packages/ui-public/src/components/ui/chart.tsx:50:          "flex
+    aspect-video justify-center text-xs
+    … +9 lines
+    [&_.recharts-sector[stroke='#fff']]:stroke-transparent
+    [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire grep -n
+  │ "contactStatus\|ContactStatus\|traveling\|awaiting_next\|prospecting\|
+  │ quoted\|booked\|returned\|inactive" main -- 'apps/client/src/**/*.ts' 'apps/
+  │ … +2 lines
+  └ main:apps/api/src/activity-logs/audit-sanitizer.ts:59:    'contactType',
+    'contactStatus',
+    … +460 lines
+    main:packages/shared-types/src/utils/__tests__/date-utils.test.ts:39:      //
+    Verify all returned timezones are valid
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• I found one clear logic gap already: hasProposalsToReview is reading
+  trip.itineraries, but the live /portal/my-trips response does not include
+  itineraries at all, so that branch is effectively always false. I’m now checking
+  the component-level accessibility and whether the mobile fixes still leave small
+  icon targets in the portal.
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'packages/ui-public/src/components/ui/button.tsx' | sed -n '1,240p'
+  └ import * as React from "react";
+    import { Slot } from "@radix-ui/react-slot";
+    … +44 lines
+
+    export { Button, buttonVariants };
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/messages/page.tsx' | sed -n '1,260p'
+  └ 'use client'
+
+    … +126 lines
+      )
+    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/documents/page.tsx' | sed -n '1,320p'
+  └ "use client";
+
+    … +231 lines
+      );
+    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/settings/page.tsx' | sed -n '1,320p'
+  └ 'use client'
+
+    … +121 lines
+      )
+    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/components/documents/document-upload-modal.tsx' | sed
+  │ -n '1,320p'
+  └ 'use client'
+
+    … +150 lines
+      )
+    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/components/signing-document.tsx' | sed -n '1,320p'
+  └ 'use client'
+
+    … +312 lines
+      )
+    }
+
+• Explored
+  └ Search new QueryClient|QueryClientProvider|staleTime|refetchOnWindowFocus|
+gcTime|
+           defaultOptions in client
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/payments/page.tsx' | sed -n '1,220p'
+  └ 'use client'
+
+    … +112 lines
+      )
+    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/components/signing-confirmation.tsx' | sed -n '1,280p'
+  └ 'use client'
+
+    … +137 lines
+      )
+    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/forms/[token]/_components/
+  │ insurance-waiver-form.tsx' | sed -n '1,320p'
+  └ 'use client'
+
+    … +316 lines
+                      <ul className="list-disc pl-6 space-y-2">
+                        <li>
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/providers.tsx' | sed -n '1,120p'
+  └ "use client";
+
+    … +22 lines
+      );
+    }
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• I’m checking two more things that affect whether this feels polished in
+  practice: the dashboard query caching policy, and the actual contrast/tap target
+  behavior rather than the intent in the PR summary. After that I’ll consolidate
+  the review with concrete fixes.
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/layout.tsx' | sed -n '1,220p'
+  └ "use client";
+
+    … +13 lines
+      );
+    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire grep -n
+  │ "size=\"icon\"\|size-10 min-h\|min-h-\[44px\]\|min-w-\[44px\]\|p-2 text-"
+  │ main -- 'apps/client/src/**/*.tsx'
+  └ main:apps/client/src/app/(dashboard)/documents/page.tsx:67:
+    size="icon"
+    … +30 lines
+    main:apps/client/src/components/dashboard/DashboardHeader.tsx:141:
+    size="icon"
+
+• Ran node -e "function h2r(h){h=h.replace('#','');return
+  │ [0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255)} function lin(c){return
+  │ c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4)} function lum([r,g,b])
+  │ … +14 lines
+  └ white/gold 2.66
+    white/ember 5.51
+    … +6 lines
+    ember on ember10 over white approx 4.75
+    orange on orange10 over white approx 2.06
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire grep -n
+  │ "btn-phoenix-primary" main -- 'apps/client/src/**/*.tsx' 'packages/
+  │ ui-public/src/**/*.tsx' 'packages/ui-public/src/**/*.ts' 'packages/
+  │ … +1 lines
+  └ main:apps/client/src/app/(dashboard)/documents/page.tsx:143:
+    className="mt-6 btn-phoenix-primary"
+    … +2 lines
+    main:apps/client/src/components/itinerary/
+    FeedbackDialog.tsx:136:                : "btn-phoenix-primary"
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire grep -n
+  │ "\.btn-phoenix-primary\|btn-phoenix-primary" main -- 'apps/client/src/**/
+  │ *.css' 'packages/ui-public/src/**/*.css' 'apps/client/src/**/*.tsx'
+  │ … +2 lines
+  └ main:apps/client/src/app/(dashboard)/documents/page.tsx:143:
+    className="mt-6 btn-phoenix-primary"
+    … +2 lines
+    main:apps/client/src/components/itinerary/
+    FeedbackDialog.tsx:136:                : "btn-phoenix-primary"
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• I found a small-but-real styling question unrelated to the new hero: btn-
+  phoenix-primary is still being used on the client, and I’m verifying whether
+  that utility actually exists or if it’s just an orphaned class that happens to
+  go unnoticed.
+
+• Explored
+  └ Search btn-phoenix-primary in tailfire
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/api/src/contacts/contact-lifecycle.service.ts' | sed -n '20,35p'
+  └ import { TravelerCreatedEvent } from '../activity-logs/events/
+    traveler-created.event'
+    … +15 lines
+    @Injectable()
+    export class ContactLifecycleService {
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'packages/shared-types/src/api/contacts.types.ts' | sed -n
+  │ '60,90p;160,180p;208,218p;326,336p'
+  └   dietaryRequirements?: string
+      mobilityRequirements?: string
+    … +70 lines
+
+      // Marketing Consent
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/components/dashboard/DashboardHeader.tsx' | sed -n
+  │ '120,180p'
+  └                   >
+                        <User className="h-4 w-4 mr-2" />
+    … +43 lines
+      );
+    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/documents/page.tsx' | sed -n
+  │ '56,110p;188,220p'
+  └   });
+
+    … +86 lines
+              {activeFilter === 'all' && !searchQuery && (
+                <button
+
+──────────────────────────────────────────────────────────────────────────────────
+
+• One more significant UI check turned up: the dashboard layout itself is dark, so
+  the hero’s semi-transparent accent backgrounds are blending over charcoal, not
+  over white. I’m calculating the actual contrast now because that can turn what
+  looks fine in code into unreadable text.
+
+• Ran node - <<'NODE'
+  │ function hexToRgb(h){h=h.replace('#','');return
+  │ [0,2,4].map(i=>parseInt(h.slice(i,i+2),16))}
+  │ … +24 lines
+  └ gold bg over charcoal #2b271e
+     contrast title charcoal/bg 1.17
+    … +10 lines
+    icon white80 over charcoal #d1d1d1 contrast gold icon on white80 1.74 ember
+    3.61 orange 1.46
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/page.tsx' | nl -ba | sed -n '1,180p'
+  └      1    "use client";
+         2
+    … +180 lines
+       180                        Your trips will appear here once your advisor
+    creates them.
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/components/dashboard/LifecycleHero.tsx' | nl -ba | sed
+  │ -n '1,220p'
+  └      1    'use client'
+         2
+    … +169 lines
+       171      )
+       172    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/providers.tsx' | nl -ba | sed -n '1,80p'
+  └      1    "use client";
+         2
+    … +24 lines
+        25      );
+        26    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/documents/page.tsx' | nl -ba | sed -n
+  │ '56,110p;188,214p'
+  └     56      });
+        57
+    … +82 lines
+       214                  ? `No documents matching "${searchQuery}". Try
+    adjusting your search.`
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/components/documents/document-upload-modal.tsx' | nl
+  │ -ba | sed -n '58,150p'
+  └     58      }
+        59
+    … +90 lines
+       149              </div>
+       150            </div>
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/trips/[tripId]/page.tsx' | nl -ba |
+  │ sed -n '80,100p'
+  └     80      }
+        81
+    … +18 lines
+        99                )}
+       100              </div>
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/trips/[tripId]/itineraries/
+  │ [itineraryId]/page.tsx' | nl -ba | sed -n '92,108p'
+  └     92
+        93      return (
+    … +14 lines
+       107                </Badge>
+       108                {itinerary.primaryDestinationName && (
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/layout.tsx' | nl -ba | sed -n '1,40p'
+  └      1    "use client";
+         2
+    … +14 lines
+        15      );
+        16    }
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire show
+  │ main:'apps/client/src/app/(dashboard)/messages/page.tsx' | nl -ba | sed -n
+  │ '96,128p'
+  └     96                        {formatTime(msg.createdAt)}
+        97                      </p>
+    … +29 lines
+       127        </div>
+       128      )
+
+─ Worked for 1m 13s ──────────────────────────────────────────────────────────────
+
+• I’m doing one last sanity check on branch drift. The repo is checked out on
+  preview, so I want to know whether the Phase 6 files differ from the main ref
+  before I cite any line numbers as authoritative.
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire diff
+  │ --name-only main..preview -- apps/client apps/api packages/ui-public
+  └ apps/api/src/auth/auth.module.ts
+    apps/api/src/auth/auth.service.ts
+    apps/api/src/email/templates/invite.template.ts
+    apps/api/src/email/templates/password-reset.template.ts
+    apps/api/src/main.ts
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire grep -n
+  │ "contactStatus\|ContactStatus" main -- 'packages/shared-types/src/schemas/
+  │ *.ts' 'packages/shared-types/src/**/*.ts' | head -n 40
+  └ main:packages/shared-types/src/api/contacts.types.ts:71:  contactStatus?:
+    'prospecting' | 'quoted' | 'booked' | 'traveling' | 'returned' |
+    … +12 lines
+    'prospecting' | 'quoted' | 'booked' | 'traveling' | 'returned' |
+    'awaiting_next' | 'inactive'
+
+• Explored
+  └ Read use-portal-data.ts, portal.service.ts, tailwind.config.ts, use-portal-
+         messages.ts
+
+─ Worked for 2m 02s ──────────────────────────────────────────────────────────────
+
+• I reviewed the main ref at 669adb71db2ac77c467c57782fe6e7d4487f02b1. The
+  checked-out branch is preview, but these Phase 6 files match main.
+
+  Findings
+
+  - High The new hero is visually wrong on the dark dashboard shell. The dashboard
+    background is bg-phoenix-charcoal in tailfire/apps/client/src/app/(dashboard)/
+    layout.tsx:10, but tailfire/apps/client/src/components/dashboard/
+    LifecycleHero.tsx:134 uses translucent accent backgrounds with a text-phoenix-
+    charcoal title at tailfire/apps/client/src/components/dashboard/
+    LifecycleHero.tsx:146. That yields roughly 1.08–1.19:1 contrast for the title.
+    The CTA buttons also use white text on gold/orange at tailfire/apps/client/
+    src/components/dashboard/LifecycleHero.tsx:113 and tailfire/apps/client/src/
+    components/dashboard/LifecycleHero.tsx:123; phoenix-gold and phoenix-orange
+    are about 2.66:1 and 2.23:1 against white, so they fail WCAG AA. Only ember
+    passes.
+  - Medium The “proposal ready” priority path is dead. tailfire/apps/client/src/
+    app/(dashboard)/page.tsx:81 checks (trip as any).itineraries, but PortalTrip
+    has no itineraries field in tailfire/apps/client/src/hooks/use-portal-
+    data.ts:69, and /portal/my-trips does not return one in tailfire/apps/api/src/
+    portal/portal.service.ts:300. In practice hasProposalsToReview is always
+    false.
+  - Medium The hero can stay on the wrong CTA longer than it should. Global React
+    Query config uses staleTime: 60s and refetchOnWindowFocus: false in tailfire/
+    apps/client/src/app/providers.tsx:7. useUnreadCount() only polls every 30s
+    while mounted in tailfire/apps/client/src/hooks/use-portal-messages.ts:41, and
+    usePortalProfile() / usePortalTrips() do not poll at all in tailfire/apps/
+    client/src/hooks/use-portal-data.ts:90. So unread-message priority can stick
+    briefly after the inbox is cleared, and status-based CTAs won’t react quickly
+    to backend lifecycle transitions.
+  - Medium Accessibility/mobile polish is incomplete. Several new custom buttons
+    do not use the shared Button component’s focus styles from tailfire/packages/
+    ui-public/src/components/ui/button.tsx:7, and some still miss accessible names
+    or 44px targets:
+      - Messages send button has no aria-label in tailfire/apps/client/src/app/
+        (dashboard)/messages/page.tsx:115.
+      - Documents upload/filter/delete buttons are custom and undersized in
+        tailfire/apps/client/src/app/(dashboard)/documents/page.tsx:91, tailfire/
+        apps/client/src/app/(dashboard)/documents/page.tsx:103, and tailfire/apps/
+        client/src/app/(dashboard)/documents/page.tsx:195.
+      - Upload modal close/remove buttons are too small and unlabeled in tailfire/
+        apps/client/src/components/documents/document-upload-modal.tsx:74 and
+        tailfire/apps/client/src/components/documents/document-upload-
+        modal.tsx:110.
+      - Trip detail back buttons still lack screen-reader labels in tailfire/apps/
+        client/src/app/(dashboard)/trips/[tripId]/page.tsx:86 and tailfire/apps/
+        client/src/app/(dashboard)/trips/[tripId]/itineraries/[itineraryId]/
+        page.tsx:97.
+  - Low Type hygiene is only partial. ContactStatus is exported locally from
+    tailfire/apps/client/src/hooks/use-portal-data.ts:6, but the same union is
+    duplicated in tailfire/packages/shared-types/src/api/contacts.types.ts:71 and
+    again in tailfire/apps/api/src/contacts/contact-lifecycle.service.ts:25. Also
+    firstName and nextTripDate are both unused props on tailfire/apps/client/src/
+    components/dashboard/LifecycleHero.tsx:7.
+
+  Direct Answers
+
+  1. contactStatus null/undefined is handled safely by the default branch in
+     tailfire/apps/client/src/components/dashboard/LifecycleHero.tsx:94. The
+     priority order is reasonable, but today it behaves as unread > status because
+     the proposal branch never gets data.
+  2. hasProposalsToReview is dead code right now. Remove it, or replace it with a
+     real backend field like hasPendingProposal.
+  3. Accessibility is not at AA today. The hero contrast fails badly on the dark
+     dashboard, gold/orange CTA buttons fail with white text, and several custom
+     icon/buttons need labels and focus treatment.
+  4. CTA state changes are only partially fresh. Unread can update on its
+     interval; profile/trip lifecycle changes will lag because there is no polling
+     and no focus refetch.
+  5. I do not see a Tailwind purge issue. The client imports the preset correctly
+     in tailfire/apps/client/tailwind.config.ts:4, and the class names are static
+     strings.
+  6. Remaining hardcoded hex in the portal/client scan: only tailfire/packages/ui-
+     public/src/components/ui/chart.tsx:50 (#ccc, #fff). The preset still contains
+     canonical hex token definitions by design.
+  7. Touch targets are mixed. Shared Button size="icon" is fine at 44x44 from
+     tailfire/packages/ui-public/src/components/ui/button.tsx:23. Missed small
+     targets are the documents filter pills, documents upload/delete buttons, and
+     upload-modal close/remove buttons.
+  8. I don’t see a hard break in the dashboard greeting flow; the fallback logic
+     in tailfire/apps/client/src/app/(dashboard)/page.tsx:77 is fine. Trip detail
+     pages mostly survive, but tailfire/apps/client/src/app/(dashboard)/trips/
+     [tripId]/page.tsx:93 still doesn’t wrap the status row, so long content can
+     overflow on narrow screens.
+  9. ContactStatus is typed and exported, but not from a canonical source. It
+     should move into shared types and be imported everywhere instead of repeating
+     string unions.
+  10. nextTripDate should be removed for now. Same for firstName. They are dead
+     props today.
+
+  Recommended changes
+
+  - Fix LifecycleHero styling first. On the dark dashboard, use light text inside
+    the hero, and either darken phoenix-gold / phoenix-orange or switch those CTA
+    buttons to dark text.
+  - Replace the itineraries cast with a real hasPendingProposal boolean from /
+    portal/my-trips, or drop the branch until that exists.
+  - Improve freshness: invalidate unread state after visiting messages, and either
+    enable focus refetch or add a light refresh policy for profile/trips on the
+    dashboard.
+  - Convert custom action buttons to shared Button where possible, and add aria-
+    label / sr-only text plus 44x44 targets where not.
+  - Centralize ContactStatus in shared types and remove unused hero props.
+
+
+› Ensure you have the most current understanding of the Tailfire codebase. Revise, validate and
+  provide critical feedback for the following DESIGN (not yet implementation).
+
+  ## Context
+  Tailfire is a multi-tenant travel-agency platform (NestJS API + Next.js admin). The existing
+  commission module (apps/api/src/financials/commission/) tracks supplier-received checks,
+  agent payouts, and settlements with two-stage commission splits. Today, the IC payout flow is
+  record-only — admins cut real e-Transfers/wires manually outside Tailfire.
+
+  ## Goal of this design
+  Build a CRA-conformant Independent Contractor (IC) self-serve commission disbursement system.
+  Phase 1 ships full mechanics with MANUAL money movement (admin sends Interac e-Transfer or
+  Wise wire by hand and records proof). Phase 2 swaps in VoPay or DreamPay behind a
+  `PayoutProvider` interface — no schema or workflow change.
+
+  ## Locked decisions (from user brainstorming)
+  - Single-tenant v1 (Phoenix Voyages); Doppler-stored config
+  - Self-invoicing PDF generated by Tailfire (CRA recipient-created tax invoice pattern;
+  written authorization e-signed once per IC, re-prompt on agreement version bump)
+  - Probationary trust: ICs get an `auto_disburse` flag (admin-set only, no auto-graduation)
+  - Aggregate invoices — IC selects multiple eligible commissions per claim
+  - Mixed-currency claim splits into one invoice per currency
+  - Auto GST/HST gross-up by IC's province if registered (per-IC `gstHstNumber` + province →
+  tax rate)
+  - Full T4A: PDF + CRA XML XFile generation (Box 048 Fees for Services)
+  - Currency for payout = original commission's currency (CAD/USD; multi-account per IC, one
+  default per currency)
+  - Failure handling: unsettle claimed items, return to "eligible", notify IC + admin
+  - Canadian residents only in v1 (US/intl ICs are future add-ons)
+  - No cheques, ever
+  - No settlement holdback beyond existing trip-status filter (`travelling`/`travelled` AND
+  supplier-check accepted)
+  - Adjustments: all pending IC-targeted `commission_adjustments` auto-roll into next claim
+  - USD on T4A: snapshot Bank of Canada daily rate on payout-completion date;
+  cadEquivalentCents stored on disbursement
+
+  ## Architecture
+  - New NestJS module `IcPayoutModule` with services: IcPayoutAccounts, IcInvoice,
+  IcInvoicePdf, Disbursement, TaxYear, T4ASlip, FxRate
+  - `PayoutProvider` strategy interface with `ManualProvider` (v1 only). v2 adds VoPay or
+  DreamPay.
+  - Existing `commission_checks` (paid type) + `commission_item_settlements` are KEPT and
+  reused — when an invoice is approved, system creates legacy paid-check + settlements
+  internally so legacy reports/payAgents still work.
+  - Admin and IC interact only with the new entities.
+
+  ## New tables (Drizzle/Postgres, all carry agencyId + audit FKs)
+  1. `ic_payout_accounts` — multi-account per IC, keyed by currency. Fields: userId, label,
+  currency, rail (interac_etransfer|eft|wise|wire|visa_direct), isDefaultForCurrency, status,
+  detailsEncrypted (pgcrypto), detailsMask, providerName/providerToken (null in v1),
+  padAgreementVersion/padAcceptedAt/padAcceptedIp.
+  2. `ic_payout_authorizations` — one per IC self-invoice authorization acceptance:
+  agreementVersion, acceptedAt, acceptedIp, signaturePngUrl. Re-prompt on version bump.
+  3. `ic_invoices` — one per claim per currency. Fields: invoiceNumber (sequential per-IC-per-
+  year), invoiceDate, currency, snapshotted IC identity (legalName/address/province/
+  gstHstNumber/sinOrBn encrypted), subtotalCents/taxCents/totalCents, taxJurisdiction/
+  taxRateBp, pdfUrl/pdfHash (sha256), status (draft|submitted|approved|cancelled), submittedAt/
+  approvedAt/approvedBy/rejectedReason.
+  4. `ic_invoice_lines` — lineType (commission|adjustment), checkItemId or adjustmentId FK,
+  description, tripRef, amountCents (can be negative), currency.
+  5. `ic_disbursements` — 1:1 with invoice. Fields: invoiceId, payoutAccountId (snapshot),
+  amountCents, currency, provider ('manual'|'vopay'|'dreampay'), rail, idempotencyKey, status
+  (pending|authorized|sending|sent|failed|returned|cancelled), v1 manual fields
+  (manualReference, manualProofUrl, manualSentAt, manualSentBy), v2 provider fields
+  (providerTxnId, providerWebhookPayloads jsonb, providerFeeCents), failure fields, FX snapshot
+  (fxRateToCad, cadEquivalentCents, fxRateSource, fxRateDate), completedAt.
+  6. `ic_t4a_slips` — one per IC per taxYear. Box048Cents =
+  sum(disbursements.cadEquivalentCents in year), snapshotted identity, status (draft|finalized|
+  amended|cancelled), pdfUrl/pdfHash, lockedAt.
+  7. `ic_t4a_filings` — per-year XFile batch. xmlFileUrl/xmlHash, totalSlips, totalBox048Cents,
+  submittedToCraAt, craConfirmation, status.
+  8. `fx_rate_snapshots` — daily BoC rates. (rateDate, fromCurrency, toCurrency) pk, rate,
+  source, fetchedAt.
+
+  ## Specific concerns I want validated
+  1. **Reuse vs replace**: Is reusing the existing `commission_checks` paid-type as an internal
+  artifact behind the new `ic_invoices` sound, or is the dual-write pattern likely to drift?
+  Should we instead deprecate `payAgents` entirely?
+  2. **Provider seam**: Is `PayoutProvider` strategy at the service layer the right seam, or
+  should it be a queue/event-driven adapter (so Phase 2 webhook-driven status updates feel
+  native)?
+  3. **Self-invoice CRA pattern**: Recipient-created tax invoice (RCTI) is permitted in Canada
+  under specific GST/HST agreement clauses. Are we capturing the right authorization fields
+  (version, e-signed, IP) to satisfy CRA audit?
+  4. **GST/HST tax math**: Province → rate mapping should use the IC's province of business
+  (not the trip's) for self-employed commission income. Confirm. Also: do we apply HST when IC
+  is registered AND lives in HST province, or always at IC's province rate regardless of trip
+  origin? (CRA: place-of-supply rules for services, generally where the service was rendered =
+  IC's location.)
+  5. **FX for T4A**: Bank of Canada publishes a single daily rate (replaced noon-rate in 2017).
+  Is BoC daily rate on completedAt date defensible? Or should we use BoC monthly average for
+  predictability?
+  6. **Multi-currency invoice splitting**: A claim spanning CAD and USD line items splits into
+  2 invoices, 2 disbursements. Does this complicate IC mental model or is it cleaner?
+  7. **Encryption boundary**: `detailsEncrypted` (bank info) and `sinOrBn` use pgcrypto
+  envelope keys stored in Doppler. Is that sufficient for PIPEDA + CRA, or do we need a
+  dedicated KMS (AWS KMS/GCP KMS) for SIN-class data?
+  8. **Idempotency**: `idempotencyKey` generated at request time even in v1 (manual provider
+  ignores it). Right move for forward compat?
+  9. **Admin approval gate**: For non-auto_disburse ICs, every invoice requires explicit admin
+  approve. Should we add a $ ceiling that ALSO triggers approval even for auto_disburse ICs
+  (fraud blast-radius limiter)?
+  10. **Year-end T4A locking**: `ic_t4a_filings.lockedAt` freezes the year against further
+  edits after CRA submission. Amendments require an explicit "amend" workflow that creates a
+  new filing record. Is this right per CRA T4A amendment rules (amended slips marked with code
+  "A")?
+
+  Please review against the actual Tailfire codebase (apps/api/src/financials/commission/,
+  packages/database/src/schema/commission-checks.schema.ts, user_profiles.commission_settings,
+  existing trip-order-invoice / Puppeteer PDF infra, encryption patterns in api-credentials/,
+  audit log patterns in activity-logs/). Identify blocking issues, schema risks, naming
+  collisions with existing tables, drift risks with the legacy commission flow, and any CRA/
+  PIPEDA exposure I may have missed.
+
+  If changes or improvements are needed, please provide clear concise instructions and
+  guidance.
+
+
+• I’m validating this against the live Tailfire code first, then I’ll check the CRA/GST/T4A
+  assumptions against current primary-source guidance. I’m starting with the commission schemas/
+  services, existing payout flow, PDF infrastructure, encryption patterns, and audit logging so
+  the design feedback is anchored to what Tailfire actually does today.
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire rev-parse HEAD
+  └ 753612315328125b124b7fd9beed35e1a36daa4e
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire rev-parse --abbrev-ref HEAD
+  └ fix/sentry-triage-batch1
+
+• Explored
+  └ List api
+    Search financials/commission|commission-checks\.schema|commission|trip-order|document-
+templates|
+           handlebars|puppeteer|api-credentials|activity-logs|user-profiles\.schema|trip-
+           orders\.schema|encryption
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire status --short
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve confirmed the repo is clean, but it’s checked out on fix/sentry-triage-batch1, not main.
+  I’m reading the current commission code and schema next, and I’ll also verify whether these
+  areas differ from main before I treat any branch-local code as authoritative.
+
+• Explored
+  └ Read user-profiles.schema.ts, commission-checks.schema.ts
+    Search payAgents|commission_item_settlements|commission_checks|paid type|checkType|settle|
+           adjustment|eligible|payout|disburse|agent payout|self invoice|invoice in commission
+
+• Ran git -C /Users/alguertin/Development/tailfire-project/tailfire diff --name-only main..HEAD
+  │ -- apps/api/src/financials/commission packages/database/src/schema/
+  │ commission-checks.schema.ts packages/database/src/schema/user-profiles.schema.ts apps/api/
+  │ … +2 lines
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• The relevant commission, document, encryption, and activity-log files are identical to main,
+  so I can cite the current worktree safely. I’m reading the payout mechanics and the existing
+  PDF/encryption/audit seams now, because the biggest question in your design is whether the new
+  IC flow can sit on top of the old commission settlement artifacts without drifting.
+
+• Explored
+  └ Read commission.service.ts, commission.controller.ts, commission.types.ts, trip-
+order.service.ts
+    Search commissionSettings|licensingInfo|split|collaborator|gst|hst|tax|independent|
+contractor|
+           payout|bank|sin|bn in api
+
+─ Worked for 1m 10s ────────────────────────────────────────────────────────────────────────────
+
+• Context compacted
+
+• Searching the web
+
+• Searched
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’m validating the design against the live commission code and the current CRA/BoC guidance,
+  because the tax and filing assumptions here are exactly where a clean architecture can still
+  be wrong.
+
+• Searching the web
+
+• Searched site:canada.ca CRA recipient-created tax invoice GST/HST agreement recipient-created
+  invoice self-billing
+
+• Searching the web
+
+• Searched site:canada.ca GST/HST info sheet recipient created invoice self-billing agreement
+
+• Searching the web
+
+• Searched site:canada.ca T4A slip box 048 fees for services amended code A
+
+• Searching the web
+
+• Searched site:canada.ca Internet file transfer amended T4A code A xml
+
+• Searching the web
+
+• Searched site:canada.ca recipient created invoice GST/HST Canada self-billing agreement
+
+• Searching the web
+
+• Searched site:priv.gc.ca PIPEDA safeguards sensitivity encryption key management personal
+  information
+
+• Searching the web
+
+• Searched site:bankofcanada.ca daily exchange rates noon rate replaced 2017 bank of canada
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve got enough to start tightening the design against the actual payout code. Next step is
+  verifying the exact legacy seams: how payAgents, settlements, adjustments, commission
+  settings, encryption, and PDF rendering behave today.
+
+• Explored
+  └ Read user-profiles.service.ts, update-user-profile.dto.ts, api-credentials.service.ts,
+         encryption.service.ts, audit-sanitizer.ts, puppeteer-pdf.service.ts, handlebars-
+         renderer.service.ts
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• The key risk is already showing up: the current commission engine is more coupled than the
+  design assumes. I’m now checking where paid checks and settlements are consumed so I can tell
+  you whether “internal legacy artifact” is safe or whether you need a clean cutover.
+
+• Explored
+  └ Read commission.service.ts
+    Search commission_item_settlements|checkType.*'paid'|check_type.*paid|commission_checks in
+api
+    Read activity-pricing.schema.ts, commission.types.ts
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve confirmed the legacy payout path is not just dormant bookkeeping. Paid checks and
+  settlements already feed dashboards and financial reports, so any “new layer over old layer”
+  design needs a clear source-of-truth rule or it will drift fast.
+
+• Explored
+  └ Read financial.queries.ts, dashboard.service.ts, document-templates.service.ts, template-
+         context-builder.service.ts
+
+• Searching the web
+
+• Searched
+
+• Searching the web
+
+• Searched
+  https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/char
+ge-collect-place-supply.html
+
+• Searching the web
+
+• Searched 'General rule 1' in
+  https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/char
+ge-collect-place-supply.html
+
+• Searching the web
+
+• Searched
+  https://www.canada.ca/en/services/taxes/excise-taxes-duties-and-levies/digital-services-tax/ra
+te-exchange.html
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve confirmed a second major architectural constraint: Tailfire already exposes self-claiming
+  (POST /commission/claims/me) and admin paid-check views. If this design ships without
+  explicitly cutting those paths over, agents will have two payout systems at once.
+
+• Explored
+  └ Read page.tsx, commission.controller.ts, user-profiles.schema.ts
+    Search claims/me|payAgents\(|commission/due/pay|commission/claims/me in apps
+
+• Searching the web
+
+• Searched site:canada.ca recipient created tax invoice agreement GST/HST self-billing invoice
+  supplier recipient
+
+• Searching the web
+
+• Searched
+  https://www.canada.ca/en/revenue-agency/services/forms-publications/publications/8-4/documenta
+ry-requirements-claiming-input-tax-credits.html
+
+• Searching the web
+
+• Searched 'Evidence of the fact of agreement' in
+  https://www.canada.ca/en/revenue-agency/services/forms-publications/publications/g300-6-4/agre
+ements-writing-gst-300-6-4.html
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’m checking the operational scaffolding now: encryption, audit sanitization, document
+  rendering, and admin hooks. That’s where hidden blockers show up for SIN handling, proof
+  files, and year-end documents.
+
+• Explored
+  └ Search sanitizeForAudit|ActivityLogsService|activity_logs|log.*audit|buildAuditDescription
+in
+           api
+    Read activity-logs.service.ts, activity-log-helpers.ts
+    Search storageService\.upload|uploadMediaFile|uploadFile|documents bucket|proofUrl|pdfUrl in
+api
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve got enough to judge the financial core. I’m doing one last pass on storage and schema
+  shape so I can call out whether proofs, PDFs, and encrypted payout details can reuse the
+  current infrastructure cleanly.
+
+• Explored
+  └ Read storage.service.ts, trip-order.service.ts
+    Search gstHstNumber|hstNumber|sin|business number|bn in api
+    Search invoiceNumber|sequential|trip order number|versionNumber|pdfHash|sha256|hash in api
+
+• Searching the web
+
+• Searched site:canada.ca T4A amount paid during the year dollars and cents Canadian dollars
+
+• Searching the web
+
+• Searched 'Report all amounts in Canadian dollars, even if they were paid in another currency'
+
+• Searching the web
+
+• Searched
+  https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/payroll/completing-fili
+ng-information-returns/t4a-information-payers/t4a-slip.html
+
+• Explored
+  └ Read index.ts
+    Search ic_|disbursement|payout_account|t4a|fx_rate|authorization in schema
+    Read user-profiles.types.ts
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve isolated the main design tension: the existing commission engine is single-currency,
+  single-settlement, and already user-facing. The design can work, but only if it treats the
+  legacy rows as a private write-through ledger and explicitly turns off the old self-claim
+  route.
+
+• Explored
+  └ Read commission.service.ts, commission-checks.schema.ts
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• One more validation pass: I’m checking whether Tailfire already has the right async processing
+  primitives. That determines whether the provider seam should stay synchronous at the service
+  layer or become a first-class queue/job model from day one.
+
+• Explored
+  └ Read document-render.processor.ts
+    Search BullMQ|BullModule|@Processor|@Process|document render|webhook|queue in api
+    Read commission.module.ts, trip-orders.schema.ts
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I’ve verified Tailfire already has BullMQ and a document-render queue, which changes the
+  recommendation: keep the provider interface, but make disbursement state changes job-driven
+  from the start so v2 webhooks don’t force a rewrite.
+
+• Explored
+  └ Read trip-order.service.ts, audit.event.ts
+
+• Searching the web
+
+• Searched
+  https://www.canada.ca/en/revenue-agency/services/e-services/filing-information-returns-electro
+nically-t4-t5-other-types-returns-overview/t619-2026/t4a-2026.html
+
+• Searching the web
+
+• Searched 'Self-employed commissions'
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I found a likely tax-classification problem in the design itself: CRA’s T4A materials
+  distinguish self-employed commissions from fees for services. For contractor commissions, Box
+  020 may fit better than Box 048, so the T4A mapping needs tax review before you bake it into
+  schema.
+
+• Explored
+  └ Search payroll account|RP0001|payrollAccount|bn15|business number|program account in api
+    Read financials.schema.ts
+    Search payer's account|RP0001|BN15|payroll in financials
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• One more important mismatch: the codebase does not currently use pgcrypto for secret storage.
+  Sensitive data is encrypted in the Nest layer with one environment key, so designing
+  detailsEncrypted around database-side pgcrypto would be a new security model, not a drop-in
+  extension of current patterns.
+
+• Explored
+  └ Search pgcrypto|ENCRYPTION_KEY|encryptObject\(|decryptObject\( in tailfire
+
+• Searching the web
+
+• Searched 'General Rule 1 – Address in Canada obtained'
+
+• Searching the web
+
+• Searched
+  https://www.canada.ca/en/revenue-agency/services/forms-publications/publications/3-3-6/plc-spp
+ly-prvnc-gnrl-rls-fr-srvcs.html
+
+• Searching the web
+
+• Searched
+  https://www.canada.ca/en/revenue-agency/services/forms-publications/publications/3-3-6/plc-spp
+ly-prvnc-gnrl-rls-fr-srvcs.html
+
+─ Worked for 1m 24s ────────────────────────────────────────────────────────────────────────────
+
+• I’ve got the core findings. I’m pulling one last reference from the portal documents flow so I
+  can tell you whether pdfUrl/proofUrl/xmlFileUrl should really be URLs, or whether they should
+  be stored as storage paths with signed-read generation like the rest of Tailfire.
+
+• Explored
+  └ Read portal.service.ts, contact-documents.schema.ts
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I have the design-level blockers. I’m grabbing exact line refs for the supporting
+  infrastructure now so the feedback is concrete and directly actionable rather than
+  architectural hand-waving.
+
+• Explored
+  └ Read user-profiles.schema.ts, encryption.service.ts, api-credentials.service.ts, audit-
+         sanitizer.ts, audit.event.ts
+
+─ Worked for 1m 05s ────────────────────────────────────────────────────────────────────────────
+
+• I validated this against the current tailfire/ codebase and the current CRA/BoC/OPC guidance.
+  The design is directionally strong, but there are a few blocking issues before implementation.
+
+  Findings
+
+  - Critical The T4A mapping is likely wrong. CRA’s current T4A materials distinguish self-
+    employed commissions from fees for services, and Box 048 explicitly excludes GST/HST/PST.
+    Your ic_t4a_slips.Box048Cents = sum(disbursements.cadEquivalentCents) would overreport
+    whenever the payout includes tax. If these are IC commission payouts, Box 020 may be the
+    closer fit than Box 048. At minimum, you need separate fields for reportableBaseCadCents,
+    taxCadCents, and disbursedCadCents. External: CRA T4A slip and XML spec. Internal context:
+    current commission payouts are explicitly commissions, not generic AP invoices. tailfire/
+    apps/api/src/financials/commission/commission.service.ts:608
+  - Critical The GST/HST province logic in the design is not consistent with CRA’s general
+    place-of-supply rule for services. CRA’s default rule is based on the recipient’s Canadian
+    address, often the contracting address, not the contractor’s province of residence. In this
+    model Phoenix is usually the recipient of the IC’s service, so a blanket “IC province
+    determines rate” rule is not safe. You need a place-of-supply decision model plus effective-
+    dated rate tables. Internal config today has no payer payroll/tax account metadata beyond
+    generic business info. tailfire/packages/database/src/schema/financials.schema.ts:280
+  - Critical Creating the legacy paid check and settlements only on invoice approval is too late
+    if invoice submission is meant to reserve commissions. The current eligibility engine
+    excludes payable items only after commission_item_settlements exists, and payAgents()
+    atomically claims both settlements and pending adjustments in one transaction. If you wait
+    until approval, the same commission can remain eligible and be claimed again. You need
+    either:
+      - a new reservation layer with unique active claim constraints on commission lines and
+        adjustments, or
+      - legacy settlement artifacts created at claim submission, then reversed on rejection/
+        failure.
+        Current behavior is atomic and settlement-driven. tailfire/apps/api/src/financials/
+        commission/commission.service.ts:646, tailfire/apps/api/src/financials/commission/
+        commission.service.ts:683, tailfire/packages/database/src/schema/commission-
+        checks.schema.ts:145
+  - High The old payout system is already live and user-facing. Admins have /commission/due/pay,
+    agents have /commission/claims/me, paid checks appear in the admin UI, and reporting/
+    dashboard queries already consume commission_checks. If you add a new IC payout flow without
+    cutting these over, you will have two competing payout entrypoints and guaranteed drift.
+    Reuse is only safe if legacy rows become a private write-through ledger and the old
+    endpoints/UI are deprecated or routed into the new module. tailfire/apps/api/src/financials/
+    commission/commission.controller.ts:182, tailfire/apps/api/src/financials/commission/
+    commission.controller.ts:194, tailfire/apps/admin/src/app/commission/page.tsx:25, tailfire/
+    apps/api/src/reporting/queries/financial.queries.ts:199
+  - High Multi-currency is not compatible with the current commission schema yet. payAgents()
+    hardcodes paid checks to CAD, getCommissionDue() aggregates across all eligible checks
+    without grouping by currency, and commission_adjustments has no currency column at all.
+    Mixed-currency invoices are fine conceptually, but you must first make adjustments currency-
+    aware and group eligibility by source commission currency. tailfire/apps/api/src/financials/
+    commission/commission.service.ts:616, tailfire/apps/api/src/financials/commission/
+    commission.service.ts:698, tailfire/packages/database/src/schema/commission-
+    checks.schema.ts:192
+  - High You are missing a canonical IC tax/profile table. Current user_profiles only has
+    officeAddress, licensingInfo, and commissionSettings JSON blobs. That is not a clean source
+    of truth for legal name, tax domicile, residency, GST/HST registration status/effective
+    date, SIN vs BN, auto-disburse, or payout approval policy. Add a typed ic_profiles or
+    ic_tax_profiles table and snapshot from that into invoices/T4A. tailfire/packages/database/
+    src/schema/user-profiles.schema.ts:70
+  - High Do not copy full SIN/BN into every invoice snapshot. Tailfire’s current secret pattern
+    is app-layer AES-256-GCM with one ENCRYPTION_KEY, not pgcrypto/KMS. That is acceptable
+    baseline encryption, but duplicating SIN-class data across invoices materially increases
+    exposure. Store the full SIN/BN once in a dedicated encrypted tax-profile record, keep
+    masked refs on invoices, and snapshot the full identifier only where legally required for
+    T4A generation/export. Also add key versioning if you introduce highly sensitive contractor
+    tax data. tailfire/apps/api/src/common/encryption/encryption.service.ts:18, tailfire/apps/
+    api/src/api-credentials/api-credentials.service.ts:42
+  - Medium The provider seam should not be only a synchronous service strategy. Tailfire already
+    has BullMQ queues and a document-render worker. For payouts, keep PayoutProvider, but make
+    disbursement orchestration job-driven from day one and add an ic_disbursement_attempts
+    table. That will make manual send, provider send, retries, returns, and webhooks all fit the
+    same state machine. tailfire/apps/api/src/document-render/document-render.processor.ts:1,
+    tailfire/packages/database/src/schema/trip-orders.schema.ts:35
+  - Medium Store document paths, not permanent URLs. Current portal documents persist the
+    storage path in the DB and generate fresh signed URLs on read. Your proposed pdfUrl,
+    manualProofUrl, xmlFileUrl, and signaturePngUrl should follow that pattern as ...StoragePath
+    fields. tailfire/apps/api/src/portal/portal.service.ts:353, tailfire/apps/api/src/portal/
+    portal.service.ts:373, tailfire/packages/database/src/schema/contact-documents.schema.ts:35
+  - Medium The design is missing payer filing identity. CRA XML filing needs the payer payroll
+    account number, and I do not see any current agency-level storage for that. agency_settings
+    has branding/contact fields but no payroll account / BN15-style filing config. Add an agency
+    tax-filing config table or extend agency_settings. tailfire/packages/database/src/schema/
+    financials.schema.ts:280
+  - Medium Sequential invoice numbering needs a stronger allocator than Tailfire’s current
+    optimistic MAX()+1 pattern used for trip-order snapshots. That pattern is acceptable for
+    internal version snapshots, but not for legal contractor invoices. Use a DB sequence or a
+    dedicated per-IC-per-year counter table. tailfire/apps/api/src/financials/trip-
+    order.service.ts:345
+  - Low If you want audit coverage, new entities must be added deliberately. Current audit
+    logging only knows a fixed set of entity types and a whitelist-based sanitizer. Without
+    explicit additions, teams will either skip audits or risk logging raw metadata. tailfire/
+    apps/api/src/activity-logs/events/audit.event.ts:49, tailfire/apps/api/src/activity-logs/
+    audit-sanitizer.ts:15
+
+  Direct Answers
+
+  1. Reuse vs replace: reuse is acceptable only as an internal ledger/eligibility artifact with
+     one write path. Do not leave payAgents and claims/me live in parallel.
+  2. Provider seam: keep PayoutProvider, but run sends, retries, and status transitions through
+     jobs plus webhook handlers.
+  3. Self-invoice CRA pattern: version, timestamp, IP, and signature evidence are directionally
+     right, but add agreement text hash, rendered agreement artifact, and payer/recipient tax-
+     registration attestations. I would still require tax/legal review because I did not find a
+     CRA page that explicitly blesses your exact RCTI flow.
+  4. GST/HST math: do not key tax rate off the IC province alone. Determine place of supply from
+     the CRA service rules, usually the recipient/contracting address unless a specific
+     exception applies.
+  5. FX for T4A: daily Bank of Canada rate on payout completion date is defensible and more
+     auditable than monthly average. Monthly average is acceptable only if you choose it
+     consistently.
+  6. Multi-currency split: clean operationally, but only after you make eligibility and
+     adjustments currency-aware.
+  7. Encryption boundary: current app-layer encryption is a baseline, not a best-in-class SIN
+     control. KMS is not explicitly required by PIPEDA, but minimization, key rotation/
+     versioning, and strict access control are needed.
+  8. Idempotency: yes, keep idempotencyKey in v1 and make it unique.
+  9. Admin approval ceiling: yes, add a hard cap even for auto_disburse ICs.
+  10. Year-end T4A locking/amendments: the direction is right. Preserve original slips, create
+     explicit amended filings, and use CRA amendment semantics rather than mutating prior-year
+     records.
+
+  Recommended revisions
+
+  - Add ic_profiles / ic_tax_profiles as the canonical contractor record.
+  - Add currency to commission_adjustments, and make claim selection grouped by received-check
+    currency.
+  - Add reservation semantics before approval.
+  - Change T4A design to store reportable base separately from tax and total payout.
+  - Replace ...Url columns with storage-path columns plus signed-read generation.
+  - Add payer payroll/tax filing config at the agency level.
+  - Add ic_disbursement_attempts and a queue-backed payout orchestrator.
+  - Add explicit rejected invoice status and a clearer invoice/disbursement state machine.
+
+  External sources
+
+  - CRA place-of-supply for services:
+
+  https://www.canada.ca/en/revenue-agency/services/forms-publications/publications/3-3-6/plc-spp
+ly-prvnc-gnrl-rls-fr-srvcs.html
+  - CRA GST/HST rates and place-of-supply overview:
+
+  https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/char
+ge-collect-place-supply.html
+  - CRA T4A slip guidance:
+
+  https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/payroll/completing-fili
+ng-information-returns/t4a-information-payers/t4a-slip.html
+  - CRA T4A summary guidance:
+
+  https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/payroll/completing-fili
+ng-information-returns/t4a-information-payers/t4a-summary.html
+  - CRA XML amendment rules:
+
+  https://www.canada.ca/en/revenue-agency/services/e-services/filing-information-returns-electro
+nically-t4-t5-other-types-returns-overview/filing-information-returns-electronically-t4-t5-other
+-types-returns-amend.html
+  - Bank of Canada FX guidance: https://www.bankofcanada.ca/rates/exchange/daily-exchange-rates/
+    and
+    https://www.bankofcanada.ca/rates/exchange/background-information-on-foreign-exchange-rates/
+  - OPC PIPEDA safeguards and SIN sensitivity:
+
+  https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-prote
+ction-and-electronic-documents-act-pipeda/p_principle/principles/p_safeguards/?wbdisable=true
+    and
+
+  https://www.priv.gc.ca/en/privacy-topics/sins-and-drivers-licences/social-insurance-numbers/pr
+otecting-your-social-insurance-number/
+
+  If you want, I can turn this into a revised Phase 1 schema and workflow spec that fits
+  Tailfire’s current commission engine without drift.
+
+
+› Run /review on my current changes
+
+  gpt-5.4 xhigh · 16% left · ~/Development/tailfire-project
