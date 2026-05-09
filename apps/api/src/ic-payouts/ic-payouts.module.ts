@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { IcTaxProfilesService } from './ic-tax-profiles/ic-tax-profiles.service'
+import { IcPayoutAccountsService } from './payout-accounts/ic-payout-accounts.service'
 
 /**
  * IcPayoutsModule
@@ -9,12 +10,12 @@ import { IcTaxProfilesService } from './ic-tax-profiles/ic-tax-profiles.service'
  * to be listed in imports — their providers are available everywhere.
  *
  * Services added in Tasks 7–9+:
- *   - IcTaxProfilesService        (Task 7) ✓
- *   - IcPayoutAccountsService     (Task 8)
+ *   - IcTaxProfilesService          (Task 7) ✓
+ *   - IcPayoutAccountsService       (Task 8) ✓
  *   - IcPayoutAuthorizationsService (Task 9)
  */
 @Module({
-  providers: [IcTaxProfilesService],
-  exports: [IcTaxProfilesService],
+  providers: [IcTaxProfilesService, IcPayoutAccountsService],
+  exports: [IcTaxProfilesService, IcPayoutAccountsService],
 })
 export class IcPayoutsModule {}
