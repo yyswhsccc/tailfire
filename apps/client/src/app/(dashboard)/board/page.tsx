@@ -4,14 +4,20 @@ import { usePortalBoards, type PortalBoard, type BoardComponent } from '@/hooks/
 import { Sparkles, Ship, Plane, Hotel, MapPin, ExternalLink } from 'lucide-react'
 import Image from 'next/image'
 
+const COMPONENT_ICONS: Record<string, typeof MapPin> = {
+  cruise: Ship,
+  flight: Plane,
+  hotel: Hotel,
+  tour: MapPin,
+}
+
 function formatPrice(price?: string) {
   if (!price) return null
   return price
 }
 
 function ComponentCard({ component }: { component: BoardComponent }) {
-  const icons: Record<string, typeof MapPin> = { cruise: Ship, flight: Plane, hotel: Hotel, tour: MapPin }
-  const Icon = icons[component.type] || MapPin
+  const Icon = COMPONENT_ICONS[component.type] ?? MapPin
 
   return (
     <div className="group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md">
