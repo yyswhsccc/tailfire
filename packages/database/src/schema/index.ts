@@ -57,6 +57,9 @@ export * from './commission-checks.schema'
 // Agency tax filing config (CRA payer identity for T4A filings)
 export * from './agency-tax-filing-config.schema'
 
+// IC tax profiles (canonical IC identity: SIN/BN, GST/HST, disbursement policy)
+export * from './ic-tax-profiles.schema'
+
 // Payment schedule templates (agency-scoped reusable patterns)
 export * from './payment-templates.schema'
 
