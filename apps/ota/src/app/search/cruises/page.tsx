@@ -8,6 +8,7 @@ import { CruiseProductCard } from "@/components/cards/cruise-product-card";
 import { FilterChips, type FilterChipOption } from "@/components/search/filter-chips";
 import { SearchResultsHeader } from "@/components/search/search-results-header";
 import { SearchPageShell } from "@/components/search/search-page-shell";
+import { TrackSearchEvent } from "@/components/search/track-search-event";
 import CruisesLoading from "./loading";
 
 export const metadata: Metadata = {
@@ -287,6 +288,11 @@ function CruiseResults({
 
   return (
     <>
+      <TrackSearchEvent
+        entityType="cruises"
+        query={searchParams as Record<string, unknown>}
+        resultCount={pagination.totalItems}
+      />
       {/* Sort chips + results count */}
       <div className="mb-4 space-y-3">
         <SearchResultsHeader count={pagination.totalItems} noun="cruises" />
