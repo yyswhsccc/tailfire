@@ -86,6 +86,7 @@ export interface PaginatedCommissionChecksResponseDto {
 export interface AgentCommissionDueDto {
   userId: string
   userName: string
+  currency: string                  // ISO 4217, 3-letter (e.g. 'CAD', 'USD')
   bookingCount: number
   commissionDueCents: number
   adjustmentsCents: number

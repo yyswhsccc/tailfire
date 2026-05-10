@@ -4,8 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import type { AgentCommissionDueDto } from '@tailfire/shared-types/api'
 
-function formatCurrency(cents: number): string {
-  return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(cents / 100)
+function formatCurrency(cents: number, currency: string): string {
+  return new Intl.NumberFormat('en-CA', { style: 'currency', currency }).format(cents / 100)
 }
 
 interface AgentPayableTableProps {
@@ -23,6 +23,7 @@ export function AgentPayableTable({ data, onRecordPayout }: AgentPayableTablePro
       <TableHeader>
         <TableRow>
           <TableHead>Agent</TableHead>
+          <TableHead>Currency</TableHead>
           <TableHead className="text-right">Bookings</TableHead>
           <TableHead className="text-right">Commission Due</TableHead>
           <TableHead className="text-right">Adjustments</TableHead>
@@ -32,12 +33,13 @@ export function AgentPayableTable({ data, onRecordPayout }: AgentPayableTablePro
       </TableHeader>
       <TableBody>
         {data.map((agent) => (
-          <TableRow key={agent.userId}>
+          <TableRow key={`${agent.userId}-${agent.currency}`}>
             <TableCell className="font-medium">{agent.userName}</TableCell>
+            <TableCell>{agent.currency}</TableCell>
             <TableCell className="text-right">{agent.bookingCount}</TableCell>
-            <TableCell className="text-right">{formatCurrency(agent.commissionDueCents)}</TableCell>
-            <TableCell className="text-right">{formatCurrency(agent.adjustmentsCents)}</TableCell>
-            <TableCell className="text-right font-semibold">{formatCurrency(agent.totalDueCents)}</TableCell>
+            <TableCell className="text-right">{formatCurrency(agent.commissionDueCents, agent.currency)}</TableCell>
+            <TableCell className="text-right">{formatCurrency(agent.adjustmentsCents, agent.currency)}</TableCell>
+            <TableCell className="text-right font-semibold">{formatCurrency(agent.totalDueCents, agent.currency)}</TableCell>
             <TableCell>
               {onRecordPayout && (
                 <Button size="sm" variant="outline" onClick={() => onRecordPayout(agent.userId)}>

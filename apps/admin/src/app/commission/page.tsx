@@ -6,18 +6,18 @@ import {
   useCommissionDue,
   useCommissionChecks,
   useCommissionSummary,
-  useClaimCommission,
   useAcceptCheck,
   useUpdateCheck,
 } from '@/hooks/use-commission'
 import { CommissionStats } from './_components/commission-stats'
 import { AgentPayableTable } from './_components/agent-payable-table'
 import { CommissionChecksTable } from './_components/commission-checks-table'
+import { ClaimBuilder } from './_components/claim-builder'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import Link from 'next/link'
-import { DollarSign, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { DashboardLayout } from '@/components/layout'
 
 export default function CommissionPage() {
@@ -27,20 +27,8 @@ export default function CommissionPage() {
   const { data: summary } = useCommissionSummary()
   const { data: receivedChecks } = useCommissionChecks({ checkType: 'received' })
   const { data: paidChecks } = useCommissionChecks({ checkType: 'paid' })
-  const claimCommission = useClaimCommission()
   const acceptCheck = useAcceptCheck()
   const updateCheck = useUpdateCheck()
-
-  const handleClaim = async () => {
-    try {
-      await claimCommission.mutateAsync()
-      toast({ title: 'Commission claimed', description: 'Your commission claim has been submitted for approval.' })
-    } catch (error: any) {
-      toast({ title: 'Claim failed', description: error?.message || 'An error occurred.', variant: 'destructive' })
-    }
-  }
-
-  const myPayable = due?.find(() => true) // For agents, API returns only their own data
 
   return (
     <DashboardLayout>
@@ -61,12 +49,7 @@ export default function CommissionPage() {
               </Link>
             </Button>
           )}
-          {!isAdmin && myPayable && myPayable.totalDueCents > 0 && (
-            <Button onClick={handleClaim} disabled={claimCommission.isPending}>
-              <DollarSign className="mr-2 h-4 w-4" />
-              {claimCommission.isPending ? 'Claiming...' : 'Claim Commission'}
-            </Button>
-          )}
+          {!isAdmin && <ClaimBuilder />}
         </div>
       </div>
 

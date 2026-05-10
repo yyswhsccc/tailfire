@@ -257,3 +257,12 @@ export * from './contact-duplicate-dismissals.schema'
 // Consumer activity tracking (OTA browsing signals + AI summaries)
 export * from './consumer-activity.schema'
 export * from './consumer-insights.schema'
+
+// Tax rates (effective-dated provincial/federal GST/HST rates for IC invoice tax calculation)
+export * from './tax-rates.schema'
+
+// IC invoice number sequences (race-free per-IC per-tax-year sequential counters)
+export * from './ic-invoice-number-sequences.schema'
+
+// IC invoices + invoice lines (RCTI payout invoices with mutual-exclusivity CHECK constraint)
+export * from './ic-invoices.schema'

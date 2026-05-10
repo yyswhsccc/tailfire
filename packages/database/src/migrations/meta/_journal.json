@@ -1450,6 +1450,34 @@
       "when": 1778414400006,
       "tag": "20260509210000_ic_audit_entity_types",
       "breakpoints": true
+    },
+    {
+      "idx": 207,
+      "version": "7",
+      "when": 1778414400007,
+      "tag": "20260510220820_commission_adjustments_currency",
+      "breakpoints": true
+    },
+    {
+      "idx": 208,
+      "version": "7",
+      "when": 1778414400008,
+      "tag": "20260510221000_tax_rates",
+      "breakpoints": true
+    },
+    {
+      "idx": 209,
+      "version": "7",
+      "when": 1778414400009,
+      "tag": "20260510222000_ic_invoice_number_sequences",
+      "breakpoints": true
+    },
+    {
+      "idx": 210,
+      "version": "7",
+      "when": 1778414400010,
+      "tag": "20260510223000_ic_invoices",
+      "breakpoints": true
     }
   ]
 }
