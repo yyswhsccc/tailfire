@@ -1471,6 +1471,13 @@
       "when": 1778414400009,
       "tag": "20260510222000_ic_invoice_number_sequences",
       "breakpoints": true
+    },
+    {
+      "idx": 210,
+      "version": "7",
+      "when": 1778414400010,
+      "tag": "20260510223000_ic_invoices",
+      "breakpoints": true
     }
   ]
 }

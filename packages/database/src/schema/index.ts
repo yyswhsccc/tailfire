@@ -263,3 +263,6 @@ export * from './tax-rates.schema'
 
 // IC invoice number sequences (race-free per-IC per-tax-year sequential counters)
 export * from './ic-invoice-number-sequences.schema'
+
+// IC invoices + invoice lines (RCTI payout invoices with mutual-exclusivity CHECK constraint)
+export * from './ic-invoices.schema'
