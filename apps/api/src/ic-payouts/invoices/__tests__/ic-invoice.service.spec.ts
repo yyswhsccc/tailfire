@@ -938,6 +938,162 @@ describe('IcInvoiceService.approve', () => {
   })
 })
 
+// ─── Auto-approve path (Task 29) ──────────────────────────────────────────────
+
+describe('IcInvoiceService.submitClaim — auto-approve path (Task 29)', () => {
+  let service: IcInvoiceService
+  let mockDb: ReturnType<typeof createMockDb>
+  let mockAllocator: ReturnType<typeof createMockAllocator>
+  let mockPlaceOfSupply: ReturnType<typeof createMockPlaceOfSupply>
+  let mockPdf: ReturnType<typeof createMockPdf>
+  let mockStorage: ReturnType<typeof createMockStorage>
+
+  // The eligible item yields $100 commission. With HST 13%: totalCents = $113.
+  const COMMISSION_CENTS = 10_000       // $100
+  const TOTAL_CENTS = 11_300            // $100 + 13% HST
+
+  // Build a db configured for a single CAD item ($100 commission) with the given profile overrides.
+  function buildDb(profileOverrides: Record<string, unknown> = {}) {
+    const profile = makeProfile({
+      autoDisburse: false,
+      approvalCeilingCents: null,
+      ...profileOverrides,
+    })
+
+    // Invoice row reflects $100 commission + 13% HST = $113 total
+    const invoice = makeInvoiceRow({
+      reportableBaseCents: COMMISSION_CENTS,
+      taxCents: 1_300,
+      totalCents: TOTAL_CENTS,
+      status: 'submitted',
+      approvedAt: null,
+      approvedBy: null,
+    })
+
+    const db = createMockDb({
+      profile,
+      eligibleItems: [makeCadItem('item-1', COMMISSION_CENTS)],
+      adjustments: [],
+      settlementsReturning: [{ id: 'settlement-0' }],
+      reservationCheck: makeReservationCheck({ checkAmountCents: COMMISSION_CENTS }),
+      invoice,
+      // existingInvoice is what approve() reads back from its UPDATE RETURNING.
+      // It must be 'submitted' so the approve() WHERE guard passes.
+      existingInvoice: makeInvoiceRow({
+        reportableBaseCents: COMMISSION_CENTS,
+        taxCents: 1_300,
+        totalCents: TOTAL_CENTS,
+        status: 'submitted',
+        approvedAt: null,
+        approvedBy: null,
+      }),
+      lines: [],
+    })
+
+    return { db, profile }
+  }
+
+  async function buildModule(db: ReturnType<typeof createMockDb>) {
+    mockDb = db
+    mockAllocator = createMockAllocator()
+    mockPlaceOfSupply = createMockPlaceOfSupply({ taxType: 'HST', rateBp: 1300 })
+    mockPdf = createMockPdf()
+    mockStorage = createMockStorage()
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        IcInvoiceService,
+        { provide: DatabaseService, useValue: mockDb },
+        { provide: IcInvoiceNumberAllocator, useValue: mockAllocator },
+        { provide: PlaceOfSupplyService, useValue: mockPlaceOfSupply },
+        { provide: IcInvoicePdfService, useValue: mockPdf },
+        { provide: StorageService, useValue: mockStorage },
+      ],
+    }).compile()
+
+    service = moduleRef.get(IcInvoiceService)
+  }
+
+  afterEach(() => jest.clearAllMocks())
+
+  it('T29-1: auto-approves when autoDisburse=true and total is under ceiling', async () => {
+    // $113 total, $200 ceiling → should auto-approve
+    const { db } = buildDb({ autoDisburse: true, approvalCeilingCents: 200_00 })
+    await buildModule(db)
+
+    const result = await service.submitClaim({
+      agencyId: AGENCY_ID,
+      userId: USER_ID,
+      selectedCheckItemIds: ['item-1'],
+    })
+
+    const inv = result.invoices[0]!
+    expect(inv.status).toBe('approved')
+    expect(inv.approvedBy).toBe(USER_ID)   // IC's own userId — auto-approve audit trail
+    expect(inv.approvedAt).toBeInstanceOf(Date)
+  })
+
+  it('T29-2: auto-approves when approvalCeilingCents is null (no ceiling)', async () => {
+    // null ceiling → approve unconditionally when autoDisburse=true
+    const { db } = buildDb({ autoDisburse: true, approvalCeilingCents: null })
+    await buildModule(db)
+
+    const result = await service.submitClaim({
+      agencyId: AGENCY_ID,
+      userId: USER_ID,
+      selectedCheckItemIds: ['item-1'],
+    })
+
+    expect(result.invoices[0]!.status).toBe('approved')
+  })
+
+  it('T29-3: stays submitted when totalCents exceeds ceiling', async () => {
+    // $113 total, $50 ceiling → ceiling exceeded → no auto-approve
+    const { db } = buildDb({ autoDisburse: true, approvalCeilingCents: 50_00 })
+    await buildModule(db)
+
+    const result = await service.submitClaim({
+      agencyId: AGENCY_ID,
+      userId: USER_ID,
+      selectedCheckItemIds: ['item-1'],
+    })
+
+    const inv = result.invoices[0]!
+    expect(inv.status).toBe('submitted')
+    expect(inv.approvedAt).toBeNull()
+  })
+
+  it('T29-4: stays submitted when autoDisburse is false (default path unchanged)', async () => {
+    // autoDisburse=false → never auto-approve regardless of ceiling
+    const { db } = buildDb({ autoDisburse: false, approvalCeilingCents: 1_000_00 })
+    await buildModule(db)
+
+    const result = await service.submitClaim({
+      agencyId: AGENCY_ID,
+      userId: USER_ID,
+      selectedCheckItemIds: ['item-1'],
+    })
+
+    expect(result.invoices[0]!.status).toBe('submitted')
+  })
+
+  it('T29-5: uses totalCents (including tax) for ceiling check, not reportableBase', async () => {
+    // Commission = $100, HST 13% = $13, totalCents = $113.
+    // Ceiling = $110: reportableBase ($100) would pass, but totalCents ($113) exceeds it.
+    // Must NOT auto-approve.
+    const { db } = buildDb({ autoDisburse: true, approvalCeilingCents: 110_00 })
+    await buildModule(db)
+
+    const result = await service.submitClaim({
+      agencyId: AGENCY_ID,
+      userId: USER_ID,
+      selectedCheckItemIds: ['item-1'],
+    })
+
+    expect(result.invoices[0]!.status).toBe('submitted')
+  })
+})
+
 // ─── reject() tests ────────────────────────────────────────────────────────────
 
 describe('IcInvoiceService.reject', () => {

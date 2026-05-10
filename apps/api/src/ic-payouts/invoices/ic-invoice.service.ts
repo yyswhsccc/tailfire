@@ -580,14 +580,46 @@ export class IcInvoiceService {
       return invoice
     })
 
-    // 5. PDF rendering OUTSIDE the transaction.
+    // 5. Auto-approval gate (Task 29)
+    //    Runs AFTER the transaction commits and BEFORE PDF render so the PDF
+    //    is generated against the final status (approved or submitted).
+    //
+    //    Rules:
+    //    - autoDisburse must be true (admin-only policy flag)
+    //    - approvalCeilingCents null  → no ceiling, always auto-approve
+    //    - approvalCeilingCents 0     → approve only $0 invoices; effectively
+    //      disables auto-approve for non-zero invoices (0 <= 0 is well-defined)
+    //    - Ceiling check uses totalCents (commission + tax), NOT reportableBase
+    //    - The IC's own userId is recorded as approvedBy so the audit trail
+    //      distinguishes this system path from a human admin approval.
+    //      A future task can stamp triggeredBy:'auto_disburse_policy' on the event.
+    let finalInvoice = committedInvoice
+    const ceilingOk =
+      args.profile.approvalCeilingCents == null ||
+      finalInvoice.totalCents <= args.profile.approvalCeilingCents
+    if (args.profile.autoDisburse === true && ceilingOk) {
+      try {
+        finalInvoice = await this.approve(finalInvoice.id, args.profile.userId)
+      } catch (autoApproveErr) {
+        // Auto-approve failure is non-fatal — the invoice stays in 'submitted'.
+        // Log prominently so admins can investigate the unexpected state.
+        const msg = autoApproveErr instanceof Error ? autoApproveErr.message : String(autoApproveErr)
+        this.logger.error(
+          `Auto-approve failed for invoice ${finalInvoice.id} (${finalInvoice.invoiceNumber}): ${msg}. ` +
+          `Invoice remains in 'submitted' state. ` +
+          `autoDisburse=true but approval gate did not complete — manual admin review required.`,
+        )
+      }
+    }
+
+    // 6. PDF rendering OUTSIDE the transaction.
     //    The reservation is committed. PDF failure must never roll it back.
     try {
       // Fetch lines for PDF context
       const lines = await this.db.client
         .select()
         .from(icInvoiceLines)
-        .where(eq(icInvoiceLines.invoiceId, committedInvoice.id))
+        .where(eq(icInvoiceLines.invoiceId, finalInvoice.id))
 
       // Fetch agency tax filing config for the agency identity block on the invoice.
       // Should always exist (PlaceOfSupplyService would have failed earlier if missing),
@@ -602,9 +634,9 @@ export class IcInvoiceService {
       if (!agencyConfig) {
         this.logger.warn(
           `Missing agency_tax_filing_config for agency ${args.agencyId}. ` +
-          `Invoice ${committedInvoice.invoiceNumber} will be committed without a PDF.`,
+          `Invoice ${finalInvoice.invoiceNumber} will be committed without a PDF.`,
         )
-        return committedInvoice
+        return finalInvoice
       }
 
       // Build agency address lines for the invoice header
@@ -626,7 +658,7 @@ export class IcInvoiceService {
         : bn15
 
       const pdfBytes = await this.pdf.render({
-        invoice: committedInvoice,
+        invoice: finalInvoice,
         lines,
         agencyLegalName: agencyConfig.legalName,
         agencyAddressLines,
@@ -642,7 +674,7 @@ export class IcInvoiceService {
       const pdfStoragePath = await this.storage.uploadDocument(
         pdfBytes,
         componentId,
-        `${committedInvoice.invoiceNumber}.pdf`,
+        `${finalInvoice.invoiceNumber}.pdf`,
         'application/pdf',
       )
 
@@ -652,18 +684,18 @@ export class IcInvoiceService {
       await this.db.client
         .update(icInvoices)
         .set({ pdfStoragePath, pdfHash, updatedAt: new Date() })
-        .where(eq(icInvoices.id, committedInvoice.id))
+        .where(eq(icInvoices.id, finalInvoice.id))
         .returning()
 
-      return { ...committedInvoice, pdfStoragePath, pdfHash }
+      return { ...finalInvoice, pdfStoragePath, pdfHash }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       this.logger.error(
-        `PDF render/upload failed for invoice ${committedInvoice.id} (${committedInvoice.invoiceNumber}): ${message}. ` +
-        `Invoice remains committed in 'submitted' state without PDF. Re-trigger via admin endpoint.`,
+        `PDF render/upload failed for invoice ${finalInvoice.id} (${finalInvoice.invoiceNumber}): ${message}. ` +
+        `Invoice remains committed in its current state without PDF. Re-trigger via admin endpoint.`,
       )
       // Return invoice WITHOUT pdf fields — reservation is still intact
-      return committedInvoice
+      return finalInvoice
     }
   }
 
