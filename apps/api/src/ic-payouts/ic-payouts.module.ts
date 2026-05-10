@@ -6,6 +6,8 @@ import { RctiPdfService } from './authorizations/rcti-pdf.service'
 import { AgencyTaxFilingService } from './agency-tax-filing/agency-tax-filing.service'
 import { IcInvoiceNumberAllocator } from './invoices/ic-invoice-number-allocator.service'
 import { PlaceOfSupplyService } from './place-of-supply/place-of-supply.service'
+import { IcInvoiceService } from './invoices/ic-invoice.service'
+import { IcInvoicePdfService } from './invoices/ic-invoice-pdf.service'
 import { IcTaxProfilesController } from './ic-tax-profiles/ic-tax-profiles.controller'
 import { IcPayoutAccountsController } from './payout-accounts/ic-payout-accounts.controller'
 import { IcPayoutAuthorizationsController } from './authorizations/ic-payout-authorizations.controller'
@@ -28,6 +30,8 @@ import { DocumentRenderModule } from '../document-render/document-render.module'
  *   - AgencyTaxFilingService        (Task 16) ✓
  *   - IcInvoiceNumberAllocator      (Task 20) ✓
  *   - PlaceOfSupplyService          (Task 22) ✓
+ *   - IcInvoicePdfService           (Task 24 stub, Task 25 will implement) ✓
+ *   - IcInvoiceService              (Task 24) ✓
  *
  * Controllers added in Task 10:
  *   - IcTaxProfilesController          (Task 10) ✓
@@ -55,6 +59,8 @@ import { DocumentRenderModule } from '../document-render/document-render.module'
     AgencyTaxFilingService,
     IcInvoiceNumberAllocator,
     PlaceOfSupplyService,
+    IcInvoicePdfService,
+    IcInvoiceService,
   ],
   exports: [
     IcTaxProfilesService,
@@ -64,6 +70,8 @@ import { DocumentRenderModule } from '../document-render/document-render.module'
     AgencyTaxFilingService,
     IcInvoiceNumberAllocator,
     PlaceOfSupplyService,
+    IcInvoicePdfService,
+    IcInvoiceService,
   ],
 })
 export class IcPayoutsModule {}
