@@ -257,3 +257,6 @@ export * from './contact-duplicate-dismissals.schema'
 // Consumer activity tracking (OTA browsing signals + AI summaries)
 export * from './consumer-activity.schema'
 export * from './consumer-insights.schema'
+
+// Tax rates (effective-dated provincial/federal GST/HST rates for IC invoice tax calculation)
+export * from './tax-rates.schema'

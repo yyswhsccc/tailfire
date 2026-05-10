@@ -1457,6 +1457,13 @@
       "when": 1778414400007,
       "tag": "20260510220820_commission_adjustments_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 208,
+      "version": "7",
+      "when": 1778414400008,
+      "tag": "20260510221000_tax_rates",
+      "breakpoints": true
     }
   ]
 }
