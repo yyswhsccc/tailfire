@@ -783,6 +783,119 @@ describe('IcInvoiceService.submitClaim — C3 reservation', () => {
   })
 })
 
+// ─── getEligibleForUser() tests ────────────────────────────────────────────────
+
+describe('IcInvoiceService.getEligibleForUser — eligibility query', () => {
+  let service: IcInvoiceService
+  let mockDb: ReturnType<typeof createMockDb>
+
+  async function buildModule(db?: ReturnType<typeof createMockDb>) {
+    mockDb = db ?? createMockDb()
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        IcInvoiceService,
+        { provide: DatabaseService, useValue: mockDb },
+        { provide: IcInvoiceNumberAllocator, useValue: createMockAllocator() },
+        { provide: PlaceOfSupplyService, useValue: createMockPlaceOfSupply() },
+        { provide: IcInvoicePdfService, useValue: createMockPdf() },
+        { provide: StorageService, useValue: createMockStorage() },
+      ],
+    }).compile()
+
+    service = moduleRef.get(IcInvoiceService)
+  }
+
+  beforeEach(async () => { await buildModule() })
+  afterEach(() => jest.clearAllMocks())
+
+  it('groups eligible items and adjustments by currency', async () => {
+    // Build a db where:
+    //   - execute (items query) returns 1 CAD item + 1 USD item
+    //   - select (adjustments) returns 1 CAD adjustment
+    const cadAdjustment = makeAdjustment('adj-cad-1', 'CAD', 1000)
+
+    const db = createMockDb({
+      eligibleItems: [
+        makeCadItem('i1'),
+        makeUsdItem('i2'),
+      ],
+      adjustments: [cadAdjustment],
+    })
+
+    // Override execute to return items in the raw SQL shape that getEligibleForUser expects.
+    // Outside-tx execute call 0: items query. Adjustments use Drizzle .select().
+    db._mocks.mockExecute.mockImplementation(async () => [
+      {
+        check_item_id: 'i1',
+        currency: 'CAD',
+        trip_ref: 'Smith',
+        description: 'Resort',
+        commission_cents: '50000',
+      } as any,
+      {
+        check_item_id: 'i2',
+        currency: 'USD',
+        trip_ref: 'Jones',
+        description: 'Flight',
+        commission_cents: '30000',
+      } as any,
+    ] as any)
+
+    // Override select chain to return adjustments for the .from(commissionAdjustments).where() call.
+    // getEligibleForUser uses: db.client.select().from().where()
+    // The mockSelect already handles this in the createMockDb via makeSelectChain.
+    // We override to return adjustments on the second select call (first is unused here).
+    let selectCallIdx = 0
+    db._mocks.mockSelect.mockImplementation(() => {
+      selectCallIdx++
+      const rows = selectCallIdx === 1 ? [cadAdjustment] : []
+      const chain: any = {}
+      chain.from = jest.fn(() => chain)
+      chain.where = jest.fn(() => Promise.resolve(rows))
+      return chain
+    })
+
+    await buildModule(db)
+
+    const result = await service.getEligibleForUser(AGENCY_ID, USER_ID)
+
+    expect(result.itemsByCurrency).toHaveLength(2)
+
+    const cad = result.itemsByCurrency.find(g => g.currency === 'CAD')!
+    expect(cad).toBeDefined()
+    expect(cad.items).toHaveLength(1)
+    expect(cad.items[0]!.checkItemId).toBe('i1')
+    expect(cad.items[0]!.commissionCents).toBe(50000)
+    expect(cad.adjustments).toHaveLength(1)
+    expect(cad.adjustments[0]!.adjustmentId).toBe('adj-cad-1')
+
+    const usd = result.itemsByCurrency.find(g => g.currency === 'USD')!
+    expect(usd).toBeDefined()
+    expect(usd.items).toHaveLength(1)
+    expect(usd.items[0]!.checkItemId).toBe('i2')
+    expect(usd.items[0]!.commissionCents).toBe(30000)
+    expect(usd.adjustments).toHaveLength(0)
+  })
+
+  it('returns empty itemsByCurrency when no eligible items or adjustments exist', async () => {
+    const db = createMockDb({ eligibleItems: [], adjustments: [] })
+
+    db._mocks.mockExecute.mockImplementation(async () => [])
+    db._mocks.mockSelect.mockImplementation(() => {
+      const chain: any = {}
+      chain.from = jest.fn(() => chain)
+      chain.where = jest.fn(() => Promise.resolve([]))
+      return chain
+    })
+
+    await buildModule(db)
+
+    const result = await service.getEligibleForUser(AGENCY_ID, USER_ID)
+    expect(result.itemsByCurrency).toHaveLength(0)
+  })
+})
+
 // ─── approve() tests ───────────────────────────────────────────────────────────
 
 describe('IcInvoiceService.approve', () => {

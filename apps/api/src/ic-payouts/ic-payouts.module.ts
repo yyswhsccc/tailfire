@@ -12,6 +12,7 @@ import { IcTaxProfilesController } from './ic-tax-profiles/ic-tax-profiles.contr
 import { IcPayoutAccountsController } from './payout-accounts/ic-payout-accounts.controller'
 import { IcPayoutAuthorizationsController } from './authorizations/ic-payout-authorizations.controller'
 import { AgencyTaxFilingController } from './agency-tax-filing/agency-tax-filing.controller'
+import { IcInvoiceController } from './invoices/ic-invoice.controller'
 import { TripsModule } from '../trips/trips.module'
 import { DocumentRenderModule } from '../document-render/document-render.module'
 
@@ -38,6 +39,7 @@ import { DocumentRenderModule } from '../document-render/document-render.module'
  *   - IcPayoutAccountsController       (Task 10) ✓
  *   - IcPayoutAuthorizationsController (Task 10) ✓
  *   - AgencyTaxFilingController        (Task 16) ✓
+ *   - IcInvoiceController              (Task 26) ✓
  *
  * Imports:
  *   - TripsModule            → provides StorageService (document storage)
@@ -50,6 +52,7 @@ import { DocumentRenderModule } from '../document-render/document-render.module'
     IcPayoutAccountsController,
     IcPayoutAuthorizationsController,
     AgencyTaxFilingController,
+    IcInvoiceController,
   ],
   providers: [
     IcTaxProfilesService,

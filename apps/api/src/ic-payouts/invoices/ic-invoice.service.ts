@@ -35,6 +35,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  NotFoundException,
   Logger,
 } from '@nestjs/common'
 import { createHash } from 'crypto'
@@ -51,10 +52,13 @@ import type { SubmitClaimInput } from './dto/submit-claim.dto'
 const {
   icTaxProfiles,
   commissionChecks,
+  commissionAdjustments,
   icInvoices,
   icInvoiceLines,
   agencyTaxFilingConfig,
 } = schema
+
+export type IcInvoiceStatus = (typeof schema.icInvoiceStatusEnum.enumValues)[number]
 
 // ── Internal types ─────────────────────────────────────────────────────────────
 
@@ -241,6 +245,172 @@ export class IcInvoiceService {
 
       return invoice
     })
+  }
+
+  // ============================================================================
+  // PUBLIC: getEligibleForUser
+  // ============================================================================
+
+  /**
+   * Returns all unsettled commission check items and pending adjustments
+   * for the given user, grouped by currency.
+   *
+   * This is the pre-claim browsing endpoint — the IC uses this to select
+   * which items to include before calling submitClaim.
+   */
+  async getEligibleForUser(agencyId: string, userId: string): Promise<{
+    itemsByCurrency: Array<{
+      currency: string
+      items: Array<{
+        checkItemId: string
+        tripRef: string | null
+        description: string | null
+        commissionCents: number
+      }>
+      adjustments: Array<{
+        adjustmentId: string
+        description: string
+        amountCents: number
+      }>
+    }>
+  }> {
+    // Fetch unsettled commission check items the user is a collaborator on
+    const itemRows: any[] = await this.db.client.execute(sql`
+      SELECT
+        cci.id AS check_item_id,
+        src_cc.currency,
+        ap.trip_ref AS trip_ref,
+        cci.description,
+        GREATEST(COALESCE(cci.received_cents, 0), 0) AS commission_cents
+      FROM commission_check_items cci
+      JOIN commission_checks src_cc ON src_cc.id = cci.check_id
+      JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
+      JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      JOIN itinerary_days id_day ON id_day.id = ia.itinerary_day_id
+      JOIN itineraries i ON i.id = id_day.itinerary_id
+      JOIN trips t ON t.id = i.trip_id
+      JOIN trip_collaborators tc
+        ON tc.trip_id = t.id
+        AND tc.user_id = ${userId}::uuid
+        AND tc.is_active = true
+      LEFT JOIN commission_item_settlements existing
+        ON existing.check_item_id = cci.id
+        AND existing.recipient_user_id = ${userId}::uuid
+      WHERE src_cc.agency_id = ${agencyId}::uuid
+        AND src_cc.check_type = 'received'
+        AND src_cc.status = 'accepted'
+        AND t.status IN ('travelling', 'travelled')
+        AND existing.id IS NULL
+    `)
+
+    // Fetch pending adjustments for this user
+    const adjustmentRows = await this.db.client
+      .select()
+      .from(commissionAdjustments)
+      .where(and(
+        eq(commissionAdjustments.agencyId, agencyId),
+        eq(commissionAdjustments.agentUserId, userId),
+        eq(commissionAdjustments.status, 'pending'),
+      ))
+
+    // Group by currency
+    const groups = new Map<string, {
+      items: Array<{ checkItemId: string; tripRef: string | null; description: string | null; commissionCents: number }>
+      adjustments: Array<{ adjustmentId: string; description: string; amountCents: number }>
+    }>()
+
+    for (const row of itemRows) {
+      const c = row.currency as string
+      if (!groups.has(c)) groups.set(c, { items: [], adjustments: [] })
+      groups.get(c)!.items.push({
+        checkItemId: row.check_item_id as string,
+        tripRef: (row.trip_ref as string) ?? null,
+        description: (row.description as string) ?? null,
+        commissionCents: Number(row.commission_cents),
+      })
+    }
+
+    for (const adj of adjustmentRows) {
+      const c = adj.currency
+      if (!groups.has(c)) groups.set(c, { items: [], adjustments: [] })
+      groups.get(c)!.adjustments.push({
+        adjustmentId: adj.id,
+        description: adj.description,
+        amountCents: adj.amountCents,
+      })
+    }
+
+    return {
+      itemsByCurrency: Array.from(groups.entries()).map(([currency, group]) => ({
+        currency,
+        items: group.items,
+        adjustments: group.adjustments,
+      })),
+    }
+  }
+
+  // ============================================================================
+  // PUBLIC: listForUser
+  // ============================================================================
+
+  async listForUser(agencyId: string, userId: string) {
+    return await this.db.client
+      .select()
+      .from(icInvoices)
+      .where(and(
+        eq(icInvoices.agencyId, agencyId),
+        eq(icInvoices.userId, userId),
+      ))
+      .orderBy(sql`created_at DESC`)
+  }
+
+  // ============================================================================
+  // PUBLIC: getInvoiceDetail
+  // ============================================================================
+
+  async getInvoiceDetail(
+    agencyId: string,
+    invoiceId: string,
+    requestingUserId: string,
+    isAdmin: boolean,
+  ) {
+    const conditions: any[] = [
+      eq(icInvoices.id, invoiceId),
+      eq(icInvoices.agencyId, agencyId),
+    ]
+    if (!isAdmin) {
+      conditions.push(eq(icInvoices.userId, requestingUserId))
+    }
+
+    const [invoice] = await this.db.client
+      .select()
+      .from(icInvoices)
+      .where(and(...conditions))
+      .limit(1)
+
+    if (!invoice) throw new NotFoundException('Invoice not found')
+
+    const lines = await this.db.client
+      .select()
+      .from(icInvoiceLines)
+      .where(eq(icInvoiceLines.invoiceId, invoiceId))
+
+    return { ...invoice, lines }
+  }
+
+  // ============================================================================
+  // PUBLIC: listForAdmin
+  // ============================================================================
+
+  async listForAdmin(agencyId: string, status?: IcInvoiceStatus) {
+    const conditions: any[] = [eq(icInvoices.agencyId, agencyId)]
+    if (status) conditions.push(eq(icInvoices.status, status))
+
+    return await this.db.client
+      .select()
+      .from(icInvoices)
+      .where(and(...conditions))
+      .orderBy(sql`submitted_at DESC NULLS LAST, created_at DESC`)
   }
 
   // ============================================================================
