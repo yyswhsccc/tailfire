@@ -63,6 +63,17 @@ export type AuditEntityType =
   | 'trip_group'
   | 'contact_loyalty_program'
   | 'loyalty_program'
+  // IC commission payout entity types
+  | 'agency_tax_filing_config'
+  | 'ic_tax_profile'
+  | 'ic_payout_authorization'
+  | 'ic_payout_account'
+  | 'ic_invoice'
+  | 'ic_invoice_line'
+  | 'ic_disbursement'
+  | 'ic_disbursement_attempt'
+  | 'ic_t4a_slip'
+  | 'ic_t4a_filing'
 
 /**
  * Generic audit event for all entity changes

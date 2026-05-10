@@ -70,6 +70,7 @@ import { ConsumerAuthModule } from './consumer-auth/consumer-auth.module'
 import { ConsumerActivityModule } from './consumer-activity/consumer-activity.module'
 import { DestinationsModule } from './destinations/destinations.module'
 import { PortalMessagesModule } from './portal-messages/portal-messages.module'
+import { IcPayoutsModule } from './ic-payouts/ic-payouts.module'
 
 @Module({
   imports: [
@@ -254,6 +255,9 @@ import { PortalMessagesModule } from './portal-messages/portal-messages.module'
 
     // Portal Messages (agent-client messaging via client portal)
     PortalMessagesModule,
+
+    // IC Commission Payouts (tax profiles, payout accounts, authorizations, RCTI)
+    IcPayoutsModule,
   ],
   controllers: [AppController],
   providers: [

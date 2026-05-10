@@ -204,6 +204,46 @@ describe('audit-sanitizer', () => {
         expect(result).not.toHaveProperty('content')
       })
 
+      it('redacts sinOrBnEncrypted from audit events on ic_tax_profile', () => {
+        const result = sanitizeForAudit('ic_tax_profile', {
+          legalName: 'Mary IC',
+          sinOrBnEncrypted: Buffer.from('secret'),
+        })
+
+        expect(result).not.toHaveProperty('sinOrBnEncrypted')
+        expect(result.legalName).toBe('Mary IC')
+      })
+
+      it('redacts sinOrBn raw input from audit events', () => {
+        const result = sanitizeForAudit('ic_tax_profile', {
+          legalName: 'Mary IC',
+          sinOrBn: '123456789',
+        })
+
+        expect(result).not.toHaveProperty('sinOrBn')
+        expect(result.legalName).toBe('Mary IC')
+      })
+
+      it('redacts detailsEncrypted from audit events on ic_payout_account', () => {
+        const result = sanitizeForAudit('ic_payout_account', {
+          label: 'My account',
+          detailsEncrypted: Buffer.from('secret'),
+        })
+
+        expect(result).not.toHaveProperty('detailsEncrypted')
+        expect(result.label).toBe('My account')
+      })
+
+      it('redacts raw details input from audit events on ic_payout_account', () => {
+        const result = sanitizeForAudit('ic_payout_account', {
+          label: 'My account',
+          details: { transitNumber: '12345', institutionNumber: '004', accountNumber: '9876543' },
+        })
+
+        expect(result).not.toHaveProperty('details')
+        expect(result.label).toBe('My account')
+      })
+
       it('blocks fields with blocked terms in their names (case-insensitive)', () => {
         const input = {
           name: 'Test',
@@ -571,6 +611,17 @@ describe('audit-sanitizer', () => {
       'itinerary',
       'contact',
       'user',
+      // IC commission payout entity types
+      'agency_tax_filing_config',
+      'ic_tax_profile',
+      'ic_payout_authorization',
+      'ic_payout_account',
+      'ic_invoice',
+      'ic_invoice_line',
+      'ic_disbursement',
+      'ic_disbursement_attempt',
+      'ic_t4a_slip',
+      'ic_t4a_filing',
     ]
 
     it.each(entityTypes)('has whitelist defined for %s entity type', (entityType) => {

@@ -103,6 +103,9 @@ export * from './loyalty-programs.types.js'
 // Commission System
 export * from './commission.types.js'
 
+// IC Commission Payouts (Independent Contractor payout management)
+export * from './ic-payouts.types.js'
+
 // Super Search
 export * from './search.types.js'
 

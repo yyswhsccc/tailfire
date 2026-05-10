@@ -19,10 +19,19 @@ export interface EncryptedData {
  * The encryption key must be provided via ENCRYPTION_KEY environment variable
  * as a base64-encoded 32-byte key.
  *
+ * Key versioning is supported via ENCRYPTION_KEY_V1, ENCRYPTION_KEY_V2, ...
+ * environment variables (hex-encoded 32-byte keys). This allows key rotation
+ * without re-encrypting all rows at once — new data is encrypted with the
+ * current version while older data can still be decrypted with its stored version.
+ *
  * @example
  * ```typescript
  * const encrypted = await encryptionService.encrypt(JSON.stringify(credentials))
  * const decrypted = await encryptionService.decrypt(encrypted)
+ *
+ * // Versioned API (for SIN/BN and other sensitive fields)
+ * const { ciphertext, keyVersion } = encryptionService.encryptWithVersion(sin)
+ * const plain = encryptionService.decryptWithVersion(ciphertext, keyVersion)
  * ```
  */
 @Injectable()
@@ -32,6 +41,10 @@ export class EncryptionService {
 
   private readonly ALGORITHM = 'aes-256-gcm'
   private readonly IV_LENGTH = 16 // 128 bits
+
+  // Versioned key registry — populated from ENCRYPTION_KEY_V1, V2, ... (hex)
+  private readonly keyByVersion: Map<number, Buffer> = new Map()
+  public readonly currentKeyVersion: number
 
   /**
    * Constructor initializes the encryption key immediately to ensure it's available
@@ -44,6 +57,21 @@ export class EncryptionService {
   constructor(private readonly configService: ConfigService) {
     const nodeEnv = this.configService.get<string>('NODE_ENV')
     const isTestEnv = nodeEnv === 'test'
+
+    // ── Versioned keys: ENCRYPTION_KEY_V1, V2, ... (hex-encoded 32-byte keys) ──
+    let v = 1
+    while (true) {
+      const hexKey = this.configService.get<string>(`ENCRYPTION_KEY_V${v}`)
+      if (!hexKey) break
+      this.keyByVersion.set(v, Buffer.from(hexKey, 'hex'))
+      v++
+    }
+
+    // currentKeyVersion = highest configured version, or 1 if none found
+    this.currentKeyVersion = this.keyByVersion.size > 0 ? this.keyByVersion.size : 1
+
+    // ── Legacy key: ENCRYPTION_KEY (base64-encoded 32-byte key) ──
+    // Falls back to version 1 when no ENCRYPTION_KEY_V* vars are configured.
     let encryptionKeyBase64 = this.configService.get<string>('ENCRYPTION_KEY')
 
     if (!encryptionKeyBase64) {
@@ -60,14 +88,30 @@ export class EncryptionService {
 
     try {
       // Decode base64 string to Buffer
-      this.encryptionKey = Buffer.from(encryptionKeyBase64, 'base64')
+      const legacyKey = Buffer.from(encryptionKeyBase64, 'base64')
 
       // Validate key size (must be exactly 32 bytes for AES-256)
-      if (this.encryptionKey.length !== 32) {
-        throw new Error(
-          `ENCRYPTION_KEY must be exactly 32 bytes (256 bits) when decoded. ` +
-          `Got ${this.encryptionKey.length} bytes. Generate a new key with: openssl rand -base64 32`
-        )
+      if (legacyKey.length !== 32) {
+        // If versioned keys are configured, the legacy key is not required to be
+        // valid — it may be a hex-format placeholder set for test/versioned setups.
+        if (this.keyByVersion.size > 0) {
+          // Use an ephemeral key for the legacy encrypt()/decrypt() path so those
+          // methods remain callable (existing callers won't use versioned data).
+          this.encryptionKey = crypto.randomBytes(32)
+          this.logger.debug('Legacy ENCRYPTION_KEY is not 32 bytes but versioned keys are present; using ephemeral key for legacy path')
+        } else {
+          throw new Error(
+            `ENCRYPTION_KEY must be exactly 32 bytes (256 bits) when decoded. ` +
+            `Got ${legacyKey.length} bytes. Generate a new key with: openssl rand -base64 32`
+          )
+        }
+      } else {
+        this.encryptionKey = legacyKey
+      }
+
+      // Register legacy key as version 1 fallback if no V1 was configured
+      if (!this.keyByVersion.has(1)) {
+        this.keyByVersion.set(1, this.encryptionKey)
       }
 
       this.logger.debug('EncryptionService initialized with AES-256-GCM')
@@ -142,6 +186,65 @@ export class EncryptionService {
       this.logger.error(`Decryption failed: ${errorMsg}`)
       throw new Error(`Decryption failed - data may be corrupted or tampered: ${errorMsg}`)
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Versioned API — for SIN/BN and other CRA-sensitive fields
+  // Ciphertext layout: [iv: 12 bytes][authTag: 16 bytes][encrypted payload]
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Encrypts plaintext using a specific key version (AES-256-GCM, 12-byte IV).
+   *
+   * The returned `ciphertext` Buffer is self-contained:
+   *   bytes 0–11  → IV (12 bytes)
+   *   bytes 12–27 → GCM auth tag (16 bytes)
+   *   bytes 28+   → encrypted payload
+   *
+   * Store `keyVersion` alongside the ciphertext so the correct key can be
+   * looked up on decryption. This enables key rotation without a bulk
+   * re-encryption pass.
+   *
+   * @param plain   - Plaintext string to encrypt (e.g. SIN, BN)
+   * @param version - Key version to use; defaults to `currentKeyVersion`
+   * @returns `{ ciphertext: Buffer, keyVersion: number }`
+   * @throws Error if the requested version has no configured key
+   */
+  encryptWithVersion(
+    plain: string,
+    version?: number,
+  ): { ciphertext: Buffer; keyVersion: number } {
+    const v = version ?? this.currentKeyVersion
+    const key = this.keyByVersion.get(v)
+    if (!key) {
+      throw new Error(`Encryption: no key configured for version ${v}`)
+    }
+    const iv = crypto.randomBytes(12)
+    const cipher = crypto.createCipheriv(this.ALGORITHM, key, iv)
+    const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()])
+    const tag = cipher.getAuthTag()
+    return { ciphertext: Buffer.concat([iv, tag, enc]), keyVersion: v }
+  }
+
+  /**
+   * Decrypts a Buffer produced by `encryptWithVersion`.
+   *
+   * @param ciphertext - The combined IV+authTag+payload Buffer
+   * @param version    - The key version stored alongside the ciphertext
+   * @returns Decrypted plaintext string
+   * @throws Error if the version has no configured key or GCM auth fails
+   */
+  decryptWithVersion(ciphertext: Buffer, version: number): string {
+    const key = this.keyByVersion.get(version)
+    if (!key) {
+      throw new Error(`Encryption: no key configured for version ${version}`)
+    }
+    const iv = ciphertext.subarray(0, 12)
+    const tag = ciphertext.subarray(12, 28)
+    const enc = ciphertext.subarray(28)
+    const decipher = crypto.createDecipheriv(this.ALGORITHM, key, iv)
+    decipher.setAuthTag(tag)
+    return Buffer.concat([decipher.update(enc), decipher.final()]).toString('utf8')
   }
 
   /**

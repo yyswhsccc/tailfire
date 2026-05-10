@@ -54,6 +54,18 @@ export * from './financials.schema'
 // Commission system (check-based commission tracking)
 export * from './commission-checks.schema'
 
+// Agency tax filing config (CRA payer identity for T4A filings)
+export * from './agency-tax-filing-config.schema'
+
+// IC tax profiles (canonical IC identity: SIN/BN, GST/HST, disbursement policy)
+export * from './ic-tax-profiles.schema'
+
+// IC payout authorizations (RCTI agreement consent records)
+export * from './ic-payout-authorizations.schema'
+
+// IC payout accounts (bank/e-transfer/wire destination accounts with encrypted details)
+export * from './ic-payout-accounts.schema'
+
 // Payment schedule templates (agency-scoped reusable patterns)
 export * from './payment-templates.schema'
 

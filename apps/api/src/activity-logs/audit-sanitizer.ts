@@ -65,6 +65,17 @@ const ALLOWED_FIELDS: Record<string, string[]> = {
   contact_loyalty_program: ['programName', 'providerName', 'membershipNumber', 'tierLevel', 'loyaltyProgramId'],
   loyalty_program: ['providerName', 'programName', 'programType', 'isActive'],
   activity_traveler: ['contactLoyaltyProgramId'],
+  // IC commission payout entity types
+  agency_tax_filing_config: ['hstNumber', 'filingFrequency', 'isActive', 'updatedAt'],
+  ic_tax_profile: ['legalName', 'taxType', 'province', 'isVerified', 'verifiedAt'],
+  ic_payout_authorization: ['authorizedAt', 'revokedAt', 'isActive', 'authorizedBy'],
+  ic_payout_account: ['label', 'accountType', 'isDefault', 'isVerified', 'createdAt'],
+  ic_invoice: ['invoiceNumber', 'status', 'issuedAt', 'dueAt', 'totalCents', 'currency'],
+  ic_invoice_line: ['description', 'quantity', 'unitAmountCents', 'totalAmountCents'],
+  ic_disbursement: ['status', 'totalCents', 'currency', 'scheduledAt', 'processedAt'],
+  ic_disbursement_attempt: ['status', 'attemptedAt', 'failureReason'],
+  ic_t4a_slip: ['taxYear', 'status', 'issuedAt', 'totalBoxAmountCents'],
+  ic_t4a_filing: ['taxYear', 'status', 'filedAt', 'slipCount'],
 }
 
 /**
@@ -92,6 +103,11 @@ const BLOCKED_FIELDS = [
   'encryptedData',
   'bankAccount',
   'routingNumber',
+  // IC payout sensitive fields — encrypted blobs and raw PII inputs
+  'sinOrBnEncrypted',
+  'sinOrBn',
+  'detailsEncrypted',
+  'details',
 ]
 
 /**
