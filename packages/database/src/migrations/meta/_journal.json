@@ -1450,6 +1450,13 @@
       "when": 1778414400006,
       "tag": "20260509210000_ic_audit_entity_types",
       "breakpoints": true
+    },
+    {
+      "idx": 207,
+      "version": "7",
+      "when": 1778414400007,
+      "tag": "20260510220820_commission_adjustments_currency",
+      "breakpoints": true
     }
   ]
 }

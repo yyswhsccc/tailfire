@@ -192,6 +192,9 @@ export const commissionAdjustments = pgTable('commission_adjustments', {
   amountCents: integer('amount_cents').notNull(),
   adjustmentType: commissionAdjustmentTypeEnum('adjustment_type').notNull(),
 
+  // Currency (ISO 4217, 3-char; required for multi-currency claim grouping — Phase 2)
+  currency: varchar('currency', { length: 3 }).notNull().default('CAD'),
+
   // Tax fields (fixes TraveleSolutions manual workaround)
   taxType: varchar('tax_type', { length: 50 }),
   taxRate: decimal('tax_rate', { precision: 5, scale: 2 }),
