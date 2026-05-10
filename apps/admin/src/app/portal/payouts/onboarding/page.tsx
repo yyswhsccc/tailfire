@@ -3,6 +3,7 @@
 import { Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { TaxProfileStep } from './_components/tax-profile-step'
+import { AuthorizationStep } from './_components/authorization-step'
 import { cn } from '@/lib/utils'
 
 // Steps 2 and 3 will be added by Tasks 14 and 15
@@ -35,7 +36,7 @@ function OnboardingContent() {
 
       <div>
         {step === 1 && <TaxProfileStep onComplete={() => goToStep(2)} />}
-        {step === 2 && <PlaceholderStep label="Authorization (coming in Task 14)" />}
+        {step === 2 && <AuthorizationStep onComplete={() => goToStep(3)} />}
         {step === 3 && <PlaceholderStep label="First account (coming in Task 15)" />}
       </div>
     </div>
