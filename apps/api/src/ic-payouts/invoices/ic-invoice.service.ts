@@ -45,6 +45,7 @@ import { IcInvoiceNumberAllocator } from './ic-invoice-number-allocator.service'
 import { PlaceOfSupplyService } from '../place-of-supply/place-of-supply.service'
 import { IcInvoicePdfService } from './ic-invoice-pdf.service'
 import { StorageService } from '../../trips/storage.service'
+import { RCTI_AGREEMENT_VERSION } from '../authorizations/rcti-template'
 import type { SubmitClaimInput } from './dto/submit-claim.dto'
 
 const {
@@ -52,6 +53,7 @@ const {
   commissionChecks,
   icInvoices,
   icInvoiceLines,
+  agencyTaxFilingConfig,
 } = schema
 
 // ── Internal types ─────────────────────────────────────────────────────────────
@@ -417,13 +419,53 @@ export class IcInvoiceService {
         .from(icInvoiceLines)
         .where(eq(icInvoiceLines.invoiceId, committedInvoice.id))
 
+      // Fetch agency tax filing config for the agency identity block on the invoice.
+      // Should always exist (PlaceOfSupplyService would have failed earlier if missing),
+      // but we treat a missing config as non-fatal to preserve the non-blocking posture.
+      const agencyConfigRows = await this.db.client
+        .select()
+        .from(agencyTaxFilingConfig)
+        .where(eq(agencyTaxFilingConfig.agencyId, args.agencyId))
+        .limit(1)
+
+      const agencyConfig = agencyConfigRows[0]
+      if (!agencyConfig) {
+        this.logger.warn(
+          `Missing agency_tax_filing_config for agency ${args.agencyId}. ` +
+          `Invoice ${committedInvoice.invoiceNumber} will be committed without a PDF.`,
+        )
+        return committedInvoice
+      }
+
+      // Build agency address lines for the invoice header
+      const addr = agencyConfig.filingAddress as {
+        street?: string
+        city?: string
+        province?: string
+        postalCode?: string
+      }
+      const agencyAddressLines = [
+        addr.street ?? '',
+        [addr.city, addr.province, addr.postalCode].filter(Boolean).join(', '),
+      ].filter(s => s.trim().length > 0)
+
+      // Mask BN15 for display: last 4 digits visible, rest replaced with '*'
+      const bn15 = agencyConfig.payerAccountNumber
+      const agencyBn15 = bn15.length > 4
+        ? '*'.repeat(bn15.length - 4) + bn15.slice(-4)
+        : bn15
+
       const pdfBytes = await this.pdf.render({
         invoice: committedInvoice,
         lines,
+        agencyLegalName: agencyConfig.legalName,
+        agencyAddressLines,
+        agencyBn15,
         icLegalName: args.profile.legalName,
-        icAddress: args.profile.domicileAddress as Record<string, unknown>,
+        icAddress: args.profile.domicileAddress as { street: string; city: string; province: string; postalCode: string },
         icGstHstNumber: args.profile.gstHstNumber ?? null,
         icSinOrBnMask: args.profile.sinOrBnMask ?? null,
+        rctiAgreementVersion: RCTI_AGREEMENT_VERSION,
       })
 
       const componentId = `ic-payouts/invoices/${args.agencyId}/${args.userId}`
