@@ -260,3 +260,6 @@ export * from './consumer-insights.schema'
 
 // Tax rates (effective-dated provincial/federal GST/HST rates for IC invoice tax calculation)
 export * from './tax-rates.schema'
+
+// IC invoice number sequences (race-free per-IC per-tax-year sequential counters)
+export * from './ic-invoice-number-sequences.schema'

@@ -1464,6 +1464,13 @@
       "when": 1778414400008,
       "tag": "20260510221000_tax_rates",
       "breakpoints": true
+    },
+    {
+      "idx": 209,
+      "version": "7",
+      "when": 1778414400009,
+      "tag": "20260510222000_ic_invoice_number_sequences",
+      "breakpoints": true
     }
   ]
 }
