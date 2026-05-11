@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { BullModule } from '@nestjs/bullmq'
 import { IcTaxProfilesService } from './ic-tax-profiles/ic-tax-profiles.service'
 import { IcPayoutAccountsService } from './payout-accounts/ic-payout-accounts.service'
 import { IcPayoutAuthorizationsService } from './authorizations/ic-payout-authorizations.service'
@@ -15,6 +16,7 @@ import { AgencyTaxFilingController } from './agency-tax-filing/agency-tax-filing
 import { IcInvoiceController } from './invoices/ic-invoice.controller'
 import { TripsModule } from '../trips/trips.module'
 import { DocumentRenderModule } from '../document-render/document-render.module'
+import { QUEUES } from '../automation/automation.types'
 
 /**
  * IcPayoutsModule
@@ -46,7 +48,35 @@ import { DocumentRenderModule } from '../document-render/document-render.module'
  *   - DocumentRenderModule   → provides PuppeteerPdfService (PDF rendering)
  */
 @Module({
-  imports: [TripsModule, DocumentRenderModule],
+  imports: [
+    TripsModule,
+    DocumentRenderModule,
+    BullModule.registerQueue(
+      {
+        name: QUEUES.IC_PAYOUT_DISBURSE,
+        defaultJobOptions: {
+          removeOnComplete: { age: 24 * 3600, count: 1000 },
+          removeOnFail: { age: 7 * 24 * 3600 },
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+        },
+      },
+      {
+        name: QUEUES.IC_PAYOUT_WEBHOOK,
+        defaultJobOptions: {
+          removeOnComplete: { age: 24 * 3600, count: 1000 },
+          removeOnFail: { age: 7 * 24 * 3600 },
+        },
+      },
+      {
+        name: QUEUES.IC_PAYOUT_RECONCILE,
+        defaultJobOptions: {
+          removeOnComplete: { age: 24 * 3600, count: 100 },
+          removeOnFail: { age: 7 * 24 * 3600 },
+        },
+      },
+    ),
+  ],
   controllers: [
     IcTaxProfilesController,
     IcPayoutAccountsController,
