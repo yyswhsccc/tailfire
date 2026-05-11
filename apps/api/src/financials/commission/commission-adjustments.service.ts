@@ -54,6 +54,7 @@ export class CommissionAdjustmentsService {
         agencyId,
         description: dto.description,
         amountCents: dto.amountCents,
+        currency: dto.currency ?? 'CAD',
         adjustmentType: dto.adjustmentType,
         taxType: dto.taxType,
         taxRate: dto.taxRate?.toString(),
