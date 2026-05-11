@@ -182,18 +182,31 @@ export class DisbursementService {
   // PUBLIC: listForAdmin
   // ============================================================================
 
-  async listForAdmin(agencyId: string, status?: IcDisbursementStatus): Promise<IcDisbursement[]> {
-    // Join through ic_invoices to scope by agencyId
-    const rows: IcDisbursement[] = await this.db.client.execute(sql`
-      SELECT d.*
+  async listForAdmin(agencyId: string, status?: IcDisbursementStatus): Promise<(IcDisbursement & {
+    invoiceNumber: string
+    icLegalName: string
+    payoutAccountMask: string
+  })[]> {
+    // Join through ic_invoices (agency scope) and ic_payout_accounts (mask) for UI-ready data
+    const rows = await this.db.client.execute(sql`
+      SELECT
+        d.*,
+        i.invoice_number AS "invoiceNumber",
+        i.ic_legal_name  AS "icLegalName",
+        a.details_mask   AS "payoutAccountMask"
       FROM ic_disbursements d
-      JOIN ic_invoices i ON i.id = d.invoice_id
+      JOIN ic_invoices       i ON i.id = d.invoice_id
+      JOIN ic_payout_accounts a ON a.id = d.payout_account_id
       WHERE i.agency_id = ${agencyId}::uuid
         ${status ? sql`AND d.status = ${status}` : sql``}
       ORDER BY d.created_at DESC
-    `) as unknown as IcDisbursement[]
+    `)
 
-    return rows
+    return rows as unknown as (IcDisbursement & {
+      invoiceNumber: string
+      icLegalName: string
+      payoutAccountMask: string
+    })[]
   }
 
   // ============================================================================

@@ -18,7 +18,11 @@ import {
   Param,
   Query,
   UsePipes,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiTags } from '@nestjs/swagger'
 import { AdminOnly } from '../../auth/decorators/admin-only.decorator'
 import { GetAuthContext } from '../../auth/decorators/auth-context.decorator'
@@ -26,6 +30,7 @@ import type { AuthContext } from '../../auth/auth.types'
 import { zodValidation } from '../../common/pipes'
 import { DisbursementService } from './disbursement.service'
 import type { IcDisbursementStatus } from './disbursement.service'
+import { StorageService } from '../../trips/storage.service'
 import {
   markSentSchema,
   markFailedSchema,
@@ -33,11 +38,16 @@ import {
   type MarkFailedDto,
 } from './dto/disbursement-dto'
 
+const ALLOWED_PROOF_MIME = ['application/pdf', 'image/png', 'image/jpeg', 'image/heic']
+
 @ApiTags('IC Payouts — Disbursements')
 @Controller('ic-payouts/admin/disbursements')
 @AdminOnly()
 export class DisbursementController {
-  constructor(private readonly service: DisbursementService) {}
+  constructor(
+    private readonly service: DisbursementService,
+    private readonly storage: StorageService,
+  ) {}
 
   /**
    * GET /ic-payouts/admin/disbursements
@@ -106,5 +116,37 @@ export class DisbursementController {
     @Body() body: MarkFailedDto,
   ) {
     return this.service.fail(id, body.reason, auth.userId)
+  }
+
+  /**
+   * POST /ic-payouts/admin/disbursements/:id/upload-proof
+   * Uploads a payment proof file (PDF, PNG, JPEG, HEIC) to storage.
+   * Returns a storagePath that can be passed to mark-sent as proofPath.
+   *
+   * Upload happens BEFORE mark-sent — the UI calls this first, then passes
+   * the returned storagePath to the mark-sent body.
+   */
+  @Post(':id/upload-proof')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadProof(
+    @GetAuthContext() _auth: AuthContext,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<{ storagePath: string }> {
+    if (!file) {
+      throw new BadRequestException('No file uploaded')
+    }
+    if (!ALLOWED_PROOF_MIME.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `Unsupported file type ${file.mimetype}. Allowed: PDF, PNG, JPEG, HEIC.`,
+      )
+    }
+    const storagePath = await this.storage.uploadDocument(
+      file.buffer,
+      `ic-payout-proofs/${id}`,
+      file.originalname,
+      file.mimetype,
+    )
+    return { storagePath }
   }
 }
