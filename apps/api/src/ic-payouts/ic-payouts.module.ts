@@ -11,6 +11,9 @@ import { IcInvoiceService } from './invoices/ic-invoice.service'
 import { IcInvoicePdfService } from './invoices/ic-invoice-pdf.service'
 import { ManualPayoutProvider } from './disbursements/providers/manual.provider'
 import { PayoutProviderFactory } from './disbursements/providers/payout-provider.factory'
+import { DisbursementService } from './disbursements/disbursement.service'
+import { DisbursementProcessor } from './disbursements/disbursement.processor'
+import { DisbursementController } from './disbursements/disbursement.controller'
 import { IcTaxProfilesController } from './ic-tax-profiles/ic-tax-profiles.controller'
 import { IcPayoutAccountsController } from './payout-accounts/ic-payout-accounts.controller'
 import { IcPayoutAuthorizationsController } from './authorizations/ic-payout-authorizations.controller'
@@ -40,12 +43,16 @@ import { QUEUES } from '../automation/automation.types'
  *   - ManualPayoutProvider          (Task 33) ✓
  *   - PayoutProviderFactory         (Task 33) ✓
  *
+ *   - DisbursementService          (Task 34) ✓
+ *   - DisbursementProcessor        (Task 34) ✓
+ *
  * Controllers added in Task 10:
  *   - IcTaxProfilesController          (Task 10) ✓
  *   - IcPayoutAccountsController       (Task 10) ✓
  *   - IcPayoutAuthorizationsController (Task 10) ✓
  *   - AgencyTaxFilingController        (Task 16) ✓
  *   - IcInvoiceController              (Task 26) ✓
+ *   - DisbursementController           (Task 34) ✓
  *
  * Imports:
  *   - TripsModule            → provides StorageService (document storage)
@@ -87,6 +94,7 @@ import { QUEUES } from '../automation/automation.types'
     IcPayoutAuthorizationsController,
     AgencyTaxFilingController,
     IcInvoiceController,
+    DisbursementController,
   ],
   providers: [
     IcTaxProfilesService,
@@ -100,6 +108,8 @@ import { QUEUES } from '../automation/automation.types'
     IcInvoiceService,
     ManualPayoutProvider,
     PayoutProviderFactory,
+    DisbursementService,
+    DisbursementProcessor,
   ],
   exports: [
     IcTaxProfilesService,
@@ -113,6 +123,7 @@ import { QUEUES } from '../automation/automation.types'
     IcInvoiceService,
     ManualPayoutProvider,
     PayoutProviderFactory,
+    DisbursementService,
   ],
 })
 export class IcPayoutsModule {}

@@ -48,6 +48,7 @@ import { IcInvoicePdfService } from './ic-invoice-pdf.service'
 import { StorageService } from '../../trips/storage.service'
 import { RCTI_AGREEMENT_VERSION } from '../authorizations/rcti-template'
 import type { SubmitClaimInput } from './dto/submit-claim.dto'
+import { DisbursementService } from '../disbursements/disbursement.service'
 
 const {
   icTaxProfiles,
@@ -105,6 +106,7 @@ export class IcInvoiceService {
     private readonly placeOfSupply: PlaceOfSupplyService,
     private readonly pdf: IcInvoicePdfService,
     private readonly storage: StorageService,
+    private readonly disbursementService: DisbursementService,
   ) {}
 
   // ============================================================================
@@ -162,9 +164,9 @@ export class IcInvoiceService {
   // ============================================================================
 
   async approve(invoiceId: string, approverUserId: string): Promise<IcInvoice> {
-    return this.db.client.transaction(async (tx) => {
+    const invoice = await this.db.client.transaction(async (tx) => {
       // Atomically flip status submitted → approved (WHERE guard prevents double-approve)
-      const [invoice] = await tx
+      const [updated] = await tx
         .update(icInvoices)
         .set({
           status: 'approved',
@@ -176,21 +178,44 @@ export class IcInvoiceService {
         .where(eq(icInvoices.id, invoiceId))
         .returning()
 
-      if (!invoice) {
+      if (!updated) {
         throw new BadRequestException('Invoice not in submitted state or does not exist')
       }
 
       // Flip the reservation paid check to 'accepted'
-      if (invoice.reservationCheckId) {
+      if (updated.reservationCheckId) {
         await tx
           .update(commissionChecks)
           .set({ status: 'accepted', updatedAt: new Date() })
-          .where(eq(commissionChecks.id, invoice.reservationCheckId))
+          .where(eq(commissionChecks.id, updated.reservationCheckId))
           .returning()
       }
 
-      return invoice
+      return updated
     })
+
+    // After the transaction commits, enqueue a disbursement.
+    // Failure here is non-fatal: an approved invoice without a disbursement is recoverable
+    // (admin can manually re-trigger enqueue). But rolling back an approval and leaving the
+    // IC seeing 'rejected' falsely is much worse.
+    try {
+      await this.disbursementService.enqueue(
+        invoice.id,
+        invoice.userId,
+        invoice.totalCents,
+        invoice.currency,
+      )
+    } catch (enqueueErr) {
+      const msg = enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr)
+      this.logger.error(
+        `ALERT: Failed to enqueue disbursement for approved invoice ${invoice.id} ` +
+        `(${invoice.invoiceNumber}): ${msg}. ` +
+        `Invoice is approved but no disbursement was created. ` +
+        `Admin must manually trigger enqueue via the disbursements endpoint.`,
+      )
+    }
+
+    return invoice
   }
 
   // ============================================================================
