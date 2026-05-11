@@ -158,6 +158,7 @@ export interface CreateCommissionAdjustmentDto {
   checkId?: string
   description: string
   amountCents: number
+  currency?: string // ISO 4217. Defaults to 'CAD' if omitted (matches DB column default).
   adjustmentType: CommissionAdjustmentType
   taxType?: string // 'GST', 'HST', 'VAT'
   taxRate?: number // e.g., 13.00 for 13%
