@@ -19,12 +19,17 @@
  */
 
 import { Test } from '@nestjs/testing'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { IcInvoiceService } from '../ic-invoice.service'
 import { DatabaseService } from '../../../db/database.service'
 import { IcInvoiceNumberAllocator } from '../ic-invoice-number-allocator.service'
 import { PlaceOfSupplyService } from '../../place-of-supply/place-of-supply.service'
 import { IcInvoicePdfService } from '../ic-invoice-pdf.service'
 import { StorageService } from '../../../trips/storage.service'
+import { DisbursementService } from '../../disbursements/disbursement.service'
+
+const mockEventEmitter = { emit: jest.fn() }
+const mockDisbursementService = { enqueue: jest.fn().mockResolvedValue({}) }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -472,6 +477,8 @@ describe('IcInvoiceService.submitClaim — C3 reservation', () => {
         { provide: PlaceOfSupplyService, useValue: mockPlaceOfSupply },
         { provide: IcInvoicePdfService, useValue: mockPdf },
         { provide: StorageService, useValue: mockStorage },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: DisbursementService, useValue: mockDisbursementService },
       ],
     }).compile()
 
@@ -800,6 +807,8 @@ describe('IcInvoiceService.getEligibleForUser — eligibility query', () => {
         { provide: PlaceOfSupplyService, useValue: createMockPlaceOfSupply() },
         { provide: IcInvoicePdfService, useValue: createMockPdf() },
         { provide: StorageService, useValue: createMockStorage() },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: DisbursementService, useValue: mockDisbursementService },
       ],
     }).compile()
 
@@ -913,6 +922,8 @@ describe('IcInvoiceService.approve', () => {
         { provide: PlaceOfSupplyService, useValue: createMockPlaceOfSupply() },
         { provide: IcInvoicePdfService, useValue: createMockPdf() },
         { provide: StorageService, useValue: createMockStorage() },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: DisbursementService, useValue: mockDisbursementService },
       ],
     }).compile()
 
@@ -1008,6 +1019,8 @@ describe('IcInvoiceService.submitClaim — auto-approve path (Task 29)', () => {
         { provide: PlaceOfSupplyService, useValue: mockPlaceOfSupply },
         { provide: IcInvoicePdfService, useValue: mockPdf },
         { provide: StorageService, useValue: mockStorage },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: DisbursementService, useValue: mockDisbursementService },
       ],
     }).compile()
 
@@ -1111,6 +1124,8 @@ describe('IcInvoiceService.reject', () => {
         { provide: PlaceOfSupplyService, useValue: createMockPlaceOfSupply() },
         { provide: IcInvoicePdfService, useValue: createMockPdf() },
         { provide: StorageService, useValue: createMockStorage() },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: DisbursementService, useValue: mockDisbursementService },
       ],
     }).compile()
 

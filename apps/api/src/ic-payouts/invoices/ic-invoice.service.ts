@@ -40,6 +40,7 @@ import {
 } from '@nestjs/common'
 import { createHash } from 'crypto'
 import { sql, eq, and } from 'drizzle-orm'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { DatabaseService } from '../../db/database.service'
 import { schema } from '@tailfire/database'
 import { IcInvoiceNumberAllocator } from './ic-invoice-number-allocator.service'
@@ -107,6 +108,7 @@ export class IcInvoiceService {
     private readonly pdf: IcInvoicePdfService,
     private readonly storage: StorageService,
     private readonly disbursementService: DisbursementService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   // ============================================================================
@@ -154,6 +156,18 @@ export class IcInvoiceService {
         profile,
       })
       invoices.push(invoice)
+
+      // Emit after the transaction commits (not inside the tx).
+      // autoApproved=true when the invoice was immediately approved by the auto-disburse gate.
+      const autoApproved = invoice.status === 'approved'
+      this.eventEmitter.emit('ic-payout.invoice.submitted', {
+        invoiceId: invoice.id,
+        agencyId: input.agencyId,
+        userId: input.userId,
+        currency,
+        totalCents: invoice.totalCents,
+        autoApproved,
+      })
     }
 
     return { invoices }
@@ -194,6 +208,16 @@ export class IcInvoiceService {
       return updated
     })
 
+    // After the transaction commits, emit the approved event.
+    this.eventEmitter.emit('ic-payout.invoice.approved', {
+      invoiceId: invoice.id,
+      agencyId: invoice.agencyId,
+      userId: invoice.userId,
+      totalCents: invoice.totalCents,
+      currency: invoice.currency,
+      approvedBy: approverUserId,
+    })
+
     // After the transaction commits, enqueue a disbursement.
     // Failure here is non-fatal: an approved invoice without a disbursement is recoverable
     // (admin can manually re-trigger enqueue). But rolling back an approval and leaving the
@@ -227,7 +251,7 @@ export class IcInvoiceService {
     reason: string,
     rejectorUserId: string,
   ): Promise<IcInvoice> {
-    return this.db.client.transaction(async (tx) => {
+    const invoice = await this.db.client.transaction(async (tx) => {
       // Atomically flip status (submitted|approved) → rejected
       const [invoice] = await tx
         .update(icInvoices)
@@ -270,6 +294,17 @@ export class IcInvoiceService {
 
       return invoice
     })
+
+    // Emit after the transaction commits.
+    this.eventEmitter.emit('ic-payout.invoice.rejected', {
+      invoiceId: invoice.id,
+      agencyId: invoice.agencyId,
+      userId: invoice.userId,
+      reason,
+      rejectedBy: rejectorUserId,
+    })
+
+    return invoice
   }
 
   // ============================================================================

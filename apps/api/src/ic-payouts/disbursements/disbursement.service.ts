@@ -31,6 +31,7 @@ import {
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
 import { eq, and, inArray, sql } from 'drizzle-orm'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { DatabaseService } from '../../db/database.service'
 import { schema } from '@tailfire/database'
 import { QUEUES } from '../../automation/automation.types'
@@ -58,6 +59,7 @@ export class DisbursementService {
     private readonly db: DatabaseService,
     @InjectQueue(QUEUES.IC_PAYOUT_DISBURSE) private readonly queue: Queue,
     private readonly fxRate: FxRateService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   // ============================================================================
@@ -330,7 +332,7 @@ export class DisbursementService {
     const fxRateDate = completedDateStr
 
     // 4. Atomic transaction: update attempt + disbursement with FX snapshot
-    return this.db.client.transaction(async (tx) => {
+    const sent = await this.db.client.transaction(async (tx) => {
       // 4a. Find the in-progress attempt (outcome IS NULL) or insert a new 'sent' attempt
       const [openAttempt] = await tx
         .select()
@@ -401,14 +403,26 @@ export class DisbursementService {
         )
       }
 
-      // TODO(Task 39): emit 'ic-payout.disbursement.sent' event with disbursementId, invoiceId, userId
-
       this.logger.log(
         `Disbursement ${disbursementId} marked sent by ${markedByUserId} (ref=${ref}, fxRate=${fxRateToCad} ${d.currency}→CAD)`,
       )
 
       return updated
     })
+
+    // Emit after the transaction commits.
+    this.eventEmitter.emit('ic-payout.disbursement.sent', {
+      disbursementId: sent.id,
+      invoiceId: sent.invoiceId,
+      agencyId: invoice.agencyId,
+      userId: sent.userId,
+      currency: sent.currency,
+      amountCents: sent.amountCents,
+      reference: ref,
+      completedAt,
+    })
+
+    return sent
   }
 
   // ============================================================================
@@ -421,7 +435,11 @@ export class DisbursementService {
     reason: string,
     failedByUserId: string,
   ): Promise<IcDisbursement> {
-    return this.db.client.transaction(async (tx) => {
+    // Capture context needed for the post-tx event before entering the transaction.
+    // (invoice.agencyId is also available inside tx, captured via closure below)
+    let capturedAgencyId: string | null = null
+
+    const failed = await this.db.client.transaction(async (tx) => {
       // 1. Load disbursement; require status IN ('queued', 'sending')
       const [d] = await tx
         .select()
@@ -449,6 +467,8 @@ export class DisbursementService {
       if (!invoice) {
         throw new NotFoundException(`Invoice ${d.invoiceId} not found for disbursement ${disbursementId}`)
       }
+
+      capturedAgencyId = invoice.agencyId
 
       const now = new Date()
 
@@ -515,14 +535,26 @@ export class DisbursementService {
         .set({ status: 'cancelled', updatedAt: now })
         .where(eq(icInvoices.id, d.invoiceId))
 
-      // TODO(Task 39): emit 'ic-payout.disbursement.failed' event with disbursementId, invoiceId, userId, reason
-
       this.logger.log(
         `Disbursement ${disbursementId} marked failed by ${failedByUserId}: ${reason}. Invoice ${d.invoiceId} cancelled.`,
       )
 
       return updated
     })
+
+    // Emit after the transaction commits.
+    this.eventEmitter.emit('ic-payout.disbursement.failed', {
+      disbursementId: failed.id,
+      invoiceId: failed.invoiceId,
+      agencyId: capturedAgencyId ?? '',
+      userId: failed.userId,
+      currency: failed.currency,
+      amountCents: failed.amountCents,
+      reason,
+      failedBy: failedByUserId,
+    })
+
+    return failed
   }
 
   // ============================================================================

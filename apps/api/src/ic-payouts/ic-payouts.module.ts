@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { BullModule } from '@nestjs/bullmq'
 import { HttpModule } from '@nestjs/axios'
+import { EmailModule } from '../email/email.module'
 import { IcTaxProfilesService } from './ic-tax-profiles/ic-tax-profiles.service'
 import { IcPayoutAccountsService } from './payout-accounts/ic-payout-accounts.service'
 import { IcPayoutAuthorizationsService } from './authorizations/ic-payout-authorizations.service'
@@ -17,6 +18,7 @@ import { DisbursementProcessor } from './disbursements/disbursement.processor'
 import { DisbursementController } from './disbursements/disbursement.controller'
 import { FxRateService } from './fx/fx-rate.service'
 import { ReconcileService } from './disbursements/reconcile.service'
+import { IcPayoutNotificationsService } from './notifications/ic-payout-notifications.service'
 import { IcTaxProfilesController } from './ic-tax-profiles/ic-tax-profiles.controller'
 import { IcPayoutAccountsController } from './payout-accounts/ic-payout-accounts.controller'
 import { IcPayoutAuthorizationsController } from './authorizations/ic-payout-authorizations.controller'
@@ -70,6 +72,7 @@ import { QUEUES } from '../automation/automation.types'
     TripsModule,
     DocumentRenderModule,
     HttpModule,
+    EmailModule,
     BullModule.registerQueue(
       {
         name: QUEUES.IC_PAYOUT_DISBURSE,
@@ -120,6 +123,7 @@ import { QUEUES } from '../automation/automation.types'
     DisbursementProcessor,
     FxRateService,
     ReconcileService,
+    IcPayoutNotificationsService,
   ],
   exports: [
     IcTaxProfilesService,

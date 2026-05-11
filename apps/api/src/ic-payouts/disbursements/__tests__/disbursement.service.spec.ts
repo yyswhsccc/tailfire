@@ -19,11 +19,14 @@
  */
 
 import { Test } from '@nestjs/testing'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { DisbursementService } from '../disbursement.service'
 import { DatabaseService } from '../../../db/database.service'
 import { FxRateService } from '../../fx/fx-rate.service'
 import { getQueueToken } from '@nestjs/bullmq'
 import { QUEUES } from '../../../automation/automation.types'
+
+const mockEventEmitter = { emit: jest.fn() }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -400,6 +403,7 @@ async function buildModule(
       { provide: DatabaseService, useValue: db },
       { provide: getQueueToken(QUEUES.IC_PAYOUT_DISBURSE), useValue: queue },
       { provide: FxRateService, useValue: fxRate },
+      { provide: EventEmitter2, useValue: mockEventEmitter },
     ],
   }).compile()
 
@@ -554,6 +558,15 @@ describe('DisbursementService.markSent', () => {
 
     // FxRateService was called with the correct args
     expect(fxRate.getRateOnDate).toHaveBeenCalledWith('CAD', 'CAD', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
+
+    // EventEmitter2 should emit disbursement.sent after transaction commits
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      'ic-payout.disbursement.sent',
+      expect.objectContaining({
+        disbursementId: expect.any(String),
+        reference: 'ETRANSFER-123',
+      }),
+    )
   })
 
   it('D6b: inserts new "sent" attempt when no open attempt exists', async () => {
@@ -682,6 +695,16 @@ describe('DisbursementService.fail', () => {
     // commissionChecks cancelled
     const checkCancelUpdate = db._calls.updates.find((u: any) => u.status === 'cancelled')
     expect(checkCancelUpdate).toBeDefined()
+
+    // EventEmitter2 should emit disbursement.failed after transaction commits
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      'ic-payout.disbursement.failed',
+      expect.objectContaining({
+        disbursementId: expect.any(String),
+        reason: 'Wire transfer failed: invalid IBAN',
+        failedBy: ADMIN_ID,
+      }),
+    )
   })
 
   // D8. Fail from 'queued' allowed

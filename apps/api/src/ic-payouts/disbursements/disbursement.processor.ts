@@ -18,6 +18,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { Processor, WorkerHost } from '@nestjs/bullmq'
 import { Job } from 'bullmq'
 import { eq } from 'drizzle-orm'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import { DatabaseService } from '../../db/database.service'
 import { schema } from '@tailfire/database'
 import { QUEUES } from '../../automation/automation.types'
@@ -26,7 +27,7 @@ import { PayoutProviderFactory } from './providers/payout-provider.factory'
 import { IcPayoutAccountsService } from '../payout-accounts/ic-payout-accounts.service'
 import type { Rail } from '../payout-accounts/ic-payout-accounts.service'
 
-const { icDisbursements, icPayoutAccounts } = schema
+const { icDisbursements, icPayoutAccounts, icInvoices } = schema
 
 @Processor(QUEUES.IC_PAYOUT_DISBURSE)
 @Injectable()
@@ -38,6 +39,7 @@ export class DisbursementProcessor extends WorkerHost {
     private readonly providerFactory: PayoutProviderFactory,
     private readonly accounts: IcPayoutAccountsService,
     private readonly disbursements: DisbursementService,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     super()
   }
@@ -102,8 +104,26 @@ export class DisbursementProcessor extends WorkerHost {
         `Disbursement ${disbursementId} is awaiting manual send (attempt ${attemptNumber}). ` +
         `Admin must complete via mark-sent or mark-failed endpoint.`,
       )
+
+      // Load invoice to get agencyId for the notification.
+      const [invoice] = await this.db.client
+        .select()
+        .from(icInvoices)
+        .where(eq(icInvoices.id, d.invoiceId))
+        .limit(1)
+
+      this.eventEmitter.emit('ic-payout.disbursement.awaiting-manual-send', {
+        disbursementId,
+        invoiceId: d.invoiceId,
+        agencyId: invoice?.agencyId ?? '',
+        userId: d.userId,
+        currency: d.currency,
+        amountCents: d.amountCents,
+        rail: d.rail,
+        mask: account?.detailsMask ?? '****',
+      })
+
       // Stay in 'sending'. Admin completes via controller.
-      // TODO(Task 39): emit 'ic-payout.disbursement.awaiting-manual-send' event with disbursementId
       return
     }
 
