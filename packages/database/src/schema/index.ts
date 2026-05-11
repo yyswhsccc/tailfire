@@ -266,3 +266,6 @@ export * from './ic-invoice-number-sequences.schema'
 
 // IC invoices + invoice lines (RCTI payout invoices with mutual-exclusivity CHECK constraint)
 export * from './ic-invoices.schema'
+
+// IC disbursements + disbursement attempts (provider-agnostic payout execution with FX snapshot)
+export * from './ic-disbursements.schema'
