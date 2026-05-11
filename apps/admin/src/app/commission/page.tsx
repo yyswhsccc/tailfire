@@ -60,6 +60,7 @@ export default function CommissionPage() {
           {isAdmin && <TabsTrigger value="payable">Payable by Agent</TabsTrigger>}
           <TabsTrigger value="received">Received Checks</TabsTrigger>
           <TabsTrigger value="claims">{isAdmin ? 'Agent Claims' : 'My Claims'}</TabsTrigger>
+          {isAdmin && <TabsTrigger value="disbursements">Disbursements</TabsTrigger>}
           {isAdmin && <TabsTrigger value="unreconciled">Unreconciled</TabsTrigger>}
         </TabsList>
 
@@ -124,6 +125,27 @@ export default function CommissionPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {isAdmin && (
+          <TabsContent value="disbursements">
+            <Card>
+              <CardHeader>
+                <CardTitle>IC Commission Disbursements</CardTitle>
+                <CardDescription>
+                  Review IC commission invoices and manage manual disbursement sends.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  IC agents submit RCTI commission claims, which appear here for review. Once approved,
+                  manage the payout (mark sent with reference + proof, or mark failed to reverse the reservation).
+                </p>
+                <Button asChild>
+                  <Link href="/commission/disbursements">Open Disbursements Queue</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
         {isAdmin && (
           <TabsContent value="unreconciled">
             <Card>

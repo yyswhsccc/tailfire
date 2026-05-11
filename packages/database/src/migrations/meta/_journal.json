@@ -1478,6 +1478,20 @@
       "when": 1778414400010,
       "tag": "20260510223000_ic_invoices",
       "breakpoints": true
+    },
+    {
+      "idx": 211,
+      "version": "7",
+      "when": 1778414400011,
+      "tag": "20260511000000_ic_disbursements",
+      "breakpoints": true
+    },
+    {
+      "idx": 212,
+      "version": "7",
+      "when": 1778414400012,
+      "tag": "20260511010000_fx_rate_snapshots",
+      "breakpoints": true
     }
   ]
 }
