@@ -12,8 +12,9 @@
  * RBAC: admin sees all, agent sees only their own data.
  */
 
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, ForbiddenException } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, ForbiddenException, GoneException } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
+import { ConfigService } from '@nestjs/config'
 import { CommissionService } from './commission.service'
 import { AdminOnly } from '../../auth/decorators/admin-only.decorator'
 import { GetAuthContext } from '../../auth/decorators/auth-context.decorator'
@@ -42,7 +43,14 @@ import type {
 @ApiTags('Commission')
 @Controller()
 export class CommissionController {
-  constructor(private readonly commissionService: CommissionService) {}
+  constructor(
+    private readonly commissionService: CommissionService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private isIcPayoutsV2Enabled(): boolean {
+    return this.configService.get<string>('IC_PAYOUTS_V2_ENABLED') === 'true'
+  }
 
   // ============================================================================
   // CHECK MANAGEMENT
@@ -185,16 +193,29 @@ export class CommissionController {
     @GetAuthContext() auth: AuthContext,
     @Body() dto: PayAgentDto
   ): Promise<CommissionCheckResponseDto[]> {
+    if (this.isIcPayoutsV2Enabled()) {
+      throw new GoneException(
+        'Legacy payAgents endpoint disabled. Use the IC payouts module: ICs submit their own claims via /ic-payouts/me/claims; admins review/approve via /ic-payouts/admin/invoices.'
+      )
+    }
     return this.commissionService.payAgents(auth.agencyId, dto, auth.userId)
   }
 
   /**
-   * Agent self-claim endpoint — agents can claim their own payable commission
+   * Agent self-claim endpoint — agents can claim their own payable commission.
+   *
+   * @deprecated When IC_PAYOUTS_V2_ENABLED='true' this returns HTTP 410 Gone.
+   * Use POST /ic-payouts/me/claims instead.
    */
   @Post('commission/claims/me')
   async claimMyCommission(
     @GetAuthContext() auth: AuthContext,
   ): Promise<CommissionCheckResponseDto[]> {
+    if (this.isIcPayoutsV2Enabled()) {
+      throw new GoneException(
+        'Legacy claims endpoint disabled. Submit claims via POST /ic-payouts/me/claims (browse eligible items first at GET /ic-payouts/me/eligible).'
+      )
+    }
     return this.commissionService.payAgents(auth.agencyId, {
       userIds: [auth.userId],
     }, auth.userId)
