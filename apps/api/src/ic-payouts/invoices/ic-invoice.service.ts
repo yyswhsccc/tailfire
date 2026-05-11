@@ -334,12 +334,15 @@ export class IcInvoiceService {
       }>
     }>
   }> {
-    // Fetch unsettled commission check items the user is a collaborator on
+    // Fetch unsettled commission check items the user is a collaborator on.
+    // trip_ref is composed from trip.reference_number with fallback to trip.name —
+    // activity_pricing has no trip_ref column (was a Task 24 mistake); trips table is
+    // the source of truth for the human-readable identifier shown to the IC.
     const itemRows: any[] = await this.db.client.execute(sql`
       SELECT
         cci.id AS check_item_id,
         src_cc.currency,
-        ap.trip_ref AS trip_ref,
+        COALESCE(t.reference_number, t.name) AS trip_ref,
         cci.description,
         GREATEST(COALESCE(cci.received_cents, 0), 0) AS commission_cents
       FROM commission_check_items cci
