@@ -16,6 +16,7 @@ import { DisbursementService } from './disbursements/disbursement.service'
 import { DisbursementProcessor } from './disbursements/disbursement.processor'
 import { DisbursementController } from './disbursements/disbursement.controller'
 import { FxRateService } from './fx/fx-rate.service'
+import { ReconcileService } from './disbursements/reconcile.service'
 import { IcTaxProfilesController } from './ic-tax-profiles/ic-tax-profiles.controller'
 import { IcPayoutAccountsController } from './payout-accounts/ic-payout-accounts.controller'
 import { IcPayoutAuthorizationsController } from './authorizations/ic-payout-authorizations.controller'
@@ -118,6 +119,7 @@ import { QUEUES } from '../automation/automation.types'
     DisbursementService,
     DisbursementProcessor,
     FxRateService,
+    ReconcileService,
   ],
   exports: [
     IcTaxProfilesService,
@@ -133,6 +135,7 @@ import { QUEUES } from '../automation/automation.types'
     PayoutProviderFactory,
     DisbursementService,
     FxRateService,
+    ReconcileService,
   ],
 })
 export class IcPayoutsModule {}
