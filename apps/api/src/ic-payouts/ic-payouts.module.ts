@@ -9,6 +9,8 @@ import { IcInvoiceNumberAllocator } from './invoices/ic-invoice-number-allocator
 import { PlaceOfSupplyService } from './place-of-supply/place-of-supply.service'
 import { IcInvoiceService } from './invoices/ic-invoice.service'
 import { IcInvoicePdfService } from './invoices/ic-invoice-pdf.service'
+import { ManualPayoutProvider } from './disbursements/providers/manual.provider'
+import { PayoutProviderFactory } from './disbursements/providers/payout-provider.factory'
 import { IcTaxProfilesController } from './ic-tax-profiles/ic-tax-profiles.controller'
 import { IcPayoutAccountsController } from './payout-accounts/ic-payout-accounts.controller'
 import { IcPayoutAuthorizationsController } from './authorizations/ic-payout-authorizations.controller'
@@ -35,6 +37,8 @@ import { QUEUES } from '../automation/automation.types'
  *   - PlaceOfSupplyService          (Task 22) ✓
  *   - IcInvoicePdfService           (Task 24 stub, Task 25 will implement) ✓
  *   - IcInvoiceService              (Task 24) ✓
+ *   - ManualPayoutProvider          (Task 33) ✓
+ *   - PayoutProviderFactory         (Task 33) ✓
  *
  * Controllers added in Task 10:
  *   - IcTaxProfilesController          (Task 10) ✓
@@ -94,6 +98,8 @@ import { QUEUES } from '../automation/automation.types'
     PlaceOfSupplyService,
     IcInvoicePdfService,
     IcInvoiceService,
+    ManualPayoutProvider,
+    PayoutProviderFactory,
   ],
   exports: [
     IcTaxProfilesService,
@@ -105,6 +111,8 @@ import { QUEUES } from '../automation/automation.types'
     PlaceOfSupplyService,
     IcInvoicePdfService,
     IcInvoiceService,
+    ManualPayoutProvider,
+    PayoutProviderFactory,
   ],
 })
 export class IcPayoutsModule {}
