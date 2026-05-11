@@ -12,8 +12,11 @@
  *  - fail() is admin-only, transactional, reverses the invoice reservation,
  *    sets invoice.status='cancelled' (NOT 'rejected' — failure is post-approval).
  *
- * FX snapshot (fxRateToCad, cadEquivalent*) is left NULL on markSent in this task.
- * Task 37 will populate these via FxRateService.getRateOnDate().
+ * FX snapshot (fxRateToCad, cadEquivalent*): populated by markSent via FxRateService.
+ * The FX rate is resolved BEFORE the transaction (may make an HTTP call to BoC).
+ * If FX fetch fails, markSent fails and the disbursement stays in 'sending' for retry.
+ * CAD→CAD returns 1.0 instantly (no DB/HTTP). USD→CAD uses BoC Valet snapshot.
+ * These values feed T4A Box 020 at year-end and MUST be populated on every sent disbursement.
  *
  * Notification events are stubbed as TODO comments. Task 39 wires the EventEmitter2 calls.
  */
@@ -31,6 +34,7 @@ import { eq, and, inArray, sql } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
 import { schema } from '@tailfire/database'
 import { QUEUES } from '../../automation/automation.types'
+import { FxRateService } from '../fx/fx-rate.service'
 
 const {
   icDisbursements,
@@ -53,6 +57,7 @@ export class DisbursementService {
   constructor(
     private readonly db: DatabaseService,
     @InjectQueue(QUEUES.IC_PAYOUT_DISBURSE) private readonly queue: Queue,
+    private readonly fxRate: FxRateService,
   ) {}
 
   // ============================================================================
@@ -253,6 +258,19 @@ export class DisbursementService {
   // ============================================================================
   // PUBLIC: markSent
   // Admin-only. Atomically sets disbursement to 'sent' from 'sending'.
+  //
+  // FX resolution strategy (Task 37):
+  //   The FX rate is fetched BEFORE entering the transaction to avoid HTTP-in-tx.
+  //   If FxRateService.getRateOnDate fails (BoC unavailable, rate not yet published),
+  //   markSent throws and the disbursement stays in 'sending' so the admin can retry
+  //   once connectivity or the BoC publication is available.
+  //
+  //   CAD→CAD returns 1.0 instantly (no DB or HTTP). USD→CAD uses BoC Valet snapshot
+  //   (stored in fx_rate_snapshots; fetched on-demand if not yet stored).
+  //
+  //   The CAD-equivalent values (cadEquivalentBaseCents, cadEquivalentTaxCents,
+  //   cadEquivalentTotalCents) feed T4A Box 020 at year-end and MUST be populated
+  //   for every disbursement that transitions to 'sent'.
   // ============================================================================
 
   async markSent(
@@ -261,27 +279,59 @@ export class DisbursementService {
     proofPath: string | null,
     markedByUserId: string,
   ): Promise<IcDisbursement> {
+    // 1. Pre-load disbursement (outside tx — read-only, for FX resolution)
+    const [d] = await this.db.client
+      .select()
+      .from(icDisbursements)
+      .where(eq(icDisbursements.id, disbursementId))
+      .limit(1)
+
+    if (!d) {
+      throw new NotFoundException(`Disbursement ${disbursementId} not found`)
+    }
+
+    if (d.status !== 'sending') {
+      throw new BadRequestException(
+        `Disbursement ${disbursementId} must be in 'sending' status to mark as sent (current: ${d.status})`,
+      )
+    }
+
+    // 2. Load invoice to get reportableBaseCents, taxCents, totalCents for CAD-equivalent calc
+    const [invoice] = await this.db.client
+      .select()
+      .from(icInvoices)
+      .where(eq(icInvoices.id, d.invoiceId))
+      .limit(1)
+
+    if (!invoice) {
+      throw new BadRequestException(
+        `Invoice ${d.invoiceId} not found for disbursement ${disbursementId}`,
+      )
+    }
+
+    // 3. Resolve FX rate BEFORE entering the transaction.
+    //    For CAD→CAD: FxRateService returns 1.0 immediately (no DB or HTTP).
+    //    For USD→CAD: may fetch from BoC Valet API and snapshot to DB.
+    //    If this throws, markSent fails cleanly and disbursement stays in 'sending'.
+    const completedAt = new Date()
+    const completedDateStr = completedAt.toISOString().slice(0, 10)
+    const fxRateValue = await this.fxRate.getRateOnDate(d.currency, 'CAD', completedDateStr)
+
+    // CAD-equivalent computation: integer rounding (never floor/ceiling) to avoid
+    // fractional-cent drift. sourceCents × fxRate, rounded to nearest cent.
+    const cadEquivalentBaseCents = Math.round(invoice.reportableBaseCents * fxRateValue)
+    const cadEquivalentTaxCents = Math.round(invoice.taxCents * fxRateValue)
+    const cadEquivalentTotalCents = Math.round(invoice.totalCents * fxRateValue)
+
+    // fxRateToCad is numeric(18,8) without { mode: 'number' } in Drizzle schema →
+    // expects/returns strings. Pass as toFixed(8) string.
+    const fxRateToCad = fxRateValue.toFixed(8)
+    const fxRateSource = 'bank_of_canada' as const
+    const fxRateDate = completedDateStr
+
+    // 4. Atomic transaction: update attempt + disbursement with FX snapshot
     return this.db.client.transaction(async (tx) => {
-      // 1. Load disbursement and require status='sending'
-      const [d] = await tx
-        .select()
-        .from(icDisbursements)
-        .where(eq(icDisbursements.id, disbursementId))
-        .limit(1)
-
-      if (!d) {
-        throw new NotFoundException(`Disbursement ${disbursementId} not found`)
-      }
-
-      if (d.status !== 'sending') {
-        throw new BadRequestException(
-          `Disbursement ${disbursementId} must be in 'sending' status to mark as sent (current: ${d.status})`,
-        )
-      }
-
-      const now = new Date()
-
-      // 2. Find the in-progress attempt (outcome IS NULL) or insert a new 'sent' attempt
+      // 4a. Find the in-progress attempt (outcome IS NULL) or insert a new 'sent' attempt
       const [openAttempt] = await tx
         .select()
         .from(icDisbursementAttempts)
@@ -292,7 +342,7 @@ export class DisbursementService {
         .limit(1)
 
       if (openAttempt) {
-        // 3a. Update the existing open attempt to 'sent'
+        // Update the existing open attempt to 'sent'
         await tx
           .update(icDisbursementAttempts)
           .set({
@@ -300,11 +350,11 @@ export class DisbursementService {
             manualReference: ref,
             manualProofStoragePath: proofPath,
             manualSentBy: markedByUserId,
-            completedAt: now,
+            completedAt,
           })
           .where(eq(icDisbursementAttempts.id, openAttempt.id))
       } else {
-        // 3b. No open attempt — insert a new 'sent' attempt
+        // No open attempt — insert a new 'sent' attempt
         const nextNumber = await this._getNextAttemptNumberInTx(tx, disbursementId)
         await tx
           .insert(icDisbursementAttempts)
@@ -317,24 +367,27 @@ export class DisbursementService {
             manualReference: ref,
             manualProofStoragePath: proofPath,
             manualSentBy: markedByUserId,
-            startedAt: now,
-            completedAt: now,
+            startedAt: completedAt,
+            completedAt,
           })
       }
 
-      // 4. Update disbursement: status='sent', completedAt=now
-      // Atomic guard: WHERE status='sending' prevents a concurrent markSent from
-      // writing after the first already committed (READ COMMITTED race).
-      // TODO(Task 37): populate fxRateToCad, cadEquivalentBaseCents, cadEquivalentTaxCents,
-      //   cadEquivalentTotalCents, fxRateSource, fxRateDate via FxRateService.getRateOnDate(
-      //     d.currency, 'CAD', now
-      //   ). If currency is already 'CAD', rate=1.0 and cadEquivalent* = the base amounts.
+      // 4b. Atomic disbursement update with FX snapshot.
+      // WHERE status='sending' guard prevents a concurrent markSent from writing
+      // after the first already committed (READ COMMITTED race).
       const [updated] = await tx
         .update(icDisbursements)
         .set({
           status: 'sent',
-          completedAt: now,
-          updatedAt: now,
+          completedAt,
+          updatedAt: completedAt,
+          // FX snapshot fields (Task 37) — always populated; CAD has rate=1.0
+          fxRateToCad,
+          cadEquivalentBaseCents,
+          cadEquivalentTaxCents,
+          cadEquivalentTotalCents,
+          fxRateSource,
+          fxRateDate,
         })
         .where(and(
           eq(icDisbursements.id, disbursementId),
@@ -351,7 +404,7 @@ export class DisbursementService {
       // TODO(Task 39): emit 'ic-payout.disbursement.sent' event with disbursementId, invoiceId, userId
 
       this.logger.log(
-        `Disbursement ${disbursementId} marked sent by ${markedByUserId} (ref=${ref})`,
+        `Disbursement ${disbursementId} marked sent by ${markedByUserId} (ref=${ref}, fxRate=${fxRateToCad} ${d.currency}→CAD)`,
       )
 
       return updated

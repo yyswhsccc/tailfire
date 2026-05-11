@@ -7,18 +7,21 @@
  *  D3.  enqueue idempotent: if disbursement already exists for invoice, returns existing without re-enqueueing
  *  D4.  enqueue rejects if no active default payout account for currency
  *  D5.  markSent rejects if disbursement status ≠ 'sending'
- *  D6.  markSent updates status + completedAt + closes open attempt
+ *  D6.  markSent updates status + completedAt + closes open attempt (includes FX snapshot)
  *  D7.  fail from 'sending' reverses settlements, adjustments, sets invoice='cancelled'
  *  D8.  fail from 'queued' allowed (admin can cancel before sending)
  *  D9.  getNextAttemptNumber returns 1 for no attempts, n+1 otherwise
  *  D10. markSent throws ConflictException when concurrent finalize races the update
  *  D11. fail throws ConflictException when concurrent finalize races the update
  *  D12. enqueue handles 23505 by returning the winner row without re-enqueueing
+ *  D13. markSent for CAD invoice: fxRate=1.0 without BoC call, cadEquivalent* = source amounts
+ *  D14. markSent for USD invoice: fxRate applied, cadEquivalent* = source × rate (rounded)
  */
 
 import { Test } from '@nestjs/testing'
 import { DisbursementService } from '../disbursement.service'
 import { DatabaseService } from '../../../db/database.service'
+import { FxRateService } from '../../fx/fx-rate.service'
 import { getQueueToken } from '@nestjs/bullmq'
 import { QUEUES } from '../../../automation/automation.types'
 
@@ -120,30 +123,33 @@ function makeAttempt(overrides: Record<string, unknown> = {}) {
  * DB call patterns per method:
  *
  * enqueue:
- *   select(icInvoices)         → [invoice | []]
- *   select(icDisbursements)    → [existing | []]  (idempotency check)
- *   select(icPayoutAccounts)   → [account | []]
- *   insert(icDisbursements)    → [disbursement]
+ *   db.client.select(icInvoices)       → [invoice | []]       (selectResponses[0])
+ *   db.client.select(icDisbursements)  → [existing | []]      (selectResponses[1])
+ *   db.client.select(icPayoutAccounts) → [account | []]       (selectResponses[2])
+ *   db.client.insert(icDisbursements)  → [disbursement]
+ *   db.client.select(icDisbursements)  → [winnerRow | []]     (selectResponses[3], 23505 only)
  *
- * markSent (inside tx):
- *   select(icDisbursements)    → [disbursement]
- *   select(icDisbursementAttempts) → [openAttempt | []]
- *   update(icDisbursementAttempts)  (if open attempt found)
- *   OR insert(icDisbursementAttempts) (if no open attempt)
- *   update(icDisbursements)    → [updated disbursement]
+ * markSent (Task 37: pre-tx + inside tx):
+ *   db.client.select(icDisbursements)       → [disbursement]  (selectResponses[0])
+ *   db.client.select(icInvoices)            → [invoice]       (selectResponses[1])
+ *   -- FxRateService.getRateOnDate called here (mocked separately) --
+ *   tx.select(icDisbursementAttempts) → [openAttempt | []]   (txSelectResponses[0])
+ *   tx.update(icDisbursementAttempts)  (if open attempt found)
+ *   OR tx.insert(icDisbursementAttempts) (if no open attempt)
+ *   tx.update(icDisbursements)    → [updated disbursement]
  *
  * fail (inside tx):
- *   select(icDisbursements)    → [disbursement]
- *   select(icInvoices)         → [invoice]
- *   insert(icDisbursementAttempts)
- *   execute (DELETE settlements)
- *   execute (UPDATE adjustments)
- *   update(commissionChecks)
- *   update(icInvoices)
- *   update(icDisbursements) → [updated disbursement]
+ *   tx.select(icDisbursements)    → [disbursement]            (txSelectResponses[0])
+ *   tx.select(icInvoices)         → [invoice]                 (txSelectResponses[1])
+ *   tx.insert(icDisbursementAttempts)
+ *   tx.execute (DELETE settlements)
+ *   tx.execute (UPDATE adjustments)
+ *   tx.update(commissionChecks)
+ *   tx.update(icInvoices)
+ *   tx.update(icDisbursements)    → [updated disbursement]
  *
  * getNextAttemptNumber:
- *   execute → [{ n: <number> }]
+ *   db.client.execute → [{ n: <number> }]
  */
 function createMockDb(opts: {
   invoice?: ReturnType<typeof makeInvoice> | null
@@ -151,17 +157,22 @@ function createMockDb(opts: {
   account?: ReturnType<typeof makeAccount> | null
   newDisbursement?: ReturnType<typeof makeDisbursement>
   disbursementForMutation?: ReturnType<typeof makeDisbursement> | null
+  /**
+   * Invoice to return for the pre-tx invoice fetch in markSent (Task 37).
+   * Defaults to makeInvoice() so markSent tests pass without extra config.
+   */
+  invoiceForMarkSent?: ReturnType<typeof makeInvoice> | null
   openAttempt?: ReturnType<typeof makeAttempt> | null
   updatedDisbursement?: ReturnType<typeof makeDisbursement>
   invoiceForFail?: ReturnType<typeof makeInvoice> | null
   nextAttemptN?: number
   /**
-   * 'markSent' (default): tx selects → [disbursement, openAttempt]
-   * 'fail':               tx selects → [disbursement, invoice]
-   * Needed because fail() changed to: load disbursement → load invoice → atomic update,
-   * whereas markSent() does: load disbursement → load openAttempt → update attempt → update disbursement.
+   * Controls which db.client select layout and tx select layout to use.
+   * 'enqueue' (default): db.client → [invoice, existing, account, winner]
+   * 'markSent':          db.client → [disbursement, invoice] (pre-tx); tx → [openAttempt]
+   * 'fail':              db.client not used for selects; tx → [disbursement, invoice]
    */
-  txPath?: 'markSent' | 'fail'
+  txPath?: 'markSent' | 'fail' | 'enqueue'
   /**
    * Override what the disbursement update returns inside a tx.
    * Pass [] to simulate a concurrent-finalize collision (ConflictException path).
@@ -182,11 +193,12 @@ function createMockDb(opts: {
     account = makeAccount(),
     newDisbursement = makeDisbursement(),
     disbursementForMutation = makeDisbursement({ status: 'sending' }),
+    invoiceForMarkSent = makeInvoice(),
     openAttempt = makeAttempt(),
     updatedDisbursement = makeDisbursement({ status: 'sent', completedAt: new Date() }),
     invoiceForFail = makeInvoice(),
     nextAttemptN = 1,
-    txPath = 'markSent',
+    txPath = 'enqueue',
     txUpdateReturns,
     insertThrows,
     winnerRow,
@@ -199,16 +211,36 @@ function createMockDb(opts: {
     executes: [] as any[],
   }
 
-  // Select call counter — used to return different rows per call
-  // enqueue path:  [0]=invoice, [1]=existing disbursement, [2]=account, [3]=winner (23505 only)
-  // markSent/fail: handled inside the transaction mock
+  // Select call counter — used to return different rows per call.
+  //
+  // enqueue path (db.client):
+  //   [0]=invoice, [1]=existing disbursement, [2]=account, [3]=winner (23505 only)
+  //
+  // markSent path (db.client, pre-tx — Task 37):
+  //   [0]=disbursement (status check), [1]=invoice (for CAD-equivalent calc)
+  //   → then transaction handles the rest
+  //
+  // fail/transitionToSending: all inside transaction, db.client selects not used
   let selectCallCount = 0
-  const selectResponses: any[][] = [
-    invoice ? [invoice] : [],              // 0: invoice lookup (enqueue/fail)
-    existingDisbursement ? [existingDisbursement] : [],  // 1: existing disbursement check
-    account ? [account] : [],              // 2: payout account lookup
-    winnerRow ? [winnerRow] : [],          // 3: winner SELECT after 23505
-  ]
+  // selectResponses layout differs per path:
+  //
+  // 'enqueue':  [0]=invoice, [1]=existingDisbursement, [2]=account, [3]=winnerRow
+  //
+  // 'markSent': [0]=disbursementForMutation (status check pre-tx)
+  //             [1]=invoiceForMarkSent (for CAD-equivalent calc pre-tx)
+  //
+  // 'fail':     db.client selects not used (all inside tx)
+  const selectResponses: any[][] = txPath === 'markSent'
+    ? [
+        disbursementForMutation ? [disbursementForMutation] : [],  // 0: disbursement pre-tx
+        invoiceForMarkSent ? [invoiceForMarkSent] : [],            // 1: invoice pre-tx
+      ]
+    : [
+        invoice ? [invoice] : [],                                  // 0: invoice (enqueue)
+        existingDisbursement ? [existingDisbursement] : [],        // 1: existing disbursement check
+        account ? [account] : [],                                  // 2: payout account lookup
+        winnerRow ? [winnerRow] : [],                              // 3: winner SELECT after 23505
+      ]
 
   function makeSelectChain(rows: any[]): any {
     return {
@@ -264,8 +296,11 @@ function createMockDb(opts: {
   const mockTransaction = jest.fn(async (cb: (tx: any) => Promise<any>) => {
     // Inside a transaction, serve tx-specific selects based on which method is being tested.
     //
-    // markSent path: [0]=disbursement, [1]=openAttempt
-    // fail path:     [0]=disbursement, [1]=invoice
+    // markSent path (Task 37): disbursement + invoice are pre-tx (db.client selects above).
+    //   tx selects: [0]=openAttempt only
+    //
+    // fail path:
+    //   tx selects: [0]=disbursement, [1]=invoice
     //
     // This ordering matches the actual service call order in each method.
     const txSelectCount = { n: 0 }
@@ -275,8 +310,8 @@ function createMockDb(opts: {
           invoiceForFail ? [invoiceForFail] : [],                    // 1: invoice
         ]
       : [
-          disbursementForMutation ? [disbursementForMutation] : [],  // 0: disbursement
-          openAttempt !== undefined ? (openAttempt ? [openAttempt] : []) : [],  // 1: open attempt
+          // markSent: only openAttempt in tx (disbursement + invoice pre-loaded outside tx)
+          openAttempt !== undefined ? (openAttempt ? [openAttempt] : []) : [],  // 0: open attempt
         ]
 
     // What the disbursement UPDATE returns inside the tx.
@@ -342,17 +377,29 @@ function createMockQueue() {
   }
 }
 
+/**
+ * Creates a FxRateService mock.
+ * Default: returns 1.0 (CAD→CAD identity). Override getRateOnDate per-test as needed.
+ */
+function createMockFxRateService(defaultRate = 1.0) {
+  return {
+    getRateOnDate: jest.fn().mockResolvedValue(defaultRate),
+  }
+}
+
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
 async function buildModule(
   db: ReturnType<typeof createMockDb>,
   queue = createMockQueue(),
+  fxRate: ReturnType<typeof createMockFxRateService> = createMockFxRateService(),
 ) {
   const moduleRef = await Test.createTestingModule({
     providers: [
       DisbursementService,
       { provide: DatabaseService, useValue: db },
       { provide: getQueueToken(QUEUES.IC_PAYOUT_DISBURSE), useValue: queue },
+      { provide: FxRateService, useValue: fxRate },
     ],
   }).compile()
 
@@ -360,6 +407,7 @@ async function buildModule(
     service: moduleRef.get(DisbursementService),
     queue,
     db,
+    fxRate,
   }
 }
 
@@ -445,7 +493,10 @@ describe('DisbursementService.markSent', () => {
 
   // D5. Rejects if not 'sending'
   it('D5: throws BadRequestException when disbursement status is not "sending"', async () => {
-    const db = createMockDb({ disbursementForMutation: makeDisbursement({ status: 'queued' }) })
+    const db = createMockDb({
+      txPath: 'markSent',
+      disbursementForMutation: makeDisbursement({ status: 'queued' }),
+    })
     const { service } = await buildModule(db)
 
     await expect(service.markSent(DISBURSE_ID, 'REF-001', null, ADMIN_ID))
@@ -454,7 +505,10 @@ describe('DisbursementService.markSent', () => {
   })
 
   it('D5b: throws BadRequestException when disbursement is already sent', async () => {
-    const db = createMockDb({ disbursementForMutation: makeDisbursement({ status: 'sent' }) })
+    const db = createMockDb({
+      txPath: 'markSent',
+      disbursementForMutation: makeDisbursement({ status: 'sent' }),
+    })
     const { service } = await buildModule(db)
 
     await expect(service.markSent(DISBURSE_ID, 'REF-001', null, ADMIN_ID))
@@ -462,32 +516,56 @@ describe('DisbursementService.markSent', () => {
       .toThrow(/must be in 'sending' status/)
   })
 
-  // D6. Happy path
-  it('D6: updates open attempt to "sent" and sets disbursement status to "sent"', async () => {
-    const db = createMockDb({
-      disbursementForMutation: makeDisbursement({ status: 'sending' }),
-      openAttempt: makeAttempt({ outcome: null }),
-      updatedDisbursement: makeDisbursement({ status: 'sent', completedAt: new Date() }),
+  // D6. Happy path — includes FX snapshot assertions
+  it('D6: updates open attempt to "sent" and sets disbursement status to "sent" with FX snapshot', async () => {
+    const fxRate = createMockFxRateService(1.0)  // CAD→CAD
+    const updatedDisb = makeDisbursement({
+      status: 'sent',
+      completedAt: new Date(),
+      fxRateToCad: '1.00000000',
+      cadEquivalentBaseCents: 30_000,
+      cadEquivalentTaxCents: 3_900,
+      cadEquivalentTotalCents: 33_900,
+      fxRateSource: 'bank_of_canada',
+      fxRateDate: new Date().toISOString().slice(0, 10),
     })
-    const { service } = await buildModule(db)
+    const db = createMockDb({
+      txPath: 'markSent',
+      disbursementForMutation: makeDisbursement({ status: 'sending', currency: 'CAD' }),
+      invoiceForMarkSent: makeInvoice({ currency: 'CAD', reportableBaseCents: 30_000, taxCents: 3_900, totalCents: 33_900 }),
+      openAttempt: makeAttempt({ outcome: null }),
+      updatedDisbursement: updatedDisb,
+    })
+    const { service } = await buildModule(db, createMockQueue(), fxRate)
 
     const result = await service.markSent(DISBURSE_ID, 'ETRANSFER-123', '/proof/receipt.pdf', ADMIN_ID)
 
     expect(result.status).toBe('sent')
     expect(result.completedAt).toBeDefined()
 
-    // Ensure at least one update set status='sent' on the disbursement
+    // Ensure the FX fields were passed in the disbursement update
     const sentUpdate = db._calls.updates.find((u: any) => u.status === 'sent')
     expect(sentUpdate).toBeDefined()
+    expect(sentUpdate.fxRateToCad).toBe('1.00000000')
+    expect(sentUpdate.fxRateSource).toBe('bank_of_canada')
+    expect(sentUpdate.cadEquivalentBaseCents).toBe(30_000)
+    expect(sentUpdate.cadEquivalentTaxCents).toBe(3_900)
+    expect(sentUpdate.cadEquivalentTotalCents).toBe(33_900)
+
+    // FxRateService was called with the correct args
+    expect(fxRate.getRateOnDate).toHaveBeenCalledWith('CAD', 'CAD', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
   })
 
   it('D6b: inserts new "sent" attempt when no open attempt exists', async () => {
+    const fxRate = createMockFxRateService(1.0)
     const db = createMockDb({
-      disbursementForMutation: makeDisbursement({ status: 'sending' }),
+      txPath: 'markSent',
+      disbursementForMutation: makeDisbursement({ status: 'sending', currency: 'CAD' }),
+      invoiceForMarkSent: makeInvoice(),
       openAttempt: null,  // No open attempt
       updatedDisbursement: makeDisbursement({ status: 'sent', completedAt: new Date() }),
     })
-    const { service } = await buildModule(db)
+    const { service } = await buildModule(db, createMockQueue(), fxRate)
 
     const result = await service.markSent(DISBURSE_ID, 'REF-002', null, ADMIN_ID)
 
@@ -497,6 +575,73 @@ describe('DisbursementService.markSent', () => {
     expect(insertedAttempt).toBeDefined()
     expect(insertedAttempt.manualReference).toBe('REF-002')
     expect(insertedAttempt.manualSentBy).toBe(ADMIN_ID)
+  })
+
+  // D13. CAD path: fxRate=1.0, cadEquivalent* = source amounts, no BoC call needed
+  it('D13: CAD disbursement uses fxRate=1.0, cadEquivalent* equals source amounts', async () => {
+    const fxRate = createMockFxRateService(1.0)
+    const invoice = makeInvoice({ currency: 'CAD', reportableBaseCents: 50_000, taxCents: 6_500, totalCents: 56_500 })
+    const db = createMockDb({
+      txPath: 'markSent',
+      disbursementForMutation: makeDisbursement({ status: 'sending', currency: 'CAD' }),
+      invoiceForMarkSent: invoice,
+      openAttempt: makeAttempt({ outcome: null }),
+      updatedDisbursement: makeDisbursement({ status: 'sent', completedAt: new Date() }),
+    })
+    const { service } = await buildModule(db, createMockQueue(), fxRate)
+
+    await service.markSent(DISBURSE_ID, 'REF-CAD', null, ADMIN_ID)
+
+    const sentUpdate = db._calls.updates.find((u: any) => u.status === 'sent')
+    expect(sentUpdate).toBeDefined()
+
+    // rate=1.0 → CAD-equivalent values equal the source amounts
+    expect(sentUpdate.fxRateToCad).toBe('1.00000000')
+    expect(sentUpdate.cadEquivalentBaseCents).toBe(50_000)
+    expect(sentUpdate.cadEquivalentTaxCents).toBe(6_500)
+    expect(sentUpdate.cadEquivalentTotalCents).toBe(56_500)
+    expect(sentUpdate.fxRateSource).toBe('bank_of_canada')
+    expect(sentUpdate.fxRateDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  // D14. USD path: fxRate applied, cadEquivalent* = source × rate (rounded to nearest cent)
+  it('D14: USD disbursement applies fxRate, cadEquivalent* = Math.round(source × rate)', async () => {
+    const USD_TO_CAD = 1.3825
+    const fxRate = createMockFxRateService(USD_TO_CAD)
+    // Invoice amounts in USD cents
+    const reportableBaseCents = 30_000   // $300 USD
+    const taxCents = 3_900               // $39 USD
+    const totalCents = 33_900            // $339 USD
+
+    const invoice = makeInvoice({
+      currency: 'USD',
+      reportableBaseCents,
+      taxCents,
+      totalCents,
+    })
+    const db = createMockDb({
+      txPath: 'markSent',
+      disbursementForMutation: makeDisbursement({ status: 'sending', currency: 'USD' }),
+      invoiceForMarkSent: invoice,
+      openAttempt: makeAttempt({ outcome: null }),
+      updatedDisbursement: makeDisbursement({ status: 'sent', completedAt: new Date() }),
+    })
+    const { service } = await buildModule(db, createMockQueue(), fxRate)
+
+    await service.markSent(DISBURSE_ID, 'WISE-USD-001', null, ADMIN_ID)
+
+    // FxRateService called with correct currency pair
+    expect(fxRate.getRateOnDate).toHaveBeenCalledWith('USD', 'CAD', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
+
+    const sentUpdate = db._calls.updates.find((u: any) => u.status === 'sent')
+    expect(sentUpdate).toBeDefined()
+
+    expect(sentUpdate.fxRateToCad).toBe(USD_TO_CAD.toFixed(8))
+    expect(sentUpdate.cadEquivalentBaseCents).toBe(Math.round(reportableBaseCents * USD_TO_CAD))
+    expect(sentUpdate.cadEquivalentTaxCents).toBe(Math.round(taxCents * USD_TO_CAD))
+    expect(sentUpdate.cadEquivalentTotalCents).toBe(Math.round(totalCents * USD_TO_CAD))
+    expect(sentUpdate.fxRateSource).toBe('bank_of_canada')
+    expect(sentUpdate.fxRateDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 })
 
@@ -614,14 +759,17 @@ describe('DisbursementService — concurrency guards', () => {
 
   // D10. markSent ConflictException when disbursement update returns no rows
   it('D10: markSent throws ConflictException when disbursement was already finalized by a concurrent request', async () => {
-    // Simulate: disbursement is in 'sending' (passes the status check), but the
+    // Simulate: disbursement is in 'sending' (passes the pre-tx status check), but the
     // WHERE status='sending' guard on the UPDATE matches no rows (concurrent finalize won).
+    const fxRate = createMockFxRateService(1.0)
     const db = createMockDb({
-      disbursementForMutation: makeDisbursement({ status: 'sending' }),
+      txPath: 'markSent',
+      disbursementForMutation: makeDisbursement({ status: 'sending', currency: 'CAD' }),
+      invoiceForMarkSent: makeInvoice(),
       openAttempt: makeAttempt({ outcome: null }),
       txUpdateReturns: [],  // UPDATE returns no rows → concurrent finalize collision
     })
-    const { service } = await buildModule(db)
+    const { service } = await buildModule(db, createMockQueue(), fxRate)
 
     await expect(service.markSent(DISBURSE_ID, 'REF-001', null, ADMIN_ID))
       .rejects
