@@ -269,3 +269,6 @@ export * from './ic-invoices.schema'
 
 // IC disbursements + disbursement attempts (provider-agnostic payout execution with FX snapshot)
 export * from './ic-disbursements.schema'
+
+// FX rate snapshots (daily BoC rates cached for T4A CAD-equivalent calculation)
+export * from './fx-rate-snapshots.schema'

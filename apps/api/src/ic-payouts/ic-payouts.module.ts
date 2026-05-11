@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { BullModule } from '@nestjs/bullmq'
+import { HttpModule } from '@nestjs/axios'
 import { IcTaxProfilesService } from './ic-tax-profiles/ic-tax-profiles.service'
 import { IcPayoutAccountsService } from './payout-accounts/ic-payout-accounts.service'
 import { IcPayoutAuthorizationsService } from './authorizations/ic-payout-authorizations.service'
@@ -14,6 +15,7 @@ import { PayoutProviderFactory } from './disbursements/providers/payout-provider
 import { DisbursementService } from './disbursements/disbursement.service'
 import { DisbursementProcessor } from './disbursements/disbursement.processor'
 import { DisbursementController } from './disbursements/disbursement.controller'
+import { FxRateService } from './fx/fx-rate.service'
 import { IcTaxProfilesController } from './ic-tax-profiles/ic-tax-profiles.controller'
 import { IcPayoutAccountsController } from './payout-accounts/ic-payout-accounts.controller'
 import { IcPayoutAuthorizationsController } from './authorizations/ic-payout-authorizations.controller'
@@ -57,11 +59,16 @@ import { QUEUES } from '../automation/automation.types'
  * Imports:
  *   - TripsModule            → provides StorageService (document storage)
  *   - DocumentRenderModule   → provides PuppeteerPdfService (PDF rendering)
+ *   - HttpModule             → provides HttpService for BoC Valet API (FxRateService)
+ *
+ * Services added in Task 36:
+ *   - FxRateService          (Task 36) ✓
  */
 @Module({
   imports: [
     TripsModule,
     DocumentRenderModule,
+    HttpModule,
     BullModule.registerQueue(
       {
         name: QUEUES.IC_PAYOUT_DISBURSE,
@@ -110,6 +117,7 @@ import { QUEUES } from '../automation/automation.types'
     PayoutProviderFactory,
     DisbursementService,
     DisbursementProcessor,
+    FxRateService,
   ],
   exports: [
     IcTaxProfilesService,
@@ -124,6 +132,7 @@ import { QUEUES } from '../automation/automation.types'
     ManualPayoutProvider,
     PayoutProviderFactory,
     DisbursementService,
+    FxRateService,
   ],
 })
 export class IcPayoutsModule {}
