@@ -21,12 +21,13 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   NotFoundException,
   Logger,
 } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
 import { schema } from '@tailfire/database'
 import { QUEUES } from '../../automation/automation.types'
@@ -117,32 +118,50 @@ export class DisbursementService {
     // 4. Generate idempotency key
     const idempotencyKey = crypto.randomUUID()
 
-    // 5. Insert the disbursement row
-    const [row] = await this.db.client
-      .insert(icDisbursements)
-      .values({
-        invoiceId,
-        userId,
-        payoutAccountId: account.id,
-        amountCents,
-        currency,
-        provider: 'manual',
-        rail: account.rail as Rail,
-        idempotencyKey,
-        status: 'queued',
-        // FX fields all NULL — populated by markSent (Task 37)
-        fxRateToCad: null,
-        cadEquivalentBaseCents: null,
-        cadEquivalentTaxCents: null,
-        cadEquivalentTotalCents: null,
-        fxRateSource: null,
-        fxRateDate: null,
-        completedAt: null,
-      })
-      .returning()
-
-    if (!row) {
-      throw new Error(`Failed to insert disbursement row for invoice ${invoiceId}`)
+    // 5. Insert the disbursement row (handle 23505 unique_violation from concurrent enqueue)
+    let row: IcDisbursement
+    try {
+      const [inserted] = await this.db.client
+        .insert(icDisbursements)
+        .values({
+          invoiceId,
+          userId,
+          payoutAccountId: account.id,
+          amountCents,
+          currency,
+          provider: 'manual',
+          rail: account.rail as Rail,
+          idempotencyKey,
+          status: 'queued',
+          // FX fields all NULL — populated by markSent (Task 37)
+          fxRateToCad: null,
+          cadEquivalentBaseCents: null,
+          cadEquivalentTaxCents: null,
+          cadEquivalentTotalCents: null,
+          fxRateSource: null,
+          fxRateDate: null,
+          completedAt: null,
+        })
+        .returning()
+      if (!inserted) throw new Error(`Failed to insert disbursement row for invoice ${invoiceId}`)
+      row = inserted
+    } catch (err: any) {
+      if (err?.code === '23505') {
+        // Concurrent enqueue won the INSERT race — fetch and return the winning row.
+        // Do NOT enqueue a second BullMQ job; the winner already did.
+        const [winner] = await this.db.client
+          .select()
+          .from(icDisbursements)
+          .where(eq(icDisbursements.invoiceId, invoiceId))
+          .limit(1)
+        if (winner) {
+          this.logger.log(
+            `Concurrent enqueue for invoice ${invoiceId}: returning winner ${winner.id} (idempotencyKey ${winner.idempotencyKey})`,
+          )
+          return winner
+        }
+      }
+      throw err
     }
 
     // 6. Enqueue BullMQ job — use idempotency key as jobId to prevent duplicate enqueues
@@ -291,6 +310,8 @@ export class DisbursementService {
       }
 
       // 4. Update disbursement: status='sent', completedAt=now
+      // Atomic guard: WHERE status='sending' prevents a concurrent markSent from
+      // writing after the first already committed (READ COMMITTED race).
       // TODO(Task 37): populate fxRateToCad, cadEquivalentBaseCents, cadEquivalentTaxCents,
       //   cadEquivalentTotalCents, fxRateSource, fxRateDate via FxRateService.getRateOnDate(
       //     d.currency, 'CAD', now
@@ -302,11 +323,16 @@ export class DisbursementService {
           completedAt: now,
           updatedAt: now,
         })
-        .where(eq(icDisbursements.id, disbursementId))
+        .where(and(
+          eq(icDisbursements.id, disbursementId),
+          eq(icDisbursements.status, 'sending'),
+        ))
         .returning()
 
       if (!updated) {
-        throw new Error(`Failed to update disbursement ${disbursementId} to sent`)
+        throw new ConflictException(
+          `Disbursement ${disbursementId} was already finalized by a concurrent request.`,
+        )
       }
 
       // TODO(Task 39): emit 'ic-payout.disbursement.sent' event with disbursementId, invoiceId, userId
@@ -360,7 +386,25 @@ export class DisbursementService {
 
       const now = new Date()
 
-      // 2. Append a 'failed' attempt
+      // 2. Atomic transition: disbursement → failed
+      // WHERE status IN ('queued','sending') guard prevents two concurrent fail()
+      // calls from both writing (READ COMMITTED race). Only one wins the row lock.
+      const [updated] = await tx
+        .update(icDisbursements)
+        .set({ status: 'failed', updatedAt: now })
+        .where(and(
+          eq(icDisbursements.id, disbursementId),
+          inArray(icDisbursements.status, ['queued', 'sending']),
+        ))
+        .returning()
+
+      if (!updated) {
+        throw new ConflictException(
+          `Disbursement ${disbursementId} was already finalized by a concurrent request.`,
+        )
+      }
+
+      // 3. Append a 'failed' attempt (only runs after atomic transition succeeds)
       const nextNumber = await this._getNextAttemptNumberInTx(tx, disbursementId)
       await tx
         .insert(icDisbursementAttempts)
@@ -376,15 +420,15 @@ export class DisbursementService {
           completedAt: now,
         })
 
-      // 3. Reverse the invoice reservation (same pattern as IcInvoiceService.reject)
+      // 4. Reverse the invoice reservation (same pattern as IcInvoiceService.reject)
       if (invoice.reservationCheckId) {
-        // 3a. Delete settled commission_item_settlements linked to this reservation
+        // 4a. Delete settled commission_item_settlements linked to this reservation
         await tx.execute(sql`
           DELETE FROM commission_item_settlements
           WHERE paid_check_id = ${invoice.reservationCheckId}
         `)
 
-        // 3b. Flip reconciled adjustments back to pending
+        // 4b. Flip reconciled adjustments back to pending
         await tx.execute(sql`
           UPDATE commission_adjustments
           SET status = 'pending', check_id = NULL, updated_at = now()
@@ -392,29 +436,18 @@ export class DisbursementService {
             AND status = 'reconciled'
         `)
 
-        // 3c. Cancel the reservation paid check
+        // 4c. Cancel the reservation paid check
         await tx
           .update(commissionChecks)
           .set({ status: 'cancelled', updatedAt: now })
           .where(eq(commissionChecks.id, invoice.reservationCheckId))
       }
 
-      // 4. Set invoice.status='cancelled' (NOT 'rejected' — failure is post-approval)
+      // 5. Set invoice.status='cancelled' (NOT 'rejected' — failure is post-approval)
       await tx
         .update(icInvoices)
         .set({ status: 'cancelled', updatedAt: now })
         .where(eq(icInvoices.id, d.invoiceId))
-
-      // 5. Set disbursement.status='failed'
-      const [updated] = await tx
-        .update(icDisbursements)
-        .set({ status: 'failed', updatedAt: now })
-        .where(eq(icDisbursements.id, disbursementId))
-        .returning()
-
-      if (!updated) {
-        throw new Error(`Failed to update disbursement ${disbursementId} to failed`)
-      }
 
       // TODO(Task 39): emit 'ic-payout.disbursement.failed' event with disbursementId, invoiceId, userId, reason
 

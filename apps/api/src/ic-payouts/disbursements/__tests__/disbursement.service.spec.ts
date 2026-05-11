@@ -11,6 +11,9 @@
  *  D7.  fail from 'sending' reverses settlements, adjustments, sets invoice='cancelled'
  *  D8.  fail from 'queued' allowed (admin can cancel before sending)
  *  D9.  getNextAttemptNumber returns 1 for no attempts, n+1 otherwise
+ *  D10. markSent throws ConflictException when concurrent finalize races the update
+ *  D11. fail throws ConflictException when concurrent finalize races the update
+ *  D12. enqueue handles 23505 by returning the winner row without re-enqueueing
  */
 
 import { Test } from '@nestjs/testing'
@@ -152,6 +155,26 @@ function createMockDb(opts: {
   updatedDisbursement?: ReturnType<typeof makeDisbursement>
   invoiceForFail?: ReturnType<typeof makeInvoice> | null
   nextAttemptN?: number
+  /**
+   * 'markSent' (default): tx selects → [disbursement, openAttempt]
+   * 'fail':               tx selects → [disbursement, invoice]
+   * Needed because fail() changed to: load disbursement → load invoice → atomic update,
+   * whereas markSent() does: load disbursement → load openAttempt → update attempt → update disbursement.
+   */
+  txPath?: 'markSent' | 'fail'
+  /**
+   * Override what the disbursement update returns inside a tx.
+   * Pass [] to simulate a concurrent-finalize collision (ConflictException path).
+   */
+  txUpdateReturns?: ReturnType<typeof makeDisbursement>[]
+  /**
+   * If set, the INSERT on icDisbursements throws this error (used to simulate 23505).
+   */
+  insertThrows?: Error
+  /**
+   * The row returned by the winner-SELECT after a 23505 collision.
+   */
+  winnerRow?: ReturnType<typeof makeDisbursement>
 } = {}) {
   const {
     invoice = makeInvoice(),
@@ -163,6 +186,10 @@ function createMockDb(opts: {
     updatedDisbursement = makeDisbursement({ status: 'sent', completedAt: new Date() }),
     invoiceForFail = makeInvoice(),
     nextAttemptN = 1,
+    txPath = 'markSent',
+    txUpdateReturns,
+    insertThrows,
+    winnerRow,
   } = opts
 
   // Track calls
@@ -173,14 +200,14 @@ function createMockDb(opts: {
   }
 
   // Select call counter — used to return different rows per call
+  // enqueue path:  [0]=invoice, [1]=existing disbursement, [2]=account, [3]=winner (23505 only)
+  // markSent/fail: handled inside the transaction mock
   let selectCallCount = 0
   const selectResponses: any[][] = [
     invoice ? [invoice] : [],              // 0: invoice lookup (enqueue/fail)
     existingDisbursement ? [existingDisbursement] : [],  // 1: existing disbursement check
     account ? [account] : [],              // 2: payout account lookup
-    disbursementForMutation ? [disbursementForMutation] : [],  // 3: disbursement for markSent/fail
-    openAttempt ? [openAttempt] : [],      // 4: open attempt lookup
-    invoiceForFail ? [invoiceForFail] : [], // 5: invoice in fail tx
+    winnerRow ? [winnerRow] : [],          // 3: winner SELECT after 23505
   ]
 
   function makeSelectChain(rows: any[]): any {
@@ -201,12 +228,14 @@ function createMockDb(opts: {
     return makeSelectChain(rows)
   })
 
-  // insert mock
+  // insert mock — supports insertThrows to simulate 23505
   const mockInsert = jest.fn((_table: any) => ({
     values: jest.fn((vals: any) => {
       calls.inserts.push(vals)
       return {
-        returning: jest.fn().mockResolvedValue([newDisbursement]),
+        returning: insertThrows
+          ? jest.fn().mockRejectedValue(insertThrows)
+          : jest.fn().mockResolvedValue([newDisbursement]),
       }
     }),
   }))
@@ -233,13 +262,28 @@ function createMockDb(opts: {
 
   // transaction mock — passes simplified tx object to callback
   const mockTransaction = jest.fn(async (cb: (tx: any) => Promise<any>) => {
-    // Inside a transaction, reset select counter to serve tx-specific calls
+    // Inside a transaction, serve tx-specific selects based on which method is being tested.
+    //
+    // markSent path: [0]=disbursement, [1]=openAttempt
+    // fail path:     [0]=disbursement, [1]=invoice
+    //
+    // This ordering matches the actual service call order in each method.
     const txSelectCount = { n: 0 }
-    const txSelectResponses: any[][] = [
-      disbursementForMutation ? [disbursementForMutation] : [],  // 0: disbursement
-      openAttempt !== undefined ? (openAttempt ? [openAttempt] : []) : [],  // 1: open attempt
-      invoiceForFail ? [invoiceForFail] : [],  // 2: invoice (for fail path)
-    ]
+    const txSelectResponses: any[][] = txPath === 'fail'
+      ? [
+          disbursementForMutation ? [disbursementForMutation] : [],  // 0: disbursement
+          invoiceForFail ? [invoiceForFail] : [],                    // 1: invoice
+        ]
+      : [
+          disbursementForMutation ? [disbursementForMutation] : [],  // 0: disbursement
+          openAttempt !== undefined ? (openAttempt ? [openAttempt] : []) : [],  // 1: open attempt
+        ]
+
+    // What the disbursement UPDATE returns inside the tx.
+    // Pass txUpdateReturns=[] to simulate a concurrent-finalize collision.
+    const txUpdateReturnValue = txUpdateReturns !== undefined
+      ? txUpdateReturns
+      : [updatedDisbursement]
 
     let txInsertCount = 0
     const tx = {
@@ -262,12 +306,13 @@ function createMockDb(opts: {
           calls.updates.push(setObj)
           return {
             where: jest.fn(() => ({
-              returning: jest.fn().mockResolvedValue([updatedDisbursement]),
+              returning: jest.fn().mockResolvedValue(txUpdateReturnValue),
             })),
           }
         }),
       })),
-      execute: jest.fn(async () => {
+      execute: jest.fn(async (query: any) => {
+        calls.executes.push(query)
         const idx = executeCount++
         if (idx === 0) return [{ n: nextAttemptN }]
         return []
@@ -461,6 +506,7 @@ describe('DisbursementService.fail', () => {
   // D7. Reversal from 'sending'
   it('D7: from "sending" — appends failed attempt, reverses invoice reservation, cancels invoice', async () => {
     const db = createMockDb({
+      txPath: 'fail',
       disbursementForMutation: makeDisbursement({ status: 'sending' }),
       invoiceForFail: makeInvoice({ reservationCheckId: RESERVATION_CHECK_ID }),
       updatedDisbursement: makeDisbursement({ status: 'failed' }),
@@ -480,11 +526,23 @@ describe('DisbursementService.fail', () => {
     // Invoice was cancelled
     const invoiceCancelUpdate = db._calls.updates.find((u: any) => u.status === 'cancelled')
     expect(invoiceCancelUpdate).toBeDefined()
+
+    // Reversal SQL fired: DELETE settlements + UPDATE adjustments
+    const deleteSettlements = db._calls.executes.find(
+      (e: any) => e?.queryChunks?.some((c: any) => String(c?.value ?? '').includes('commission_item_settlements'))
+        || String(e).includes('commission_item_settlements'),
+    )
+    expect(deleteSettlements).toBeDefined()
+
+    // commissionChecks cancelled
+    const checkCancelUpdate = db._calls.updates.find((u: any) => u.status === 'cancelled')
+    expect(checkCancelUpdate).toBeDefined()
   })
 
   // D8. Fail from 'queued' allowed
   it('D8: from "queued" — allowed (admin cancels before processor runs)', async () => {
     const db = createMockDb({
+      txPath: 'fail',
       disbursementForMutation: makeDisbursement({ status: 'queued' }),
       invoiceForFail: makeInvoice({ reservationCheckId: RESERVATION_CHECK_ID }),
       updatedDisbursement: makeDisbursement({ status: 'failed' }),
@@ -493,10 +551,17 @@ describe('DisbursementService.fail', () => {
 
     const result = await service.fail(DISBURSE_ID, 'Admin cancelled before send', ADMIN_ID)
     expect(result.status).toBe('failed')
+
+    // Reversal SQL fired even from 'queued'
+    const failedAttempt = db._calls.inserts.find((i: any) => i.outcome === 'failed')
+    expect(failedAttempt).toBeDefined()
   })
 
   it('D7c: throws BadRequestException when disbursement is already "sent"', async () => {
-    const db = createMockDb({ disbursementForMutation: makeDisbursement({ status: 'sent' }) })
+    const db = createMockDb({
+      txPath: 'fail',
+      disbursementForMutation: makeDisbursement({ status: 'sent' }),
+    })
     const { service } = await buildModule(db)
 
     await expect(service.fail(DISBURSE_ID, 'some reason', ADMIN_ID))
@@ -539,5 +604,69 @@ describe('DisbursementService.transitionToSending', () => {
 
     const sentUpdate = db._calls.updates.find((u: any) => u.status === 'sending')
     expect(sentUpdate).toBeDefined()
+  })
+})
+
+// ─── Concurrency / idempotency tests ──────────────────────────────────────────
+
+describe('DisbursementService — concurrency guards', () => {
+  afterEach(() => jest.clearAllMocks())
+
+  // D10. markSent ConflictException when disbursement update returns no rows
+  it('D10: markSent throws ConflictException when disbursement was already finalized by a concurrent request', async () => {
+    // Simulate: disbursement is in 'sending' (passes the status check), but the
+    // WHERE status='sending' guard on the UPDATE matches no rows (concurrent finalize won).
+    const db = createMockDb({
+      disbursementForMutation: makeDisbursement({ status: 'sending' }),
+      openAttempt: makeAttempt({ outcome: null }),
+      txUpdateReturns: [],  // UPDATE returns no rows → concurrent finalize collision
+    })
+    const { service } = await buildModule(db)
+
+    await expect(service.markSent(DISBURSE_ID, 'REF-001', null, ADMIN_ID))
+      .rejects
+      .toThrow(/already finalized by a concurrent request/)
+  })
+
+  // D11. fail ConflictException when disbursement update returns no rows
+  it('D11: fail throws ConflictException when disbursement was already finalized by a concurrent request', async () => {
+    // Simulate: disbursement is in 'queued' (passes the status check), but the
+    // WHERE status IN ('queued','sending') guard on the UPDATE matches no rows.
+    const db = createMockDb({
+      txPath: 'fail',
+      disbursementForMutation: makeDisbursement({ status: 'queued' }),
+      invoiceForFail: makeInvoice(),
+      txUpdateReturns: [],  // UPDATE returns no rows → concurrent finalize collision
+    })
+    const { service } = await buildModule(db)
+
+    await expect(service.fail(DISBURSE_ID, 'some reason', ADMIN_ID))
+      .rejects
+      .toThrow(/already finalized by a concurrent request/)
+  })
+
+  // D12. enqueue handles 23505 unique_violation by returning the winner row
+  it('D12: enqueue handles 23505 by returning the winner row without re-enqueueing the BullMQ job', async () => {
+    const winner = makeDisbursement({ status: 'queued', idempotencyKey: 'winner-key-0000-0000-000000000000'.slice(0, 36) })
+    const uniqueViolationErr = Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' })
+
+    const db = createMockDb({
+      invoice: makeInvoice({ status: 'approved' }),
+      existingDisbursement: null,  // Idempotency check finds nothing (concurrent race)
+      account: makeAccount(),
+      insertThrows: uniqueViolationErr,  // INSERT throws 23505
+      winnerRow: winner,                 // Follow-up SELECT returns the winner
+    })
+    const queue = createMockQueue()
+    const { service } = await buildModule(db, queue)
+
+    const result = await service.enqueue(INVOICE_ID, USER_ID, 33_900, 'CAD')
+
+    // Returns the winning row
+    expect(result.id).toBe(winner.id)
+    expect(result.idempotencyKey).toBe(winner.idempotencyKey)
+
+    // Does NOT enqueue a duplicate BullMQ job
+    expect(queue.add).not.toHaveBeenCalled()
   })
 })
