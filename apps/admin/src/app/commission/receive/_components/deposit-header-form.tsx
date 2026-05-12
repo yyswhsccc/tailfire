@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useCreateDeposit } from '@/hooks/use-commission'
-import { useSuppliers } from '@/hooks/use-suppliers'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -10,12 +9,9 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  CheckCounterpartyFields,
+  type SupportedCurrency,
+} from '@/app/commission/_components/check-counterparty-fields'
 
 interface DepositHeaderFormProps {
   onCreated: (depositId: string, totalAmountCents: number, depositNumber: string) => void
@@ -25,16 +21,18 @@ interface DepositHeaderFormProps {
 export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderFormProps) {
   const { toast } = useToast()
   const createDeposit = useCreateDeposit()
-  const { data: suppliersData } = useSuppliers({ limit: 100 })
 
   const [depositNumber, setDepositNumber] = useState('')
   const [depositDate, setDepositDate] = useState('')
   const [totalAmountDollars, setTotalAmountDollars] = useState('')
-  const [supplierId, setSupplierId] = useState<string>('')
+
+  // Counterparty fields owned by the shared subcomponent.
+  const [supplierId, setSupplierId] = useState<string | null>(null)
+  const [senderName, setSenderName] = useState('')
+  const [currency, setCurrency] = useState<SupportedCurrency>('CAD')
+
   const [notes, setNotes] = useState('')
   const [fileUrl, setFileUrl] = useState('')
-
-  const suppliers = suppliersData?.suppliers ?? []
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,6 +43,14 @@ export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderForm
     }
     if (!depositDate) {
       toast({ title: 'Validation error', description: 'Deposit date is required.', variant: 'destructive' })
+      return
+    }
+    if (!supplierId) {
+      toast({
+        title: 'Supplier required',
+        description: 'Pick the supplier this deposit came from — reporting depends on it.',
+        variant: 'destructive',
+      })
       return
     }
     const dollars = parseFloat(totalAmountDollars)
@@ -60,7 +66,9 @@ export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderForm
         depositNumber: depositNumber.trim(),
         depositDate,
         totalAmountCents,
-        supplierId: supplierId && supplierId !== '__none__' ? supplierId : undefined,
+        currency,
+        supplierId,
+        senderName: senderName.trim() || undefined,
         notes: notes.trim() || undefined,
         fileUrl: fileUrl.trim() || undefined,
         fileName: fileUrl.trim() ? fileUrl.trim().split('/').pop() : undefined,
@@ -111,7 +119,7 @@ export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderForm
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="totalAmount">Total Amount (CAD) *</Label>
+              <Label htmlFor="totalAmount">Total Amount *</Label>
               <Input
                 id="totalAmount"
                 type="number"
@@ -126,34 +134,26 @@ export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderForm
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="supplier">Supplier</Label>
-              <Select value={supplierId} onValueChange={setSupplierId} disabled={busy}>
-                <SelectTrigger id="supplier">
-                  <SelectValue placeholder="All suppliers" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">All suppliers</SelectItem>
-                  {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <CheckCounterpartyFields
+            supplierId={supplierId}
+            onSupplierIdChange={setSupplierId}
+            senderName={senderName}
+            onSenderNameChange={setSenderName}
+            currency={currency}
+            onCurrencyChange={setCurrency}
+            disabled={busy}
+            required
+          />
 
-            <div className="space-y-2">
-              <Label htmlFor="fileUrl">File URL (optional)</Label>
-              <Input
-                id="fileUrl"
-                value={fileUrl}
-                onChange={(e) => setFileUrl(e.target.value)}
-                placeholder="https://..."
-                disabled={busy}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="fileUrl">File URL (optional)</Label>
+            <Input
+              id="fileUrl"
+              value={fileUrl}
+              onChange={(e) => setFileUrl(e.target.value)}
+              placeholder="https://..."
+              disabled={busy}
+            />
           </div>
 
           <div className="space-y-2">
