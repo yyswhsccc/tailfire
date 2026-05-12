@@ -299,7 +299,7 @@ export default function UsersSettingsPage() {
               onActivate={(user) => handleStatusAction(user, 'activate')}
               onDelete={(user) => handleStatusAction(user, 'delete')}
               onResendInvite={(user) => handleStatusAction(user, 'resend-invite')}
-              onImpersonate={(user) => startImpersonation(user.id)}
+              onImpersonate={(user) => startImpersonation(user.id, user.role)}
               onResetMfa={handleResetMfa}
               rowSelection={rowSelection}
               onRowSelectionChange={setRowSelection}

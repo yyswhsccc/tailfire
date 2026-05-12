@@ -48,14 +48,17 @@ export function useImpersonation() {
     return () => clearInterval(interval)
   }, [status.active, checkStatus])
 
-  const start = async (userId: string) => {
+  const start = async (userId: string, role?: string) => {
     setLoading(true)
     try {
       await api.post(`/admin/impersonate/${userId}`)
       if (typeof window !== 'undefined') {
         localStorage.setItem('impersonate-user-id', userId)
       }
-      window.location.href = '/dashboard'
+      // Non-admin users (role='user') have no access to /dashboard and admin tabs;
+      // route them to /portal where IC self-serve lives. Admins keep /dashboard.
+      const destination = role === 'admin' ? '/dashboard' : '/portal'
+      window.location.href = destination
     } finally {
       setLoading(false)
     }
