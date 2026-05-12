@@ -945,17 +945,19 @@ export function FlightForm({
 
   const addSeat = (legIndex: number, travelerName: string) => {
     const currentSeats = getValues(`flightSegments.${legIndex}.seats`) || []
-    setValue(`flightSegments.${legIndex}.seats`, [
-      ...currentSeats,
-      { id: generateId(), travelerName, seatNumber: '' },
-    ])
+    setValue(
+      `flightSegments.${legIndex}.seats`,
+      [...currentSeats, { id: generateId(), travelerName, seatNumber: '' }],
+      { shouldDirty: true }
+    )
   }
 
   const removeSeat = (legIndex: number, seatId: string) => {
     const currentSeats = getValues(`flightSegments.${legIndex}.seats`) || []
     setValue(
       `flightSegments.${legIndex}.seats`,
-      currentSeats.filter((s) => s.id !== seatId)
+      currentSeats.filter((s) => s.id !== seatId),
+      { shouldDirty: true }
     )
   }
 
@@ -963,7 +965,8 @@ export function FlightForm({
     const currentSeats = getValues(`flightSegments.${legIndex}.seats`) || []
     setValue(
       `flightSegments.${legIndex}.seats`,
-      currentSeats.map((s) => (s.id === seatId ? { ...s, seatNumber } : s))
+      currentSeats.map((s) => (s.id === seatId ? { ...s, seatNumber } : s)),
+      { shouldDirty: true }
     )
   }
 
@@ -1018,21 +1021,31 @@ export function FlightForm({
   })
 
   // Update pricing data handler
+  // IMPORTANT: setValue must pass { shouldDirty: true } so the autosave effect
+  // (gated on isDirty) fires when only pricing fields change. Without it,
+  // edits via PricingSection/CommissionSection/BookingDetailsSection silently
+  // never persist. Mirrors the pattern used by tour-form, lodging-form, etc.
   const handlePricingUpdate = useCallback((updates: Partial<PricingData>) => {
-    // TODO Phase 4: Add invoiceType to form schema
-    if ('totalPriceCents' in updates) setValue('totalPriceCents', updates.totalPriceCents ?? 0)
-    if ('taxesAndFeesCents' in updates) setValue('taxesAndFeesCents', updates.taxesAndFeesCents ?? 0)
-    if ('currency' in updates) setValue('currency', updates.currency ?? 'CAD')
-    if ('pricingType' in updates) setValue('pricingType', updates.pricingType as any ?? 'per_person')
-    if ('confirmationNumber' in updates) setValue('confirmationNumber', updates.confirmationNumber ?? '')
-    if ('commissionTotalCents' in updates) setValue('commissionTotalCents', updates.commissionTotalCents ?? 0)
-    if ('commissionSplitPercentage' in updates) setValue('commissionSplitPercentage', updates.commissionSplitPercentage ?? 0)
-    if ('commissionExpectedDate' in updates) setValue('commissionExpectedDate', updates.commissionExpectedDate ?? null)
-    if ('termsAndConditions' in updates) setValue('termsAndConditions', updates.termsAndConditions ?? '')
-    if ('cancellationPolicy' in updates) setValue('cancellationPolicy', updates.cancellationPolicy ?? '')
-    if ('supplier' in updates) setValue('supplier', updates.supplier ?? '')
-    if ('pricingBreakdown' in updates) setPricingBreakdown(updates.pricingBreakdown ?? null)
-  }, [setValue])
+    const opts = { shouldDirty: true, shouldValidate: true } as const
+    if ('totalPriceCents' in updates) setValue('totalPriceCents', updates.totalPriceCents ?? 0, opts)
+    if ('taxesAndFeesCents' in updates) setValue('taxesAndFeesCents', updates.taxesAndFeesCents ?? 0, opts)
+    if ('currency' in updates) setValue('currency', updates.currency ?? 'CAD', opts)
+    if ('pricingType' in updates) setValue('pricingType', updates.pricingType as any ?? 'per_person', opts)
+    if ('confirmationNumber' in updates) setValue('confirmationNumber', updates.confirmationNumber ?? '', opts)
+    if ('commissionTotalCents' in updates) setValue('commissionTotalCents', updates.commissionTotalCents ?? 0, opts)
+    if ('commissionSplitPercentage' in updates) setValue('commissionSplitPercentage', updates.commissionSplitPercentage ?? 0, opts)
+    if ('commissionExpectedDate' in updates) setValue('commissionExpectedDate', updates.commissionExpectedDate ?? null, opts)
+    if ('termsAndConditions' in updates) setValue('termsAndConditions', updates.termsAndConditions ?? '', opts)
+    if ('cancellationPolicy' in updates) setValue('cancellationPolicy', updates.cancellationPolicy ?? '', opts)
+    if ('supplier' in updates) setValue('supplier', updates.supplier ?? '', opts)
+    if ('pricingBreakdown' in updates) {
+      setPricingBreakdown(updates.pricingBreakdown ?? null)
+      // Breakdown lives in component state, not the form. Touch a form field
+      // so the autosave gate (isDirty) fires for breakdown-only edits like
+      // adding a row or renaming a traveler label.
+      setValue('totalPriceCents', getValues('totalPriceCents') ?? 0, opts)
+    }
+  }, [setValue, getValues])
 
   // Handle supplier defaults from BookingDetailsSection
   const handleSupplierDefaultsApplied = useCallback((defaults: SupplierDefaults) => {
