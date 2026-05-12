@@ -89,27 +89,46 @@ export class TripAccessService {
     if (trip.ownerId === auth.userId) {
       access = { canRead: true, canWrite: true, reason: 'User owns this trip' }
     } else {
-      // Check for explicit share
-      const [share] = await this.db.client
-        .select({ accessLevel: this.db.schema.tripShares.accessLevel })
-        .from(this.db.schema.tripShares)
+      // Check active trip_collaborators (TES import sets trips.ownerId to an admin
+      // fixture and links the real agent via this table, so collaborator presence
+      // must grant the same effective access as ownership).
+      const [collab] = await this.db.client
+        .select({ id: this.db.schema.tripCollaborators.id })
+        .from(this.db.schema.tripCollaborators)
         .where(
           and(
-            eq(this.db.schema.tripShares.tripId, tripId),
-            eq(this.db.schema.tripShares.sharedWithUserId, auth.userId),
+            eq(this.db.schema.tripCollaborators.tripId, tripId),
+            eq(this.db.schema.tripCollaborators.userId, auth.userId),
+            eq(this.db.schema.tripCollaborators.isActive, true),
           ),
         )
         .limit(1)
 
-      if (share) {
-        access = share.accessLevel === 'write'
-          ? { canRead: true, canWrite: true, reason: 'Write share granted' }
-          : { canRead: true, canWrite: false, reason: 'Read-only share granted' }
-      } else if (trip.ownerId === null) {
-        // Inbound trips (no owner) - agency users can view but not edit
-        access = { canRead: true, canWrite: false, reason: 'Inbound trip (no owner) - read-only access' }
+      if (collab) {
+        access = { canRead: true, canWrite: true, reason: 'User is a trip collaborator' }
       } else {
-        access = { canRead: false, canWrite: false, reason: 'No access to this trip' }
+        // Check for explicit share
+        const [share] = await this.db.client
+          .select({ accessLevel: this.db.schema.tripShares.accessLevel })
+          .from(this.db.schema.tripShares)
+          .where(
+            and(
+              eq(this.db.schema.tripShares.tripId, tripId),
+              eq(this.db.schema.tripShares.sharedWithUserId, auth.userId),
+            ),
+          )
+          .limit(1)
+
+        if (share) {
+          access = share.accessLevel === 'write'
+            ? { canRead: true, canWrite: true, reason: 'Write share granted' }
+            : { canRead: true, canWrite: false, reason: 'Read-only share granted' }
+        } else if (trip.ownerId === null) {
+          // Inbound trips (no owner) - agency users can view but not edit
+          access = { canRead: true, canWrite: false, reason: 'Inbound trip (no owner) - read-only access' }
+        } else {
+          access = { canRead: false, canWrite: false, reason: 'No access to this trip' }
+        }
       }
     }
 
@@ -222,6 +241,19 @@ export class TripAccessService {
       .from(this.db.schema.tripShares)
       .where(eq(this.db.schema.tripShares.sharedWithUserId, auth.userId))
 
+    // Get trips where user is an active collaborator. The TES import assigns
+    // trips.ownerId to an admin fixture and uses trip_collaborators to link the
+    // real agent; without this query non-admin agents see zero trips.
+    const collaboratorTrips = await this.db.client
+      .select({ tripId: this.db.schema.tripCollaborators.tripId })
+      .from(this.db.schema.tripCollaborators)
+      .where(
+        and(
+          eq(this.db.schema.tripCollaborators.userId, auth.userId),
+          eq(this.db.schema.tripCollaborators.isActive, true),
+        ),
+      )
+
     // Inbound trips without an owner are admin-only (for assignment).
     // Non-admin agents only see their own inbound trips via ownedTrips above.
 
@@ -232,6 +264,9 @@ export class TripAccessService {
     }
     for (const share of sharedTrips) {
       tripIds.add(share.tripId)
+    }
+    for (const collab of collaboratorTrips) {
+      tripIds.add(collab.tripId)
     }
 
     const accessibleTripIds = Array.from(tripIds)
