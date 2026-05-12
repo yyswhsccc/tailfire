@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { TaxProfileStep } from './_components/tax-profile-step'
 import { AuthorizationStep } from './_components/authorization-step'
 import { FirstAccountStep } from './_components/first-account-step'
+import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 // Steps 2 and 3 will be added by Tasks 14 and 15
@@ -35,11 +36,13 @@ function OnboardingContent() {
 
       <ProgressIndicator current={step} steps={STEPS} />
 
-      <div>
-        {step === 1 && <TaxProfileStep onComplete={() => goToStep(2)} />}
-        {step === 2 && <AuthorizationStep onComplete={() => goToStep(3)} />}
-        {step === 3 && <FirstAccountStep />}
-      </div>
+      <Card>
+        <CardContent className="pt-6">
+          {step === 1 && <TaxProfileStep onComplete={() => goToStep(2)} />}
+          {step === 2 && <AuthorizationStep onComplete={() => goToStep(3)} />}
+          {step === 3 && <FirstAccountStep />}
+        </CardContent>
+      </Card>
     </div>
   )
 }
