@@ -101,8 +101,11 @@ function formatDateLocal(dateStr: string): string {
 const VALID_STATUSES = ['draft', 'proposing', 'approved', 'cancelled'] as const
 type FormStatus = (typeof VALID_STATUSES)[number]
 
-// Valid pricing type values
-const VALID_PRICING_TYPES = ['per_person', 'per_group', 'fixed', 'per_room', 'total'] as const
+// Valid pricing type values — must stay in sync with the DB pricing_type enum
+// and the flightFormSchema in flight-validation.ts. Without flat_rate/per_night
+// here, coercePricingType would silently fall back to per_person when loading
+// existing rows saved with those values.
+const VALID_PRICING_TYPES = ['per_person', 'per_room', 'flat_rate', 'per_night', 'total'] as const
 type FormPricingType = (typeof VALID_PRICING_TYPES)[number]
 
 // Coerce API proposal status to form status

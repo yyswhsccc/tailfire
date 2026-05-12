@@ -132,7 +132,10 @@ export const flightFormSchema = z.object({
     .pipe(z.number().nonnegative('Taxes cannot be negative'))
     .default(0),
   currency: z.string().default('CAD'),
-  pricingType: z.enum(['per_person', 'per_group', 'fixed', 'per_room', 'total']).default('per_person'),
+  // Matches the DB pricing_type enum. UI emits per_person/per_room/flat_rate;
+  // per_night and total are accepted for back-compat with existing rows
+  // (PricingSection normalizes legacy 'total' to 'flat_rate' on display).
+  pricingType: z.enum(['per_person', 'per_room', 'flat_rate', 'per_night', 'total']).default('per_person'),
   confirmationNumber: z.string().default(''),
 
   // Commission fields
