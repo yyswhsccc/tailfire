@@ -27,9 +27,6 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { and, eq, lt } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
 import { DisbursementService } from './disbursement.service'
-import { schema } from '@tailfire/database'
-
-const { icDisbursements } = schema
 
 // Sentinel UUID for system-initiated actions (used in audit columns).
 // '00000000-0000-0000-0000-000000000000' is the canonical "nil UUID" — Postgres accepts it,
@@ -110,6 +107,10 @@ export class ReconcileService {
    */
   async findStuck(): Promise<Array<{ id: string }>> {
     const cutoff = new Date(Date.now() - STUCK_THRESHOLD_HOURS * 60 * 60 * 1000)
+    // Access schema via the DatabaseService getter so resolution happens at
+    // call-time (avoids module-load races where a top-level destructure
+    // would capture the schema export before circular re-exports finish).
+    const { icDisbursements } = this.db.schema
 
     return this.db.client
       .select({ id: icDisbursements.id })
