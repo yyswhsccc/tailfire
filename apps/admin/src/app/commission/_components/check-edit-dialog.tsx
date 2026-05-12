@@ -247,8 +247,19 @@ export function CheckEditDialog({ check, open, onOpenChange }: Props) {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={update.isPending}>
-            {update.isPending ? 'Saving…' : 'Save changes'}
+          {/*
+            The server rejects edits to accepted/cancelled checks with a
+            400. Disable Save in that case so we don't promise an update
+            we can't deliver. To edit such a check, the admin must first
+            recall (accepted → submitted) or unblock the row through
+            another flow.
+          */}
+          <Button
+            onClick={handleSave}
+            disabled={update.isPending || isLocked}
+            title={isLocked ? `This check is ${check.status} — recall it before editing.` : undefined}
+          >
+            {update.isPending ? 'Saving…' : isLocked ? `Locked (${check.status})` : 'Save changes'}
           </Button>
         </DialogFooter>
       </DialogContent>
