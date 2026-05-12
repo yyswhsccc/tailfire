@@ -21,6 +21,7 @@ import { EditUserDialog } from './_components/edit-user-dialog'
 import { ChangeStatusDialog } from './_components/change-status-dialog'
 import { BatchActionBar } from './_components/batch-action-bar'
 import { BatchConfirmDialog, BatchResult } from './_components/batch-confirm-dialog'
+import { UsersPagination } from './_components/users-pagination'
 import { useUsers, useUpdateUserStatus, useDeleteUser, useResetUserMfa } from '@/hooks/use-users'
 import { useAuthStore } from '@/stores/auth.store'
 import { useToast } from '@/hooks/use-toast'
@@ -50,6 +51,15 @@ export default function UsersSettingsPage() {
   const [statusFilter, setStatusFilter] = useState<UserStatus | undefined>()
   const [roleFilter, setRoleFilter] = useState<UserRole | undefined>()
 
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(25)
+
+  // Reset to page 1 whenever a filter changes so users don't sit on an empty page.
+  useEffect(() => {
+    setPage(1)
+  }, [search, statusFilter, roleFilter, limit])
+
   // Dialog state
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -67,6 +77,8 @@ export default function UsersSettingsPage() {
     search: search || undefined,
     status: statusFilter,
     role: roleFilter,
+    page,
+    limit,
   })
 
   // Reset selection only when the SET of user IDs changes (not on reference change)
@@ -289,21 +301,33 @@ export default function UsersSettingsPage() {
               </p>
             </div>
           ) : (
-            <UsersTable
-              users={data.users}
-              currentUserId={currentUser?.id || ''}
-              isCurrentUserAdmin={isAdmin}
-              onEdit={handleEdit}
-              onLock={(user) => handleStatusAction(user, 'lock')}
-              onUnlock={(user) => handleStatusAction(user, 'unlock')}
-              onActivate={(user) => handleStatusAction(user, 'activate')}
-              onDelete={(user) => handleStatusAction(user, 'delete')}
-              onResendInvite={(user) => handleStatusAction(user, 'resend-invite')}
-              onImpersonate={(user) => startImpersonation(user.id, user.role)}
-              onResetMfa={handleResetMfa}
-              rowSelection={rowSelection}
-              onRowSelectionChange={setRowSelection}
-            />
+            <>
+              <UsersTable
+                users={data.users}
+                currentUserId={currentUser?.id || ''}
+                isCurrentUserAdmin={isAdmin}
+                onEdit={handleEdit}
+                onLock={(user) => handleStatusAction(user, 'lock')}
+                onUnlock={(user) => handleStatusAction(user, 'unlock')}
+                onActivate={(user) => handleStatusAction(user, 'activate')}
+                onDelete={(user) => handleStatusAction(user, 'delete')}
+                onResendInvite={(user) => handleStatusAction(user, 'resend-invite')}
+                onImpersonate={(user) => startImpersonation(user.id, user.role)}
+                onResetMfa={handleResetMfa}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+              />
+              <div className="border-t">
+                <UsersPagination
+                  page={data.page}
+                  totalPages={data.totalPages}
+                  total={data.total}
+                  limit={data.limit}
+                  onPageChange={setPage}
+                  onLimitChange={setLimit}
+                />
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
