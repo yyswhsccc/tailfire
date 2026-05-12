@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Combobox } from '@/components/ui/combobox'
-import { useSuppliers } from '@/hooks/use-suppliers'
+import { useSuppliers, useSupplier } from '@/hooks/use-suppliers'
 
 /** Active currencies. ISO 4217 codes. Add to this list when business needs grow. */
 export const SUPPORTED_CURRENCIES = [
@@ -72,8 +72,26 @@ export function CheckCounterpartyFields({
   disabled,
   required = true,
 }: Props) {
-  const { data, isLoading } = useSuppliers({ limit: 500, isActive: true })
-  const suppliers = data?.suppliers ?? []
+  // Load all suppliers (don't filter to active-only) so historical checks
+  // with now-inactive suppliers still render the name. Bump limit high
+  // enough to fit a realistic agency master list — pagination beyond this
+  // is handled by the singleton fetch below.
+  const { data, isLoading } = useSuppliers({ limit: 1000 })
+  const listSuppliers = data?.suppliers ?? []
+
+  // When the selected supplierId isn't in the loaded list (paginated past
+  // the limit, or fetched too narrowly), pull it directly by id so the
+  // picker button can render the supplier's name instead of the raw UUID.
+  const isInList = supplierId ? listSuppliers.some((s) => s.id === supplierId) : true
+  const { data: detachedSupplier } = useSupplier(
+    supplierId && !isLoading && !isInList ? supplierId : null,
+  )
+
+  // Merge the detached supplier (if any) so the Combobox has a label to
+  // display for the currently-selected value. De-dupe by id.
+  const suppliers = detachedSupplier
+    ? [detachedSupplier, ...listSuppliers.filter((s) => s.id !== detachedSupplier.id)]
+    : listSuppliers
 
   // When a supplier is picked, seed the senderName from supplier.name —
   // but only if the user hasn't already typed a value, so we don't clobber
@@ -89,7 +107,10 @@ export function CheckCounterpartyFields({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierId, suppliers.length])
 
-  const options = suppliers.map((s) => ({ value: s.id, label: s.name }))
+  const options = suppliers.map((s) => ({
+    value: s.id,
+    label: s.isActive === false ? `${s.name} (inactive)` : s.name,
+  }))
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
