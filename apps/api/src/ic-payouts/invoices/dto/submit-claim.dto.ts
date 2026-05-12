@@ -20,7 +20,14 @@ export class SubmitClaimDto {
 
 export interface SubmitClaimInput {
   agencyId: string
+  /** IC the claim belongs to. The invoice's user_id is set to this value. */
   userId: string
+  /**
+   * Present only when an admin is submitting on behalf of the IC. Used to
+   * record the actual actor in the audit event without overwriting the
+   * invoice's user_id.
+   */
+  submittedByAdminUserId?: string
   selectedCheckItemIds: string[]
 }
 

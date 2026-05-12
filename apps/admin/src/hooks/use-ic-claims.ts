@@ -36,20 +36,52 @@ export const icClaimsKeys = {
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
-export const useEligibleForClaim = () =>
+/**
+ * Eligible items for the authenticated IC's own claim flow.
+ * Pass an `onBehalfOfUserId` to switch into admin "generate claim for
+ * agent" mode — the request hits /ic-payouts/admin/users/:id/eligible.
+ */
+export const useEligibleForClaim = (onBehalfOfUserId?: string) =>
   useQuery<EligibleResponseDto>({
-    queryKey: icClaimsKeys.eligible,
-    queryFn: () => api.get<EligibleResponseDto>('/ic-payouts/me/eligible'),
+    // Cache key disambiguates self vs admin-target so we don't bleed data
+    // between admin-generated claim sessions and the admin's own claim flow.
+    queryKey: onBehalfOfUserId
+      ? (['ic-payouts', 'admin', 'eligible', onBehalfOfUserId] as const)
+      : icClaimsKeys.eligible,
+    queryFn: () =>
+      api.get<EligibleResponseDto>(
+        onBehalfOfUserId
+          ? `/ic-payouts/admin/users/${onBehalfOfUserId}/eligible`
+          : '/ic-payouts/me/eligible',
+      ),
+    enabled: onBehalfOfUserId === undefined || onBehalfOfUserId.length > 0,
   })
 
-export const useSubmitClaim = () => {
+/**
+ * Submit a claim. Pass `onBehalfOfUserId` to submit AS that IC (admin only).
+ * The resulting invoice belongs to the IC; the admin's id is recorded on
+ * the audit event via the controller.
+ */
+export const useSubmitClaim = (onBehalfOfUserId?: string) => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (selectedCheckItemIds: string[]) =>
-      api.post<{ invoices: Array<{ id: string }> }>('/ic-payouts/me/claims', { selectedCheckItemIds }),
+      api.post<{ invoices: Array<{ id: string }> }>(
+        onBehalfOfUserId
+          ? `/ic-payouts/admin/users/${onBehalfOfUserId}/claims`
+          : '/ic-payouts/me/claims',
+        { selectedCheckItemIds },
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: icClaimsKeys.eligible })
       qc.invalidateQueries({ queryKey: icClaimsKeys.invoices })
+      if (onBehalfOfUserId) {
+        qc.invalidateQueries({ queryKey: ['ic-payouts', 'admin', 'eligible', onBehalfOfUserId] })
+        // Admin queue refreshes too — new submitted invoice should appear.
+        qc.invalidateQueries({ queryKey: ['ic-payouts', 'admin', 'invoices'] })
+        // And the /commission Payable-by-Agent total now drops by the claimed amount.
+        qc.invalidateQueries({ queryKey: ['commission'] })
+      }
     },
   })
 }

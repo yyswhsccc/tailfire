@@ -87,6 +87,23 @@ export class IcTaxProfilesController {
   }
 
   /**
+   * GET /ic-payouts/admin/users/:userId/tax-profile
+   * Admin-only: read the tax profile for any IC in the agency. Used by the
+   * "Generate claim on behalf of agent" flow to know whether GST/HST applies.
+   * Same mask scrubbing as the IC's own /me/tax-profile.
+   */
+  @Get('admin/users/:userId/tax-profile')
+  @AdminOnly()
+  async getForAgent(
+    @GetAuthContext() auth: AuthContext,
+    @Param('userId') userId: string,
+  ) {
+    const profile = await this.service.findByUser(auth.agencyId, userId)
+    if (!profile) return null
+    return this.stripEncryptedFields(profile)
+  }
+
+  /**
    * PATCH /ic-payouts/admin/users/:userId/tax-profile/policy
    * Admin-only: update disbursement policy fields on another user's tax profile.
    */

@@ -80,11 +80,48 @@ export function useAcceptCheck() {
   })
 }
 
+/**
+ * PATCH /commission/checks/:id — admin can update any editable field on a
+ * non-accepted, non-cancelled check (the server enforces). Pass `status:
+ * 'cancelled'` to void a check; the service atomically reverses settlements
+ * + adjustments when cancelling a paid check.
+ */
+export interface UpdateCheckPayload {
+  checkNumber?: string
+  checkDate?: string
+  checkAmountCents?: number
+  currency?: string
+  senderName?: string
+  senderSupplierId?: string
+  recipientName?: string
+  recipientUserId?: string
+  payrollId?: string
+  notes?: string
+  status?: 'pending' | 'submitted' | 'accepted' | 'cancelled'
+}
+
 export function useUpdateCheck() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { status?: string; notes?: string } }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateCheckPayload }) =>
       api.patch(`/commission/checks/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: commissionKeys.all })
+    },
+  })
+}
+
+/**
+ * "Delete" a check by transitioning it to `cancelled`. The server reverses
+ * any line-item settlements and re-opens reconciled adjustments. Use this
+ * for admin-side cleanup of mistyped or duplicate checks; the row stays in
+ * the DB for audit but is filtered from the active Received Checks view.
+ */
+export function useDeleteCheck() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (checkId: string) =>
+      api.patch(`/commission/checks/${checkId}`, { status: 'cancelled' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: commissionKeys.all })
     },

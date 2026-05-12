@@ -21,12 +21,24 @@ export const icPayoutsKeys = {
 
 // ─── Tax Profile ──────────────────────────────────────────────────────────────
 
-export function useMyTaxProfile() {
+/**
+ * Read a tax profile. Without args, returns the authenticated IC's own
+ * profile. Pass `onBehalfOfUserId` (admin only) to read the target IC's
+ * profile via /ic-payouts/admin/users/:id/tax-profile — used by the
+ * "Generate claim on behalf of agent" flow so the GST/HST preview
+ * reflects the IC who'll own the invoice.
+ */
+export function useMyTaxProfile(onBehalfOfUserId?: string) {
   return useQuery<IcTaxProfileDto | null>({
-    queryKey: icPayoutsKeys.taxProfile(),
+    queryKey: onBehalfOfUserId
+      ? (['ic-payouts', 'admin', 'tax-profile', onBehalfOfUserId] as const)
+      : icPayoutsKeys.taxProfile(),
     queryFn: async () => {
+      const path = onBehalfOfUserId
+        ? `/ic-payouts/admin/users/${onBehalfOfUserId}/tax-profile`
+        : '/ic-payouts/me/tax-profile'
       try {
-        return await api.get<IcTaxProfileDto>('/ic-payouts/me/tax-profile')
+        return await api.get<IcTaxProfileDto>(path)
       } catch (err: unknown) {
         // 404 means not yet created — return null, not an error
         if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 404) {
@@ -35,6 +47,7 @@ export function useMyTaxProfile() {
         throw err
       }
     },
+    enabled: onBehalfOfUserId === undefined || onBehalfOfUserId.length > 0,
   })
 }
 
