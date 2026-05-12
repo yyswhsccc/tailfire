@@ -112,6 +112,22 @@ export function useUpdateCheck() {
 }
 
 /**
+ * Recall an accepted check back to 'submitted' so its editable fields
+ * can be modified again. Server endpoint (commission.service.recallCheck)
+ * rejects the call when the check isn't in 'accepted' state.
+ */
+export function useRecallCheck() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (checkId: string) =>
+      api.post(`/commission/checks/${checkId}/recall`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: commissionKeys.all })
+    },
+  })
+}
+
+/**
  * "Delete" a check by transitioning it to `cancelled`. The server reverses
  * any line-item settlements and re-opens reconciled adjustments. Use this
  * for admin-side cleanup of mistyped or duplicate checks; the row stays in

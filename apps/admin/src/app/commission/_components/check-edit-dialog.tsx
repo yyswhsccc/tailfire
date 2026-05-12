@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useUpdateCheck, type UpdateCheckPayload } from '@/hooks/use-commission'
+import { useUpdateCheck, useRecallCheck, type UpdateCheckPayload } from '@/hooks/use-commission'
 import { useToast } from '@/hooks/use-toast'
 import type { CommissionCheckResponseDto } from '@tailfire/shared-types/api'
 import {
@@ -66,6 +66,7 @@ function normalizeCurrency(c: string | null | undefined): SupportedCurrency {
 
 export function CheckEditDialog({ check, open, onOpenChange }: Props) {
   const update = useUpdateCheck()
+  const recall = useRecallCheck()
   const { toast } = useToast()
 
   // Local form state — hydrated from the row each time the dialog opens.
@@ -102,6 +103,25 @@ export function CheckEditDialog({ check, open, onOpenChange }: Props) {
 
   const isReceived = check.checkType === 'received'
   const isLocked = check.status === 'accepted' || check.status === 'cancelled'
+  // Cancelled is a terminal state — recall doesn't apply, so only offer
+  // it for accepted checks. The server enforces this too.
+  const canRecall = check.status === 'accepted'
+
+  const handleRecall = async () => {
+    try {
+      await recall.mutateAsync(check.id)
+      toast({
+        title: 'Check recalled',
+        description: 'Status is now Submitted — fields are editable.',
+      })
+      // Dialog stays open; the parent's query invalidation pushes a
+      // fresh `check` prop with the new status, and the hydration
+      // effect resets the form state to match.
+    } catch (e: unknown) {
+      const msg = e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : 'Recall failed'
+      toast({ title: 'Recall failed', description: msg, variant: 'destructive' })
+    }
+  }
 
   const handleSave = async () => {
     const cents = centsFromDollars(amountDollars)
@@ -150,9 +170,11 @@ export function CheckEditDialog({ check, open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle>Edit commission check</DialogTitle>
           <DialogDescription>
-            {isLocked
-              ? `This check is ${check.status}. The server will reject edits unless you transition it back first.`
-              : 'Update the editable fields. To void this check, change status to Cancelled.'}
+            {check.status === 'accepted'
+              ? 'This check is Accepted. Click Recall to flip it back to Submitted, then edit the fields.'
+              : check.status === 'cancelled'
+                ? 'This check is Cancelled (void) — it can’t be edited.'
+                : 'Update the editable fields. To void this check, change status to Cancelled.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -245,22 +267,33 @@ export function CheckEditDialog({ check, open, onOpenChange }: Props) {
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
           {/*
-            The server rejects edits to accepted/cancelled checks with a
-            400. Disable Save in that case so we don't promise an update
-            we can't deliver. To edit such a check, the admin must first
-            recall (accepted → submitted) or unblock the row through
-            another flow.
+            Accepted checks can't be edited until they're recalled back to
+            submitted (server enforces). Show Recall in that case so the
+            admin can fix typos / amount errors on a check they already
+            accepted, without leaving the dialog. Save replaces Recall
+            once the row transitions back to submitted.
           */}
-          <Button
-            onClick={handleSave}
-            disabled={update.isPending || isLocked}
-            title={isLocked ? `This check is ${check.status} — recall it before editing.` : undefined}
-          >
-            {update.isPending ? 'Saving…' : isLocked ? `Locked (${check.status})` : 'Save changes'}
-          </Button>
+          {canRecall ? (
+            <Button
+              variant="secondary"
+              onClick={handleRecall}
+              disabled={recall.isPending}
+              title="Flips the check back to Submitted so editable fields unlock."
+            >
+              {recall.isPending ? 'Recalling…' : 'Recall to Submitted'}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSave}
+              disabled={update.isPending || isLocked}
+              title={isLocked ? `This check is ${check.status} — recall it before editing.` : undefined}
+            >
+              {update.isPending ? 'Saving…' : isLocked ? `Locked (${check.status})` : 'Save changes'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
