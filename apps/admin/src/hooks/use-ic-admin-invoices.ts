@@ -70,3 +70,24 @@ export const useRejectInvoice = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ic-payouts', 'admin', 'invoices'] }),
   })
 }
+
+/**
+ * Admin-only cancel — for duplicate / stuck claims. Distinct from reject:
+ * neutral framing, allowed on approved invoices (as long as no disbursement
+ * has gone in-flight), and unwinds the reservation the same way reject does.
+ *
+ * Server enforces the source-state policy; the UI just renders the button
+ * conditionally based on `status`.
+ */
+export const useCancelInvoice = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.post(`/ic-payouts/admin/invoices/${id}/cancel`, { reason }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ic-payouts', 'admin', 'invoices'] })
+      // Cancel unwinds the reservation → commission rollups change too.
+      qc.invalidateQueries({ queryKey: ['commission'] })
+    },
+  })
+}

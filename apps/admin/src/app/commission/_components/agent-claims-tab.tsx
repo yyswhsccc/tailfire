@@ -28,8 +28,10 @@ import {
   useAdminInvoices,
   useApproveInvoice,
   useRejectInvoice,
+  useCancelInvoice,
   type AdminInvoiceListItem,
 } from '@/hooks/use-ic-admin-invoices'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useMyInvoices } from '@/hooks/use-ic-claims'
 import { CommissionChecksTable } from './commission-checks-table'
 import type { CommissionCheckResponseDto } from '@tailfire/shared-types/api'
@@ -87,9 +89,16 @@ export function AgentClaimsTab(props: AgentClaimsTabProps) {
 // ─── V2 admin queue ──────────────────────────────────────────────────────────
 
 function AdminClaimsCard() {
-  const { data: invoices, isLoading } = useAdminInvoices('submitted')
+  // Admins toggle between Submitted (the default review queue) and All to
+  // reach approved/rejected/cancelled invoices when a stuck-state override
+  // is needed.
+  const [statusFilter, setStatusFilter] = useState<'submitted' | 'all'>('submitted')
+  const { data: invoices, isLoading } = useAdminInvoices(
+    statusFilter === 'all' ? undefined : statusFilter,
+  )
   const approve = useApproveInvoice()
   const reject = useRejectInvoice()
+  const cancel = useCancelInvoice()
   const { toast } = useToast()
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -119,20 +128,49 @@ function AdminClaimsCard() {
     }
   }
 
+  const onCancel = async (id: string) => {
+    const reason = window.prompt(
+      'Why are you cancelling this claim?\n\n(Duplicate, stuck state, admin error, IC asked to redo…)',
+    )
+    if (!reason) return
+    setBusyId(id)
+    try {
+      await cancel.mutateAsync({ id, reason })
+      toast({ title: 'Claim cancelled' })
+    } catch (e: any) {
+      toast({ title: 'Cancel failed', description: e?.message, variant: 'destructive' })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Agent Payout Claims</CardTitle>
-        <CardDescription>
-          IC commission claims awaiting review. Approve to send to the disbursements queue, or reject to release the reservation.
-        </CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle>Agent Payout Claims</CardTitle>
+          <CardDescription>
+            IC commission claims awaiting review. Approve to send to the disbursements queue, reject for a value judgement, or cancel to void a duplicate / stuck claim.
+          </CardDescription>
+        </div>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'submitted' | 'all')}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="submitted">Submitted</SelectItem>
+            <SelectItem value="all">All statuses</SelectItem>
+          </SelectContent>
+        </Select>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>
         ) : !invoices || invoices.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
-            No claims to review right now. Submitted claims will appear here.
+            {statusFilter === 'submitted'
+              ? 'No claims to review right now. Submitted claims will appear here.'
+              : 'No claims at all in this agency yet.'}
           </p>
         ) : (
           <InvoiceTable
@@ -141,6 +179,7 @@ function AdminClaimsCard() {
             busyId={busyId}
             onApprove={onApprove}
             onReject={onReject}
+            onCancel={onCancel}
           />
         )}
       </CardContent>
@@ -184,9 +223,12 @@ interface InvoiceTableProps {
   busyId?: string | null
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
+  /** Admin-only cancel — duplicate / stuck override. */
+  onCancel?: (id: string) => void
 }
 
-function InvoiceTable({ invoices, showAgent, busyId, onApprove, onReject }: InvoiceTableProps) {
+function InvoiceTable({ invoices, showAgent, busyId, onApprove, onReject, onCancel }: InvoiceTableProps) {
+  const showActions = !!(onApprove || onReject || onCancel)
   return (
     <Table>
       <TableHeader>
@@ -196,51 +238,69 @@ function InvoiceTable({ invoices, showAgent, busyId, onApprove, onReject }: Invo
           <TableHead>Date</TableHead>
           <TableHead className="text-right">Total</TableHead>
           <TableHead>Status</TableHead>
-          {(onApprove || onReject) && <TableHead className="text-right">Actions</TableHead>}
+          {showActions && <TableHead className="text-right">Actions</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
-        {invoices.map((inv) => (
-          <TableRow key={inv.id}>
-            <TableCell className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
-            {showAgent && <TableCell>{inv.icLegalName}</TableCell>}
-            <TableCell>{formatDate(inv.invoiceDate)}</TableCell>
-            <TableCell className="text-right font-medium">
-              {formatCurrency(inv.totalCents, inv.currency)}
-            </TableCell>
-            <TableCell>
-              <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${statusColor(inv.status)}`}>
-                {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
-              </span>
-            </TableCell>
-            {(onApprove || onReject) && (
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
-                  {inv.status === 'submitted' && onApprove && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busyId === inv.id}
-                      onClick={() => onApprove(inv.id)}
-                    >
-                      Approve
-                    </Button>
-                  )}
-                  {inv.status === 'submitted' && onReject && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busyId === inv.id}
-                      onClick={() => onReject(inv.id)}
-                    >
-                      Reject
-                    </Button>
-                  )}
-                </div>
+        {invoices.map((inv) => {
+          // Cancel is allowed pre-disbursement-in-flight. The server enforces
+          // the disbursement check, so the UI only filters by invoice status:
+          // draft/submitted/approved are eligible.
+          const canCancel =
+            !!onCancel && (inv.status === 'draft' || inv.status === 'submitted' || inv.status === 'approved')
+          return (
+            <TableRow key={inv.id}>
+              <TableCell className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
+              {showAgent && <TableCell>{inv.icLegalName}</TableCell>}
+              <TableCell>{formatDate(inv.invoiceDate)}</TableCell>
+              <TableCell className="text-right font-medium">
+                {formatCurrency(inv.totalCents, inv.currency)}
               </TableCell>
-            )}
-          </TableRow>
-        ))}
+              <TableCell>
+                <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${statusColor(inv.status)}`}>
+                  {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
+                </span>
+              </TableCell>
+              {showActions && (
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    {inv.status === 'submitted' && onApprove && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busyId === inv.id}
+                        onClick={() => onApprove(inv.id)}
+                      >
+                        Approve
+                      </Button>
+                    )}
+                    {inv.status === 'submitted' && onReject && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busyId === inv.id}
+                        onClick={() => onReject(inv.id)}
+                      >
+                        Reject
+                      </Button>
+                    )}
+                    {canCancel && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:bg-destructive/10"
+                        disabled={busyId === inv.id}
+                        onClick={() => onCancel!(inv.id)}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              )}
+            </TableRow>
+          )
+        })}
       </TableBody>
     </Table>
   )

@@ -14,6 +14,7 @@
  *   ic-payout.invoice.submitted             → admin email (skipped on auto-approve path)
  *   ic-payout.invoice.approved              → IC email
  *   ic-payout.invoice.rejected              → IC email (includes reason)
+ *   ic-payout.invoice.cancelled             → IC email (admin override; includes reason)
  *   ic-payout.disbursement.awaiting-manual-send → admin email (with rail + mask)
  *   ic-payout.disbursement.sent             → IC email (with reference)
  *   ic-payout.disbursement.failed           → both IC + admin
@@ -55,6 +56,14 @@ export interface InvoiceRejectedEvent {
   userId: string
   reason: string
   rejectedBy: string
+}
+
+export interface InvoiceCancelledEvent {
+  invoiceId: string
+  agencyId: string
+  userId: string
+  reason: string
+  cancelledBy: string
 }
 
 export interface DisbursementAwaitingManualSendEvent {
@@ -238,6 +247,47 @@ export class IcPayoutNotificationsService {
     } catch (err) {
       this.logger.error(
         `[ic-payouts] Failed to send invoice.rejected notification for ${payload.invoiceId}: ${err instanceof Error ? err.message : String(err)}`,
+      )
+    }
+  }
+
+  // ===========================================================================
+  // invoice.cancelled → IC email (admin override; includes reason)
+  // ===========================================================================
+
+  @OnEvent('ic-payout.invoice.cancelled')
+  async onInvoiceCancelled(payload: InvoiceCancelledEvent): Promise<void> {
+    try {
+      const recipient = await this.getUserEmail(payload.userId)
+      if (!recipient) {
+        this.logger.warn(
+          `[ic-payouts] No email found for user ${payload.userId}; skipping invoice.cancelled notification`,
+        )
+        return
+      }
+
+      await this.email.sendEmail({
+        agencyId: payload.agencyId,
+        to: [recipient],
+        subject: `[IC Payout] Claim cancelled by admin`,
+        html: `
+          <p>Your commission claim has been cancelled by an administrator.</p>
+          <p>
+            <strong>Invoice ID:</strong> ${payload.invoiceId}<br>
+            <strong>Reason:</strong> ${payload.reason}
+          </p>
+          <p>Any eligible items and adjustments have been returned to your queue so you can resubmit. Please contact your agency administrator if you have questions.</p>
+        `,
+        text: `Your commission claim has been cancelled by an administrator. Invoice ${payload.invoiceId}. Reason: ${payload.reason}. Eligible items and adjustments have been returned to your queue so you can resubmit.`,
+        templateSlug: 'ic-payout.invoice.cancelled',
+      })
+
+      this.logger.log(
+        `[ic-payouts] Cancellation notification sent for invoice ${payload.invoiceId} to ${recipient}`,
+      )
+    } catch (err) {
+      this.logger.error(
+        `[ic-payouts] Failed to send invoice.cancelled notification for ${payload.invoiceId}: ${err instanceof Error ? err.message : String(err)}`,
       )
     }
   }

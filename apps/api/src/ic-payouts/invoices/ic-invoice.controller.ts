@@ -14,6 +14,7 @@
  *   GET  /ic-payouts/admin/invoices/:id     — detail with audit data + signed PDF URL
  *   POST /ic-payouts/admin/invoices/:id/approve — approve a submitted invoice
  *   POST /ic-payouts/admin/invoices/:id/reject  — reject with reason
+ *   POST /ic-payouts/admin/invoices/:id/cancel  — admin cancel (duplicate / stuck)
  */
 
 import {
@@ -36,8 +37,10 @@ import { StorageService } from '../../trips/storage.service'
 import {
   submitClaimSchema,
   rejectInvoiceSchema,
+  cancelInvoiceSchema,
   type SubmitClaimZodDto,
   type RejectInvoiceDto,
+  type CancelInvoiceDto,
 } from './dto/submit-claim.dto'
 
 @ApiTags('IC Payouts')
@@ -181,6 +184,26 @@ export class IcInvoiceController {
     @Body() body: RejectInvoiceDto,
   ) {
     return this.service.reject(id, body.reason, auth.userId)
+  }
+
+  /**
+   * POST /ic-payouts/admin/invoices/:id/cancel
+   * Admin override for stuck or duplicate invoices. Allowed on
+   * draft/submitted/approved. Blocked when a disbursement is already
+   * in-flight (sending) or sent — those need a clawback / reversal
+   * flow, not a cancel.
+   *
+   * Body: { reason: string }
+   */
+  @Post('admin/invoices/:id/cancel')
+  @AdminOnly()
+  @UsePipes(zodValidation(cancelInvoiceSchema))
+  async cancel(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() body: CancelInvoiceDto,
+  ) {
+    return this.service.cancel(id, body.reason, auth.userId)
   }
 
   // ==========================================================================

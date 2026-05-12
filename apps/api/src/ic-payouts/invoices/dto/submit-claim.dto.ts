@@ -42,3 +42,8 @@ export const rejectInvoiceSchema = z.object({
   reason: z.string().min(1).max(2000),
 })
 export type RejectInvoiceDto = z.infer<typeof rejectInvoiceSchema>
+
+export const cancelInvoiceSchema = z.object({
+  reason: z.string().min(1).max(2000),
+})
+export type CancelInvoiceDto = z.infer<typeof cancelInvoiceSchema>
