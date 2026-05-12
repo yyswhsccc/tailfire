@@ -312,6 +312,129 @@ export class IcInvoiceService {
   }
 
   // ============================================================================
+  // PUBLIC: cancel  (admin override)
+  // ============================================================================
+
+  /**
+   * Admin-only "cancel" of an IC invoice. Distinct from reject in two ways:
+   *
+   *   1. Intent — reject is a value judgement ("the IC's submission was wrong"),
+   *      cancel is neutral ("this invoice should not exist": duplicate, stuck
+   *      state, admin error, IC asked to redo).
+   *   2. Source-state policy — cancel is allowed on draft/submitted/approved,
+   *      but BLOCKS whenever a disbursement has already gone in-flight
+   *      (sending) or sent. Money in motion can't be cancelled from this
+   *      endpoint; that requires a clawback/reversal flow.
+   *
+   * Unwind is the same as reject:
+   *   - delete commission_item_settlements linked to the reservation check
+   *   - flip reconciled adjustments back to pending
+   *   - cancel the reservation paid check
+   *   - cancel any non-terminal disbursement (queued/failed/returned)
+   *
+   * The DB row stores the reason via an audit event, not a dedicated column —
+   * status='cancelled' + the emitted `ic-payout.invoice.cancelled` event are
+   * the audit trail. (Reusing rejected_at/rejected_reason would lie about
+   * what happened; a dedicated migration is overkill for a single field.)
+   */
+  async cancel(
+    invoiceId: string,
+    reason: string,
+    cancellerUserId: string,
+  ): Promise<IcInvoice> {
+    const invoice = await this.db.client.transaction(async (tx) => {
+      // Load the invoice first so we can validate state and check disbursement
+      const [existing] = await tx
+        .select()
+        .from(icInvoices)
+        .where(eq(icInvoices.id, invoiceId))
+        .limit(1)
+
+      if (!existing) {
+        throw new NotFoundException(`Invoice ${invoiceId} not found`)
+      }
+
+      if (existing.status === 'cancelled' || existing.status === 'rejected') {
+        throw new BadRequestException(
+          `Invoice already terminal (status=${existing.status}). Nothing to cancel.`,
+        )
+      }
+
+      // Block cancel when money is already in motion. We allow cancel against
+      // disbursements in queued/failed/returned because those are safe to void
+      // (no money moved or it came back).
+      const blockingDisbursement = await tx.execute(sql`
+        SELECT id, status FROM ic_disbursements
+        WHERE invoice_id = ${invoiceId}::uuid
+          AND status IN ('sending', 'sent')
+        LIMIT 1
+      `)
+
+      if (blockingDisbursement && (blockingDisbursement as any[]).length > 0) {
+        const d = (blockingDisbursement as any[])[0]
+        throw new BadRequestException(
+          `Cannot cancel: disbursement ${d.id} is ${d.status}. Use a reversal/clawback flow for in-flight or sent funds.`,
+        )
+      }
+
+      // Flip invoice → cancelled
+      const [updated] = await tx
+        .update(icInvoices)
+        .set({
+          status: 'cancelled',
+          updatedBy: cancellerUserId,
+          updatedAt: new Date(),
+        })
+        .where(eq(icInvoices.id, invoiceId))
+        .returning()
+
+      if (!updated) {
+        throw new BadRequestException('Failed to cancel invoice')
+      }
+
+      if (updated.reservationCheckId) {
+        // Unwind the reservation, same as reject
+        await tx.execute(sql`
+          DELETE FROM commission_item_settlements
+          WHERE paid_check_id = ${updated.reservationCheckId}
+        `)
+
+        await tx.execute(sql`
+          UPDATE commission_adjustments
+          SET status = 'pending', check_id = NULL, updated_at = now()
+          WHERE check_id = ${updated.reservationCheckId}
+            AND status = 'reconciled'
+        `)
+
+        await tx
+          .update(commissionChecks)
+          .set({ status: 'cancelled', updatedAt: new Date() })
+          .where(eq(commissionChecks.id, updated.reservationCheckId))
+      }
+
+      // Cancel any safe-to-cancel disbursements alongside the invoice.
+      await tx.execute(sql`
+        UPDATE ic_disbursements
+        SET status = 'cancelled', updated_at = now()
+        WHERE invoice_id = ${invoiceId}::uuid
+          AND status IN ('queued', 'failed', 'returned')
+      `)
+
+      return updated
+    })
+
+    this.eventEmitter.emit('ic-payout.invoice.cancelled', {
+      invoiceId: invoice.id,
+      agencyId: invoice.agencyId,
+      userId: invoice.userId,
+      reason,
+      cancelledBy: cancellerUserId,
+    })
+
+    return invoice
+  }
+
+  // ============================================================================
   // PUBLIC: getEligibleForUser
   // ============================================================================
 
