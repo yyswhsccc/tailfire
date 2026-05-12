@@ -246,6 +246,10 @@ export class CommissionService {
       throw new BadRequestException(`Cannot update check in '${check.status}' status`)
     }
 
+    if (dto.senderSupplierId) {
+      await this.assertSupplierBelongsToAgency(agencyId, dto.senderSupplierId)
+    }
+
     // If cancelling a paid check, reverse settlements and adjustments atomically
     const isCancellingPaidCheck =
       dto.status === 'cancelled' && check.checkType === 'paid'
@@ -1124,6 +1128,13 @@ export class CommissionService {
     dto: CreateDepositDto,
     userId?: string
   ): Promise<DepositDetailResponseDto> {
+    // Validate supplier belongs to this agency. Reporting depends on the
+    // FK; a stale or cross-agency UUID would silently break commission
+    // rollups, so we reject it loudly here.
+    if (dto.supplierId) {
+      await this.assertSupplierBelongsToAgency(agencyId, dto.supplierId)
+    }
+
     const [check] = await this.db.client
       .insert(this.db.schema.commissionChecks)
       .values({
@@ -1132,9 +1143,9 @@ export class CommissionService {
         checkType: 'received',
         checkDate: dto.depositDate,
         checkAmountCents: dto.totalAmountCents,
-        currency: 'CAD',
+        currency: dto.currency ?? 'CAD',
         senderSupplierId: dto.supplierId ?? null,
-        senderName: dto.supplierId ? null : 'Supplier Deposit',
+        senderName: dto.senderName?.trim() || (dto.supplierId ? null : 'Supplier Deposit'),
         status: 'submitted',
         source: 'deposit',
         notes: dto.notes,
@@ -1146,6 +1157,29 @@ export class CommissionService {
       .returning()
 
     return this.formatDepositDetail(check)
+  }
+
+  /**
+   * Throws NotFoundException if the supplier id doesn't exist. Suppliers
+   * are a shared catalog (no agency_id column on the suppliers table), so
+   * the check is existence-only. Used by createDeposit / updateCheck to
+   * keep commission_checks.sender_supplier_id honest for reporting.
+   *
+   * (The unused agencyId parameter is kept for API symmetry — if suppliers
+   * ever become agency-scoped, this is the choke point to update.)
+   */
+  private async assertSupplierBelongsToAgency(
+    _agencyId: string,
+    supplierId: string,
+  ): Promise<void> {
+    const [row] = await this.db.client
+      .select({ id: this.db.schema.suppliers.id })
+      .from(this.db.schema.suppliers)
+      .where(eq(this.db.schema.suppliers.id, supplierId))
+      .limit(1)
+    if (!row) {
+      throw new NotFoundException(`Supplier ${supplierId} not found`)
+    }
   }
 
   async finalizeDeposit(

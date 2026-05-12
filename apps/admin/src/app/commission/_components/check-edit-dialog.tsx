@@ -7,6 +7,11 @@
  * enforces that accepted/cancelled checks can't be edited (BadRequest) so
  * we mostly hide the trigger for those rows; the dialog still shows a
  * helpful error if the server rejects.
+ *
+ * Counterparty/currency fields are driven by the shared
+ * CheckCounterpartyFields subcomponent so this dialog and the Receive
+ * Deposit form stay aligned. Received checks pick a supplier (FK);
+ * paid checks (to agents) keep the legacy free-text recipient input.
  */
 
 import { useEffect, useState } from 'react'
@@ -31,6 +36,11 @@ import {
 import { useUpdateCheck, type UpdateCheckPayload } from '@/hooks/use-commission'
 import { useToast } from '@/hooks/use-toast'
 import type { CommissionCheckResponseDto } from '@tailfire/shared-types/api'
+import {
+  CheckCounterpartyFields,
+  SUPPORTED_CURRENCIES,
+  type SupportedCurrency,
+} from './check-counterparty-fields'
 
 interface Props {
   check: CommissionCheckResponseDto | null
@@ -48,6 +58,12 @@ function centsFromDollars(dollars: string): number | null {
   return Math.round(n * 100)
 }
 
+function normalizeCurrency(c: string | null | undefined): SupportedCurrency {
+  const upper = (c || 'CAD').toUpperCase()
+  const known = SUPPORTED_CURRENCIES.find((sc) => sc.code === upper)
+  return (known?.code ?? 'CAD') as SupportedCurrency
+}
+
 export function CheckEditDialog({ check, open, onOpenChange }: Props) {
   const update = useUpdateCheck()
   const { toast } = useToast()
@@ -56,8 +72,16 @@ export function CheckEditDialog({ check, open, onOpenChange }: Props) {
   const [checkNumber, setCheckNumber] = useState('')
   const [checkDate, setCheckDate] = useState('')
   const [amountDollars, setAmountDollars] = useState('')
-  const [currency, setCurrency] = useState('CAD')
-  const [counterparty, setCounterparty] = useState('')
+  const [currency, setCurrency] = useState<SupportedCurrency>('CAD')
+
+  // Received-check counterparty
+  const [senderSupplierId, setSenderSupplierId] = useState<string | null>(null)
+  const [senderName, setSenderName] = useState('')
+
+  // Paid-check counterparty (free-text agent name — agents are users, not
+  // suppliers; no FK picker is appropriate here)
+  const [recipientName, setRecipientName] = useState('')
+
   const [status, setStatus] = useState<'pending' | 'submitted' | 'accepted' | 'cancelled'>('pending')
   const [notes, setNotes] = useState('')
 
@@ -66,8 +90,10 @@ export function CheckEditDialog({ check, open, onOpenChange }: Props) {
     setCheckNumber(check.checkNumber)
     setCheckDate(check.checkDate.slice(0, 10))
     setAmountDollars(dollarsFromCents(check.checkAmountCents))
-    setCurrency(check.currency || 'CAD')
-    setCounterparty(check.checkType === 'received' ? (check.senderName ?? '') : (check.recipientName ?? ''))
+    setCurrency(normalizeCurrency(check.currency))
+    setSenderSupplierId(check.senderSupplierId ?? null)
+    setSenderName(check.senderName ?? '')
+    setRecipientName(check.recipientName ?? '')
     setStatus(check.status as typeof status)
     setNotes(check.notes ?? '')
   }, [check])
@@ -83,16 +109,30 @@ export function CheckEditDialog({ check, open, onOpenChange }: Props) {
       toast({ title: 'Invalid amount', description: 'Enter a positive amount.', variant: 'destructive' })
       return
     }
+    // Supplier is required on received checks — reporting depends on the FK.
+    if (isReceived && !senderSupplierId) {
+      toast({
+        title: 'Supplier required',
+        description: 'Pick the supplier this check came from — reporting depends on it.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     const payload: UpdateCheckPayload = {
       checkNumber: checkNumber.trim() || undefined,
       checkDate: checkDate || undefined,
       checkAmountCents: cents,
-      currency: currency || undefined,
+      currency,
       notes: notes.trim() || undefined,
       status,
     }
-    if (isReceived) payload.senderName = counterparty.trim() || undefined
-    else payload.recipientName = counterparty.trim() || undefined
+    if (isReceived) {
+      payload.senderSupplierId = senderSupplierId ?? undefined
+      payload.senderName = senderName.trim() || undefined
+    } else {
+      payload.recipientName = recipientName.trim() || undefined
+    }
 
     try {
       await update.mutateAsync({ id: check.id, data: payload })
@@ -133,38 +173,56 @@ export function CheckEditDialog({ check, open, onOpenChange }: Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="check-amount">Amount</Label>
-              <Input
-                id="check-amount"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={amountDollars}
-                onChange={(e) => setAmountDollars(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="check-currency">Currency</Label>
-              <Input
-                id="check-currency"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                maxLength={3}
-              />
-            </div>
-          </div>
-
           <div>
-            <Label htmlFor="check-counterparty">{isReceived ? 'Sender (Supplier)' : 'Recipient (Agent)'}</Label>
+            <Label htmlFor="check-amount">Amount</Label>
             <Input
-              id="check-counterparty"
-              value={counterparty}
-              onChange={(e) => setCounterparty(e.target.value)}
+              id="check-amount"
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              value={amountDollars}
+              onChange={(e) => setAmountDollars(e.target.value)}
             />
           </div>
+
+          {isReceived ? (
+            <CheckCounterpartyFields
+              supplierId={senderSupplierId}
+              onSupplierIdChange={setSenderSupplierId}
+              senderName={senderName}
+              onSenderNameChange={setSenderName}
+              currency={currency}
+              onCurrencyChange={setCurrency}
+              required
+            />
+          ) : (
+            <>
+              <div>
+                <Label htmlFor="check-recipient">Recipient (Agent)</Label>
+                <Input
+                  id="check-recipient"
+                  value={recipientName}
+                  onChange={(e) => setRecipientName(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="check-currency-paid">Currency</Label>
+                <Select value={currency} onValueChange={(v) => setCurrency(v as SupportedCurrency)}>
+                  <SelectTrigger id="check-currency-paid">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_CURRENCIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
 
           <div>
             <Label htmlFor="check-status">Status</Label>
