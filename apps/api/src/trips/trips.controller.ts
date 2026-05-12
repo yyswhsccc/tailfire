@@ -24,6 +24,7 @@ import {
   ParseUUIDPipe,
   Res,
 } from '@nestjs/common'
+import type { Response } from 'express'
 import { eq } from 'drizzle-orm'
 import { AdminOnly } from '../auth/decorators/admin-only.decorator'
 import { FileInterceptor } from '@nestjs/platform-express'
@@ -37,6 +38,7 @@ import { TripGroupAccessService } from './trip-group-access.service'
 import { StorageService } from './storage.service'
 import { GroupBillingService } from './group-billing.service'
 import { TripOrderService } from '../financials/trip-order.service'
+import { TripProposalPdfService } from './trip-proposal-pdf.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
 import { ActivitiesService } from './activities.service'
@@ -84,6 +86,7 @@ export class TripsController {
     private readonly tripLifecycleService: TripLifecycleService,
     private readonly groupBillingService: GroupBillingService,
     private readonly tripOrderService: TripOrderService,
+    private readonly tripProposalPdfService: TripProposalPdfService,
   ) {}
 
   /**
@@ -830,6 +833,55 @@ export class TripsController {
   ) {
     await this.tripAccessService.verifyWriteAccess(id, auth)
     return this.tripsService.previewProposal(id)
+  }
+
+  /**
+   * Preview proposal data using a short-lived signed PDF token.
+   * GET /trips/:id/preview-proposal/with-pdf-token?token=<token>
+   *
+   * Public route — auth is enforced by HMAC token validation tied to the trip.
+   * Used by Puppeteer-rendered preview page during PDF generation.
+   */
+  @Public()
+  @Get(':id/preview-proposal/with-pdf-token')
+  async previewProposalWithPdfToken(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('token') token: string,
+  ) {
+    if (!token) {
+      throw new BadRequestException('Missing pdf token')
+    }
+    this.tripProposalPdfService.verifyToken(token, id)
+    return this.tripsService.previewProposal(id)
+  }
+
+  /**
+   * Render proposal preview to PDF.
+   * GET /trips/:id/preview-proposal/pdf
+   *
+   * Access check: User must have write access.
+   */
+  @Get(':id/preview-proposal/pdf')
+  async previewProposalPdf(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.tripAccessService.verifyWriteAccess(id, auth)
+    const trip = await this.tripsService.findOne(id)
+    const pdfBuffer = await this.tripProposalPdfService.renderProposalPdf(id, auth.agencyId)
+
+    const slug = trip?.name
+      ? trip.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 60)
+      : id.slice(0, 8)
+    const filename = `${slug || id.slice(0, 8)}-proposal.pdf`
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': pdfBuffer.length,
+    })
+    res.send(pdfBuffer)
   }
 
   @Patch(':id/publish')

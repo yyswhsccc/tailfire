@@ -46,6 +46,57 @@ export class PuppeteerPdfService implements OnModuleDestroy {
     }
   }
 
+  /**
+   * Render a live URL to a PDF buffer.
+   *
+   * Navigates a fresh page to the given URL, runs `setup` (e.g. wait for a
+   * data-pdf-ready marker) and then prints the page.
+   */
+  async renderUrlToPdf(
+    url: string,
+    options: {
+      setup?: (page: puppeteer.Page) => Promise<void>
+      pdfOptions?: puppeteer.PDFOptions
+      viewport?: { width: number; height: number; deviceScaleFactor?: number }
+      navigationTimeoutMs?: number
+    } = {},
+  ): Promise<Buffer> {
+    const browser = await this.getBrowser()
+    const page = await browser.newPage()
+
+    try {
+      if (options.viewport) {
+        await page.setViewport(options.viewport)
+      }
+
+      await page.goto(url, {
+        waitUntil: 'networkidle0',
+        timeout: options.navigationTimeoutMs ?? 30000,
+      })
+
+      if (options.setup) {
+        await options.setup(page)
+      }
+
+      const pdfBuffer = await page.pdf(
+        options.pdfOptions ?? {
+          format: 'letter',
+          printBackground: true,
+          margin: {
+            top: '0.5in',
+            right: '0.5in',
+            bottom: '0.5in',
+            left: '0.5in',
+          },
+        },
+      )
+
+      return Buffer.from(pdfBuffer)
+    } finally {
+      await page.close().catch(() => undefined)
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------

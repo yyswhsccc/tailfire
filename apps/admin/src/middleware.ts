@@ -21,8 +21,12 @@ const pendingAllowedRoutes = ['/auth/set-password', '/auth/callback']
 // Routes exempt from MFA checks (user must access these to complete MFA)
 const mfaExemptRoutes = ['/auth/mfa-verify', '/auth/mfa-enroll', '/auth/callback', '/auth/login']
 
+// Proposal preview accepts a short-lived pdfToken (HMAC, validated by the API)
+// so Puppeteer can render the live preview during PDF generation.
+const PDF_PREVIEW_PATH = /^\/trips\/[^/]+\/preview\/?$/
+
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { pathname, searchParams } = request.nextUrl
 
   // Skip middleware for static files, API routes, and Sentry tunnel
   if (
@@ -31,6 +35,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/monitoring') ||
     pathname.includes('.')
   ) {
+    return NextResponse.next()
+  }
+
+  // Allow Puppeteer-rendered PDF preview through without a session.
+  if (PDF_PREVIEW_PATH.test(pathname) && searchParams.get('pdfToken')) {
     return NextResponse.next()
   }
 
