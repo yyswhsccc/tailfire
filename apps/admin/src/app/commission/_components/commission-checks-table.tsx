@@ -6,8 +6,11 @@ import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
 import type { CommissionCheckResponseDto } from '@tailfire/shared-types/api'
 
-function formatCurrency(cents: number): string {
-  return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(cents / 100)
+// Format using the row's currency so USD checks don't render as CAD.
+// Fall back to CAD only when the row truly has no currency (legacy rows).
+function formatCurrency(cents: number, currency: string | null | undefined): string {
+  const code = (currency || 'CAD').toUpperCase()
+  return new Intl.NumberFormat('en-CA', { style: 'currency', currency: code }).format(cents / 100)
 }
 
 function getStatusColor(status: string) {
@@ -54,7 +57,7 @@ export function CommissionChecksTable({ data, isAdmin, onAccept, onReject }: Com
             </TableCell>
             <TableCell>{check.checkType === 'received' ? check.senderName : check.recipientName}</TableCell>
             <TableCell>{formatDate(check.checkDate)}</TableCell>
-            <TableCell className="text-right font-medium">{formatCurrency(check.checkAmountCents)}</TableCell>
+            <TableCell className="text-right font-medium">{formatCurrency(check.checkAmountCents, check.currency)}</TableCell>
             <TableCell>
               <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(check.status)}`}>
                 {check.status.charAt(0).toUpperCase() + check.status.slice(1)}
