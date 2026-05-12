@@ -136,6 +136,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = async () => {
+    // End any active impersonation session BEFORE signing out so the row in
+    // impersonation_sessions doesn't dangle. ImpersonationGuard rejects all
+    // requests on next admin login if an unended session row still matches.
+    if (typeof window !== 'undefined' && localStorage.getItem('impersonate-user-id')) {
+      try {
+        const { api } = await import('@/lib/api')
+        await api.delete('/admin/impersonate')
+      } catch {
+        // Best-effort: continue with sign-out even if the call fails so the
+        // user isn't stuck. The reconcile cron will eventually clean up stale
+        // sessions.
+      } finally {
+        localStorage.removeItem('impersonate-user-id')
+      }
+    }
     await supabase.auth.signOut()
   }
 
