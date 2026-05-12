@@ -29,15 +29,26 @@ function formatCents(cents: number, currency: string): string {
 interface Props {
   /** Optional custom trigger element; defaults to a "Claim Commission" Button */
   trigger?: React.ReactNode
+  /**
+   * Admin-only: when set, the dialog operates in "generate claim on behalf
+   * of agent" mode. Eligible items, tax profile, and submission all hit the
+   * admin endpoints scoped to this userId. The resulting invoice still
+   * belongs to the IC; the admin is recorded as the actor in the audit log.
+   */
+  onBehalfOfUserId?: string
+  /** Display name of the agent in admin mode (shown in the dialog title). */
+  onBehalfOfName?: string
 }
 
-export function ClaimBuilder({ trigger }: Props) {
+export function ClaimBuilder({ trigger, onBehalfOfUserId, onBehalfOfName }: Props) {
   const [open, setOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  const { data: eligible, isLoading } = useEligibleForClaim()
-  const { data: profile } = useMyTaxProfile()
-  const submit = useSubmitClaim()
+  const isAdminMode = !!onBehalfOfUserId
+
+  const { data: eligible, isLoading } = useEligibleForClaim(onBehalfOfUserId)
+  const { data: profile } = useMyTaxProfile(onBehalfOfUserId)
+  const submit = useSubmitClaim(onBehalfOfUserId)
   const { toast } = useToast()
 
   const taxApplies = profile?.gstHstRegistered === true
@@ -94,8 +105,10 @@ export function ClaimBuilder({ trigger }: Props) {
     try {
       const result = await submit.mutateAsync(Array.from(selectedIds))
       toast({
-        title: 'Claim submitted',
-        description: `${result.invoices?.length ?? 0} invoice(s) created and sent for review.`,
+        title: isAdminMode ? 'Claim generated' : 'Claim submitted',
+        description: isAdminMode
+          ? `${result.invoices?.length ?? 0} invoice(s) submitted on behalf of ${onBehalfOfName ?? 'the agent'} and queued for admin approval.`
+          : `${result.invoices?.length ?? 0} invoice(s) created and sent for review.`,
       })
       setOpen(false)
       setSelectedIds(new Set())
@@ -117,36 +130,53 @@ export function ClaimBuilder({ trigger }: Props) {
         {trigger ?? (
           <Button>
             <DollarSign className="mr-2 h-4 w-4" />
-            Claim Commission
+            {isAdminMode ? 'Generate claim' : 'Claim Commission'}
           </Button>
         )}
       </DialogTrigger>
 
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Claim eligible commissions</DialogTitle>
+          <DialogTitle>
+            {isAdminMode
+              ? `Generate claim on behalf of ${onBehalfOfName ?? 'agent'}`
+              : 'Claim eligible commissions'}
+          </DialogTitle>
         </DialogHeader>
+
+        {isAdminMode && (
+          <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded p-3">
+            You are submitting this claim on behalf of <strong>{onBehalfOfName ?? 'this IC'}</strong>.
+            The resulting invoice will belong to them. An admin (not you) must still approve it from the Agent Claims tab.
+          </p>
+        )}
 
         {/* Payout profile required banner */}
         {!isLoading && !profile && (
           <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
-            You need to complete your{' '}
-            <Link href="/portal/payouts/onboarding" className="underline font-medium">
-              payout profile
-            </Link>{' '}
-            before submitting a claim.
+            {isAdminMode ? (
+              <>This agent has not completed their payout profile yet. They must finish IC onboarding before a claim can be submitted on their behalf.</>
+            ) : (
+              <>
+                You need to complete your{' '}
+                <Link href="/portal/payouts/onboarding" className="underline font-medium">
+                  payout profile
+                </Link>{' '}
+                before submitting a claim.
+              </>
+            )}
           </p>
         )}
 
         {/* Tax registration status */}
         {profile && !taxApplies && (
           <p className="text-xs text-muted-foreground">
-            You are not GST/HST registered — no tax will be applied to your invoice.
+            {isAdminMode ? 'This IC is' : 'You are'} not GST/HST registered — no tax will be applied to the invoice.
           </p>
         )}
         {profile && taxApplies && (
           <p className="text-xs text-muted-foreground">
-            {AGENCY_TAX_TYPE} ({(AGENCY_TAX_RATE_BP / 100).toFixed(0)}%) will be added to your invoice. The server is authoritative at submission time.
+            {AGENCY_TAX_TYPE} ({(AGENCY_TAX_RATE_BP / 100).toFixed(0)}%) will be added to the invoice. The server is authoritative at submission time.
           </p>
         )}
 

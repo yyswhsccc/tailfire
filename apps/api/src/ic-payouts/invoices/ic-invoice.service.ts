@@ -167,6 +167,10 @@ export class IcInvoiceService {
         currency,
         totalCents: invoice.totalCents,
         autoApproved,
+        // When an admin generates the claim on behalf of the IC, the invoice
+        // still belongs to the IC (user_id), but downstream audit consumers
+        // need to know the actual actor.
+        submittedByAdminUserId: input.submittedByAdminUserId ?? null,
       })
     }
 

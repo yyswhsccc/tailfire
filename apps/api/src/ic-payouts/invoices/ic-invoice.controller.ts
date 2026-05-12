@@ -184,6 +184,53 @@ export class IcInvoiceController {
   }
 
   // ==========================================================================
+  // Admin "on-behalf-of" claim generation
+  //
+  // Lets an admin start a claim for a specific IC. The resulting invoice
+  // still belongs to the IC (user_id = target). The admin's id is recorded
+  // via SubmitClaimInput.submittedByAdminUserId so the audit event
+  // attributes the actor while approval still requires a separate admin
+  // step (an admin can't self-approve a claim they generated).
+  // ==========================================================================
+
+  /**
+   * GET /ic-payouts/admin/users/:userId/eligible
+   * Admin-side mirror of /ic-payouts/me/eligible. Returns the target IC's
+   * eligible items and pending adjustments grouped by currency so the
+   * admin can pick which items to include when generating a claim.
+   */
+  @Get('admin/users/:userId/eligible')
+  @AdminOnly()
+  async getEligibleForAgent(
+    @GetAuthContext() auth: AuthContext,
+    @Param('userId') userId: string,
+  ) {
+    return this.service.getEligibleForUser(auth.agencyId, userId)
+  }
+
+  /**
+   * POST /ic-payouts/admin/users/:userId/claims
+   * Submit a claim on behalf of an IC. Identical semantics to
+   * /ic-payouts/me/claims except the target user is the URL param and the
+   * audit event records the admin actor.
+   */
+  @Post('admin/users/:userId/claims')
+  @AdminOnly()
+  @UsePipes(zodValidation(submitClaimSchema))
+  async submitClaimForAgent(
+    @GetAuthContext() auth: AuthContext,
+    @Param('userId') userId: string,
+    @Body() body: SubmitClaimZodDto,
+  ) {
+    return this.service.submitClaim({
+      agencyId: auth.agencyId,
+      userId,
+      submittedByAdminUserId: auth.userId,
+      selectedCheckItemIds: body.selectedCheckItemIds,
+    })
+  }
+
+  // ==========================================================================
   // Private helpers
   // ==========================================================================
 

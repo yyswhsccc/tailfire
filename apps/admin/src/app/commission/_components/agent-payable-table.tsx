@@ -3,6 +3,8 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import type { AgentCommissionDueDto } from '@tailfire/shared-types/api'
+import { ClaimBuilder } from './claim-builder'
+import { IC_PAYOUTS_V2_ENABLED } from './agent-claims-tab'
 
 function formatCurrency(cents: number, currency: string): string {
   return new Intl.NumberFormat('en-CA', { style: 'currency', currency }).format(cents / 100)
@@ -41,11 +43,30 @@ export function AgentPayableTable({ data, onRecordPayout }: AgentPayableTablePro
             <TableCell className="text-right">{formatCurrency(agent.adjustmentsCents, agent.currency)}</TableCell>
             <TableCell className="text-right font-semibold">{formatCurrency(agent.totalDueCents, agent.currency)}</TableCell>
             <TableCell>
-              {onRecordPayout && (
-                <Button size="sm" variant="outline" onClick={() => onRecordPayout(agent.userId)}>
-                  Record Payout
-                </Button>
-              )}
+              <div className="flex items-center justify-end gap-2">
+                {/*
+                  V2: admins can submit a claim AS the agent. The resulting
+                  invoice still belongs to the IC; an admin still has to
+                  approve it from the Agent Claims tab. This reuses
+                  ClaimBuilder by passing onBehalfOfUserId.
+                */}
+                {IC_PAYOUTS_V2_ENABLED && (
+                  <ClaimBuilder
+                    onBehalfOfUserId={agent.userId}
+                    onBehalfOfName={agent.userName}
+                    trigger={
+                      <Button size="sm" variant="outline">
+                        Generate claim
+                      </Button>
+                    }
+                  />
+                )}
+                {onRecordPayout && (
+                  <Button size="sm" variant="outline" onClick={() => onRecordPayout(agent.userId)}>
+                    Record Payout
+                  </Button>
+                )}
+              </div>
             </TableCell>
           </TableRow>
         ))}
