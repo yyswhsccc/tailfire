@@ -71,7 +71,11 @@ export function DocumentUploadModal({ isOpen, onClose }: DocumentUploadModalProp
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-phoenix-charcoal">Upload Document</h3>
-            <button onClick={handleClose} className="rounded-lg p-1 text-gray-400 hover:text-gray-600">
+            <button
+              onClick={handleClose}
+              aria-label="Close upload dialog"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-gray-400 hover:text-gray-600"
+            >
               <X className="size-5" />
             </button>
           </div>
@@ -109,7 +113,8 @@ export function DocumentUploadModal({ isOpen, onClose }: DocumentUploadModalProp
                   </div>
                   <button
                     onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
-                    className="text-gray-400 hover:text-gray-600"
+                    aria-label="Remove selected file"
+                    className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-gray-400 hover:text-gray-600"
                   >
                     <X className="size-4" />
                   </button>

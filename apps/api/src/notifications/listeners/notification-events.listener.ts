@@ -827,15 +827,22 @@ export class NotificationEventsListener {
   // =========================================================================
 
   /**
-   * Get trip by ID with owner and agency info
+   * Get trip by ID with owner and agency info.
+   * Returns null when tripId is undefined/empty so events without a trip
+   * association (Drizzle rejects undefined params) don't crash. Sentry: API-5K.
    */
-  private async getTrip(tripId: string): Promise<{
+  private async getTrip(tripId: string | undefined | null): Promise<{
     id: string
     name: string
     ownerId: string | null
     agencyId: string
     status: string
   } | null> {
+    if (!tripId) {
+      this.logger.warn('getTrip called without tripId — skipping')
+      return null
+    }
+
     const [trip] = await this.db.client
       .select({
         id: this.db.schema.trips.id,

@@ -155,9 +155,12 @@ export class PlatformNotificationService {
         .limit(1)
 
       if (cursorNotification[0]) {
-        const cursorCreatedAt = cursorNotification[0].createdAt instanceof Date
-          ? cursorNotification[0].createdAt.toISOString()
-          : cursorNotification[0].createdAt
+        // Always normalize through Date → ISO string. The previous `instanceof Date`
+        // branch left raw driver values un-stringified, which the postgres binary
+        // protocol then tried to byteLength() and threw TypeError on. Sentry: API-50.
+        const cursorCreatedAt = new Date(
+          cursorNotification[0].createdAt as Date | string,
+        ).toISOString()
         conditions.push(
           sql`(${this.db.schema.platformNotifications.createdAt}, ${this.db.schema.platformNotifications.id}) < (${cursorCreatedAt}, ${options.cursor})`
         )

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { serviceFetch } from "@/lib/api";
 import { SearchPageShell } from "@/components/search/search-page-shell";
+import { TrackSearchEvent } from "@/components/search/track-search-event";
 import { FlightSearchClient } from "@/components/flights/flight-search-client";
 import type { FlightOffer } from "@/components/flights/flight-search-store";
 
@@ -100,6 +101,13 @@ export default async function FlightsPage({ searchParams }: FlightsPageProps) {
 
   return (
     <SearchPageShell productType="flights">
+      {hasFilters && (
+        <TrackSearchEvent
+          entityType="flights"
+          query={params as Record<string, unknown>}
+          resultCount={initialResults.length}
+        />
+      )}
       <FlightSearchClient
         initialResults={initialResults}
         searchError={searchError}

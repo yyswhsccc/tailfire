@@ -11,6 +11,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { OnEvent } from '@nestjs/event-emitter'
 import { eq, sql } from 'drizzle-orm'
+import type { ContactStatus } from '@tailfire/shared-types'
 import { DatabaseService } from '../db/database.service'
 import { TripActiveEvent } from '../trips/events/trip-active.event'
 import { TripTravellingEvent } from '../trips/events/trip-travelling.event'
@@ -21,8 +22,6 @@ import { TravelerCreatedEvent } from '../activity-logs/events/traveler-created.e
 import { TravelerUpdatedEvent } from '../activity-logs/events/traveler-updated.event'
 import { TravelerDeletedEvent } from '../activity-logs/events/traveler-deleted.event'
 import { EventEmitter2 } from '@nestjs/event-emitter'
-
-type ContactStatus = 'prospecting' | 'quoted' | 'booked' | 'traveling' | 'returned' | 'awaiting_next' | 'inactive'
 
 interface TripSummary {
   status: string
