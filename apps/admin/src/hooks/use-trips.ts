@@ -643,10 +643,16 @@ export function useDeleteGroupMedia() {
  * Fetch trip proposal data for the admin preview page.
  * Uses the same DTO shape as the client-facing proposal view.
  */
-export function usePreviewProposal(tripId: string | undefined) {
+export function usePreviewProposal(tripId: string | undefined, pdfToken?: string) {
   return useQuery({
-    queryKey: [...tripKeys.detail(tripId!), 'preview-proposal'],
-    queryFn: () => api.get<SharedTripProposalDto>(`/trips/${tripId}/preview-proposal`),
+    queryKey: [...tripKeys.detail(tripId!), 'preview-proposal', pdfToken ? 'pdf' : 'live'],
+    queryFn: () => {
+      const path = pdfToken
+        ? `/trips/${tripId}/preview-proposal/with-pdf-token?token=${encodeURIComponent(pdfToken)}`
+        : `/trips/${tripId}/preview-proposal`
+      return api.get<SharedTripProposalDto>(path)
+    },
     enabled: !!tripId,
+    staleTime: pdfToken ? 0 : undefined,
   })
 }

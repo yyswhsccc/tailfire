@@ -24,6 +24,7 @@ import { EmailModule } from '../email/email.module'
 import { TemplatesModule } from '../templates/templates.module'
 import { TasksModule } from '../tasks/tasks.module'
 import { FormsModule } from '../forms/forms.module'
+import { DocumentRenderModule } from '../document-render/document-render.module'
 
 // Services
 import { TripsService } from './trips.service'
@@ -55,6 +56,7 @@ import { ActivityTravelersService } from './activity-travelers.service'
 import { ActivityBookingsService } from './activity-bookings.service'
 import { BookingValidationService } from './booking-validation.service'
 import { TripLifecycleService } from './trip-lifecycle.service'
+import { TripProposalPdfService } from './trip-proposal-pdf.service'
 import { TravelerBookingsService } from './traveler-bookings.service'
 import { InsuranceService } from './insurance.service'
 import { InsuranceAutomationService } from './insurance-automation.service'
@@ -108,6 +110,7 @@ import { TripAutomationsController } from './trip-automations.controller'
     forwardRef(() => TemplatesModule), // For ItineraryCloneService (duplication)
     forwardRef(() => TasksModule), // For ActivityBookingsService insurance task creation
     FormsModule, // For InsuranceAutomationService (form token generation)
+    DocumentRenderModule, // For proposal PDF rendering via Puppeteer
   ],
   controllers: [
     TripsController,
@@ -177,6 +180,7 @@ import { TripAutomationsController } from './trip-automations.controller'
     ActivityDocumentsService,
     ActivityMediaService,
     TripMediaService,
+    TripProposalPdfService,
   ],
   exports: [
     TripsService,
