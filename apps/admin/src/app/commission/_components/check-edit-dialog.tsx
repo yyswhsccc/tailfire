@@ -170,13 +170,21 @@ export function CheckEditDialog({ check, open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle>Edit commission check</DialogTitle>
           <DialogDescription>
-            {check.status === 'accepted'
-              ? 'This check is Accepted. Click Recall to flip it back to Submitted, then edit the fields.'
-              : check.status === 'cancelled'
-                ? 'This check is Cancelled (void) — it can’t be edited.'
-                : 'Update the editable fields. To void this check, change status to Cancelled.'}
+            {statusDescription(check.status, isReceived)}
           </DialogDescription>
         </DialogHeader>
+
+        {/*
+          Quick reference for the four statuses. Hidden under <details> so
+          the dialog stays compact; clicked-open when an admin is unsure
+          what each state means.
+        */}
+        <details className="text-xs text-muted-foreground bg-muted/40 rounded-md px-3 py-2">
+          <summary className="cursor-pointer select-none">
+            What do these statuses mean?
+          </summary>
+          {isReceived ? <ReceivedStatusGuide /> : <PaidStatusGuide />}
+        </details>
 
         <div className="grid gap-4 py-2">
           <div className="grid grid-cols-2 gap-3">
@@ -297,5 +305,91 @@ export function CheckEditDialog({ check, open, onOpenChange }: Props) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ── Status copy ────────────────────────────────────────────────────────────
+//
+// Received checks describe the supplier↔agency leg. Paid checks (legacy V1)
+// described agency↔agent payouts; new payouts now flow through ic_invoices
+// and ic_disbursements, so paid-check copy is kept short and unambiguous.
+
+type CheckStatus = 'pending' | 'submitted' | 'accepted' | 'cancelled'
+
+function statusDescription(status: CheckStatus, isReceived: boolean): string {
+  if (isReceived) {
+    switch (status) {
+      case 'pending':
+        return 'Deposit recorded. Match line items to bookings, then transition to Submitted.'
+      case 'submitted':
+        return 'Reconciling line items against bookings. Agents see their share in Commission Due. Accept once the deposit is confirmed correct.'
+      case 'accepted':
+        return 'Deposit closed at the supplier↔agency level. Agents still need to claim their share via IC Payouts before they actually get paid. Click Recall to unlock for edits.'
+      case 'cancelled':
+        return 'Deposit voided. Settlements reversed and adjustments reopened for the next correct deposit. Read-only.'
+    }
+  }
+  switch (status) {
+    case 'pending':
+      return 'Legacy payout draft (V1). New payouts flow through IC Payouts instead.'
+    case 'submitted':
+      return 'Legacy payout in queue (V1).'
+    case 'accepted':
+      return 'Legacy payout acknowledged by the agent. Click Recall to unlock for edits.'
+    case 'cancelled':
+      return 'Payout voided. Items returned to the agent’s claimable pool. Read-only.'
+  }
+}
+
+function ReceivedStatusGuide() {
+  return (
+    <dl className="mt-2 space-y-1.5 leading-snug">
+      <div>
+        <dt className="font-semibold text-foreground inline">Pending — </dt>
+        <dd className="inline">deposit recorded; not yet being reconciled.</dd>
+      </div>
+      <div>
+        <dt className="font-semibold text-foreground inline">Submitted — </dt>
+        <dd className="inline">
+          line items matched to bookings; appears in each affected agent&apos;s Commission Due.
+          One deposit can span many agents.
+        </dd>
+      </div>
+      <div>
+        <dt className="font-semibold text-foreground inline">Accepted — </dt>
+        <dd className="inline">
+          supplier↔agency leg is closed. <strong>Agents are not paid by this status</strong> —
+          they still need to claim their share via IC Payouts (invoice → disbursement) for
+          money to actually move.
+        </dd>
+      </div>
+      <div>
+        <dt className="font-semibold text-foreground inline">Cancelled — </dt>
+        <dd className="inline">deposit voided; settlements deleted; reconciled adjustments reopened. Terminal.</dd>
+      </div>
+    </dl>
+  )
+}
+
+function PaidStatusGuide() {
+  return (
+    <dl className="mt-2 space-y-1.5 leading-snug">
+      <p className="mb-1.5">
+        Paid checks are the legacy V1 agency→agent ledger. New agent payouts run through
+        <strong> IC Payouts</strong> instead (ic_invoices + ic_disbursements with their own statuses).
+      </p>
+      <div>
+        <dt className="font-semibold text-foreground inline">Pending / Submitted — </dt>
+        <dd className="inline">drafted / in queue.</dd>
+      </div>
+      <div>
+        <dt className="font-semibold text-foreground inline">Accepted — </dt>
+        <dd className="inline">acknowledged received by the agent.</dd>
+      </div>
+      <div>
+        <dt className="font-semibold text-foreground inline">Cancelled — </dt>
+        <dd className="inline">voided; settlements reversed; items returned to the agent&apos;s claim pool. Terminal.</dd>
+      </div>
+    </dl>
   )
 }
