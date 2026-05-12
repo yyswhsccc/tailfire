@@ -8,6 +8,7 @@ import { Search, HelpCircle, Settings, Bug, BookOpen, Keyboard } from 'lucide-re
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
 import { useAuth } from '@/providers/auth-provider'
+import { useUser } from '@/hooks/use-user'
 import { UserAvatar } from '@/components/user/user-avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -40,9 +41,11 @@ export function TopNav() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout: clearStore } = useAuthStore()
-  const { signOut, claims } = useAuth()
+  const { signOut } = useAuth()
   const { data: profile } = useMyProfile()
-  const isAdmin = claims?.role === 'admin'
+  // Effective isAdmin — reflects the impersonated user when impersonating
+  // so admin-only nav entries hide as expected during agent QA.
+  const { isAdmin } = useUser()
   const unreadEmailCount = useUnreadEmailCount()
   const [searchOpen, setSearchOpen] = useState(false)
   const [bugReportOpen, setBugReportOpen] = useState(false)

@@ -24,7 +24,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { useTags, useCreateTag, useUpdateTag, useDeleteTag } from '@/hooks/use-tags'
 import { useDebouncedCallback } from '@/hooks/use-debounce'
-import { useAuth } from '@/providers/auth-provider'
+import { useUser } from '@/hooks/use-user'
 import { confirmDialog } from '@/components/ui/confirmation-dialog'
 import { useToast } from '@/hooks/use-toast'
 import type { TagWithUsageDto } from '@tailfire/shared-types/api'
@@ -36,8 +36,8 @@ import type { TagWithUsageDto } from '@tailfire/shared-types/api'
  * Admins can CRUD system tags. All users can CRUD their own agent tags.
  */
 export default function TagsLibraryPage() {
-  const { claims } = useAuth()
-  const isAdmin = claims?.role === 'admin'
+  // Effective isAdmin so impersonated agents see the agent-tag-only view.
+  const { isAdmin } = useUser()
   const { toast } = useToast()
 
   const [activeTab, setActiveTab] = useState<'system' | 'agent'>('system')
