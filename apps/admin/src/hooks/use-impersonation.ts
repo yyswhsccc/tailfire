@@ -55,9 +55,10 @@ export function useImpersonation() {
       if (typeof window !== 'undefined') {
         localStorage.setItem('impersonate-user-id', userId)
       }
-      // Non-admin users (role='user') have no access to /dashboard and admin tabs;
-      // route them to /portal where IC self-serve lives. Admins keep /dashboard.
-      const destination = role === 'admin' ? '/dashboard' : '/portal'
+      // Non-admin users (role='user') have no access to /dashboard's admin-only
+      // widgets; route them to /trips which is the day-to-day agent view.
+      // From there they can navigate to /portal/payouts/onboarding etc.
+      const destination = role === 'admin' ? '/dashboard' : '/trips'
       window.location.href = destination
     } finally {
       setLoading(false)
