@@ -10,6 +10,22 @@ import type {
   SyncResultDto,
 } from '@tailfire/shared-types'
 
+/**
+ * Recognises low-level socket / connection drops that are safe to retry on
+ * idempotent reads. Covers both Supabase pooler hiccups and IMAP server
+ * forced disconnects. Auth failures are deliberately NOT included — those
+ * are permanent and handled separately.
+ */
+function isTransientNetworkError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const code = (err as { code?: string }).code
+  if (code && ['ECONNRESET', 'ETIMEDOUT', 'EPIPE', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH'].includes(code)) {
+    return true
+  }
+  const msg = (err as { message?: string }).message || ''
+  return /ECONNRESET|socket hang up|read ETIMEDOUT|Connection terminated/i.test(msg)
+}
+
 @Injectable()
 export class ImapSyncService {
   private readonly logger = new Logger(ImapSyncService.name)
@@ -244,18 +260,61 @@ export class ImapSyncService {
    * List IMAP folders for an account
    */
   async listFolders(accountId: string): Promise<EmailFolderDto[]> {
+    // One-shot retry on transient socket-level failures (ECONNRESET,
+    // ETIMEDOUT, EPIPE) from either the Supabase pooler or the IMAP server.
+    // The op is idempotent (pure reads) so retry is safe. Account/auth
+    // failures are NOT retried — they're handled in the catch as before.
+    const MAX_ATTEMPTS = 2
+    let lastError: any
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        return await this.doListFolders(accountId)
+      } catch (error: any) {
+        lastError = error
+        if (!isTransientNetworkError(error) || attempt === MAX_ATTEMPTS) {
+          break
+        }
+        const backoffMs = 250 * attempt
+        this.logger.warn(
+          `List folders attempt ${attempt}/${MAX_ATTEMPTS} for account ${accountId} hit transient error ${error.code || error.message}; retrying in ${backoffMs}ms`,
+        )
+        await new Promise((r) => setTimeout(r, backoffMs))
+      }
+    }
+
+    // Final failure — degrade gracefully (empty list) and log. The IMAP
+    // auth handler still runs so credential-revocation flow is intact.
+    const detail = lastError?.responseText || lastError?.responseStatus || lastError?.message
+    this.logger.error(
+      `List folders failed for account ${accountId} after ${MAX_ATTEMPTS} attempt(s): ${detail}`,
+      lastError?.stack,
+    )
+    try {
+      const account = await this.emailAccountsService.getAccountById(accountId)
+      await this.handleImapAuthFailure(lastError, accountId, (account?.syncState as Record<string, unknown>) ?? {})
+    } catch {
+      // If even the account fetch fails (e.g. DB still down), don't compound
+      // the error — the original cause is already logged above.
+    }
+    return []
+  }
+
+  /**
+   * Inner helper for listFolders — performs one attempt without retry.
+   */
+  private async doListFolders(accountId: string): Promise<EmailFolderDto[]> {
     const account = await this.emailAccountsService.getAccountById(accountId)
     const credentials = await this.emailAccountsService.getDecryptedCredentials(accountId)
 
-    try {
-      const client = await this.createImapClient({
-        host: account.imapHost,
-        port: account.imapPort,
-        secure: account.imapTls,
-        user: credentials.username,
-        pass: credentials.password,
-      })
+    const client = await this.createImapClient({
+      host: account.imapHost,
+      port: account.imapPort,
+      secure: account.imapTls,
+      user: credentials.username,
+      pass: credentials.password,
+    })
 
+    try {
       await client.connect()
       const mailboxes = await client.list()
       await client.logout()
@@ -284,11 +343,11 @@ export class ImapSyncService {
         totalMessages: countsByFolder.get(mb.path)?.total ?? 0,
         unseenMessages: countsByFolder.get(mb.path)?.unseen ?? 0,
       }))
-    } catch (error: any) {
-      const detail = error.responseText || error.responseStatus || error.message
-      this.logger.error(`List folders failed for account ${accountId}: ${detail}`, error.stack)
-      await this.handleImapAuthFailure(error, accountId, (account.syncState as Record<string, unknown>) ?? {})
-      return []
+    } catch (err) {
+      // Make sure the IMAP socket isn't left dangling on partial failures
+      // before letting the outer retry/error path see the rejection.
+      try { await client.logout() } catch { /* ignore secondary close errors */ }
+      throw err
     }
   }
 
