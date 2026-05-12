@@ -73,10 +73,10 @@ export function CheckCounterpartyFields({
   required = true,
 }: Props) {
   // Load all suppliers (don't filter to active-only) so historical checks
-  // with now-inactive suppliers still render the name. Bump limit high
-  // enough to fit a realistic agency master list — pagination beyond this
-  // is handled by the singleton fetch below.
-  const { data, isLoading } = useSuppliers({ limit: 1000 })
+  // with now-inactive suppliers still render the name. The API caps the
+  // limit at 100 — anything beyond is handled by the singleton fetch
+  // below for the currently-selected row.
+  const { data, isLoading } = useSuppliers({ limit: 100 })
   const listSuppliers = data?.suppliers ?? []
 
   // When the selected supplierId isn't in the loaded list (paginated past
