@@ -19,7 +19,6 @@
  * a supplier before saving (parent enforces the required rule on submit).
  */
 
-import { useEffect } from 'react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import {
@@ -29,8 +28,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Combobox } from '@/components/ui/combobox'
-import { useSuppliers, useSupplier } from '@/hooks/use-suppliers'
+import { SupplierCombobox } from '@/components/suppliers/supplier-combobox'
+import { useSupplier } from '@/hooks/use-suppliers'
+import type { SupplierDto } from '@tailfire/shared-types'
 
 /** Active currencies. ISO 4217 codes. Add to this list when business needs grow. */
 export const SUPPORTED_CURRENCIES = [
@@ -72,45 +72,23 @@ export function CheckCounterpartyFields({
   disabled,
   required = true,
 }: Props) {
-  // Load all suppliers (don't filter to active-only) so historical checks
-  // with now-inactive suppliers still render the name. The API caps the
-  // limit at 100 — anything beyond is handled by the singleton fetch
-  // below for the currently-selected row.
-  const { data, isLoading } = useSuppliers({ limit: 100 })
-  const listSuppliers = data?.suppliers ?? []
+  // Resolve the currently-selected supplier by id so the combobox button
+  // can show the name (the combobox is value-by-name internally).
+  // Server-side search inside the combobox removes the previous 100-item
+  // cap that made suppliers past "Crystal Inn" unreachable.
+  const { data: selectedSupplier } = useSupplier(supplierId || null)
+  const selectedSupplierName = selectedSupplier?.name ?? null
 
-  // When the selected supplierId isn't in the loaded list (paginated past
-  // the limit, or fetched too narrowly), pull it directly by id so the
-  // picker button can render the supplier's name instead of the raw UUID.
-  const isInList = supplierId ? listSuppliers.some((s) => s.id === supplierId) : true
-  const { data: detachedSupplier } = useSupplier(
-    supplierId && !isLoading && !isInList ? supplierId : null,
-  )
-
-  // Merge the detached supplier (if any) so the Combobox has a label to
-  // display for the currently-selected value. De-dupe by id.
-  const suppliers = detachedSupplier
-    ? [detachedSupplier, ...listSuppliers.filter((s) => s.id !== detachedSupplier.id)]
-    : listSuppliers
-
-  // When a supplier is picked, seed the senderName from supplier.name —
-  // but only if the user hasn't already typed a value, so we don't clobber
-  // an override. Picking a different supplier replaces the name (it tracks
-  // the picker until the user edits).
-  useEffect(() => {
-    if (!supplierId) return
-    const picked = suppliers.find((s) => s.id === supplierId)
-    if (!picked) return
-    if (senderName.trim() === '' || isAutoFilledFromAnySupplier(senderName, suppliers)) {
-      onSenderNameChange(picked.name)
+  const handleSupplierSelect = (supplier: SupplierDto | null) => {
+    onSupplierIdChange(supplier?.id ?? null)
+    // Seed senderName from the picked supplier when blank or when the
+    // current value still matches a supplier name (i.e., not user-typed
+    // override). Use the picked supplier's name directly — no need to
+    // search a local list.
+    if (supplier && (senderName.trim() === '' || senderName.trim() === selectedSupplierName)) {
+      onSenderNameChange(supplier.name)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supplierId, suppliers.length])
-
-  const options = suppliers.map((s) => ({
-    value: s.id,
-    label: s.isActive === false ? `${s.name} (inactive)` : s.name,
-  }))
+  }
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -118,14 +96,17 @@ export function CheckCounterpartyFields({
         <Label htmlFor="supplier-picker">
           Supplier {required && <span className="text-destructive">*</span>}
         </Label>
-        <Combobox
-          options={options}
-          value={supplierId}
-          onValueChange={onSupplierIdChange}
-          placeholder={isLoading ? 'Loading suppliers…' : 'Select a supplier'}
-          searchPlaceholder="Search suppliers…"
-          emptyText="No suppliers match — try a different search or add one in Suppliers."
-          disabled={disabled || isLoading}
+        <SupplierCombobox
+          value={selectedSupplierName}
+          onValueChange={(name) => {
+            // Combobox passes name == current → clear path. Drop supplier id too.
+            if (!name) onSupplierIdChange(null)
+          }}
+          onSupplierSelect={handleSupplierSelect}
+          placeholder="Select a supplier"
+          disabled={disabled}
+          showOnlyActive={false}
+          allowCreate={false}
           className="w-full"
         />
         <p className="text-xs text-muted-foreground">
@@ -167,10 +148,3 @@ export function CheckCounterpartyFields({
   )
 }
 
-// Treat the senderName as "auto-filled" if it exactly matches the name of
-// ANY supplier in the current list — so re-picking still updates it.
-function isAutoFilledFromAnySupplier(name: string, suppliers: { name: string }[]): boolean {
-  const trimmed = name.trim()
-  if (!trimmed) return false
-  return suppliers.some((s) => s.name === trimmed)
-}

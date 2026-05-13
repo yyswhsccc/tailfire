@@ -191,7 +191,14 @@ export function SupplierCombobox({
                         )}
                       />
                       <div className="flex flex-col">
-                        <span>{supplier.name}</span>
+                        <span>
+                          {supplier.name}
+                          {supplier.isActive === false && (
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              (inactive)
+                            </span>
+                          )}
+                        </span>
                         {supplier.supplierType && (
                           <span className="text-xs text-muted-foreground">
                             {supplier.supplierType}
