@@ -23,6 +23,23 @@ import { itineraryActivities } from './activities.schema'
 // Type for vehicle features/amenities
 export type TransportationFeatures = string[]
 
+/**
+ * One leg of a multi-segment transit journey (typically rail or coach with
+ * interchanges). interchangeMinutesAfter is the buffer in minutes between
+ * the END of this leg and the START of the next — ignored on the last leg.
+ */
+export interface TransportationLeg {
+  trainNumber?: string | null
+  operator?: string | null
+  departureStation?: string | null
+  arrivalStation?: string | null
+  departureDate?: string | null  // YYYY-MM-DD
+  departureTime?: string | null  // HH:mm
+  arrivalDate?: string | null
+  arrivalTime?: string | null
+  interchangeMinutesAfter?: number | null
+}
+
 // Transportation subtype enum values
 export type TransportationSubtype =
   | 'transfer'      // Airport/hotel transfers
@@ -106,9 +123,13 @@ export const transportationDetails = pgTable('transportation_details', {
   rentalCarClass: varchar('rental_car_class', { length: 50 }),
   rentalFuelPolicy: varchar('rental_fuel_policy', { length: 50 }),
 
-  // Station/terminal for train, ferry, bus
+  // Station/terminal for train, ferry, bus (top-level summary — used when
+  // legs is null/empty for a single-leg journey)
   departureStation: varchar('departure_station', { length: 255 }),
   arrivalStation: varchar('arrival_station', { length: 255 }),
+
+  // Multi-leg journey (train/bus with interchanges). NULL or empty = single-leg.
+  legs: jsonb('legs').$type<TransportationLeg[]>(),
 
   // Timestamps
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

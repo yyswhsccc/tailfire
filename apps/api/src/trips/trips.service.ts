@@ -3529,6 +3529,7 @@ export class TripsService {
           rentalFuelPolicy: d.rentalFuelPolicy || null,
           departureStation: d.departureStation || null,
           arrivalStation: d.arrivalStation || null,
+          legs: Array.isArray((d as any).legs) ? (d as any).legs : null,
           isRoundTrip: d.isRoundTrip === 1,
         }
       }
