@@ -47,7 +47,7 @@ import {
   toDiningApiPayload,
   type DiningFormData,
 } from '@/lib/validation/dining-validation'
-import { getErrorMessage, scrollToFirstError } from '@/lib/validation/utils'
+import { getErrorMessage, scrollToFirstError, flattenErrors, formatFieldLabel } from '@/lib/validation/utils'
 import { TripDateWarning } from '@/components/ui/trip-date-warning'
 import { getDefaultMonthHint } from '@/lib/date-utils'
 import { usePendingDayResolution } from '@/components/ui/pending-day-picker'
@@ -191,6 +191,7 @@ export function DiningForm({
     setValue,
     getValues,
     reset,
+    trigger,
     formState: { errors, isDirty, isValid, isValidating, isSubmitting },
   } = form
 
@@ -400,11 +401,23 @@ export function DiningForm({
 
   // Force save handler
   const forceSave = useCallback(async () => {
-    if (!isValid) {
-      scrollToFirstError(errors)
+    // With mode: 'onSubmit', RHF doesn't populate `errors` until validation
+    // runs. Trigger first so the toast below can name the failing fields
+    // instead of falling back to the generic message (#298).
+    const valid = await trigger()
+    if (!valid) {
+      const currentErrors = form.formState.errors as Record<string, unknown>
+      scrollToFirstError(currentErrors)
+      const errorFields = flattenErrors(currentErrors)
+      const details = errorFields
+        .map(f => {
+          const msg = getErrorMessage(currentErrors, f)
+          return `${formatFieldLabel(f)}: ${msg || 'invalid'}`
+        })
+        .join(', ')
       toast({
         title: 'Validation Error',
-        description: 'Please fix the errors before saving.',
+        description: details || 'Please fix the errors before saving.',
         variant: 'destructive',
       })
       return
@@ -443,11 +456,12 @@ export function DiningForm({
       })
     }
   }, [
-    isValid,
-    errors,
+    trigger,
+    form,
     activityId,
     activityPricingId,
     pricingBreakdown,
+    activityBookingDate,
     getValues,
     createDining,
     updateDining,

@@ -232,6 +232,7 @@ export function TourForm({
     setValue,
     getValues,
     reset,
+    trigger,
     formState: { errors, isDirty, isValid, isValidating, isSubmitting },
   } = form
 
@@ -521,12 +522,17 @@ export function TourForm({
 
   // Force save handler
   const forceSave = useCallback(async () => {
-    if (!isValid) {
-      scrollToFirstError(errors)
-      const errorFields = flattenErrors(errors as Record<string, unknown>)
+    // With mode: 'onSubmit', RHF doesn't populate `errors` until validation
+    // runs. Triggering validation first ensures the toast below can name
+    // the specific failing fields instead of falling back to the generic
+    // "Please fix the errors before saving" message (#298).
+    const valid = await trigger()
+    if (!valid) {
+      scrollToFirstError(form.formState.errors)
+      const errorFields = flattenErrors(form.formState.errors as Record<string, unknown>)
       const details = errorFields
         .map(f => {
-          const msg = getErrorMessage(errors as Record<string, unknown>, f)
+          const msg = getErrorMessage(form.formState.errors as Record<string, unknown>, f)
           return `${formatFieldLabel(f)}: ${msg || 'invalid'}`
         })
         .join(', ')
@@ -570,12 +576,13 @@ export function TourForm({
       })
     }
   }, [
-    isValid,
-    errors,
+    trigger,
+    form,
     activityId,
     activityPricingId,
     getValues,
     pricingBreakdown,
+    bookingDate,
     createTour,
     updateTour,
     toast,

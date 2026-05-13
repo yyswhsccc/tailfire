@@ -59,7 +59,7 @@ import {
   toPackageUpdatePayload,
   type PackageFormData,
 } from '@/lib/validation/package-validation'
-import { scrollToFirstError } from '@/lib/validation/utils'
+import { scrollToFirstError, flattenErrors, formatFieldLabel, getErrorMessage } from '@/lib/validation/utils'
 
 /** Tab values for the package form - exported for use in page component */
 export type PackageTab = 'general' | 'documents' | 'booking' | 'comments'
@@ -162,6 +162,7 @@ export function PackageForm({
     setValue,
     getValues,
     reset,
+    trigger,
     formState: { errors, isDirty, isValid, isValidating, isSubmitting },
   } = form
 
@@ -294,11 +295,23 @@ export function PackageForm({
 
   // Force save handler
   const forceSave = useCallback(async () => {
-    if (!isValid) {
-      scrollToFirstError(errors)
+    // With mode: 'onSubmit', RHF doesn't populate errors until validation
+    // runs. Trigger first so the toast can name the failing fields
+    // instead of the generic "Please fix the errors" fallback (#298).
+    const valid = await trigger()
+    if (!valid) {
+      const currentErrors = form.formState.errors as Record<string, unknown>
+      scrollToFirstError(currentErrors)
+      const errorFields = flattenErrors(currentErrors)
+      const details = errorFields
+        .map(f => {
+          const msg = getErrorMessage(currentErrors, f)
+          return `${formatFieldLabel(f)}: ${msg || 'invalid'}`
+        })
+        .join(', ')
       toast({
         title: 'Validation Error',
-        description: 'Please fix the errors before saving.',
+        description: details || 'Please fix the errors before saving.',
         variant: 'destructive',
       })
       return
