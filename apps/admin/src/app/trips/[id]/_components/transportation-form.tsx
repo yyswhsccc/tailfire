@@ -380,6 +380,17 @@ export function TransportationForm({
       setValue('transportationDetails.departureStation', '', { shouldDirty: true })
       setValue('transportationDetails.arrivalStation', '', { shouldDirty: true })
     }
+    // Clear journey legs when switching away from a leg-capable subtype
+    // (train / bus). Otherwise legs persist hidden in form state and would
+    // still be sent on save — leaking multi-leg data onto a car_rental,
+    // ferry, etc. activity. The legs UI is intentionally scoped to
+    // train + bus only (#304).
+    if (
+      ['train', 'bus'].includes(prev) &&
+      !['train', 'bus'].includes(subtype)
+    ) {
+      setValue('transportationDetails.legs', [], { shouldDirty: true })
+    }
     // Clear flight number when switching away from transfer/shuttle
     if (['transfer', 'shuttle'].includes(prev) && !['transfer', 'shuttle'].includes(subtype)) {
       setValue('transportationDetails.flightNumber', '', { shouldDirty: true })
