@@ -1,14 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { useSaveStatus } from '@/hooks/use-save-status'
+import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
 import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Settings, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, DollarSign, FileText, ImageIcon } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { Settings, ChevronDown, ChevronUp, Sparkles, Check, AlertCircle, DollarSign, FileText, ImageIcon } from 'lucide-react'
 import type { ActivityResponseDto, OptionCategory, ItineraryDayWithActivitiesDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -159,8 +158,6 @@ export function OptionsForm({
   const [activityId, setActivityId] = useState<string | null>(activity?.id || null)
 
   // Safety net refs to prevent duplicate creation race condition
-  const activityIdRef = useRef<string | null>(activity?.id || null)
-  const createInProgressRef = useRef(false)
 
   // Activity pricing ID (gated on this for payment schedule)
   const [activityPricingId, setActivityPricingId] = useState<string | null>(null)
@@ -192,13 +189,8 @@ export function OptionsForm({
   // Track supplier commission rate from selected supplier
   const [supplierCommissionRate, setSupplierCommissionRate] = useState<number | null>(null)
 
-  // Auto-save status tracking (with date validation)
-  const { saveStatus, setSaveStatus, lastSavedAt, setLastSavedAt } = useSaveStatus({
-    activityId: activity?.id,
-    updatedAt: activity?.updatedAt,
-  })
-  const failureToastShown = useRef(false)
-  const lastSavedSnapshotRef = useRef<string | null>(null)
+  // Autosave was removed in #306. Form saves only via the manual Save Changes
+  // button; the header "Unsaved changes" badge below reflects RHF isDirty.
 
   // Initialize form with RHF + Zod
   // Pass dayId to defaults so itineraryDayId is set for non-pendingDay mode
@@ -216,7 +208,7 @@ export function OptionsForm({
     reset,
     setError,
     trigger,
-    formState: { errors, isDirty, isValid, isValidating, isSubmitting },
+    formState: { errors, isDirty, isValid },
   } = form
 
   // Watch specific fields for auto-save
@@ -372,7 +364,6 @@ export function OptionsForm({
       queueMicrotask(() => {
         if (!cancelled) {
           reset(serverFormData, { keepDirty: false })
-          lastSavedSnapshotRef.current = JSON.stringify(serverFormData)
         }
       })
     }
@@ -383,91 +374,8 @@ export function OptionsForm({
     }
   }, [optionsData, dayId, trip?.currency, dayDate, reset])
 
-  // Auto-save with proper validation gating
-  useEffect(() => {
-    // Gate: only save when isDirty && isValid && not validating && not submitting && mutations not pending
-    if (!isDirty || !isValid || isValidating || isSubmitting) {
-      return
-    }
-    if (createOptions.isPending || updateOptions.isPending) {
-      return
-    }
-
-    const currentSnapshot = JSON.stringify(getValues())
-    if (currentSnapshot === lastSavedSnapshotRef.current) {
-      return // No actual changes
-    }
-
-    const saveTimer = setTimeout(async () => {
-      // SAFETY NET: Check refs to prevent duplicate creation race condition
-      if (createInProgressRef.current) {
-        return
-      }
-
-      try {
-        setSaveStatus('saving')
-        const formData = getValues()
-        const apiPayload = toOptionsApiPayload(formData)
-
-        let response: any
-        // Use ref for immediate check (state may be stale)
-        if (activityId || activityIdRef.current) {
-          const id = activityId || activityIdRef.current!
-          response = await updateOptions.mutateAsync({ id, data: { optionsDetails: apiPayload.optionsDetails } })
-        } else {
-          // Mark create as in progress before API call
-          createInProgressRef.current = true
-          try {
-            response = await createOptions.mutateAsync(apiPayload)
-          } finally {
-            createInProgressRef.current = false
-          }
-        }
-
-        // Update activity ID on create
-        if (response?.id && !activityIdRef.current) {
-          // Update ref immediately (synchronous) before React state update
-          activityIdRef.current = response.id
-          setActivityId(response.id)
-        }
-
-        lastSavedSnapshotRef.current = currentSnapshot
-        setLastSavedAt(new Date())
-        setSaveStatus('saved')
-        failureToastShown.current = false
-      } catch (err: any) {
-        setSaveStatus('error')
-        // Map server errors to form fields
-        if (err?.errors) {
-          mapServerErrors(err.errors, setError, OPTIONS_FORM_FIELDS)
-        }
-        if (!failureToastShown.current) {
-          failureToastShown.current = true
-          toast({
-            title: 'Auto-save failed',
-            description: err.message || 'Could not save option',
-            variant: 'destructive',
-          })
-        }
-      }
-    }, 1000) // 1 second debounce
-
-    return () => clearTimeout(saveTimer)
-  }, [
-    watchedFields,
-    isDirty,
-    isValid,
-    isValidating,
-    isSubmitting,
-    activityId,
-    getValues,
-    createOptions,
-    updateOptions,
-    setError,
-    toast,
-    setLastSavedAt,
-    setSaveStatus,
-  ])
+  // Autosave removed in #306 — see useUnsavedChangesWarning below.
+  useUnsavedChangesWarning(isDirty)
 
   // Array field helpers (convert string to array on newlines/commas)
   const parseArrayField = (value: string): string[] => {
@@ -513,7 +421,6 @@ export function OptionsForm({
       return
     }
     try {
-      setSaveStatus('saving')
       const formData = getValues()
       const payload = { ...formData, pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
       const apiPayload = toOptionsApiPayload(payload)
@@ -529,14 +436,12 @@ export function OptionsForm({
         setActivityId(response.id)
       }
 
-      lastSavedSnapshotRef.current = JSON.stringify(payload)
-      setLastSavedAt(new Date())
-      setSaveStatus('saved')
+      // Reset RHF dirty state so the "Unsaved changes" badge clears
+      reset(getValues(), { keepValues: true, keepDirty: false })
 
       // Show success overlay and redirect
       setShowSuccess(true)
     } catch (err: any) {
-      setSaveStatus('error')
       if (err?.errors) {
         mapServerErrors(err.errors, setError, OPTIONS_FORM_FIELDS)
       }
@@ -620,34 +525,17 @@ export function OptionsForm({
           </div>
         </div>
 
-        {/* Auto-Save Status Indicator */}
+        {/* Unsaved-changes indicator — replaces the autosave status block (#306) */}
         <div className="flex items-center gap-2 text-sm">
-          {saveStatus === 'saving' && (
+          {isDirty ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-              <span className="text-gray-500">Saving...</span>
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <span className="text-amber-700">Unsaved changes</span>
             </>
-          )}
-          {saveStatus === 'saved' && lastSavedAt && (
+          ) : (
             <>
               <Check className="h-4 w-4 text-green-600" />
-              <span className="text-gray-500">
-                Saved {formatDistanceToNow(lastSavedAt, { addSuffix: true })}
-              </span>
-            </>
-          )}
-          {saveStatus === 'error' && (
-            <>
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span className="text-red-600">Error - Click Save to retry</span>
-            </>
-          )}
-          {saveStatus === 'idle' && (
-            <>
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-              </svg>
-              <span className="text-gray-400">Not saved yet</span>
+              <span className="text-gray-500">All changes saved</span>
             </>
           )}
           {/* Validation indicator */}

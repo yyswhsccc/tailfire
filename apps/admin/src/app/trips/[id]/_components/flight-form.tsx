@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
-import { useSaveStatus } from '@/hooks/use-save-status'
+import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
@@ -9,7 +9,6 @@ import { useSearchParams } from 'next/navigation'
 import { useForm, useWatch, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plane, ChevronDown, ChevronUp, Sparkles, Plus, MoreVertical, Loader2, Check, AlertCircle, X, Trash2, Pencil } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -290,11 +289,8 @@ export function FlightForm({
   // Activity pricing ID (gated on this for payment schedule)
   const [activityPricingId, setActivityPricingId] = useState<string | null>(null)
 
-  // Save status tracking (with date validation)
-  const { saveStatus, setSaveStatus, lastSavedAt, setLastSavedAt } = useSaveStatus({
-    activityId: activity?.id,
-    updatedAt: activity?.updatedAt,
-  })
+  // Autosave was removed in #306. Form saves only via the manual Save Changes
+  // button; the header "Unsaved changes" badge below reflects RHF isDirty.
 
   // Flight search state (per-segment)
   const [searchingSegmentIndex, setSearchingSegmentIndex] = useState<number | null>(null)
@@ -353,7 +349,7 @@ export function FlightForm({
     control,
     register,
     handleSubmit,
-    formState: { errors, isDirty, isValid, isValidating, isSubmitting },
+    formState: { errors, isDirty },
     reset,
     setError,
     getValues,
@@ -499,9 +495,6 @@ export function FlightForm({
 
   // Ref to track loaded flight ID (prevents re-seeding on every render)
   const flightIdRef = useRef<string | null>(null)
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  // Ref to track if a save is in progress (prevents dependency array from triggering re-runs)
-  const isSavingRef = useRef(false)
   // Ref to access activityId without triggering effect re-runs
   const activityIdRef = useRef<string | null>(activity?.id || null)
 
@@ -615,117 +608,8 @@ export function FlightForm({
     }
   }, [watchedFields, getValues, selectedPackageId, pricingBreakdown])
 
-  // Auto-save effect with proper validation gating
-  // IMPORTANT: Uses refs for activityId and saving state to prevent infinite loops
-  // when state changes after successful save (which would re-trigger this effect)
-  useEffect(() => {
-    // Gate 1: Must be dirty and valid
-    if (!isDirty || !isValid || isValidating || isSubmitting) {
-      return
-    }
-
-    // Gate 2: A save must not already be in progress (use ref, not mutation state)
-    if (isSavingRef.current) {
-      return
-    }
-
-    // Clear previous timeout
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current)
-    }
-
-    // Debounce auto-save
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      // Double-check we're not already saving (race condition protection)
-      if (isSavingRef.current) {
-        return
-      }
-
-      isSavingRef.current = true
-      const data = getValues()
-      const payload = { ...toFlightApiPayload(data), pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
-
-      setSaveStatus('saving')
-
-      try {
-        let response: { id?: string; activityPricingId?: string | null }
-
-        // Use ref to get current activityId (not state, which would cause dependency issues)
-        const currentActivityId = activityIdRef.current
-
-        if (currentActivityId) {
-          response = await updateMutation.mutateAsync({ id: currentActivityId, data: payload as any })
-        } else {
-          response = await createMutation.mutateAsync(payload as any)
-        }
-
-        // First save (create) - set IDs
-        if (!currentActivityId && response.id) {
-          setActivityId(response.id)
-          activityIdRef.current = response.id // Update ref immediately
-        }
-
-        // Extract activityPricingId
-        if (response.activityPricingId) {
-          setActivityPricingId(response.activityPricingId)
-        }
-
-        setSaveStatus('saved')
-        setLastSavedAt(new Date())
-
-        // Reset dirty state to prevent re-triggering auto-save
-        // This is crucial to break the potential infinite loop
-        reset(getValues(), { keepDirty: false, keepValues: true })
-      } catch (err) {
-        setSaveStatus('error')
-
-        // Map server errors to form fields
-        if (err && typeof err === 'object' && 'response' in err) {
-          const apiError = err as { response?: { data?: { errors?: Record<string, string[]> } } }
-          if (apiError.response?.data?.errors) {
-            // Convert API errors format to ServerFieldError[]
-            const fieldErrors = Object.entries(apiError.response.data.errors).flatMap(
-              ([field, messages]) => messages.map(message => ({ field, message }))
-            )
-            mapServerErrors(fieldErrors, setError, FLIGHT_FORM_FIELDS)
-            scrollToFirstError(errors)
-          }
-        }
-
-        toast({
-          title: 'Auto-save failed',
-          description: err instanceof Error ? err.message : 'An error occurred',
-          variant: 'destructive',
-        })
-      } finally {
-        isSavingRef.current = false
-      }
-    }, 1500)
-
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current)
-      }
-    }
-  }, [
-    watchedFields,
-    isDirty,
-    isValid,
-    isValidating,
-    isSubmitting,
-    // REMOVED: activityId, activityPricingId, createMutation.isPending, updateMutation.isPending
-    // These caused infinite loops - now using refs instead
-    getValues,
-    reset,
-    setError,
-    toast,
-    setSaveStatus,
-    setLastSavedAt,
-    createMutation,
-    updateMutation,
-    errors,
-    pricingBreakdown,
-  ])
+  // Autosave removed in #306 — see useUnsavedChangesWarning below.
+  useUnsavedChangesWarning(isDirty)
 
   const handleAiSubmit = () => {
     toast({
@@ -976,8 +860,6 @@ export function FlightForm({
   const onSubmit = handleSubmit(async (data) => {
     const payload = { ...toFlightApiPayload(data), pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
 
-    setSaveStatus('saving')
-
     try {
       let response: { id?: string; activityPricingId?: string | null }
 
@@ -995,14 +877,12 @@ export function FlightForm({
         setActivityPricingId(response.activityPricingId)
       }
 
-      setSaveStatus('saved')
-      setLastSavedAt(new Date())
+      // Reset RHF dirty state so the "Unsaved changes" badge clears
+      reset(getValues(), { keepValues: true, keepDirty: false })
 
       // Show success overlay and redirect
       setShowSuccess(true)
     } catch (err) {
-      setSaveStatus('error')
-
       if (err && typeof err === 'object' && 'response' in err) {
         const apiError = err as { response?: { data?: { errors?: Record<string, string[]> } } }
         if (apiError.response?.data?.errors) {
@@ -1212,34 +1092,17 @@ export function FlightForm({
           </div>
         </div>
 
-        {/* Save Status Indicator */}
+        {/* Unsaved-changes indicator — replaces the autosave status block (#306) */}
         <div className="flex items-center gap-2 text-sm">
-          {saveStatus === 'saving' && (
+          {isDirty ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-              <span className="text-gray-500">Saving...</span>
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <span className="text-amber-700">Unsaved changes</span>
             </>
-          )}
-          {saveStatus === 'saved' && lastSavedAt && (
+          ) : (
             <>
               <Check className="h-4 w-4 text-green-600" />
-              <span className="text-gray-500">
-                Saved {formatDistanceToNow(lastSavedAt, { addSuffix: true })}
-              </span>
-            </>
-          )}
-          {saveStatus === 'error' && (
-            <>
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span className="text-red-600">Error - Click Save to retry</span>
-            </>
-          )}
-          {saveStatus === 'idle' && (
-            <>
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-              </svg>
-              <span className="text-gray-400">Not saved yet</span>
+              <span className="text-gray-500">All changes saved</span>
             </>
           )}
         </div>
