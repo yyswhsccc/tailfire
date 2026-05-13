@@ -292,12 +292,18 @@ export function PricingSection({
                 Individual Item
               </Label>
             </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="part_of_package" id="part_of_package" />
-              <Label htmlFor="part_of_package" className="font-normal cursor-pointer">
-                Part of Trip Package
-              </Label>
-            </div>
+            {/* "Part of Trip Package" is only shown when the activity is
+                already linked to a package, so it can be unlinked here.
+                Linking an unlinked activity happens from the package's
+                Add Activities sheet, not from this form. */}
+            {invoiceType === 'part_of_package' && !!packageId && (
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="part_of_package" id="part_of_package" />
+                <Label htmlFor="part_of_package" className="font-normal cursor-pointer">
+                  Part of Trip Package
+                </Label>
+              </div>
+            )}
           </RadioGroup>
 
           {errors.invoiceType && (

@@ -101,8 +101,11 @@ function formatDateLocal(dateStr: string): string {
 const VALID_STATUSES = ['draft', 'proposing', 'approved', 'cancelled'] as const
 type FormStatus = (typeof VALID_STATUSES)[number]
 
-// Valid pricing type values
-const VALID_PRICING_TYPES = ['per_person', 'per_group', 'fixed', 'per_room', 'total'] as const
+// Valid pricing type values — must stay in sync with the DB pricing_type enum
+// and the flightFormSchema in flight-validation.ts. Without flat_rate/per_night
+// here, coercePricingType would silently fall back to per_person when loading
+// existing rows saved with those values.
+const VALID_PRICING_TYPES = ['per_person', 'per_room', 'flat_rate', 'per_night', 'total'] as const
 type FormPricingType = (typeof VALID_PRICING_TYPES)[number]
 
 // Coerce API proposal status to form status
@@ -945,17 +948,19 @@ export function FlightForm({
 
   const addSeat = (legIndex: number, travelerName: string) => {
     const currentSeats = getValues(`flightSegments.${legIndex}.seats`) || []
-    setValue(`flightSegments.${legIndex}.seats`, [
-      ...currentSeats,
-      { id: generateId(), travelerName, seatNumber: '' },
-    ])
+    setValue(
+      `flightSegments.${legIndex}.seats`,
+      [...currentSeats, { id: generateId(), travelerName, seatNumber: '' }],
+      { shouldDirty: true }
+    )
   }
 
   const removeSeat = (legIndex: number, seatId: string) => {
     const currentSeats = getValues(`flightSegments.${legIndex}.seats`) || []
     setValue(
       `flightSegments.${legIndex}.seats`,
-      currentSeats.filter((s) => s.id !== seatId)
+      currentSeats.filter((s) => s.id !== seatId),
+      { shouldDirty: true }
     )
   }
 
@@ -963,7 +968,8 @@ export function FlightForm({
     const currentSeats = getValues(`flightSegments.${legIndex}.seats`) || []
     setValue(
       `flightSegments.${legIndex}.seats`,
-      currentSeats.map((s) => (s.id === seatId ? { ...s, seatNumber } : s))
+      currentSeats.map((s) => (s.id === seatId ? { ...s, seatNumber } : s)),
+      { shouldDirty: true }
     )
   }
 
@@ -1018,20 +1024,34 @@ export function FlightForm({
   })
 
   // Update pricing data handler
+  // IMPORTANT: setValue must pass { shouldDirty: true } so the autosave effect
+  // (gated on isDirty) fires when only pricing fields change. Without it,
+  // edits via PricingSection/CommissionSection/BookingDetailsSection silently
+  // never persist. Mirrors the pattern used by tour-form, lodging-form, etc.
   const handlePricingUpdate = useCallback((updates: Partial<PricingData>) => {
-    // TODO Phase 4: Add invoiceType to form schema
-    if ('totalPriceCents' in updates) setValue('totalPriceCents', updates.totalPriceCents ?? 0)
-    if ('taxesAndFeesCents' in updates) setValue('taxesAndFeesCents', updates.taxesAndFeesCents ?? 0)
-    if ('currency' in updates) setValue('currency', updates.currency ?? 'CAD')
-    if ('pricingType' in updates) setValue('pricingType', updates.pricingType as any ?? 'per_person')
-    if ('confirmationNumber' in updates) setValue('confirmationNumber', updates.confirmationNumber ?? '')
-    if ('commissionTotalCents' in updates) setValue('commissionTotalCents', updates.commissionTotalCents ?? 0)
-    if ('commissionSplitPercentage' in updates) setValue('commissionSplitPercentage', updates.commissionSplitPercentage ?? 0)
-    if ('commissionExpectedDate' in updates) setValue('commissionExpectedDate', updates.commissionExpectedDate ?? null)
-    if ('termsAndConditions' in updates) setValue('termsAndConditions', updates.termsAndConditions ?? '')
-    if ('cancellationPolicy' in updates) setValue('cancellationPolicy', updates.cancellationPolicy ?? '')
-    if ('supplier' in updates) setValue('supplier', updates.supplier ?? '')
-    if ('pricingBreakdown' in updates) setPricingBreakdown(updates.pricingBreakdown ?? null)
+    const opts = { shouldDirty: true, shouldValidate: true } as const
+    if ('totalPriceCents' in updates) setValue('totalPriceCents', updates.totalPriceCents ?? 0, opts)
+    if ('taxesAndFeesCents' in updates) setValue('taxesAndFeesCents', updates.taxesAndFeesCents ?? 0, opts)
+    if ('currency' in updates) setValue('currency', updates.currency ?? 'CAD', opts)
+    if ('pricingType' in updates) setValue('pricingType', updates.pricingType as any ?? 'per_person', opts)
+    if ('confirmationNumber' in updates) setValue('confirmationNumber', updates.confirmationNumber ?? '', opts)
+    if ('commissionTotalCents' in updates) setValue('commissionTotalCents', updates.commissionTotalCents ?? 0, opts)
+    if ('commissionSplitPercentage' in updates) setValue('commissionSplitPercentage', updates.commissionSplitPercentage ?? 0, opts)
+    if ('commissionExpectedDate' in updates) setValue('commissionExpectedDate', updates.commissionExpectedDate ?? null, opts)
+    if ('termsAndConditions' in updates) setValue('termsAndConditions', updates.termsAndConditions ?? '', opts)
+    if ('cancellationPolicy' in updates) setValue('cancellationPolicy', updates.cancellationPolicy ?? '', opts)
+    if ('supplier' in updates) setValue('supplier', updates.supplier ?? '', opts)
+    if ('pricingBreakdown' in updates) {
+      // pricingBreakdown lives in component state, not the form schema, so
+      // breakdown-only edits (adding an empty row, renaming a traveler label
+      // without a price change) do NOT flip isDirty and won't autosave on
+      // their own. When the user also enters/changes a price, totalPriceCents
+      // updates via the setValue above, which dirties the form and the
+      // breakdown rides along in the autosave payload via pricingBreakdownJson.
+      // Proper fix is to put pricingBreakdownJson into the form schema; that
+      // is in scope for the autosave-removal work tracked in #306.
+      setPricingBreakdown(updates.pricingBreakdown ?? null)
+    }
   }, [setValue])
 
   // Handle supplier defaults from BookingDetailsSection
