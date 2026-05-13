@@ -2,19 +2,12 @@
 
 import { useState, useMemo } from 'react'
 import { usePendingReceivables } from '@/hooks/use-commission'
-import { useSuppliers } from '@/hooks/use-suppliers'
 import { useDebounce } from '@/hooks/use-debounce'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { SupplierCombobox } from '@/components/suppliers/supplier-combobox'
 import {
   Table,
   TableBody,
@@ -51,11 +44,9 @@ export function PendingReceivablesTable({
   onSelectItem,
   onAutoMatch,
 }: PendingReceivablesTableProps) {
-  const { data: suppliersData } = useSuppliers({ limit: 100 })
-  const suppliers = suppliersData?.suppliers ?? []
-
   // Filter state
-  const [supplierId, setSupplierId] = useState('')
+  const [supplierId, setSupplierId] = useState<string | null>(null)
+  const [supplierName, setSupplierName] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [departureDateFrom, setDepartureDateFrom] = useState('')
   const [departureDateTo, setDepartureDateTo] = useState('')
@@ -64,7 +55,7 @@ export function PendingReceivablesTable({
   const debouncedSearch = useDebounce(search, 300)
 
   const filter: PendingReceivablesFilterDto = useMemo(() => ({
-    supplierId: supplierId && supplierId !== '__none__' ? supplierId : undefined,
+    supplierId: supplierId || undefined,
     search: debouncedSearch || undefined,
     departureDateFrom: departureDateFrom || undefined,
     departureDateTo: departureDateTo || undefined,
@@ -99,19 +90,17 @@ export function PendingReceivablesTable({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Supplier</Label>
-          <Select value={supplierId} onValueChange={setSupplierId}>
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="All suppliers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">All suppliers</SelectItem>
-              {suppliers.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SupplierCombobox
+            value={supplierName}
+            onValueChange={(name) => {
+              setSupplierName(name)
+              if (!name) setSupplierId(null)
+            }}
+            onSupplierSelect={(supplier) => setSupplierId(supplier?.id ?? null)}
+            placeholder="All suppliers"
+            allowCreate={false}
+            className="h-9"
+          />
         </div>
 
         <div className="space-y-1">
