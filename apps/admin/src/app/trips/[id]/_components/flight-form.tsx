@@ -1042,13 +1042,17 @@ export function FlightForm({
     if ('cancellationPolicy' in updates) setValue('cancellationPolicy', updates.cancellationPolicy ?? '', opts)
     if ('supplier' in updates) setValue('supplier', updates.supplier ?? '', opts)
     if ('pricingBreakdown' in updates) {
+      // pricingBreakdown lives in component state, not the form schema, so
+      // breakdown-only edits (adding an empty row, renaming a traveler label
+      // without a price change) do NOT flip isDirty and won't autosave on
+      // their own. When the user also enters/changes a price, totalPriceCents
+      // updates via the setValue above, which dirties the form and the
+      // breakdown rides along in the autosave payload via pricingBreakdownJson.
+      // Proper fix is to put pricingBreakdownJson into the form schema; that
+      // is in scope for the autosave-removal work tracked in #306.
       setPricingBreakdown(updates.pricingBreakdown ?? null)
-      // Breakdown lives in component state, not the form. Touch a form field
-      // so the autosave gate (isDirty) fires for breakdown-only edits like
-      // adding a row or renaming a traveler label.
-      setValue('totalPriceCents', getValues('totalPriceCents') ?? 0, opts)
     }
-  }, [setValue, getValues])
+  }, [setValue])
 
   // Handle supplier defaults from BookingDetailsSection
   const handleSupplierDefaultsApplied = useCallback((defaults: SupplierDefaults) => {
