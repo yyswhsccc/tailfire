@@ -18,7 +18,12 @@
 
 import { sql } from 'drizzle-orm'
 import type { DatabaseService } from '../../db/database.service'
-import { tripScopeFilter, paginationSql } from './sales.queries'
+import {
+  tripScopeFilter,
+  paginationSql,
+  TRIP_AGENT_LATERAL,
+  TRIP_PRIMARY_AGENT_ID,
+} from './sales.queries'
 
 // ============================================================================
 // Types
@@ -624,9 +629,10 @@ export async function queryInsuranceUnresolved(
       tti.created_at AS pending_since
     FROM trip_traveler_insurance tti
     JOIN trips t ON t.id = tti.trip_id
+    ${TRIP_AGENT_LATERAL}
     JOIN trip_travelers tt ON tt.id = tti.trip_traveler_id
     JOIN contacts c ON c.id = tt.contact_id
-    LEFT JOIN user_profiles up ON up.id = t.owner_id
+    LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
     WHERE ${scope}
       AND tti.status = 'pending'
       AND t.status IN ('active', 'travelling')

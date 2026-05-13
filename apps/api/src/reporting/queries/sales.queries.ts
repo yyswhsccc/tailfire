@@ -71,6 +71,43 @@ export function tripScopeFilter(tripIds: string[] | 'all', agencyId: string): SQ
   return sql`t.agency_id = ${agencyId} AND t.id IN ${sqlIdList(tripIds)}`
 }
 
+/**
+ * LATERAL join that resolves the trip's primary agent.
+ *
+ * TES-imported trips have trips.owner_id = admin fixture; the actual agent
+ * is in trip_collaborators with role='agent'. Joining via owner_id misses
+ * agent attribution for those trips. This LATERAL JOIN picks the highest-
+ * commission agent collaborator, falling back to owner_id when no agent
+ * collaborator exists.
+ *
+ * Must be appended to every FROM clause that aliases the trips table as `t`.
+ * Use TRIP_PRIMARY_AGENT_ID below to read the resolved agent id, and
+ * tripPrimaryAgentFilter for WHERE-clause filtering.
+ */
+export const TRIP_AGENT_LATERAL = sql`
+  LEFT JOIN LATERAL (
+    SELECT user_id
+    FROM trip_collaborators tc
+    WHERE tc.trip_id = t.id
+      AND tc.role = 'agent'
+      AND tc.is_active = true
+    ORDER BY tc.commission_percentage DESC NULLS LAST, tc.created_at ASC
+    LIMIT 1
+  ) tagent ON true
+`
+
+/**
+ * The trip's primary-agent id with fallback to owner_id.
+ * Use anywhere a query previously referenced `t.owner_id` for agent attribution
+ * (display joins, GROUP BY, agent filters).
+ */
+export const TRIP_PRIMARY_AGENT_ID = sql`COALESCE(tagent.user_id, t.owner_id)`
+
+/** Build agent-filter fragment using the collaborator-resolved primary agent. */
+export function tripPrimaryAgentFilter(agentId?: string): SQL {
+  return agentId ? sql`AND ${TRIP_PRIMARY_AGENT_ID} = ${agentId}` : sql``
+}
+
 /** Informational activity types to exclude from sales queries */
 const EXCLUDED_ACTIVITY_TYPES = sql`('port_info', 'tour_day')`
 
@@ -81,6 +118,7 @@ const CANONICAL_JOIN = sql`
   LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
   LEFT JOIN itineraries itin ON itin.id = iday.itinerary_id
   JOIN trips t ON t.id = COALESCE(itin.trip_id, ia.trip_id)
+  ${TRIP_AGENT_LATERAL}
 `
 
 /** Apply pagination offset/limit */
@@ -118,7 +156,7 @@ export async function queryBookedSales(
 
   // Optional agent filter
   const agentFilter = options.agentId
-    ? sql`AND t.owner_id = ${options.agentId}`
+    ? sql`AND ${TRIP_PRIMARY_AGENT_ID} = ${options.agentId}`
     : sql``
 
   // Optional trip type filter
@@ -160,7 +198,7 @@ export async function queryBookedSales(
       count(DISTINCT ia.id)::int AS activity_count,
       (SELECT count(*)::int FROM trip_travelers tt WHERE tt.trip_id = t.id) AS traveler_count
     ${CANONICAL_JOIN}
-    LEFT JOIN user_profiles up ON up.id = t.owner_id
+    LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
     LEFT JOIN contacts c ON c.id = t.primary_contact_id
     WHERE ${scope}
       AND t.status IN ('active', 'travelling', 'travelled')
@@ -245,7 +283,7 @@ export async function queryDepartedSales(
   const sortDir = options.sortOrder === 'asc' ? sql`ASC` : sql`DESC`
 
   const agentFilter = options.agentId
-    ? sql`AND t.owner_id = ${options.agentId}`
+    ? sql`AND ${TRIP_PRIMARY_AGENT_ID} = ${options.agentId}`
     : sql``
 
   const tripTypeFilter = options.tripType
@@ -286,7 +324,7 @@ export async function queryDepartedSales(
       count(DISTINCT ia.id)::int AS activity_count,
       (SELECT count(*)::int FROM trip_travelers tt WHERE tt.trip_id = t.id) AS traveler_count
     ${CANONICAL_JOIN}
-    LEFT JOIN user_profiles up ON up.id = t.owner_id
+    LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
     LEFT JOIN contacts c ON c.id = t.primary_contact_id
     WHERE ${scope}
       AND t.status IN ('active', 'travelling', 'travelled')
@@ -351,7 +389,8 @@ export async function queryDepartedSales(
 // ============================================================================
 
 /**
- * Admin-only report. GROUP BY t.owner_id.
+ * Admin-only report. GROUP BY the trip's primary agent (collaborator with
+ * role='agent', falling back to owner_id when no agent collaborator exists).
  * Returns agent name, booking count, total sales, average booking value.
  */
 export async function querySalesByAgent(
@@ -365,7 +404,7 @@ export async function querySalesByAgent(
   const isSingleAgentDrilldown = !!options.agentId
 
   const agentFilter = options.agentId
-    ? sql`AND t.owner_id = ${options.agentId}`
+    ? sql`AND ${TRIP_PRIMARY_AGENT_ID} = ${options.agentId}`
     : sql``
 
   const sortCol = options.sortBy === 'totalSalesCents'
@@ -389,7 +428,7 @@ export async function querySalesByAgent(
         AND t.status IN ('active', 'travelling', 'travelled')
         AND ia.booking_status = 'booked'
         AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
-        AND t.owner_id IS NOT NULL
+        AND ${TRIP_PRIMARY_AGENT_ID} IS NOT NULL
         AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startDate}::timestamptz
         AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endDate}::timestamptz
         ${agentFilter}
@@ -411,13 +450,13 @@ export async function querySalesByAgent(
         count(DISTINCT ia.id)::int AS activity_count,
         (SELECT count(*)::int FROM trip_travelers tt WHERE tt.trip_id = t.id) AS traveler_count
       ${CANONICAL_JOIN}
-      LEFT JOIN user_profiles up ON up.id = t.owner_id
+      LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
       LEFT JOIN contacts c ON c.id = t.primary_contact_id
       WHERE ${scope}
         AND t.status IN ('active', 'travelling', 'travelled')
         AND ia.booking_status = 'booked'
         AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
-        AND t.owner_id IS NOT NULL
+        AND ${TRIP_PRIMARY_AGENT_ID} IS NOT NULL
         AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startDate}::timestamptz
         AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endDate}::timestamptz
         ${agentFilter}
@@ -444,13 +483,13 @@ export async function querySalesByAgent(
   } else {
     // Grouped mode: aggregate by agent
     const countResult = await db.client.execute(sql`
-      SELECT count(DISTINCT t.owner_id)::int AS total_rows
+      SELECT count(DISTINCT ${TRIP_PRIMARY_AGENT_ID})::int AS total_rows
       ${CANONICAL_JOIN}
       WHERE ${scope}
         AND t.status IN ('active', 'travelling', 'travelled')
         AND ia.booking_status = 'booked'
         AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
-        AND t.owner_id IS NOT NULL
+        AND ${TRIP_PRIMARY_AGENT_ID} IS NOT NULL
         AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startDate}::timestamptz
         AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endDate}::timestamptz
     `)
@@ -458,7 +497,7 @@ export async function querySalesByAgent(
 
     const dataResult = await db.client.execute(sql`
       SELECT
-        t.owner_id AS agent_id,
+        ${TRIP_PRIMARY_AGENT_ID} AS agent_id,
         up.first_name AS agent_first_name,
         up.last_name AS agent_last_name,
         count(DISTINCT t.id)::int AS booking_count,
@@ -469,15 +508,15 @@ export async function querySalesByAgent(
           ELSE 0
         END AS avg_booking_value_cents
       ${CANONICAL_JOIN}
-      LEFT JOIN user_profiles up ON up.id = t.owner_id
+      LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
       WHERE ${scope}
         AND t.status IN ('active', 'travelling', 'travelled')
         AND ia.booking_status = 'booked'
         AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
-        AND t.owner_id IS NOT NULL
+        AND ${TRIP_PRIMARY_AGENT_ID} IS NOT NULL
         AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startDate}::timestamptz
         AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endDate}::timestamptz
-      GROUP BY t.owner_id, up.first_name, up.last_name
+      GROUP BY ${TRIP_PRIMARY_AGENT_ID}, up.first_name, up.last_name
       ORDER BY ${sortCol} ${sortDir} NULLS LAST
       ${paginationSql(page, pageSize)}
     `)
@@ -495,7 +534,7 @@ export async function querySalesByAgent(
   // Summary: agency-wide totals
   const summaryResult = await db.client.execute(sql`
     SELECT
-      count(DISTINCT t.owner_id)::int AS agent_count,
+      count(DISTINCT ${TRIP_PRIMARY_AGENT_ID})::int AS agent_count,
       count(DISTINCT t.id)::int AS total_bookings,
       coalesce(sum(ap.total_price_cents), 0)::bigint AS total_sales_cents
     ${CANONICAL_JOIN}
@@ -503,7 +542,7 @@ export async function querySalesByAgent(
       AND t.status IN ('active', 'travelling', 'travelled')
       AND ia.booking_status = 'booked'
       AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
-      AND t.owner_id IS NOT NULL
+      AND ${TRIP_PRIMARY_AGENT_ID} IS NOT NULL
       AND coalesce(t.booking_date::timestamptz, t.created_at) >= ${startDate}::timestamptz
       AND coalesce(t.booking_date::timestamptz, t.created_at) <= ${endDate}::timestamptz
       ${agentFilter}
@@ -595,7 +634,7 @@ export async function querySalesByDestination(
         count(DISTINCT ia.id)::int AS activity_count,
         (SELECT count(*)::int FROM trip_travelers tt WHERE tt.trip_id = t.id) AS traveler_count
       ${CANONICAL_JOIN}
-      LEFT JOIN user_profiles up ON up.id = t.owner_id
+      LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
       LEFT JOIN contacts c ON c.id = t.primary_contact_id
       WHERE ${scope}
         AND t.status IN ('active', 'travelling', 'travelled')
@@ -934,7 +973,7 @@ export async function queryBookingPipeline(
         coalesce((t.estimated_total_cost::numeric * 100)::bigint, 0)::bigint AS estimated_total_cents,
         (SELECT count(*)::int FROM trip_travelers tt WHERE tt.trip_id = t.id) AS traveler_count
       FROM trips t
-      LEFT JOIN user_profiles up ON up.id = t.owner_id
+      LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
       LEFT JOIN contacts c ON c.id = t.primary_contact_id
       WHERE ${scope}
         ${statusFilter}

@@ -8,10 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  CheckCounterpartyFields,
-  type SupportedCurrency,
-} from '@/app/commission/_components/check-counterparty-fields'
+import { SupplierCombobox } from '@/components/suppliers/supplier-combobox'
 
 interface DepositHeaderFormProps {
   onCreated: (depositId: string, totalAmountCents: number, depositNumber: string) => void
@@ -25,12 +22,8 @@ export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderForm
   const [depositNumber, setDepositNumber] = useState('')
   const [depositDate, setDepositDate] = useState('')
   const [totalAmountDollars, setTotalAmountDollars] = useState('')
-
-  // Counterparty fields owned by the shared subcomponent.
   const [supplierId, setSupplierId] = useState<string | null>(null)
-  const [senderName, setSenderName] = useState('')
-  const [currency, setCurrency] = useState<SupportedCurrency>('CAD')
-
+  const [supplierName, setSupplierName] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
   const [fileUrl, setFileUrl] = useState('')
 
@@ -43,14 +36,6 @@ export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderForm
     }
     if (!depositDate) {
       toast({ title: 'Validation error', description: 'Deposit date is required.', variant: 'destructive' })
-      return
-    }
-    if (!supplierId) {
-      toast({
-        title: 'Supplier required',
-        description: 'Pick the supplier this deposit came from — reporting depends on it.',
-        variant: 'destructive',
-      })
       return
     }
     const dollars = parseFloat(totalAmountDollars)
@@ -66,9 +51,7 @@ export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderForm
         depositNumber: depositNumber.trim(),
         depositDate,
         totalAmountCents,
-        currency,
-        supplierId,
-        senderName: senderName.trim() || undefined,
+        supplierId: supplierId || undefined,
         notes: notes.trim() || undefined,
         fileUrl: fileUrl.trim() || undefined,
         fileName: fileUrl.trim() ? fileUrl.trim().split('/').pop() : undefined,
@@ -119,7 +102,7 @@ export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderForm
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="totalAmount">Total Amount *</Label>
+              <Label htmlFor="totalAmount">Total Amount (CAD) *</Label>
               <Input
                 id="totalAmount"
                 type="number"
@@ -134,26 +117,33 @@ export function DepositHeaderForm({ onCreated, isSubmitting }: DepositHeaderForm
             </div>
           </div>
 
-          <CheckCounterpartyFields
-            supplierId={supplierId}
-            onSupplierIdChange={setSupplierId}
-            senderName={senderName}
-            onSenderNameChange={setSenderName}
-            currency={currency}
-            onCurrencyChange={setCurrency}
-            disabled={busy}
-            required
-          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="supplier">Supplier</Label>
+              <SupplierCombobox
+                value={supplierName}
+                onValueChange={(name) => {
+                  setSupplierName(name)
+                  // When cleared (name === null), also clear the id
+                  if (!name) setSupplierId(null)
+                }}
+                onSupplierSelect={(supplier) => setSupplierId(supplier?.id ?? null)}
+                placeholder="All suppliers"
+                disabled={busy}
+                allowCreate={false}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="fileUrl">File URL (optional)</Label>
-            <Input
-              id="fileUrl"
-              value={fileUrl}
-              onChange={(e) => setFileUrl(e.target.value)}
-              placeholder="https://..."
-              disabled={busy}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="fileUrl">File URL (optional)</Label>
+              <Input
+                id="fileUrl"
+                value={fileUrl}
+                onChange={(e) => setFileUrl(e.target.value)}
+                placeholder="https://..."
+                disabled={busy}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
