@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
+import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
 import { useSearchParams } from 'next/navigation'
 import { useForm, useWatch } from 'react-hook-form'
 import { Ship, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, DollarSign, FileText, ImageIcon, Calendar, Anchor, RefreshCw, Plus, Trash2 } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -169,10 +169,6 @@ export function CustomCruiseForm({
   // Track activity ID (for create->update transition)
   const [activityId, setActivityId] = useState<string | null>(activity?.id || null)
 
-  // Safety net refs to prevent duplicate creation race condition
-  // These are updated synchronously (unlike React state) to prevent multiple creates
-  const activityIdRef = useRef<string | null>(activity?.id || null)
-  const createInProgressRef = useRef(false)
 
   // Activity pricing ID (gated on this for payment schedule)
   const [activityPricingId, setActivityPricingId] = useState<string | null>(null)
@@ -202,9 +198,8 @@ export function CustomCruiseForm({
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
   const queryClient = useQueryClient()
 
-  // Auto-save state
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  // Autosave was removed in #306. Form saves only via the manual Save Changes
+  // button; the header "Unsaved changes" badge below reflects RHF isDirty.
 
   // Fetch cruise data (for edit mode)
   const { data: cruiseData } = useCustomCruise(activityId || '')
@@ -236,7 +231,7 @@ export function CustomCruiseForm({
     setValue,
     getValues,
     watch,
-    formState: { errors, isDirty, isSubmitting },
+    formState: { errors, isDirty },
   } = useForm<CustomCruiseFormData>({
     // No resolver - we'll validate manually with trigger() and custom validation
     // This prevents any validation from running during Controller registration
@@ -258,8 +253,6 @@ export function CustomCruiseForm({
   // Ref to track loaded cruise ID (prevent re-seeding on same cruise)
   const cruiseIdRef = useRef<string | null>(null)
 
-  // Ref to track last saved state to trigger auto-save only when values actually change
-  const lastSavedHash = useRef<string | null>(null)
 
   // Counter to trigger auto-save effect when form changes
   const [changeCounter, setChangeCounter] = useState(0)
@@ -537,128 +530,8 @@ export function CustomCruiseForm({
     }
   }, [watchedDepartureDate, days, dayId, isEditMode, findDayByDate, computedDayId, setValue])
 
-  // ============================================================================
-  // Auto-save effect with proper validation gating
-  // ============================================================================
-
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const mutationInProgress = createCustomCruise.isPending || updateCustomCruise.isPending
-
-  useEffect(() => {
-    // Clear pending timeout
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current)
-    }
-
-    // Basic gating: only auto-save when dirty and not currently saving
-    if (!isDirty || isSubmitting || mutationInProgress) {
-      return
-    }
-
-    // Debounce auto-save
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      // SAFETY NET: Check refs synchronously to prevent duplicate creation race condition
-      // React state updates (setActivityId) are async, so we use refs for immediate checks
-      if (createInProgressRef.current) {
-        // Another create is already in flight - skip this auto-save
-        return
-      }
-
-      try {
-        setAutoSaveStatus('saving')
-
-        const formData = getValues()
-        const currentHash = JSON.stringify(formData)
-
-        // Only trigger auto-save if values have actually changed
-        if (currentHash === lastSavedHash.current) {
-          setAutoSaveStatus('idle')
-          return
-        }
-
-        // Validate form data (clears previous errors and sets new ones if invalid)
-        const { isValid } = validateFormData(formData)
-
-        if (!isValid) {
-          setAutoSaveStatus('idle')
-          return
-        }
-
-        const payload = toCustomCruiseApiPayload(formData)
-
-        // Use ref for immediate check (state may be stale due to async nature)
-        if (activityId || activityIdRef.current) {
-          // Update existing - send full payload (not just customCruiseDetails)
-          const id = activityId || activityIdRef.current!
-          await updateCustomCruise.mutateAsync({
-            id,
-            data: payload as any,
-          })
-        } else {
-          // SAFETY NET: Mark create as in progress BEFORE the API call
-          createInProgressRef.current = true
-
-          try {
-            // Create new
-            const response = await createCustomCruise.mutateAsync(payload)
-            if (response.id) {
-              // Update ref immediately (synchronous) before React state update
-              activityIdRef.current = response.id
-              setActivityId(response.id)
-            }
-          } finally {
-            // Always clear the flag, even on error
-            createInProgressRef.current = false
-          }
-        }
-
-        setAutoSaveStatus('saved')
-        setLastSavedAt(new Date())
-        lastSavedHash.current = currentHash
-        reset(formData, { keepDirty: false })
-      } catch (err) {
-        setAutoSaveStatus('error')
-
-        // Map server errors to form fields
-        const apiError = err as any
-        if (apiError?.response?.data?.errors) {
-          const fieldErrors: ServerFieldError[] = Object.entries(apiError.response.data.errors).flatMap(
-            ([field, messages]) => (messages as string[]).map((message) => ({ field, message }))
-          )
-          mapServerErrors(fieldErrors, setError, CUSTOM_CRUISE_FORM_FIELDS)
-          scrollToFirstError(errors)
-        }
-
-        toast({
-          title: 'Auto-save failed',
-          description: apiError?.message || 'Please try again.',
-          variant: 'destructive',
-        })
-      }
-    }, 1500)
-
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current)
-      }
-    }
-  }, [
-    // Use changeCounter which is updated by subscription effect AFTER render
-    // This avoids the "Cannot update component while rendering" error
-    changeCounter,
-    isDirty,
-    isSubmitting,
-    mutationInProgress,
-    activityId,
-    getValues,
-    reset,
-    setError,
-    toast,
-    createCustomCruise,
-    updateCustomCruise,
-    validateFormData,
-    errors,
-  ])
+  // Autosave removed in #306 — see useUnsavedChangesWarning below.
+  useUnsavedChangesWarning(isDirty)
 
   // Force save handler
   const forceSave = useCallback(async () => {
@@ -722,8 +595,6 @@ export function CustomCruiseForm({
     const payload = { ...basePayload, pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
 
     try {
-      setAutoSaveStatus('saving')
-
       if (activityId) {
         // Update existing - send full payload (not just customCruiseDetails)
         await updateCustomCruise.mutateAsync({
@@ -737,15 +608,12 @@ export function CustomCruiseForm({
         }
       }
 
-      setAutoSaveStatus('saved')
-      setLastSavedAt(new Date())
+      // Reset RHF dirty state so the "Unsaved changes" badge clears
       reset(formData, { keepDirty: false })
 
       // Show success overlay and redirect
       setShowSuccess(true)
     } catch (err) {
-      setAutoSaveStatus('error')
-
       const apiError = err as any
       if (apiError?.response?.data?.errors) {
         const fieldErrors: ServerFieldError[] = Object.entries(apiError.response.data.errors).flatMap(
@@ -821,7 +689,6 @@ export function CustomCruiseForm({
     const payload = toCustomCruiseApiPayload(formData)
 
     try {
-      setAutoSaveStatus('saving')
       let savedId = activityId
 
       if (activityId) {
@@ -837,8 +704,7 @@ export function CustomCruiseForm({
         }
       }
 
-      setAutoSaveStatus('saved')
-      setLastSavedAt(new Date())
+      // Reset RHF dirty state so the "Unsaved changes" badge clears
       reset(formData, { keepDirty: false })
 
       // Now generate port schedule
@@ -846,7 +712,6 @@ export function CustomCruiseForm({
         generatePortSchedule.mutate(savedId)
       }
     } catch (err) {
-      setAutoSaveStatus('error')
       const apiError = err as any
       toast({
         title: 'Save failed',
@@ -972,34 +837,17 @@ export function CustomCruiseForm({
           </div>
         </div>
 
-        {/* Auto-Save Status Indicator */}
+        {/* Unsaved-changes indicator — replaces the autosave status block (#306) */}
         <div className="flex items-center gap-2 text-sm">
-          {autoSaveStatus === 'saving' && (
+          {isDirty ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-              <span className="text-gray-500">Saving...</span>
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <span className="text-amber-700">Unsaved changes</span>
             </>
-          )}
-          {autoSaveStatus === 'saved' && lastSavedAt && (
+          ) : (
             <>
               <Check className="h-4 w-4 text-green-600" />
-              <span className="text-gray-500">
-                Saved {formatDistanceToNow(lastSavedAt, { addSuffix: true })}
-              </span>
-            </>
-          )}
-          {autoSaveStatus === 'error' && (
-            <>
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span className="text-red-600">Error - Click Save to retry</span>
-            </>
-          )}
-          {autoSaveStatus === 'idle' && (
-            <>
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-              </svg>
-              <span className="text-gray-400">Not saved yet</span>
+              <span className="text-gray-500">All changes saved</span>
             </>
           )}
         </div>

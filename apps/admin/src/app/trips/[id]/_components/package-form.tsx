@@ -16,9 +16,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useSaveStatus } from '@/hooks/use-save-status'
-import { Package, FileText, DollarSign, Loader2, Check, Link as LinkIcon, Unlink } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
+import { Package, FileText, DollarSign, Check, AlertCircle, Link as LinkIcon, Unlink } from 'lucide-react'
 import type { PackageResponseDto, PackageLinkedActivityDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -123,7 +122,6 @@ export function PackageForm({
   )
 
   // Safety net ref to prevent duplicate creation race condition
-  const createInProgressRef = useRef(false)
 
   // Fetch package data if not provided
   const { data: fetchedPackageData } = useBooking(packageId || null, {
@@ -137,17 +135,8 @@ export function PackageForm({
   const linkActivities = useLinkActivities()
   const unlinkActivities = useUnlinkActivities()
 
-  // Auto-save state
-  const {
-    saveStatus: autoSaveStatus,
-    setSaveStatus: setAutoSaveStatus,
-    lastSavedAt,
-    setLastSavedAt,
-  } = useSaveStatus({
-    activityId: packageId,
-    updatedAt: packageData?.updatedAt,
-  })
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  // Autosave was removed in #306. Form saves only via the manual Save Changes
+  // button; the header "Unsaved changes" badge below reflects RHF isDirty.
 
   // Initialize react-hook-form with Zod validation
   const form = useForm<PackageFormData>({
@@ -163,7 +152,7 @@ export function PackageForm({
     getValues,
     reset,
     trigger,
-    formState: { errors, isDirty, isValid, isValidating, isSubmitting },
+    formState: { errors, isDirty },
   } = form
 
   // useWatch for form fields
@@ -204,94 +193,11 @@ export function PackageForm({
     }
   }, [packageData, reset])
 
-  // Watch all form values for auto-save
+  // Watch all form values so pricingData useMemo below re-runs on edits.
   const watchedValues = useWatch({ control })
-  // Create stable string representation for dependency comparison
-  // useWatch returns new object reference every render - JSON.stringify creates stable primitive
-  const watchedValuesKey = useMemo(() => JSON.stringify(watchedValues), [watchedValues])
 
-  // Auto-save effect
-  useEffect(() => {
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current)
-    }
-
-    if (!isDirty || !isValid || isValidating || isSubmitting || createBooking.isPending || updateBooking.isPending) {
-      return
-    }
-
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      // SAFETY NET: Check refs to prevent duplicate creation race condition
-      if (createInProgressRef.current) {
-        return
-      }
-
-      setAutoSaveStatus('saving')
-      try {
-        const formData = getValues()
-
-        let response
-        // Use ref for immediate check (state may be stale)
-        if (currentPackageId || packageIdRef.current) {
-          const id = currentPackageId || packageIdRef.current!
-          const updatePayload = { ...toPackageUpdatePayload(formData), pricingBreakdownJson: pricingBreakdown, bookingDate: bookingDate || null }
-          response = await updateBooking.mutateAsync({ id, data: updatePayload })
-        } else {
-          // Mark create as in progress before API call
-          createInProgressRef.current = true
-          try {
-            const createPayload = { ...toPackageApiPayload(formData, tripId), pricingBreakdownJson: pricingBreakdown, bookingDate: bookingDate || null }
-            response = await createBooking.mutateAsync(createPayload)
-          } finally {
-            createInProgressRef.current = false
-          }
-        }
-
-        if (response.id && !packageIdRef.current) {
-          // Update ref immediately (synchronous) before React state update
-          packageIdRef.current = response.id
-          setCurrentPackageId(response.id)
-        }
-
-        // Update activityPricingId from response (created/returned by API)
-        if (response.activityPricingId && response.activityPricingId !== activityPricingId) {
-          setActivityPricingId(response.activityPricingId)
-        }
-
-        setAutoSaveStatus('saved')
-        setLastSavedAt(new Date())
-      } catch (err: any) {
-        setAutoSaveStatus('error')
-        toast({
-          title: 'Auto-save failed',
-          description: err.message,
-          variant: 'destructive',
-        })
-      }
-    }, 1000)
-
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current)
-      }
-    }
-  }, [
-    watchedValuesKey, // Use stable string instead of object reference
-    isDirty,
-    isValid,
-    isValidating,
-    isSubmitting,
-    currentPackageId,
-    activityPricingId,
-    tripId,
-    getValues,
-    pricingBreakdown,
-    createBooking,
-    updateBooking,
-    toast,
-    setAutoSaveStatus,
-    setLastSavedAt,
-  ])
+  // Autosave removed in #306 — see useUnsavedChangesWarning below.
+  useUnsavedChangesWarning(isDirty)
 
   // Force save handler
   const forceSave = useCallback(async () => {
@@ -317,7 +223,6 @@ export function PackageForm({
       return
     }
 
-    setAutoSaveStatus('saving')
     try {
       const formData = getValues()
 
@@ -339,8 +244,8 @@ export function PackageForm({
         setActivityPricingId(response.activityPricingId)
       }
 
-      setAutoSaveStatus('saved')
-      setLastSavedAt(new Date())
+      // Reset RHF dirty state so the "Unsaved changes" badge clears
+      reset(getValues(), { keepValues: true, keepDirty: false })
 
       toast({
         title: 'Package saved',
@@ -349,7 +254,6 @@ export function PackageForm({
 
       onSuccess?.()
     } catch (err: any) {
-      setAutoSaveStatus('error')
       toast({
         title: 'Save failed',
         description: err.message,
@@ -357,19 +261,19 @@ export function PackageForm({
       })
     }
   }, [
-    isValid,
-    errors,
+    trigger,
+    form,
+    reset,
     currentPackageId,
     activityPricingId,
     tripId,
     getValues,
     pricingBreakdown,
+    bookingDate,
     createBooking,
     updateBooking,
     toast,
     onSuccess,
-    setAutoSaveStatus,
-    setLastSavedAt,
   ])
 
   // Link activity to package
@@ -536,22 +440,18 @@ export function PackageForm({
               </Select>
             </div>
 
-            {/* Auto-save Status */}
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              {autoSaveStatus === 'saving' && (
+            {/* Unsaved-changes indicator — replaces the autosave status block (#306) */}
+            <div className="flex items-center gap-2 text-sm">
+              {isDirty ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Saving...</span>
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <span className="text-amber-700">Unsaved changes</span>
                 </>
-              )}
-              {autoSaveStatus === 'saved' && lastSavedAt && (
+              ) : (
                 <>
-                  <Check className="h-4 w-4 text-green-500" />
-                  <span>Saved {formatDistanceToNow(lastSavedAt, { addSuffix: true })}</span>
+                  <Check className="h-4 w-4 text-green-600" />
+                  <span className="text-gray-500">All changes saved</span>
                 </>
-              )}
-              {autoSaveStatus === 'error' && (
-                <span className="text-red-500">Save failed</span>
               )}
             </div>
 
