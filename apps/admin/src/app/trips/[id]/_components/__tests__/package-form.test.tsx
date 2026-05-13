@@ -27,14 +27,7 @@ vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: vi.fn() }),
 }))
 
-vi.mock('@/hooks/use-save-status', () => ({
-  useSaveStatus: () => ({
-    saveStatus: 'synced',
-    setSaveStatus: vi.fn(),
-    lastSavedAt: null,
-    setLastSavedAt: vi.fn(),
-  }),
-}))
+// use-save-status was removed in #306 along with autosave; no mock needed.
 
 vi.mock('@/hooks/use-payment-schedules', () => ({
   usePaymentSchedule: () => ({ data: null, isLoading: false }),

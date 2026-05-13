@@ -1,14 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useSaveStatus } from '@/hooks/use-save-status'
+import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Anchor, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { Anchor, ChevronDown, ChevronUp, Sparkles, Check, AlertCircle } from 'lucide-react'
 import type { ActivityResponseDto, ItineraryDayWithActivitiesDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -99,9 +98,6 @@ export function PortInfoForm({
   // Track activity ID (for create->update transition)
   const [activityId, setActivityId] = useState<string | null>(activity?.id || null)
 
-  // Safety net refs to prevent duplicate creation race condition
-  const activityIdRef = useRef<string | null>(activity?.id || null)
-  const createInProgressRef = useRef(false)
 
   // Booking status state
   const [showSuccess, setShowSuccess] = useState(false)
@@ -110,17 +106,8 @@ export function PortInfoForm({
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
   const queryClient = useQueryClient()
 
-  // Auto-save state (with date validation)
-  const {
-    saveStatus: autoSaveStatus,
-    setSaveStatus: setAutoSaveStatus,
-    lastSavedAt,
-    setLastSavedAt,
-  } = useSaveStatus({
-    activityId: activity?.id,
-    updatedAt: activity?.updatedAt,
-  })
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  // Autosave was removed in #306. Form saves only via the manual Save Changes
+  // button; the header "Unsaved changes" badge below reflects RHF isDirty.
 
   // Setup react-hook-form with Zod validation
   const form = useForm<PortInfoFormData>({
@@ -135,7 +122,7 @@ export function PortInfoForm({
     setValue,
     getValues,
     reset,
-    formState: { errors, isDirty, isValid, isValidating, isSubmitting },
+    formState: { errors, isDirty },
   } = form
 
   // useWatch for custom components (Selects, DatePickers, TimePickers, Checkbox)
@@ -146,11 +133,6 @@ export function PortInfoForm({
   const departureTimeValue = useWatch({ control, name: 'portInfoDetails.departureTime' })
   const tenderRequiredValue = useWatch({ control, name: 'portInfoDetails.tenderRequired' })
 
-  // Watch all form values for auto-save
-  const watchedValues = useWatch({ control })
-  // Create stable string representation for dependency comparison
-  // useWatch returns new object reference every render - JSON.stringify creates stable primitive
-  const watchedValuesKey = useMemo(() => JSON.stringify(watchedValues), [watchedValues])
   const portNameValue = useWatch({ control, name: 'portInfoDetails.portName' })
 
   // Auto-generate activity name from port name
@@ -264,90 +246,11 @@ export function PortInfoForm({
     }
   }, [portInfoData, dayId, dayDate, reset])
 
-  // Auto-save effect with validation gating
-  useEffect(() => {
-    // Clear any pending auto-save
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current)
-    }
-
-    // Gate auto-save on validation state
-    if (!isDirty || !isValid || isValidating || isSubmitting || createPortInfo.isPending || updatePortInfo.isPending) {
-      return
-    }
-
-    // Debounce the save
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      // SAFETY NET: Check refs to prevent duplicate creation race condition
-      if (createInProgressRef.current) {
-        return
-      }
-
-      setAutoSaveStatus('saving')
-
-      try {
-        const formData = getValues()
-        const payload = toPortInfoApiPayload(formData)
-
-        // Use ref for immediate check (state may be stale)
-        if (activityId || activityIdRef.current) {
-          // Update existing
-          const id = activityId || activityIdRef.current!
-          await updatePortInfo.mutateAsync({ id, data: payload.portInfoDetails || {} })
-        } else {
-          // Mark create as in progress before API call
-          createInProgressRef.current = true
-          try {
-            // Create new
-            const result = await createPortInfo.mutateAsync(payload)
-            if (result?.id) {
-              // Update ref immediately (synchronous) before React state update
-              activityIdRef.current = result.id
-              setActivityId(result.id)
-            }
-          } finally {
-            createInProgressRef.current = false
-          }
-        }
-
-        setAutoSaveStatus('saved')
-        setLastSavedAt(new Date())
-      } catch (err: any) {
-        setAutoSaveStatus('error')
-        toast({
-          title: 'Auto-save failed',
-          description: err.message || 'Failed to save port information',
-          variant: 'destructive',
-        })
-      }
-    }, 1000)
-
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current)
-      }
-    }
-  }, [
-    watchedValuesKey, // Use stable string instead of object reference
-    isDirty,
-    isValid,
-    isValidating,
-    isSubmitting,
-    activityId,
-    getValues,
-    createPortInfo,
-    updatePortInfo,
-    toast,
-    setAutoSaveStatus,
-    setLastSavedAt,
-  ])
+  // Autosave removed in #306 — see useUnsavedChangesWarning below.
+  useUnsavedChangesWarning(isDirty)
 
   // Force save function
   const forceSave = useCallback(async () => {
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current)
-    }
-
     // Validate before saving
     const isFormValid = await form.trigger()
     if (!isFormValid) {
@@ -359,8 +262,6 @@ export function PortInfoForm({
       })
       return
     }
-
-    setAutoSaveStatus('saving')
 
     try {
       const formData = getValues()
@@ -375,13 +276,12 @@ export function PortInfoForm({
         }
       }
 
-      setAutoSaveStatus('saved')
-      setLastSavedAt(new Date())
+      // Reset RHF dirty state so the "Unsaved changes" badge clears
+      reset(getValues(), { keepValues: true, keepDirty: false })
 
       // Show success overlay and redirect
       setShowSuccess(true)
     } catch (err: any) {
-      setAutoSaveStatus('error')
       toast({
         title: 'Save failed',
         description: err.message || 'Failed to save port information',
@@ -390,14 +290,13 @@ export function PortInfoForm({
     }
   }, [
     form,
+    reset,
     errors,
     activityId,
     getValues,
     createPortInfo,
     updatePortInfo,
     toast,
-    setAutoSaveStatus,
-    setLastSavedAt,
   ])
 
   const handleAiSubmit = () => {
@@ -485,34 +384,17 @@ export function PortInfoForm({
           </div>
         </div>
 
-        {/* Auto-Save Status Indicator */}
+        {/* Unsaved-changes indicator — replaces the autosave status block (#306) */}
         <div className="flex items-center gap-2 text-sm">
-          {autoSaveStatus === 'saving' && (
+          {isDirty ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-              <span className="text-gray-500">Saving...</span>
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <span className="text-amber-700">Unsaved changes</span>
             </>
-          )}
-          {autoSaveStatus === 'saved' && lastSavedAt && (
+          ) : (
             <>
               <Check className="h-4 w-4 text-green-600" />
-              <span className="text-gray-500">
-                Saved {formatDistanceToNow(lastSavedAt, { addSuffix: true })}
-              </span>
-            </>
-          )}
-          {autoSaveStatus === 'error' && (
-            <>
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span className="text-red-600">Error - Click Save to retry</span>
-            </>
-          )}
-          {autoSaveStatus === 'idle' && (
-            <>
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-              </svg>
-              <span className="text-gray-400">Not saved yet</span>
+              <span className="text-gray-500">All changes saved</span>
             </>
           )}
         </div>
@@ -520,7 +402,7 @@ export function PortInfoForm({
         {/* Booking Button */}
         <BookingHeaderButton
           activityId={activityId}
-          activityName={watchedValues.portInfoDetails?.portName || 'Port Info'}
+          activityName={portNameValue || 'Port Info'}
           activityType="port_info"
           isBooked={activityIsBooked}
           bookingDate={activityBookingDate}

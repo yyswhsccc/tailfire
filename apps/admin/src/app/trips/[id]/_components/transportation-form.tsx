@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { api } from '@/lib/api'
-import { useSaveStatus } from '@/hooks/use-save-status'
+import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
@@ -48,14 +48,12 @@ import {
   ImageIcon,
   Globe,
   Key,
-  Loader2,
   Check,
   AlertCircle,
   ChevronUp,
   ChevronDown,
   Train,
 } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
 import {
@@ -280,8 +278,6 @@ export function TransportationForm({
   const [activityId, setActivityId] = useState<string | null>(activity?.id || null)
 
   // Safety net refs to prevent duplicate creation race condition
-  const activityIdRef = useRef<string | null>(activity?.id || null)
-  const createInProgressRef = useRef(false)
 
   // Activity pricing ID (gated on this for payment schedule)
   const [activityPricingId, setActivityPricingId] = useState<string | null>(null)
@@ -316,13 +312,8 @@ export function TransportationForm({
   // Track supplier commission rate from selected supplier
   const [supplierCommissionRate, setSupplierCommissionRate] = useState<number | null>(null)
 
-  // Auto-save status tracking (with date validation)
-  const { saveStatus, setSaveStatus, lastSavedAt, setLastSavedAt } = useSaveStatus({
-    activityId: activity?.id,
-    updatedAt: activity?.updatedAt,
-  })
-  const failureToastShown = useRef(false)
-  const lastSavedSnapshotRef = useRef<string | null>(null)
+  // Autosave was removed in #306. Form saves only via the manual Save Changes
+  // button; the header "Unsaved changes" badge below reflects RHF isDirty.
 
   // Fetch full transportation data if editing
   const { data: transportationData } = useTransportation(activityId || '')
@@ -346,7 +337,7 @@ export function TransportationForm({
     getValues,
     reset,
     setError,
-    formState: { errors, isDirty, isValid, isValidating, isSubmitting },
+    formState: { errors, isDirty },
   } = form
 
   // Watch specific fields for auto-save
@@ -607,8 +598,6 @@ export function TransportationForm({
       queueMicrotask(() => {
         if (!cancelled) {
           reset(defaults, { keepDirty: false })
-          // Update snapshot to prevent immediate re-save
-          lastSavedSnapshotRef.current = JSON.stringify(getValues())
         }
       })
     }
@@ -638,105 +627,8 @@ export function TransportationForm({
     [activityId, createMutation, updateMutation, pricingBreakdown, activityBookingDate]
   )
 
-  // Auto-save effect with proper gating
-  useEffect(() => {
-    // Gate conditions per plan spec
-    if (!isDirty || !isValid || isValidating || isSubmitting) {
-      return
-    }
-    if (createMutation.isPending || updateMutation.isPending) {
-      return
-    }
-    if (!dayId) {
-      return
-    }
-
-    // Compare against last saved snapshot
-    const currentSnapshot = JSON.stringify(getValues())
-    if (currentSnapshot === lastSavedSnapshotRef.current) {
-      return
-    }
-
-    const timer = setTimeout(async () => {
-      // SAFETY NET: Check refs to prevent duplicate creation race condition
-      if (createInProgressRef.current) {
-        return
-      }
-
-      setSaveStatus('saving')
-
-      try {
-        // Check if we're creating (no activity yet)
-        const isCreating = !activityId && !activityIdRef.current
-        if (isCreating) {
-          createInProgressRef.current = true
-        }
-
-        let response
-        try {
-          response = await saveFn(getValues())
-        } finally {
-          if (isCreating) {
-            createInProgressRef.current = false
-          }
-        }
-
-        // Update activity ID on create
-        if (response.id && !activityIdRef.current) {
-          // Update ref immediately (synchronous) before React state update
-          activityIdRef.current = response.id
-          setActivityId(response.id)
-        }
-
-        // Reset dirty state and update snapshot
-        reset(getValues(), { keepDirty: false })
-        lastSavedSnapshotRef.current = JSON.stringify(getValues())
-
-        setSaveStatus('saved')
-        setLastSavedAt(new Date())
-        failureToastShown.current = false
-      } catch (err: any) {
-        setSaveStatus('error')
-
-        // Map server validation errors to form fields
-        if (err.fieldErrors) {
-          mapServerErrors(err.fieldErrors, setError, TRANSPORTATION_FORM_FIELDS)
-        }
-
-        // Show toast only once per error session
-        if (!failureToastShown.current) {
-          toast({
-            title: 'Auto-save failed',
-            description: err.message || 'Please check the form for errors.',
-            variant: 'destructive',
-          })
-          failureToastShown.current = true
-          setTimeout(() => {
-            failureToastShown.current = false
-          }, 5000)
-        }
-      }
-    }, 500) // 500ms debounce
-
-    return () => clearTimeout(timer)
-  }, [
-    watchedFields,
-    isDirty,
-    isValid,
-    isValidating,
-    isSubmitting,
-    createMutation.isPending,
-    updateMutation.isPending,
-    dayId,
-    activityId,
-    getValues,
-    saveFn,
-    reset,
-    setError,
-    setLastSavedAt,
-    setSaveStatus,
-    toast,
-  ])
+  // Autosave removed in #306 — see useUnsavedChangesWarning below.
+  useUnsavedChangesWarning(isDirty)
 
   // Toggle feature
   const toggleFeature = (feature: string) => {
@@ -750,8 +642,6 @@ export function TransportationForm({
   // Form submission handler
   const onSubmit = handleSubmit(
     async (data) => {
-      // Success - force save
-      setSaveStatus('saving')
       try {
         const response = await saveFn(data)
 
@@ -760,14 +650,10 @@ export function TransportationForm({
         }
 
         reset(getValues(), { keepDirty: false })
-        lastSavedSnapshotRef.current = JSON.stringify(getValues())
-        setSaveStatus('saved')
-        setLastSavedAt(new Date())
 
         // Show success overlay and redirect
         setShowSuccess(true)
       } catch (err: any) {
-        setSaveStatus('error')
         if (err.fieldErrors) {
           mapServerErrors(err.fieldErrors, setError, TRANSPORTATION_FORM_FIELDS)
         }
@@ -820,26 +706,17 @@ export function TransportationForm({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Auto-Save Status Indicator */}
+          {/* Unsaved-changes indicator — replaces the autosave status block (#306) */}
           <div className="flex items-center gap-2 text-sm mr-4">
-            {saveStatus === 'saving' && (
+            {isDirty ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-                <span className="text-gray-500">Saving...</span>
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <span className="text-amber-700">Unsaved changes</span>
               </>
-            )}
-            {saveStatus === 'saved' && lastSavedAt && (
+            ) : (
               <>
                 <Check className="h-4 w-4 text-green-600" />
-                <span className="text-gray-500">
-                  Saved {formatDistanceToNow(lastSavedAt, { addSuffix: true })}
-                </span>
-              </>
-            )}
-            {saveStatus === 'error' && (
-              <>
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <span className="text-red-600">Error</span>
+                <span className="text-gray-500">All changes saved</span>
               </>
             )}
           </div>

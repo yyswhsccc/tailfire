@@ -175,6 +175,7 @@ export async function queryUpcomingDepartures(
       count(*) FILTER (WHERE t.start_date <= CURRENT_DATE + 7) ::int AS departing_within_7_days,
       count(*) FILTER (WHERE t.start_date <= CURRENT_DATE + 14) ::int AS departing_within_14_days
     FROM trips t
+    ${TRIP_AGENT_LATERAL}
     WHERE ${scope}
       AND t.status IN ('active', 'travelling')
       AND t.start_date >= CURRENT_DATE

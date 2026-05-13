@@ -349,6 +349,7 @@ export async function queryPaymentSchedule(
     LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
     LEFT JOIN itineraries itin ON itin.id = iday.itinerary_id
     JOIN trips t ON t.id = COALESCE(itin.trip_id, ia.trip_id)
+    ${TRIP_AGENT_LATERAL}
     WHERE ${scope}
       AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
       ${agentFilter}
@@ -382,6 +383,7 @@ export async function queryPaymentSchedule(
     LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
     LEFT JOIN itineraries itin ON itin.id = iday.itinerary_id
     JOIN trips t ON t.id = COALESCE(itin.trip_id, ia.trip_id)
+    ${TRIP_AGENT_LATERAL}
     LEFT JOIN contacts c ON c.id = t.primary_contact_id
     LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
     WHERE ${scope}
@@ -423,6 +425,7 @@ export async function queryPaymentSchedule(
     LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
     LEFT JOIN itineraries itin ON itin.id = iday.itinerary_id
     JOIN trips t ON t.id = COALESCE(itin.trip_id, ia.trip_id)
+    ${TRIP_AGENT_LATERAL}
     WHERE ${scope}
       AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
       ${agentFilter}

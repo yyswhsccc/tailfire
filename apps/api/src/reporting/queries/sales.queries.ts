@@ -973,6 +973,7 @@ export async function queryBookingPipeline(
         coalesce((t.estimated_total_cost::numeric * 100)::bigint, 0)::bigint AS estimated_total_cents,
         (SELECT count(*)::int FROM trip_travelers tt WHERE tt.trip_id = t.id) AS traveler_count
       FROM trips t
+      ${TRIP_AGENT_LATERAL}
       LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
       LEFT JOIN contacts c ON c.id = t.primary_contact_id
       WHERE ${scope}
