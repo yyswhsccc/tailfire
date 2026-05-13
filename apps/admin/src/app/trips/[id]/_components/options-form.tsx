@@ -48,7 +48,7 @@ import {
   OPTIONS_FORM_FIELDS,
   type OptionsFormData,
 } from '@/lib/validation'
-import { mapServerErrors, scrollToFirstError, getErrorMessage } from '@/lib/validation/utils'
+import { mapServerErrors, scrollToFirstError, getErrorMessage, flattenErrors, formatFieldLabel } from '@/lib/validation/utils'
 import { TripDateWarning } from '@/components/ui/trip-date-warning'
 import { getDefaultMonthHint } from '@/lib/date-utils'
 import { usePendingDayResolution } from '@/components/ui/pending-day-picker'
@@ -215,6 +215,7 @@ export function OptionsForm({
     getValues,
     reset,
     setError,
+    trigger,
     formState: { errors, isDirty, isValid, isValidating, isSubmitting },
   } = form
 
@@ -490,8 +491,25 @@ export function OptionsForm({
 
   // Force save handler
   const handleForceSave = async () => {
-    if (!isValid) {
-      scrollToFirstError(errors)
+    // With mode: 'onSubmit', RHF doesn't populate errors until validation
+    // runs. Trigger first so we can name the failing fields in the toast
+    // instead of silently returning (#298).
+    const valid = await trigger()
+    if (!valid) {
+      const currentErrors = form.formState.errors as Record<string, unknown>
+      scrollToFirstError(currentErrors)
+      const errorFields = flattenErrors(currentErrors)
+      const details = errorFields
+        .map(f => {
+          const msg = getErrorMessage(currentErrors, f)
+          return `${formatFieldLabel(f)}: ${msg || 'invalid'}`
+        })
+        .join(', ')
+      toast({
+        title: 'Validation Error',
+        description: details || 'Please fix the errors before saving.',
+        variant: 'destructive',
+      })
       return
     }
     try {
