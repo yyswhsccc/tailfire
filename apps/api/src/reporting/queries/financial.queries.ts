@@ -17,7 +17,13 @@
 
 import { sql } from 'drizzle-orm'
 import type { DatabaseService } from '../../db/database.service'
-import { sqlIdList, tripScopeFilter, paginationSql } from './sales.queries'
+import {
+  sqlIdList,
+  tripScopeFilter,
+  paginationSql,
+  TRIP_AGENT_LATERAL,
+  TRIP_PRIMARY_AGENT_ID,
+} from './sales.queries'
 
 // Re-export shared helpers for downstream consumers
 export { sqlIdList, tripScopeFilter }
@@ -54,6 +60,7 @@ const CT_CANONICAL_JOIN = sql`
   LEFT JOIN itinerary_days iday ON iday.id = ia.itinerary_day_id
   LEFT JOIN itineraries itin ON itin.id = iday.itinerary_id
   JOIN trips t ON t.id = COALESCE(itin.trip_id, ia.trip_id)
+  ${TRIP_AGENT_LATERAL}
 `
 
 /** Informational activity types to exclude */
@@ -79,7 +86,7 @@ export async function queryCommissionAging(
   const { page, pageSize } = options
 
   const agentFilter = options.agentId
-    ? sql`AND t.owner_id = ${options.agentId}`
+    ? sql`AND ${TRIP_PRIMARY_AGENT_ID} = ${options.agentId}`
     : sql``
 
   const sortCol = options.sortBy === 'daysSinceDeparture'
@@ -125,7 +132,7 @@ export async function queryCommissionAging(
         ELSE '90+'
       END AS aging_bucket
     ${CT_CANONICAL_JOIN}
-    LEFT JOIN user_profiles up ON up.id = t.owner_id
+    LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
     WHERE ${scope}
       AND t.status IN ('travelling', 'travelled')
       AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
@@ -320,7 +327,7 @@ export async function queryPaymentSchedule(
   const { page, pageSize } = options
 
   const agentFilter = options.agentId
-    ? sql`AND t.owner_id = ${options.agentId}`
+    ? sql`AND ${TRIP_PRIMARY_AGENT_ID} = ${options.agentId}`
     : sql``
 
   const sortCol = options.sortBy === 'dueDate'
@@ -376,7 +383,7 @@ export async function queryPaymentSchedule(
     LEFT JOIN itineraries itin ON itin.id = iday.itinerary_id
     JOIN trips t ON t.id = COALESCE(itin.trip_id, ia.trip_id)
     LEFT JOIN contacts c ON c.id = t.primary_contact_id
-    LEFT JOIN user_profiles up ON up.id = t.owner_id
+    LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
     WHERE ${scope}
       AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
       ${agentFilter}
@@ -457,7 +464,7 @@ export async function queryAgentCommissionStatement(
   const { page, pageSize } = options
 
   const agentFilter = options.agentId
-    ? sql`AND t.owner_id = ${options.agentId}`
+    ? sql`AND ${TRIP_PRIMARY_AGENT_ID} = ${options.agentId}`
     : sql``
 
   const sortCol = options.sortBy === 'grossCommission'
@@ -490,7 +497,7 @@ export async function queryAgentCommissionStatement(
       t.start_date AS departure_date,
       up.first_name AS agent_first_name,
       up.last_name AS agent_last_name,
-      t.owner_id AS agent_id,
+      ${TRIP_PRIMARY_AGENT_ID} AS agent_id,
       coalesce(ap.total_price_cents, 0)::bigint AS total_sales_cents,
       ct.commission_rate,
       coalesce(ct.gross_commission_cents, 0)::int AS gross_commission,
@@ -498,7 +505,7 @@ export async function queryAgentCommissionStatement(
       coalesce(ct.paid_cents, 0)::int AS paid_to_agent,
       (coalesce(ct.gross_commission_cents, 0) - coalesce(ct.paid_cents, 0))::int AS pending
     ${CT_CANONICAL_JOIN}
-    LEFT JOIN user_profiles up ON up.id = t.owner_id
+    LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
     WHERE ${scope}
       AND ia.activity_type NOT IN ${EXCLUDED_ACTIVITY_TYPES}
       ${agentFilter}
@@ -528,7 +535,7 @@ export async function queryAgentCommissionStatement(
   // Summary: aggregates across all matching rows
   const summaryResult = await db.client.execute(sql`
     SELECT
-      count(DISTINCT t.owner_id)::int AS agent_count,
+      count(DISTINCT ${TRIP_PRIMARY_AGENT_ID})::int AS agent_count,
       count(*)::int AS total_items,
       coalesce(sum(ap.total_price_cents), 0)::bigint AS total_sales_cents,
       coalesce(sum(ct.gross_commission_cents), 0)::bigint AS total_gross_commission,

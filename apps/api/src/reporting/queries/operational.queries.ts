@@ -17,7 +17,12 @@
 
 import { sql } from 'drizzle-orm'
 import type { DatabaseService } from '../../db/database.service'
-import { tripScopeFilter, paginationSql } from './sales.queries'
+import {
+  tripScopeFilter,
+  paginationSql,
+  TRIP_AGENT_LATERAL,
+  TRIP_PRIMARY_AGENT_ID,
+} from './sales.queries'
 
 // ============================================================================
 // Types
@@ -62,13 +67,14 @@ export async function queryUpcomingDepartures(
   const { page, pageSize } = options
 
   const agentFilter = options.agentId
-    ? sql`AND t.owner_id = ${options.agentId}`
+    ? sql`AND ${TRIP_PRIMARY_AGENT_ID} = ${options.agentId}`
     : sql``
 
   // Count query
   const countResult = await db.client.execute(sql`
     SELECT count(*)::int AS total_rows
     FROM trips t
+    ${TRIP_AGENT_LATERAL}
     WHERE ${scope}
       AND t.status IN ('active', 'travelling')
       AND t.start_date >= CURRENT_DATE
@@ -105,8 +111,9 @@ export async function queryUpcomingDepartures(
         ELSE 'unpaid'
       END AS payment_status
     FROM trips t
+    ${TRIP_AGENT_LATERAL}
     LEFT JOIN contacts c ON c.id = t.primary_contact_id
-    LEFT JOIN user_profiles up ON up.id = t.owner_id
+    LEFT JOIN user_profiles up ON up.id = ${TRIP_PRIMARY_AGENT_ID}
     LEFT JOIN LATERAL (
       SELECT coalesce(sum(epi.expected_amount_cents), 0) AS total_expected_cents
       FROM activity_pricing ap2
