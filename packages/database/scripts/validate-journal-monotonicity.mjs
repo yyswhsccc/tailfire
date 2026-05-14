@@ -2,18 +2,21 @@
 /**
  * Journal monotonicity guard.
  *
- * Why this matters in two layers:
+ * Why this matters:
  *
- *   1. drizzle-orm's stock migrator skipped entries where
- *      `migration.folderMillis <= max(__drizzle_migrations.created_at)`.
- *      We replaced that with a hash-based applier
- *      (packages/database/src/migrate.ts) so OUR runtime no longer relies on
- *      monotonicity for correctness.
+ *   drizzle-orm's stock migrator decides whether to apply each migration by
+ *   comparing `migration.folderMillis` against
+ *   `max(__drizzle_migrations.created_at)` captured once at the start of the
+ *   run. If a NEW journal entry has `when` <= that max, Drizzle silently
+ *   SKIPS it (it thinks the entry has already been applied). The old
+ *   migrate.ts then masked the skip via a reconcile loop — that's what
+ *   caused the IC-payouts drift on 2026-05-14.
  *
- *   2. Even with the new runtime, non-monotonic `when` values make the
- *      journal confusing for humans and trip up any other tooling that
- *      assumes idx order = wall-clock order. We keep this validator to
- *      enforce that invariant for any NEW entry (idx > cutoff).
+ *   packages/database/src/migrate.ts no longer masks silent skips (the
+ *   reconcile loop is gone, replaced by a strict coverage check). So a
+ *   silent skip now fails the deploy loud — but the deploy still fails.
+ *   This validator is the upstream guard that catches the problem at PR
+ *   time, before it ever reaches a deploy.
  *
  * Pre-existing non-monotonic entries (idx ≤ cutoff) are grandfathered.
  *
@@ -64,9 +67,9 @@ for (const entry of entries) {
 }
 
 if (errors.length > 0) {
-  console.error('Journal monotonicity violation — the hash-based runtime will still apply these')
-  console.error('migrations, but mixing non-monotonic timestamps in NEW entries makes the journal')
-  console.error('harder to read and breaks downstream tooling that assumes idx order = wall-clock order:')
+  console.error('Journal monotonicity violation — drizzle-orm would silently skip these migrations')
+  console.error('(folderMillis <= max(__drizzle_migrations.created_at) at deploy time), and the')
+  console.error('strict coverage check in packages/database/src/migrate.ts would then fail the deploy:')
   errors.forEach((e) => console.error(`  ${e}`))
   console.error('')
   console.error("Fix: ensure the new entry's `when` value is greater than the largest existing `when`.")

@@ -44,16 +44,17 @@ import { existsSync, readdirSync, readFileSync } from 'fs'
  *
  * Recovery for already-drifted environments:
  * ------------------------------------------
- * The Prod IC-payouts drift from 2026-05-14 needs scripts/migration/
- * recover-prod-ic-payouts.mjs to run BEFORE this. That script applies the
- * 11 missing SQL files directly and writes correct tracking rows.
- * Wired into .github/workflows/deploy-prod.yml as a pre-migration step.
+ * The Prod IC-payouts drift from 2026-05-14 needs
+ * packages/database/scripts/recover-prod-ic-payouts.mjs to run BEFORE this.
+ * That script applies the 11 missing SQL files directly and writes correct
+ * tracking rows. Wired into .github/workflows/deploy-prod.yml as a
+ * pre-migration step.
  *
  * Future prevention:
  * ------------------
- * scripts/validate-journal-monotonicity.mjs is a CI gate that enforces
- * NEW journal entries always have `when` greater than every previous entry,
- * so this scenario can't happen for fresh migrations.
+ * packages/database/scripts/validate-journal-monotonicity.mjs is a CI gate
+ * that enforces NEW journal entries always have `when` greater than every
+ * previous entry, so this scenario can't happen for fresh migrations.
  *
  * @param connectionString - PostgreSQL connection string (session mode — DDL)
  */
