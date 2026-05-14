@@ -52,6 +52,7 @@ import { PaymentAuditService } from './payment-audit.service'
 import { PaymentTemplatesService } from './payment-templates.service'
 import { ActivityTotalsService } from './activity-totals.service'
 import { ActivityTravelersService } from './activity-travelers.service'
+import { ActivityTravelerAssignmentPolicy } from './activity-traveler-assignment.policy'
 import { ActivityBookingsService } from './activity-bookings.service'
 import { BookingValidationService } from './booking-validation.service'
 import { TripLifecycleService } from './trip-lifecycle.service'
@@ -167,6 +168,7 @@ import { TripAutomationsController } from './trip-automations.controller'
     PaymentTemplatesService,
     ActivityTotalsService,
     ActivityTravelersService,
+    ActivityTravelerAssignmentPolicy,
     ActivityBookingsService,
     BookingValidationService,
     TripLifecycleService,
