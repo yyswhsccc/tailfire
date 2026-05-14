@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import type { AgentCommissionDueDto } from '@tailfire/shared-types/api'
@@ -23,8 +24,14 @@ export function AgentPayableTable({ data, onRecordPayout }: AgentPayableTablePro
   const [adjustingAgent, setAdjustingAgent] = useState<{ userId: string; userName: string; currency: string } | null>(null)
 
   if (data.length === 0) {
-    return <p className="text-sm text-muted-foreground py-8 text-center">No payable commissions at this time.</p>
+    return <p className="text-sm text-muted-foreground py-8 text-center">No agents currently have payable commission.</p>
   }
+
+  // Hide the Adjustments column when no row carries an adjustment. Removes a
+  // noisy column for the common (and intended) case where everyone's roll-up
+  // is zero. Admins can still reach the dialog by clicking the row's Total
+  // (see the per-row open below).
+  const showAdjustmentsColumn = data.some((agent) => agent.adjustmentsCents !== 0)
 
   return (
     <>
@@ -35,7 +42,7 @@ export function AgentPayableTable({ data, onRecordPayout }: AgentPayableTablePro
           <TableHead>Currency</TableHead>
           <TableHead className="text-right">Bookings</TableHead>
           <TableHead className="text-right">Commission Due</TableHead>
-          <TableHead className="text-right">Adjustments</TableHead>
+          {showAdjustmentsColumn && <TableHead className="text-right">Adjustments</TableHead>}
           <TableHead className="text-right">Total Payable</TableHead>
           <TableHead></TableHead>
         </TableRow>
@@ -43,26 +50,38 @@ export function AgentPayableTable({ data, onRecordPayout }: AgentPayableTablePro
       <TableBody>
         {data.map((agent) => (
           <TableRow key={`${agent.userId}-${agent.currency}`}>
-            <TableCell className="font-medium">{agent.userName}</TableCell>
+            <TableCell className="font-medium">
+              {/* Clickable agent name → links to their profile so admins can
+                  cross-reference contact info, prior claims, etc. without
+                  navigating through Contacts. */}
+              <Link
+                href={`/contacts/${agent.userId}`}
+                className="underline-offset-2 hover:underline"
+              >
+                {agent.userName}
+              </Link>
+            </TableCell>
             <TableCell>{agent.currency}</TableCell>
             <TableCell className="text-right">{agent.bookingCount}</TableCell>
             <TableCell className="text-right">{formatCurrency(agent.commissionDueCents, agent.currency)}</TableCell>
-            <TableCell className="text-right">
-              {/*
-                Clickable adjustments figure — opens the agent-adjustments
-                management dialog so admins can add/edit/delete inline. The
-                figure shown is the rolled-up pending net from
-                getCommissionDue, so closing the dialog refreshes here too.
-              */}
-              <button
-                type="button"
-                className="underline-offset-2 hover:underline text-right tabular-nums"
-                onClick={() => setAdjustingAgent({ userId: agent.userId, userName: agent.userName, currency: agent.currency })}
-                aria-label={`Manage adjustments for ${agent.userName}`}
-              >
-                {formatCurrency(agent.adjustmentsCents, agent.currency)}
-              </button>
-            </TableCell>
+            {showAdjustmentsColumn && (
+              <TableCell className="text-right">
+                {/*
+                  Clickable adjustments figure — opens the agent-adjustments
+                  management dialog so admins can add/edit/delete inline. The
+                  figure shown is the rolled-up pending net from
+                  getCommissionDue, so closing the dialog refreshes here too.
+                */}
+                <button
+                  type="button"
+                  className="underline-offset-2 hover:underline text-right tabular-nums"
+                  onClick={() => setAdjustingAgent({ userId: agent.userId, userName: agent.userName, currency: agent.currency })}
+                  aria-label={`Manage adjustments for ${agent.userName}`}
+                >
+                  {formatCurrency(agent.adjustmentsCents, agent.currency)}
+                </button>
+              </TableCell>
+            )}
             <TableCell className="text-right font-semibold">{formatCurrency(agent.totalDueCents, agent.currency)}</TableCell>
             <TableCell>
               <div className="flex items-center justify-end gap-2">
@@ -85,7 +104,21 @@ export function AgentPayableTable({ data, onRecordPayout }: AgentPayableTablePro
                 )}
                 {onRecordPayout && (
                   <Button size="sm" variant="outline" onClick={() => onRecordPayout(agent.userId)}>
-                    Record Payout
+                    Record payout
+                  </Button>
+                )}
+                {/*
+                  When adjustments are hidden as a column, give admins another
+                  way to open the dialog — small "Adjust" affordance that
+                  preserves the workflow without bringing the column back.
+                */}
+                {!showAdjustmentsColumn && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setAdjustingAgent({ userId: agent.userId, userName: agent.userName, currency: agent.currency })}
+                  >
+                    Adjust
                   </Button>
                 )}
               </div>
