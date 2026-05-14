@@ -273,7 +273,7 @@ export function DiningForm({
         proposalStatus: diningData.proposalStatus,
         totalPriceCents: initialPricing.totalPriceCents,
         taxesAndFeesCents: initialPricing.taxesAndFeesCents,
-        currency: trip?.currency || initialPricing.currency,
+        currency: initialPricing.currency || trip?.currency,
         confirmationNumber: initialPricing.confirmationNumber,
         pricingType: diningData.pricingType || 'per_person',
         diningDetails: diningData.diningDetails || undefined,
