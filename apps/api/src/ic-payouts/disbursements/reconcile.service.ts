@@ -88,8 +88,14 @@ export class ReconcileService {
     for (const row of stuck) {
       // Defensive: a Drizzle select() can theoretically yield a row whose
       // selected fields are undefined if the underlying column reference was
-      // unresolved at query-build time. Skip silently — #328.
-      if (!row?.id) continue
+      // unresolved at query-build time. Skip but log loudly so the underlying
+      // schema-resolution bug is visible if it ever recurs — #328.
+      if (!row?.id) {
+        this.logger.warn(
+          '[ic-payouts] Reconcile sweep skipped a row with no id — possible schema-resolution race',
+        )
+        continue
+      }
       try {
         await this.disbursements.fail(row.id, STUCK_REASON, SYSTEM_ACTOR_ID)
         processed++
@@ -124,7 +130,15 @@ export class ReconcileService {
         lt(icDisbursements.updatedAt, cutoff),
       ))
 
-    // Filter out any row whose id didn't resolve (paranoid — #328).
-    return rows.filter((r): r is { id: string } => Boolean(r?.id))
+    // Filter out any row whose id didn't resolve (paranoid — #328). Log so a
+    // recurrence of the underlying schema-resolution bug stays visible.
+    const filtered = rows.filter((r): r is { id: string } => Boolean(r?.id))
+    const dropped = rows.length - filtered.length
+    if (dropped > 0) {
+      this.logger.warn(
+        `[ic-payouts] findStuck dropped ${dropped} row(s) with no id — possible schema-resolution race`,
+      )
+    }
+    return filtered
   }
 }
