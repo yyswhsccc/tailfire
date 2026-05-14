@@ -33,6 +33,7 @@ import type { AuthContext } from '../auth/auth.types'
 import { TripAccessService } from './trip-access.service'
 import { DayLocationService } from './day-location.service'
 import { GroupBillingService } from './group-billing.service'
+import { ActivityTravelerAssignmentPolicy } from './activity-traveler-assignment.policy'
 import * as Sentry from '@sentry/nestjs'
 
 // Type for activity thumbnails map
@@ -53,6 +54,7 @@ export class ActivitiesService {
     private readonly tripAccessService: TripAccessService,
     private readonly dayLocationService: DayLocationService,
     private readonly groupBillingService: GroupBillingService,
+    private readonly travelerAssignment: ActivityTravelerAssignmentPolicy,
   ) {}
 
   // ============================================================================
@@ -667,17 +669,7 @@ export class ActivitiesService {
     // Per-activity traveler editing remains available afterwards for the
     // case where some activities don't apply to all travelers.
     if (resolvedTripId) {
-      try {
-        await this.db.client.execute(sql`
-          INSERT INTO activity_travelers (activity_id, trip_traveler_id, trip_id)
-          SELECT ${activity.id}::uuid, tt.id, ${resolvedTripId}::uuid
-          FROM trip_travelers tt
-          WHERE tt.trip_id = ${resolvedTripId}::uuid
-          ON CONFLICT (activity_id, trip_traveler_id) DO NOTHING
-        `)
-      } catch (error) {
-        this.logger.warn(`Failed to auto-assign trip travelers to activity ${activity.id}: ${error}`)
-      }
+      await this.travelerAssignment.assignAllTripTravelersToActivity(activity.id, resolvedTripId)
     }
 
     // Emit audit event (after all DB operations succeed)
