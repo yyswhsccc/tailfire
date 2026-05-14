@@ -1,9 +1,9 @@
 'use client'
 
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronLeft, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { GuardedLink } from '@/lib/dirty-guard'
 
 export interface SidebarSection {
   title?: string
@@ -44,20 +44,20 @@ export function DetailSidebar({
   return (
     <aside className="w-44 h-full flex-shrink-0 border-r border-ash-200 bg-white overflow-y-auto">
       {/* Primary back link */}
-      <Link
+      <GuardedLink
         href={backHref}
         onClick={onNavigate}
         className="flex items-center gap-2 px-3 py-3 text-sm text-ash-600 hover:text-ash-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-phoenix-gold-500 focus-visible:ring-offset-2 focus-visible:ring-inset"
       >
         <ChevronLeft className="h-4 w-4" />
         {backLabel}
-      </Link>
+      </GuardedLink>
 
       {/* Additional back links */}
       {additionalBackLinks && additionalBackLinks.length > 0 && (
         <div className="border-b border-ash-200 pb-2">
           {additionalBackLinks.map((link, idx) => (
-            <Link
+            <GuardedLink
               key={idx}
               href={link.href}
               onClick={onNavigate}
@@ -65,7 +65,7 @@ export function DetailSidebar({
             >
               <ChevronLeft className="h-4 w-4" />
               {link.label}
-            </Link>
+            </GuardedLink>
           ))}
         </div>
       )}
@@ -118,7 +118,7 @@ export function DetailSidebar({
 
                 return (
                   <li key={item.href}>
-                    <Link
+                    <GuardedLink
                       href={item.href}
                       onClick={onNavigate}
                       className={cn(
@@ -140,7 +140,7 @@ export function DetailSidebar({
                           {item.badge}
                         </span>
                       )}
-                    </Link>
+                    </GuardedLink>
                   </li>
                 )
               })}

@@ -1,31 +1,38 @@
 'use client'
 
 /**
- * useUnsavedChangesWarning — prompts the user before they navigate away with
- * dirty form state. Replaces autosave on the activity-editor forms (#306).
+ * useUnsavedChangesWarning — warns the user before they navigate away with
+ * dirty form state. Two layers, both opt-in via this single hook call:
  *
- * Scope: browser-level only.
- *   - refresh, tab close, external link, hard URL change → native browser
- *     beforeunload dialog. Browser controls the message (most modern browsers
- *     ignore custom strings and show a stock prompt).
+ *   1. Browser beforeunload (refresh, tab close, hard URL change, external
+ *      link) — native dialog. Browser controls the message (modern browsers
+ *      ignore custom strings and show stock copy).
  *
- * In-app navigation (Next.js App Router <Link> clicks, router.push/replace,
- * back/forward buttons) is NOT intercepted here. An earlier draft tried to
- * monkeypatch window.history.pushState / replaceState and intercept popstate
- * with history.go(1) recovery; Codex flagged this as unsafe because App
- * Router uses replaceState for internal state sync (not just navigation),
- * which produced false-positive confirms, and popstate recovery could
- * loop or desync URL state. A proper in-app guard is tracked as a follow-up.
+ *   2. In-app navigation — registers with the DirtyGuardProvider so
+ *      <GuardedLink> and useGuardedRouter prompt before navigating. This is
+ *      the #313 follow-up to #306; #306 deliberately scoped out in-app nav
+ *      after Codex flagged the original history-monkeypatch approach as
+ *      unsafe coupling to App Router internals.
  *
- * For now: each form's Cancel button is the explicit "discard changes"
- * affordance, and clicking a sidebar/breadcrumb link while dirty silently
- * navigates away. The "Unsaved changes" badge in the form header signals
- * the state so the user can choose to click Save first.
+ * The in-app guard only catches navigation that goes through GuardedLink /
+ * useGuardedRouter. Bare <Link>s and raw useRouter() calls navigate silently
+ * — Codex's recommendation: that's the deliberate trade-off for safety.
+ *
+ * Forms call this once with their RHF isDirty value:
+ *
+ *   const { formState: { isDirty } } = form
+ *   useUnsavedChangesWarning(isDirty)
  */
 
 import { useEffect } from 'react'
+import { useRegisterDirtyGuard } from '@/lib/dirty-guard'
 
 export function useUnsavedChangesWarning(enabled: boolean): void {
+  // In-app guard: register a getter so the LATEST `enabled` is consulted
+  // at click time, not at registration time.
+  useRegisterDirtyGuard(() => enabled)
+
+  // Browser-level guard
   useEffect(() => {
     if (!enabled) return
 
