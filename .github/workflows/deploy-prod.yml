@@ -80,18 +80,6 @@ jobs:
           ENUMSQL
           echo "✅ Pre-migration enum setup complete"
 
-      - name: One-time recovery — IC-payouts drift (2026-05-14)
-        # Idempotent: each IC migration applies only if its witness (table /
-        # column / enum value) is missing. If the schema is correct but the
-        # tracking-row hash is stale, the script fixes only the tracking row
-        # (no DDL). Safe to leave in place until Prod is verified — remove
-        # the step + script in a follow-up PR once the drift is fully gone.
-        # The script lives inside packages/database/ so node's ESM resolver
-        # can find the hoisted `postgres` package.
-        run: |
-          node packages/database/scripts/recover-prod-ic-payouts.mjs
-          echo "✅ IC-payouts recovery script applied"
-
       - name: Run Drizzle migrations
         working-directory: apps/api
         run: pnpm db:migrate
