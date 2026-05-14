@@ -19,6 +19,7 @@
  * a supplier before saving (parent enforces the required rule on submit).
  */
 
+import { useEffect, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import {
@@ -30,7 +31,6 @@ import {
 } from '@/components/ui/select'
 import { SupplierCombobox } from '@/components/suppliers/supplier-combobox'
 import { useSupplier } from '@/hooks/use-suppliers'
-import type { SupplierDto } from '@tailfire/shared-types'
 
 /** Active currencies. ISO 4217 codes. Add to this list when business needs grow. */
 export const SUPPORTED_CURRENCIES = [
@@ -72,23 +72,34 @@ export function CheckCounterpartyFields({
   disabled,
   required = true,
 }: Props) {
-  // Resolve the currently-selected supplier by id so the combobox button
-  // can show the name (the combobox is value-by-name internally).
-  // Server-side search inside the combobox removes the previous 100-item
-  // cap that made suppliers past "Crystal Inn" unreachable.
-  const { data: selectedSupplier } = useSupplier(supplierId || null)
-  const selectedSupplierName = selectedSupplier?.name ?? null
+  // Pull the selected supplier by id so the combobox button can render its
+  // name (the SupplierCombobox tracks value-by-name, so it needs the name
+  // string for the current selection). Skips the fetch when nothing is
+  // selected.
+  const { data: selectedSupplier } = useSupplier(supplierId ?? null)
+  const selectedName = selectedSupplier?.name ?? null
 
-  const handleSupplierSelect = (supplier: SupplierDto | null) => {
-    onSupplierIdChange(supplier?.id ?? null)
-    // Seed senderName from the picked supplier when blank or when the
-    // current value still matches a supplier name (i.e., not user-typed
-    // override). Use the picked supplier's name directly — no need to
-    // search a local list.
-    if (supplier && (senderName.trim() === '' || senderName.trim() === selectedSupplierName)) {
-      onSenderNameChange(supplier.name)
+  // Remember names of every supplier we've seen via the picker so the
+  // senderName auto-fill heuristic can recognize a value as
+  // "matches-some-known-supplier" and replace it when the user re-picks.
+  const [seenNames, setSeenNames] = useState<Set<string>>(() => new Set())
+  useEffect(() => {
+    if (selectedSupplier?.name) {
+      setSeenNames((prev) => (prev.has(selectedSupplier.name) ? prev : new Set(prev).add(selectedSupplier.name)))
     }
-  }
+  }, [selectedSupplier?.name])
+
+  // When the selected supplier resolves, seed senderName from supplier.name —
+  // but only if the user hasn't typed an override, so we don't clobber d/b/a
+  // names. Picking a different supplier replaces the name (tracks the picker
+  // until the user edits).
+  useEffect(() => {
+    if (!selectedSupplier) return
+    if (senderName.trim() === '' || isAutoFilledFromAnySupplier(senderName, seenNames)) {
+      onSenderNameChange(selectedSupplier.name)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSupplier?.id])
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -97,17 +108,18 @@ export function CheckCounterpartyFields({
           Supplier {required && <span className="text-destructive">*</span>}
         </Label>
         <SupplierCombobox
-          value={selectedSupplierName}
+          value={selectedName}
           onValueChange={(name) => {
-            // Combobox passes name == current → clear path. Drop supplier id too.
+            // Clearing the supplier from the picker also clears the id —
+            // the new-supplier-creation path below handles the inverse via
+            // onSupplierSelect.
             if (!name) onSupplierIdChange(null)
           }}
-          onSupplierSelect={handleSupplierSelect}
-          placeholder="Select a supplier"
+          onSupplierSelect={(supplier) => onSupplierIdChange(supplier?.id ?? null)}
+          placeholder="Select a supplier…"
           disabled={disabled}
           showOnlyActive={false}
-          allowCreate={false}
-          className="w-full"
+          allowCreate
         />
         <p className="text-xs text-muted-foreground">
           Links this check to the supplier record so reporting can roll up commissions per supplier.
@@ -148,3 +160,10 @@ export function CheckCounterpartyFields({
   )
 }
 
+// Treat the senderName as "auto-filled" if it exactly matches the name of
+// any supplier we've seen via the picker — so re-picking still updates it.
+function isAutoFilledFromAnySupplier(name: string, seenNames: Set<string>): boolean {
+  const trimmed = name.trim()
+  if (!trimmed) return false
+  return seenNames.has(trimmed)
+}
