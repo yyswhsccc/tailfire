@@ -79,6 +79,19 @@
 - Test raw SQL queries in psql before committing: `source apps/api/.env && psql "$DATABASE_URL" -c "SELECT ..."`
 - Verify columns exist: `psql "$DATABASE_URL" -c "\d table_name"`
 
+### 7. Colocated Spec Convention (Refactor Roadmap Step 1 — Issue #357)
+
+When introducing new files that match these patterns, ship a colocated `*.spec.ts` (or `*.spec.tsx`) in the same directory:
+
+- `*Policy.ts` — pure decision/rule classes (e.g. `ActivityTravelerAssignmentPolicy`)
+- `*Lifecycle.ts` / `use*Lifecycle.ts` — encapsulated form/component lifecycle hooks
+- `*Adapter.ts` — translation layers between domains
+- `*Mapper.ts` / `*Resolver.ts` — pure transformation/lookup helpers
+
+**Why:** today's behavioral regressions (#347, #351, #352) shipped because the refactor pattern was untested. Type checking caught nothing. The PR validation workflow (`.github/workflows/pr-validation.yml`) runs tests on every PR — these conventions ensure new shared code lands with the coverage that makes the next refactor safe.
+
+Initially soft (convention, not enforced by CI script). Will be enforced by a check once the broader test cleanup (informational jobs → blocking) is done.
+
 ## Development Workflow (A to Z)
 
 ### Complete Flow
