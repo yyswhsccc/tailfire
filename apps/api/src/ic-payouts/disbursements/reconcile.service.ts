@@ -86,6 +86,10 @@ export class ReconcileService {
     let processed = 0
 
     for (const row of stuck) {
+      // Defensive: a Drizzle select() can theoretically yield a row whose
+      // selected fields are undefined if the underlying column reference was
+      // unresolved at query-build time. Skip silently — #328.
+      if (!row?.id) continue
       try {
         await this.disbursements.fail(row.id, STUCK_REASON, SYSTEM_ACTOR_ID)
         processed++
@@ -112,12 +116,15 @@ export class ReconcileService {
     // would capture the schema export before circular re-exports finish).
     const { icDisbursements } = this.db.schema
 
-    return this.db.client
+    const rows = await this.db.client
       .select({ id: icDisbursements.id })
       .from(icDisbursements)
       .where(and(
         eq(icDisbursements.status, 'sending'),
         lt(icDisbursements.updatedAt, cutoff),
       ))
+
+    // Filter out any row whose id didn't resolve (paranoid — #328).
+    return rows.filter((r): r is { id: string } => Boolean(r?.id))
   }
 }
