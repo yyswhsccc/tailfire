@@ -41,6 +41,7 @@ export interface BaseComponentData {
   coordinates?: any | null
   notes?: string | null
   confirmationNumber?: string | null
+  referralUrl?: string | null
   status?: string
   proposalStatus?: string
   bookingStatus?: string
@@ -61,6 +62,7 @@ export interface UpdateBaseComponentData {
   coordinates?: any | null
   notes?: string | null
   confirmationNumber?: string | null
+  referralUrl?: string | null
   status?: string
   proposalStatus?: string
   bookingStatus?: string
@@ -161,6 +163,7 @@ export class BaseComponentService {
         coordinates: data.coordinates || null,
         notes: data.notes || null,
         confirmationNumber: data.confirmationNumber || null,
+        referralUrl: data.referralUrl || null,
         proposalStatus: (data.proposalStatus as any) || 'draft',
         bookingStatus: (data.bookingStatus as any) || 'unbooked',
         pricingType: data.pricingType as any,
@@ -260,6 +263,7 @@ export class BaseComponentService {
         ...(data.coordinates !== undefined && { coordinates: data.coordinates }),
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.confirmationNumber !== undefined && { confirmationNumber: data.confirmationNumber }),
+        ...(data.referralUrl !== undefined && { referralUrl: data.referralUrl }),
         ...(data.proposalStatus && { proposalStatus: data.proposalStatus as any }),
         ...(data.bookingStatus && { bookingStatus: data.bookingStatus as any }),
         ...(data.pricingType !== undefined && { pricingType: data.pricingType as any }),

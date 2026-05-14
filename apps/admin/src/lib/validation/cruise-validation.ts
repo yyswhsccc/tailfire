@@ -128,6 +128,8 @@ export const customCruiseFormSchema = z.object({
   currency: z.string().default('USD'),
   pricingType: z.enum(['per_person', 'per_room', 'flat_rate', 'per_night', 'per_group', 'fixed', 'total']).default('per_person'),
   confirmationNumber: z.string().default(''),
+  // #302 — external "Book this activity" CTA for the proposal preview
+  referralUrl: z.string().optional().default(''),
 
   // Commission fields
   commissionTotalCents: z.coerce.number().nullable().optional(),
@@ -210,6 +212,7 @@ export function toCustomCruiseDefaults(
     currency: serverData?.currency ?? tripCurrency ?? 'USD',
     pricingType: serverData?.pricingType ?? 'per_person',
     confirmationNumber: serverData?.confirmationNumber ?? '',
+    referralUrl: serverData?.referralUrl ?? '',
 
     commissionTotalCents: serverData?.commissionTotalCents ?? null,
     commissionSplitPercentage: serverData?.commissionSplitPercentage ?? null,
@@ -305,6 +308,7 @@ export function toCustomCruiseApiPayload(data: CustomCruiseFormData): CreateCust
     currency: data.currency,
     pricingType: data.pricingType as PricingType,
     confirmationNumber: data.confirmationNumber || undefined,
+    referralUrl: data.referralUrl || null,
     commissionTotalCents: data.commissionTotalCents ?? undefined,
     commissionSplitPercentage: data.commissionSplitPercentage ?? undefined,
     commissionExpectedDate: data.commissionExpectedDate || undefined,

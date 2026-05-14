@@ -324,6 +324,7 @@ describe('toTransportationApiPayload', () => {
       proposalStatus: 'approved' as const,
       notes: 'VIP service',
       confirmationNumber: 'TRN123',
+      referralUrl: '',
       transportationDetails: {
         subtype: 'transfer' as const,
         providerName: 'Luxury Transfers',
@@ -401,6 +402,7 @@ describe('toTransportationApiPayload', () => {
       proposalStatus: 'draft' as const,
       notes: '',
       confirmationNumber: '',
+      referralUrl: '',
       transportationDetails: {
         subtype: null,
         providerName: '',

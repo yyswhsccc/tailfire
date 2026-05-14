@@ -75,6 +75,7 @@ export function buildInitialPricingState(component: any) {
     termsAndConditions: '',
     cancellationPolicy: '',
     confirmationNumber: component.confirmationNumber || '',
+    referralUrl: component.referralUrl || '',
     supplier: '',
     pricingBreakdown: component.pricingBreakdownJson ?? null,
   }

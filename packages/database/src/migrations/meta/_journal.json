@@ -1422,6 +1422,13 @@
       "when": 1778767090000,
       "tag": "20260513221810_add_transportation_legs",
       "breakpoints": true
+    },
+    {
+      "idx": 203,
+      "version": "7",
+      "when": 1778767484000,
+      "tag": "20260514020444_add_activity_referral_url",
+      "breakpoints": true
     }
   ]
 }

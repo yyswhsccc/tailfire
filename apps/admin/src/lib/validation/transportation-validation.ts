@@ -119,6 +119,8 @@ export const transportationFormSchema = z.object({
   proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
   notes: z.string().optional().default(''),
   confirmationNumber: z.string().optional().default(''),
+  // #302 — external "Book this activity" CTA for the proposal preview
+  referralUrl: z.string().optional().default(''),
 
   // Nested transportation details
   transportationDetails: transportationDetailsSchema,
@@ -252,6 +254,7 @@ export function toTransportationDefaults(
     proposalStatus: serverData?.proposalStatus ?? 'draft',
     notes: serverData?.notes ?? '',
     confirmationNumber: serverData?.confirmationNumber ?? '',
+    referralUrl: serverData?.referralUrl ?? '',
 
     transportationDetails: {
       subtype: serverDetails?.subtype ?? null,
@@ -330,6 +333,7 @@ export function toTransportationApiPayload(data: TransportationFormData): Create
     proposalStatus: data.proposalStatus,
     notes: data.notes || null,
     confirmationNumber: data.confirmationNumber || null,
+    referralUrl: data.referralUrl || null,
     transportationDetails: {
       subtype: data.transportationDetails.subtype as TransportationSubtype | null,
       providerName: data.transportationDetails.providerName || null,
