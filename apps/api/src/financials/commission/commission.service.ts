@@ -979,7 +979,23 @@ export class CommissionService {
     }
 
     if (filters.supplierId) {
-      conditions.push(sql`asup.supplier_id = ${filters.supplierId}`)
+      // Two ways an activity can be tied to a supplier:
+      //
+      //   1. activity_suppliers.supplier_id (FK — the proper way)
+      //   2. activity_pricing.supplier (legacy free-text)
+      //
+      // Many TES-imported pending receivables only have the free-text
+      // value populated (no FK row). Filtering on (1) alone would
+      // silently return zero rows even when the supplier obviously has
+      // pending commission — exactly what #333 reported for Sunwing.
+      //
+      // Match by FK OR by the supplier's canonical name, scoped to the
+      // selected supplier_id so we don't accidentally widen to other
+      // suppliers with similar names.
+      conditions.push(sql`(
+        asup.supplier_id = ${filters.supplierId}
+        OR ap.supplier = (SELECT name FROM suppliers WHERE id = ${filters.supplierId})
+      )`)
     }
 
     if (filters.departureDateFrom) {
