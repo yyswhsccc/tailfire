@@ -52,8 +52,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: Build dependent packages
-        run: pnpm --filter @tailfire/database build && pnpm --filter @tailfire/shared-types build
- && pnpm --filter @tailfire/api-client build
+        run: pnpm --filter @tailfire/database build && pnpm --filter @tailfire/shared-types build && pnpm --filter @tailfire/api-client build
       - run: pnpm --filter @tailfire/admin typecheck
 
   migration-monotonicity:
@@ -191,6 +190,5 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - name: Build dependent packages
-        run: pnpm --filter @tailfire/database build && pnpm --filter @tailfire/shared-types build
- && pnpm --filter @tailfire/api-client build
+        run: pnpm --filter @tailfire/database build && pnpm --filter @tailfire/shared-types build && pnpm --filter @tailfire/api-client build
       - run: pnpm --filter @tailfire/admin test
