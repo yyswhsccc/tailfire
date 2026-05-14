@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { GuardedLink } from '@/lib/dirty-guard'
 import { Search, HelpCircle, Settings, Bug, BookOpen, Keyboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
@@ -38,6 +38,10 @@ const navigation = [
 
 export function TopNav() {
   const pathname = usePathname()
+  // Sign-out is an explicit leave action — using the raw router skips
+  // the dirty-form confirm, which would be redundant after the user
+  // already clicked "Sign Out". Nav links in this header are <GuardedLink>
+  // so they don't need this router for nav.
   const router = useRouter()
   const { user, logout: clearStore } = useAuthStore()
   const { signOut, claims } = useAuth()
@@ -109,7 +113,7 @@ export function TopNav() {
     <header className="sticky top-0 z-50 w-full border-b border-ash-200 bg-white">
       <div className="flex h-14 items-center px-4 gap-4">
         {/* Logo */}
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <GuardedLink href="/dashboard" className="flex items-center gap-2">
           <Image
             src="/logo.png"
             alt="Tailfire"
@@ -117,7 +121,7 @@ export function TopNav() {
             height={32}
             className="h-8 w-8"
           />
-        </Link>
+        </GuardedLink>
 
         {/* Main Navigation */}
         <nav className="flex items-center space-x-1">
@@ -125,7 +129,7 @@ export function TopNav() {
             const isActive = pathname?.startsWith(item.href)
             const badge = item.name === 'Emails' && unreadEmailCount > 0 ? unreadEmailCount : 0
             return (
-              <Link
+              <GuardedLink
                 key={item.name}
                 href={item.href}
                 className={cn(
@@ -144,7 +148,7 @@ export function TopNav() {
                 {isActive && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-phoenix-gold-600" />
                 )}
-              </Link>
+              </GuardedLink>
             )
           })}
         </nav>
@@ -225,18 +229,18 @@ export function TopNav() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/profile">Profile</Link>
+                <GuardedLink href="/profile">Profile</GuardedLink>
               </DropdownMenuItem>
               {isAdmin ? (
                 <DropdownMenuItem asChild>
-                  <Link href="/settings" className="flex items-center">
+                  <GuardedLink href="/settings" className="flex items-center">
                     <Settings className="mr-2 h-4 w-4" />
                     Admin
-                  </Link>
+                  </GuardedLink>
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem asChild>
-                  <Link href="/settings">Settings</Link>
+                  <GuardedLink href="/settings">Settings</GuardedLink>
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
