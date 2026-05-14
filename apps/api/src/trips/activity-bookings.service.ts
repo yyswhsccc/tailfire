@@ -60,6 +60,14 @@ export class ActivityBookingsService {
       throw new BadRequestException('Activity is linked to a package. Use package booking instead.')
     }
 
+    // UX shortcut: when the activity has no travelers but the trip does,
+    // assume the booking applies to every trip traveler. The user can still
+    // unassign individuals afterward via the per-activity Travelers editor.
+    // Without this, every "Mark as Booked" required clicking through to add
+    // every traveler manually, even on trips where everyone is on every
+    // activity — the dominant case. Bug #347.
+    await this.ensureActivityHasTravelers(activityId, activity.tripId)
+
     // Tier 1 booking validation
     const validation = await this.bookingValidationService.validateBooking(activityId)
     if (!validation.valid) {
@@ -438,5 +446,38 @@ export class ActivityBookingsService {
       bookingDate: row.booking_date,
       tripId: row.trip_id,
     }
+  }
+
+  /**
+   * If an activity has zero explicitly-assigned travelers but its parent
+   * trip has trip_travelers, auto-link all of them. Matches the user mental
+   * model — when everyone on a trip is on every activity (the dominant
+   * pattern), the agent shouldn't have to click through and add each
+   * traveler before they can mark the activity as booked. Bug #347.
+   *
+   * Per-activity selection (one room for two, single-seat tour, etc.) still
+   * works: the agent edits the activity's Travelers list afterward to
+   * unassign anyone who doesn't belong.
+   *
+   * Safe to call repeatedly — uses ON CONFLICT DO NOTHING against the
+   * (activity_id, trip_traveler_id) unique index.
+   */
+  private async ensureActivityHasTravelers(activityId: string, tripId: string): Promise<void> {
+    const existing = await this.db.client
+      .select({ id: this.db.schema.activityTravelers.id })
+      .from(this.db.schema.activityTravelers)
+      .where(eq(this.db.schema.activityTravelers.activityId, activityId))
+      .limit(1)
+
+    if (existing.length > 0) return
+
+    // No activity-level assignments yet — pull all trip travelers and link them.
+    await this.db.client.execute(sql`
+      INSERT INTO activity_travelers (activity_id, trip_traveler_id, trip_id)
+      SELECT ${activityId}::uuid, tt.id, ${tripId}::uuid
+      FROM trip_travelers tt
+      WHERE tt.trip_id = ${tripId}::uuid
+      ON CONFLICT (activity_id, trip_traveler_id) DO NOTHING
+    `)
   }
 }
