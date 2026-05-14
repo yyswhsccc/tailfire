@@ -379,7 +379,7 @@ export function TourForm({
         proposalStatus: tourData.proposalStatus,
         totalPriceCents: initialPricing.totalPriceCents,
         taxesAndFeesCents: initialPricing.taxesAndFeesCents,
-        currency: trip?.currency || initialPricing.currency,
+        currency: initialPricing.currency || trip?.currency,
         confirmationNumber: initialPricing.confirmationNumber,
         pricingType: tourData.pricingType || 'per_person',
         tourDetails: {

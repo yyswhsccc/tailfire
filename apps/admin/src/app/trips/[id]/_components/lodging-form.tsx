@@ -376,7 +376,7 @@ export function LodgingForm({
         proposalStatus: lodgingData.proposalStatus as 'draft' | 'proposing' | 'approved' | 'cancelled',
         totalPriceCents: initialPricing.totalPriceCents,
         taxesAndFeesCents: initialPricing.taxesAndFeesCents,
-        currency: trip?.currency || initialPricing.currency,
+        currency: initialPricing.currency || trip?.currency,
         confirmationNumber: initialPricing.confirmationNumber,
         pricingType: (lodgingData.pricingType || 'per_room') as 'per_room' | 'per_person' | 'total',
         lodgingDetails: lodgingData.lodgingDetails,
