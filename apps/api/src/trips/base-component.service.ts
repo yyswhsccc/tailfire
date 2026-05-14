@@ -263,7 +263,7 @@ export class BaseComponentService {
         ...(data.coordinates !== undefined && { coordinates: data.coordinates }),
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.confirmationNumber !== undefined && { confirmationNumber: data.confirmationNumber }),
-        ...(data.referralUrl !== undefined && { referralUrl: data.referralUrl }),
+        ...(data.referralUrl !== undefined && { referralUrl: data.referralUrl || null }),
         ...(data.proposalStatus && { proposalStatus: data.proposalStatus as any }),
         ...(data.bookingStatus && { bookingStatus: data.bookingStatus as any }),
         ...(data.pricingType !== undefined && { pricingType: data.pricingType as any }),

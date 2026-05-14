@@ -20,6 +20,35 @@ const pricingBreakdownItemSchema = z.object({
   travelerId: z.string().uuid().optional(),
 })
 
+// Accepts null, undefined, empty string, or a parseable http(s) URL. Blocks
+// javascript:, data:, file:, etc. — the URL is rendered as a clickable CTA in
+// the client portal, so unsafe schemes must be rejected at the API boundary.
+// Empty-string-to-null normalization happens in the API layer; this schema is
+// kept as `string | null | undefined` so DTO call sites stay backwards-compat.
+const httpHttpsUrlSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .superRefine((v, ctx) => {
+    if (!v) return
+    const trimmed = v.trim()
+    if (!trimmed) return
+    try {
+      const u = new URL(trimmed)
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'URL must use http:// or https://',
+        })
+      }
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Must be a valid URL (e.g. https://example.com/book)',
+      })
+    }
+  })
+
 // =============================================================================
 // Create Activity DTO Schema
 // =============================================================================
@@ -54,9 +83,9 @@ export const createActivityDtoSchema = z.object({
   bookingStatus: activityBookingStatusSchema.optional(),
 
   // Optional external "Book this activity" URL — rendered as a CTA in the
-  // shared-trip / proposal preview (#302). Accept empty string from the form,
-  // null from the DB, or missing.
-  referralUrl: z.string().nullable().optional(),
+  // shared-trip / proposal preview (#302). http(s) only; empty strings
+  // normalized to null so unsafe schemes (javascript:, data:) cannot persist.
+  referralUrl: httpHttpsUrlSchema,
 
   // Pricing - all nullable/optional
   pricingType: pricingTypeSchema.nullable().optional(),
@@ -107,8 +136,8 @@ export const updateActivityDtoSchema = z.object({
   confirmationNumber: z.string().nullable().optional(),
   proposalStatus: activityProposalStatusSchema.optional(),
   bookingStatus: activityBookingStatusSchema.optional(),
-  // #302 — generic external "Book this activity" CTA URL
-  referralUrl: z.string().nullable().optional(),
+  // #302 — generic external "Book this activity" CTA URL; http(s) only.
+  referralUrl: httpHttpsUrlSchema,
 
   // Update-only fields
   isVisibleInCalendar: z.boolean().optional(),
