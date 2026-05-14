@@ -5,9 +5,9 @@
  * travelers across activities" rule. Each test corresponds to one of the
  * three call sites the policy replaces:
  *
- *   - assignAllTripTravelersToActivity → ActivitiesService.create
- *   - ensureActivityHasAssignments     → ActivityBookingsService.markAsBooked
- *   - assignTravelerToAllTripActivities → TripTravelersService.create
+ *   - tryAssignAllTripTravelersToActivity → ActivitiesService.create
+ *   - tryEnsureActivityHasAssignments     → ActivityBookingsService.markAsBooked
+ *   - tryAssignTravelerToAllTripActivities → TripTravelersService.create
  */
 import { ActivityTravelerAssignmentPolicy } from './activity-traveler-assignment.policy'
 
@@ -37,12 +37,12 @@ function buildMockDb(opts: { existingAssignments?: number } = {}): MockDb {
 }
 
 describe('ActivityTravelerAssignmentPolicy', () => {
-  describe('assignAllTripTravelersToActivity', () => {
+  describe('tryAssignAllTripTravelersToActivity', () => {
     it('executes the INSERT and resolves cleanly', async () => {
       const db = buildMockDb()
       const policy = new ActivityTravelerAssignmentPolicy(db as any)
 
-      await policy.assignAllTripTravelersToActivity('activity-1', 'trip-1')
+      await policy.tryAssignAllTripTravelersToActivity('activity-1', 'trip-1')
 
       expect(db.client.execute).toHaveBeenCalledTimes(1)
       // Verify it was given an SQL chunk (drizzle returns an object with .queryChunks).
@@ -58,41 +58,41 @@ describe('ActivityTravelerAssignmentPolicy', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
 
       await expect(
-        policy.assignAllTripTravelersToActivity('activity-1', 'trip-1'),
+        policy.tryAssignAllTripTravelersToActivity('activity-1', 'trip-1'),
       ).resolves.toBeUndefined()
 
       warnSpy.mockRestore()
     })
   })
 
-  describe('ensureActivityHasAssignments', () => {
+  describe('tryEnsureActivityHasAssignments', () => {
     it('short-circuits when the activity already has assignments', async () => {
       const db = buildMockDb({ existingAssignments: 1 })
       const policy = new ActivityTravelerAssignmentPolicy(db as any)
 
-      const result = await policy.ensureActivityHasAssignments('activity-2', 'trip-1')
+      const result = await policy.tryEnsureActivityHasAssignments('activity-2', 'trip-1')
 
       expect(result.skipped).toBe(true)
       expect(db.client.execute).not.toHaveBeenCalled()
     })
 
-    it('delegates to assignAllTripTravelersToActivity when activity has none', async () => {
+    it('delegates to tryAssignAllTripTravelersToActivity when activity has none', async () => {
       const db = buildMockDb({ existingAssignments: 0 })
       const policy = new ActivityTravelerAssignmentPolicy(db as any)
 
-      const result = await policy.ensureActivityHasAssignments('activity-3', 'trip-1')
+      const result = await policy.tryEnsureActivityHasAssignments('activity-3', 'trip-1')
 
       expect(result.skipped).toBe(false)
       expect(db.client.execute).toHaveBeenCalledTimes(1)
     })
   })
 
-  describe('assignTravelerToAllTripActivities', () => {
+  describe('tryAssignTravelerToAllTripActivities', () => {
     it('executes the fan-out INSERT', async () => {
       const db = buildMockDb()
       const policy = new ActivityTravelerAssignmentPolicy(db as any)
 
-      await policy.assignTravelerToAllTripActivities('traveler-1', 'trip-1')
+      await policy.tryAssignTravelerToAllTripActivities('traveler-1', 'trip-1')
 
       expect(db.client.execute).toHaveBeenCalledTimes(1)
       expect(db.client.execute.mock.calls[0]![0]).toBeTruthy()
@@ -104,7 +104,7 @@ describe('ActivityTravelerAssignmentPolicy', () => {
       const policy = new ActivityTravelerAssignmentPolicy(db as any)
 
       await expect(
-        policy.assignTravelerToAllTripActivities('traveler-1', 'trip-1'),
+        policy.tryAssignTravelerToAllTripActivities('traveler-1', 'trip-1'),
       ).resolves.toBeUndefined()
     })
   })
