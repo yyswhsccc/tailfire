@@ -1,25 +1,51 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import postgres from 'postgres'
-import crypto from 'node:crypto'
 import { join, resolve } from 'path'
 import { existsSync, readdirSync, readFileSync } from 'fs'
 
 /**
- * Runs pending database migrations
+ * Runs pending database migrations.
  *
  * ⚠️ IMPORTANT: This should ONLY be called from apps/api during deployment.
- * Do NOT run migrations from edge functions, frontend, or other environments.
  *
- * @param connectionString - PostgreSQL connection string (requires service role key)
+ * Known fragility (and why we no longer mask it):
+ * ------------------------------------------------
+ * `drizzle-orm/postgres-js/migrator` decides whether to apply each migration
+ * by comparing `migration.folderMillis` against the single value
+ * `max(__drizzle_migrations.created_at)` captured ONCE at the start of the
+ * run. That logic breaks across out-of-order merges:
  *
- * @example
- * ```typescript
- * // apps/api/src/db/migrate-on-startup.ts
- * import { runMigrations } from '@tailfire/database'
+ *   1. Branch A ships migration X with when=1000.
+ *   2. Branch B (cut earlier) ships migration Y with when=500.
+ *   3. After A deploys, max(created_at) = 1000.
+ *   4. When B deploys, Drizzle sees Y.folderMillis (500) < 1000 and
+ *      silently SKIPS Y, even though Y's hash is not in the tracking table.
  *
- * await runMigrations(process.env.DATABASE_URL!)
- * ```
+ * We hit this on 2026-05-14 with PR #297: the IC-payouts migrations
+ * (idx 202-212, when = May 10) got silently skipped on Prod because
+ * transportation_legs + referral_url (idx 213-214, when = May 14) had
+ * already been applied via an earlier deploy.
+ *
+ * The OLD migrate.ts had a `reconcile` loop here that inserted tracking
+ * rows for any journal entry not yet tracked, WITHOUT running the SQL.
+ * That masked the silent skip and produced the production drift on
+ * 2026-05-14 (6 IC tables missing from Prod, tracking table lying about it).
+ *
+ * The fix: remove the reconcile loop, add a strict invariant after
+ * `migrate()` returns. If Drizzle silently skipped anything, the count
+ * mismatch makes the deploy fail loudly instead of corrupting silently.
+ *
+ * Long-term fix: replace Drizzle's monotonicity-based migrator with a
+ * hash-based applier. Out of scope for this hotfix because existing
+ * tracking-table contents have hashes that don't match current files
+ * (files have been edited since they were applied).
+ *
+ * Prevention: scripts/validate-journal-monotonicity.mjs enforces that
+ * NEW journal entries always have monotonically-increasing `when` values,
+ * so this scenario doesn't happen for future migrations.
+ *
+ * @param connectionString - PostgreSQL connection string (session mode — DDL)
  */
 export async function runMigrations(connectionString: string) {
   console.log('🔄 Running database migrations...')
@@ -28,13 +54,12 @@ export async function runMigrations(connectionString: string) {
   const db = drizzle(sql)
 
   try {
-    // Try multiple paths to find migrations folder
-    // This handles both tsx (source) and built (dist) execution
+    // Locate migrations folder (handles both src/ and dist/ execution)
     const possiblePaths = [
-      join(__dirname, '..', 'src', 'migrations'),  // From dist/
-      join(__dirname, 'migrations'),               // From src/
-      resolve(process.cwd(), 'packages/database/src/migrations'),  // From repo root
-      resolve(process.cwd(), '../../packages/database/src/migrations'),  // From apps/api
+      join(__dirname, '..', 'src', 'migrations'),
+      join(__dirname, 'migrations'),
+      resolve(process.cwd(), 'packages/database/src/migrations'),
+      resolve(process.cwd(), '../../packages/database/src/migrations'),
     ]
 
     let migrationsFolder: string | null = null
@@ -44,109 +69,87 @@ export async function runMigrations(connectionString: string) {
         break
       }
     }
-
     if (!migrationsFolder) {
       console.error('❌ Could not find migrations folder. Tried paths:')
-      possiblePaths.forEach(p => console.error(`  - ${p} (exists: ${existsSync(p)})`))
+      possiblePaths.forEach((p) => console.error(`  - ${p} (exists: ${existsSync(p)})`))
       throw new Error('Migrations folder not found')
     }
-
     console.log(`📂 Using migrations folder: ${migrationsFolder}`)
 
-    // Log migration status
     const journalPath = join(migrationsFolder, 'meta', '_journal.json')
-    const journal = JSON.parse(readFileSync(journalPath, 'utf-8'))
-    const sqlFiles = readdirSync(migrationsFolder).filter(f => f.endsWith('.sql'))
+    const journal = JSON.parse(readFileSync(journalPath, 'utf-8')) as {
+      entries: Array<{ idx: number; when: number; tag: string; breakpoints?: boolean }>
+    }
 
+    const sqlFiles = readdirSync(migrationsFolder).filter((f) => f.endsWith('.sql'))
     console.log(`📋 Journal has ${journal.entries.length} migrations`)
     console.log(`📄 Found ${sqlFiles.length} SQL files`)
 
-    // Check current migration state in database
-    const appliedResult = await sql`
-      SELECT COUNT(*) as count FROM drizzle.__drizzle_migrations
-    `.catch(() => [{ count: 0 }])
-    const appliedCount = Number(appliedResult[0]?.count || 0)
-    console.log(`✓ Database has ${appliedCount} applied migrations`)
-
-    const pendingCount = journal.entries.length - appliedCount
-    if (pendingCount > 0) {
-      console.log(`⏳ ${pendingCount} migrations pending...`)
+    // Pre-migration count
+    const preResult = await sql`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`.catch(
+      () => [{ n: 0 }],
+    )
+    const preCount = Number(preResult[0]?.n ?? 0)
+    console.log(`✓ Database has ${preCount} applied migrations`)
+    const expectedPending = journal.entries.length - preCount
+    if (expectedPending > 0) {
+      console.log(`⏳ ${expectedPending} migration(s) pending`)
     } else {
-      console.log(`✅ All migrations already applied`)
+      console.log('✅ All migrations already applied')
     }
 
-    // Run migrations
+    // Hand off to Drizzle's stock migrator. It will iterate journal entries
+    // and apply any whose folderMillis > max(__drizzle_migrations.created_at).
+    // Known fragility documented at the top of this file.
     await migrate(db, { migrationsFolder })
 
-    // Reconcile: register any journal entries missing from __drizzle_migrations.
-    // This fixes tracking gaps caused by non-monotonic journal timestamps where
-    // Drizzle applied the SQL (schema objects exist) but skipped inserting the
-    // tracking row because created_at < max(created_at).
-    const dbRows = await sql`
-      SELECT created_at FROM drizzle.__drizzle_migrations
-    `
-    const registeredTimestamps = new Set(dbRows.map(r => Number(r.created_at)))
-
-    let reconciled = 0
-    for (const entry of journal.entries) {
-      if (!registeredTimestamps.has(entry.when)) {
-        const sqlFilePath = join(migrationsFolder, `${entry.tag}.sql`)
-        if (!existsSync(sqlFilePath)) {
-          console.warn(`⚠️ Missing SQL file for journal entry ${entry.idx}: ${entry.tag}`)
-          continue
-        }
-        const sqlContent = readFileSync(sqlFilePath, 'utf-8')
-        const hash = crypto.createHash('sha256').update(sqlContent).digest('hex')
-
-        await sql`
-          INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
-          VALUES (${hash}, ${entry.when})
-        `
-        reconciled++
-        console.log(`🔧 Reconciled orphaned entry ${entry.idx}: ${entry.tag}`)
-      }
-    }
-
-    if (reconciled > 0) {
-      console.log(`🔧 Reconciled ${reconciled} orphaned migration tracking row(s)`)
-    }
-
-    // Reverse reconcile: remove ghost rows (DB rows with no matching journal entry).
-    // These are artifacts of timestamp reordering where old tracking rows survived cleanup.
-    const journalTimestamps = new Set(journal.entries.map((e: { when: number }) => e.when))
-    const currentDbRows = await sql`
-      SELECT id, created_at FROM drizzle.__drizzle_migrations
-    `
+    // Remove ghost rows — tracking rows whose created_at has no matching
+    // journal entry. These accumulate when journal entries get renumbered
+    // during merges. Safe to delete: by definition they don't correspond to
+    // any current migration. The strict count check below requires this
+    // cleanup to pass.
+    const journalTimestamps = new Set(journal.entries.map((e) => Number(e.when)))
+    const trackedNow = await sql`SELECT id, created_at FROM drizzle.__drizzle_migrations`
     let ghostsRemoved = 0
-    for (const row of currentDbRows) {
+    for (const row of trackedNow) {
       if (!journalTimestamps.has(Number(row.created_at))) {
-        await sql`
-          DELETE FROM drizzle.__drizzle_migrations WHERE id = ${row.id}
-        `
+        await sql`DELETE FROM drizzle.__drizzle_migrations WHERE id = ${row.id}`
         ghostsRemoved++
-        console.log(`🧹 Removed ghost tracking row (created_at: ${row.created_at})`)
+        console.log(`🧹 Removed ghost tracking row id=${row.id} (created_at=${row.created_at})`)
       }
     }
     if (ghostsRemoved > 0) {
       console.log(`🧹 Removed ${ghostsRemoved} ghost tracking row(s)`)
     }
 
-    // Verify final state
-    const finalResult = await sql`
-      SELECT COUNT(*) as count FROM drizzle.__drizzle_migrations
-    `
-    const finalCount = Number(finalResult[0]?.count || 0)
+    // Strict post-migration invariant. The old `reconcile` loop that lived
+    // here silently inserted tracking rows for migrations Drizzle skipped,
+    // producing the IC-payouts drift on 2026-05-14. Refusing to declare
+    // success on a coverage gap makes any future skip visible immediately.
+    //
+    // Coverage check: every journal entry's `when` must appear AT LEAST once
+    // in the tracking table. We allow harmless duplicate rows (some legacy
+    // migrations carry both a legacy filename-style and a proper-hash row
+    // for the same `created_at`).
+    const trackedRows = await sql`SELECT created_at FROM drizzle.__drizzle_migrations`
+    const tracked = new Set(trackedRows.map((r) => Number(r.created_at)))
+    const missing = journal.entries.filter((e) => !tracked.has(Number(e.when)))
 
-    if (finalCount !== journal.entries.length) {
-      console.warn(`⚠️ Count mismatch: DB has ${finalCount} rows, journal has ${journal.entries.length} entries`)
+    if (missing.length > 0) {
+      throw new Error(
+        `Migration coverage gap after apply: ${missing.length} journal entr${missing.length === 1 ? 'y' : 'ies'} not in tracking table.\n` +
+          `Drizzle silently skipped (likely the folderMillis < max(created_at) bug):\n` +
+          missing.map((e) => `  - idx=${e.idx} ${e.tag} when=${e.when}`).join('\n') +
+          `\n\nUsually caused by a journal entry with \`when\` <= max(__drizzle_migrations.created_at) ` +
+          `at the start of this deploy. See packages/database/src/migrate.ts for context.`,
+      )
     }
 
-    const changes = reconciled + ghostsRemoved
-    if (changes > 0) {
-      console.log(`✅ Migrations completed (${finalCount} total, ${reconciled} reconciled, ${ghostsRemoved} ghosts removed)`)
-    } else {
-      console.log(`✅ Migrations completed successfully (${finalCount} total)`)
-    }
+    const postCount = trackedRows.length
+    const applied = postCount - preCount
+    console.log(
+      `✅ Migrations completed — applied ${applied}, ${postCount} total tracking rows (${journal.entries.length} journal entries covered)`,
+    )
   } catch (error) {
     console.error('❌ Migration failed:', error)
     throw error

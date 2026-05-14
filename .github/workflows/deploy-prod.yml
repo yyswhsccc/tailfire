@@ -80,6 +80,13 @@ jobs:
           ENUMSQL
           echo "✅ Pre-migration enum setup complete"
 
+      - name: One-time recovery — IC-payouts tracking drift (2026-05-14)
+        run: |
+          # Idempotent: only deletes tracking rows for migrations whose
+          # tables don't exist. Safe to run every deploy until removed.
+          psql "$DATABASE_URL" -f scripts/migration/recover-prod-ic-payouts-tracking.sql
+          echo "✅ IC-payouts recovery script applied"
+
       - name: Run Drizzle migrations
         working-directory: apps/api
         run: pnpm db:migrate
