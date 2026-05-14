@@ -72,11 +72,11 @@ export function buildInitialPricingState(component: any) {
     commissionTotalCents: component.commissionTotalCents || 0,
     commissionSplitPercentage: component.commissionSplitPercentage ? parseFloat(component.commissionSplitPercentage) : 0,
     commissionExpectedDate: component.commissionExpectedDate || null,
-    termsAndConditions: '',
-    cancellationPolicy: '',
+    termsAndConditions: component.termsAndConditions || '',
+    cancellationPolicy: component.cancellationPolicy || '',
     confirmationNumber: component.confirmationNumber || '',
     referralUrl: component.referralUrl || '',
-    supplier: '',
+    supplier: component.supplier || '',
     pricingBreakdown: component.pricingBreakdownJson ?? null,
   }
 }

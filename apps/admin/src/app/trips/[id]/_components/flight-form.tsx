@@ -556,7 +556,9 @@ export function FlightForm({
             ?? synthesizeFlightDetailsFromActivity(sourceData),
           totalPriceCents: initialPricing.totalPriceCents,
           taxesAndFeesCents: initialPricing.taxesAndFeesCents,
-          currency: trip?.currency || initialPricing.currency,
+          // Activity-level currency wins (#352). Trip currency is only the fallback
+          // when the activity row hasn't set one yet.
+          currency: initialPricing.currency || trip?.currency,
           pricingType: coercePricingType(sourceData.pricingType),
           confirmationNumber: initialPricing.confirmationNumber,
           commissionTotalCents: initialPricing.commissionTotalCents,
