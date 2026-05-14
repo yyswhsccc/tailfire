@@ -21,7 +21,7 @@
  * the single-current model matches the actual usage.
  */
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 
 type DirtyChecker = () => boolean
 
@@ -46,19 +46,14 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
   // Most-recently-registered checker wins. Stored in a ref so we don't
   // re-render the entire tree on every register/unregister.
   const checkerRef = useRef<DirtyChecker | null>(null)
-  // A counter on state so consumers that want to react to dirty changes can
-  // (currently unused; kept for future "show a header indicator" use).
-  const [, setRegistryTick] = useState(0)
 
   const register = useCallback((checker: DirtyChecker) => {
     checkerRef.current = checker
-    setRegistryTick((t) => t + 1)
   }, [])
 
   const unregister = useCallback((checker: DirtyChecker) => {
     if (checkerRef.current === checker) {
       checkerRef.current = null
-      setRegistryTick((t) => t + 1)
     }
   }, [])
 
@@ -78,11 +73,15 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
     return window.confirm(message)
   }, [])
 
-  const value: DirtyGuardContextValue = {
-    register,
-    unregister,
-    confirmIfDirty,
-  }
+  // Memoize the context value so consumers that depend on `ctx` in their
+  // useEffect deps don't see a fresh object every provider render. Without
+  // useMemo, useRegisterDirtyGuard's effect would re-fire forever and the
+  // form page would die with React error #185 (infinite update loop) —
+  // exactly what #334 was reporting.
+  const value = useMemo<DirtyGuardContextValue>(
+    () => ({ register, unregister, confirmIfDirty }),
+    [register, unregister, confirmIfDirty],
+  )
 
   return <DirtyGuardContext.Provider value={value}>{children}</DirtyGuardContext.Provider>
 }
