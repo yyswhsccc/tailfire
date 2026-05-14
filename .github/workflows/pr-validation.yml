@@ -1,0 +1,194 @@
+name: PR Validation
+
+# Issue #357 — Step 1 of the refactor roadmap. Guardrail for all subsequent
+# refactor work.
+#
+# Honest current state: most lint/typecheck/test surfaces have pre-existing
+# breakage. Three jobs are known-clean today and gate PR merges:
+#
+#   BLOCKING:
+#     * admin-typecheck       — verified clean 2026-05-14
+#     * migration-monotonicity — already runs in deploy-preview, never failed
+#     * supabase-migrations-guard — pure file-presence check
+#
+# Everything else runs informationally so we can see regression drift on every
+# PR. Each informational job is promoted to blocking when its surface is clean
+# — by deleting `continue-on-error: true`. Tracked baselines as of 2026-05-14:
+#
+#   lint           — admin 16 err / api 10 err / ota 5 err
+#   api-typecheck  — softvoyage + email pre-existing TS errors
+#   api-tests      — 25/62 suites fail to compile (TS errors above)
+#   admin-tests    — 5/18 files fail
+#
+# Follow-up cleanup work tracked under #357. Re-run this workflow file's
+# self-review when you delete a `continue-on-error`.
+
+on:
+  pull_request:
+    branches:
+      - main
+      - preview
+
+concurrency:
+  group: pr-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # BLOCKING JOBS — known clean. PR cannot merge if any of these fail.
+  # ---------------------------------------------------------------------------
+
+  admin-typecheck:
+    name: Admin typecheck (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Build dependent packages
+        run: pnpm --filter @tailfire/database build && pnpm --filter @tailfire/shared-types build && pnpm --filter @tailfire/api-client build
+      - run: pnpm --filter @tailfire/admin typecheck
+
+  migration-monotonicity:
+    name: Migration journal monotonicity (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tailfire/database build
+      - run: pnpm --filter @tailfire/database migrations:validate-journal
+
+  supabase-migrations-guard:
+    name: Supabase migrations guard (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for stray .sql files outside Drizzle
+        run: |
+          if find apps/ota/supabase/migrations -maxdepth 1 -name "*.sql" -not -path "*/_archive/*" 2>/dev/null | grep -q .; then
+            echo "::error::Found .sql files in apps/ota/supabase/migrations/. All migrations must live in packages/database/src/migrations/ (Drizzle)."
+            exit 1
+          fi
+          echo "OK — no stray Supabase migrations."
+
+  # ---------------------------------------------------------------------------
+  # INFORMATIONAL JOBS — visible on every PR, do not block. Promote by
+  # deleting `continue-on-error: true` once each surface is green.
+  # ---------------------------------------------------------------------------
+
+  lint-admin:
+    name: Lint admin (informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tailfire/admin lint
+
+  lint-api:
+    name: Lint api (informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tailfire/api lint
+
+  lint-ota:
+    name: Lint ota (informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tailfire/ota lint
+
+  api-typecheck:
+    name: API typecheck (informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Build dependent packages
+        run: pnpm --filter @tailfire/database build && pnpm --filter @tailfire/shared-types build
+
+      - run: pnpm --filter @tailfire/api typecheck
+
+  api-tests:
+    name: API tests (informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Build dependent packages
+        run: pnpm --filter @tailfire/database build && pnpm --filter @tailfire/shared-types build
+
+      - run: pnpm --filter @tailfire/api test
+
+  admin-tests:
+    name: Admin tests (informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Build dependent packages
+        run: pnpm --filter @tailfire/database build && pnpm --filter @tailfire/shared-types build && pnpm --filter @tailfire/api-client build
+      - run: pnpm --filter @tailfire/admin test
