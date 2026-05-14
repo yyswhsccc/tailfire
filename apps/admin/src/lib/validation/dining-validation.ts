@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod'
+import { optionalHttpsUrl } from './utils'
 import type { CreateDiningActivityDto, PricingType } from '@tailfire/shared-types/api'
 
 // ============================================================================
@@ -62,6 +63,8 @@ export const diningFormSchema = z.object({
   currency: z.string().default('CAD'),
   pricingType: z.enum(['per_person', 'per_room', 'flat_rate', 'per_night']).default('per_person'),
   confirmationNumber: z.string().optional().default(''),
+  // #302 — external "Book this activity" CTA for the proposal preview
+  referralUrl: optionalHttpsUrl,
 
   // Commission fields
   commissionTotalCents: z.coerce.number()
@@ -187,6 +190,7 @@ export function toDiningDefaults(
     currency: serverData?.currency ?? tripCurrency ?? 'CAD',
     pricingType: serverData?.pricingType ?? 'per_person',
     confirmationNumber: serverData?.confirmationNumber ?? '',
+    referralUrl: serverData?.referralUrl ?? '',
 
     commissionTotalCents: serverData?.commissionTotalCents ?? 0,
     commissionSplitPercentage: serverData?.commissionSplitPercentage ?? 0,
@@ -237,6 +241,7 @@ export function toDiningApiPayload(data: DiningFormData): CreateDiningActivityDt
     currency: data.currency,
     pricingType: data.pricingType as PricingType,
     confirmationNumber: data.confirmationNumber,
+    referralUrl: data.referralUrl || null,
     commissionTotalCents: data.commissionTotalCents ?? 0,
     commissionSplitPercentage: data.commissionSplitPercentage ?? 0,
     commissionExpectedDate: data.commissionExpectedDate || null,

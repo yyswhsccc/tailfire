@@ -703,6 +703,7 @@ export function useAddCruiseToItinerary(defaultItineraryId?: string) {
         coordinates: null,
         notes: null,
         confirmationNumber: null,
+        referralUrl: null,
         proposalStatus: 'draft',
         bookingStatus: 'unbooked',
         isVisibleInCalendar: true,

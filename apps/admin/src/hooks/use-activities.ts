@@ -165,6 +165,7 @@ export function useCreateActivity(itineraryId: string, dayId: string) {
             address: newActivity.address || null,
             coordinates: newActivity.coordinates || null,
             confirmationNumber: newActivity.confirmationNumber || null,
+            referralUrl: newActivity.referralUrl || null,
             proposalStatus: newActivity.proposalStatus || 'draft',
             bookingStatus: 'unbooked',
             isVisibleInCalendar: true,

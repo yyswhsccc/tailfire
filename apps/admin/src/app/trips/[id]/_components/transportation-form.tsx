@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { api } from '@/lib/api'
-import { useSaveStatus } from '@/hooks/use-save-status'
+import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
 import { useSearchParams } from 'next/navigation'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type {
   ActivityResponseDto,
@@ -48,14 +48,12 @@ import {
   ImageIcon,
   Globe,
   Key,
-  Loader2,
   Check,
   AlertCircle,
   ChevronUp,
   ChevronDown,
   Train,
 } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
 import {
@@ -280,8 +278,6 @@ export function TransportationForm({
   const [activityId, setActivityId] = useState<string | null>(activity?.id || null)
 
   // Safety net refs to prevent duplicate creation race condition
-  const activityIdRef = useRef<string | null>(activity?.id || null)
-  const createInProgressRef = useRef(false)
 
   // Activity pricing ID (gated on this for payment schedule)
   const [activityPricingId, setActivityPricingId] = useState<string | null>(null)
@@ -316,13 +312,8 @@ export function TransportationForm({
   // Track supplier commission rate from selected supplier
   const [supplierCommissionRate, setSupplierCommissionRate] = useState<number | null>(null)
 
-  // Auto-save status tracking (with date validation)
-  const { saveStatus, setSaveStatus, lastSavedAt, setLastSavedAt } = useSaveStatus({
-    activityId: activity?.id,
-    updatedAt: activity?.updatedAt,
-  })
-  const failureToastShown = useRef(false)
-  const lastSavedSnapshotRef = useRef<string | null>(null)
+  // Autosave was removed in #306. Form saves only via the manual Save Changes
+  // button; the header "Unsaved changes" badge below reflects RHF isDirty.
 
   // Fetch full transportation data if editing
   const { data: transportationData } = useTransportation(activityId || '')
@@ -346,7 +337,7 @@ export function TransportationForm({
     getValues,
     reset,
     setError,
-    formState: { errors, isDirty, isValid, isValidating, isSubmitting },
+    formState: { errors, isDirty },
   } = form
 
   // Watch specific fields for auto-save
@@ -357,6 +348,17 @@ export function TransportationForm({
 
   // Watch subtype for conditional rendering
   const subtype = useWatch({ control, name: 'transportationDetails.subtype' })
+
+  // Multi-leg journey legs (train / bus with interchanges, #304)
+  const {
+    fields: legFields,
+    append: appendLeg,
+    remove: removeLeg,
+  } = useFieldArray({
+    control,
+    name: 'transportationDetails.legs',
+  })
+  const supportsLegs = subtype === 'train' || subtype === 'bus'
 
   // Clear fields that don't apply to the new subtype (stale field policy)
   const prevSubtypeRef = useRef<string | null | undefined>(subtype)
@@ -377,6 +379,17 @@ export function TransportationForm({
     if (['train', 'ferry', 'bus'].includes(prev) && !['train', 'ferry', 'bus'].includes(subtype)) {
       setValue('transportationDetails.departureStation', '', { shouldDirty: true })
       setValue('transportationDetails.arrivalStation', '', { shouldDirty: true })
+    }
+    // Clear journey legs when switching away from a leg-capable subtype
+    // (train / bus). Otherwise legs persist hidden in form state and would
+    // still be sent on save — leaking multi-leg data onto a car_rental,
+    // ferry, etc. activity. The legs UI is intentionally scoped to
+    // train + bus only (#304).
+    if (
+      ['train', 'bus'].includes(prev) &&
+      !['train', 'bus'].includes(subtype)
+    ) {
+      setValue('transportationDetails.legs', [], { shouldDirty: true })
     }
     // Clear flight number when switching away from transfer/shuttle
     if (['transfer', 'shuttle'].includes(prev) && !['transfer', 'shuttle'].includes(subtype)) {
@@ -531,6 +544,7 @@ export function TransportationForm({
       taxesAndFeesCents: values.taxesAndFeesCents || 0,
       currency: values.currency || 'CAD',
       confirmationNumber: values.confirmationNumber || '',
+      referralUrl: values.referralUrl || '',
       commissionTotalCents: values.commissionTotalCents || 0,
       commissionSplitPercentage: values.commissionSplitPercentage || 0,
       commissionExpectedDate: values.commissionExpectedDate || null,
@@ -607,8 +621,6 @@ export function TransportationForm({
       queueMicrotask(() => {
         if (!cancelled) {
           reset(defaults, { keepDirty: false })
-          // Update snapshot to prevent immediate re-save
-          lastSavedSnapshotRef.current = JSON.stringify(getValues())
         }
       })
     }
@@ -638,105 +650,8 @@ export function TransportationForm({
     [activityId, createMutation, updateMutation, pricingBreakdown, activityBookingDate]
   )
 
-  // Auto-save effect with proper gating
-  useEffect(() => {
-    // Gate conditions per plan spec
-    if (!isDirty || !isValid || isValidating || isSubmitting) {
-      return
-    }
-    if (createMutation.isPending || updateMutation.isPending) {
-      return
-    }
-    if (!dayId) {
-      return
-    }
-
-    // Compare against last saved snapshot
-    const currentSnapshot = JSON.stringify(getValues())
-    if (currentSnapshot === lastSavedSnapshotRef.current) {
-      return
-    }
-
-    const timer = setTimeout(async () => {
-      // SAFETY NET: Check refs to prevent duplicate creation race condition
-      if (createInProgressRef.current) {
-        return
-      }
-
-      setSaveStatus('saving')
-
-      try {
-        // Check if we're creating (no activity yet)
-        const isCreating = !activityId && !activityIdRef.current
-        if (isCreating) {
-          createInProgressRef.current = true
-        }
-
-        let response
-        try {
-          response = await saveFn(getValues())
-        } finally {
-          if (isCreating) {
-            createInProgressRef.current = false
-          }
-        }
-
-        // Update activity ID on create
-        if (response.id && !activityIdRef.current) {
-          // Update ref immediately (synchronous) before React state update
-          activityIdRef.current = response.id
-          setActivityId(response.id)
-        }
-
-        // Reset dirty state and update snapshot
-        reset(getValues(), { keepDirty: false })
-        lastSavedSnapshotRef.current = JSON.stringify(getValues())
-
-        setSaveStatus('saved')
-        setLastSavedAt(new Date())
-        failureToastShown.current = false
-      } catch (err: any) {
-        setSaveStatus('error')
-
-        // Map server validation errors to form fields
-        if (err.fieldErrors) {
-          mapServerErrors(err.fieldErrors, setError, TRANSPORTATION_FORM_FIELDS)
-        }
-
-        // Show toast only once per error session
-        if (!failureToastShown.current) {
-          toast({
-            title: 'Auto-save failed',
-            description: err.message || 'Please check the form for errors.',
-            variant: 'destructive',
-          })
-          failureToastShown.current = true
-          setTimeout(() => {
-            failureToastShown.current = false
-          }, 5000)
-        }
-      }
-    }, 500) // 500ms debounce
-
-    return () => clearTimeout(timer)
-  }, [
-    watchedFields,
-    isDirty,
-    isValid,
-    isValidating,
-    isSubmitting,
-    createMutation.isPending,
-    updateMutation.isPending,
-    dayId,
-    activityId,
-    getValues,
-    saveFn,
-    reset,
-    setError,
-    setLastSavedAt,
-    setSaveStatus,
-    toast,
-  ])
+  // Autosave removed in #306 — see useUnsavedChangesWarning below.
+  useUnsavedChangesWarning(isDirty)
 
   // Toggle feature
   const toggleFeature = (feature: string) => {
@@ -750,8 +665,6 @@ export function TransportationForm({
   // Form submission handler
   const onSubmit = handleSubmit(
     async (data) => {
-      // Success - force save
-      setSaveStatus('saving')
       try {
         const response = await saveFn(data)
 
@@ -760,14 +673,10 @@ export function TransportationForm({
         }
 
         reset(getValues(), { keepDirty: false })
-        lastSavedSnapshotRef.current = JSON.stringify(getValues())
-        setSaveStatus('saved')
-        setLastSavedAt(new Date())
 
         // Show success overlay and redirect
         setShowSuccess(true)
       } catch (err: any) {
-        setSaveStatus('error')
         if (err.fieldErrors) {
           mapServerErrors(err.fieldErrors, setError, TRANSPORTATION_FORM_FIELDS)
         }
@@ -820,26 +729,17 @@ export function TransportationForm({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Auto-Save Status Indicator */}
+          {/* Unsaved-changes indicator — replaces the autosave status block (#306) */}
           <div className="flex items-center gap-2 text-sm mr-4">
-            {saveStatus === 'saving' && (
+            {isDirty ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-                <span className="text-gray-500">Saving...</span>
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <span className="text-amber-700">Unsaved changes</span>
               </>
-            )}
-            {saveStatus === 'saved' && lastSavedAt && (
+            ) : (
               <>
                 <Check className="h-4 w-4 text-green-600" />
-                <span className="text-gray-500">
-                  Saved {formatDistanceToNow(lastSavedAt, { addSuffix: true })}
-                </span>
-              </>
-            )}
-            {saveStatus === 'error' && (
-              <>
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <span className="text-red-600">Error</span>
+                <span className="text-gray-500">All changes saved</span>
               </>
             )}
           </div>
@@ -1289,6 +1189,185 @@ export function TransportationForm({
               </div>
             </CardContent>
           </Card>
+          )}
+
+          {/* Journey Legs — train/bus journeys with interchanges (#304) */}
+          {supportsLegs && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Train className="h-5 w-5 text-blue-500" />
+                    {subtype === 'train' ? 'Train Journey Legs' : 'Bus Journey Legs'}
+                  </CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      appendLeg({
+                        trainNumber: '',
+                        operator: '',
+                        departureStation: '',
+                        arrivalStation: '',
+                        departureDate: null,
+                        departureTime: '',
+                        arrivalDate: null,
+                        arrivalTime: '',
+                        interchangeMinutesAfter: null,
+                      })
+                    }
+                  >
+                    + Add Leg
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add each segment of the journey. Use “interchange minutes after” to record the connection time before the next leg.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {legFields.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No legs added. The Departure / Arrival details above describe a direct single-leg journey. Add a leg to record train changes.
+                  </p>
+                ) : (
+                  legFields.map((field, index) => (
+                    <div key={field.id} className="rounded-md border border-gray-200 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">
+                          Leg {index + 1}
+                          {index === legFields.length - 1 && legFields.length > 1 && (
+                            <span className="ml-2 text-xs text-muted-foreground">(final leg)</span>
+                          )}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => removeLeg(index)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">{subtype === 'train' ? 'Train Number' : 'Bus Number'}</Label>
+                          <Input
+                            {...register(`transportationDetails.legs.${index}.trainNumber`)}
+                            placeholder={subtype === 'train' ? 'e.g., BRB 79023' : 'e.g., FlixBus 1234'}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Operator</Label>
+                          <Input
+                            {...register(`transportationDetails.legs.${index}.operator`)}
+                            placeholder="e.g., Bayerische Regiobahn"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Departure Station</Label>
+                          <Input
+                            {...register(`transportationDetails.legs.${index}.departureStation`)}
+                            placeholder="e.g., München Hbf"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Arrival Station</Label>
+                          <Input
+                            {...register(`transportationDetails.legs.${index}.arrivalStation`)}
+                            placeholder="e.g., Garmisch-Partenkirchen"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Departure Date</Label>
+                          <Controller
+                            control={control}
+                            name={`transportationDetails.legs.${index}.departureDate`}
+                            render={({ field: ctrl }) => (
+                              <DatePickerEnhanced
+                                value={(ctrl.value as string | null) ?? null}
+                                onChange={(date) => ctrl.onChange(date ?? null)}
+                                placeholder="YYYY-MM-DD"
+                                defaultMonthHint={tripMonthHint}
+                              />
+                            )}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Departure Time</Label>
+                          <Controller
+                            control={control}
+                            name={`transportationDetails.legs.${index}.departureTime`}
+                            render={({ field: ctrl }) => (
+                              <TimePicker
+                                value={(ctrl.value as string | null) ?? null}
+                                onChange={(time) => ctrl.onChange(time ?? '')}
+                                placeholder="HH:MM"
+                              />
+                            )}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Arrival Date</Label>
+                          <Controller
+                            control={control}
+                            name={`transportationDetails.legs.${index}.arrivalDate`}
+                            render={({ field: ctrl }) => (
+                              <DatePickerEnhanced
+                                value={(ctrl.value as string | null) ?? null}
+                                onChange={(date) => ctrl.onChange(date ?? null)}
+                                placeholder="YYYY-MM-DD"
+                                defaultMonthHint={tripMonthHint}
+                              />
+                            )}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Arrival Time</Label>
+                          <Controller
+                            control={control}
+                            name={`transportationDetails.legs.${index}.arrivalTime`}
+                            render={({ field: ctrl }) => (
+                              <TimePicker
+                                value={(ctrl.value as string | null) ?? null}
+                                onChange={(time) => ctrl.onChange(time ?? '')}
+                                placeholder="HH:MM"
+                              />
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Interchange time only meaningful when another leg follows */}
+                      {index < legFields.length - 1 && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Interchange after this leg (minutes)</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={1440}
+                              {...register(`transportationDetails.legs.${index}.interchangeMinutesAfter`, {
+                                setValueAs: (v) => (v === '' || v === null ? null : Number(v)),
+                              })}
+                              placeholder="e.g., 39"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
           )}
 
           {/* Car Rental Specific Fields - only show for car rentals */}

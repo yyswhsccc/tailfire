@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useSaveStatus } from '@/hooks/use-save-status'
+import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
@@ -9,8 +9,7 @@ import { useSearchParams, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Building2, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, Package } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { Building2, ChevronDown, ChevronUp, Sparkles, Check, AlertCircle, Package } from 'lucide-react'
 import type { ActivityResponseDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -241,13 +240,8 @@ export function LodgingForm({
   // Fetch amenities from database (grouped by category)
   const { data: amenitiesGrouped, isLoading: amenitiesLoading } = useAmenitiesGrouped()
 
-  // Auto-save status tracking (with date validation)
-  const { saveStatus, setSaveStatus, lastSavedAt, setLastSavedAt } = useSaveStatus({
-    activityId: activity?.id,
-    updatedAt: activity?.updatedAt,
-  })
-  const failureToastShown = useRef(false)
-  const lastSavedSnapshotRef = useRef<string | null>(null)
+  // Autosave was removed in #306. Form saves only via the manual Save Changes
+  // button; the header "Unsaved changes" badge below reflects RHF isDirty.
 
   // Pricing validation errors for PricingSection component (not used yet - future integration)
   const [pricingValidationErrors] = useState<ValidationErrors>({})
@@ -268,7 +262,7 @@ export function LodgingForm({
     getValues,
     reset,
     setError,
-    formState: { errors, isDirty, isValid, isValidating, isSubmitting },
+    formState: { errors, isDirty },
   } = form
 
   // Compute trip month hint once for date pickers (opens to trip start month)
@@ -399,8 +393,6 @@ export function LodgingForm({
       queueMicrotask(() => {
         if (!cancelled) {
           reset(toLodgingDefaults(serverData as any, dayDate, trip?.startDate), { keepDirty: false })
-          // Update snapshot to prevent immediate re-save
-          lastSavedSnapshotRef.current = JSON.stringify(getValues())
         }
       })
     }
@@ -431,94 +423,8 @@ export function LodgingForm({
     [activityId, createLodging, updateLodging, pricingBreakdown, activityBookingDate]
   )
 
-  // Auto-save effect with proper gating
-  useEffect(() => {
-    // Gate conditions per plan spec
-    if (!isDirty || !isValid || isValidating || isSubmitting) {
-      return
-    }
-    if (createLodging.isPending || updateLodging.isPending) {
-      return
-    }
-    if (!dayId) {
-      return
-    }
-    // Don't auto-save for new activities - require explicit "Create" action
-    // This prevents duplicate creation when user clicks "Create Lodging" while auto-save timer is pending
-    if (!activityId) {
-      return
-    }
-
-    // Compare against last saved snapshot
-    const currentSnapshot = JSON.stringify(getValues())
-    if (currentSnapshot === lastSavedSnapshotRef.current) {
-      return
-    }
-
-    const timer = setTimeout(async () => {
-      setSaveStatus('saving')
-
-      try {
-        const response = await saveFn(getValues())
-
-        // Update activity ID on create
-        if (!activityId && response.id) {
-          setActivityId(response.id)
-        }
-        if (response.activityPricingId && response.activityPricingId !== activityPricingId) {
-          setActivityPricingId(response.activityPricingId)
-        }
-
-        // Reset dirty state and update snapshot
-        reset(getValues(), { keepDirty: false })
-        lastSavedSnapshotRef.current = JSON.stringify(getValues())
-
-        setSaveStatus('saved')
-        setLastSavedAt(new Date())
-        failureToastShown.current = false
-      } catch (err: any) {
-        setSaveStatus('error')
-
-        // Map server validation errors to form fields
-        if (err.fieldErrors) {
-          mapServerErrors(err.fieldErrors, setError, LODGING_FORM_FIELDS)
-        }
-
-        // Show toast only once per error session
-        if (!failureToastShown.current) {
-          toast({
-            title: 'Auto-save failed',
-            description: err.message || 'Please check the form for errors.',
-            variant: 'destructive',
-          })
-          failureToastShown.current = true
-          setTimeout(() => {
-            failureToastShown.current = false
-          }, 5000)
-        }
-      }
-    }, 500) // 500ms debounce
-
-    return () => clearTimeout(timer)
-  }, [
-    watchedFields,
-    isDirty,
-    isValid,
-    isValidating,
-    isSubmitting,
-    createLodging.isPending,
-    updateLodging.isPending,
-    dayId,
-    activityId,
-    activityPricingId,
-    getValues,
-    saveFn,
-    reset,
-    setError,
-    setLastSavedAt,
-    setSaveStatus,
-    toast,
-  ])
+  // Autosave removed in #306 — see useUnsavedChangesWarning below.
+  useUnsavedChangesWarning(isDirty)
 
   // Photo import effect: triggers when activityId becomes available and there are stored photos
   useEffect(() => {
@@ -610,6 +516,7 @@ export function LodgingForm({
       taxesAndFeesCents: watch('taxesAndFeesCents') || 0,
       currency: watch('currency') || 'CAD',
       confirmationNumber: watch('confirmationNumber') || '',
+      referralUrl: watch('referralUrl') || '',
       commissionTotalCents: watch('commissionTotalCents') || 0,
       commissionSplitPercentage: watch('commissionSplitPercentage') || 0,
       commissionExpectedDate: dateToString(watch('commissionExpectedDate')),
@@ -851,8 +758,6 @@ export function LodgingForm({
   // Form submission handler
   const onSubmit = handleSubmit(
     async (data) => {
-      // Success - force save
-      setSaveStatus('saving')
       try {
         const response = await saveFn(data)
 
@@ -864,14 +769,10 @@ export function LodgingForm({
         }
 
         reset(getValues(), { keepDirty: false })
-        lastSavedSnapshotRef.current = JSON.stringify(getValues())
-        setSaveStatus('saved')
-        setLastSavedAt(new Date())
 
         // Show success overlay and redirect
         setShowSuccess(true)
       } catch (err: any) {
-        setSaveStatus('error')
         if (err.fieldErrors) {
           mapServerErrors(err.fieldErrors, setError, LODGING_FORM_FIELDS)
         }
@@ -975,34 +876,17 @@ export function LodgingForm({
           </div>
         </div>
 
-        {/* Auto-Save Status Indicator */}
+        {/* Unsaved-changes indicator — replaces the autosave status block (#306) */}
         <div className="flex items-center gap-2 text-sm">
-          {saveStatus === 'saving' && (
+          {isDirty ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-              <span className="text-gray-500">Saving...</span>
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <span className="text-amber-700">Unsaved changes</span>
             </>
-          )}
-          {saveStatus === 'saved' && lastSavedAt && (
+          ) : (
             <>
               <Check className="h-4 w-4 text-green-600" />
-              <span className="text-gray-500">
-                Saved {formatDistanceToNow(lastSavedAt, { addSuffix: true })}
-              </span>
-            </>
-          )}
-          {saveStatus === 'error' && (
-            <>
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span className="text-red-600">Error - Click Save to retry</span>
-            </>
-          )}
-          {saveStatus === 'idle' && (
-            <>
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-              </svg>
-              <span className="text-gray-400">Not saved yet</span>
+              <span className="text-gray-500">All changes saved</span>
             </>
           )}
         </div>

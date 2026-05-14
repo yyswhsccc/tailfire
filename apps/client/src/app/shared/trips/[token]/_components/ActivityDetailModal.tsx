@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { MapPin, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
+import { MapPin, Clock, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { MoreHorizontal } from 'lucide-react'
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
   Separator,
 } from '@tailfire/ui-public'
 import type { SharedActivityDto } from '@tailfire/shared-types'
+import { safeExternalUrl } from '@/lib/utils'
 import {
   typeIcons,
   statusVariants,
@@ -162,6 +163,25 @@ export function ActivityDetailModal({
               </div>
             </>
           )}
+
+          {/* "Book this activity" CTA */}
+          {(() => {
+            const safeReferralUrl = safeExternalUrl(activity.referralUrl)
+            return safeReferralUrl ? (
+              <>
+                <Separator />
+                <a
+                  href={safeReferralUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Book this activity
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </>
+            ) : null
+          })()}
 
           {/* Confirmation number */}
           {activity.confirmationNumber && (

@@ -133,16 +133,22 @@ export class AmadeusFlightOffersProvider
         }
       }
 
+      // Surface the upstream Amadeus error body so we can diagnose recurring 400s
+      // (Sentry: API-2S has 28 events with no actionable detail). The body is
+      // tiny JSON, safe to log/capture as long as we don't echo credentials —
+      // request URL and headers are scrubbed by Sentry's default integrations.
+      const upstreamBody = error.response?.data
       this.logger.error('Amadeus Flight Offers API error', {
         requestId,
         latencyMs,
         error: error.message,
         status,
+        upstreamBody,
       })
 
       Sentry.captureException(error, {
         tags: { service: 'amadeus_offers', operation: 'authenticated-request' },
-        extra: { endpoint, requestId, latencyMs, status },
+        extra: { endpoint, requestId, latencyMs, status, upstreamBody },
       })
 
       // Surface the Amadeus error detail for 400s so the frontend gets useful feedback

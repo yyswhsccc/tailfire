@@ -11,6 +11,23 @@ import type { BaseFilterDto } from './common.types'
 // import type { Contact, ContactInsert} from '../database'
 
 // ============================================================================
+// SHARED TYPES
+// ============================================================================
+
+/** Canonical contact lifecycle status. Mirrors `contact_status` enum in DB. */
+export type ContactStatus =
+  | 'prospecting'
+  | 'quoted'
+  | 'booked'
+  | 'traveling'
+  | 'returned'
+  | 'awaiting_next'
+  | 'inactive'
+
+/** Canonical contact type. Mirrors `contact_type` enum in DB. */
+export type ContactType = 'lead' | 'client'
+
+// ============================================================================
 // CREATE DTOs
 // ============================================================================
 
@@ -67,8 +84,8 @@ export interface CreateContactDto {
   travelPreferences?: string // JSONB
 
   // Lifecycle (optional on create, defaults applied)
-  contactType?: 'lead' | 'client' // Defaults to 'lead'
-  contactStatus?: 'prospecting' | 'quoted' | 'booked' | 'traveling' | 'returned' | 'awaiting_next' | 'inactive'
+  contactType?: ContactType // Defaults to 'lead'
+  contactStatus?: ContactStatus
   becameClientAt?: string // ISO timestamp, required when contactType is 'client'
 
   // Marketing consent (optional on create, defaults to false)
@@ -166,8 +183,8 @@ export interface UpdateContactDto {
   travelPreferences?: string
 
   // Lifecycle (use specific endpoints for type/status changes)
-  contactType?: 'lead' | 'client'
-  contactStatus?: 'prospecting' | 'quoted' | 'booked' | 'traveling' | 'returned' | 'awaiting_next' | 'inactive'
+  contactType?: ContactType
+  contactStatus?: ContactStatus
   firstBookingDate?: string
   lastTripReturnDate?: string
 
@@ -210,7 +227,7 @@ export interface UpdateContactGroupMemberDto {
 
 // New DTOs for Phase 2 & 3 endpoints
 export interface UpdateContactStatusDto {
-  status: 'prospecting' | 'quoted' | 'booked' | 'traveling' | 'returned' | 'awaiting_next' | 'inactive'
+  status: ContactStatus
 }
 
 export interface UpdateMarketingConsentDto {
@@ -238,7 +255,7 @@ export interface ContactFilterDto {
   tags?: string[] // Match any of these tags
   hasPassport?: boolean
   passportExpiring?: boolean // Within 6 months
-  contactType?: 'lead' | 'client'
+  contactType?: ContactType
   contactStatus?: string[]
 
   // Scope
@@ -327,8 +344,8 @@ export interface ContactResponseDto {
   travelPreferences: string | null
 
   // Lifecycle & Status
-  contactType: 'lead' | 'client'
-  contactStatus: 'prospecting' | 'quoted' | 'booked' | 'traveling' | 'returned' | 'awaiting_next' | 'inactive'
+  contactType: ContactType
+  contactStatus: ContactStatus
   becameClientAt: string | null
   firstBookingDate: string | null
   lastTripReturnDate: string | null

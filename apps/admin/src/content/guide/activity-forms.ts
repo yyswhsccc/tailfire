@@ -40,7 +40,7 @@ Each activity form is organized into tabs:
 - **Booking / Pricing** — supplier pricing, payment schedule, booking status
 - **Comments** — internal team discussion about this activity
 
-> **Tip:** Forms auto-save as you work. Look for the save indicator to confirm changes are persisted.
+> **Tip:** Forms do not auto-save. The header shows **Unsaved changes** while you're editing — click **Save Changes** when you're done, or **Cancel** to discard.
 
 ## Flights
 

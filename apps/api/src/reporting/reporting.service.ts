@@ -412,8 +412,14 @@ export class ReportingService {
    * Determine the set of trip IDs to scope queries to.
    *
    * - admin + 'agency' → 'all'
-   * - admin + 'my'     → query trips where owner_id = auth.userId
-   *   (getAccessibleTripIds returns 'all' for admins, which defeats "my" filtering)
+   * - admin + 'my'     → trips this admin has a personal hand in (union of:
+   *                       owner_id = self, trip_collaborators row, trip_shares row)
+   *                       (getAccessibleTripIds returns 'all' for admins, which
+   *                       defeats "my" filtering and would also fail to surface
+   *                       collaborator-based ties — TES imports set
+   *                       trips.owner_id to an admin fixture and put the real
+   *                       relationship in trip_collaborators, so resolving by
+   *                       owner_id alone hides most of an admin's actual book)
    * - agent             → getAccessibleTripIds (owned + shared + inbound)
    */
   private async resolveTripIds(
@@ -424,8 +430,12 @@ export class ReportingService {
       if (viewScope === 'agency') {
         return 'all'
       }
-      // Admin "My" scope: fetch trips owned by this admin user
-      const ownedTrips = await this.db.client
+      // Admin "My" scope: union owner_id + active trip_collaborators + trip_shares.
+      // All three are agency-scoped + soft-delete-filtered so we don't leak across
+      // tenants or surface deleted trips.
+      const tripIds = new Set<string>()
+
+      const owned = await this.db.client
         .select({ id: this.db.schema.trips.id })
         .from(this.db.schema.trips)
         .where(
@@ -435,7 +445,42 @@ export class ReportingService {
             isNull(this.db.schema.trips.deletedAt),
           ),
         )
-      return ownedTrips.map((t) => t.id)
+      for (const t of owned) tripIds.add(t.id)
+
+      const collaborated = await this.db.client
+        .select({ tripId: this.db.schema.tripCollaborators.tripId })
+        .from(this.db.schema.tripCollaborators)
+        .innerJoin(
+          this.db.schema.trips,
+          eq(this.db.schema.tripCollaborators.tripId, this.db.schema.trips.id),
+        )
+        .where(
+          and(
+            eq(this.db.schema.tripCollaborators.userId, auth.userId),
+            eq(this.db.schema.tripCollaborators.isActive, true),
+            eq(this.db.schema.trips.agencyId, auth.agencyId),
+            isNull(this.db.schema.trips.deletedAt),
+          ),
+        )
+      for (const row of collaborated) tripIds.add(row.tripId)
+
+      const shared = await this.db.client
+        .select({ tripId: this.db.schema.tripShares.tripId })
+        .from(this.db.schema.tripShares)
+        .innerJoin(
+          this.db.schema.trips,
+          eq(this.db.schema.tripShares.tripId, this.db.schema.trips.id),
+        )
+        .where(
+          and(
+            eq(this.db.schema.tripShares.sharedWithUserId, auth.userId),
+            eq(this.db.schema.trips.agencyId, auth.agencyId),
+            isNull(this.db.schema.trips.deletedAt),
+          ),
+        )
+      for (const row of shared) tripIds.add(row.tripId)
+
+      return Array.from(tripIds)
     }
 
     // Agent: use standard access control

@@ -83,14 +83,15 @@ export default function TripDetailPage({
     <>
       {/* Header */}
       <div className="flex items-start gap-2 mb-6">
-        <Link href="/trips">
+        <Link href="/trips" aria-label="Back to trips">
           <Button variant="ghost" size="icon" className="text-phoenix-text-muted hover:text-white shrink-0">
             <ArrowLeft className="h-5 w-5" />
+            <span className="sr-only">Back to trips</span>
           </Button>
         </Link>
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-white md:text-2xl">{trip.name}</h1>
-          <div className="flex items-center gap-3 mt-1">
+          <div className="flex flex-wrap items-center gap-3 mt-1">
             <Badge className={`${getStatusColor(trip.status)} text-white border-0`}>
               {formatStatus(trip.status)}
             </Badge>

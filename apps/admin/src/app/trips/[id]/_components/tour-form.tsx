@@ -1,13 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useSaveStatus } from '@/hooks/use-save-status'
+import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { useSearchParams } from 'next/navigation'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Compass, ChevronDown, ChevronUp, Sparkles, Loader2, Check, AlertCircle, Plus, X } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { Compass, ChevronDown, ChevronUp, Sparkles, Check, AlertCircle, Plus, X } from 'lucide-react'
 import type { ActivityResponseDto, ItineraryDayWithActivitiesDto, NormalizedTourActivity } from '@tailfire/shared-types/api'
 import { ActivitySearchPanel } from '@/components/activity-search-panel'
 import { Button } from '@/components/ui/button'
@@ -169,8 +168,6 @@ export function TourForm({
   const [activityId, setActivityId] = useState<string | null>(activity?.id || null)
 
   // Safety net refs to prevent duplicate creation race condition
-  const activityIdRef = useRef<string | null>(activity?.id || null)
-  const createInProgressRef = useRef(false)
 
   // Pending Amadeus pictures to import after activity is created
   const pendingPicturesRef = useRef<string[]>([])
@@ -202,17 +199,8 @@ export function TourForm({
   // Track supplier commission rate from selected supplier
   const [supplierCommissionRate, setSupplierCommissionRate] = useState<number | null>(null)
 
-  // Auto-save state
-  const {
-    saveStatus: autoSaveStatus,
-    setSaveStatus: setAutoSaveStatus,
-    lastSavedAt,
-    setLastSavedAt,
-  } = useSaveStatus({
-    activityId: activity?.id,
-    updatedAt: activity?.updatedAt,
-  })
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  // Autosave was removed in #306. Form saves only via the manual Save Changes
+  // button. The header "Unsaved changes" badge below reflects RHF's isDirty.
 
   // Tag input states for inclusions, exclusions, whatToBring
   const [inclusionInput, setInclusionInput] = useState('')
@@ -232,7 +220,8 @@ export function TourForm({
     setValue,
     getValues,
     reset,
-    formState: { errors, isDirty, isValid, isValidating, isSubmitting },
+    trigger,
+    formState: { errors, isDirty, isValid },
   } = form
 
   // useWatch for custom components
@@ -434,99 +423,25 @@ export function TourForm({
     }
   }, [tourData, dayId, trip?.currency, dayDate, reset])
 
-  // Watch all form values for auto-save
-  const watchedValues = useWatch({ control })
-  // Create stable string representation for dependency comparison
-  // useWatch returns new object reference every render - JSON.stringify creates stable primitive
-  const watchedValuesKey = useMemo(() => JSON.stringify(watchedValues), [watchedValues])
-
-  // Auto-save effect
-  useEffect(() => {
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current)
-    }
-
-    if (!isDirty || !isValid || isValidating || isSubmitting || createTour.isPending || updateTour.isPending) {
-      return
-    }
-
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      // SAFETY NET: Check refs to prevent duplicate creation race condition
-      if (createInProgressRef.current) {
-        return
-      }
-
-      setAutoSaveStatus('saving')
-      try {
-        const formData = getValues()
-
-        let response
-        // Use ref for immediate check (state may be stale)
-        if (activityId || activityIdRef.current) {
-          const id = activityId || activityIdRef.current!
-          response = await updateTour.mutateAsync({ id, data: formData })
-        } else {
-          // Mark create as in progress before API call
-          createInProgressRef.current = true
-          try {
-            response = await createTour.mutateAsync(formData)
-          } finally {
-            createInProgressRef.current = false
-          }
-        }
-
-        if (response.id && !activityIdRef.current) {
-          // Update ref immediately (synchronous) before React state update
-          activityIdRef.current = response.id
-          setActivityId(response.id)
-        }
-        if ((response as any).activityPricingId && (response as any).activityPricingId !== activityPricingId) {
-          setActivityPricingId((response as any).activityPricingId)
-        }
-
-        setAutoSaveStatus('saved')
-        setLastSavedAt(new Date())
-      } catch (err: any) {
-        setAutoSaveStatus('error')
-        const fieldErrors = err?.fieldErrors as Array<{ field: string; message: string }> | undefined
-        const details = fieldErrors?.map((e: any) => `${e.field}: ${e.message}`).join('; ')
-        toast({
-          title: 'Auto-save failed',
-          description: details || err.message,
-          variant: 'destructive',
-        })
-      }
-    }, 1000)
-
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current)
-      }
-    }
-  }, [
-    watchedValuesKey, // Use stable string instead of object reference
-    isDirty,
-    isValid,
-    isValidating,
-    isSubmitting,
-    activityId,
-    activityPricingId,
-    getValues,
-    createTour,
-    updateTour,
-    toast,
-    setAutoSaveStatus,
-    setLastSavedAt,
-  ])
+  // Autosave removed in #306 — see useUnsavedChangesWarning below. The form
+  // saves only via the manual Save Changes button (forceSave) or an explicit
+  // submit handler. Replacing the old "Saving / Saved X ago" indicator with a
+  // dirty-state "Unsaved changes" badge in the header.
+  useUnsavedChangesWarning(isDirty)
 
   // Force save handler
   const forceSave = useCallback(async () => {
-    if (!isValid) {
-      scrollToFirstError(errors)
-      const errorFields = flattenErrors(errors as Record<string, unknown>)
+    // With mode: 'onSubmit', RHF doesn't populate `errors` until validation
+    // runs. Triggering validation first ensures the toast below can name
+    // the specific failing fields instead of falling back to the generic
+    // "Please fix the errors before saving" message (#298).
+    const valid = await trigger()
+    if (!valid) {
+      scrollToFirstError(form.formState.errors)
+      const errorFields = flattenErrors(form.formState.errors as Record<string, unknown>)
       const details = errorFields
         .map(f => {
-          const msg = getErrorMessage(errors as Record<string, unknown>, f)
+          const msg = getErrorMessage(form.formState.errors as Record<string, unknown>, f)
           return `${formatFieldLabel(f)}: ${msg || 'invalid'}`
         })
         .join(', ')
@@ -538,7 +453,6 @@ export function TourForm({
       return
     }
 
-    setAutoSaveStatus('saving')
     try {
       const formData = getValues()
       const payload = { ...formData, pricingBreakdownJson: pricingBreakdown, bookingDate: bookingDate || null }
@@ -557,10 +471,10 @@ export function TourForm({
         setActivityPricingId((response as any).activityPricingId)
       }
 
-      setAutoSaveStatus('saved')
-      setLastSavedAt(new Date())
+      // Reset RHF dirty state so the "Unsaved changes" badge clears
+      reset(getValues(), { keepValues: true, keepDirty: false })
+      toast({ title: isEditing ? 'Tour updated' : 'Tour created' })
     } catch (err: any) {
-      setAutoSaveStatus('error')
       const fieldErrors = err?.fieldErrors as Array<{ field: string; message: string }> | undefined
       const details = fieldErrors?.map((e: any) => `${e.field}: ${e.message}`).join('; ')
       toast({
@@ -570,17 +484,18 @@ export function TourForm({
       })
     }
   }, [
-    isValid,
-    errors,
+    trigger,
+    form,
+    reset,
+    isEditing,
     activityId,
     activityPricingId,
     getValues,
     pricingBreakdown,
+    bookingDate,
     createTour,
     updateTour,
     toast,
-    setAutoSaveStatus,
-    setLastSavedAt,
   ])
 
   const handleAiSubmit = () => {
@@ -671,6 +586,7 @@ export function TourForm({
     taxesAndFeesCents: getValues('taxesAndFeesCents') || 0,
     currency: getValues('currency') || 'CAD',
     confirmationNumber: getValues('confirmationNumber') || '',
+    referralUrl: getValues('referralUrl') || '',
     commissionTotalCents: getValues('commissionTotalCents') || 0,
     commissionSplitPercentage: getValues('commissionSplitPercentage') || 0,
     commissionExpectedDate: getValues('commissionExpectedDate') || null,
@@ -752,34 +668,17 @@ export function TourForm({
           </div>
         </div>
 
-        {/* Auto-Save Status Indicator */}
+        {/* Unsaved-changes indicator — replaces the autosave status block (#306) */}
         <div className="flex items-center gap-2 text-sm">
-          {autoSaveStatus === 'saving' && (
+          {isDirty ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-              <span className="text-gray-500">Saving...</span>
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <span className="text-amber-700">Unsaved changes</span>
             </>
-          )}
-          {autoSaveStatus === 'saved' && lastSavedAt && (
+          ) : (
             <>
               <Check className="h-4 w-4 text-green-600" />
-              <span className="text-gray-500">
-                Saved {formatDistanceToNow(lastSavedAt, { addSuffix: true })}
-              </span>
-            </>
-          )}
-          {autoSaveStatus === 'error' && (
-            <>
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span className="text-red-600">Error - Click Save to retry</span>
-            </>
-          )}
-          {autoSaveStatus === 'idle' && (
-            <>
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-              </svg>
-              <span className="text-gray-400">Not saved yet</span>
+              <span className="text-gray-500">All changes saved</span>
             </>
           )}
         </div>
