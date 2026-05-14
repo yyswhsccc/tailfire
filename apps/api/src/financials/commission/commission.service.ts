@@ -660,6 +660,11 @@ export class CommissionService {
         AND cc.status = 'accepted'
         AND cis.id IS NULL
         AND t.status IN ('travelling', 'travelled')
+        -- Filter out the admin fixture (TES import seeds it as a
+        -- co-collaborator on every imported trip; it should never appear
+        -- as an agent earning commission). The real human admins use
+        -- their own user accounts when also doing agent work.
+        AND up.email <> 'admin@phoenixvoyages.ca'
         ${scopeUserId ? sql`AND up.id = ${scopeUserId}` : sql``}
       GROUP BY up.id, up.first_name, up.last_name, up.email, up.commission_settings, cc.currency
     `)
