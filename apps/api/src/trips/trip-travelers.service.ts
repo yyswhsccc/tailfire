@@ -207,7 +207,7 @@ export class TripTravelersService {
     // Optionally propagate the new traveler onto every existing activity
     // on the trip so the agent doesn't have to re-assign one-by-one.
     if (options?.addToAllActivities && traveler) {
-      await this.travelerAssignment.assignTravelerToAllTripActivities(traveler.id, tripId)
+      await this.travelerAssignment.tryAssignTravelerToAllTripActivities(traveler.id, tripId)
     }
 
     // Emit traveler created event

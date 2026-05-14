@@ -92,6 +92,30 @@ When introducing new files that match these patterns, ship a colocated `*.spec.t
 
 Initially soft (convention, not enforced by CI script). Will be enforced by a check once the broader test cleanup (informational jobs → blocking) is done.
 
+### 8. Policy Error Handling — Strict by Default (Refactor Roadmap — Issue #368)
+
+When extracting a `*Policy` class from a service, the **default error mode is strict**: throw on failure, or return an explicit `{ ok, error }` shape that the caller must handle.
+
+**Best-effort error swallowing (`catch + logger.warn`) is only valid when ALL of the following are true:**
+
+1. The operation is a non-critical side-effect (e.g. cache priming, denormalization, UX-convenience auto-assignment).
+2. The caller's main operation has its own integrity invariant — the policy is a "nice to have" on top.
+3. The class of bug "this silently didn't happen" is acceptable in this domain.
+
+**Naming convention:** methods that silently swallow errors get a `try*` prefix to signal the contract at the call site:
+
+```ts
+// Strict (default) — throws on failure
+async assignContactToInvoice(invoiceId: string, contactId: string): Promise<void>
+
+// Best-effort — logs and continues. Caller may NOT rely on success.
+async tryAssignAllTripTravelersToActivity(activityId: string, tripId: string): Promise<void>
+```
+
+**Never best-effort:** payment schedules, ledger writes, audit trails, ownership changes, commission disbursements, anything ledger-backed. Make the error mode explicit in the method signature.
+
+The existing `ActivityTravelerAssignmentPolicy` (#359) uses `try*` because trip-traveler fan-out is a UX shortcut — losing one assignment to a transient DB hiccup is recoverable on the next save. Payment schedules (#361) and similar must follow strict mode.
+
 ## Development Workflow (A to Z)
 
 ### Complete Flow

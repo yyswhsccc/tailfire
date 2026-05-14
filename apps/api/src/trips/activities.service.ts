@@ -669,7 +669,7 @@ export class ActivitiesService {
     // Per-activity traveler editing remains available afterwards for the
     // case where some activities don't apply to all travelers.
     if (resolvedTripId) {
-      await this.travelerAssignment.assignAllTripTravelersToActivity(activity.id, resolvedTripId)
+      await this.travelerAssignment.tryAssignAllTripTravelersToActivity(activity.id, resolvedTripId)
     }
 
     // Emit audit event (after all DB operations succeed)

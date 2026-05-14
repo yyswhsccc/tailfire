@@ -68,7 +68,7 @@ export class ActivityBookingsService {
     // Without this, every "Mark as Booked" required clicking through to add
     // every traveler manually, even on trips where everyone is on every
     // activity — the dominant case. Bug #347.
-    await this.travelerAssignment.ensureActivityHasAssignments(activityId, activity.tripId)
+    await this.travelerAssignment.tryEnsureActivityHasAssignments(activityId, activity.tripId)
 
     // Tier 1 booking validation
     const validation = await this.bookingValidationService.validateBooking(activityId)

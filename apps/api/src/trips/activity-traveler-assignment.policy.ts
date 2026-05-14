@@ -13,6 +13,17 @@
  * authority. Future rule changes (group-booking scoping, archived itineraries,
  * declined travelers) land here once instead of three times.
  *
+ * **Error mode: best-effort (per Issue #368 doctrine).**
+ * All methods here are prefixed with `try*` because every traveler assignment
+ * is a UX-convenience side effect — losing one assignment to a transient DB
+ * hiccup is recoverable on the next save/edit and does not corrupt user state.
+ * Failures are logged via `logger.warn` and swallowed. Callers MAY NOT rely
+ * on success.
+ *
+ * Other policy classes (payment schedules, ledger writes, audit trails)
+ * MUST follow strict mode — throw or return explicit `{ ok, error }`. See
+ * CLAUDE.md > "Policy Error Handling — Strict by Default".
+ *
  * Idempotency: every INSERT relies on the
  *   activity_travelers_unique (activity_id, trip_traveler_id)
  * index documented at packages/database/src/schema/activity-travelers.schema.ts.
@@ -35,10 +46,10 @@ export class ActivityTravelerAssignmentPolicy {
    *   - A new activity is created (ActivitiesService.create)
    *   - An activity is being marked booked and has no travelers yet
    *     (ActivityBookingsService.markAsBooked safety net — call
-   *     ensureActivityHasAssignments instead to skip the work when the
+   *     tryEnsureActivityHasAssignments instead to skip the work when the
    *     activity already has assignments)
    */
-  async assignAllTripTravelersToActivity(
+  async tryAssignAllTripTravelersToActivity(
     activityId: string,
     tripId: string,
   ): Promise<void> {
@@ -58,14 +69,14 @@ export class ActivityTravelerAssignmentPolicy {
   }
 
   /**
-   * Same as assignAllTripTravelersToActivity, but pre-checks whether the
+   * Same as tryAssignAllTripTravelersToActivity, but pre-checks whether the
    * activity already has assignments and short-circuits if it does. Use this
    * as a defensive backstop where the work is usually unnecessary.
    *
    * Returns { skipped: true } when the pre-check found existing assignments,
    *          { skipped: false } when assignments were inserted.
    */
-  async ensureActivityHasAssignments(
+  async tryEnsureActivityHasAssignments(
     activityId: string,
     tripId: string,
   ): Promise<{ skipped: boolean }> {
@@ -79,7 +90,7 @@ export class ActivityTravelerAssignmentPolicy {
       return { skipped: true }
     }
 
-    await this.assignAllTripTravelersToActivity(activityId, tripId)
+    await this.tryAssignAllTripTravelersToActivity(activityId, tripId)
     return { skipped: false }
   }
 
@@ -95,7 +106,7 @@ export class ActivityTravelerAssignmentPolicy {
    * not double-count — both branches resolve to the same set of activities
    * for a given trip.
    */
-  async assignTravelerToAllTripActivities(
+  async tryAssignTravelerToAllTripActivities(
     travelerId: string,
     tripId: string,
   ): Promise<void> {
