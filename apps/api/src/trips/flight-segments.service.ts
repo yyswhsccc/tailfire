@@ -10,7 +10,7 @@
  */
 
 import { Injectable } from '@nestjs/common'
-import { eq, asc } from 'drizzle-orm'
+import { eq, asc, sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import type { FlightSegmentDto } from '@tailfire/shared-types'
 
@@ -33,20 +33,29 @@ export class FlightSegmentsService {
 
   /**
    * Create multiple flight segments for an activity
-   * Replaces any existing segments (delete + insert)
+   * Replaces any existing segments (delete + insert) atomically.
+   * If the incoming list has duplicate segmentOrder values, the last entry
+   * wins — protects against the flight_segments_activity_order_unique
+   * constraint violation reported in #321.
    */
   async createMany(activityId: string, segments: FlightSegmentDto[]): Promise<void> {
     if (!segments || segments.length === 0) {
       return
     }
 
-    // Delete existing segments first (idempotent operation)
-    await this.deleteByActivityId(activityId)
+    // De-duplicate by effective segmentOrder so we never feed the unique
+    // index a clashing pair (e.g. two entries with segmentOrder: 0, or an
+    // explicit 0 colliding with an unset entry's index fallback).
+    const byOrder = new Map<number, FlightSegmentDto & { _index: number }>()
+    segments.forEach((segment, index) => {
+      const order = segment.segmentOrder ?? index
+      byOrder.set(order, { ...segment, _index: index })
+    })
 
     // Insert new segments
-    const values = segments.map((segment, index) => ({
+    const values = Array.from(byOrder.entries()).map(([order, segment]) => ({
       activityId,
-      segmentOrder: segment.segmentOrder ?? index,
+      segmentOrder: order,
       airline: segment.airline || null,
       flightNumber: segment.flightNumber || null,
       // Departure details
@@ -79,14 +88,44 @@ export class FlightSegmentsService {
       aircraftImageAuthor: segment.aircraftImageAuthor || null,
     }))
 
-    await this.db.client.insert(this.db.schema.flightSegments).values(values)
+    // Delete + insert in a single transaction, and serialize concurrent
+    // replacements for the same activity via a transaction-scoped advisory
+    // lock keyed by activityId. Without the lock, two PATCH requests for the
+    // same activity could interleave: tx A deletes the old rows, tx B reads
+    // past them, both transactions try to INSERT, and the second one fails
+    // the unique (activity_id, segment_order) index. The advisory lock is
+    // released at COMMIT/ROLLBACK — pure-Postgres mutual exclusion with no
+    // long-lived row locks. Root cause analysis for #321.
+    await this.db.client.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${activityId}, 0))`,
+      )
+      await tx
+        .delete(this.db.schema.flightSegments)
+        .where(eq(this.db.schema.flightSegments.activityId, activityId))
+      await tx.insert(this.db.schema.flightSegments).values(values)
+    })
   }
 
   /**
-   * Update segments for an activity (replace all)
-   * Uses delete + insert strategy for simplicity
+   * Update segments for an activity (replace all). Treats an empty input as
+   * "clear all segments" — important so a PATCH that removes every segment
+   * actually empties the table instead of leaving the prior rows behind.
+   * The clear path takes the same per-activity advisory lock as createMany
+   * so it cannot race against a concurrent replacement and undo the new rows.
    */
   async updateMany(activityId: string, segments: FlightSegmentDto[]): Promise<void> {
+    if (!segments || segments.length === 0) {
+      await this.db.client.transaction(async (tx) => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended(${activityId}, 0))`,
+        )
+        await tx
+          .delete(this.db.schema.flightSegments)
+          .where(eq(this.db.schema.flightSegments.activityId, activityId))
+      })
+      return
+    }
     await this.createMany(activityId, segments)
   }
 
