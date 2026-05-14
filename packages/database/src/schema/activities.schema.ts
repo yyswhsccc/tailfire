@@ -118,6 +118,11 @@ export const itineraryActivities = pgTable('itinerary_activities', {
   isVisibleInCalendar: boolean('is_visible_in_calendar').default(true).notNull(),
   bookingDate: timestamp('booking_date', { withTimezone: true }),
 
+  // Optional external "Book this activity" URL surfaced as a CTA on the
+  // shared-trip / proposal preview (#302). Affiliate / referral links are
+  // routinely long, so text rather than varchar(N).
+  referralUrl: text('referral_url'),
+
   // Pricing
   /**
    * @deprecated Use activity_pricing.totalPriceCents instead.

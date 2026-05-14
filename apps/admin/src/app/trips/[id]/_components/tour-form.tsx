@@ -586,6 +586,7 @@ export function TourForm({
     taxesAndFeesCents: getValues('taxesAndFeesCents') || 0,
     currency: getValues('currency') || 'CAD',
     confirmationNumber: getValues('confirmationNumber') || '',
+    referralUrl: getValues('referralUrl') || '',
     commissionTotalCents: getValues('commissionTotalCents') || 0,
     commissionSplitPercentage: getValues('commissionSplitPercentage') || 0,
     commissionExpectedDate: getValues('commissionExpectedDate') || null,

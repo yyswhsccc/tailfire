@@ -516,6 +516,7 @@ export function LodgingForm({
       taxesAndFeesCents: watch('taxesAndFeesCents') || 0,
       currency: watch('currency') || 'CAD',
       confirmationNumber: watch('confirmationNumber') || '',
+      referralUrl: watch('referralUrl') || '',
       commissionTotalCents: watch('commissionTotalCents') || 0,
       commissionSplitPercentage: watch('commissionSplitPercentage') || 0,
       commissionExpectedDate: dateToString(watch('commissionExpectedDate')),

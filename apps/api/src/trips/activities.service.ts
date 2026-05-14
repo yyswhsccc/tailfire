@@ -598,6 +598,7 @@ export class ActivitiesService {
         coordinates: dto.coordinates || null,
         notes: dto.notes || null,
         confirmationNumber: dto.confirmationNumber || null,
+        referralUrl: dto.referralUrl || null,
         proposalStatus: dto.proposalStatus || 'draft',
         bookingStatus: dto.bookingStatus || 'unbooked',
         pricingType: dto.pricingType || null,
@@ -713,6 +714,7 @@ export class ActivitiesService {
       coordinates?: { lat: number; lng: number } | null
       notes?: string | null
       confirmationNumber?: string | null
+      referralUrl?: string | null
       proposalStatus?: 'draft' | 'proposing' | 'approved' | 'cancelled'
       bookingStatus?: 'unbooked' | 'booked' | 'cancelled'
     }>
@@ -739,6 +741,7 @@ export class ActivitiesService {
       coordinates: dto.coordinates || null,
       notes: dto.notes || null,
       confirmationNumber: dto.confirmationNumber || null,
+      referralUrl: dto.referralUrl || null,
       proposalStatus: dto.proposalStatus || 'draft',
       bookingStatus: dto.bookingStatus || 'unbooked',
     }))
@@ -815,6 +818,7 @@ export class ActivitiesService {
         ...(dto.coordinates !== undefined && { coordinates: dto.coordinates }),
         ...(dto.notes !== undefined && { notes: dto.notes }),
         ...(dto.confirmationNumber !== undefined && { confirmationNumber: dto.confirmationNumber }),
+        ...(dto.referralUrl !== undefined && { referralUrl: dto.referralUrl || null }),
         ...(dto.proposalStatus && { proposalStatus: dto.proposalStatus }),
         ...(dto.bookingStatus !== undefined && { bookingStatus: dto.bookingStatus }),
         ...(dto.isVisibleInCalendar !== undefined && { isVisibleInCalendar: dto.isVisibleInCalendar }),
@@ -1298,6 +1302,7 @@ export class ActivitiesService {
       coordinates: activity.coordinates || null,
       notes: activity.notes || null,
       confirmationNumber: activity.confirmationNumber || null,
+      referralUrl: activity.referralUrl || null,
       // Booking tracking
       isVisibleInCalendar: activity.isVisibleInCalendar ?? true,
       bookingDate: activity.bookingDate?.toISOString() || null,

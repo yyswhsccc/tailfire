@@ -1046,6 +1046,8 @@ export interface SharedActivityDto {
   proposalStatus: SharedProposalStatus
   bookingStatus: SharedBookingStatus
   confirmationNumber: string | null
+  /** Optional external "Book this activity →" CTA URL (#302). */
+  referralUrl: string | null
   thumbnail: string | null
   media: SharedMediaDto[]
   pricing: SharedActivityPricingDto | null

@@ -167,6 +167,23 @@ export function BookingDetailsSection({
           />
         </div>
 
+        {/* #302 — external "Book this activity" CTA URL surfaced in the
+            shared-trip proposal preview. Empty = no CTA rendered. */}
+        <div className="space-y-2" data-field="referralUrl">
+          <Label className="text-sm font-medium text-gray-700">
+            Client booking link <span className="text-xs text-gray-500 font-normal">(optional)</span>
+          </Label>
+          <Input
+            type="url"
+            placeholder="https://..."
+            value={pricingData.referralUrl || ''}
+            onChange={(e) => onUpdate({ referralUrl: e.target.value })}
+          />
+          <p className="text-xs text-gray-500">
+            Shown as a “Book this activity →” button on the client proposal preview. Use a direct booking or affiliate link.
+          </p>
+        </div>
+
         {/* Document Actions */}
         <div className="flex gap-2">
           <Button

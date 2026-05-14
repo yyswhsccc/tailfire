@@ -3409,6 +3409,7 @@ export class TripsService {
       proposalStatus: activity.proposalStatus || 'draft',
       bookingStatus: activity.bookingStatus || 'unbooked',
       confirmationNumber: activity.confirmationNumber || null,
+      referralUrl: activity.referralUrl || null,
       thumbnail: activity.thumbnail || null,
       media,
       pricing,

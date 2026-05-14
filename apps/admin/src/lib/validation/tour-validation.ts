@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod'
+import { optionalHttpsUrl } from './utils'
 import type { CreateActivityDto, PricingType } from '@tailfire/shared-types/api'
 
 // ============================================================================
@@ -85,6 +86,9 @@ export const tourFormSchema = z.object({
   currency: z.string().default('CAD'),
   pricingType: z.enum(['per_person', 'per_room', 'flat_rate', 'per_night']).default('per_person'),
   confirmationNumber: z.string().optional().default(''),
+  // #302 — optional external "Book this activity" CTA URL rendered in the
+  // client portal proposal preview
+  referralUrl: optionalHttpsUrl,
 
   // Commission fields
   commissionTotalCents: z.coerce.number()
@@ -214,6 +218,7 @@ export function toTourDefaults(
     currency: serverData?.currency ?? tripCurrency ?? 'CAD',
     pricingType: serverData?.pricingType ?? 'per_person',
     confirmationNumber: serverData?.confirmationNumber ?? '',
+    referralUrl: serverData?.referralUrl ?? '',
 
     commissionTotalCents: serverData?.commissionTotalCents ?? 0,
     commissionSplitPercentage: serverData?.commissionSplitPercentage ?? 0,
@@ -316,6 +321,7 @@ export function toTourApiPayload(data: TourFormData): CreateActivityDto & {
     timezone: tourDetails.timezone || null,
     notes: notesContent || null,
     confirmationNumber: data.confirmationNumber || null,
+    referralUrl: data.referralUrl || null,
     pricingType: data.pricingType as PricingType,
     currency: data.currency,
     // Extended fields for pricing
