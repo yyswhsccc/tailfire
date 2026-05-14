@@ -14,7 +14,7 @@
  * @see beta/docs/design/payment-schedule/PAYMENT_SCHEDULE_TEMPLATES.md
  */
 
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common'
 import { and, eq, sql, isNull } from 'drizzle-orm'
 import { addDays, subDays, isAfter } from 'date-fns'
 import { DatabaseService } from '../db/database.service'
@@ -293,7 +293,16 @@ export class PaymentSchedulesService {
 
     // Create payment schedule config
     // Note: agencyId is on activityPricing, not paymentScheduleConfig
-    const [config] = await this.db.client
+    //
+    // The pre-insert idempotency check above is racy: two concurrent POSTs
+    // for the same (pricingId, travelerBookingId) can both pass it. The DB
+    // catches that via uq_psc_pricing_global / uq_psc_pricing_traveler
+    // partial unique indexes. Catch that explicitly so the second writer
+    // returns a clean 409 instead of leaking a Postgres unique-violation as
+    // a 500. Bug #346 — mguertin reported "failed to create payment
+    // schedule" while a real schedule was being persisted in the same
+    // window.
+    const config = await this.db.client
       .insert(this.db.schema.paymentScheduleConfig)
       .values({
         activityPricingId: pricingId,
@@ -305,6 +314,20 @@ export class PaymentSchedulesService {
         depositAmountCents: data.depositAmountCents || null,
       })
       .returning()
+      .then((rows) => rows[0])
+      .catch((err: unknown) => {
+        // Postgres unique_violation = 23505. postgres-js surfaces it as an
+        // Error whose `code` property is '23505'. The uq_psc_pricing_*
+        // partial indexes catch the race where two concurrent POSTs both
+        // pass the idempotency check above and both try to insert.
+        const code = (err as { code?: string })?.code
+        if (code === '23505') {
+          throw new ConflictException(
+            'A payment schedule for this activity already exists. Refresh and edit the existing schedule instead.',
+          )
+        }
+        throw err
+      })
 
     // Create expected payment items if provided
     let expectedPaymentItems: ExpectedPaymentItemDto[] = []

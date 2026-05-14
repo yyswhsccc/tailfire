@@ -89,10 +89,31 @@ export function useCreatePaymentSchedule() {
         description: 'Payment schedule has been successfully created.',
       })
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
+      // If the server says a schedule already exists (race or stale cache),
+      // refresh the local query so the form re-renders with the existing
+      // schedule instead of stranding the user on a destructive toast.
+      // Bug #346 — user clicks Create, server says "already exists", page
+      // doesn't update on its own.
+      const message = error?.message || ''
+      const isAlreadyExists =
+        error?.status === 409 ||
+        /already exists/i.test(message)
+
+      if (isAlreadyExists && variables?.activityPricingId) {
+        queryClient.invalidateQueries({
+          queryKey: paymentScheduleKeys.byActivityPricing(variables.activityPricingId),
+        })
+        toast({
+          title: 'Schedule already exists',
+          description: 'Loaded the existing schedule for this activity.',
+        })
+        return
+      }
+
       toast({
         title: 'Failed to create payment schedule',
-        description: error?.message || 'An unexpected error occurred.',
+        description: message || 'An unexpected error occurred.',
         variant: 'destructive',
       })
     },
