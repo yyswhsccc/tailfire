@@ -9,8 +9,8 @@ import { existsSync, readdirSync, readFileSync } from 'fs'
  *
  * ⚠️ IMPORTANT: This should ONLY be called from apps/api during deployment.
  *
- * Known fragility (and why we no longer mask it):
- * ------------------------------------------------
+ * Known Drizzle fragility (and why we no longer mask it):
+ * -------------------------------------------------------
  * `drizzle-orm/postgres-js/migrator` decides whether to apply each migration
  * by comparing `migration.folderMillis` against the single value
  * `max(__drizzle_migrations.created_at)` captured ONCE at the start of the
@@ -32,18 +32,28 @@ import { existsSync, readdirSync, readFileSync } from 'fs'
  * That masked the silent skip and produced the production drift on
  * 2026-05-14 (6 IC tables missing from Prod, tracking table lying about it).
  *
- * The fix: remove the reconcile loop, add a strict invariant after
- * `migrate()` returns. If Drizzle silently skipped anything, the count
- * mismatch makes the deploy fail loudly instead of corrupting silently.
+ * What this version does:
+ * -----------------------
+ * - Still uses Drizzle's stock `migrate()` for the actual application.
+ * - Removed the silent reconcile loop entirely.
+ * - Added a strict coverage check after `migrate()`: every journal entry's
+ *   `when` MUST appear at least once in tracking, else throws with a list.
+ *   A future silent-skip will FAIL the deploy loud instead of corrupting.
+ * - Kept the harmless ghost-row cleanup for tracking rows whose `created_at`
+ *   no longer matches any journal entry (post-renumber housekeeping).
  *
- * Long-term fix: replace Drizzle's monotonicity-based migrator with a
- * hash-based applier. Out of scope for this hotfix because existing
- * tracking-table contents have hashes that don't match current files
- * (files have been edited since they were applied).
+ * Recovery for already-drifted environments:
+ * ------------------------------------------
+ * The Prod IC-payouts drift from 2026-05-14 needs scripts/migration/
+ * recover-prod-ic-payouts.mjs to run BEFORE this. That script applies the
+ * 11 missing SQL files directly and writes correct tracking rows.
+ * Wired into .github/workflows/deploy-prod.yml as a pre-migration step.
  *
- * Prevention: scripts/validate-journal-monotonicity.mjs enforces that
- * NEW journal entries always have monotonically-increasing `when` values,
- * so this scenario doesn't happen for future migrations.
+ * Future prevention:
+ * ------------------
+ * scripts/validate-journal-monotonicity.mjs is a CI gate that enforces
+ * NEW journal entries always have `when` greater than every previous entry,
+ * so this scenario can't happen for fresh migrations.
  *
  * @param connectionString - PostgreSQL connection string (session mode — DDL)
  */
