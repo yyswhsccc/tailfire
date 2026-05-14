@@ -8,6 +8,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import React from 'react'
@@ -328,5 +330,121 @@ describe('useActivityFormLifecycle', () => {
         ['itineraryDays'],
       ]),
     )
+  })
+
+  // --- save flow: Zod resolver values used in payload (Codex review) --------
+  // The hook routes save through form.handleSubmit so the values handed to
+  // toPayload() are the resolver-transformed output (z.coerce, defaults,
+  // superRefine). Without this, z.coerce.number() for price fields would pass
+  // strings to the API.
+  it('save() passes resolver-coerced values to toPayload', async () => {
+    const { Wrapper } = wrapperFactory()
+    const schema = z.object({
+      itineraryDayId: z.string(),
+      totalPriceCents: z.coerce.number().int().default(0),
+      currency: z.string().default('CAD'),
+      supplier: z.string().default(''),
+      termsAndConditions: z.string().default(''),
+      cancellationPolicy: z.string().default(''),
+    })
+    type SchemaForm = z.infer<typeof schema>
+    const toPayloadSpy = vi.fn((v: SchemaForm) => v)
+
+    const { result } = renderHook(
+      () => {
+        const form = useForm<SchemaForm>({
+          resolver: zodResolver(schema),
+          defaultValues: defaultFormValues as SchemaForm,
+        })
+        const lifecycle = useActivityFormLifecycle<SchemaForm, SchemaForm, SchemaForm>({
+          activityType: 'flight',
+          tripId: 'trip-1',
+          initialActivityId: 'a-5',
+          form,
+          apiData: null,
+          hydrate: baseHydrate as any,
+          toPayload: toPayloadSpy,
+          create: create as any,
+          update: update as any,
+        })
+        return { form, lifecycle }
+      },
+      { wrapper: Wrapper },
+    )
+
+    // Set the field with a string — z.coerce should turn it into a number.
+    act(() => {
+      result.current.form.setValue('totalPriceCents', '12345' as any, {
+        shouldDirty: true,
+      })
+    })
+
+    await act(async () => {
+      await result.current.lifecycle.save()
+    })
+
+    expect(toPayloadSpy).toHaveBeenCalledTimes(1)
+    const passed = toPayloadSpy.mock.calls[0]![0]
+    expect(typeof passed.totalPriceCents).toBe('number')
+    expect(passed.totalPriceCents).toBe(12345)
+  })
+
+  // --- hydration: respects explicit hydrationKey -----------------------------
+  // React Query refetches yield new object identities for the same logical
+  // data. With hydrationKey, the hook skips re-hydrating on identity-only
+  // changes — protects the user's dirty edits.
+  it('does NOT re-hydrate when hydrationKey is stable but apiData identity changes', async () => {
+    const { Wrapper } = wrapperFactory()
+    let api: TestApi = {
+      id: 'a-6',
+      itineraryDayId: 'day-1',
+      currency: 'CAD',
+      supplier: 'Original',
+      termsAndConditions: 'Original T&C',
+      cancellationPolicy: null,
+      totalPriceCents: 0,
+    }
+
+    const { result, rerender } = renderHook(
+      ({ apiData, hydrationKey }: { apiData: TestApi; hydrationKey: string }) => {
+        const form = useForm<TestForm>({ defaultValues: defaultFormValues })
+        const lifecycle = useActivityFormLifecycle({
+          activityType: 'flight',
+          tripId: 'trip-1',
+          initialActivityId: 'a-6',
+          form,
+          apiData,
+          hydrationKey,
+          hydrate: baseHydrate,
+          toPayload: basePayload,
+          create,
+          update,
+        })
+        return { form, lifecycle }
+      },
+      {
+        wrapper: Wrapper,
+        initialProps: { apiData: api, hydrationKey: 'v1' },
+      },
+    )
+
+    await waitFor(() => {
+      expect(result.current.form.getValues('supplier')).toBe('Original')
+    })
+
+    // User edits the form (dirty state).
+    act(() => {
+      result.current.form.setValue('supplier', 'User typed this', { shouldDirty: true })
+    })
+
+    // Simulate React Query refetch — same logical data, new object identity.
+    api = { ...api, supplier: 'Original' /* server-side value, unchanged */ }
+    rerender({ apiData: api, hydrationKey: 'v1' })
+
+    // Wait a tick for any deferred reset that might have fired.
+    await new Promise((r) => setTimeout(r, 10))
+
+    // User's dirty edit must survive — hydrationKey is unchanged.
+    expect(result.current.form.getValues('supplier')).toBe('User typed this')
   })
 })

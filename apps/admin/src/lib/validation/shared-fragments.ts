@@ -4,12 +4,26 @@
  * Activity edit forms (flight/dining/lodging/tour/options/custom-cruise/
  * port-info/package) all duplicate the same booking-detail and pricing
  * fields with subtle drift. PR #355 fixed today's hydration bug at the
- * helper level; this file is the next step — a single source of truth for
- * the field shapes, ready to be composed via `z.object({ ...fragment.shape })`
- * by each form's schema as it migrates to the lifecycle hook.
+ * helper level; this file is the single source of truth for the field
+ * shapes, ready to be composed by each form's schema as it migrates to
+ * the lifecycle hook.
  *
- * Pilot: flight-form only consumes these in PR #363's follow-up. Other
- * forms keep their own field declarations until they migrate.
+ * **Composition pattern — prefer .extend() over shape spread:**
+ *
+ *   // Good — preserves fragment-level refinements when added later
+ *   export const flightFormSchema = pricingFragment
+ *     .extend(bookingDetailsFragment.shape)
+ *     .extend(commissionFragment.shape)
+ *     .extend({ itineraryDayId: z.string().min(1), flightDetails: ... })
+ *
+ *   // Acceptable while fragments have no refinements, but breaks the day
+ *   // any fragment grows a .refine() / .superRefine():
+ *   export const flightFormSchema = z.object({
+ *     ...pricingFragment.shape,
+ *     ...bookingDetailsFragment.shape,
+ *   })
+ *
+ * Caught in Codex design review of PR #364.
  *
  * Field-name drift caught while writing this:
  *   - package-form historically used `supplierName` internally and mapped
