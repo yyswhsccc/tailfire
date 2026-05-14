@@ -86,6 +86,7 @@ export interface PaginatedCommissionChecksResponseDto {
 export interface AgentCommissionDueDto {
   userId: string
   userName: string
+  currency: string                  // ISO 4217, 3-letter (e.g. 'CAD', 'USD')
   bookingCount: number
   commissionDueCents: number
   adjustmentsCents: number
@@ -155,7 +156,15 @@ export interface CreateDepositDto {
   depositNumber: string
   depositDate: string
   totalAmountCents: number
+  /** ISO 4217 three-letter currency code. Defaults to CAD on the server. */
+  currency?: string
   supplierId?: string
+  /**
+   * Sender name as written on the check. Optional — when omitted, the
+   * server falls back to supplier.name (if supplierId provided) or a
+   * generic 'Supplier Deposit' label.
+   */
+  senderName?: string
   notes?: string
   fileUrl?: string
   fileName?: string

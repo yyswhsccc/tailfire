@@ -23,6 +23,7 @@ const settingsTabs: SettingsTab[] = [
   { id: 'automation', label: 'Automation', href: '/settings/automation' },
   { id: 'users', label: 'Users', href: '/settings/users' },
   { id: 'email', label: 'Email', href: '/settings/email' },
+  { id: 'tax-filing', label: 'Tax Filing', href: '/settings/tax-filing' },
   { id: 'agency', label: 'Agency', href: '/settings/agency', disabled: true },
 ]
 

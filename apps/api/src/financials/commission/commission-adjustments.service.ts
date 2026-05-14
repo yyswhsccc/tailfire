@@ -54,6 +54,7 @@ export class CommissionAdjustmentsService {
         agencyId,
         description: dto.description,
         amountCents: dto.amountCents,
+        currency: dto.currency ?? 'CAD',
         adjustmentType: dto.adjustmentType,
         taxType: dto.taxType,
         taxRate: dto.taxRate?.toString(),
@@ -163,6 +164,38 @@ export class CommissionAdjustmentsService {
       .returning()
 
     return this.formatAdjustment(updated)
+  }
+
+  /**
+   * Delete a pending adjustment. Reconciled adjustments cannot be deleted —
+   * they've already flowed into a paid check / IC invoice and need to be
+   * reversed through the parent record instead.
+   */
+  async deleteAdjustment(agencyId: string, adjustmentId: string): Promise<void> {
+    const [existing] = await this.db.client
+      .select()
+      .from(this.db.schema.commissionAdjustments)
+      .where(
+        and(
+          eq(this.db.schema.commissionAdjustments.id, adjustmentId),
+          eq(this.db.schema.commissionAdjustments.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!existing) {
+      throw new NotFoundException(`Adjustment ${adjustmentId} not found`)
+    }
+
+    if (existing.status === 'reconciled') {
+      throw new BadRequestException(
+        'Cannot delete a reconciled adjustment. Cancel the parent check first to unwind the reconciliation.',
+      )
+    }
+
+    await this.db.client
+      .delete(this.db.schema.commissionAdjustments)
+      .where(eq(this.db.schema.commissionAdjustments.id, adjustmentId))
   }
 
   private formatAdjustment(adjustment: any): CommissionAdjustmentResponseDto {

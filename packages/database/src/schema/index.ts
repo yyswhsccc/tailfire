@@ -54,6 +54,18 @@ export * from './financials.schema'
 // Commission system (check-based commission tracking)
 export * from './commission-checks.schema'
 
+// Agency tax filing config (CRA payer identity for T4A filings)
+export * from './agency-tax-filing-config.schema'
+
+// IC tax profiles (canonical IC identity: SIN/BN, GST/HST, disbursement policy)
+export * from './ic-tax-profiles.schema'
+
+// IC payout authorizations (RCTI agreement consent records)
+export * from './ic-payout-authorizations.schema'
+
+// IC payout accounts (bank/e-transfer/wire destination accounts with encrypted details)
+export * from './ic-payout-accounts.schema'
+
 // Payment schedule templates (agency-scoped reusable patterns)
 export * from './payment-templates.schema'
 
@@ -245,3 +257,18 @@ export * from './contact-duplicate-dismissals.schema'
 // Consumer activity tracking (OTA browsing signals + AI summaries)
 export * from './consumer-activity.schema'
 export * from './consumer-insights.schema'
+
+// Tax rates (effective-dated provincial/federal GST/HST rates for IC invoice tax calculation)
+export * from './tax-rates.schema'
+
+// IC invoice number sequences (race-free per-IC per-tax-year sequential counters)
+export * from './ic-invoice-number-sequences.schema'
+
+// IC invoices + invoice lines (RCTI payout invoices with mutual-exclusivity CHECK constraint)
+export * from './ic-invoices.schema'
+
+// IC disbursements + disbursement attempts (provider-agnostic payout execution with FX snapshot)
+export * from './ic-disbursements.schema'
+
+// FX rate snapshots (daily BoC rates cached for T4A CAD-equivalent calculation)
+export * from './fx-rate-snapshots.schema'

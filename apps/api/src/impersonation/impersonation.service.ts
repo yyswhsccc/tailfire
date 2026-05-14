@@ -113,7 +113,7 @@ export class ImpersonationService {
 
     const targetUser = await this.db.client.query.userProfiles.findFirst({
       where: eq(this.db.schema.userProfiles.id, session.targetUserId),
-      columns: { firstName: true, lastName: true },
+      columns: { firstName: true, lastName: true, role: true, agencyId: true, email: true },
     })
 
     return {
@@ -121,6 +121,13 @@ export class ImpersonationService {
       sessionId: session.id,
       targetUserId: session.targetUserId,
       targetName: [targetUser?.firstName, targetUser?.lastName].filter(Boolean).join(' '),
+      // targetRole + targetAgencyId + targetEmail let the admin frontend swap
+      // UI gating to the impersonated user's identity without forging a JWT.
+      // The real admin's JWT still flows on every request as the Authorization
+      // header — these fields are advisory for the client only.
+      targetRole: targetUser?.role ?? null,
+      targetAgencyId: targetUser?.agencyId ?? null,
+      targetEmail: targetUser?.email ?? null,
       expiresAt: session.expiresAt,
       createdAt: session.createdAt,
     }

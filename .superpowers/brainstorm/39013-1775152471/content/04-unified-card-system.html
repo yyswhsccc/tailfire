@@ -1,0 +1,272 @@
+<h2>Unified Product Card Family</h2>
+<p class="subtitle">One card component per product type with size variants. Every card has "+ Add to Trip". No more hub vs search split.</p>
+
+<div class="section">
+  <h3>The Problem Today</h3>
+  <div class="split" style="gap:24px;">
+    <div style="background:rgba(180,50,50,0.08);border:1px solid rgba(180,50,50,0.2);border-radius:12px;padding:16px;">
+      <h4 style="color:#B33939;margin:0 0 8px;">Hub Cards (read-only)</h4>
+      <p style="font-size:12px;margin:0;opacity:0.7;">cruise-card.tsx, flight-card.tsx, activity-card.tsx — display only, no AddToTrip, no interaction beyond navigation</p>
+    </div>
+    <div style="background:rgba(180,50,50,0.08);border:1px solid rgba(180,50,50,0.2);border-radius:12px;padding:16px;">
+      <h4 style="color:#B33939;margin:0 0 8px;">Search Result Cards (shoppable)</h4>
+      <p style="font-size:12px;margin:0;opacity:0.7;">cruise-result-card.tsx, flight-result-card.tsx, hotel-result-card.tsx, tour-result-card.tsx — AddToTrip, pricing, actions</p>
+    </div>
+  </div>
+  <p style="font-size:12px;text-align:center;margin-top:12px;color:#C59746;font-weight:600;">&#8595; Merged into ONE card per product type with size variants &#8595;</p>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>7 Product Card Types &times; 3 Size Variants</h3>
+
+  <!-- CRUISE CARDS -->
+  <div style="margin-bottom:32px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <span style="font-size:20px;">&#128674;</span>
+      <h4 style="margin:0;color:#1A1A1A;font-size:15px;">CruiseProductCard</h4>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.5fr 1fr;gap:16px;align-items:start;">
+      <!-- Full -->
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;font-family:Lato,sans-serif;">
+        <div style="height:130px;background:linear-gradient(135deg,#1a3a5c,#0d2137);display:flex;align-items:center;justify-content:center;position:relative;">
+          <span style="font-size:28px;">&#128674;</span>
+          <div style="position:absolute;top:8px;left:8px;background:rgba(197,151,70,0.9);padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;color:#fff;">SAVE $200</div>
+          <div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.6);padding:2px 6px;border-radius:4px;font-size:9px;color:#fff;">7 Nights</div>
+        </div>
+        <div style="padding:12px;">
+          <p style="font-size:13px;font-weight:600;color:#1A1A1A;margin:0;">Western Caribbean Cruise</p>
+          <p style="font-size:10px;color:#888;margin:3px 0;">Royal Caribbean &bull; Harmony of the Seas</p>
+          <p style="font-size:10px;color:#888;margin:0;">Cozumel &bull; Grand Cayman &bull; Jamaica</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+            <span style="font-size:15px;font-weight:700;color:#C59746;">from $849<span style="font-size:10px;font-weight:400;color:#888;">/pp</span></span>
+            <div style="background:#C59746;color:#fff;font-size:10px;font-weight:600;padding:6px 12px;border-radius:8px;">+ Add to Trip</div>
+          </div>
+        </div>
+        <div style="text-align:center;padding:4px;font-size:9px;color:#888;border-top:1px solid #f0f0f0;">variant: <strong>full</strong> — entity pages, search results</div>
+      </div>
+      <!-- Compact -->
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;font-family:Lato,sans-serif;">
+        <div style="display:flex;">
+          <div style="width:90px;min-height:90px;background:linear-gradient(135deg,#1a3a5c,#0d2137);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="font-size:20px;">&#128674;</span>
+          </div>
+          <div style="padding:10px;flex:1;min-width:0;">
+            <p style="font-size:12px;font-weight:600;color:#1A1A1A;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Western Caribbean</p>
+            <p style="font-size:10px;color:#888;margin:2px 0;">Royal Caribbean &bull; 7N</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+              <span style="font-size:13px;font-weight:700;color:#C59746;">$849</span>
+              <span style="background:#C59746;color:#fff;font-size:8px;font-weight:600;padding:3px 8px;border-radius:5px;">+ Add</span>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:center;padding:4px;font-size:9px;color:#888;border-top:1px solid #f0f0f0;">variant: <strong>compact</strong> — related rails, AI suggestions</div>
+      </div>
+      <!-- Mini -->
+      <div style="font-family:Lato,sans-serif;">
+        <div style="background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:14px;">&#128674;</span>
+          <div style="flex:1;min-width:0;">
+            <p style="font-size:10px;font-weight:600;color:#1A1A1A;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">W. Caribbean 7N</p>
+            <p style="font-size:9px;color:#C59746;font-weight:600;margin:1px 0 0;">$849</p>
+          </div>
+        </div>
+        <div style="text-align:center;padding:4px;font-size:9px;color:#888;">variant: <strong>mini</strong> — basket list, pill badge</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLIGHT CARDS -->
+  <div style="margin-bottom:32px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <span style="font-size:20px;">&#9992;&#65039;</span>
+      <h4 style="margin:0;color:#1A1A1A;font-size:15px;">FlightProductCard</h4>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.5fr 1fr;gap:16px;align-items:start;">
+      <!-- Full -->
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:14px;font-family:Lato,sans-serif;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:28px;height:28px;background:#f0f0f0;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;">AC</div>
+              <div>
+                <p style="font-size:13px;font-weight:600;color:#1A1A1A;margin:0;">YOW &rarr; CZM</p>
+                <p style="font-size:10px;color:#888;margin:1px 0;">Air Canada &bull; Economy</p>
+              </div>
+            </div>
+            <div style="display:flex;gap:16px;margin-top:8px;">
+              <div><p style="font-size:10px;color:#888;margin:0;">Depart</p><p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:1px 0;">6:45 AM</p></div>
+              <div style="display:flex;align-items:center;"><div style="width:40px;height:1px;background:#E0E0E0;position:relative;"><span style="position:absolute;top:-6px;left:50%;transform:translateX(-50%);font-size:8px;color:#888;">1 stop</span></div></div>
+              <div><p style="font-size:10px;color:#888;margin:0;">Arrive</p><p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:1px 0;">1:30 PM</p></div>
+              <div><p style="font-size:10px;color:#888;margin:0;">Duration</p><p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:1px 0;">6h 45m</p></div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <span style="font-size:18px;font-weight:700;color:#C59746;">$389</span>
+            <div style="background:#C59746;color:#fff;font-size:10px;font-weight:600;padding:6px 12px;border-radius:8px;margin-top:6px;">+ Add to Trip</div>
+          </div>
+        </div>
+        <div style="text-align:center;padding:4px 0 0;font-size:9px;color:#888;border-top:1px solid #f0f0f0;margin-top:10px;">variant: <strong>full</strong></div>
+      </div>
+      <!-- Compact -->
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:10px;font-family:Lato,sans-serif;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <p style="font-size:12px;font-weight:600;color:#1A1A1A;margin:0;">YOW &rarr; CZM</p>
+            <p style="font-size:10px;color:#888;margin:2px 0;">Air Canada &bull; 1 stop &bull; 6h 45m</p>
+          </div>
+          <div style="text-align:right;">
+            <span style="font-size:14px;font-weight:700;color:#C59746;">$389</span>
+            <div style="background:#C59746;color:#fff;font-size:8px;font-weight:600;padding:3px 8px;border-radius:5px;margin-top:3px;">+ Add</div>
+          </div>
+        </div>
+        <div style="text-align:center;padding:4px 0 0;font-size:9px;color:#888;border-top:1px solid #f0f0f0;margin-top:8px;">variant: <strong>compact</strong></div>
+      </div>
+      <!-- Mini -->
+      <div style="font-family:Lato,sans-serif;">
+        <div style="background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:14px;">&#9992;&#65039;</span>
+          <div style="flex:1;min-width:0;">
+            <p style="font-size:10px;font-weight:600;color:#1A1A1A;margin:0;">YOW&rarr;CZM 6h45m</p>
+            <p style="font-size:9px;color:#C59746;font-weight:600;margin:1px 0 0;">$389</p>
+          </div>
+        </div>
+        <div style="text-align:center;padding:4px;font-size:9px;color:#888;">variant: <strong>mini</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOTEL CARDS -->
+  <div style="margin-bottom:32px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <span style="font-size:20px;">&#127968;</span>
+      <h4 style="margin:0;color:#1A1A1A;font-size:15px;">HotelProductCard</h4>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1.5fr 1fr;gap:16px;align-items:start;">
+      <!-- Full -->
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;font-family:Lato,sans-serif;">
+        <div style="height:110px;background:linear-gradient(135deg,#3a2a1a,#2a1a0a);display:flex;align-items:center;justify-content:center;position:relative;">
+          <span style="font-size:28px;">&#127968;</span>
+          <div style="position:absolute;top:8px;left:8px;display:flex;gap:2px;">
+            <span style="color:#C59746;font-size:10px;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+          </div>
+        </div>
+        <div style="padding:12px;">
+          <p style="font-size:13px;font-weight:600;color:#1A1A1A;margin:0;">Hyatt Ziva Cancun</p>
+          <p style="font-size:10px;color:#888;margin:3px 0;">All-Inclusive &bull; Beachfront &bull; 4.7 &#9733;</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+            <span style="font-size:15px;font-weight:700;color:#C59746;">$285<span style="font-size:10px;font-weight:400;color:#888;">/night</span></span>
+            <div style="background:#C59746;color:#fff;font-size:10px;font-weight:600;padding:6px 12px;border-radius:8px;">+ Add to Trip</div>
+          </div>
+        </div>
+        <div style="text-align:center;padding:4px;font-size:9px;color:#888;border-top:1px solid #f0f0f0;">variant: <strong>full</strong></div>
+      </div>
+      <!-- Compact -->
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;font-family:Lato,sans-serif;">
+        <div style="display:flex;">
+          <div style="width:80px;min-height:80px;background:linear-gradient(135deg,#3a2a1a,#2a1a0a);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="font-size:20px;">&#127968;</span>
+          </div>
+          <div style="padding:10px;flex:1;">
+            <p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:0;">Hyatt Ziva Cancun</p>
+            <p style="font-size:9px;color:#888;margin:2px 0;">All-Inclusive &bull; 4.7&#9733;</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+              <span style="font-size:12px;font-weight:700;color:#C59746;">$285/n</span>
+              <span style="background:#C59746;color:#fff;font-size:8px;font-weight:600;padding:3px 7px;border-radius:5px;">+ Add</span>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:center;padding:4px;font-size:9px;color:#888;border-top:1px solid #f0f0f0;">variant: <strong>compact</strong></div>
+      </div>
+      <!-- Mini -->
+      <div style="font-family:Lato,sans-serif;">
+        <div style="background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:14px;">&#127968;</span>
+          <div style="flex:1;min-width:0;">
+            <p style="font-size:10px;font-weight:600;color:#1A1A1A;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Hyatt Ziva</p>
+            <p style="font-size:9px;color:#C59746;font-weight:600;margin:1px 0 0;">$285/n</p>
+          </div>
+        </div>
+        <div style="text-align:center;padding:4px;font-size:9px;color:#888;">variant: <strong>mini</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOUR + DESTINATION + SHIP + PROMOTION (summary row) -->
+  <div style="margin-bottom:16px;">
+    <h4 style="margin:0 0 12px;color:#1A1A1A;font-size:14px;">+ 4 More Card Types (same pattern)</h4>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;font-family:Lato,sans-serif;">
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;">
+        <div style="height:70px;background:linear-gradient(135deg,#1a3a2a,#0d2a1a);display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:20px;">&#127966;</span>
+        </div>
+        <div style="padding:8px;">
+          <p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:0;">TourProductCard</p>
+          <p style="font-size:9px;color:#888;margin:2px 0;">Hero image, duration, Globus/operator, price/pp</p>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;">
+        <div style="height:70px;background:linear-gradient(135deg,#1a2a3a,#0d1a2a);display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:20px;">&#127961;</span>
+        </div>
+        <div style="padding:8px;">
+          <p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:0;">DestinationCard</p>
+          <p style="font-size:9px;color:#888;margin:2px 0;">Hero image, country badge, summary. Links to hub.</p>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;">
+        <div style="height:70px;background:linear-gradient(135deg,#2a1a3a,#1a0d2a);display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:20px;">&#128674;</span>
+        </div>
+        <div style="padding:8px;">
+          <p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:0;">ShipCard</p>
+          <p style="font-size:9px;color:#888;margin:2px 0;">Ship photo, cruise line, stats. Links to hub.</p>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;">
+        <div style="height:70px;background:linear-gradient(135deg,#3a3a1a,#2a2a0d);display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:20px;">&#11088;</span>
+        </div>
+        <div style="padding:8px;">
+          <p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:0;">PromotionCard</p>
+          <p style="font-size:9px;color:#888;margin:2px 0;">Savings badge, supplier, dates, promo code</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>Where each variant is used</h3>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="border-bottom:2px solid rgba(255,255,255,0.2);">
+          <th style="text-align:left;padding:8px;color:#C59746;">Variant</th>
+          <th style="text-align:left;padding:8px;">Used In</th>
+          <th style="text-align:left;padding:8px;">AddToTrip?</th>
+          <th style="text-align:left;padding:8px;">Image?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;font-weight:600;">full</td>
+          <td style="padding:6px 8px;">Entity page sections, search results, promotion detail</td>
+          <td style="padding:6px 8px;color:#4ade80;">Yes</td>
+          <td style="padding:6px 8px;">Hero image</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:6px 8px;font-weight:600;">compact</td>
+          <td style="padding:6px 8px;">Related/nearby rails, AI suggestion cards, mobile horizontal scroll</td>
+          <td style="padding:6px 8px;color:#4ade80;">Yes</td>
+          <td style="padding:6px 8px;">Thumbnail</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;font-weight:600;">mini</td>
+          <td style="padding:6px 8px;">Trip basket list, board summary, submit review</td>
+          <td style="padding:6px 8px;color:#888;">No (already in basket)</td>
+          <td style="padding:6px 8px;">Icon only</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -6,7 +6,8 @@
  * workaround used in TraveleSolutions.
  */
 
-import { Controller, Get, Post, Patch, Param, Body, Query, Req } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req, HttpCode, HttpStatus } from '@nestjs/common'
+import { AdminOnly } from '../../auth/decorators/admin-only.decorator'
 import { ApiTags } from '@nestjs/swagger'
 import { CommissionAdjustmentsService } from './commission-adjustments.service'
 import type {
@@ -49,5 +50,22 @@ export class CommissionAdjustmentsController {
   ): Promise<CommissionAdjustmentResponseDto> {
     const agencyId = req.user?.agencyId
     return this.adjustmentsService.updateAdjustment(agencyId, id, dto)
+  }
+
+  /**
+   * DELETE /commission/adjustments/:id
+   * Admin-only. Deletes a PENDING adjustment outright. Reconciled
+   * adjustments are protected and must be unwound by cancelling the
+   * parent check / invoice first.
+   */
+  @Delete('commission/adjustments/:id')
+  @AdminOnly()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteAdjustment(
+    @Req() req: any,
+    @Param('id') id: string,
+  ): Promise<void> {
+    const agencyId = req.user?.agencyId
+    await this.adjustmentsService.deleteAdjustment(agencyId, id)
   }
 }

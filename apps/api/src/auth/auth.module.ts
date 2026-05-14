@@ -17,6 +17,7 @@ import { RolesGuard } from './guards/roles.guard'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { EmailModule } from '../email/email.module'
+import { DatabaseModule } from '../db/database.module'
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { EmailModule } from '../email/email.module'
       }),
     }),
     EmailModule, // Required for password reset emails
+    DatabaseModule, // Required for user profile lookup in password reset
   ],
   controllers: [AuthController],
   providers: [JwtStrategy, PortalJwtStrategy, JwtAuthGuard, PortalAuthGuard, RolesGuard, AuthService],

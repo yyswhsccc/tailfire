@@ -105,7 +105,7 @@ export class SupabaseStorageProvider implements StorageProvider {
       name: file.name,
       path: prefix ? `${prefix}/${file.name}` : file.name,
       size: file.metadata?.size || 0,
-      lastModified: new Date(file.metadata?.lastModified || file.created_at),
+      lastModified: new Date(file.metadata?.lastModified ?? file.created_at ?? Date.now()),
       contentType: file.metadata?.mimetype,
     }))
   }

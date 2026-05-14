@@ -22,10 +22,17 @@ export default function ResetPasswordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
 
-  // CRITICAL: Extract token from URL hash and set session BEFORE updateUser
+  // Check for session (set by callback route) or extract token from URL hash
   useEffect(() => {
     const handleRecoveryToken = async () => {
-      // Supabase puts tokens in URL hash: #access_token=xxx&type=recovery
+      // First, check if we already have a session (set by /auth/callback via verifyOtp)
+      const { data: { session: existingSession } } = await supabase.auth.getSession()
+      if (existingSession) {
+        setPageState('ready')
+        return
+      }
+
+      // Fallback: Supabase puts tokens in URL hash: #access_token=xxx&type=recovery
       const hash = window.location.hash.substring(1)
       if (!hash) {
         setError('Invalid reset link. Please request a new password reset.')
@@ -104,10 +111,12 @@ export default function ResetPasswordPage() {
       setPageState('success')
 
       // Sign out and redirect to login after brief delay
-      setTimeout(async () => {
-        await supabase.auth.signOut()
-        window.location.assign('/auth/login?message=password_reset_success')
+      setTimeout(() => {
+        window.location.href = '/auth/login?message=password_reset_success'
+
       }, 2000)
+      // Sign out server-side to clear session + auth_flow cookie
+      await fetch('/auth/signout', { method: 'POST', redirect: 'manual' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {

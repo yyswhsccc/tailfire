@@ -10,16 +10,36 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Mail, Lock } from 'lucide-react'
 
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  token_invalid: 'This invitation or reset link has already been used or has expired. Please log in or request a new link.',
+  callback_failed: 'Authentication failed. Please try again or contact your administrator.',
+  session_failed: 'Failed to create your session. Please try again.',
+  missing_params: 'Invalid authentication link. Please use the link from your email.',
+  invalid_callback: 'Invalid authentication response. Please try again.',
+}
+
+const AUTH_SUCCESS_MESSAGES: Record<string, string> = {
+  password_reset_success: 'Your password has been updated. Please sign in with your new password.',
+  password_set_success: 'Your password has been set. Please sign in to continue.',
+}
+
 export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   const searchParams = useSearchParams()
   const rawRedirect = searchParams.get('redirectTo') || '/trips'
   // Sanitize to internal paths only — prevent open redirect
   const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/trips'
+  const authError = searchParams.get('error')
+  const authMessage = searchParams.get('message')
+  const [error, setError] = useState<string | null>(
+    authError ? AUTH_ERROR_MESSAGES[authError] || 'An authentication error occurred.' : null
+  )
+  const [successMessage] = useState<string | null>(
+    authMessage ? AUTH_SUCCESS_MESSAGES[authMessage] || null : null
+  )
 
   const supabase = createClient()
 
@@ -70,6 +90,11 @@ export function LoginForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {successMessage && (
+          <Alert className="border-green-200 bg-green-50 text-green-800">
+            <AlertDescription>{successMessage}</AlertDescription>
+          </Alert>
+        )}
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>

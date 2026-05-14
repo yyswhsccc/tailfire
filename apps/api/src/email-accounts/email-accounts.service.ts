@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException, HttpException, HttpStatus, Logger } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
-import { eq, and, ne, sql, desc, asc, ilike, or } from 'drizzle-orm'
+import { eq, and, sql, desc, asc, ilike, or } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { EncryptionService } from '../common/encryption/encryption.service'
 import { QUEUES } from '../automation/automation.types'

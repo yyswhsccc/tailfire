@@ -1419,12 +1419,89 @@
     {
       "idx": 202,
       "version": "7",
+      "when": 1778414400002,
+      "tag": "20260509203356_agency_tax_filing_config",
+      "breakpoints": true
+    },
+    {
+      "idx": 203,
+      "version": "7",
+      "when": 1778414400003,
+      "tag": "20260509203644_ic_tax_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 204,
+      "version": "7",
+      "when": 1778414400004,
+      "tag": "20260509203902_ic_payout_authorizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 205,
+      "version": "7",
+      "when": 1778414400005,
+      "tag": "20260509204100_ic_payout_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 206,
+      "version": "7",
+      "when": 1778414400006,
+      "tag": "20260509210000_ic_audit_entity_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 207,
+      "version": "7",
+      "when": 1778414400007,
+      "tag": "20260510220820_commission_adjustments_currency",
+      "breakpoints": true
+    },
+    {
+      "idx": 208,
+      "version": "7",
+      "when": 1778414400008,
+      "tag": "20260510221000_tax_rates",
+      "breakpoints": true
+    },
+    {
+      "idx": 209,
+      "version": "7",
+      "when": 1778414400009,
+      "tag": "20260510222000_ic_invoice_number_sequences",
+      "breakpoints": true
+    },
+    {
+      "idx": 210,
+      "version": "7",
+      "when": 1778414400010,
+      "tag": "20260510223000_ic_invoices",
+      "breakpoints": true
+    },
+    {
+      "idx": 211,
+      "version": "7",
+      "when": 1778414400011,
+      "tag": "20260511000000_ic_disbursements",
+      "breakpoints": true
+    },
+    {
+      "idx": 212,
+      "version": "7",
+      "when": 1778414400012,
+      "tag": "20260511010000_fx_rate_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 213,
+      "version": "7",
       "when": 1778767090000,
       "tag": "20260513221810_add_transportation_legs",
       "breakpoints": true
     },
     {
-      "idx": 203,
+      "idx": 214,
       "version": "7",
       "when": 1778767484000,
       "tag": "20260514020444_add_activity_referral_url",

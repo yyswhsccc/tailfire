@@ -6,7 +6,7 @@ import { TopNav } from './top-nav'
 import { useMyProfile } from '@/hooks/use-user-profile'
 
 // Routes exempt from welcome redirect
-const EXEMPT_ROUTES = ['/welcome', '/auth', '/profile']
+const EXEMPT_ROUTES = ['/welcome', '/auth', '/profile', '/portal']
 
 function isExempt(pathname: string): boolean {
   return EXEMPT_ROUTES.some(

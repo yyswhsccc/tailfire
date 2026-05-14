@@ -65,6 +65,17 @@ export default function SetPasswordPage() {
         }
       }
 
+      // Clear restricted auth_flow cookie and get fresh session with active status
+      await fetch('/auth/signout', { method: 'POST', redirect: 'manual' })
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: (await supabase.auth.getUser()).data.user?.email || '',
+        password,
+      })
+      if (signInError) {
+        window.location.href = '/auth/login?message=password_set_success'
+        return
+      }
+
       // Hard navigate so middleware picks up the fresh session
       window.location.assign('/profile?setup=true')
     } catch {

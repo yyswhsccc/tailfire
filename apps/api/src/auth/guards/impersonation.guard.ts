@@ -1,6 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { eq, and, isNull, gt } from 'drizzle-orm'
+import { eq, and, isNull, gt, sql } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator'
 import { BYPASS_IMPERSONATION_KEY } from '../decorators/bypass-impersonation.decorator'
@@ -24,7 +24,7 @@ export class ImpersonationGuard implements CanActivate {
   private async ensureTableExists(): Promise<boolean> {
     if (this.tableExists === true) return true
     try {
-      await this.db.client.execute({ sql: `SELECT 1 FROM impersonation_sessions LIMIT 0`, params: [] } as any)
+      await this.db.client.execute(sql`SELECT 1 FROM impersonation_sessions LIMIT 0`)
       this.tableExists = true
       return true
     } catch {

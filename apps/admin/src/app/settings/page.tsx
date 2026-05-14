@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Key, Ship, Users, Building2, Info, Mail } from 'lucide-react'
+import { Key, Ship, Users, Building2, Info, Mail, FileText } from 'lucide-react'
 import { SettingsTabsLayout } from './_components/settings-tabs-layout'
 
 // Build info - set at build time
@@ -47,6 +47,13 @@ const settingsCategories: SettingsCategoryCard[] = [
     description: 'Manage allowed email domains and compliance footer',
     href: '/settings/email',
     icon: <Mail className="h-6 w-6" />,
+    available: true,
+  },
+  {
+    title: 'Tax Filing',
+    description: 'CRA payer identity used on T4A slips (BN15, transmitter number, filing address)',
+    href: '/settings/tax-filing',
+    icon: <FileText className="h-6 w-6" />,
     available: true,
   },
   {

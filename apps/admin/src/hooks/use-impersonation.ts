@@ -14,12 +14,16 @@ interface ImpersonationStatus {
 }
 
 export function useImpersonation() {
-  const { isAdmin } = useUser()
+  // Use actualIsAdmin — `isAdmin` from useUser is the EFFECTIVE role and
+  // would flip to false the moment we start impersonating an agent, which
+  // would then hide the banner / disable Exit. The real admin's role must
+  // drive impersonation controls.
+  const { actualIsAdmin } = useUser()
   const [status, setStatus] = useState<ImpersonationStatus>({ active: false })
   const [loading, setLoading] = useState(false)
 
   const checkStatus = useCallback(async () => {
-    if (!isAdmin) return
+    if (!actualIsAdmin) return
     try {
       const data = await api.get<ImpersonationStatus>('/admin/impersonate/status')
       setStatus(data)
@@ -35,7 +39,7 @@ export function useImpersonation() {
         localStorage.removeItem('impersonate-user-id')
       }
     }
-  }, [isAdmin])
+  }, [actualIsAdmin])
 
   useEffect(() => {
     checkStatus()
@@ -48,14 +52,18 @@ export function useImpersonation() {
     return () => clearInterval(interval)
   }, [status.active, checkStatus])
 
-  const start = async (userId: string) => {
+  const start = async (userId: string, role?: string) => {
     setLoading(true)
     try {
       await api.post(`/admin/impersonate/${userId}`)
       if (typeof window !== 'undefined') {
         localStorage.setItem('impersonate-user-id', userId)
       }
-      window.location.href = '/dashboard'
+      // Non-admin users (role='user') have no access to /dashboard's admin-only
+      // widgets; route them to /trips which is the day-to-day agent view.
+      // From there they can navigate to /portal/payouts/onboarding etc.
+      const destination = role === 'admin' ? '/dashboard' : '/trips'
+      window.location.href = destination
     } finally {
       setLoading(false)
     }

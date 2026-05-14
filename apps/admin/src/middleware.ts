@@ -10,7 +10,11 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 // Routes that redirect to /trips if already authenticated
-const authRoutes = ['/auth/login', '/auth/forgot-password', '/auth/reset-password']
+const authRoutes = ['/auth/login', '/auth/forgot-password']
+
+// Routes that require a session but should NOT redirect to /trips
+// (user must be authenticated to change password, but needs to stay on the page)
+const authenticatedAuthRoutes = ['/auth/reset-password', '/auth/set-password']
 
 // Routes that are always public (no auth checks)
 const publicRoutes = ['/auth/callback']
@@ -37,10 +41,37 @@ export async function middleware(request: NextRequest) {
   const { user, userStatus, aal, hasMfaFactors, supabaseResponse } = await updateSession(request)
 
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
+  const isAuthenticatedAuthRoute = authenticatedAuthRoutes.some((route) => pathname.startsWith(route))
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
+
+  // Check for restricted auth flow (recovery or invite — session can only access password pages)
+  const authFlow = request.cookies.get('auth_flow')?.value
+  if (authFlow && user) {
+    const allowedPaths = authFlow === 'recovery'
+      ? ['/auth/reset-password', '/auth/signout']
+      : ['/auth/set-password', '/profile', '/auth/signout']
+
+    const isAllowed = allowedPaths.some((p) => pathname.startsWith(p))
+      || isPublicRoute
+
+    if (!isAllowed) {
+      // Restricted session trying to access dashboard — redirect back to password page
+      const redirectPath = authFlow === 'recovery' ? '/auth/reset-password' : '/auth/set-password'
+      return NextResponse.redirect(new URL(redirectPath, request.url))
+    }
+    return supabaseResponse
+  }
 
   // Public routes pass through
   if (isPublicRoute) {
+    return supabaseResponse
+  }
+
+  // Password reset/set pages: require session, but don't redirect away
+  if (isAuthenticatedAuthRoute) {
+    if (!user) {
+      return NextResponse.redirect(new URL('/auth/login', request.url))
+    }
     return supabaseResponse
   }
 

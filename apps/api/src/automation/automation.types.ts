@@ -20,6 +20,10 @@ export const QUEUES = {
   EMAIL_SYNC: 'email-sync',
   VACATION_SEARCH: 'vacation-search',
   EMAIL_WRITEBACK: 'email-writeback',
+  // IC Payouts (Phase 3 — Task 32)
+  IC_PAYOUT_DISBURSE: 'ic-payout-disburse',
+  IC_PAYOUT_WEBHOOK: 'ic-payout-webhook',
+  IC_PAYOUT_RECONCILE: 'ic-payout-reconcile',
 } as const
 
 // Alias for backward compatibility

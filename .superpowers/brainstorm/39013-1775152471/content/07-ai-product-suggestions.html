@@ -1,0 +1,223 @@
+<h2>AI Concierge — Product Suggestion Cards</h2>
+<p class="subtitle">The AI suggests real products as interactive cards. Users can add directly from the card OR tell the AI "add that cruise to my trip."</p>
+
+<div class="section">
+  <h3>AI Chat with Product Cards</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+    <!-- MOBILE CHAT -->
+    <div>
+      <div class="mockup">
+        <div class="mockup-header">Mobile — AI suggesting products</div>
+        <div class="mockup-body" style="padding:0;">
+          <div style="max-width:375px;margin:0 auto;background:#fff;font-family:Lato,system-ui,sans-serif;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+
+            <!-- Chat Header -->
+            <div style="padding:12px 16px;border-bottom:1px solid #E0E0E0;display:flex;justify-content:space-between;align-items:center;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:16px;">&#10024;</span>
+                <span style="font-size:13px;font-weight:700;color:#1A1A1A;">AI Concierge</span>
+              </div>
+              <span style="font-size:11px;color:#888;">Cozumel &bull; 2 in basket</span>
+            </div>
+
+            <!-- Chat Messages -->
+            <div style="padding:12px 16px;min-height:420px;overflow-y:auto;">
+
+              <!-- User message -->
+              <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+                <div style="background:#C59746;color:#fff;border-radius:12px 12px 4px 12px;padding:10px 14px;max-width:75%;">
+                  <p style="font-size:12px;margin:0;">What should I do in Cozumel? I like snorkeling and local food</p>
+                </div>
+              </div>
+
+              <!-- AI response with text -->
+              <div style="margin-bottom:12px;">
+                <div style="background:#faf6f0;border-radius:12px 12px 12px 4px;padding:10px 14px;max-width:85%;">
+                  <p style="font-size:12px;color:#1A1A1A;margin:0;">Great picks! Cozumel has world-class reefs and amazing street food. Here are my top suggestions:</p>
+                </div>
+              </div>
+
+              <!-- AI PRODUCT CARD 1 — Activity -->
+              <div style="margin-bottom:10px;margin-left:8px;max-width:90%;">
+                <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;">
+                  <div style="height:100px;background:linear-gradient(135deg,#0a4a6a,#063a52);display:flex;align-items:center;justify-content:center;position:relative;">
+                    <span style="font-size:32px;">&#129343;</span>
+                    <div style="position:absolute;top:6px;left:6px;background:rgba(197,151,70,0.9);padding:2px 7px;border-radius:4px;font-size:8px;font-weight:700;color:#fff;letter-spacing:0.5px;">ACTIVITY</div>
+                    <div style="position:absolute;bottom:6px;right:6px;display:flex;gap:2px;">
+                      <span style="color:#C59746;font-size:9px;">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+                      <span style="color:#fff;font-size:8px;opacity:0.8;">4.9</span>
+                    </div>
+                  </div>
+                  <div style="padding:10px 12px;">
+                    <p style="font-size:12px;font-weight:600;color:#1A1A1A;margin:0;">Palancar Reef Snorkeling Tour</p>
+                    <p style="font-size:10px;color:#888;margin:3px 0;">3 hours &bull; Small group &bull; Equipment included</p>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+                      <span style="font-size:15px;font-weight:700;color:#C59746;">$65<span style="font-size:10px;font-weight:400;color:#888;">/pp</span></span>
+                      <div style="background:#C59746;color:#fff;font-size:10px;font-weight:600;padding:6px 14px;border-radius:8px;cursor:pointer;">+ Add to Trip</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI PRODUCT CARD 2 — Tour -->
+              <div style="margin-bottom:10px;margin-left:8px;max-width:90%;">
+                <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;">
+                  <div style="height:100px;background:linear-gradient(135deg,#4a2a0a,#3a1a00);display:flex;align-items:center;justify-content:center;position:relative;">
+                    <span style="font-size:32px;">&#127860;</span>
+                    <div style="position:absolute;top:6px;left:6px;background:rgba(197,151,70,0.9);padding:2px 7px;border-radius:4px;font-size:8px;font-weight:700;color:#fff;letter-spacing:0.5px;">TOUR</div>
+                    <div style="position:absolute;bottom:6px;right:6px;display:flex;gap:2px;">
+                      <span style="color:#C59746;font-size:9px;">&#9733;&#9733;&#9733;&#9733;</span>
+                      <span style="color:#fff;font-size:8px;opacity:0.8;">4.7</span>
+                    </div>
+                  </div>
+                  <div style="padding:10px 12px;">
+                    <p style="font-size:12px;font-weight:600;color:#1A1A1A;margin:0;">Cozumel Street Food &amp; Market Walk</p>
+                    <p style="font-size:10px;color:#888;margin:3px 0;">4 hours &bull; Local guide &bull; 6 tastings included</p>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+                      <span style="font-size:15px;font-weight:700;color:#C59746;">$89<span style="font-size:10px;font-weight:400;color:#888;">/pp</span></span>
+                      <div style="background:#C59746;color:#fff;font-size:10px;font-weight:600;padding:6px 14px;border-radius:8px;cursor:pointer;">+ Add to Trip</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI PRODUCT CARD 3 — Compact hotel -->
+              <div style="margin-bottom:10px;margin-left:8px;max-width:90%;">
+                <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;display:flex;">
+                  <div style="width:80px;min-height:80px;background:linear-gradient(135deg,#3a2a1a,#2a1a0a);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span style="font-size:22px;">&#127968;</span>
+                  </div>
+                  <div style="padding:10px;flex:1;">
+                    <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+                      <span style="font-size:7px;background:rgba(197,151,70,0.9);color:#fff;padding:1px 5px;border-radius:3px;font-weight:700;">HOTEL</span>
+                      <span style="font-size:9px;color:#888;">Beachfront</span>
+                    </div>
+                    <p style="font-size:11px;font-weight:600;color:#1A1A1A;margin:0;">Hotel B Cozumel</p>
+                    <p style="font-size:9px;color:#888;margin:2px 0;">Boutique &bull; 4.8&#9733; &bull; 5 min from port</p>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+                      <span style="font-size:12px;font-weight:700;color:#C59746;">$185<span style="font-size:9px;font-weight:400;color:#888;">/night</span></span>
+                      <span style="background:#C59746;color:#fff;font-size:8px;font-weight:600;padding:4px 8px;border-radius:5px;">+ Add</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI follow-up text -->
+              <div style="margin-bottom:12px;">
+                <div style="background:#faf6f0;border-radius:12px 12px 12px 4px;padding:10px 14px;max-width:85%;">
+                  <p style="font-size:12px;color:#1A1A1A;margin:0;">You can tap "+ Add to Trip" on any card, or just tell me which ones you like and I'll add them for you!</p>
+                </div>
+              </div>
+
+              <!-- User voice command -->
+              <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+                <div style="background:#C59746;color:#fff;border-radius:12px 12px 4px 12px;padding:10px 14px;max-width:75%;">
+                  <p style="font-size:12px;margin:0;">Add the snorkeling and the food tour to my trip</p>
+                </div>
+              </div>
+
+              <!-- AI confirmation with mini cards -->
+              <div style="margin-bottom:12px;">
+                <div style="background:#faf6f0;border-radius:12px 12px 12px 4px;padding:10px 14px;max-width:85%;">
+                  <p style="font-size:12px;color:#1A1A1A;margin:0 0 8px;">Done! Added both to your trip:</p>
+                  <!-- Mini confirmation cards -->
+                  <div style="display:flex;flex-direction:column;gap:4px;">
+                    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:6px;padding:6px 8px;display:flex;align-items:center;gap:6px;">
+                      <span style="font-size:11px;">&#129343;</span>
+                      <span style="font-size:10px;flex:1;color:#1A1A1A;">Palancar Reef Snorkeling</span>
+                      <span style="font-size:9px;color:#C59746;font-weight:600;">$65</span>
+                      <span style="font-size:9px;color:#059669;font-weight:600;">&#10003;</span>
+                    </div>
+                    <div style="background:#fff;border:1px solid #E0E0E0;border-radius:6px;padding:6px 8px;display:flex;align-items:center;gap:6px;">
+                      <span style="font-size:11px;">&#127860;</span>
+                      <span style="font-size:10px;flex:1;color:#1A1A1A;">Street Food &amp; Market Walk</span>
+                      <span style="font-size:9px;color:#C59746;font-weight:600;">$89</span>
+                      <span style="font-size:9px;color:#059669;font-weight:600;">&#10003;</span>
+                    </div>
+                  </div>
+                  <p style="font-size:11px;color:#888;margin:8px 0 0;">Your trip now has 4 items (~$1,852 total). Want to see your Dream Board?</p>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Chat Input -->
+            <div style="padding:10px 16px;border-top:1px solid #E0E0E0;display:flex;gap:8px;align-items:center;">
+              <div style="flex:1;background:#faf6f0;border:1px solid #E0E0E0;border-radius:20px;padding:10px 14px;font-size:11px;color:#888;">
+                Tell me what else to add...
+              </div>
+              <div style="width:36px;height:36px;background:#C59746;border-radius:50%;display:flex;align-items:center;justify-content:center;">
+                <span style="font-size:14px;color:#fff;">&#8593;</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TWO WAYS TO ADD -->
+    <div>
+      <h4 style="margin:0 0 16px;color:#1A1A1A;font-size:15px;">Two ways to add products from AI</h4>
+
+      <!-- Way 1 -->
+      <div style="margin-bottom:24px;padding:16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="background:#C59746;color:#fff;font-size:10px;font-weight:700;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;">1</span>
+          <h4 style="margin:0;font-size:13px;">Tap the card's "+ Add to Trip" button</h4>
+        </div>
+        <p style="font-size:12px;margin:0;opacity:0.7;">Same button as entity page cards. Instant add with animation. Card state changes to "Added &#10003;" and becomes muted.</p>
+        <div style="margin-top:10px;font-family:Lato,sans-serif;">
+          <div style="display:flex;gap:8px;">
+            <div style="background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:6px;flex:1;">
+              <span style="font-size:12px;">&#129343;</span>
+              <span style="font-size:10px;flex:1;color:#1A1A1A;">Palancar Reef</span>
+              <span style="font-size:10px;font-weight:700;color:#C59746;">$65</span>
+              <span style="background:#C59746;color:#fff;font-size:8px;font-weight:600;padding:3px 8px;border-radius:5px;">+ Add</span>
+            </div>
+          </div>
+          <div style="text-align:center;margin:6px 0;color:#C59746;">&#8595; tap &#8595;</div>
+          <div style="display:flex;gap:8px;">
+            <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:6px;flex:1;">
+              <span style="font-size:12px;">&#129343;</span>
+              <span style="font-size:10px;flex:1;color:#1A1A1A;">Palancar Reef</span>
+              <span style="font-size:10px;font-weight:700;color:#059669;">$65</span>
+              <span style="font-size:9px;color:#059669;font-weight:600;">Added &#10003;</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Way 2 -->
+      <div style="margin-bottom:24px;padding:16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="background:#C59746;color:#fff;font-size:10px;font-weight:700;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;">2</span>
+          <h4 style="margin:0;font-size:13px;">Tell the AI in natural language</h4>
+        </div>
+        <p style="font-size:12px;margin:0;opacity:0.7;">The AI uses the <code style="background:rgba(255,255,255,0.1);padding:1px 4px;border-radius:3px;">manageTripBasket</code> tool to add/remove items. Confirms with mini cards showing what was added.</p>
+        <div style="margin-top:10px;font-family:Lato,sans-serif;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="background:#C59746;color:#fff;border-radius:8px 8px 4px 8px;padding:8px 10px;font-size:10px;align-self:flex-end;">"Add the snorkeling tour"</div>
+            <div style="background:#faf6f0;border-radius:8px 8px 8px 4px;padding:8px 10px;font-size:10px;color:#1A1A1A;align-self:flex-start;">"Done! Added Palancar Reef Snorkeling ($65/pp) &#10003;"</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card types in AI -->
+      <div style="padding:16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;">
+        <h4 style="margin:0 0 8px;font-size:13px;color:#C59746;">Product cards the AI can suggest</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;">
+          <div style="padding:6px 8px;background:rgba(255,255,255,0.03);border-radius:6px;">&#128674; Cruises &amp; sailings</div>
+          <div style="padding:6px 8px;background:rgba(255,255,255,0.03);border-radius:6px;">&#9992;&#65039; Flights</div>
+          <div style="padding:6px 8px;background:rgba(255,255,255,0.03);border-radius:6px;">&#127968; Hotels</div>
+          <div style="padding:6px 8px;background:rgba(255,255,255,0.03);border-radius:6px;">&#127966; Tours</div>
+          <div style="padding:6px 8px;background:rgba(255,255,255,0.03);border-radius:6px;">&#129343; Activities</div>
+          <div style="padding:6px 8px;background:rgba(255,255,255,0.03);border-radius:6px;">&#11088; Offers &amp; promotions</div>
+        </div>
+        <p style="font-size:10px;color:#888;margin:8px 0 0;">All use the same unified product card family (full variant in chat, mini variant in confirmations).</p>
+      </div>
+    </div>
+
+  </div>
+</div>

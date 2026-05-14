@@ -36,16 +36,37 @@ export async function GET(request: Request) {
       type: type as 'invite' | 'recovery' | 'email',
     })
 
+    if (error) {
+      console.error(`[auth/callback] verifyOtp failed for type=${type}: ${error.message} (status=${error.status})`)
+    }
+
     if (!error) {
       // For invites, redirect to set-password (user stays pending until password is set)
       if (type === 'invite') {
-        // No activation here — user stays pending until password is set.
-        // Activation happens on recordLogin() after successful authentication.
-        return NextResponse.redirect(`${origin}/auth/set-password`)
+        // No activation here — user stays pending until password is set
+        // Restrict session to password setup only (security: no dashboard access)
+        const inviteResponse = NextResponse.redirect(`${origin}/auth/set-password`)
+        inviteResponse.cookies.set('auth_flow', 'invite_setup', {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 60 * 30, // 30 minutes — enough to set password
+        })
+        return inviteResponse
       }
       // For recovery, redirect to password reset
       if (type === 'recovery') {
-        return NextResponse.redirect(`${origin}/auth/reset-password`)
+        // Restrict session to password reset only (security: no dashboard access)
+        const recoveryResponse = NextResponse.redirect(`${origin}/auth/reset-password`)
+        recoveryResponse.cookies.set('auth_flow', 'recovery', {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 60 * 30, // 30 minutes — enough to reset password
+        })
+        return recoveryResponse
       }
       // Default redirect
       return NextResponse.redirect(`${origin}/trips`)

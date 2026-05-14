@@ -246,6 +246,10 @@ export class CommissionService {
       throw new BadRequestException(`Cannot update check in '${check.status}' status`)
     }
 
+    if (dto.senderSupplierId) {
+      await this.assertSupplierBelongsToAgency(agencyId, dto.senderSupplierId)
+    }
+
     // If cancelling a paid check, reverse settlements and adjustments atomically
     const isCancellingPaidCheck =
       dto.status === 'cancelled' && check.checkType === 'paid'
@@ -606,16 +610,21 @@ export class CommissionService {
   // ============================================================================
 
   async getCommissionDue(agencyId: string, scopeUserId?: string): Promise<AgentCommissionDueDto[]> {
-    // Calculate commissions due per agent from accepted received checks
-    // using settlement-based anti-join instead of heuristic NOT EXISTS
+    // Calculate commissions due per (agent, currency) from accepted received checks.
+    // Each (userId, currency) pair becomes a separate row — a single agent can appear
+    // multiple times if they have unsettled items in different currencies.
     //
     // Formula (two-stage split):
     //   distributable = received_cents - tax - platform_fee
     //   agent_portion = distributable * agent_split_rate / 100  (default 60%)
     //   individual_payout = agent_portion * collaborator_percentage / 100
+    //
+    // Adjustments are matched by currency so that CAD adjustments only appear in the
+    // CAD row and USD adjustments only in the USD row.
     const result: any[] = await this.db.client.execute(sql`
       SELECT
         up.id AS user_id,
+        cc.currency,
         COALESCE(up.first_name || ' ' || up.last_name, up.email) AS user_name,
         COUNT(DISTINCT cci.activity_pricing_id) AS booking_count,
         COALESCE(SUM(
@@ -630,7 +639,8 @@ export class CommissionService {
            FROM commission_adjustments ca
            WHERE ca.agent_user_id = up.id
              AND ca.agency_id = ${agencyId}
-             AND ca.status = 'pending'),
+             AND ca.status = 'pending'
+             AND ca.currency = cc.currency),
           0
         ) AS adjustments_cents
       FROM commission_checks cc
@@ -651,12 +661,13 @@ export class CommissionService {
         AND cis.id IS NULL
         AND t.status IN ('travelling', 'travelled')
         ${scopeUserId ? sql`AND up.id = ${scopeUserId}` : sql``}
-      GROUP BY up.id, up.first_name, up.last_name, up.email, up.commission_settings
+      GROUP BY up.id, up.first_name, up.last_name, up.email, up.commission_settings, cc.currency
     `)
 
     return result.map((row: any) => ({
       userId: row.user_id,
       userName: row.user_name,
+      currency: row.currency,
       bookingCount: Number(row.booking_count),
       commissionDueCents: Number(row.commission_due_cents),
       adjustmentsCents: Number(row.adjustments_cents),
@@ -684,9 +695,12 @@ export class CommissionService {
       const txResults: CommissionCheckResponseDto[] = []
 
       for (const agent of toPay) {
-        const checkNumber = `${prefix}-${Date.now()}-${agent.userId.slice(0, 8)}`
+        // Include currency in the check number so concurrent (userId, currency) pairs
+        // in the same batch don't collide on the timestamp component.
+        const checkNumber = `${prefix}-${Date.now()}-${agent.userId.slice(0, 8)}-${agent.currency}`
 
-        // Step 1: Create placeholder paid check with amount=0
+        // Step 1: Create placeholder paid check with amount=0, using the agent's currency.
+        // One paid check is created per (userId, currency) pair — not just per userId.
         const [check] = await tx
           .insert(this.db.schema.commissionChecks)
           .values({
@@ -695,7 +709,7 @@ export class CommissionService {
             checkType: 'paid',
             checkDate,
             checkAmountCents: 0,
-            currency: 'CAD',
+            currency: agent.currency,   // ← was hardcoded 'CAD'
             recipientUserId: agent.userId,
             recipientName: agent.userName,
             status: 'submitted',
@@ -709,8 +723,9 @@ export class CommissionService {
           throw new BadRequestException(`Failed to create payment check for ${agent.userName}`)
         }
 
-        // Step 2: Atomically claim unsettled items via INSERT ... ON CONFLICT DO NOTHING RETURNING
-        // Uses corrected formula: distributable * agent_split_rate * collaborator_percentage
+        // Step 2: Atomically claim unsettled items via INSERT ... ON CONFLICT DO NOTHING RETURNING.
+        // Filtered to source received checks whose currency matches this agent row's currency,
+        // ensuring that CAD items are only claimed into a CAD paid check and USD into USD.
         const claimedRows: { settled_amount_cents: number }[] = await tx.execute(sql`
           INSERT INTO commission_item_settlements
             (check_item_id, recipient_user_id, paid_check_id, settled_amount_cents, created_by)
@@ -725,6 +740,7 @@ export class CommissionService {
             ), 0),
             ${userId}
           FROM commission_check_items cci
+          JOIN commission_checks src_cc ON src_cc.id = cci.check_id
           JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
           LEFT JOIN commission_tracking ct ON ct.component_pricing_id = cci.activity_pricing_id
           JOIN itinerary_activities ia ON ia.id = ap.activity_id
@@ -737,10 +753,10 @@ export class CommissionService {
             ON existing.check_item_id = cci.id AND existing.recipient_user_id = ${agent.userId}
           WHERE existing.id IS NULL
             AND t.status IN ('travelling', 'travelled')
-            AND cci.check_id IN (
-              SELECT cc.id FROM commission_checks cc
-              WHERE cc.agency_id = ${agencyId} AND cc.check_type = 'received' AND cc.status = 'accepted'
-            )
+            AND src_cc.agency_id = ${agencyId}
+            AND src_cc.check_type = 'received'
+            AND src_cc.status = 'accepted'
+            AND src_cc.currency = ${agent.currency}   -- ← only claim items in matching currency
           ON CONFLICT (check_item_id, recipient_user_id) DO NOTHING
           RETURNING settled_amount_cents
         `)
@@ -751,14 +767,15 @@ export class CommissionService {
           0
         )
 
-        // Step 4: Atomically claim pending adjustments via UPDATE...RETURNING
-        // This prevents concurrent transactions from double-claiming the same adjustments
+        // Step 4: Atomically claim pending adjustments via UPDATE...RETURNING.
+        // Filtered by currency so CAD adjustments are only claimed into the CAD paid check.
         const claimedAdjustments: { amount_cents: number }[] = await tx.execute(sql`
           UPDATE commission_adjustments
           SET status = 'reconciled', check_id = ${check.id}, updated_at = now()
           WHERE agent_user_id = ${agent.userId}
             AND agency_id = ${agencyId}
             AND status = 'pending'
+            AND currency = ${agent.currency}   -- ← only reconcile matching currency
           RETURNING amount_cents
         `)
         const adjustmentsCents = claimedAdjustments.reduce(
@@ -1111,6 +1128,13 @@ export class CommissionService {
     dto: CreateDepositDto,
     userId?: string
   ): Promise<DepositDetailResponseDto> {
+    // Validate supplier belongs to this agency. Reporting depends on the
+    // FK; a stale or cross-agency UUID would silently break commission
+    // rollups, so we reject it loudly here.
+    if (dto.supplierId) {
+      await this.assertSupplierBelongsToAgency(agencyId, dto.supplierId)
+    }
+
     const [check] = await this.db.client
       .insert(this.db.schema.commissionChecks)
       .values({
@@ -1119,9 +1143,9 @@ export class CommissionService {
         checkType: 'received',
         checkDate: dto.depositDate,
         checkAmountCents: dto.totalAmountCents,
-        currency: 'CAD',
+        currency: dto.currency ?? 'CAD',
         senderSupplierId: dto.supplierId ?? null,
-        senderName: dto.supplierId ? null : 'Supplier Deposit',
+        senderName: dto.senderName?.trim() || (dto.supplierId ? null : 'Supplier Deposit'),
         status: 'submitted',
         source: 'deposit',
         notes: dto.notes,
@@ -1133,6 +1157,29 @@ export class CommissionService {
       .returning()
 
     return this.formatDepositDetail(check)
+  }
+
+  /**
+   * Throws NotFoundException if the supplier id doesn't exist. Suppliers
+   * are a shared catalog (no agency_id column on the suppliers table), so
+   * the check is existence-only. Used by createDeposit / updateCheck to
+   * keep commission_checks.sender_supplier_id honest for reporting.
+   *
+   * (The unused agencyId parameter is kept for API symmetry — if suppliers
+   * ever become agency-scoped, this is the choke point to update.)
+   */
+  private async assertSupplierBelongsToAgency(
+    _agencyId: string,
+    supplierId: string,
+  ): Promise<void> {
+    const [row] = await this.db.client
+      .select({ id: this.db.schema.suppliers.id })
+      .from(this.db.schema.suppliers)
+      .where(eq(this.db.schema.suppliers.id, supplierId))
+      .limit(1)
+    if (!row) {
+      throw new NotFoundException(`Supplier ${supplierId} not found`)
+    }
   }
 
   async finalizeDeposit(

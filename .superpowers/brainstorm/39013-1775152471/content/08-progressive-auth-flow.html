@@ -1,0 +1,222 @@
+<h2>Progressive Authentication Flow</h2>
+<p class="subtitle">Anonymous browse &rarr; Add to Trip (session) &rarr; Name board + email to view &rarr; Passengers + email to submit &rarr; Account created &rarr; CRM linked</p>
+
+<div class="section">
+  <h3>The Journey — 5 Stages</h3>
+
+  <div style="display:flex;gap:4px;align-items:stretch;font-family:Lato,system-ui,sans-serif;">
+
+    <!-- Stage 1 -->
+    <div style="flex:1;background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;">
+      <div style="background:#1A1A1A;padding:10px 12px;display:flex;align-items:center;gap:6px;">
+        <span style="background:#C59746;color:#fff;font-size:9px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;">1</span>
+        <span style="font-size:11px;font-weight:600;color:#fff;">Browse</span>
+      </div>
+      <div style="padding:10px 12px;flex:1;">
+        <p style="font-size:10px;color:#888;margin:0 0 6px;font-weight:600;">Anonymous</p>
+        <div style="background:#faf6f0;border-radius:6px;padding:8px;margin-bottom:6px;">
+          <p style="font-size:10px;color:#1A1A1A;margin:0;">&#128064; View all entity pages</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#128269; Search flights, cruises, hotels</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#10024; Talk to AI concierge</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#128200; See prices &amp; availability</p>
+        </div>
+        <p style="font-size:9px;color:#888;margin:0;">Tracked via <code style="font-size:8px;background:#f0f0f0;padding:1px 3px;border-radius:2px;">ota_session</code> cookie</p>
+      </div>
+      <div style="padding:6px 12px;border-top:1px solid #f0f0f0;">
+        <p style="font-size:9px;color:#059669;font-weight:600;margin:0;">&#9679; No login required</p>
+      </div>
+    </div>
+
+    <!-- Arrow -->
+    <div style="display:flex;align-items:center;font-size:18px;color:#C59746;">&#8594;</div>
+
+    <!-- Stage 2 -->
+    <div style="flex:1;background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;">
+      <div style="background:#1A1A1A;padding:10px 12px;display:flex;align-items:center;gap:6px;">
+        <span style="background:#C59746;color:#fff;font-size:9px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;">2</span>
+        <span style="font-size:11px;font-weight:600;color:#fff;">Add to Trip</span>
+      </div>
+      <div style="padding:10px 12px;flex:1;">
+        <p style="font-size:10px;color:#888;margin:0 0 6px;font-weight:600;">Still anonymous</p>
+        <div style="background:#faf6f0;border-radius:6px;padding:8px;margin-bottom:6px;">
+          <p style="font-size:10px;color:#1A1A1A;margin:0;">&#128188; Click "+ Add to Trip"</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#128196; Auto-creates draft trip request</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#10024; AI can add items too</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#128722; Basket badge shows count</p>
+        </div>
+        <p style="font-size:9px;color:#888;margin:0;">Stored in <code style="font-size:8px;background:#f0f0f0;padding:1px 3px;border-radius:2px;">ota_trip_requests</code> linked to session</p>
+      </div>
+      <div style="padding:6px 12px;border-top:1px solid #f0f0f0;">
+        <p style="font-size:9px;color:#059669;font-weight:600;margin:0;">&#9679; No login required</p>
+      </div>
+    </div>
+
+    <!-- Arrow -->
+    <div style="display:flex;align-items:center;font-size:18px;color:#C59746;">&#8594;</div>
+
+    <!-- Stage 3 -->
+    <div style="flex:1;background:#fff;border:1px solid #C59746;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;">
+      <div style="background:#C59746;padding:10px 12px;display:flex;align-items:center;gap:6px;">
+        <span style="background:#fff;color:#C59746;font-size:9px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;">3</span>
+        <span style="font-size:11px;font-weight:600;color:#fff;">View Dream Board</span>
+      </div>
+      <div style="padding:10px 12px;flex:1;">
+        <p style="font-size:10px;color:#C59746;margin:0 0 6px;font-weight:600;">Identity capture</p>
+        <div style="background:#faf6f0;border-radius:6px;padding:8px;margin-bottom:6px;">
+          <p style="font-size:10px;color:#1A1A1A;margin:0;">&#9997; Name your board</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#128231; Provide name + email</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#127912; See full Pinterest-style board</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#128279; Share board link with companions</p>
+        </div>
+        <p style="font-size:9px;color:#888;margin:0;">CRM lookup: existing contact? Link. New? Create.</p>
+      </div>
+      <div style="padding:6px 12px;border-top:1px solid rgba(197,151,70,0.2);">
+        <p style="font-size:9px;color:#C59746;font-weight:600;margin:0;">&#9679; Name + email required</p>
+      </div>
+    </div>
+
+    <!-- Arrow -->
+    <div style="display:flex;align-items:center;font-size:18px;color:#C59746;">&#8594;</div>
+
+    <!-- Stage 4 -->
+    <div style="flex:1;background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;">
+      <div style="background:#1A1A1A;padding:10px 12px;display:flex;align-items:center;gap:6px;">
+        <span style="background:#C59746;color:#fff;font-size:9px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;">4</span>
+        <span style="font-size:11px;font-weight:600;color:#fff;">Submit Trip</span>
+      </div>
+      <div style="padding:10px 12px;flex:1;">
+        <p style="font-size:10px;color:#888;margin:0 0 6px;font-weight:600;">Full details</p>
+        <div style="background:#faf6f0;border-radius:6px;padding:8px;margin-bottom:6px;">
+          <p style="font-size:10px;color:#1A1A1A;margin:0;">&#128101; Name all passengers</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#128197; Confirm travel dates</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#128172; Special requests</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#9989; Review &amp; submit</p>
+        </div>
+        <p style="font-size:9px;color:#888;margin:0;">Triggers Phase 1 promotion pipeline to Tailfire</p>
+      </div>
+      <div style="padding:6px 12px;border-top:1px solid #f0f0f0;">
+        <p style="font-size:9px;color:#f59e0b;font-weight:600;margin:0;">&#9679; Passengers + email required</p>
+      </div>
+    </div>
+
+    <!-- Arrow -->
+    <div style="display:flex;align-items:center;font-size:18px;color:#C59746;">&#8594;</div>
+
+    <!-- Stage 5 -->
+    <div style="flex:1;background:#fff;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;">
+      <div style="background:#059669;padding:10px 12px;display:flex;align-items:center;gap:6px;">
+        <span style="background:#fff;color:#059669;font-size:9px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;">5</span>
+        <span style="font-size:11px;font-weight:600;color:#fff;">Account Created</span>
+      </div>
+      <div style="padding:10px 12px;flex:1;">
+        <p style="font-size:10px;color:#059669;margin:0 0 6px;font-weight:600;">Fully linked</p>
+        <div style="background:#f0fdf4;border-radius:6px;padding:8px;margin-bottom:6px;">
+          <p style="font-size:10px;color:#1A1A1A;margin:0;">&#128100; User account created</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#127968; Client Portal access</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#128202; Linked to Tailfire CRM</p>
+          <p style="font-size:10px;color:#1A1A1A;margin:3px 0;">&#128232; Advisor assigned &amp; notified</p>
+        </div>
+        <p style="font-size:9px;color:#888;margin:0;">Owner resolved: CRM &gt; referral &gt; group &gt; round-robin</p>
+      </div>
+      <div style="padding:6px 12px;border-top:1px solid #dcfce7;">
+        <p style="font-size:9px;color:#059669;font-weight:600;margin:0;">&#9679; Automatic — no extra step</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- IDENTITY CAPTURE MODAL -->
+<div class="section" style="margin-top:32px;">
+  <h3>Stage 3 — Identity Capture (when user taps "View My Board")</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+    <!-- Modal mockup -->
+    <div class="mockup">
+      <div class="mockup-header">Mobile — Name Your Board</div>
+      <div class="mockup-body" style="padding:0;">
+        <div style="max-width:375px;margin:0 auto;font-family:Lato,system-ui,sans-serif;">
+          <!-- Dimmed background -->
+          <div style="background:rgba(0,0,0,0.5);padding:40px 16px;border-radius:12px;">
+            <!-- Modal -->
+            <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+              <!-- Header -->
+              <div style="padding:20px 20px 0;text-align:center;">
+                <span style="font-size:32px;">&#127912;</span>
+                <h3 style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:#1A1A1A;margin:8px 0 4px;">Name Your Dream Board</h3>
+                <p style="font-size:12px;color:#888;margin:0;">Save your trip ideas and get personalized advice</p>
+              </div>
+              <!-- Form -->
+              <div style="padding:20px;">
+                <div style="margin-bottom:14px;">
+                  <label style="font-size:11px;font-weight:600;color:#1A1A1A;display:block;margin-bottom:4px;">Board Name</label>
+                  <div style="background:#faf6f0;border:1px solid #E0E0E0;border-radius:10px;padding:12px 14px;font-size:13px;color:#1A1A1A;">Cozumel Caribbean Adventure</div>
+                  <p style="font-size:9px;color:#888;margin:3px 0 0;">Auto-suggested from your first destination</p>
+                </div>
+                <div style="margin-bottom:14px;">
+                  <label style="font-size:11px;font-weight:600;color:#1A1A1A;display:block;margin-bottom:4px;">Your Name</label>
+                  <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:12px 14px;font-size:13px;color:#888;">Jane Smith</div>
+                </div>
+                <div style="margin-bottom:20px;">
+                  <label style="font-size:11px;font-weight:600;color:#1A1A1A;display:block;margin-bottom:4px;">Email</label>
+                  <div style="background:#fff;border:1px solid #E0E0E0;border-radius:10px;padding:12px 14px;font-size:13px;color:#888;">jane@example.com</div>
+                  <p style="font-size:9px;color:#888;margin:3px 0 0;">We'll use this to save your board and send updates</p>
+                </div>
+                <!-- CTA -->
+                <div style="background:#C59746;color:#fff;text-align:center;font-size:14px;font-weight:600;padding:14px;border-radius:10px;cursor:pointer;">
+                  &#10024; Open My Dream Board
+                </div>
+                <p style="font-size:9px;color:#888;text-align:center;margin:10px 0 0;">By continuing, you agree to our Terms of Service</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI can also capture -->
+    <div>
+      <h4 style="margin:0 0 12px;font-size:14px;color:#1A1A1A;">AI can also capture identity in conversation</h4>
+      <div style="font-family:Lato,sans-serif;">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <!-- AI prompt -->
+          <div style="background:#faf6f0;border-radius:10px 10px 10px 4px;padding:10px 14px;max-width:90%;">
+            <p style="font-size:11px;color:#1A1A1A;margin:0;">You've built a great trip! &#127881; Want me to save it so you can share it with your travel companions? I just need your name and email.</p>
+          </div>
+          <!-- User -->
+          <div style="background:#C59746;color:#fff;border-radius:10px 10px 4px 10px;padding:10px 14px;max-width:75%;align-self:flex-end;">
+            <p style="font-size:11px;margin:0;">Sure! I'm Jane, jane@example.com</p>
+          </div>
+          <!-- AI confirms -->
+          <div style="background:#faf6f0;border-radius:10px 10px 10px 4px;padding:10px 14px;max-width:90%;">
+            <p style="font-size:11px;color:#1A1A1A;margin:0;">Perfect, Jane! &#10003; I've saved your board as "Cozumel Caribbean Adventure." Here's your link:</p>
+            <div style="background:#fff;border:1px solid #E0E0E0;border-radius:8px;padding:8px 10px;margin-top:6px;display:flex;align-items:center;gap:6px;">
+              <span style="font-size:10px;">&#128279;</span>
+              <span style="font-size:10px;color:#C59746;flex:1;font-weight:500;">ota.phoenixvoyages.ca/my-trip/abc123</span>
+              <span style="font-size:9px;background:#faf6f0;border:1px solid #E0E0E0;padding:3px 8px;border-radius:4px;color:#1A1A1A;font-weight:500;">Copy</span>
+            </div>
+            <p style="font-size:10px;color:#888;margin:6px 0 0;">Share this with anyone — they can view your Dream Board!</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:24px;padding:14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;">
+        <h4 style="margin:0 0 8px;font-size:13px;color:#C59746;">What happens on identity capture</h4>
+        <ol style="font-size:11px;margin:0;padding-left:18px;opacity:0.7;line-height:2;">
+          <li>CRM lookup by email + agencyId</li>
+          <li>Existing contact? Link trip to them</li>
+          <li>New? Create contact in Tailfire CRM</li>
+          <li>Link all session drafts to this contact</li>
+          <li>Generate share token for board URL</li>
+          <li>Board name stored as trip request title</li>
+        </ol>
+      </div>
+
+      <div style="margin-top:16px;padding:14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;">
+        <h4 style="margin:0 0 8px;font-size:13px;color:#C59746;">30-day expiry</h4>
+        <p style="font-size:11px;margin:0;opacity:0.7;">Unnamed/unidentified drafts expire after 30 days. Named boards with email persist indefinitely. The AI can remind users to name their board when it has 3+ items.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
