@@ -79,11 +79,22 @@ export function useCreateTripTraveler(tripId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (data: CreateTripTravelerDto) =>
-      api.post<TripTravelerResponseDto>(`/trips/${tripId}/travelers`, data),
-    onSuccess: () => {
+    mutationFn: (data: CreateTripTravelerDto & { addToAllActivities?: boolean }) => {
+      const { addToAllActivities, ...body } = data
+      const url = addToAllActivities
+        ? `/trips/${tripId}/travelers?addToAllActivities=true`
+        : `/trips/${tripId}/travelers`
+      return api.post<TripTravelerResponseDto>(url, body as CreateTripTravelerDto)
+    },
+    onSuccess: (_data, variables) => {
       // Invalidate travelers list for this trip
       queryClient.invalidateQueries({ queryKey: tripTravelerKeys.lists() })
+      // When auto-assigning to activities, also invalidate activity-traveler
+      // queries so the per-activity Travelers list reflects the new traveler.
+      if (variables?.addToAllActivities) {
+        queryClient.invalidateQueries({ queryKey: ['activity-travelers'] })
+        queryClient.invalidateQueries({ queryKey: ['activities'] })
+      }
     },
   })
 }

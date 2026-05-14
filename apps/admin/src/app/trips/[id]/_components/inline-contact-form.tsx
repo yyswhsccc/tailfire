@@ -39,12 +39,14 @@ interface InlineContactFormProps {
   tripId: string
   onSuccess: () => void
   onCancel: () => void
+  addToAllActivities?: boolean
 }
 
 export function InlineContactForm({
   tripId,
   onSuccess,
   onCancel,
+  addToAllActivities,
 }: InlineContactFormProps) {
   const createTraveler = useCreateTripTraveler(tripId)
   const { toast } = useToast()
@@ -73,6 +75,7 @@ export function InlineContactForm({
         },
         role: data.role,
         travelerType: data.travelerType,
+        addToAllActivities,
       })
 
       toast({

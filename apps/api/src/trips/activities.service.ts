@@ -660,8 +660,27 @@ export class ActivitiesService {
       }
     }
 
-    // Emit audit event (after all DB operations succeed)
+    // Resolve trip id (used by both auto-assign and audit emit below)
     const resolvedTripId = tripId ?? (dto.itineraryDayId ? await this.getTripIdFromDayId(dto.itineraryDayId) : null)
+
+    // Auto-assign every current trip traveler to this new activity.
+    // Per-activity traveler editing remains available afterwards for the
+    // case where some activities don't apply to all travelers.
+    if (resolvedTripId) {
+      try {
+        await this.db.client.execute(sql`
+          INSERT INTO activity_travelers (activity_id, trip_traveler_id, trip_id)
+          SELECT ${activity.id}::uuid, tt.id, ${resolvedTripId}::uuid
+          FROM trip_travelers tt
+          WHERE tt.trip_id = ${resolvedTripId}::uuid
+          ON CONFLICT (activity_id, trip_traveler_id) DO NOTHING
+        `)
+      } catch (error) {
+        this.logger.warn(`Failed to auto-assign trip travelers to activity ${activity.id}: ${error}`)
+      }
+    }
+
+    // Emit audit event (after all DB operations succeed)
     if (resolvedTripId) {
       this.eventEmitter.emit(
         'audit.created',
