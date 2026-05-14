@@ -47,6 +47,8 @@ export const pricingDataSchema = z.object({
   termsAndConditions: z.string().optional(),
   cancellationPolicy: z.string().optional(),
   confirmationNumber: z.string().optional(),
+  /** #302 — external "Book this activity" CTA URL surfaced in the proposal preview */
+  referralUrl: z.string().optional(),
   supplier: z.string().optional(),
 }).refine(
   (data) => {

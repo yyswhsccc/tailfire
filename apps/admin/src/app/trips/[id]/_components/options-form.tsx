@@ -297,6 +297,7 @@ export function OptionsForm({
       taxesAndFeesCents: values.taxesAndFeesCents || 0,
       currency: values.currency || 'USD',
       confirmationNumber: values.confirmationNumber || '',
+      referralUrl: values.referralUrl || '',
       commissionTotalCents: values.commissionTotalCents || 0,
       commissionSplitPercentage: values.commissionSplitPercentage || 0,
       commissionExpectedDate: values.commissionExpectedDate || null,

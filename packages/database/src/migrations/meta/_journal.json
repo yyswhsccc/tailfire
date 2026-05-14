@@ -1492,6 +1492,13 @@
       "when": 1778414400012,
       "tag": "20260511010000_fx_rate_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 213,
+      "version": "7",
+      "when": 1778767484000,
+      "tag": "20260514020444_add_activity_referral_url",
+      "breakpoints": true
     }
   ]
 }

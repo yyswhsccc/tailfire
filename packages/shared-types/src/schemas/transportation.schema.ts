@@ -81,6 +81,25 @@ export const transportationDetailsDtoSchema = z.object({
   // Station/terminal
   departureStation: z.string().nullable().optional(),
   arrivalStation: z.string().nullable().optional(),
+
+  // Multi-leg journey (train/bus with interchanges).
+  // interchangeMinutesAfter is the buffer to the next leg; ignored on the last.
+  legs: z
+    .array(
+      z.object({
+        trainNumber: z.string().nullable().optional(),
+        operator: z.string().nullable().optional(),
+        departureStation: z.string().nullable().optional(),
+        arrivalStation: z.string().nullable().optional(),
+        departureDate: z.string().nullable().optional(),
+        departureTime: z.string().nullable().optional(),
+        arrivalDate: z.string().nullable().optional(),
+        arrivalTime: z.string().nullable().optional(),
+        interchangeMinutesAfter: z.number().int().min(0).max(1440).nullable().optional(),
+      }),
+    )
+    .nullable()
+    .optional(),
 })
 
 export type TransportationDetailsDto = z.infer<typeof transportationDetailsDtoSchema>

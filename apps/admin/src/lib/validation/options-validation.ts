@@ -66,6 +66,8 @@ export const optionsFormSchema = z.object({
     .nullable()
     .optional(),
   confirmationNumber: z.string().optional().default(''),
+  // #302 — external "Book this activity" CTA for the proposal preview
+  referralUrl: z.string().optional().default(''),
 
   // Commission fields
   commissionTotalCents: z.coerce.number()
@@ -203,6 +205,7 @@ export function toOptionsDefaults(
     totalPriceCents: serverData?.totalPriceCents ?? null,
     taxesAndFeesCents: serverData?.taxesAndFeesCents ?? null,
     confirmationNumber: serverData?.confirmationNumber ?? '',
+    referralUrl: serverData?.referralUrl ?? '',
 
     commissionTotalCents: serverData?.commissionTotalCents ?? null,
     commissionSplitPercentage: serverData?.commissionSplitPercentage ?? null,
@@ -259,6 +262,7 @@ export function toOptionsApiPayload(data: OptionsFormData): CreateOptionsActivit
     totalPriceCents: data.totalPriceCents,
     taxesAndFeesCents: data.taxesAndFeesCents,
     confirmationNumber: data.confirmationNumber,
+    referralUrl: data.referralUrl || null,
     commissionTotalCents: data.commissionTotalCents,
     commissionSplitPercentage: data.commissionSplitPercentage,
     commissionExpectedDate: data.commissionExpectedDate || null,

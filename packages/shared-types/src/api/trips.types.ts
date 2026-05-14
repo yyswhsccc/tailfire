@@ -911,7 +911,26 @@ export interface SharedTransportDetailDto {
   rentalFuelPolicy: string | null
   departureStation: string | null
   arrivalStation: string | null
+  /**
+   * Multi-leg journey for train/bus with interchanges (#304).
+   * Null or empty array = direct single-leg journey described by the
+   * pickup/dropoff fields above.
+   */
+  legs: SharedTransportLegDto[] | null
   isRoundTrip: boolean
+}
+
+export interface SharedTransportLegDto {
+  trainNumber: string | null
+  operator: string | null
+  departureStation: string | null
+  arrivalStation: string | null
+  departureDate: string | null
+  departureTime: string | null
+  arrivalDate: string | null
+  arrivalTime: string | null
+  /** Buffer in minutes to the next leg. Ignored on the final leg. */
+  interchangeMinutesAfter: number | null
 }
 
 export interface SharedDiningDetailDto {
@@ -1027,6 +1046,8 @@ export interface SharedActivityDto {
   proposalStatus: SharedProposalStatus
   bookingStatus: SharedBookingStatus
   confirmationNumber: string | null
+  /** Optional external "Book this activity →" CTA URL (#302). */
+  referralUrl: string | null
   thumbnail: string | null
   media: SharedMediaDto[]
   pricing: SharedActivityPricingDto | null

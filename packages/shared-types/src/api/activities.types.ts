@@ -130,6 +130,10 @@ export type ActivityResponseDto = {
   isVisibleInCalendar: boolean
   bookingDate: string | null // ISO 8601 date when booking was confirmed
 
+  // Optional external "Book this activity" URL — rendered as a CTA on the
+  // shared-trip / proposal preview (#302).
+  referralUrl: string | null
+
   // Package reference (for linking activities to packages)
   packageId: string | null
 

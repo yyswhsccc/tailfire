@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { MapPin, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
+import { MapPin, Clock, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import { MoreHorizontal } from 'lucide-react'
 import {
   Dialog,
@@ -160,6 +160,22 @@ export function ActivityDetailModal({
                   </div>
                 )}
               </div>
+            </>
+          )}
+
+          {/* "Book this activity" CTA */}
+          {activity.referralUrl && (
+            <>
+              <Separator />
+              <a
+                href={activity.referralUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Book this activity
+                <ExternalLink className="h-4 w-4" />
+              </a>
             </>
           )}
 

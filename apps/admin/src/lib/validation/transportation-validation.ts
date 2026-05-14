@@ -74,9 +74,30 @@ export const transportationDetailsSchema = z.object({
   rentalCarClass: z.string().optional().default(''),
   rentalFuelPolicy: z.string().optional().default(''),
 
-  // Station/terminal for train, ferry, bus
+  // Station/terminal for train, ferry, bus (top-level summary — used when
+  // legs is empty for a single-leg journey)
   departureStation: z.string().optional().default(''),
   arrivalStation: z.string().optional().default(''),
+
+  // Multi-leg journey (train/bus with interchanges).
+  // interchangeMinutesAfter is the buffer to the next leg; ignored on the last.
+  // Optional + undefined-rather-than-default so existing test fixtures + non-rail
+  // subtypes don't have to construct an empty array explicitly.
+  legs: z
+    .array(
+      z.object({
+        trainNumber: z.string().optional().default(''),
+        operator: z.string().optional().default(''),
+        departureStation: z.string().optional().default(''),
+        arrivalStation: z.string().optional().default(''),
+        departureDate: z.string().nullable().optional(),
+        departureTime: z.string().optional().default(''),
+        arrivalDate: z.string().nullable().optional(),
+        arrivalTime: z.string().optional().default(''),
+        interchangeMinutesAfter: z.coerce.number().int().min(0).max(1440).nullable().optional(),
+      }),
+    )
+    .optional(),
 
   // Additional details
   features: z.array(z.string()).optional().default([]),
@@ -98,6 +119,8 @@ export const transportationFormSchema = z.object({
   proposalStatus: z.enum(['draft', 'proposing', 'approved', 'cancelled']).default('draft'),
   notes: z.string().optional().default(''),
   confirmationNumber: z.string().optional().default(''),
+  // #302 — external "Book this activity" CTA for the proposal preview
+  referralUrl: z.string().optional().default(''),
 
   // Nested transportation details
   transportationDetails: transportationDetailsSchema,
@@ -231,6 +254,7 @@ export function toTransportationDefaults(
     proposalStatus: serverData?.proposalStatus ?? 'draft',
     notes: serverData?.notes ?? '',
     confirmationNumber: serverData?.confirmationNumber ?? '',
+    referralUrl: serverData?.referralUrl ?? '',
 
     transportationDetails: {
       subtype: serverDetails?.subtype ?? null,
@@ -271,6 +295,7 @@ export function toTransportationDefaults(
       rentalFuelPolicy: serverDetails?.rentalFuelPolicy ?? '',
       departureStation: serverDetails?.departureStation ?? '',
       arrivalStation: serverDetails?.arrivalStation ?? '',
+      legs: serverDetails?.legs ?? undefined,
       features: serverDetails?.features ?? [],
       specialRequests: serverDetails?.specialRequests ?? '',
       flightNumber: serverDetails?.flightNumber ?? '',
@@ -308,6 +333,7 @@ export function toTransportationApiPayload(data: TransportationFormData): Create
     proposalStatus: data.proposalStatus,
     notes: data.notes || null,
     confirmationNumber: data.confirmationNumber || null,
+    referralUrl: data.referralUrl || null,
     transportationDetails: {
       subtype: data.transportationDetails.subtype as TransportationSubtype | null,
       providerName: data.transportationDetails.providerName || null,
@@ -347,6 +373,9 @@ export function toTransportationApiPayload(data: TransportationFormData): Create
       rentalFuelPolicy: data.transportationDetails.rentalFuelPolicy || null,
       departureStation: data.transportationDetails.departureStation || null,
       arrivalStation: data.transportationDetails.arrivalStation || null,
+      // Empty array sent as null so the JSONB column distinguishes
+      // "no multi-leg" from "explicitly cleared".
+      legs: (data.transportationDetails.legs?.length ?? 0) > 0 ? data.transportationDetails.legs : null,
       features: data.transportationDetails.features || null,
       specialRequests: data.transportationDetails.specialRequests || null,
       flightNumber: data.transportationDetails.flightNumber || null,

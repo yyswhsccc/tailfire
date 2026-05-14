@@ -64,6 +64,7 @@ const TRANSPORTATION_CREATE_FIELDS: FieldMap = {
   rentalFuelPolicy: coerce.toNullable,
   departureStation: coerce.toNullable,
   arrivalStation: coerce.toNullable,
+  legs: coerce.identity, // jsonb — pass through as array (or null)
   isRoundTrip: coerce.toBoolInt, // ? 1 : 0
 }
 
@@ -110,6 +111,7 @@ const TRANSPORTATION_UPDATE_FIELDS: FieldMap = {
   rentalFuelPolicy: coerce.identity,
   departureStation: coerce.identity,
   arrivalStation: coerce.identity,
+  legs: coerce.identity, // jsonb — pass through as array (or null) on update
   isRoundTrip: coerce.toBoolInt, // ALWAYS converts (current behavior)
 }
 
@@ -156,6 +158,7 @@ const TRANSPORTATION_FORMAT_FIELDS: FieldMap = {
   rentalFuelPolicy: coerce.toNullable,
   departureStation: coerce.toNullable,
   arrivalStation: coerce.toNullable,
+  legs: coerce.identity, // jsonb — DB returns array (or null) directly
   isRoundTrip: coerce.fromBoolInt, // === 1
 }
 

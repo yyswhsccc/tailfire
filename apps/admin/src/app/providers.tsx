@@ -11,6 +11,7 @@ import { NotificationsProvider } from '@/providers/notifications-provider'
 import { PresenceProvider } from '@/providers/presence-provider'
 import { ConsoleCaptureProvider } from '@/providers/console-capture-provider'
 import { ImpersonationBanner } from '@/components/impersonation/impersonation-banner'
+import { DirtyGuardProvider } from '@/lib/dirty-guard'
 
 // Dynamically import devtools only in development
 const ReactQueryDevtools =
@@ -52,7 +53,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <PresenceProvider>
           <LoadingProvider>
             <ConfirmationDialogProvider>
+              <DirtyGuardProvider>
               {children}
+              </DirtyGuardProvider>
             <GlobalLoadingOverlay />
             <Toaster />
             {showDevtools && (

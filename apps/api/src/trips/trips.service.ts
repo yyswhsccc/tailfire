@@ -3409,6 +3409,7 @@ export class TripsService {
       proposalStatus: activity.proposalStatus || 'draft',
       bookingStatus: activity.bookingStatus || 'unbooked',
       confirmationNumber: activity.confirmationNumber || null,
+      referralUrl: activity.referralUrl || null,
       thumbnail: activity.thumbnail || null,
       media,
       pricing,
@@ -3529,6 +3530,7 @@ export class TripsService {
           rentalFuelPolicy: d.rentalFuelPolicy || null,
           departureStation: d.departureStation || null,
           arrivalStation: d.arrivalStation || null,
+          legs: Array.isArray((d as any).legs) ? (d as any).legs : null,
           isRoundTrip: d.isRoundTrip === 1,
         }
       }

@@ -53,6 +53,11 @@ export const createActivityDtoSchema = z.object({
   proposalStatus: activityProposalStatusSchema.optional(),
   bookingStatus: activityBookingStatusSchema.optional(),
 
+  // Optional external "Book this activity" URL — rendered as a CTA in the
+  // shared-trip / proposal preview (#302). Accept empty string from the form,
+  // null from the DB, or missing.
+  referralUrl: z.string().nullable().optional(),
+
   // Pricing - all nullable/optional
   pricingType: pricingTypeSchema.nullable().optional(),
   currency: z.string().length(3).optional(),
@@ -102,6 +107,8 @@ export const updateActivityDtoSchema = z.object({
   confirmationNumber: z.string().nullable().optional(),
   proposalStatus: activityProposalStatusSchema.optional(),
   bookingStatus: activityBookingStatusSchema.optional(),
+  // #302 — generic external "Book this activity" CTA URL
+  referralUrl: z.string().nullable().optional(),
 
   // Update-only fields
   isVisibleInCalendar: z.boolean().optional(),

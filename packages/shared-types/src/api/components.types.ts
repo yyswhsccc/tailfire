@@ -467,6 +467,8 @@ export type BaseComponentDto = {
   // Details
   notes: string | null
   confirmationNumber: string | null
+  // #302 — optional external "Book this activity →" CTA URL surfaced in the client proposal preview.
+  referralUrl: string | null
   proposalStatus: ActivityProposalStatus
   bookingStatus: ActivityBookingStatus
 
@@ -664,6 +666,8 @@ export type BaseCreateComponentDto = {
   // Details
   notes?: string | null
   confirmationNumber?: string | null
+  // #302 — optional external "Book this activity →" CTA URL surfaced in the client proposal preview.
+  referralUrl?: string | null
   proposalStatus?: ActivityProposalStatus
   bookingStatus?: ActivityBookingStatus
 
@@ -837,6 +841,8 @@ export type BaseUpdateComponentDto = {
   // Details
   notes?: string | null
   confirmationNumber?: string | null
+  // #302 — optional external "Book this activity →" CTA URL surfaced in the client proposal preview.
+  referralUrl?: string | null
   proposalStatus?: ActivityProposalStatus
   bookingStatus?: ActivityBookingStatus
 
