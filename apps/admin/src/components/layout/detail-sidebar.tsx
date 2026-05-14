@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { ChevronLeft, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { GuardedLink } from '@/lib/dirty-guard'
+import { GuardedLink, useDirtyGuard } from '@/lib/dirty-guard'
 
 export interface SidebarSection {
   title?: string
@@ -40,6 +40,7 @@ export function DetailSidebar({
   onNavigate,
 }: DetailSidebarProps) {
   const pathname = usePathname()
+  const { confirmIfDirty } = useDirtyGuard()
 
   return (
     <aside className="w-44 h-full flex-shrink-0 border-r border-ash-200 bg-white overflow-y-auto">
@@ -89,6 +90,11 @@ export function DetailSidebar({
                     <li key={item.href}>
                       <button
                         onClick={() => {
+                          // Sidebar button items are typically tab switches
+                          // (e.g. on the trip detail page). Treat them as
+                          // navigation away from the current view and check
+                          // the dirty guard the same way GuardedLink does.
+                          if (!confirmIfDirty()) return
                           item.onClick?.()
                           onNavigate?.()
                         }}

@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
-import { GuardedLink, useGuardedRouter } from '@/lib/dirty-guard'
+import { usePathname, useRouter } from 'next/navigation'
+import { GuardedLink } from '@/lib/dirty-guard'
 import { Search, HelpCircle, Settings, Bug, BookOpen, Keyboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth.store'
@@ -38,7 +38,11 @@ const navigation = [
 
 export function TopNav() {
   const pathname = usePathname()
-  const router = useGuardedRouter()
+  // Sign-out is an explicit leave action — using the raw router skips
+  // the dirty-form confirm, which would be redundant after the user
+  // already clicked "Sign Out". Nav links in this header are <GuardedLink>
+  // so they don't need this router for nav.
+  const router = useRouter()
   const { user, logout: clearStore } = useAuthStore()
   const { signOut, claims } = useAuth()
   const { data: profile } = useMyProfile()
