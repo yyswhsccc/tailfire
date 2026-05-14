@@ -61,6 +61,17 @@ export interface UseActivityFormLifecycleOptions<
   /** Latest API data from the caller's loader (e.g. useFlight, useLodging) */
   apiData: TApiData | null | undefined
 
+  /**
+   * Optional explicit hydration key. When provided, the hook re-hydrates
+   * only on key change — not on object-identity change. Useful when
+   * React Query refetches return a new object reference for the same
+   * logical data (would otherwise clobber the user's dirty edits).
+   *
+   * Default: when omitted, hook falls back to apiData identity comparison.
+   * Recommended: pass `apiData?.updatedAt` or `apiData?.id`.
+   */
+  hydrationKey?: string | number | null
+
   /** Build the form values to reset() from API data. Called on every apiData change. */
   hydrate: (apiData: TApiData) => Partial<TFormData>
 
@@ -111,6 +122,7 @@ export function useActivityFormLifecycle<
   const {
     form,
     apiData,
+    hydrationKey,
     hydrate,
     toPayload,
     create,
@@ -136,18 +148,22 @@ export function useActivityFormLifecycle<
   const { isDirty } = form.formState
   useUnsavedChangesWarning(isDirty)
 
-  // Track the last-hydrated apiData reference so we don't re-reset on every render
-  // when the parent re-passes the same object.
-  const lastHydratedRef = useRef<TApiData | null>(null)
+  // Track the hydration "version" we last applied. Prefers an explicit
+  // hydrationKey (resilient to React Query refetch identity changes); falls
+  // back to apiData object identity for callers that don't pass one.
+  type HydrationToken = string | number | TApiData | null
+  const lastHydratedRef = useRef<HydrationToken>(null)
 
   // Hydration effect — when fresh API data arrives, reset() the form.
   // Uses queueMicrotask to defer the reset outside React's render cycle,
   // matching the pattern in flight-form (prevents reset-during-render warnings).
   useEffect(() => {
     if (!apiData) return
-    if (lastHydratedRef.current === apiData) return
+    const token: HydrationToken =
+      hydrationKey !== undefined && hydrationKey !== null ? hydrationKey : apiData
+    if (lastHydratedRef.current === token) return
 
-    lastHydratedRef.current = apiData
+    lastHydratedRef.current = token
     const values = hydrate(apiData)
 
     let cancelled = false
@@ -159,7 +175,7 @@ export function useActivityFormLifecycle<
     return () => {
       cancelled = true
     }
-  }, [apiData, hydrate, form])
+  }, [apiData, hydrationKey, hydrate, form])
 
   const invalidateActivitySurface = useCallback(() => {
     // NOTE: kebab vs camel-case drift exists in the codebase today
@@ -180,35 +196,51 @@ export function useActivityFormLifecycle<
     [invalidateActivitySurface],
   )
 
-  const save = useCallback(async () => {
-    // Trigger RHF validation manually so we can stay in control of the
-    // save outcome and avoid the form's default `<form onSubmit>` flow.
-    const valid = await form.trigger()
-    if (!valid) return
-
+  // We route through form.handleSubmit so the values passed to toPayload
+  // are the Zod resolver's transformed output (coerce, defaults,
+  // superRefine), not the raw RHF state. Without this, `z.coerce.number()`
+  // for price fields would pass strings to the API. Caught by Codex review
+  // of PR #364 before #365 flight-form migration could inherit the bug.
+  const save = useCallback(async (): Promise<void> => {
     setIsSaving(true)
+    let didSubmit = false
+
+    const submitHandler = form.handleSubmit(async (values) => {
+      didSubmit = true
+      try {
+        const payload = toPayload(values as TFormData)
+        const response = activityId
+          ? await update(activityId, payload)
+          : await create(payload)
+
+        if (!activityId && response.id) {
+          setActivityId(response.id)
+        }
+        if (
+          response.activityPricingId !== undefined &&
+          response.activityPricingId !== null
+        ) {
+          setActivityPricingId(response.activityPricingId)
+        }
+
+        // Reset RHF dirty state without losing the current values
+        form.reset(values, { keepValues: true, keepDirty: false })
+
+        setShowSuccess(true)
+        onSaveSuccess?.(response)
+      } catch (err) {
+        onSaveError?.(err)
+      }
+    })
+
     try {
-      const data = form.getValues()
-      const payload = toPayload(data)
-      const response = activityId
-        ? await update(activityId, payload)
-        : await create(payload)
-
-      if (!activityId && response.id) {
-        setActivityId(response.id)
-      }
-      if (response.activityPricingId !== undefined && response.activityPricingId !== null) {
-        setActivityPricingId(response.activityPricingId)
-      }
-
-      // Reset RHF dirty state without losing the current values
-      form.reset(form.getValues(), { keepValues: true, keepDirty: false })
-
-      setShowSuccess(true)
-      onSaveSuccess?.(response)
-    } catch (err) {
-      onSaveError?.(err)
+      await submitHandler()
     } finally {
+      // If validation failed, handleSubmit's callback never ran. Caller
+      // can read form.formState.errors to surface validation issues.
+      if (!didSubmit) {
+        // no-op — preserves prior behavior (silent on validation failure)
+      }
       setIsSaving(false)
     }
   }, [activityId, form, toPayload, create, update, onSaveSuccess, onSaveError])
