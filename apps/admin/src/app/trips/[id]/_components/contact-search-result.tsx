@@ -18,12 +18,13 @@ import type { ContactResponseDto } from '@tailfire/shared-types/api'
 interface ContactSearchResultProps {
   contact: ContactResponseDto
   tripId: string
+  addToAllActivities?: boolean
 }
 
 /**
  * Contact search result row with "Add to Trip" functionality
  */
-export function ContactSearchResult({ contact, tripId }: ContactSearchResultProps) {
+export function ContactSearchResult({ contact, tripId, addToAllActivities }: ContactSearchResultProps) {
   const [role, setRole] = useState<'primary_contact' | 'full_access' | 'limited_access'>('limited_access')
   const [travelerType, setTravelerType] = useState<'adult' | 'child' | 'infant'>('adult')
   const [isAdding, setIsAdding] = useState(false)
@@ -39,6 +40,7 @@ export function ContactSearchResult({ contact, tripId }: ContactSearchResultProp
         contactId: contact.id,
         role,
         travelerType,
+        addToAllActivities,
       })
 
       setIsAdded(true)

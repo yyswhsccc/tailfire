@@ -50,6 +50,7 @@ export class TripTravelersController {
     @GetAuthContext() auth: AuthContext,
     @Param('tripId') tripId: string,
     @Body() createTripTravelerDto: CreateTripTravelerDto,
+    @Query('addToAllActivities') addToAllActivities?: string,
   ): Promise<TripTravelerResponseDto> {
     await this.tripAccessService.verifyWriteAccess(tripId, auth)
     // Cast to interface type - runtime validation ensures discriminated union is correct
@@ -57,6 +58,7 @@ export class TripTravelersController {
       tripId,
       createTripTravelerDto as CreateTripTravelerDtoInterface,
       auth,
+      { addToAllActivities: addToAllActivities === 'true' },
     )
   }
 

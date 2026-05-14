@@ -44,7 +44,7 @@ export function EditTravelersDialog({
   trip,
 }: EditTravelersDialogProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [addToActivities, setAddToActivities] = useState(false)
+  const [addToActivities, setAddToActivities] = useState(true)
   const [showInlineForm, setShowInlineForm] = useState(false)
   const [addedFamilyIds, setAddedFamilyIds] = useState<Set<string>>(new Set())
   const [showAllRelationships, setShowAllRelationships] = useState(false)
@@ -94,6 +94,7 @@ export function EditTravelersDialog({
         contactId: suggestion.contactId,
         role: 'full_access',
         travelerType,
+        addToAllActivities: addToActivities,
       })
 
       // Add to added IDs (immutably)
@@ -232,6 +233,7 @@ export function EditTravelersDialog({
                     key={contact.id}
                     contact={contact}
                     tripId={trip.id}
+                    addToAllActivities={addToActivities}
                   />
                 ))}
               </div>
@@ -274,6 +276,7 @@ export function EditTravelersDialog({
             tripId={trip.id}
             onCancel={() => setShowInlineForm(false)}
             onSuccess={() => setShowInlineForm(false)}
+            addToAllActivities={addToActivities}
           />
         )}
 
@@ -297,8 +300,9 @@ export function EditTravelersDialog({
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
                 <p className="text-xs">
-                  This option will be activated in Phase 4 when itinerary and activity
-                  management is implemented. For now, travelers are only added to the trip.
+                  When on, the traveler is also assigned to every existing activity
+                  on this trip. You can still remove them from individual activities
+                  afterwards. Turn off if this traveler only attends some activities.
                 </p>
               </TooltipContent>
             </Tooltip>
