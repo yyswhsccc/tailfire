@@ -10,7 +10,7 @@
  */
 
 import { Injectable } from '@nestjs/common'
-import { eq, asc } from 'drizzle-orm'
+import { eq, asc, sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import type { FlightSegmentDto } from '@tailfire/shared-types'
 
@@ -88,10 +88,18 @@ export class FlightSegmentsService {
       aircraftImageAuthor: segment.aircraftImageAuthor || null,
     }))
 
-    // Delete + insert in a single transaction so a concurrent PATCH cannot
-    // race and double-insert against the unique (activity_id, segment_order)
-    // index — root cause of #321.
+    // Delete + insert in a single transaction, and serialize concurrent
+    // replacements for the same activity via a transaction-scoped advisory
+    // lock keyed by activityId. Without the lock, two PATCH requests for the
+    // same activity could interleave: tx A deletes the old rows, tx B reads
+    // past them, both transactions try to INSERT, and the second one fails
+    // the unique (activity_id, segment_order) index. The advisory lock is
+    // released at COMMIT/ROLLBACK — pure-Postgres mutual exclusion with no
+    // long-lived row locks. Root cause analysis for #321.
     await this.db.client.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${activityId}, 0))`,
+      )
       await tx
         .delete(this.db.schema.flightSegments)
         .where(eq(this.db.schema.flightSegments.activityId, activityId))
@@ -103,10 +111,19 @@ export class FlightSegmentsService {
    * Update segments for an activity (replace all). Treats an empty input as
    * "clear all segments" — important so a PATCH that removes every segment
    * actually empties the table instead of leaving the prior rows behind.
+   * The clear path takes the same per-activity advisory lock as createMany
+   * so it cannot race against a concurrent replacement and undo the new rows.
    */
   async updateMany(activityId: string, segments: FlightSegmentDto[]): Promise<void> {
     if (!segments || segments.length === 0) {
-      await this.deleteByActivityId(activityId)
+      await this.db.client.transaction(async (tx) => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended(${activityId}, 0))`,
+        )
+        await tx
+          .delete(this.db.schema.flightSegments)
+          .where(eq(this.db.schema.flightSegments.activityId, activityId))
+      })
       return
     }
     await this.createMany(activityId, segments)
