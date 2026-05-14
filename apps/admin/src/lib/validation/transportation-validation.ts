@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod'
+import { optionalHttpsUrl } from './utils'
 import type {
   CreateTransportationActivityDto,
   TransportationSubtype,
@@ -120,7 +121,7 @@ export const transportationFormSchema = z.object({
   notes: z.string().optional().default(''),
   confirmationNumber: z.string().optional().default(''),
   // #302 — external "Book this activity" CTA for the proposal preview
-  referralUrl: z.string().optional().default(''),
+  referralUrl: optionalHttpsUrl,
 
   // Nested transportation details
   transportationDetails: transportationDetailsSchema,

@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod'
+import { optionalHttpsUrl } from './utils'
 import { addDays } from 'date-fns'
 import type { CreateLodgingActivityDto, PricingType } from '@tailfire/shared-types/api'
 
@@ -109,7 +110,7 @@ export const lodgingFormSchema = z.object({
   pricingType: z.enum(['per_room', 'per_person', 'total']).default('per_room'),
   confirmationNumber: z.string().optional().default(''),
   // #302 — external "Book this activity" CTA for the proposal preview
-  referralUrl: z.string().optional().default(''),
+  referralUrl: optionalHttpsUrl,
 
   // Commission fields
   commissionTotalCents: z.coerce.number()

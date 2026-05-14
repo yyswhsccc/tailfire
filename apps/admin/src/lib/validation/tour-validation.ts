@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod'
+import { optionalHttpsUrl } from './utils'
 import type { CreateActivityDto, PricingType } from '@tailfire/shared-types/api'
 
 // ============================================================================
@@ -87,7 +88,7 @@ export const tourFormSchema = z.object({
   confirmationNumber: z.string().optional().default(''),
   // #302 — optional external "Book this activity" CTA URL rendered in the
   // client portal proposal preview
-  referralUrl: z.string().optional().default(''),
+  referralUrl: optionalHttpsUrl,
 
   // Commission fields
   commissionTotalCents: z.coerce.number()

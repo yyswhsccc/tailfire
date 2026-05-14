@@ -7,8 +7,44 @@
  * - Error object flattening
  */
 
+import { z } from 'zod'
 import type { UseFormSetError, FieldValues, Path } from 'react-hook-form'
 import type { ServerFieldError } from './types'
+
+// ============================================================================
+// Optional http(s) URL field (shared)
+// ============================================================================
+
+/**
+ * Form-level schema for an optional external URL (e.g. activity referralUrl).
+ * Accepts empty string (default form state); otherwise requires a parseable
+ * URL whose protocol is http: or https:. Rejects javascript:/data:/file: etc.
+ * so unsafe links can never be persisted and rendered as a CTA in the client
+ * portal.
+ */
+export const optionalHttpsUrl = z
+  .string()
+  .optional()
+  .default('')
+  .superRefine((v, ctx) => {
+    const trimmed = (v ?? '').trim()
+    if (trimmed === '') return
+    try {
+      const u = new URL(trimmed)
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'URL must use http:// or https://',
+        })
+      }
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Must be a valid URL (e.g. https://example.com/book)',
+      })
+    }
+  })
+
 
 // Re-export types for convenience
 export type { ServerFieldError } from './types'

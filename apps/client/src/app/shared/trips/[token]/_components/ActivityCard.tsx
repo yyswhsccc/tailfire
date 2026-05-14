@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { MoreHorizontal, Check, X, ExternalLink } from 'lucide-react'
 import { Card, CardContent, Badge, Button } from '@tailfire/ui-public'
 import type { SharedActivityDto, ClientActivityResponseType } from '@tailfire/shared-types'
+import { safeExternalUrl } from '@/lib/utils'
 import {
   typeIcons,
   statusVariants,
@@ -104,18 +105,21 @@ export function ActivityCard({
         {activity.detail && renderActivityDetail(activity, currency)}
 
         {/* "Book this activity" CTA */}
-        {activity.referralUrl && (
-          <a
-            href={activity.referralUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            Book this activity
-            <ExternalLink className="h-3 w-3" />
-          </a>
-        )}
+        {(() => {
+          const safeReferralUrl = safeExternalUrl(activity.referralUrl)
+          return safeReferralUrl ? (
+            <a
+              href={safeReferralUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Book this activity
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          ) : null
+        })()}
 
         {/* Confirmation number */}
         {activity.confirmationNumber && (
