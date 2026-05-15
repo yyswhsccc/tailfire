@@ -1506,6 +1506,20 @@
       "when": 1778767484000,
       "tag": "20260514020444_add_activity_referral_url",
       "breakpoints": true
+    },
+    {
+      "idx": 215,
+      "version": "7",
+      "when": 1779038400000,
+      "tag": "20260515193000_backfill_cancellation_policy_tes",
+      "breakpoints": true
+    },
+    {
+      "idx": 216,
+      "version": "7",
+      "when": 1779038460000,
+      "tag": "20260515193100_backfill_package_details_tes",
+      "breakpoints": true
     }
   ]
 }
