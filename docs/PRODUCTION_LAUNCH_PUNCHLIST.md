@@ -225,18 +225,18 @@ Surprise finding: IC payouts is already on `main`. Despite "deferred" classifica
 ---
 
 ### B9. Migration scope verification + apply
-**Owner:** Claude · **Effort:** Half day (clone + dry-run + diff + apply) · **Blocks:** Phase 3-4 · **Status:** `[ ]` · **Issue:** _runbook item_
+**Owner:** Claude · **Effort:** ~1.5 hrs actual for the recovery-script gap; clone-and-apply step still operational · **Blocks:** Phase 3-4 · **Status:** `[~]` · **Issue:** _filed in B9 PR_
 
 `main` includes MORE than the original 5 portal PRs. Treat as "apply all current main Drizzle migrations."
 
 **Acceptance:**
-- [ ] Full migration list extracted from `packages/database/migrations/` against current `main` HEAD
-- [ ] Clone prod DB → run migration job against clone → verify clean exit
-- [ ] Compare `drizzle.__drizzle_migrations` against Preview row-for-row at same SHA
-- [ ] Apply to Tailfire-Prod only after successful clone dry-run
-- [ ] Enum additions run via pre-migration `psql` step (`ALTER TYPE ADD VALUE` cannot be in transactions)
-- [ ] DDL via session pooler or direct connection — **NEVER transaction pooler**
-- [ ] **Recovery-script gap addressed** — the older "silent reconcile" behavior was removed (PR #335), but the project still lacks an automated path to restore drift if migration tracking gets out of sync with actual DDL. Document the manual recovery procedure in `docs/runbooks/migration-recovery.md` (new). At minimum: a script that diffs `__drizzle_migrations` against `packages/database/migrations/` and reports orphans both directions.
+- [x] **Recovery-script gap addressed** — `scripts/migration-drift-check.sh` diffs SQL files ↔ journal ↔ `__drizzle_migrations`, reports orphans in every direction. Manual recovery procedure documented in `docs/runbooks/migration-recovery.md` (new) with one scenario per drift type. The 27 pre-existing disk-orphan SQL files surfaced by the first run are deferred for separate cleanup.
+- [ ] **Operational (Al + Claude paired):** Full migration list extracted from `packages/database/src/migrations/` against current `main` HEAD
+- [ ] **Operational:** Clone prod DB → run migration job against clone → verify clean exit
+- [ ] **Operational:** Compare `drizzle.__drizzle_migrations` against Preview row-for-row at same SHA via the new drift script
+- [ ] **Operational:** Apply to Tailfire-Prod only after successful clone dry-run
+- [x] Enum additions already run via pre-migration `psql` step in `deploy-prod.yml` (lines 65-81)
+- [x] DDL via session pooler enforced in `deploy-prod.yml` (port 6543 rejected, lines 22-27)
 
 ---
 
