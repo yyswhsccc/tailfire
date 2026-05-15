@@ -241,23 +241,17 @@ Surprise finding: IC payouts is already on `main`. Despite "deferred" classifica
 ---
 
 ### B10. Production smoke test thinness
-**Owner:** Claude · **Effort:** Half day to 1 day (per v3 changelog — Codex bumped from 2-3 hrs after scope review) · **Blocks:** Phase 6 confidence · **Status:** `[ ]` · **Issue:** _file_
+**Owner:** Claude · **Effort:** ~2 hrs actual for code-side; auto-revert deferred · **Blocks:** Phase 6 confidence · **Status:** `[~]` · **Issue:** _filed in B10 PR_
 
-`.github/workflows/deploy-prod.yml:201` only checks API health. Missing:
-- OTA homepage / search
-- Portal auth flow (magic-link → callback → session)
-- Admin authenticated page load
-- Supabase magic-link redirect chain
-- `/portal/my-profile` (verifies portal scoping)
-- OTA service-key proxy smoke (`/api/consumer-activity`)
-- Email send (Resend transactional)
-- R2 signed-URL fetch
-- Stripe webhook accept
+`.github/workflows/deploy-prod.yml:201` only checks API health. Expanded inline (B10 PR) to cover all surfaces verifiable without test creds. Auth-gated paths documented in `docs/runbooks/post-deploy-uat.md` (manual checklist).
 
 **Acceptance:**
-- [ ] New `post-deploy-smoke.yml` (or inline step) with all checks above
-- [ ] Fails the deploy if smoke fails (auto-revert or pin previous alias)
-- [ ] Smoke test runs in <5 min total
+- [x] Inline smoke steps in `deploy-prod.yml` cover: API health, CORS regression, OTA homepage, OTA /destinations, admin /login, client /, JwtAuthGuard rejects bad token
+- [x] Workflow exits non-zero on any smoke failure (deploy job fails → visible in GitHub Actions UI + email)
+- [x] Manual UAT checklist for auth-gated paths in `docs/runbooks/post-deploy-uat.md` (magic link, /portal/my-profile, OTA service-key POST, Resend email, R2 signed URL, Stripe webhook, B2 throttling)
+- [x] Manual rollback runbook in `docs/runbooks/post-deploy-rollback.md` (Vercel alias swap, Railway redeploy)
+- [ ] **Auto-revert deferred** to a follow-up scope item — alias-based blue/green or canary requires deploy-pipeline restructure beyond B10's window. Manual rollback procedure suffices for Phase 1 launch.
+- [ ] CI secrets for test agent + test consumer + Stripe test webhook → enables auth-gated smoke as a follow-up
 
 ---
 

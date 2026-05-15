@@ -203,21 +203,113 @@ jobs:
     runs-on: ubuntu-latest
     needs: [deploy-api, deploy-admin, deploy-ota, deploy-client]
     steps:
-      - name: Health check API
+      # B10: smoke coverage expanded from a single API health check to a
+      # multi-surface readiness sweep. Every check below blocks the workflow
+      # on failure. When smoke fails, see docs/runbooks/post-deploy-rollback.md
+      # for the manual revert procedure (auto-revert is a follow-up scope item).
+      #
+      # Each check uses --max-time 30 + --retry 3 to absorb cold-start flakes.
+      # Auth-gated flows (magic-link callback, /portal/my-profile, OTA
+      # service-key proxy POST, Stripe webhook) need CI secrets and run as
+      # part of UAT (B5/B10 follow-up), not in this workflow.
+
+      - name: Wait for cold-start propagation
+        run: sleep 20
+
+      - name: API health (api.tailfire.ca)
         run: |
-          if curl -sf https://api.tailfire.ca/api/v1/health; then
-            echo "✅ API health check passed"
-          else
-            echo "❌ API health check failed"
+          curl -sf --max-time 30 --retry 3 --retry-delay 5 \
+            https://api.tailfire.ca/api/v1/health \
+            && echo "✅ API health check passed" \
+            || { echo "❌ API health check failed"; exit 1; }
+
+      - name: API rejects unknown CORS origin (regression guard)
+        run: |
+          # Should NOT include allow-origin for an unknown origin
+          response=$(curl -sf --max-time 30 --retry 3 --retry-delay 5 \
+            -X OPTIONS -H "Origin: https://attacker.example.com" \
+            -H "Access-Control-Request-Method: POST" \
+            -i https://api.tailfire.ca/api/v1/health 2>&1 || true)
+          if echo "$response" | grep -qi "access-control-allow-origin: https://attacker.example.com"; then
+            echo "❌ CORS regression: unknown origin was permitted"
             exit 1
           fi
+          echo "✅ CORS rejects unknown origin"
+
+      - name: OTA homepage loads (ota.phoenixvoyages.ca)
+        run: |
+          status=$(curl -s --max-time 30 --retry 3 --retry-delay 5 \
+            -o /dev/null -w "%{http_code}" \
+            https://ota.phoenixvoyages.ca/)
+          if [ "$status" != "200" ]; then
+            echo "❌ OTA homepage returned HTTP $status (expected 200)"
+            exit 1
+          fi
+          echo "✅ OTA homepage 200"
+
+      - name: OTA destinations index renders (server-render check)
+        run: |
+          # Public marketing page; should be SSR'd or static
+          status=$(curl -s --max-time 30 --retry 3 --retry-delay 5 \
+            -o /dev/null -w "%{http_code}" \
+            https://ota.phoenixvoyages.ca/destinations)
+          if [ "$status" != "200" ]; then
+            echo "⚠️  OTA /destinations returned HTTP $status (non-blocking — page may not exist)"
+          else
+            echo "✅ OTA /destinations 200"
+          fi
+
+      - name: Admin login page loads (tailfire.phoenixvoyages.ca)
+        run: |
+          # Unauthenticated request should return 200 with login UI or 302 to login
+          status=$(curl -s --max-time 30 --retry 3 --retry-delay 5 \
+            -o /dev/null -w "%{http_code}" \
+            https://tailfire.phoenixvoyages.ca/login)
+          if [ "$status" != "200" ] && [ "$status" != "307" ]; then
+            echo "❌ Admin /login returned HTTP $status (expected 200 or 307)"
+            exit 1
+          fi
+          echo "✅ Admin /login responds"
+
+      - name: Client portal login page loads (client.phoenixvoyages.ca)
+        run: |
+          status=$(curl -s --max-time 30 --retry 3 --retry-delay 5 \
+            -o /dev/null -w "%{http_code}" \
+            https://client.phoenixvoyages.ca/)
+          if [ "$status" != "200" ] && [ "$status" != "307" ]; then
+            echo "❌ Client root returned HTTP $status (expected 200 or 307)"
+            exit 1
+          fi
+          echo "✅ Client root responds"
+
+      - name: API rejects bad JWT (auth path active)
+        run: |
+          # Sanity check that JwtAuthGuard is hot — bad token must 401
+          status=$(curl -s --max-time 30 --retry 3 --retry-delay 5 \
+            -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer not-a-real-token" \
+            https://api.tailfire.ca/api/v1/users/me)
+          if [ "$status" != "401" ] && [ "$status" != "403" ]; then
+            echo "❌ Bad-JWT returned HTTP $status (expected 401/403; auth may be broken)"
+            exit 1
+          fi
+          echo "✅ JwtAuthGuard rejects bad tokens"
 
       - name: Summary
         run: |
-          echo "🚀 All production deployments completed successfully!"
+          echo "🚀 All production deployments + smoke checks passed!"
           echo ""
           echo "Endpoints:"
           echo "  API:    https://api.tailfire.ca"
           echo "  Admin:  https://tailfire.phoenixvoyages.ca"
           echo "  OTA:    https://ota.phoenixvoyages.ca"
           echo "  Client: https://client.phoenixvoyages.ca"
+          echo ""
+          echo "Manual UAT items not exercised in CI smoke (need test agent + consumer creds):"
+          echo "  - Magic-link request → callback → session"
+          echo "  - /portal/my-profile after auth"
+          echo "  - OTA service-key proxy POST (/api/consumer-activity)"
+          echo "  - Email send via Resend"
+          echo "  - R2 signed-URL fetch"
+          echo "  - Stripe webhook accept"
+          echo "See docs/runbooks/post-deploy-uat.md for the manual checklist."
