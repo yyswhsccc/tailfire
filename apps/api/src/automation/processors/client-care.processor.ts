@@ -937,8 +937,8 @@ ${removedTasks.map((t) => `<tr><td style="font-size:14px;color:#27272a;border-bo
 
     const agencyName = agency?.name || 'Your Travel Agency'
 
-    // Build waiver form URL
-    const clientPortalUrl = process.env.CLIENT_PORTAL_URL || 'https://client.phoenixvoyages.ca'
+    // Build waiver form URL (B5 Al's domain decision 2026-05-15: my.phoenixvoyages.ca)
+    const clientPortalUrl = process.env.CLIENT_PORTAL_URL || 'https://my.phoenixvoyages.ca'
     const waiverUrl = `${clientPortalUrl}/forms/${formToken}`
 
     // Build hardcoded fallback HTML up front — used when no DB template is found

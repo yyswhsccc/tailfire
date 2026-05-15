@@ -18,7 +18,7 @@ import {
   useMyAdvisorProfile,
 } from '@/hooks/use-user-profile'
 
-const OTA_URL = process.env.NEXT_PUBLIC_OTA_URL || 'https://ota.phoenixvoyages.ca'
+const OTA_URL = process.env.NEXT_PUBLIC_OTA_URL || 'https://phoenixvoyages.ca'
 import { UserAvatar } from '@/components/user/user-avatar'
 import { AvatarCropDialog } from './avatar-crop-dialog'
 import { useProfileForm } from './profile-form-context'

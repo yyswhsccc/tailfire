@@ -692,7 +692,7 @@ export class DocumentTemplatesService {
       traveler_name: 'Jane Smith',
       trip_name: 'Mediterranean Cruise Getaway',
       trip_dates: 'Jun 15, 2026 – Jun 29, 2026',
-      waiver_url: 'https://client.phoenixvoyages.ca/forms/sample-token',
+      waiver_url: 'https://my.phoenixvoyages.ca/forms/sample-token',
       expires_date: 'Jul 15, 2026',
       contact: {
         full_name: 'Jane & John Smith',

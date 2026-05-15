@@ -19,7 +19,7 @@ export const PORTAL_NAV = [
   { href: "/travelers", label: "My Profile", icon: User },
 ];
 
-const OTA_URL = process.env.NEXT_PUBLIC_OTA_URL || "https://ota.phoenixvoyages.ca";
+const OTA_URL = process.env.NEXT_PUBLIC_OTA_URL || "https://phoenixvoyages.ca";
 
 type DashboardNavProps = {
   mobile?: boolean;

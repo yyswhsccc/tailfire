@@ -71,7 +71,7 @@ export function DashboardHeader() {
           <div className="flex items-center gap-3">
             {/* Browse Trips external link */}
             <a
-              href={process.env.NEXT_PUBLIC_OTA_URL || "https://ota.phoenixvoyages.ca"}
+              href={process.env.NEXT_PUBLIC_OTA_URL || "https://phoenixvoyages.ca"}
               target="_blank"
               rel="noopener noreferrer"
               className="hidden md:flex items-center gap-1 text-sm text-phoenix-text-light transition-colors hover:text-phoenix-gold"

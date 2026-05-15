@@ -3,7 +3,8 @@
  * Generates schema.org-compliant objects for injection via <script type="application/ld+json">.
  */
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://ota.phoenixvoyages.ca'
+// B5 (Al's domain decision 2026-05-15): apex post-WordPress-cutover.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://phoenixvoyages.ca'
 
 // ---------------------------------------------------------------------------
 // Organization

@@ -36,7 +36,7 @@ Checklist time budget: ~15 min.
    roll back immediately
 
 ## OTA service-key proxy POST
-1. With dev tools open, browse a destination on https://ota.phoenixvoyages.ca
+1. With dev tools open, browse a destination on https://ota.phoenixvoyages.ca (pre-WordPress-cutover) or https://phoenixvoyages.ca (post-cutover, B5)
 2. Confirm a `POST /api/consumer-activity` request fires from the page
 3. Confirm it returns 204 (analytics ingest, expected silent success)
 4. **Do NOT see this request fail in red** — if it does, OTA proxy or API
@@ -65,15 +65,15 @@ Checklist time budget: ~15 min.
    verification logic match
 
 ## Cross-subdomain SSO (consumer surfaces only)
-1. Sign in to OTA (`ota.phoenixvoyages.ca`) — receive a session cookie
-2. Navigate to portal (`my.phoenixvoyages.ca` or `client.phoenixvoyages.ca`)
+1. Sign in to OTA (`ota.phoenixvoyages.ca` pre-cutover / `phoenixvoyages.ca` post-cutover, B5) — receive a session cookie
+2. Navigate to portal (`my.phoenixvoyages.ca`, B5)
 3. Confirm you arrive signed in
 4. **Note:** "sign in on admin → access portal as agent" is NOT a valid
    acceptance test (admin Supabase cookies are host-only per
    `apps/admin/src/middleware.ts`). Codex retrospective 2026-05-15.
 
 ## B2 registration throttling smoke
-1. Open https://ota.phoenixvoyages.ca and trigger the email-capture modal
+1. Open the OTA host (https://ota.phoenixvoyages.ca pre-cutover / https://phoenixvoyages.ca post-cutover, B5) and trigger the email-capture modal
 2. Confirm the Cloudflare Turnstile widget renders
 3. Submit a test email — confirm it succeeds (200 from `/api/consumer-auth/register`)
 4. Submit the SAME email 4 times rapidly — confirm the 4th returns 429
