@@ -93,3 +93,75 @@ Tracked issues for the Tailfire platform as of March 16, 2026. Items are categor
 ---
 
 *Last updated: 2026-03-16*
+
+---
+
+## Production Launch (2026-05) — Accepted Patterns
+
+The following items were audited during the production launch punch list
+(`docs/PRODUCTION_LAUNCH_PUNCHLIST.md`) and are **explicitly accepted** for
+the launch window. Each entry documents the rationale and the conditions
+under which it should be revisited.
+
+If you're considering "I'll just silently swallow this error," check
+[CLAUDE.md §8 (Policy Error Handling)](../CLAUDE.md) first. The doctrine is
+**strict by default** — silent swallowing requires explicit acceptance here.
+
+### Accepted silent failures (B13, PR #384)
+
+#### `apps/ota/src/app/api/consumer-activity/route.ts:18`
+
+**Behavior:** Returns 204 No Content on every error path. Analytics ingest
+must never surface failures to consumers — a broken tracking call should not
+break the page they're viewing.
+
+**Mitigation:** `console.warn` is emitted on the catch path so failures show
+up in Vercel logs (added in B13). OTA does not currently have Sentry wired
+(per CLAUDE.md, only API + admin do), so this is the best breadcrumb
+available without adding the OTA Sentry SDK.
+
+**Revisit when:** OTA gains a Sentry integration. Replace `console.warn`
+with `Sentry.captureException(err, { level: 'warning' })`.
+
+### Accepted typecheck baseline (B12)
+
+`pnpm --filter @tailfire/api typecheck` currently fails on a known set of
+pre-existing errors. The Nest build uses SWC with `nest-cli.json`
+`"typeCheck": false`, so runtime is unaffected, but the static check is
+informational rather than blocking.
+
+**Status:** Documented as a launch risk in
+`docs/PRODUCTION_LAUNCH_PUNCHLIST.md` (B12). Triage strategy (clean vs
+accept-as-risk) is awaiting Codex consult.
+
+**Revisit when:** B12 ships (planned Phase 1 OR accept-as-risk for launch
+with a 2-week post-launch fix target).
+
+### Accepted lint baseline (API)
+
+`pnpm --filter @tailfire/api lint` currently has 9 errors:
+
+- `apps/api/src/ic-payouts/ic-tax-profiles/__tests__/ic-tax-profiles.service.spec.ts:21` — `require()` import
+- `apps/api/src/ic-payouts/payout-accounts/__tests__/ic-payout-accounts.service.spec.ts:17` — `require()` import
+- `apps/api/src/softvoyage/softvoyage.controller.ts:109,110` — `require()` imports
+- `apps/api/src/trips/itinerary-versions.service.ts:34` — `require()` import
+
+The `no-empty` error in `softvoyage-search.processor.ts:177` was **fixed in
+B13** (added `logger.warn`).
+
+**Status:** API lint is informational on PR validation, not blocking. The
+4 blocking CI jobs are: `admin-typecheck`, `migration-monotonicity`,
+`supabase-migrations-guard`, `lint-ota`.
+
+**Revisit when:** B12 cleanup OR a separate pre-launch lint sweep.
+
+### How to add an entry
+
+1. Confirm the issue is genuinely accepted, not just deferred. If it's just
+   deferred, file a GitHub issue and link from the punchlist instead.
+2. Document **what** the behavior is, **why** it's accepted, and **when** to
+   revisit.
+3. Reference the originating blocker (e.g., `B13`) so the rationale is
+   traceable.
+
+*Section added: 2026-05-15*
