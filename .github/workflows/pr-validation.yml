@@ -156,6 +156,29 @@ jobs:
 
       - run: pnpm --filter @tailfire/api typecheck
 
+  api-typecheck-baseline:
+    name: API typecheck baseline (blocking — B12 regression guard)
+    runs-on: ubuntu-latest
+    # Per Codex B12 verdict (2026-05-15) — Option B accept-as-risk:
+    # Tracks the SET of normalized typecheck error keys. Any NEW key fails.
+    # Disappearing keys are allowed (cleanup is rewarded).
+    # Full clean is deferred to 2 weeks post-launch.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Build dependent packages
+        run: pnpm --filter @tailfire/database build && pnpm --filter @tailfire/shared-types build
+
+      - name: Compare API typecheck against committed baseline
+        run: bash scripts/api-typecheck-baseline.sh check
+
   api-tests:
     name: API tests (informational)
     runs-on: ubuntu-latest
