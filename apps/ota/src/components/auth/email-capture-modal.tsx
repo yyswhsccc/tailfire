@@ -1,9 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import Script from "next/script";
+import { useEffect, useRef, useState } from "react";
 import { X, Loader2, Mail, CheckCircle } from "lucide-react";
 
 export type EmailCaptureTrigger = "save_board" | "submit_trip" | "ai_chat";
+
+// Cloudflare Turnstile site key (B2). When unset (e.g. local dev), the widget
+// is skipped and no token is sent — the API allows this in dev mode but
+// fail-closes in stg/prd via TurnstileService.
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 interface EmailCaptureModalProps {
   isOpen: boolean;
@@ -12,6 +18,25 @@ interface EmailCaptureModalProps {
   trigger?: EmailCaptureTrigger;
   title?: string;
   subtitle?: string;
+}
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        target: HTMLElement | string,
+        options: {
+          sitekey: string;
+          callback?: (token: string) => void;
+          "error-callback"?: () => void;
+          "expired-callback"?: () => void;
+          theme?: "light" | "dark" | "auto";
+        },
+      ) => string;
+      reset: (widgetId?: string) => void;
+      remove: (widgetId?: string) => void;
+    };
+  }
 }
 
 function parseCookies(): Record<string, string> {
@@ -36,6 +61,33 @@ export function EmailCaptureModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const widgetRef = useRef<HTMLDivElement | null>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  // Render the Turnstile widget when the modal opens (client side, after the
+  // Cloudflare script has loaded). Reset on close so a stale token doesn't
+  // carry over to the next attempt.
+  useEffect(() => {
+    if (!isOpen || !TURNSTILE_SITE_KEY || !widgetRef.current) return;
+    if (typeof window === "undefined" || !window.turnstile) return;
+
+    widgetIdRef.current = window.turnstile.render(widgetRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      callback: (token: string) => setTurnstileToken(token),
+      "error-callback": () => setTurnstileToken(null),
+      "expired-callback": () => setTurnstileToken(null),
+      theme: "light",
+    });
+
+    return () => {
+      if (widgetIdRef.current && window.turnstile?.remove) {
+        window.turnstile.remove(widgetIdRef.current);
+        widgetIdRef.current = null;
+      }
+      setTurnstileToken(null);
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -65,6 +117,13 @@ export function EmailCaptureModal({
       return;
     }
 
+    // B2: when Turnstile is configured, require a token before submit so we
+    // don't burn an API request that's guaranteed to 400.
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      setError("Please complete the verification challenge.");
+      return;
+    }
+
     setLoading(true);
     try {
       const cookies = parseCookies();
@@ -79,12 +138,19 @@ export function EmailCaptureModal({
           firstName: firstName.trim() || undefined,
           sessionId: otaSession,
           advisorSlug: otaRef,
+          turnstileToken: turnstileToken ?? undefined,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
+        // Reset Turnstile so the user can re-challenge after a 4xx
+        // (especially 400 on a stale/used token, or 429 throttle).
+        if (widgetIdRef.current && window.turnstile?.reset) {
+          window.turnstile.reset(widgetIdRef.current);
+          setTurnstileToken(null);
+        }
         setError(
           data?.message ||
             "Something went wrong. Please try again.",
@@ -108,6 +174,16 @@ export function EmailCaptureModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
+      {/* Cloudflare Turnstile script (loaded once, no-op if already present) */}
+      {TURNSTILE_SITE_KEY && (
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          strategy="afterInteractive"
+          async
+          defer
+        />
+      )}
+
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" />
 
@@ -191,6 +267,14 @@ export function EmailCaptureModal({
                   className="w-full rounded-lg border border-[#E0E0E0] px-4 py-2.5 text-sm text-[#1A1A1A] outline-none transition-colors placeholder:text-[#BBB] focus:border-[#C59746] focus:ring-2 focus:ring-[#C59746]/20"
                 />
               </div>
+
+              {/* Cloudflare Turnstile widget (B2). Renders only when
+                  NEXT_PUBLIC_TURNSTILE_SITE_KEY is configured — local dev
+                  without the var renders nothing and the API allows it
+                  (TurnstileService dev-mode bypass). */}
+              {TURNSTILE_SITE_KEY && (
+                <div className="flex justify-center" ref={widgetRef} aria-label="Verification challenge" />
+              )}
 
               {/* Error message */}
               {error && (

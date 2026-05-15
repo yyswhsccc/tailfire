@@ -51,8 +51,57 @@ describe('TurnstileService — B2 CAPTCHA strict-mode', () => {
       ).not.toThrow()
     })
 
-    it('initializes (with warning) when not required and no secret', () => {
+    it('initializes (with warning) when not required and no secret (dev)', () => {
       expect(() => new TurnstileService(makeConfig({}))).not.toThrow()
+    })
+
+    // Codex B2 rework, 2026-05-15: fail-closed when NODE_ENV is strict.
+    // A missing/mistyped Doppler var must NOT silently downgrade prod to dev.
+
+    it.each(['production', 'preview', 'staging'])(
+      'THROWS in NODE_ENV=%s when TURNSTILE_REQUIRED is unset',
+      (env) => {
+        expect(
+          () => new TurnstileService(makeConfig({ NODE_ENV: env, TURNSTILE_SECRET: 'sk_xxx' })),
+        ).toThrow(InternalServerErrorException)
+      },
+    )
+
+    it.each(['production', 'preview', 'staging'])(
+      'THROWS in NODE_ENV=%s when TURNSTILE_REQUIRED=true but TURNSTILE_SECRET is missing',
+      (env) => {
+        expect(
+          () => new TurnstileService(makeConfig({ NODE_ENV: env, TURNSTILE_REQUIRED: 'true' })),
+        ).toThrow(InternalServerErrorException)
+      },
+    )
+
+    it.each(['on', 'yes', '1', 'TRUE', 'True'])(
+      'THROWS in NODE_ENV=production when TURNSTILE_REQUIRED is mistyped as %s',
+      (bad) => {
+        expect(
+          () =>
+            new TurnstileService(
+              makeConfig({ NODE_ENV: 'production', TURNSTILE_REQUIRED: bad, TURNSTILE_SECRET: 'sk' }),
+            ),
+        ).toThrow(InternalServerErrorException)
+      },
+    )
+
+    it.each(['production', 'preview', 'staging'])(
+      'initializes in NODE_ENV=%s when TURNSTILE_REQUIRED=true and TURNSTILE_SECRET set',
+      (env) => {
+        expect(
+          () =>
+            new TurnstileService(
+              makeConfig({ NODE_ENV: env, TURNSTILE_REQUIRED: 'true', TURNSTILE_SECRET: 'sk_xxx' }),
+            ),
+        ).not.toThrow()
+      },
+    )
+
+    it('NODE_ENV=development tolerates missing secret + missing TURNSTILE_REQUIRED', () => {
+      expect(() => new TurnstileService(makeConfig({ NODE_ENV: 'development' }))).not.toThrow()
     })
   })
 

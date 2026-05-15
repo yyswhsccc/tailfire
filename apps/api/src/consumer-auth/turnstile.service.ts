@@ -4,14 +4,21 @@
  * Verifies Turnstile tokens against Cloudflare's siteverify endpoint.
  *
  * Behavior matrix:
- *   TURNSTILE_REQUIRED=true (stg/prd):
- *     - missing/empty token   → BadRequestException (fail-closed, B2)
- *     - invalid token         → BadRequestException
- *     - missing TURNSTILE_SECRET on startup → ConfigurationException (loud)
- *     - valid token           → resolves
+ *   NODE_ENV in {production, preview, staging}:
+ *     - TURNSTILE_REQUIRED=true + TURNSTILE_SECRET present → enforced
+ *     - anything else                                        → THROWS at startup
+ *       (Codex B2 rework, 2026-05-15: a missing/mistyped Doppler var must NOT
+ *        silently downgrade prod to dev mode — that's a CAPTCHA-bypass
+ *        regression invisible to monitoring.)
  *
- *   TURNSTILE_REQUIRED=false / unset (dev):
- *     - any token              → resolves (logs warning if secret absent)
+ *   TURNSTILE_REQUIRED=true (any NODE_ENV):
+ *     - missing/empty token    → BadRequestException (fail-closed, B2)
+ *     - invalid token          → BadRequestException
+ *     - siteverify network err → BadRequestException (no silent bypass)
+ *     - valid token            → resolves
+ *
+ *   NODE_ENV=development AND TURNSTILE_REQUIRED!=true:
+ *     - any token (or none)    → resolves with startup WARN
  *
  * Strict-context per CLAUDE.md §8: registration is auth-adjacent. We never
  * silently swallow CAPTCHA verification failures when TURNSTILE_REQUIRED=true.
@@ -21,6 +28,7 @@ import { BadRequestException, Injectable, InternalServerErrorException, Logger }
 import { ConfigService } from '@nestjs/config'
 
 const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+const STRICT_NODE_ENVS = new Set(['production', 'preview', 'staging'])
 
 interface TurnstileResponse {
   success: boolean
@@ -41,8 +49,23 @@ export class TurnstileService {
     this.secret = this.config.get<string>('TURNSTILE_SECRET')
     this.required = this.config.get<string>('TURNSTILE_REQUIRED') === 'true'
 
+    const nodeEnv = (this.config.get<string>('NODE_ENV') ?? '').toLowerCase()
+    const isStrictEnv = STRICT_NODE_ENVS.has(nodeEnv)
+
+    // CRITICAL (Codex B2 rework, 2026-05-15):
+    // In production/preview/staging, REQUIRE both TURNSTILE_REQUIRED=true and
+    // TURNSTILE_SECRET. A missing or mistyped env var must NOT silently turn
+    // CAPTCHA enforcement off — that would create a CAPTCHA-bypass regression
+    // invisible to monitoring. Fail loudly at startup instead.
+    if (isStrictEnv && (!this.required || !this.secret)) {
+      throw new InternalServerErrorException(
+        `Turnstile must be enforced when NODE_ENV=${nodeEnv}: ` +
+          'set TURNSTILE_REQUIRED=true and TURNSTILE_SECRET in Doppler.',
+      )
+    }
+
+    // Same fail-loud check for the explicit case (NODE_ENV irrelevant).
     if (this.required && !this.secret) {
-      // Fail-loud at startup if production demands Turnstile but secret is missing.
       throw new InternalServerErrorException(
         'TURNSTILE_REQUIRED=true but TURNSTILE_SECRET is not configured',
       )
