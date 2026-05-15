@@ -73,7 +73,7 @@ function buildCta(props: LifecycleHeroProps): CtaConfig {
         title: 'Where to next?',
         body: 'Tell us about your next dream destination — your advisor is here to help.',
         ctaLabel: 'Plan another trip',
-        ctaHref: process.env.NEXT_PUBLIC_OTA_URL || 'https://ota.phoenixvoyages.ca',
+        ctaHref: process.env.NEXT_PUBLIC_OTA_URL || 'https://phoenixvoyages.ca',
         accent: 'ember',
       }
     case 'prospecting':
@@ -85,7 +85,7 @@ function buildCta(props: LifecycleHeroProps): CtaConfig {
         title: 'Start dreaming',
         body: 'Save destinations and inspiration to your dream board — your advisor will see what excites you.',
         ctaLabel: 'Browse trips',
-        ctaHref: process.env.NEXT_PUBLIC_OTA_URL || 'https://ota.phoenixvoyages.ca',
+        ctaHref: process.env.NEXT_PUBLIC_OTA_URL || 'https://phoenixvoyages.ca',
         accent: 'gold',
       }
   }

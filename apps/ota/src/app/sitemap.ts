@@ -1,7 +1,10 @@
 import type { MetadataRoute } from 'next'
 import { joinArticles } from '@/content/join/articles'
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://ota.phoenixvoyages.ca'
+// B5 (Al's domain decision 2026-05-15): apex post-WordPress-cutover.
+// Until then, set NEXT_PUBLIC_SITE_URL=https://ota.phoenixvoyages.ca in the
+// Vercel prod env to keep sitemap pointing where the OTA actually lives.
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://phoenixvoyages.ca'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Static pages

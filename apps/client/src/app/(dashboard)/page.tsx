@@ -30,7 +30,7 @@ import {
   Skeleton,
 } from "@tailfire/ui-public";
 
-const OTA_URL = process.env.NEXT_PUBLIC_OTA_URL || "https://ota.phoenixvoyages.ca";
+const OTA_URL = process.env.NEXT_PUBLIC_OTA_URL || "https://phoenixvoyages.ca";
 
 const quickActions = [
   { icon: Briefcase, label: "My Trips", href: "/trips", color: "text-blue-400", external: false },

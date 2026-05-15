@@ -138,28 +138,34 @@ Status legend: `[ ]` todo · `[~]` in progress · `[!]` blocked · `[x]` done
 ---
 
 ### B5. Domain decision + CORS + robots
-**Owner:** Al (decision) · Claude (code) · **Effort:** 1 hr code, decision is the gate · **Blocks:** Phase 2 onward · **Status:** `[!]` decision pending · **Issue:** _file after decision_
+**Owner:** Al (decision made 2026-05-15) · Claude (code) · **Effort:** ~2 hrs actual · **Blocks:** Phase 2 onward · **Status:** `[~]` _code-side done; operational items (Vercel aliases + Doppler URL writes + DNS + WordPress migration) remain_ · **Issue:** _filed in B5 PR_
 
-Two options:
-- **A: Apex** — `phoenixvoyages.ca` for OTA, `my.` for portal, `admin.` for admin. Best brand recognition. Requires CORS apex support (currently subdomain-only).
-- **B: All subdomains** — `ota.phoenixvoyages.ca`, `my.` OR `client.phoenixvoyages.ca`, `admin.phoenixvoyages.ca`. Matches current code. Slightly weaker brand. Lower-risk launch.
+**Al's decision (2026-05-15):**
+- **OTA / consumer-facing** → apex `phoenixvoyages.ca` (post-WordPress cutover; until then OTA stays at `ota.phoenixvoyages.ca`)
+- **Client portal** → `my.phoenixvoyages.ca`
+- **Admin** → `tailfire.phoenixvoyages.ca` (unchanged)
 
-**Sub-decision (Codex flagged):** Portal hostname — current code/deploy/runbooks mix `my.` and `client.` naming. **Pick one now** so config/redirects/CORS all point consistently.
-
-**Code touchpoints (regardless of choice):**
-- `apps/api/src/main.ts:71` — CORS allow-list (apex regex needed if Option A)
-- `apps/ota/src/app/robots.ts:6` — hardcoded `ota.phoenixvoyages.ca`
-- Supabase Auth: Site URL + redirect allow-list
-- `COOKIE_DOMAIN` env var
+**Code changes shipped in B5 PR:**
+- `apps/api/src/main.ts:78` — CORS regex updated to allow apex AND subdomains: `^https://(?:[\w-]+\.)?phoenixvoyages\.ca$`
+- `apps/ota/src/app/robots.ts` — uses `NEXT_PUBLIC_SITE_URL` env var with apex fallback
+- `apps/ota/src/app/sitemap.ts`, `layout.tsx`, `lib/structured-data.ts` — apex fallback
+- 6 client/admin files — `https://ota.phoenixvoyages.ca` fallbacks → `https://phoenixvoyages.ca`
+- 3 hardcoded `client.phoenixvoyages.ca` references → `my.phoenixvoyages.ca`
+- `docs/ENVIRONMENTS.md` + `docs/runbooks/post-deploy-uat.md` updated with the decision
 
 **Acceptance:**
-- [ ] Decision recorded in this doc's changelog (apex vs subdomain AND `my.` vs `client.`)
-- [ ] CORS allow-list updated and tested with chosen apex/subdomains
-- [ ] `robots.ts` matches chosen host
-- [ ] Vercel domain aliases configured for chosen hosts
-- [ ] All runbooks (`DEPLOYMENT_API.md`, `ENVIRONMENTS.md`) updated to single portal hostname
-
-**Recommendation:** Option B (subdomains) + `my.` (more user-friendly than `client.`). Lower risk for first launch. Migrate to apex post-launch when traffic justifies it.
+- [x] Decision recorded in this doc's changelog (apex OTA + `my.` portal + `tailfire.` admin, 2026-05-15)
+- [x] CORS allow-list updated to support both apex AND subdomains (regex permits empty subdomain part)
+- [x] `robots.ts` uses env var with apex fallback (Vercel env override allows pre-cutover OTA at `ota.phoenixvoyages.ca`)
+- [x] All hardcoded `client.phoenixvoyages.ca` references → `my.phoenixvoyages.ca`
+- [x] All hardcoded `ota.phoenixvoyages.ca` fallbacks → `phoenixvoyages.ca` (env-overridable for pre-cutover)
+- [x] Runbooks updated (`docs/ENVIRONMENTS.md` + `docs/runbooks/post-deploy-uat.md`)
+- [ ] **Operational follow-up (Al):**
+  - Vercel domain aliases: confirm `my.phoenixvoyages.ca` aliased to client app, `tailfire.phoenixvoyages.ca` to admin (already), `phoenixvoyages.ca` to OTA (after WordPress migration)
+  - Doppler `prd` writes (need Al's authorization): `CLIENT_PORTAL_URL=https://my.phoenixvoyages.ca`, `NEXT_PUBLIC_CLIENT_URL=https://my.phoenixvoyages.ca` (currently `client.`); set `NEXT_PUBLIC_SITE_URL=https://ota.phoenixvoyages.ca` until WordPress cutover, then change to apex
+  - DNS: `my.phoenixvoyages.ca` CNAME to Vercel; apex ALIAS/ANAME to Vercel post-WordPress migration
+  - WordPress migration: separate scope; gate the apex flip on its completion
+  - `COOKIE_DOMAIN=.phoenixvoyages.ca` add to Doppler `prd` for cross-subdomain SSO when ready
 
 ---
 
