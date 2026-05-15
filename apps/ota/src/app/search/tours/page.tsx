@@ -120,7 +120,7 @@ export default async function ToursPage({ searchParams }: ToursPageProps) {
         <div className="mb-6 rounded-2xl border border-[#C59746]/30 bg-[#C59746]/5 px-5 py-4 text-sm text-[#1A1A1A]">
           <p className="font-semibold">Tours are advisor-quoted</p>
           <p className="mt-0.5 text-muted-foreground">
-            We don't display tour prices online — they vary by departure date, group size, and
+            We don&apos;t display tour prices online — they vary by departure date, group size, and
             rooming. Our advisors provide accurate, no-surprise quotes.
           </p>
         </div>

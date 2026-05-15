@@ -79,6 +79,55 @@
 - Test raw SQL queries in psql before committing: `source apps/api/.env && psql "$DATABASE_URL" -c "SELECT ..."`
 - Verify columns exist: `psql "$DATABASE_URL" -c "\d table_name"`
 
+### 7. Colocated Spec Convention (Refactor Roadmap Step 1 — Issue #357)
+
+When introducing new files that match these patterns, ship a colocated `*.spec.ts` (or `*.spec.tsx`) in the same directory:
+
+- `*Policy.ts` — pure decision/rule classes (e.g. `ActivityTravelerAssignmentPolicy`)
+- `*Lifecycle.ts` / `use*Lifecycle.ts` — encapsulated form/component lifecycle hooks
+- `*Adapter.ts` — translation layers between domains
+- `*Mapper.ts` / `*Resolver.ts` — pure transformation/lookup helpers
+
+**Why:** today's behavioral regressions (#347, #351, #352) shipped because the refactor pattern was untested. Type checking caught nothing. The PR validation workflow (`.github/workflows/pr-validation.yml`) runs tests on every PR — these conventions ensure new shared code lands with the coverage that makes the next refactor safe.
+
+Initially soft (convention, not enforced by CI script). Will be enforced by a check once the broader test cleanup (informational jobs → blocking) is done.
+
+### 8. Policy Error Handling — Strict by Default (Refactor Roadmap — Issue #368)
+
+When extracting a `*Policy` class from a service, the **default error mode is strict**: throw on failure, or return an explicit `{ ok, error }` shape that the caller must handle.
+
+**Best-effort error swallowing (`catch + logger.warn`) is only valid when ALL of the following are true:**
+
+1. The operation is a non-critical side-effect (e.g. cache priming, denormalization, UX-convenience auto-assignment).
+2. The caller's main operation has its own integrity invariant — the policy is a "nice to have" on top.
+3. The class of bug "this silently didn't happen" is acceptable in this domain.
+
+**Naming convention:** methods that silently swallow errors get a `try*` prefix to signal the contract at the call site:
+
+```ts
+// Strict (default) — throws on failure
+async assignContactToInvoice(invoiceId: string, contactId: string): Promise<void>
+
+// Best-effort — logs and continues. Caller may NOT rely on success.
+async tryAssignAllTripTravelersToActivity(activityId: string, tripId: string): Promise<void>
+```
+
+**Never best-effort:** payment schedules, ledger writes, audit trails, ownership changes, commission disbursements, anything ledger-backed. Make the error mode explicit in the method signature.
+
+The existing `ActivityTravelerAssignmentPolicy` (#359) uses `try*` because trip-traveler fan-out is a UX shortcut — losing one assignment to a transient DB hiccup is recoverable on the next save. Payment schedules (#361) and similar must follow strict mode.
+
+### 9. TripsService Refactor Inventory (Refactor Roadmap — Issue #360)
+
+`apps/api/src/trips/TRIPS_SERVICE_SURFACE.md` is the canonical inventory of `TripsService`'s 56 public methods, their split target services, and their characterization status.
+
+**Doctrine:** every PR that extracts methods out of `TripsService` into a new service class **must cite this inventory in its body**. Acceptable forms:
+
+- `Surface inventory: moving method #N (foo) to X service` (line in PR description)
+- `Surface inventory unchanged (extracting pure helper)`
+- `Updates TRIPS_SERVICE_SURFACE.md (with rationale)`
+
+Reviewers may reject the PR if no citation appears. This is the enforcement mechanism that prevents the inventory from becoming "documentation theater" (Codex audit concern).
+
 ## Development Workflow (A to Z)
 
 ### Complete Flow

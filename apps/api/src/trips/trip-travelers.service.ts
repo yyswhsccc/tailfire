@@ -6,11 +6,12 @@
 
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common'
 import { EventEmitter2 } from '@nestjs/event-emitter'
-import { eq, and, asc, desc, inArray, sql } from 'drizzle-orm'
+import { eq, and, asc, desc, inArray } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TravellerSplitsService } from '../financials/traveller-splits.service'
 import { TripNotificationsService } from '../financials/trip-notifications.service'
 import { ContactAccessService, BASIC_VIEW_ALLOWED_FIELDS } from '../contacts/contact-access.service'
+import { ActivityTravelerAssignmentPolicy } from './activity-traveler-assignment.policy'
 import {
   TravelerCreatedEvent,
   TravelerUpdatedEvent,
@@ -35,6 +36,7 @@ export class TripTravelersService {
     private readonly travellerSplitsService: TravellerSplitsService,
     private readonly tripNotificationsService: TripNotificationsService,
     private readonly contactAccessService: ContactAccessService,
+    private readonly travelerAssignment: ActivityTravelerAssignmentPolicy,
   ) {}
 
   /**
@@ -205,20 +207,7 @@ export class TripTravelersService {
     // Optionally propagate the new traveler onto every existing activity
     // on the trip so the agent doesn't have to re-assign one-by-one.
     if (options?.addToAllActivities && traveler) {
-      try {
-        await this.db.client.execute(sql`
-          INSERT INTO activity_travelers (activity_id, trip_traveler_id, trip_id)
-          SELECT ia.id, ${traveler.id}::uuid, ${tripId}::uuid
-          FROM itinerary_activities ia
-          LEFT JOIN itinerary_days id_day ON id_day.id = ia.itinerary_day_id
-          LEFT JOIN itineraries it ON it.id = id_day.itinerary_id
-          WHERE it.trip_id = ${tripId}::uuid
-             OR ia.trip_id = ${tripId}::uuid
-          ON CONFLICT (activity_id, trip_traveler_id) DO NOTHING
-        `)
-      } catch (error) {
-        this.logger.warn(`Failed to propagate traveler ${traveler.id} to existing activities on trip ${tripId}: ${error}`)
-      }
+      await this.travelerAssignment.tryAssignTravelerToAllTripActivities(traveler.id, tripId)
     }
 
     // Emit traveler created event
