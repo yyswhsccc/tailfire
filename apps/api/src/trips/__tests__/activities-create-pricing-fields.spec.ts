@@ -25,6 +25,10 @@ import { schema } from '@tailfire/database'
 
 const { trips, contacts, itineraries, itineraryDays, activityPricing, packageDetails } = schema
 
+// Phoenix Voyages agency UUID (production fixture, present on Dev / Preview / Prod).
+// Required by NOT NULL agency_id columns on trips / itineraries / itinerary_days.
+const TEST_AGENCY_ID = '00000000-0000-0000-0000-000000000001'
+
 describe('Generic POST /activities — booking detail fields', () => {
   let app: INestApplication
   let dbService: DatabaseService
@@ -71,6 +75,7 @@ describe('Generic POST /activities — booking detail fields', () => {
     const [trip] = await db
       .insert(trips)
       .values({
+        agencyId: TEST_AGENCY_ID,
         name: 'Create Pricing Fields Trip',
         primaryContactId: testContactId,
         ownerId: '00000000-0000-0000-0000-000000000001',
@@ -83,14 +88,19 @@ describe('Generic POST /activities — booking detail fields', () => {
 
     const [itinerary] = await db
       .insert(itineraries)
-      .values({ tripId: testTripId, name: 'Itin', status: 'draft' })
+      .values({ agencyId: TEST_AGENCY_ID, tripId: testTripId, name: 'Itin', status: 'draft' })
       .returning()
     if (!itinerary) throw new Error('Failed to create itinerary')
     testItineraryId = itinerary.id
 
     const [day] = await db
       .insert(itineraryDays)
-      .values({ itineraryId: testItineraryId, dayNumber: 1, date: '2026-06-01' })
+      .values({
+        agencyId: TEST_AGENCY_ID,
+        itineraryId: testItineraryId,
+        dayNumber: 1,
+        date: '2026-06-01',
+      })
       .returning()
     if (!day) throw new Error('Failed to create day')
     testDayId = day.id
