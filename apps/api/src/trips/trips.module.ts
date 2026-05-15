@@ -48,6 +48,8 @@ import { CustomTourDetailsService } from './custom-tour-details.service'
 import { TourDayDetailsService } from './tour-day-details.service'
 import { ComponentOrchestrationService } from './component-orchestration.service'
 import { PaymentSchedulesService } from './payment-schedules.service'
+import { PaymentScheduleLockPolicy } from './payment-schedule-lock.policy'
+import { PaymentContactResolver } from './payment-contact-resolver'
 import { PaymentAuditService } from './payment-audit.service'
 import { PaymentTemplatesService } from './payment-templates.service'
 import { ActivityTotalsService } from './activity-totals.service'
@@ -164,6 +166,8 @@ import { TripAutomationsController } from './trip-automations.controller'
     TourDayDetailsService,
     ComponentOrchestrationService,
     PaymentSchedulesService,
+    PaymentScheduleLockPolicy,
+    PaymentContactResolver,
     PaymentAuditService,
     PaymentTemplatesService,
     ActivityTotalsService,

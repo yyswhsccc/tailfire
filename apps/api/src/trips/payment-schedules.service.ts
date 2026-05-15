@@ -22,6 +22,8 @@ import { PaymentAuditService } from './payment-audit.service'
 import { PaymentTemplatesService } from './payment-templates.service'
 import { AutomationService } from '../automation/automation.service'
 import { QUEUES, getPaymentReminderJobId } from '../automation/automation.types'
+import { PaymentScheduleLockPolicy } from './payment-schedule-lock.policy'
+import { PaymentContactResolver } from './payment-contact-resolver'
 import type {
   PaymentScheduleConfigDto,
   CreatePaymentScheduleConfigDto,
@@ -67,6 +69,8 @@ export class PaymentSchedulesService {
     private readonly auditService: PaymentAuditService,
     private readonly templatesService: PaymentTemplatesService,
     private readonly automationService: AutomationService,
+    private readonly lockPolicy: PaymentScheduleLockPolicy,
+    private readonly contactResolver: PaymentContactResolver,
   ) {}
 
   // ============================================================================
@@ -615,8 +619,10 @@ export class PaymentSchedulesService {
   }
 
   /**
-   * Ensure the trip hasn't departed yet (status is not in_progress/completed/cancelled).
-   * Blocks payment schedule edits after departure unless user is admin.
+   * Ensure the trip hasn't departed yet. Resolves the trip status from
+   * the activity pricing ID, then delegates the lock decision to
+   * `PaymentScheduleLockPolicy` (strict mode — throws when locked).
+   * See CLAUDE.md section 8 for the doctrine on strict vs best-effort.
    */
   private async ensureTripEditable(activityPricingId: string, isAdmin = false): Promise<void> {
     if (isAdmin) return
@@ -632,12 +638,7 @@ export class PaymentSchedulesService {
 
     if (!trip) return
 
-    const lockedStatuses = ['travelling', 'travelled', 'cancelled']
-    if (lockedStatuses.includes(trip.status)) {
-      throw new BadRequestException(
-        'Payment schedule cannot be modified after the trip has departed. Contact an admin for changes.'
-      )
-    }
+    this.lockPolicy.assertEditable({ tripStatus: trip.status, isAdmin })
   }
 
   /**
@@ -954,30 +955,24 @@ export class PaymentSchedulesService {
     expectedPaymentItemId: string,
     requestedContactId?: string | null,
   ): Promise<string | null> {
-    // 1. Use explicit contactId if provided
+    // Short-circuit on explicit override to avoid unnecessary DB reads.
     if (requestedContactId) {
-      return requestedContactId
+      return this.contactResolver.resolve({ requestedContactId })
     }
 
-    // 2. Try expected payment item's assigned contact
     const [epi] = await this.db.client
       .select({ contactId: this.db.schema.expectedPaymentItems.contactId })
       .from(this.db.schema.expectedPaymentItems)
       .where(eq(this.db.schema.expectedPaymentItems.id, expectedPaymentItemId))
       .limit(1)
 
-    if (epi?.contactId) {
-      return epi.contactId
-    }
-
-    // 3. Try trip's primary contact
     const tripContext = await this.getTripContextFromPaymentItemId(expectedPaymentItemId)
-    if (tripContext?.contactId) {
-      return tripContext.contactId
-    }
 
-    // 4. No contact found
-    return null
+    // Delegate the precedence rule to PaymentContactResolver (#361).
+    return this.contactResolver.resolve({
+      expectedItemContactId: epi?.contactId,
+      tripPrimaryContactId: tripContext?.contactId,
+    })
   }
 
   /**
