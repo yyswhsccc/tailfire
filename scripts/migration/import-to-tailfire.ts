@@ -633,8 +633,54 @@ async function importSuppliers(ledger: Ledger): Promise<void> {
       addMapping(ledger, { sourceType: 'supplier', sourceId: s.TourOperatorID, tailfireId: result.id, status: 'created' })
       await delay(DELAY_MS)
     } catch (err) {
-      addMapping(ledger, { sourceType: 'supplier', sourceId: s.TourOperatorID, tailfireId: '', status: 'error', error: (err as Error).message })
-      console.error(`  ERROR supplier ${s.TourOperatorID} (${s.TourOperatorName}): ${(err as Error).message}`)
+      const message = (err as Error).message
+      // 409 means a supplier with this name already exists in TF (target env had it
+      // before import — typical at any non-greenfield cutover). Without falling
+      // back to a name lookup, the ledger ends up with status='error' + empty
+      // tailfireId, which causes Step 10 (importSupplierLinks) to build zero
+      // activity_suppliers rows. See docs/runbooks/tes-cutover-backfill-plan.md (#37).
+      if (message.includes('(409)')) {
+        try {
+          const list = await apiGet<{ suppliers: Array<{ id: string; name: string }> }>(
+            `/suppliers?search=${encodeURIComponent(s.TourOperatorName)}&limit=50`
+          )
+          const target = s.TourOperatorName.toLowerCase().trim()
+          const exact = list.suppliers?.find(
+            (it) => it.name.toLowerCase().trim() === target
+          )
+          if (exact) {
+            addMapping(ledger, {
+              sourceType: 'supplier',
+              sourceId: s.TourOperatorID,
+              tailfireId: exact.id,
+              status: 'created',
+              data: { reused: true, source: 'name_lookup_after_409' },
+            })
+            await delay(DELAY_MS)
+            continue
+          }
+          // 409 without an exact-name match in search response is a real anomaly.
+          // Fall through to error mapping with a descriptive message.
+          throw new Error(
+            `409 from POST /suppliers but exact-name lookup returned no match (got ${list.suppliers?.length || 0} similar names)`
+          )
+        } catch (lookupErr) {
+          const lookupMessage = (lookupErr as Error).message
+          addMapping(ledger, {
+            sourceType: 'supplier',
+            sourceId: s.TourOperatorID,
+            tailfireId: '',
+            status: 'error',
+            error: `409 then name-lookup failed: ${lookupMessage}`,
+          })
+          console.error(
+            `  ERROR supplier ${s.TourOperatorID} (${s.TourOperatorName}): ${lookupMessage}`
+          )
+          continue
+        }
+      }
+      addMapping(ledger, { sourceType: 'supplier', sourceId: s.TourOperatorID, tailfireId: '', status: 'error', error: message })
+      console.error(`  ERROR supplier ${s.TourOperatorID} (${s.TourOperatorName}): ${message}`)
     }
   }
 
