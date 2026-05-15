@@ -1,6 +1,6 @@
 # Production Launch Punch List — MASTER
 
-**Status:** Operational plan. Code findings validated against `origin/main @ 42d03684` (Codex review, 2026-05-15).
+**Status:** Code-side launch readiness achieved 2026-05-15. 12 launch PRs merged this session. Remaining blockers are external (lawyer / Al / tf-demo cluster).
 **Target:** Phoenix Voyages (TICO-licensed, Ontario, Canada) — `apps/ota` + `apps/client` + `apps/admin` + `apps/api` → production
 **Owner:** _set per item — most default to **Al + Claude (paired)** unless flagged otherwise_
 
@@ -8,21 +8,24 @@
 
 ## Executive Summary — TL;DR
 
-**Current state:** **14 code-verified blockers.** Sequencing-wise, **Phase 0 (decisions) and Phase 1 (security fixes) can run in PARALLEL** — B1/B2/B12 don't depend on the domain decision. Phase 2 onward serializes.
+**Code-side (Claude can ship without external action):** ✅ **complete**
+- 12 launch PRs merged in 2026-05-15 session: B1, B2, B4, B7-prep, B9, B10, B12, B13×2, B14-step-1, B14-prep
+- 5 blocking CI jobs now active (added `api-typecheck-baseline`)
+- All Codex validation gates passed (B1, B2, B12)
 
-**The 3 longest-pole items that gate launch ETA:**
+**External-side (Al / lawyer / tf-demo cluster only):** the path forward
+- **B3** Legal — engage lawyer for Privacy + Terms + cookie banner (no Claude action possible)
+- **B5** Domain decision — apex vs subdomain + portal hostname (Al's call)
+- **B6** Supabase Auth dashboard config (Al, ~30 min)
+- **B7** Doppler `prd` writes for the 4 keys identified in `docs/runbooks/doppler-prd-audit.md` (Al, ~30 min)
+- **B8** `IC_PAYOUTS_V2_ENABLED=false` Doppler write (Al, 5 min)
+- **B11 + B14 steps 2-7** — TES dry-run on tf-demo paired with Claude. Pre-analysis at `docs/runbooks/b14-tes-dry-run-pre-analysis.md`
 
-1. **Legal: Privacy + Terms + cookie banner** — gated on lawyer SLA. Start TODAY. Without it, no consumer-facing launch.
-2. **TES import re-validation + W1-W5 + dry-run + cutover (B14 + B11)** — 2-3 days of work. The April-2 validation does NOT cover 6 weeks of post-validation codebase changes (IC payouts module, traveler auto-assign policy, payment-schedule lock policy). Must re-validate against current `main` before importing prod.
-3. **Prod auth/email/env/smoke readiness** — Supabase Auth config, Doppler→Railway/Vercel sync verification, R2 + Stripe + Resend domain + smoke test expansion. Many small tasks that compound.
+**Realistic launch window from this point: 5-8 working days** (down from 8-12) since the code-side compounding work is done. Critical path is now lawyer SLA + Al's decision/config window + TES dry-run iteration.
 
-*(Domain decision is a gate, not a long pole — Al decides, then ~1hr of code work. Tracked under B5.)*
+**Internal-alias path (defensible):** B1+B2 are merged, security gates active. After Al completes B6/B7/B8 + a backup + migration dry-run + basic smoke, Phoenix Voyages staff can use the platform behind a non-public Vercel alias within **48h** for NEW trip creation. This is NOT consumer-facing soft launch and does NOT include TES historical data — that requires B14 dry-run + legal pages + full UAT.
 
-**Internal-alias path (defensible):** After B1/B2 + backup + env sync + migration dry-run + basic smoke, Phoenix Voyages staff can use the platform behind a non-public Vercel alias within **48h** for NEW trip creation. This is NOT consumer-facing soft launch and does NOT include TES historical data — that requires B14 + legal pages + TICO expansion + full smoke suite.
-
-**Realistic launch window: 8-12 working days** from start of Phase 0 to DNS flip, assuming legal returns within the window and B14 surfaces no major incompatibilities.
-
-**What's already done (Refactor + bug-fix sweep):** 17 PRs merged, including all 5 main refactor roadmap steps, 4 blocking CI jobs, hook + form lifecycle proven on flight-form. None of that work blocks launch — but it hardens the codebase for the post-launch iteration cycle.
+**Code-side baseline (prior + this session):** 17 PRs merged in the prior session (refactor roadmap + try-return types) + 12 PRs merged this session (Phase 1 security + tooling + docs). All 5 blocking CI jobs known-clean.
 
 ---
 
@@ -161,7 +164,7 @@ Two options:
 ---
 
 ### B6. Supabase Auth production config
-**Owner:** Al (Supabase dashboard access) · Claude (verification script) · **Effort:** 30 min · **Blocks:** Phase 2 · **Status:** `[ ]` · **Issue:** _no GH issue needed, runbook item_
+**Owner:** Al (Supabase dashboard access) · Claude (verification script) · **Effort:** 30 min · **Blocks:** Phase 2 · **Status:** `[!]` blocked on Al + Supabase dashboard · **Issue:** _no GH issue needed, runbook item_
 
 Lives outside the codebase — easily missed.
 
@@ -175,7 +178,7 @@ Lives outside the codebase — easily missed.
 ---
 
 ### B7. Doppler `prd` + Railway/Vercel env sync
-**Owner:** Al · **Effort:** 1-2 hrs (mostly verification) · **Blocks:** Phase 2 · **Status:** `[ ]` · **Issue:** _runbook item_
+**Owner:** Al · **Effort:** 1-2 hrs (mostly verification) · **Blocks:** Phase 2 · **Status:** `[!]` blocked on Al + Doppler `prd` write · **Issue:** _audit doc at `docs/runbooks/doppler-prd-audit.md` lists exactly what's missing_
 
 Doppler is NOT auto-synced to Railway or Vercel. Verified gap documented in `docs/runbooks/ic-payouts-cutover.md:43`.
 
@@ -211,7 +214,7 @@ Doppler is NOT auto-synced to Railway or Vercel. Verified gap documented in `doc
 ---
 
 ### B8. IC Payouts gate — must be explicit
-**Owner:** Claude · **Effort:** 5 min (set env var) · **Blocks:** Phase 2 · **Status:** `[ ]` · **Issue:** _runbook item_
+**Owner:** Al (per CLAUDE.md `prd` writes need user confirmation) · **Effort:** 5 min (set env var) · **Blocks:** Phase 2 · **Status:** `[!]` blocked on Al + Doppler `prd` write · **Issue:** _runbook item; one-line add_
 
 Surprise finding: IC payouts is already on `main`. Despite "deferred" classification:
 - `apps/api/src/app.module.ts:259` imports `IcPayoutsModule`
@@ -259,7 +262,7 @@ Surprise finding: IC payouts is already on `main`. Despite "deferred" classifica
 ---
 
 ### B11. TES → production data cutover
-**Owner:** Al (TES creds) · Claude (script + validation) · **Effort:** 1 day · **Blocks:** Phase 5 UAT · **Status:** `[ ]` · **Issue:** _follow `docs/TES_MIGRATION_RUNBOOK.md`_
+**Owner:** Al (TES creds) · Claude (script + validation) · **Effort:** 1 day · **Blocks:** Phase 5 UAT · **Status:** `[!]` blocked on B14 dry-run completing first · **Issue:** _follow `docs/TES_MIGRATION_RUNBOOK.md`_
 
 **Pre-import (W1-W5 from `project_tes_commission_mapping.md`):**
 - [ ] Agent→user mapping fixed (no admin fixture fallback)
