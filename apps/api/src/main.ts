@@ -44,6 +44,12 @@ async function bootstrap() {
     rawBody: true,
   })
 
+  // Trust proxy headers (X-Forwarded-For) so req.ip resolves to the real
+  // client IP behind Vercel/Railway/Cloudflare proxies. B2: per-IP throttling
+  // would otherwise collapse all OTA traffic onto a single Vercel function IP
+  // and self-DoS legitimate users. `1` means trust the first hop only.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1)
+
   // Security
   app.use(helmet())
 

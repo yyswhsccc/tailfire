@@ -16,6 +16,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { eq, and, isNull } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { RegisterConsumerDto } from './dto/register-consumer.dto'
+import { TurnstileService } from './turnstile.service'
 
 /** Generic response to prevent account enumeration */
 const GENERIC_RESPONSE = {
@@ -30,6 +31,7 @@ export class ConsumerAuthService {
   constructor(
     private readonly configService: ConfigService,
     private readonly db: DatabaseService,
+    private readonly turnstile: TurnstileService,
   ) {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL')
     const serviceRoleKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY')
@@ -53,7 +55,12 @@ export class ConsumerAuthService {
    * All paths return the same generic message to prevent account enumeration.
    * The consumer signs in via the portal login page (signInWithOtp).
    */
-  async registerConsumer(dto: RegisterConsumerDto) {
+  async registerConsumer(dto: RegisterConsumerDto, remoteIp?: string) {
+    // B2: Verify Turnstile BEFORE any DB writes or Supabase calls. When
+    // TURNSTILE_REQUIRED=true (stg/prd), this throws BadRequestException on
+    // missing/invalid tokens — fail-closed per CLAUDE.md §8 strict-mode policy.
+    await this.turnstile.verify(dto.turnstileToken, remoteIp)
+
     const email = dto.email.toLowerCase().trim()
 
     // 1. Check for existing contact by email
