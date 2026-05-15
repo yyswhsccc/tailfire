@@ -170,16 +170,20 @@ Status legend: `[ ]` todo · `[~]` in progress · `[!]` blocked · `[x]` done
 ---
 
 ### B6. Supabase Auth production config
-**Owner:** Al (Supabase dashboard access) · Claude (verification script) · **Effort:** 30 min · **Blocks:** Phase 2 · **Status:** `[!]` blocked on Al + Supabase dashboard · **Issue:** _no GH issue needed, runbook item_
+**Owner:** Al (Supabase dashboard access) · Claude (verification script + runbook) · **Effort:** 30 min · **Blocks:** Phase 2 · **Status:** `[~]` _verification script + runbook done; Al's dashboard config + script run remains_ · **Issue:** _no GH issue needed, runbook items_
 
-Lives outside the codebase — easily missed.
+Lives outside the codebase — easily missed. Step-by-step config in `docs/runbooks/b6-supabase-auth-prod-config.md`. Verification script `scripts/verify-supabase-auth-prod.sh` exits 0 when all 6 items below are correctly set.
 
 **Acceptance:**
-- [ ] Site URL = production OTA host
-- [ ] Redirect allow-list includes portal + OTA + admin `/auth/callback` paths
-- [ ] Email templates point to production links (magic link, password reset, confirm signup)
-- [ ] MFA enforcement confirmed (currently MFA-aware via `apps/api/src/auth/guards/jwt-auth.guard.ts`)
-- [ ] SMTP relay configured (Resend or Supabase native)
+- [x] **Claude:** verification script `scripts/verify-supabase-auth-prod.sh` (read-only Supabase Management API)
+- [x] **Claude:** step-by-step runbook `docs/runbooks/b6-supabase-auth-prod-config.md`
+- [ ] **Al:** Site URL = `https://my.phoenixvoyages.ca` (per B5)
+- [ ] **Al:** Redirect allow-list includes portal + OTA (both pre/post-cutover) + admin `/auth/callback` paths
+- [ ] **Al:** Email templates point to production links (magic link, password reset, confirm signup)
+- [ ] **Al:** MFA enforcement confirmed (currently MFA-aware via `apps/api/src/auth/guards/jwt-auth.guard.ts`)
+- [ ] **Al:** SMTP relay configured (Resend per B7 — host `smtp.resend.com`, password = `RESEND_API_KEY` from Doppler)
+- [ ] **Al:** Anonymous sign-ins DISABLED (B2 alignment — bypasses throttling otherwise)
+- [ ] **Al:** Run `bash scripts/verify-supabase-auth-prod.sh` — exit 0 confirms all the above
 
 ---
 
