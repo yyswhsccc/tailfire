@@ -160,12 +160,17 @@ Status legend: `[ ]` todo · `[~]` in progress · `[!]` blocked · `[x]` done
 - [x] All hardcoded `client.phoenixvoyages.ca` references → `my.phoenixvoyages.ca`
 - [x] All hardcoded `ota.phoenixvoyages.ca` fallbacks → `phoenixvoyages.ca` (env-overridable for pre-cutover)
 - [x] Runbooks updated (`docs/ENVIRONMENTS.md` + `docs/runbooks/post-deploy-uat.md`)
-- [ ] **Operational follow-up (Al):**
+- [x] **Doppler `prd` writes (Al authorized 2026-05-15; Claude executed via Doppler MCP):**
+  - `CLIENT_PORTAL_URL=https://my.phoenixvoyages.ca` ✓
+  - `NEXT_PUBLIC_CLIENT_URL=https://my.phoenixvoyages.ca` ✓
+  - `COOKIE_DOMAIN=.phoenixvoyages.ca` ✓ (NEW key for cross-subdomain SSO)
+- [ ] **Remaining operational (Al):**
+  - Sync the 3 new Doppler vars to Railway production env per CLAUDE.md ⚠️ — Doppler→Railway is NOT auto-synced
+  - Sync the 2 `NEXT_PUBLIC_*` vars to Vercel client + ota project envs (build-time)
   - Vercel domain aliases: confirm `my.phoenixvoyages.ca` aliased to client app, `tailfire.phoenixvoyages.ca` to admin (already), `phoenixvoyages.ca` to OTA (after WordPress migration)
-  - Doppler `prd` writes (need Al's authorization): `CLIENT_PORTAL_URL=https://my.phoenixvoyages.ca`, `NEXT_PUBLIC_CLIENT_URL=https://my.phoenixvoyages.ca` (currently `client.`); set `NEXT_PUBLIC_SITE_URL=https://ota.phoenixvoyages.ca` until WordPress cutover, then change to apex
+  - `NEXT_PUBLIC_SITE_URL` Vercel OTA env: keep `https://ota.phoenixvoyages.ca` until WordPress cutover, then change to apex
   - DNS: `my.phoenixvoyages.ca` CNAME to Vercel; apex ALIAS/ANAME to Vercel post-WordPress migration
-  - WordPress migration: separate scope; gate the apex flip on its completion
-  - `COOKIE_DOMAIN=.phoenixvoyages.ca` add to Doppler `prd` for cross-subdomain SSO when ready
+  - WordPress migration: separate scope; gates the apex flip
 
 ---
 
