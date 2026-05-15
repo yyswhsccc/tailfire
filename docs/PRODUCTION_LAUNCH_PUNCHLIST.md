@@ -17,8 +17,8 @@
 - **B3** Legal — engage lawyer for Privacy + Terms + cookie banner (no Claude action possible)
 - **B5** Domain decision — apex vs subdomain + portal hostname (Al's call)
 - **B6** Supabase Auth dashboard config (Al, ~30 min)
-- **B7** Doppler `prd` writes for the 4 keys identified in `docs/runbooks/doppler-prd-audit.md` (Al, ~30 min)
-- **B8** `IC_PAYOUTS_V2_ENABLED=false` Doppler write (Al, 5 min)
+- **B7** Doppler `prd` writes for the 3 remaining Turnstile keys identified in `docs/runbooks/doppler-prd-audit.md` (Al, ~10 min — only need values from Cloudflare; the 4th key `IC_PAYOUTS_V2_ENABLED=false` was set 2026-05-15)
+- ~~**B8** `IC_PAYOUTS_V2_ENABLED=false` Doppler write~~ — DONE 2026-05-15 (Al authorized; Claude executed via Doppler MCP). Railway sync still owed — see B8 details.
 - **B11 + B14 steps 2-7** — TES dry-run on tf-demo paired with Claude. Pre-analysis at `docs/runbooks/b14-tes-dry-run-pre-analysis.md`
 
 **Realistic launch window from this point: 5-8 working days** (down from 8-12) since the code-side compounding work is done. Critical path is now lawyer SLA + Al's decision/config window + TES dry-run iteration.
@@ -214,7 +214,7 @@ Doppler is NOT auto-synced to Railway or Vercel. Verified gap documented in `doc
 ---
 
 ### B8. IC Payouts gate — must be explicit
-**Owner:** Al (per CLAUDE.md `prd` writes need user confirmation) · **Effort:** 5 min (set env var) · **Blocks:** Phase 2 · **Status:** `[!]` blocked on Al + Doppler `prd` write · **Issue:** _runbook item; one-line add_
+**Owner:** Al (authorized) · Claude (executed) · **Effort:** 5 min actual · **Blocks:** Phase 2 · **Status:** `[x]` _Doppler `prd` set 2026-05-15; Railway sync follow-up below_ · **Issue:** _no GH issue, runbook item_
 
 Surprise finding: IC payouts is already on `main`. Despite "deferred" classification:
 - `apps/api/src/app.module.ts:259` imports `IcPayoutsModule`
@@ -223,10 +223,11 @@ Surprise finding: IC payouts is already on `main`. Despite "deferred" classifica
 - Runbook exists at `docs/runbooks/ic-payouts-cutover.md`
 
 **Acceptance:**
-- [ ] **`IC_PAYOUTS_V2_ENABLED=false` set explicitly** in Doppler `prd` (do NOT rely on default)
-- [ ] Run all IC migrations as part of standard prod migration set (they ship regardless)
-- [ ] Verify legacy commission endpoints work with the flag off (sanity test)
-- [ ] Schedule with finance: when to flip the flag
+- [x] **`IC_PAYOUTS_V2_ENABLED=false` set explicitly** in Doppler `prd` (Al authorized 2026-05-15; Claude executed via Doppler MCP `secrets_update`)
+- [x] IC migrations already ship as part of standard prod migration set (they're in `packages/database/src/migrations/` regardless of flag)
+- [ ] **Operational follow-up (Al):** sync the new var to Railway production env per CLAUDE.md ⚠️ — Doppler→Railway is NOT auto-synced. Run: `railway environment production && railway service api-prod && railway variables --set "IC_PAYOUTS_V2_ENABLED=false"`. Then redeploy the API to pick it up, OR wait for the next deploy.
+- [ ] Verify legacy commission endpoints work with the flag off after Railway sync (sanity test — hit `GET /commission/due/eligible` as admin, expect normal response, not `GoneException`)
+- [ ] Schedule with finance: when to flip the flag to `true` (post-launch IC payouts cutover)
 
 ---
 
