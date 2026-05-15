@@ -6,10 +6,23 @@ import { X, Loader2, Mail, CheckCircle } from "lucide-react";
 
 export type EmailCaptureTrigger = "save_board" | "submit_trip" | "ai_chat";
 
-// Cloudflare Turnstile site key (B2). When unset (e.g. local dev), the widget
-// is skipped and no token is sent — the API allows this in dev mode but
-// fail-closes in stg/prd via TurnstileService.
+// Cloudflare Turnstile site key (B2). When unset locally (NODE_ENV !==
+// 'production'), the widget is skipped and no token is sent — the API allows
+// this in dev mode but fail-closes in stg/prd via TurnstileService.
+//
+// In production builds, missing the site key is a hard configuration error
+// (Codex B2 small-fix 2026-05-15): if the Vercel env var didn't propagate,
+// the modal would render without a widget and every registration would 400
+// from the backend. Surface that loudly at module load instead.
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+if (process.env.NODE_ENV === "production" && !TURNSTILE_SITE_KEY) {
+  // Throwing at module load fails the Next.js build/render rather than
+  // silently shipping a broken registration flow.
+  throw new Error(
+    "NEXT_PUBLIC_TURNSTILE_SITE_KEY is required in production builds. " +
+      "Set it in Vercel env (sourced from Doppler) before deploying.",
+  );
+}
 
 interface EmailCaptureModalProps {
   isOpen: boolean;
@@ -62,12 +75,24 @@ export function EmailCaptureModal({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  // Codex B2 small-fix 2026-05-15: track when the Cloudflare script has
+  // loaded so we can re-trigger the render effect. Without this, opening the
+  // modal before the script downloads would leave the widget invisible and
+  // submit blocked forever.
+  const [scriptReady, setScriptReady] = useState(false);
   const widgetRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
 
-  // Render the Turnstile widget when the modal opens (client side, after the
-  // Cloudflare script has loaded). Reset on close so a stale token doesn't
-  // carry over to the next attempt.
+  // If the Cloudflare script was already loaded by a previous modal open, the
+  // <Script> onLoad won't fire again. Reflect the actual window state on mount.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.turnstile) {
+      setScriptReady(true);
+    }
+  }, []);
+
+  // Render the Turnstile widget when the modal opens AND the script is ready.
+  // Reset on close so a stale token doesn't carry over to the next attempt.
   useEffect(() => {
     if (!isOpen || !TURNSTILE_SITE_KEY || !widgetRef.current) return;
     if (typeof window === "undefined" || !window.turnstile) return;
@@ -87,7 +112,7 @@ export function EmailCaptureModal({
       }
       setTurnstileToken(null);
     };
-  }, [isOpen]);
+  }, [isOpen, scriptReady]);
 
   if (!isOpen) return null;
 
@@ -174,13 +199,17 @@ export function EmailCaptureModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      {/* Cloudflare Turnstile script (loaded once, no-op if already present) */}
+      {/* Cloudflare Turnstile script. onLoad triggers a re-render of the
+          widget effect — without this, opening the modal before the script
+          downloads would leave the widget invisible and submit blocked
+          forever (Codex B2 small-fix 2026-05-15). */}
       {TURNSTILE_SITE_KEY && (
         <Script
           src="https://challenges.cloudflare.com/turnstile/v0/api.js"
           strategy="afterInteractive"
           async
           defer
+          onLoad={() => setScriptReady(true)}
         />
       )}
 

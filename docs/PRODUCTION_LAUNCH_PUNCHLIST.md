@@ -80,12 +80,16 @@ Status legend: `[ ]` todo · `[~]` in progress · `[!]` blocked · `[x]` done
 **Impact:** Account spray, fake accounts, magic-link abuse, email deliverability damage.
 
 **Acceptance:**
-- [~] `ThrottlerGuard` applied (per-IP `default` + per-email `register-email` named throttler) — code in B2 PR
-- [~] Cloudflare Turnstile token wired in DTO + `TurnstileService` verifies before any DB write — code in B2 PR
-- [~] Spec covers: per-throttler decorator wiring, missing/invalid Turnstile → 400, dev mode bypass when disabled
-- [ ] OTA registration form widget integration (separate follow-up — needs `NEXT_PUBLIC_TURNSTILE_SITE_KEY` from Doppler)
-- [ ] Doppler `prd` keys: `TURNSTILE_SECRET`, `TURNSTILE_REQUIRED=true`
-- [ ] Decision DEFERRED: keep public endpoint or force through OTA service-key proxy (Codex's preferred long-term option). Phase 1 ships throttler+CAPTCHA-token verification on the public endpoint to close the immediate window; proxy migration filed as follow-up.
+- [x] `ThrottlerGuard` applied (per-IP `default` + per-email `register-email` named throttler)
+- [x] Cloudflare Turnstile token wired in DTO + `TurnstileService` verifies before any DB write
+- [x] OTA proxy forwards `turnstileToken` AND visitor `x-forwarded-for` to API (Codex rework)
+- [x] OTA `EmailCaptureModal` renders Turnstile widget, blocks submit until token, resets on 4xx, handles script-load race via `onLoad` → re-render
+- [x] API `main.ts` sets `trust proxy = 1` so `req.ip` resolves to real client IP behind Vercel/Railway
+- [x] `TurnstileService` fail-closed on `NODE_ENV ∈ {production, preview, staging}` — startup throws unless `TURNSTILE_REQUIRED=true` AND `TURNSTILE_SECRET` are both set
+- [x] OTA modal `throws` at module load if `NODE_ENV=production` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is missing (Vercel build catches missing env)
+- [x] Spec coverage: 33 tests — per-throttler decorator wiring, strict-env startup invariants (incl. mistypes), Turnstile behavior matrix
+- [ ] **Operational follow-up (Al):** Doppler `prd`/`stg` keys: `TURNSTILE_SECRET`, `TURNSTILE_REQUIRED=true`, OTA `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. Verify Doppler→Railway and Doppler→Vercel sync per CLAUDE.md ⚠️ section.
+- [ ] Decision DEFERRED: keep public endpoint or force through OTA service-key proxy (Codex's preferred long-term option). Phase 1 ships throttler+CAPTCHA on public endpoint; proxy migration is a separate post-launch item.
 
 ---
 
