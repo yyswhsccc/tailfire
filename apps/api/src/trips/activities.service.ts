@@ -634,6 +634,9 @@ export class ActivitiesService {
           commissionTotalCents: dto.commissionTotalCents ?? null,
           commissionSplitPercentage: dto.commissionSplitPercentage?.toString() ?? null,
           pricingBreakdownJson: dto.pricingBreakdownJson ?? null,
+          supplier: dto.supplier ?? null,
+          cancellationPolicy: dto.cancellationPolicy ?? null,
+          termsAndConditions: dto.termsAndConditions ?? null,
           billedToTripId,
         })
         .onConflictDoNothing({ target: this.db.schema.activityPricing.activityId })
@@ -855,7 +858,9 @@ export class ActivitiesService {
       dto.pricingType !== undefined ||
       dto.commissionTotalCents !== undefined ||
       dto.commissionSplitPercentage !== undefined ||
-      dto.supplier !== undefined
+      dto.supplier !== undefined ||
+      dto.cancellationPolicy !== undefined ||
+      dto.termsAndConditions !== undefined
 
     if (hasPricingUpdates) {
       // Child pricing guard: block pricing updates on children linked to packages
@@ -879,6 +884,8 @@ export class ActivitiesService {
             commission_total_cents = COALESCE(${dto.commissionTotalCents ?? null}, commission_total_cents),
             commission_split_percentage = COALESCE(${dto.commissionSplitPercentage?.toString() ?? null}, commission_split_percentage),
             supplier = COALESCE(${dto.supplier ?? null}, supplier),
+            cancellation_policy = COALESCE(${dto.cancellationPolicy ?? null}, cancellation_policy),
+            terms_and_conditions = COALESCE(${dto.termsAndConditions ?? null}, terms_and_conditions),
             updated_at = NOW()
           WHERE activity_id = ${id}
         `)

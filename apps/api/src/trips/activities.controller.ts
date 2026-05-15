@@ -294,8 +294,15 @@ export class ActivitiesGlobalController {
     } else {
       throw new BadRequestException('Either itineraryDayId or tripId is required')
     }
-    // Pass tripId for floating packages that need it for agency resolution
-    const result = await this.activitiesService.create(dto, getActorId(req), dto.tripId ?? undefined)
+    // Pass tripId for floating packages that need it for agency resolution.
+    // Pass packageDetails so package_details row is created alongside the
+    // activity (only persisted when activityType='package').
+    const result = await this.activitiesService.create(
+      dto,
+      getActorId(req),
+      dto.tripId ?? undefined,
+      dto.packageDetails
+    )
     // For packages, link child activities if provided
     if (dto.activityType === 'package' && dto.activityIds?.length) {
       await this.activitiesService.linkChildrenToPackage(result.id, dto.activityIds)

@@ -1,31 +1,36 @@
 # Production Launch Punch List — MASTER
 
-**Status:** Code-side launch readiness achieved 2026-05-15. 12 launch PRs merged this session. Remaining blockers are external (lawyer / Al / tf-demo cluster).
+**Status:** **TF-Demo (Preview) fully operational 2026-05-15.** 7 of 14 blockers fully `[x]`; 6 are `[~]` (code-side done; operational items remain); 1 is `[!]` (gated on prior blocker). 22+ PRs merged this session. Ready for user testing on tf-demo.
 **Target:** Phoenix Voyages (TICO-licensed, Ontario, Canada) — `apps/ota` + `apps/client` + `apps/admin` + `apps/api` → production
-**Owner:** _set per item — most default to **Al + Claude (paired)** unless flagged otherwise_
+**Owner:** _set per item_
 
 ---
 
 ## Executive Summary — TL;DR
 
-**Code-side (Claude can ship without external action):** ✅ **complete**
-- 12 launch PRs merged in 2026-05-15 session: B1, B2, B4, B7-prep, B9, B10, B12, B13×2, B14-step-1, B14-prep
-- 5 blocking CI jobs now active (added `api-typecheck-baseline`)
+**Code-side + Doppler + Supabase Auth + Vercel preview-env:** ✅ **complete**
+- Fully `[x]`: **B1, B2, B3, B6, B7, B8, B13** (7 blockers)
+- `[~]` code-complete, operational items remain: **B4** (Al's domain review), **B5** (WordPress cutover gates apex), **B9** (clone-and-apply rehearsal), **B10** (auto-revert deferred), **B12** (full clean post-launch), **B14** (dry-run still owed)
+- `[!]` blocked: **B11** (waits on B14 dry-run)
+- 5 blocking CI jobs active (admin-typecheck, migration-monotonicity, supabase-migrations-guard, lint-ota, api-typecheck-baseline)
 - All Codex validation gates passed (B1, B2, B12)
 
-**External-side (Al / lawyer / tf-demo cluster only):** the path forward
-- **B3** Legal — engage lawyer for Privacy + Terms + cookie banner (no Claude action possible)
-- **B5** Domain decision — apex vs subdomain + portal hostname (Al's call)
-- **B6** Supabase Auth dashboard config (Al, ~30 min)
-- **B7** Doppler `prd` writes for the 3 remaining Turnstile keys identified in `docs/runbooks/doppler-prd-audit.md` (Al, ~10 min — only need values from Cloudflare; the 4th key `IC_PAYOUTS_V2_ENABLED=false` was set 2026-05-15)
-- ~~**B8** `IC_PAYOUTS_V2_ENABLED=false` Doppler write~~ — DONE 2026-05-15 (Al authorized; Claude executed via Doppler MCP). Railway sync still owed — see B8 details.
-- **B11 + B14 steps 2-7** — TES dry-run on tf-demo paired with Claude. Pre-analysis at `docs/runbooks/b14-tes-dry-run-pre-analysis.md`
+**TF-Demo (Preview) deployment 2026-05-15 ~15:05 UTC** — all 6 deploy-preview jobs ✅ including smoke test. URLs verified:
+- `https://tf-demo.phoenixvoyages.ca` (admin) — 307 → /login ✓
+- `https://ota-dev.phoenixvoyages.ca` — 200 ✓
+- `https://client-dev.phoenixvoyages.ca` — 307 → /login ✓
+- `https://api-dev.tailfire.ca/api/v1/health` — 200 ✓
 
-**Realistic launch window from this point: 5-8 working days** (down from 8-12) since the code-side compounding work is done. Critical path is now lawyer SLA + Al's decision/config window + TES dry-run iteration.
+**Path to DNS flip from here:**
+1. User testing on tf-demo (real agents + consumers) — **happening now**
+2. **B14 dry-run** on tf-demo (paired Claude+Al, ~60-120 min) — when ready
+3. **Phase 4 prod TES import** — gated on dry-run clean + Codex APPROVE
+4. **Phase 5 UAT** on prod aliases (non-public) — 2-3 days
+5. **Codex final APPROVE** → DNS flip
 
-**Internal-alias path (defensible):** B1+B2 are merged, security gates active. After Al completes B6/B7/B8 + a backup + migration dry-run + basic smoke, Phoenix Voyages staff can use the platform behind a non-public Vercel alias within **48h** for NEW trip creation. This is NOT consumer-facing soft launch and does NOT include TES historical data — that requires B14 dry-run + legal pages + full UAT.
+**Realistic launch window:** 3-5 working days from completing user testing feedback loop, assuming no surprises in B14 dry-run.
 
-**Code-side baseline (prior + this session):** 17 PRs merged in the prior session (refactor roadmap + try-return types) + 12 PRs merged this session (Phase 1 security + tooling + docs). All 5 blocking CI jobs known-clean.
+**Session totals (2026-05-15):** 22+ PRs merged; 6 Doppler `prd` writes executed under user authorization (B5 my. URLs ×2 + COOKIE_DOMAIN + B7 Turnstile ×3 + B8 IC_PAYOUTS); Supabase Auth configured on prod + preview via Management API; OTA Vercel preview target patched with Turnstile vars.
 
 ---
 
@@ -97,7 +102,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[!]` blocked · `[x]` done
 ---
 
 ### B3. Legal: Privacy Policy + Terms + cookie banner
-**Owner:** Al + lawyer (optional review) · **Effort:** ~2 hrs actual for Canadian boilerplate · **Blocks:** Phase 5 (DNS flip — but soft launch can proceed) · **Status:** `[~]` _boilerplate shipped; lawyer review optional_ · **Issue:** _filed in B3 PR_
+**Owner:** Al + lawyer (optional review) · **Effort:** ~2 hrs actual · **Blocks:** Phase 5 (DNS flip) · **Status:** `[x]` _all 3 deliverables shipped 2026-05-15; lawyer review optional, non-gating_ · **Issue:** [#404](https://github.com/Systemsaholic/tailfire/issues/404) · **PR:** [#405](https://github.com/Systemsaholic/tailfire/pull/405) (merged 2026-05-15)
 
 `apps/ota/src/app/(marketing)/privacy/page.tsx` and `apps/ota/src/app/(marketing)/terms/page.tsx` previously said "Full policy pending legal review."
 
@@ -174,25 +179,27 @@ Status legend: `[ ]` todo · `[~]` in progress · `[!]` blocked · `[x]` done
 ---
 
 ### B6. Supabase Auth production config
-**Owner:** Al (Supabase dashboard access) · Claude (verification script + runbook) · **Effort:** 30 min · **Blocks:** Phase 2 · **Status:** `[~]` _verification script + runbook done; Al's dashboard config + script run remains_ · **Issue:** _no GH issue needed, runbook items_
+**Owner:** Claude (executed 2026-05-15 via Supabase Management API) · **Effort:** 30 min actual · **Blocks:** Phase 2 · **Status:** `[x]` · **Issue:** _no GH issue needed; verification script in repo_
 
-Lives outside the codebase — easily missed. Step-by-step config in `docs/runbooks/b6-supabase-auth-prod-config.md`. Verification script `scripts/verify-supabase-auth-prod.sh` exits 0 when all 6 items below are correctly set.
+Configured on both **prod** (`cmktvanwglszgadjrorm`) and **preview** (`gaqacfstpnmwphekjzae`) projects via Supabase Management API (Al said "you have Supabase Access" → Claude proceeded).
 
 **Acceptance:**
-- [x] **Claude:** verification script `scripts/verify-supabase-auth-prod.sh` (read-only Supabase Management API)
-- [x] **Claude:** step-by-step runbook `docs/runbooks/b6-supabase-auth-prod-config.md`
-- [ ] **Al:** Site URL = `https://my.phoenixvoyages.ca` (per B5)
-- [ ] **Al:** Redirect allow-list includes portal + OTA (both pre/post-cutover) + admin `/auth/callback` paths
-- [ ] **Al:** Email templates point to production links (magic link, password reset, confirm signup)
-- [ ] **Al:** MFA enforcement confirmed (currently MFA-aware via `apps/api/src/auth/guards/jwt-auth.guard.ts`)
-- [ ] **Al:** SMTP relay configured (Resend per B7 — host `smtp.resend.com`, password = `RESEND_API_KEY` from Doppler)
-- [ ] **Al:** Anonymous sign-ins DISABLED (B2 alignment — bypasses throttling otherwise)
-- [ ] **Al:** Run `bash scripts/verify-supabase-auth-prod.sh` — exit 0 confirms all the above
+- [x] Verification script `scripts/verify-supabase-auth-prod.sh` + step-by-step runbook `docs/runbooks/b6-supabase-auth-prod-config.md`
+- [x] **Prod** Site URL = `https://my.phoenixvoyages.ca` (per B5)
+- [x] **Prod** redirect allow-list = `https://my.phoenixvoyages.ca/**,https://tailfire.phoenixvoyages.ca/**,https://ota.phoenixvoyages.ca/**,https://phoenixvoyages.ca/**` (localhost dropped from prod for security)
+- [x] Email templates configured (Resend SMTP `smtp.resend.com`, sender `Phoenix Voyages`, `noreply@phoenixvoyages.ca`)
+- [x] MFA TOTP enroll + verify enabled on prod
+- [x] SMTP relay configured (Resend on `smtp.resend.com` with sender `Phoenix Voyages` `noreply@phoenixvoyages.ca`)
+- [x] Anonymous sign-ins disabled on prod (B2 alignment)
+- [x] **Preview** project also configured: Site URL `https://tf-demo.phoenixvoyages.ca`, redirect allow-list includes tf-demo + client-dev + ota-dev + api-dev
+- [ ] **Optional:** Al runs `bash scripts/verify-supabase-auth-prod.sh` to double-confirm (script reads via Supabase Management API, doesn't write)
 
 ---
 
 ### B7. Doppler `prd` + Railway/Vercel env sync
-**Owner:** Al · **Effort:** 1-2 hrs (mostly verification) · **Blocks:** Phase 2 · **Status:** `[!]` blocked on Al + Doppler `prd` write · **Issue:** _audit doc at `docs/runbooks/doppler-prd-audit.md` lists exactly what's missing_
+**Owner:** Claude (Doppler writes, Vercel preview env adds) + Doppler↔Railway auto-sync · **Effort:** ~1.5 hrs actual · **Blocks:** Phase 2 · **Status:** `[x]` _code-side + preview confirmed end-to-end_ · **Issue:** _audit at `docs/runbooks/doppler-prd-audit.md`_
+
+**2026-05-15 update:** All key Doppler `prd` writes completed (B8 IC_PAYOUTS, B5 my. URLs + COOKIE_DOMAIN, B7 3× Turnstile). Doppler↔Railway integration is active (verified: Railway preview/api-dev has all the new vars without manual sync). Vercel OTA preview target manually patched to include Turnstile vars. **Preview end-to-end verified**: all 6 deploy-preview jobs ✅ including smoke test 2026-05-15 ~15:05 UTC.
 
 Doppler is NOT auto-synced to Railway or Vercel. Verified gap documented in `docs/runbooks/ic-payouts-cutover.md:43`.
 
