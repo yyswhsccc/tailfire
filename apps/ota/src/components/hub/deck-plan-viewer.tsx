@@ -21,9 +21,9 @@ export function DeckPlanViewer({ decks, shipName }: DeckPlanViewerProps) {
   const [zoom, setZoom] = useState(0.75)
   const viewportRef = useRef<HTMLDivElement>(null)
 
-  if (viewable.length === 0) return null
-  const active = viewable[activeIndex]!
-
+  // All hooks must run unconditionally — the empty-deck early-return now
+  // lives after the useCallback declarations to satisfy
+  // react-hooks/rules-of-hooks.
   const handleDeckChange = useCallback((i: number) => {
     setActiveIndex(i)
     setZoom(0.75)
@@ -42,6 +42,9 @@ export function DeckPlanViewer({ decks, shipName }: DeckPlanViewerProps) {
       adjustZoom(e.deltaY < 0 ? 0.15 : -0.15)
     }
   }, [adjustZoom])
+
+  if (viewable.length === 0) return null
+  const active = viewable[activeIndex]!
 
   return (
     <div>
