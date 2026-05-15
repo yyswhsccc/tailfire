@@ -73,7 +73,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[!]` blocked · `[x]` done
 ---
 
 ### B2. Security: Public registration not throttled
-**Owner:** Claude · **Effort:** 2-4 hrs (Turnstile/hCaptcha + per-email throttling, not 30min) · **Blocks:** Phase 1 · **Status:** `[~]` · **Issue:** [#381](https://github.com/Systemsaholic/tailfire/issues/381)
+**Owner:** Claude · **Effort:** ~6 hrs actual (initial + Codex REWORK + small fixes) · **Blocks:** Phase 1 · **Status:** `[x]` _code-side_ · **Issue:** [#381](https://github.com/Systemsaholic/tailfire/issues/381) · **PR:** [#382](https://github.com/Systemsaholic/tailfire/pull/382) (merged 2026-05-15) · **Operational follow-up below**
 
 `apps/api/src/consumer-auth/consumer-auth.controller.ts:28` — `POST /consumer-auth/register` is public + ungated. `apps/api/src/auth/auth.controller.ts:25` notes `ThrottlerGuard` is NOT global.
 
