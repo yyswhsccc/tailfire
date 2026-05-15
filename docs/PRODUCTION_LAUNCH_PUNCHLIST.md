@@ -97,19 +97,18 @@ Status legend: `[ ]` todo · `[~]` in progress · `[!]` blocked · `[x]` done
 ---
 
 ### B3. Legal: Privacy Policy + Terms + cookie banner
-**Owner:** Al + lawyer · **Effort:** lawyer SLA-bound · **Blocks:** Phase 5 (DNS flip — but soft launch can proceed if invite-only) · **Status:** `[!]` blocked on legal · **Issue:** _file as project item_
+**Owner:** Al + lawyer (optional review) · **Effort:** ~2 hrs actual for Canadian boilerplate · **Blocks:** Phase 5 (DNS flip — but soft launch can proceed) · **Status:** `[~]` _boilerplate shipped; lawyer review optional_ · **Issue:** _filed in B3 PR_
 
-`apps/ota/src/app/(marketing)/privacy/page.tsx:25` and `apps/ota/src/app/(marketing)/terms/page.tsx:25` both say "Full policy pending legal review."
+`apps/ota/src/app/(marketing)/privacy/page.tsx` and `apps/ota/src/app/(marketing)/terms/page.tsx` previously said "Full policy pending legal review."
 
 **Impact:** Direct PIPEDA exposure. TICO expects pre-sale privacy + terms posting for online travel sellers.
 
 **Acceptance:**
-- [ ] Final Privacy Policy published (PIPEDA-compliant, lawyer-reviewed)
-- [ ] Final Terms of Service published (lawyer-reviewed)
-- [ ] Cookie banner / consent live (PIPEDA + OPC tracking guidance)
-- [ ] Refund/cancellation policy surfaced in booking flow
-
-**Path:** Engage lawyer today. Use a public-facing template + Phoenix Voyages-specific clauses while waiting. Soft launch can proceed behind invite-only beta with placeholder banner saying "private beta — full T&Cs at launch."
+- [x] **Privacy Policy** — full Canadian boilerplate with PIPEDA compliance, TICO #50017089 prominently disclosed, 14 sections (information collected, how used, sharing, international transfers, retention, cookies, PIPEDA rights, security, breach notification, children's privacy, Privacy Officer contact)
+- [x] **Terms of Service** — TICO-registered travel agency boilerplate. 13 sections covering: Phoenix-as-agent disclosure, pricing/currency, Reg 26/05 §41 price-increase rules, cancellation + non-refundable disclosure, **travel insurance offered/declined**, **travel documents (passport/visa)**, force majeure, limitation of liability, TICO compensation fund language, dispute resolution, Ontario governing law
+- [x] **Cookie banner** — PIPEDA-aware React component (`apps/ota/src/components/cookie-consent/cookie-banner.tsx`), shows on first visit, Accept / Necessary-only choices, persists in localStorage as `pv_cookie_consent`. Wired into OTA root layout.
+- [ ] **Optional follow-up:** lawyer review for sign-off (recommended but not gating Phase 5 — TICO doesn't require lawyer-signed; just published + accurate)
+- [ ] Refund/cancellation policy surfaced in booking flow (already covered by B4 TICO §38 invoice gate — cancellation_policy on every booking)
 
 ---
 

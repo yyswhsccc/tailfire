@@ -6,6 +6,7 @@ import { Nav } from "@/components/layout/nav";
 import { Footer } from "@/components/layout/footer";
 import { ChatWidgetLoader } from "@/components/chat/chat-widget-loader";
 import { TripBasketProvider } from "@/components/trip-builder/trip-basket-provider";
+import { CookieBanner } from "@/components/cookie-consent/cookie-banner";
 import { generateOrganizationJsonLd, generateSearchActionJsonLd } from "@/lib/structured-data";
 import "./globals.css";
 
@@ -70,6 +71,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <main>{children}</main>
           <Footer />
           <ChatWidgetLoader />
+          <CookieBanner />
         </TripBasketProvider>
       </body>
     </html>
