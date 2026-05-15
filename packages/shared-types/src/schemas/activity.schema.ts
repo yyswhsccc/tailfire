@@ -95,6 +95,15 @@ export const createActivityDtoSchema = z.object({
   commissionTotalCents: z.number().int().nonnegative().nullable().optional(),
   commissionSplitPercentage: z.number().min(0).max(100).nullable().optional(),
 
+  // Booking detail fields persisted to activity_pricing. Mirrors update schema
+  // so the generic /activities create path can accept the same fields the
+  // typed component endpoints (POST /flights, /lodgings, …) already accept.
+  // Load-bearing for B4 §38 finalize() (cancellationPolicy) and supplier
+  // attribution on receivables.
+  supplier: z.string().max(255).nullable().optional(),
+  cancellationPolicy: z.string().nullable().optional(),
+  termsAndConditions: z.string().nullable().optional(),
+
   // Per-person pricing breakdown
   pricingBreakdownJson: z.array(pricingBreakdownItemSchema).nullable().optional(),
 
@@ -103,6 +112,22 @@ export const createActivityDtoSchema = z.object({
 
   // Package-specific: activities to link immediately after creation
   activityIds: z.array(z.string().uuid()).optional(),
+
+  // Package-specific details. Persisted to package_details row when
+  // activityType === 'package'. Ignored for other types.
+  packageDetails: z
+    .object({
+      supplierId: z.string().uuid().nullable().optional(),
+      supplierName: z.string().max(255).nullable().optional(),
+      paymentStatus: z
+        .enum(['unpaid', 'deposit_paid', 'paid', 'refunded', 'partially_refunded'])
+        .optional(),
+      cancellationPolicy: z.string().nullable().optional(),
+      cancellationDeadline: z.string().nullable().optional(),
+      termsAndConditions: z.string().nullable().optional(),
+      groupBookingNumber: z.string().max(255).nullable().optional(),
+    })
+    .optional(),
 })
 
 export type CreateActivityDto = z.infer<typeof createActivityDtoSchema>
