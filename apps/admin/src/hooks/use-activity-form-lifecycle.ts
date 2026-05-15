@@ -49,11 +49,36 @@ export interface UseActivityFormLifecycleOptions<
   activityType: ActivityType
   tripId: string
 
-  /** Initial activity id when editing; null on new */
+  /**
+   * Initial activity id when editing; null on new. Used only in
+   * UNCONTROLLED mode (when `activityId` prop is omitted). Ignored when
+   * the caller passes `activityId` as a controlled prop.
+   */
   initialActivityId?: string | null
   initialActivityPricingId?: string | null
   initialIsBooked?: boolean
   initialBookingDate?: string | null
+
+  /**
+   * CONTROLLED activity id. When provided, the hook treats activityId as
+   * caller-owned state — useful for forms where the URL drives the
+   * current activity (sidebar navigation between activities of the same
+   * type). The hook calls `onActivityIdChange` when an internal action
+   * (e.g. successful create) needs to update the id; caller MUST wire
+   * that callback to its own setState.
+   *
+   * If omitted, the hook owns activityId internally (uncontrolled mode).
+   * Mixing modes per-render is not supported.
+   *
+   * Pattern from flight-form (#365): URL-sync useEffect → caller setState
+   * → controlled prop change → hook re-renders with new id.
+   */
+  activityId?: string | null
+  onActivityIdChange?: (id: string | null) => void
+
+  /** CONTROLLED activity pricing id. Same controlled-or-uncontrolled rules as activityId. */
+  activityPricingId?: string | null
+  onActivityPricingIdChange?: (id: string | null) => void
 
   /** Caller's RHF form instance */
   form: UseFormReturn<TFormData>
@@ -133,12 +158,54 @@ export function useActivityFormLifecycle<
     initialActivityPricingId = null,
     initialIsBooked = false,
     initialBookingDate = null,
+    activityId: controlledActivityId,
+    onActivityIdChange,
+    activityPricingId: controlledActivityPricingId,
+    onActivityPricingIdChange,
   } = opts
 
-  const [activityId, setActivityId] = useState<string | null>(initialActivityId)
-  const [activityPricingId, setActivityPricingId] = useState<string | null>(
+  // Controlled-or-uncontrolled state for activityId / activityPricingId.
+  // Caller decides at mount time by passing (or omitting) the controlled
+  // prop. Switching modes mid-life is not supported.
+  const activityIdIsControlled = controlledActivityId !== undefined
+  const activityPricingIdIsControlled = controlledActivityPricingId !== undefined
+
+  const [internalActivityId, setInternalActivityId] = useState<string | null>(
+    initialActivityId,
+  )
+  const [internalActivityPricingId, setInternalActivityPricingId] = useState<string | null>(
     initialActivityPricingId,
   )
+
+  const activityId = activityIdIsControlled
+    ? (controlledActivityId ?? null)
+    : internalActivityId
+  const activityPricingId = activityPricingIdIsControlled
+    ? (controlledActivityPricingId ?? null)
+    : internalActivityPricingId
+
+  const setActivityId = useCallback(
+    (id: string | null) => {
+      if (activityIdIsControlled) {
+        onActivityIdChange?.(id)
+      } else {
+        setInternalActivityId(id)
+      }
+    },
+    [activityIdIsControlled, onActivityIdChange],
+  )
+
+  const setActivityPricingId = useCallback(
+    (id: string | null) => {
+      if (activityPricingIdIsControlled) {
+        onActivityPricingIdChange?.(id)
+      } else {
+        setInternalActivityPricingId(id)
+      }
+    },
+    [activityPricingIdIsControlled, onActivityPricingIdChange],
+  )
+
   const [isBooked, setIsBooked] = useState<boolean>(initialIsBooked)
   const [bookingDate, setBookingDate] = useState<string | null>(initialBookingDate)
   const [showSuccess, setShowSuccess] = useState(false)

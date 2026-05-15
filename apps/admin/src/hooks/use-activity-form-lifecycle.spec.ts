@@ -447,4 +447,146 @@ describe('useActivityFormLifecycle', () => {
     // User's dirty edit must survive — hydrationKey is unchanged.
     expect(result.current.form.getValues('supplier')).toBe('User typed this')
   })
+
+  // --- controlled-ID mode (PR A — prerequisite for #365 flight migration) ---
+  // When the caller passes `activityId` as a prop, the hook treats it as
+  // controlled — caller owns the state. Used by forms that need URL-driven
+  // navigation between activities of the same type (e.g. flight-form's
+  // sidebar navigation).
+  describe('controlled activityId mode', () => {
+    it('reads activityId from the controlled prop, not internal state', async () => {
+      const { Wrapper } = wrapperFactory()
+      const onChange = vi.fn()
+
+      const { result, rerender } = renderHook(
+        ({ activityId }: { activityId: string | null }) => {
+          const form = useForm<TestForm>({ defaultValues: defaultFormValues })
+          const lifecycle = useActivityFormLifecycle({
+            activityType: 'flight',
+            tripId: 'trip-1',
+            form,
+            apiData: null,
+            hydrate: baseHydrate,
+            toPayload: basePayload,
+            create,
+            update,
+            activityId, // controlled
+            onActivityIdChange: onChange,
+          })
+          return lifecycle
+        },
+        { wrapper: Wrapper, initialProps: { activityId: 'flight-A' } },
+      )
+
+      expect(result.current.activityId).toBe('flight-A')
+
+      // Simulate caller updating the controlled prop (e.g. URL changed)
+      rerender({ activityId: 'flight-B' })
+      expect(result.current.activityId).toBe('flight-B')
+    })
+
+    it('calls onActivityIdChange when save() create produces a new id', async () => {
+      const { Wrapper } = wrapperFactory()
+      const onChange = vi.fn()
+
+      const { result } = renderHook(
+        () => {
+          const form = useForm<TestForm>({ defaultValues: defaultFormValues })
+          const lifecycle = useActivityFormLifecycle({
+            activityType: 'flight',
+            tripId: 'trip-1',
+            form,
+            apiData: null,
+            hydrate: baseHydrate,
+            toPayload: basePayload,
+            create,
+            update,
+            activityId: null, // controlled, starts as new
+            onActivityIdChange: onChange,
+          })
+          return { form, lifecycle }
+        },
+        { wrapper: Wrapper },
+      )
+
+      await act(async () => {
+        await result.current.lifecycle.save()
+      })
+
+      // save() runs create (no activityId) and reports the new id back to caller
+      expect(create).toHaveBeenCalledTimes(1)
+      expect(onChange).toHaveBeenCalledWith('new-activity-id')
+    })
+
+    it('uses controlled activityId for save() update path', async () => {
+      const { Wrapper } = wrapperFactory()
+      const onChange = vi.fn()
+
+      const { result } = renderHook(
+        () => {
+          const form = useForm<TestForm>({ defaultValues: defaultFormValues })
+          const lifecycle = useActivityFormLifecycle({
+            activityType: 'flight',
+            tripId: 'trip-1',
+            form,
+            apiData: null,
+            hydrate: baseHydrate,
+            toPayload: basePayload,
+            create,
+            update,
+            activityId: 'controlled-existing-id', // controlled, edit mode
+            onActivityIdChange: onChange,
+          })
+          return { form, lifecycle }
+        },
+        { wrapper: Wrapper },
+      )
+
+      await act(async () => {
+        await result.current.lifecycle.save()
+      })
+
+      expect(update).toHaveBeenCalledWith(
+        'controlled-existing-id',
+        expect.any(Object),
+      )
+      expect(create).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('controlled activityPricingId mode', () => {
+    it('calls onActivityPricingIdChange when save() response includes a new pricing id', async () => {
+      const { Wrapper } = wrapperFactory()
+      const onActivityIdChange = vi.fn()
+      const onActivityPricingIdChange = vi.fn()
+
+      const { result } = renderHook(
+        () => {
+          const form = useForm<TestForm>({ defaultValues: defaultFormValues })
+          const lifecycle = useActivityFormLifecycle({
+            activityType: 'flight',
+            tripId: 'trip-1',
+            form,
+            apiData: null,
+            hydrate: baseHydrate,
+            toPayload: basePayload,
+            create,
+            update,
+            activityId: null,
+            onActivityIdChange,
+            activityPricingId: null,
+            onActivityPricingIdChange,
+          })
+          return { form, lifecycle }
+        },
+        { wrapper: Wrapper },
+      )
+
+      await act(async () => {
+        await result.current.lifecycle.save()
+      })
+
+      expect(onActivityPricingIdChange).toHaveBeenCalledWith('new-pricing-id')
+    })
+  })
 })
