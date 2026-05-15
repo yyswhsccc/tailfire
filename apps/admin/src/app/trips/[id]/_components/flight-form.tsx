@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
-import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
+import { useActivityFormLifecycle } from '@/hooks/use-activity-form-lifecycle'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
@@ -39,7 +39,6 @@ import {
   useExternalFlightSearchWithProvider,
 } from '@/hooks/use-flights'
 import { useIsChildOfPackage } from '@/hooks/use-is-child-of-package'
-import { useQueryClient } from '@tanstack/react-query'
 import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import type { NormalizedFlightStatus, NormalizedFlightOffer } from '@tailfire/shared-types/api'
 import { FlightOffersSearchPanel } from '@/components/flight-offers-search-panel'
@@ -257,11 +256,9 @@ export function FlightForm({
     return tabParam === 'booking' ? 'booking' : 'general'
   })
 
-  const [showSuccess, setShowSuccess] = useState(false)
   const { returnToItinerary } = useActivityNavigation()
   const [activityIsBooked, setActivityIsBooked] = useState(activity?.bookingStatus === 'booked')
   const [activityBookingDate, setActivityBookingDate] = useState<string | null>(activity?.bookingDate ?? null)
-  const queryClient = useQueryClient()
 
   // Package linkage state
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(activity?.packageId ?? null)
@@ -348,9 +345,7 @@ export function FlightForm({
   const {
     control,
     register,
-    handleSubmit,
     formState: { errors, isDirty },
-    reset,
     setError,
     getValues,
     setValue,
@@ -458,6 +453,86 @@ export function FlightForm({
   const createMutation = useCreateFlight(itineraryId, effectiveDayId)
   const updateMutation = useUpdateFlight(itineraryId, effectiveDayId)
 
+  // ---------- Activity form lifecycle hook (#365 — controlled-ID mode) ----------
+  // Hook owns: showSuccess overlay, hydration (form.reset from flightData),
+  // save flow (validation → create/update → dirty reset → success), cache
+  // invalidation, and useUnsavedChangesWarning.
+  //
+  // Flight-form keeps LOCAL: activityId (URL-sync writes to it), bookingDate +
+  // isBooked (BookingDetailsSection has manual editing that hook's
+  // setBookingState API doesn't cleanly accommodate yet — separate follow-up).
+  const lifecycle = useActivityFormLifecycle({
+    activityType: 'flight',
+    tripId: trip?.id || '',
+    form,
+    apiData: flightData ?? null,
+    hydrationKey: flightData?.id ?? null,
+    activityId,
+    onActivityIdChange: setActivityId,
+    activityPricingId,
+    onActivityPricingIdChange: setActivityPricingId,
+    hydrate: (data) => {
+      const initialPricing = buildInitialPricingState(data as any)
+      return toFlightDefaults(
+        {
+          itineraryDayId: dayId,
+          name: data.name,
+          description: data.description || '',
+          proposalStatus: coerceStatus(data.proposalStatus),
+          flightDetails: coerceFlightDetails(data.flightDetails)
+            ?? synthesizeFlightDetailsFromActivity(data as any),
+          totalPriceCents: initialPricing.totalPriceCents,
+          taxesAndFeesCents: initialPricing.taxesAndFeesCents,
+          // Activity-level currency wins (#352). Trip currency is only the fallback
+          // when the activity row hasn't set one yet.
+          currency: initialPricing.currency || trip?.currency,
+          pricingType: coercePricingType(data.pricingType),
+          confirmationNumber: initialPricing.confirmationNumber,
+          commissionTotalCents: initialPricing.commissionTotalCents,
+          commissionSplitPercentage: initialPricing.commissionSplitPercentage,
+          commissionExpectedDate: initialPricing.commissionExpectedDate,
+          termsAndConditions: initialPricing.termsAndConditions,
+          cancellationPolicy: initialPricing.cancellationPolicy,
+          supplier: initialPricing.supplier,
+        },
+        dayDate,
+        trip?.currency,
+      ) as any
+    },
+    toPayload: (data) => ({
+      ...toFlightApiPayload(data),
+      // pricingBreakdown lives outside RHF — closure captures the latest value.
+      // Booking date is local state.
+      pricingBreakdownJson: pricingBreakdown,
+      bookingDate: activityBookingDate || null,
+    }),
+    create: async (payload) => {
+      const response = await createMutation.mutateAsync(payload as any)
+      return { id: response.id!, activityPricingId: response.activityPricingId ?? null }
+    },
+    update: async (id, payload) => {
+      const response = await updateMutation.mutateAsync({ id, data: payload as any })
+      return { id: response.id!, activityPricingId: response.activityPricingId ?? null }
+    },
+    onSaveError: (err) => {
+      // Preserve the existing field-level server-error mapping behavior.
+      if (err && typeof err === 'object' && 'response' in err) {
+        const apiError = err as { response?: { data?: { errors?: Record<string, string[]> } } }
+        if (apiError.response?.data?.errors) {
+          const fieldErrors = Object.entries(apiError.response.data.errors).flatMap(
+            ([field, messages]) => messages.map(message => ({ field, message })),
+          )
+          mapServerErrors(fieldErrors, setError, FLIGHT_FORM_FIELDS)
+          scrollToFirstError(errors)
+        }
+      }
+      toast({
+        title: 'Save failed',
+        description: err instanceof Error ? err.message : 'An error occurred',
+        variant: 'destructive',
+      })
+    },
+  })
 
   // Trip month hint for date pickers (opens calendar to trip's month)
   const tripMonthHint = useMemo(
@@ -493,27 +568,20 @@ export function FlightForm({
     }
   }, [effectiveDayDate, isEditing, flightSegmentsWatch, setValue])
 
-  // Ref to track loaded flight ID (prevents re-seeding on every render)
-  const flightIdRef = useRef<string | null>(null)
   // Ref to access activityId without triggering effect re-runs
   const activityIdRef = useRef<string | null>(activity?.id || null)
 
-  // Sync activityId with URL param (handles client-side navigation)
-  // IMPORTANT: Use activityIdFromUrl (URL param) NOT activity?.id because:
-  // - activity?.id may be stale during navigation (due to useActivity's keepPreviousData)
-  // - activityIdFromUrl is directly from useParams, changes immediately on navigation
-  // When navigating away and back to the same flight, React may reuse component
-  // but we need to force re-hydration by resetting the ref
+  // Sync activityId with URL param (handles client-side navigation).
+  // Use activityIdFromUrl (URL param) NOT activity?.id because activity?.id may
+  // be stale during navigation due to useActivity's keepPreviousData. The
+  // lifecycle hook (#365) handles re-hydration via hydrationKey=flightData?.id
+  // — when this useEffect updates activityId, useFlight refetches and the new
+  // flightData triggers the hook to reset the form.
   useEffect(() => {
     const targetId = activityIdFromUrl || activity?.id
     if (targetId && targetId !== activityId) {
-      flightIdRef.current = null // Reset to force re-hydration
       setActivityId(targetId)
       activityIdRef.current = targetId // Keep ref in sync
-    }
-    // Cleanup: reset ref on unmount to ensure fresh state on next mount
-    return () => {
-      flightIdRef.current = null
     }
   }, [activityIdFromUrl, activity?.id, activityId])
 
@@ -522,71 +590,10 @@ export function FlightForm({
     activityIdRef.current = activityId
   }, [activityId])
 
-  // Smart re-seeding: ONLY hydrate when flightData is available
-  // The activity prop from parent doesn't include flightDetails, so we must wait
-  // for useFlight to return the complete flight data with segments.
-  // Uses queueMicrotask to defer form reset outside React's render cycle,
-  // preventing "Cannot update a component while rendering" warnings
-  useEffect(() => {
-    // Guard: cleanup flag to prevent microtask running after unmount
-    let cancelled = false
-
-    // IMPORTANT: Only use flightData for hydration - activity prop doesn't have flightDetails
-    // This ensures we don't hydrate with empty data and then block re-hydration when
-    // the complete flightData arrives (since both have the same ID)
-    const sourceData = flightData
-
-    if (sourceData && sourceData.id !== flightIdRef.current) {
-      flightIdRef.current = sourceData.id
-
-      setActivityId(sourceData.id)
-      setActivityPricingId(sourceData.activityPricingId || null)
-
-      // Build pricing state from loaded flight
-      const initialPricing = buildInitialPricingState(sourceData as any)
-
-      // Build defaults for reset
-      const defaults = toFlightDefaults(
-        {
-          itineraryDayId: dayId,
-          name: sourceData.name,
-          description: sourceData.description || '',
-          proposalStatus: coerceStatus(sourceData.proposalStatus),
-          flightDetails: coerceFlightDetails(sourceData.flightDetails)
-            ?? synthesizeFlightDetailsFromActivity(sourceData),
-          totalPriceCents: initialPricing.totalPriceCents,
-          taxesAndFeesCents: initialPricing.taxesAndFeesCents,
-          // Activity-level currency wins (#352). Trip currency is only the fallback
-          // when the activity row hasn't set one yet.
-          currency: initialPricing.currency || trip?.currency,
-          pricingType: coercePricingType(sourceData.pricingType),
-          confirmationNumber: initialPricing.confirmationNumber,
-          commissionTotalCents: initialPricing.commissionTotalCents,
-          commissionSplitPercentage: initialPricing.commissionSplitPercentage,
-          commissionExpectedDate: initialPricing.commissionExpectedDate,
-          termsAndConditions: initialPricing.termsAndConditions,
-          cancellationPolicy: initialPricing.cancellationPolicy,
-          supplier: initialPricing.supplier,
-        },
-        dayDate,
-        trip?.currency
-      )
-
-      // Use queueMicrotask to defer form reset outside React's render cycle
-      queueMicrotask(() => {
-        if (!cancelled) {
-          reset(defaults)
-        }
-      })
-    }
-
-    // Cleanup: mark cancelled to prevent stale microtask execution
-    return () => {
-      cancelled = true
-    }
-  }, [flightData, dayId, dayDate, trip?.currency, reset])
-  // Note: removed activity from deps - we only use flightData which has complete flight details
-  // Note: removed activity from deps - we only use flightData which has complete flight details
+  // Hydration is now handled by useActivityFormLifecycle's `hydrate` callback
+  // (#365). The hook re-hydrates when `hydrationKey` (flightData?.id) changes,
+  // not on object-identity changes — which is the protection against React
+  // Query refetches clobbering the user's dirty edits.
 
   // Build pricingData from form values (memoized)
   const pricingData: PricingData = useMemo(() => {
@@ -611,8 +618,8 @@ export function FlightForm({
     }
   }, [watchedFields, getValues, selectedPackageId, pricingBreakdown])
 
-  // Autosave removed in #306 — see useUnsavedChangesWarning below.
-  useUnsavedChangesWarning(isDirty)
+  // Autosave removed in #306. Unsaved-changes warning now wired automatically
+  // by useActivityFormLifecycle (#365).
 
   const handleAiSubmit = () => {
     toast({
@@ -860,51 +867,11 @@ export function FlightForm({
     )
   }
 
-  const onSubmit = handleSubmit(async (data) => {
-    const payload = { ...toFlightApiPayload(data), pricingBreakdownJson: pricingBreakdown, bookingDate: activityBookingDate || null }
-
-    try {
-      let response: { id?: string; activityPricingId?: string | null }
-
-      if (activityId) {
-        response = await updateMutation.mutateAsync({ id: activityId, data: payload as any })
-      } else {
-        response = await createMutation.mutateAsync(payload as any)
-      }
-
-      if (!activityId && response.id) {
-        setActivityId(response.id)
-      }
-
-      if (response.activityPricingId) {
-        setActivityPricingId(response.activityPricingId)
-      }
-
-      // Reset RHF dirty state so the "Unsaved changes" badge clears
-      reset(getValues(), { keepValues: true, keepDirty: false })
-
-      // Show success overlay and redirect
-      setShowSuccess(true)
-    } catch (err) {
-      if (err && typeof err === 'object' && 'response' in err) {
-        const apiError = err as { response?: { data?: { errors?: Record<string, string[]> } } }
-        if (apiError.response?.data?.errors) {
-          // Convert API errors format to ServerFieldError[]
-          const fieldErrors = Object.entries(apiError.response.data.errors).flatMap(
-            ([field, messages]) => messages.map(message => ({ field, message }))
-          )
-          mapServerErrors(fieldErrors, setError, FLIGHT_FORM_FIELDS)
-          scrollToFirstError(errors)
-        }
-      }
-
-      toast({
-        title: 'Save failed',
-        description: err instanceof Error ? err.message : 'An error occurred',
-        variant: 'destructive',
-      })
-    }
-  })
+  // Save flow is now owned by useActivityFormLifecycle (#365). The hook
+  // wraps form.handleSubmit (so values are resolver-transformed), routes to
+  // create vs update based on the controlled activityId prop, resets dirty
+  // state, shows the success overlay, and calls onSaveError for the
+  // server-error mapping (preserves field-level highlights via mapServerErrors).
 
   // Update pricing data handler
   // IMPORTANT: setValue must pass { shouldDirty: true } so the autosave effect
@@ -950,10 +917,10 @@ export function FlightForm({
   return (
     <div className="relative max-w-5xl">
       <FormSuccessOverlay
-        show={showSuccess}
+        show={lifecycle.showSuccess}
         message={isEditing ? 'Flight Updated!' : 'Flight Added!'}
         onComplete={returnToItinerary}
-        onDismiss={() => setShowSuccess(false)}
+        onDismiss={() => lifecycle.setShowSuccess(false)}
         duration={1000}
       />
 
@@ -1125,16 +1092,12 @@ export function FlightForm({
           onBooked={(_cascadedCount, confirmedDate) => {
             setActivityIsBooked(true)
             setActivityBookingDate(confirmedDate ? confirmedDate : new Date().toISOString().split('T')[0]!)
-            queryClient.invalidateQueries({ queryKey: ['activities'] })
-            queryClient.invalidateQueries({ queryKey: ['bookings'] })
-            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+            lifecycle.invalidateActivitySurface()
           }}
           onUnbooked={() => {
             setActivityIsBooked(false)
             setActivityBookingDate(null)
-            queryClient.invalidateQueries({ queryKey: ['activities'] })
-            queryClient.invalidateQueries({ queryKey: ['bookings'] })
-            queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+            lifecycle.invalidateActivitySurface()
           }}
         />
       </div>
@@ -1957,7 +1920,7 @@ export function FlightForm({
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button onClick={onSubmit} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={lifecycle.save} className="bg-blue-600 hover:bg-blue-700">
           {isEditing ? 'Save Changes' : 'Create Flight'}
         </Button>
       </div>
