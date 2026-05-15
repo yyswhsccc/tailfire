@@ -4,18 +4,19 @@ name: PR Validation
 # refactor work.
 #
 # Honest current state: most lint/typecheck/test surfaces have pre-existing
-# breakage. Three jobs are known-clean today and gate PR merges:
+# breakage. Four jobs are known-clean today and gate PR merges:
 #
 #   BLOCKING:
-#     * admin-typecheck       — verified clean 2026-05-14
-#     * migration-monotonicity — already runs in deploy-preview, never failed
+#     * admin-typecheck         — verified clean 2026-05-14
+#     * migration-monotonicity  — already runs in deploy-preview, never failed
 #     * supabase-migrations-guard — pure file-presence check
+#     * lint-ota                — graduated 2026-05-14 after 5 React Hook fixes
 #
 # Everything else runs informationally so we can see regression drift on every
 # PR. Each informational job is promoted to blocking when its surface is clean
-# — by deleting `continue-on-error: true`. Tracked baselines as of 2026-05-14:
+# — by deleting `continue-on-error: true`. Tracked baselines:
 #
-#   lint           — admin 16 err / api 10 err / ota 5 err
+#   lint           — admin 16 err / api 10 err (ota cleaned 2026-05-14)
 #   api-typecheck  — softvoyage + email pre-existing TS errors
 #   api-tests      — 25/62 suites fail to compile (TS errors above)
 #   admin-tests    — 5/18 files fail
@@ -122,9 +123,8 @@ jobs:
       - run: pnpm --filter @tailfire/api lint
 
   lint-ota:
-    name: Lint ota (informational)
+    name: Lint ota (blocking)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2

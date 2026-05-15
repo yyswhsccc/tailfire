@@ -100,19 +100,23 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
   const setDelayPredictions = useFlightSearch((s) => s.setDelayPredictions);
   const fetchedRef = useRef(false);
 
-  // First segment for display
+  // First / last segment lookups. Null-safe so hooks below stay
+  // unconditional — required by react-hooks/rules-of-hooks. Null check
+  // (early-return) lives after all hooks.
   const firstSeg = offer.segments[0];
   const lastSeg = offer.segments[offer.segments.length - 1];
-  if (!firstSeg || !lastSeg) return null;
 
-  const carrier = firstSeg.carrier;
-  const flightNumber = firstSeg.flightNumber;
+  const carrier = firstSeg?.carrier ?? "";
+  const flightNumber = firstSeg?.flightNumber ?? "";
   const flightKey = `${carrier}${flightNumber}`;
   const stops = countStops(offer.segments);
 
   // Total elapsed time from first departure to last arrival (includes layovers)
   const totalDuration = computeElapsedMinutes(offer.segments);
-  const durationLabel = totalDuration > 0 ? formatDuration(totalDuration) : formatIsoDuration(firstSeg.duration);
+  const durationLabel =
+    totalDuration > 0
+      ? formatDuration(totalDuration)
+      : formatIsoDuration(firstSeg?.duration ?? "");
 
   // Delay prediction
   const prediction: DelayPrediction | undefined = delayPredictions.get(flightKey);
@@ -121,6 +125,7 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
   const predictionCount = delayPredictions.size;
   useEffect(() => {
     if (fetchedRef.current) return;
+    if (!firstSeg || !lastSeg) return;
     if (delayPredictions.has(flightKey)) return;
     if (!firstSeg.aircraft) return;
     if (predictionCount >= 5) return; // Limit to 5 predictions max
@@ -158,7 +163,9 @@ export function FlightCard({ offer, onSelect, isUpsell }: FlightCardProps) {
       .catch(() => {
         // Silently ignore — delay prediction is optional enrichment
       });
-  }, [flightKey, carrier, flightNumber, firstSeg, lastSeg, delayPredictions, setDelayPredictions]);
+  }, [flightKey, carrier, flightNumber, firstSeg, lastSeg, delayPredictions, setDelayPredictions, predictionCount]);
+
+  if (!firstSeg || !lastSeg) return null;
 
   // Price info
   const priceNum = parseFloat(offer.price.perTraveler);
