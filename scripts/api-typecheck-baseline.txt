@@ -17,7 +17,6 @@ src/email-accounts/email-sync-scheduler.service.ts::TS2532::Object is possibly '
 src/email-accounts/imap-sync.service.ts::TS2769::No overload matches this call.
 src/email-accounts/imap-sync.service.ts::TS6133::'...' is declared but its value is never read.
 src/email-accounts/imap-write.service.ts::TS2339::Property '...' does not exist on type '...'.
-src/financials/financial-summary.service.ts::TS6133::'...' is declared but its value is never read.
 src/reporting/queries/sales.queries.ts::TS2532::Object is possibly '...'.
 src/softvoyage/dto/vacation-live-search.dto.ts::TS2564::Property '...' has no initializer and is not definitely assigned in the constructor.
 src/softvoyage/softvoyage-search.processor.ts::TS2352::Conversion of type '...' to type '...' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to '...' first.
