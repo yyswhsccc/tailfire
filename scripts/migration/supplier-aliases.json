@@ -1,0 +1,80 @@
+{
+  "$schema": "supplier-aliases.schema.json",
+  "$doc": "Curated supplier alias whitelist for the P3 supplier dedup classifier (#28). 'aliases' entries are auto-merged into the canonical name (T1). 'must_not_merge' pairs override fuzzy-match suggestions to prevent merging legally-distinct entities (e.g. an airline and its vacation-package subsidiary). See docs/runbooks/tes-cutover-backfill-plan.md (Phase 3 / P3.A).",
+  "aliases": [
+    {
+      "canonical": "Carnival Cruise Line",
+      "aliases": ["CCL", "Carnival", "Carnival Cruise Lines", "Carnival Cruises"]
+    },
+    {
+      "canonical": "Norwegian Cruise Line",
+      "aliases": ["NCL", "Norwegian", "Norwegian Cruise Lines", "Norwegian Cruises"]
+    },
+    {
+      "canonical": "Royal Caribbean",
+      "aliases": ["RCL", "RCI", "Royal Caribbean International", "Royal Caribbean Cruises"]
+    },
+    {
+      "canonical": "Princess Cruises",
+      "aliases": ["PCL", "Princess", "Princess Cruise Line"]
+    },
+    {
+      "canonical": "Holland America Line",
+      "aliases": ["HAL", "Holland America", "Holland America Cruises"]
+    },
+    {
+      "canonical": "Celebrity Cruises",
+      "aliases": ["CEL", "Celebrity", "Celebrity Cruise Line"]
+    },
+    {
+      "canonical": "MSC Cruises",
+      "aliases": ["MSC", "MSC Cruise Line"]
+    },
+    {
+      "canonical": "Disney Cruise Line",
+      "aliases": ["DCL", "Disney Cruises"]
+    },
+    {
+      "canonical": "Air Canada",
+      "aliases": ["AC", "AirCanada"]
+    },
+    {
+      "canonical": "WestJet",
+      "aliases": ["WS", "West Jet"]
+    },
+    {
+      "canonical": "Air Transat",
+      "aliases": ["TS", "Transat A.T.", "Transat Airlines"]
+    },
+    {
+      "canonical": "Sunwing Airlines",
+      "aliases": ["WG", "Sunwing Air"]
+    },
+    {
+      "canonical": "Porter Airlines",
+      "aliases": ["PD", "Porter"]
+    }
+  ],
+  "must_not_merge": [
+    {
+      "pair": ["Air Canada", "Air Canada Vacations"],
+      "reason": "Different IATA codes (AC airline vs ACV tour operator), different commission contracts, different remittance addresses."
+    },
+    {
+      "pair": ["WestJet", "WestJet Vacations"],
+      "reason": "WS airline vs WS Vacations tour-package brand are different legal entities."
+    },
+    {
+      "pair": ["Sunwing Airlines", "Sunwing Vacations"],
+      "reason": "Sunwing Airlines (carrier) vs Sunwing Vacations (tour operator) are separate brands of the parent group."
+    },
+    {
+      "pair": ["Air Transat", "Transat Holidays"],
+      "reason": "Air Transat (carrier) vs Transat Holidays (tour operator) — different commission flow."
+    },
+    {
+      "pair": ["Transat", "Transat Holidays"],
+      "reason": "Same as Air Transat / Transat Holidays."
+    }
+  ]
+}
