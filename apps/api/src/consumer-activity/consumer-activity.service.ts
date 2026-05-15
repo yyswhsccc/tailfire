@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common'
-import { eq, desc } from 'drizzle-orm'
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common'
+import { and, eq, desc } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import type { TrackEventDto } from './dto/track-event.dto'
 
@@ -8,6 +8,25 @@ export class ConsumerActivityService {
   private readonly logger = new Logger(ConsumerActivityService.name)
 
   constructor(private readonly db: DatabaseService) {}
+
+  /**
+   * Verify the contact belongs to the actor's agency.
+   * Throws ForbiddenException if not — does not distinguish missing from cross-agency
+   * to avoid leaking contact existence across agencies.
+   */
+  private async assertContactInAgency(contactId: string, agencyId: string): Promise<void> {
+    const { contacts } = this.db.schema
+
+    const rows = await this.db.client
+      .select({ id: contacts.id })
+      .from(contacts)
+      .where(and(eq(contacts.id, contactId), eq(contacts.agencyId, agencyId)))
+      .limit(1)
+
+    if (rows.length === 0) {
+      throw new ForbiddenException('Contact not accessible from this agency')
+    }
+  }
 
   /**
    * Record a consumer activity event.
@@ -46,8 +65,11 @@ export class ConsumerActivityService {
   /**
    * Get activity for a contact (for the admin contact profile).
    * Returns the most recent events, grouped by entity for signal generation.
+   * Verifies the contact belongs to the actor's agency before reading.
    */
-  async getActivityForContact(contactId: string, limit = 50) {
+  async getActivityForContact(contactId: string, agencyId: string, limit = 50) {
+    await this.assertContactInAgency(contactId, agencyId)
+
     const { consumerActivity } = this.db.schema
 
     const events = await this.db.client
@@ -62,8 +84,11 @@ export class ConsumerActivityService {
 
   /**
    * Get insights (AI summaries + purchase signals) for a contact.
+   * Verifies the contact belongs to the actor's agency before reading.
    */
-  async getInsightsForContact(contactId: string) {
+  async getInsightsForContact(contactId: string, agencyId: string) {
+    await this.assertContactInAgency(contactId, agencyId)
+
     const { consumerInsights } = this.db.schema
 
     return this.db.client
@@ -77,9 +102,10 @@ export class ConsumerActivityService {
   /**
    * Generate purchase signals from browsing activity.
    * Returns aggregated signals like "Viewed Caribbean 5 times", "Searched cruises 3 times".
+   * Agency check happens inside getActivityForContact.
    */
-  async generateSignals(contactId: string) {
-    const events = await this.getActivityForContact(contactId, 200)
+  async generateSignals(contactId: string, agencyId: string) {
+    const events = await this.getActivityForContact(contactId, agencyId, 200)
 
     // Aggregate page views by entity
     const entityCounts = new Map<string, { name: string; type: string; count: number }>()

@@ -10,7 +10,7 @@
  */
 
 import { Injectable, NotFoundException, Logger } from '@nestjs/common'
-import { eq, sql, and, isNull } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { ExchangeRatesService } from './exchange-rates.service'
 import { TripAccessService } from '../trips/trip-access.service'

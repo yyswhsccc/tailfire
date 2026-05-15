@@ -78,7 +78,7 @@ function BoardCard({ board }: { board: PortalBoard }) {
           <Sparkles className="mx-auto size-8 text-gray-300" />
           <p className="mt-2 text-sm text-gray-500">No items saved yet</p>
           <a
-            href={process.env.NEXT_PUBLIC_OTA_URL || 'https://ota.phoenixvoyages.ca'}
+            href={process.env.NEXT_PUBLIC_OTA_URL || 'https://phoenixvoyages.ca'}
             className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-phoenix-gold hover:underline"
           >
             Browse trips <ExternalLink className="size-3.5" />
@@ -100,7 +100,7 @@ export default function BoardPage() {
           <p className="mt-1 text-sm text-gray-500">Your saved trip ideas and inspiration</p>
         </div>
         <a
-          href={process.env.NEXT_PUBLIC_OTA_URL || 'https://ota.phoenixvoyages.ca'}
+          href={process.env.NEXT_PUBLIC_OTA_URL || 'https://phoenixvoyages.ca'}
           className="inline-flex w-fit items-center gap-1.5 rounded-full bg-phoenix-gold px-4 py-2.5 text-sm font-medium text-white hover:bg-phoenix-gold/90"
         >
           Add more <ExternalLink className="size-3.5" />
@@ -129,7 +129,7 @@ export default function BoardPage() {
             Start exploring destinations, cruises, and more on our travel site.
           </p>
           <a
-            href={process.env.NEXT_PUBLIC_OTA_URL || 'https://ota.phoenixvoyages.ca'}
+            href={process.env.NEXT_PUBLIC_OTA_URL || 'https://phoenixvoyages.ca'}
             className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-phoenix-gold px-6 py-2.5 text-sm font-medium text-white hover:bg-phoenix-gold/90"
           >
             Start exploring <ExternalLink className="size-3.5" />

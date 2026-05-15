@@ -17,8 +17,14 @@
  * All methods here are prefixed with `try*` because every traveler assignment
  * is a UX-convenience side effect — losing one assignment to a transient DB
  * hiccup is recoverable on the next save/edit and does not corrupt user state.
- * Failures are logged via `logger.warn` and swallowed. Callers MAY NOT rely
- * on success.
+ * Failures are logged via `logger.warn` and swallowed.
+ *
+ * **Return shape: explicit { ok, error? } (per Issue #374 / Codex retrospective).**
+ * Callers may NOT rely on success — but they CAN introspect the outcome via
+ * the return value. Forms that opted into a fan-out (e.g.
+ * TripTravelersService.create with addToAllActivities=true) can surface
+ * partial-failure toasts to the user. Other callers can ignore the result
+ * with an explicit comment.
  *
  * Other policy classes (payment schedules, ledger writes, audit trails)
  * MUST follow strict mode — throw or return explicit `{ ok, error }`. See
@@ -32,6 +38,25 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { eq, sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
+
+/**
+ * Outcome of a best-effort policy call.
+ *
+ * - `ok: true` → the operation completed (no exception).
+ * - `ok: false` → an error was caught and logged; `error` carries the cause.
+ *
+ * Callers that need to react to failure (e.g. surface a partial-failure
+ * toast) read `ok`. Callers that are fire-and-forget can ignore the result.
+ */
+export interface BestEffortResult {
+  ok: boolean
+  error?: unknown
+}
+
+export interface EnsureAssignmentsResult extends BestEffortResult {
+  /** True when the pre-check found existing assignments and no INSERT ran. */
+  skipped: boolean
+}
 
 @Injectable()
 export class ActivityTravelerAssignmentPolicy {
@@ -52,7 +77,7 @@ export class ActivityTravelerAssignmentPolicy {
   async tryAssignAllTripTravelersToActivity(
     activityId: string,
     tripId: string,
-  ): Promise<void> {
+  ): Promise<BestEffortResult> {
     try {
       await this.db.client.execute(sql`
         INSERT INTO activity_travelers (activity_id, trip_traveler_id, trip_id)
@@ -61,10 +86,12 @@ export class ActivityTravelerAssignmentPolicy {
         WHERE tt.trip_id = ${tripId}::uuid
         ON CONFLICT (activity_id, trip_traveler_id) DO NOTHING
       `)
+      return { ok: true }
     } catch (error) {
       this.logger.warn(
         `Failed to assign trip travelers to activity ${activityId}: ${error}`,
       )
+      return { ok: false, error }
     }
   }
 
@@ -73,13 +100,14 @@ export class ActivityTravelerAssignmentPolicy {
    * activity already has assignments and short-circuits if it does. Use this
    * as a defensive backstop where the work is usually unnecessary.
    *
-   * Returns { skipped: true } when the pre-check found existing assignments,
-   *          { skipped: false } when assignments were inserted.
+   * Returns `{ ok: true, skipped: true }` when the pre-check found existing
+   * assignments and no INSERT was needed. `{ ok, skipped: false, error? }`
+   * otherwise — `ok` reflects whether the delegated INSERT succeeded.
    */
   async tryEnsureActivityHasAssignments(
     activityId: string,
     tripId: string,
-  ): Promise<{ skipped: boolean }> {
+  ): Promise<EnsureAssignmentsResult> {
     const existing = await this.db.client
       .select({ id: this.db.schema.activityTravelers.id })
       .from(this.db.schema.activityTravelers)
@@ -87,11 +115,11 @@ export class ActivityTravelerAssignmentPolicy {
       .limit(1)
 
     if (existing.length > 0) {
-      return { skipped: true }
+      return { ok: true, skipped: true }
     }
 
-    await this.tryAssignAllTripTravelersToActivity(activityId, tripId)
-    return { skipped: false }
+    const result = await this.tryAssignAllTripTravelersToActivity(activityId, tripId)
+    return { ok: result.ok, skipped: false, error: result.error }
   }
 
   /**
@@ -109,7 +137,7 @@ export class ActivityTravelerAssignmentPolicy {
   async tryAssignTravelerToAllTripActivities(
     travelerId: string,
     tripId: string,
-  ): Promise<void> {
+  ): Promise<BestEffortResult> {
     try {
       await this.db.client.execute(sql`
         INSERT INTO activity_travelers (activity_id, trip_traveler_id, trip_id)
@@ -121,10 +149,12 @@ export class ActivityTravelerAssignmentPolicy {
            OR ia.trip_id = ${tripId}::uuid
         ON CONFLICT (activity_id, trip_traveler_id) DO NOTHING
       `)
+      return { ok: true }
     } catch (error) {
       this.logger.warn(
         `Failed to propagate traveler ${travelerId} to existing activities on trip ${tripId}: ${error}`,
       )
+      return { ok: false, error }
     }
   }
 }

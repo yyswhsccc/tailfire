@@ -372,8 +372,9 @@ export default function TripDetailPage() {
     if (process.env.NEXT_PUBLIC_CLIENT_URL) return process.env.NEXT_PUBLIC_CLIENT_URL
     const origin = window.location.origin
     if (origin.includes(':3100')) return origin.replace(':3100', ':3103')
-    if (origin.includes('tailfire.phoenixvoyages.ca')) return 'https://client.phoenixvoyages.ca'
-    return origin.replace('admin', 'client')
+    // B5 (Al's domain decision 2026-05-15): client portal lives at my.phoenixvoyages.ca
+    if (origin.includes('tailfire.phoenixvoyages.ca')) return 'https://my.phoenixvoyages.ca'
+    return origin.replace('admin', 'my')
   }
 
   const handleCopyShareLink = () => {

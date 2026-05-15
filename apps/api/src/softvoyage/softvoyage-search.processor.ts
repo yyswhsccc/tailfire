@@ -174,7 +174,11 @@ export class SoftvoyageSearchProcessor extends WorkerHost {
         try {
           await this.redis.set('vco:debug:raw-html', html, 'EX', 600) // 10 min
           this.logger.log(`Saved ${html.length} bytes of raw VCO HTML to Redis for debugging`)
-        } catch {}
+        } catch (err) {
+          // B13: best-effort debug write; surface failures via Sentry breadcrumb
+          // instead of swallowing silently so we notice if Redis goes sideways.
+          this.logger.warn(`Failed to save VCO debug HTML to Redis: ${(err as Error).message}`)
+        }
       }
 
       // 7. Parse HTML via result parser

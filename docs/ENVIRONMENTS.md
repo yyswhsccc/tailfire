@@ -8,7 +8,12 @@ This document describes the current branch-to-environment mapping, frontend env 
 | --- | --- | --- |
 | Local | local worktree | `localhost:3100-3103` |
 | Preview | `preview` | `deploy-preview.yml` migrates the Preview database, deploys Railway `api-dev`, deploys Vercel previews, and aliases the admin preview to `tf-demo.phoenixvoyages.ca` |
-| Production | `main` | `deploy-prod.yml` migrates the Production database, deploys Railway `api-prod`, and targets `api.tailfire.ca`, `tailfire.phoenixvoyages.ca`, `ota.phoenixvoyages.ca`, and `client.phoenixvoyages.ca` |
+| Production | `main` | `deploy-prod.yml` migrates the Production database, deploys Railway `api-prod`, and targets `api.tailfire.ca`, `tailfire.phoenixvoyages.ca` (admin), `my.phoenixvoyages.ca` (client portal), and the OTA — see B5 below |
+
+**B5 (Al's domain decision 2026-05-15):**
+- **OTA / consumer-facing** → apex `phoenixvoyages.ca` post-WordPress cutover. Until cutover the apex still serves WordPress; OTA continues to live at `ota.phoenixvoyages.ca` with `NEXT_PUBLIC_SITE_URL` set explicitly in Vercel prod env. Code fallbacks updated to apex so the cutover only requires a Vercel alias swap + Doppler env update.
+- **Client portal** → `my.phoenixvoyages.ca` (was `client.`). Vercel domain alias + Doppler `CLIENT_PORTAL_URL` / `NEXT_PUBLIC_CLIENT_URL` updates needed.
+- **Admin** → `tailfire.phoenixvoyages.ca` (unchanged).
 
 Preview should not be documented with the old fixed `tailfire-dev`, `ota-dev`, or `client-dev` subdomains. The tracked workflow uses Vercel preview deployments, and the API health check currently waits on a generated Railway URL rather than a stable alias.
 

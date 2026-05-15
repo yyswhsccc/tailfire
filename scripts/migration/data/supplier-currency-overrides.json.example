@@ -1,0 +1,18 @@
+{
+  "_comment": "Map TES TourOperatorName values (exact string match) to non-CAD settlement currency. Default is CAD when supplier is not listed. Copy to supplier-currency-overrides.json and adjust as needed. Add entries for any cruise line or international supplier that settles in USD.",
+  "Carnival Cruise Line": "USD",
+  "Celebrity Cruises": "USD",
+  "Norwegian Cruise Line": "USD",
+  "Princess Cruises": "USD",
+  "Royal Caribbean International": "USD",
+  "AmaWaterways": "USD",
+  "Holland America Line": "USD",
+  "Disney Cruise Line": "USD",
+  "MSC Cruises": "USD",
+  "Viking Cruises": "USD",
+  "Oceania Cruises": "USD",
+  "Regent Seven Seas Cruises": "USD",
+  "Silversea Cruises": "USD",
+  "Seabourn Cruise Line": "USD",
+  "Cunard Line": "USD"
+}

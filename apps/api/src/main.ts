@@ -44,6 +44,12 @@ async function bootstrap() {
     rawBody: true,
   })
 
+  // Trust proxy headers (X-Forwarded-For) so req.ip resolves to the real
+  // client IP behind Vercel/Railway/Cloudflare proxies. B2: per-IP throttling
+  // would otherwise collapse all OTA traffic onto a single Vercel function IP
+  // and self-DoS legitimate users. `1` means trust the first hop only.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1)
+
   // Security
   app.use(helmet())
 
@@ -68,8 +74,12 @@ async function bootstrap() {
       if (/^https:\/\/tailfire-[\w-]+-systemsaholic-[\w]+\.vercel\.app$/.test(origin)) {
         return callback(null, true)
       }
-      // Allow all phoenixvoyages.ca subdomains (admin, client, ota, tf-demo, etc.)
-      if (/^https:\/\/[\w-]+\.phoenixvoyages\.ca$/.test(origin)) {
+      // B5: allow apex phoenixvoyages.ca (OTA/marketing) AND all subdomains
+      // (my., tailfire., tf-demo., etc.). Per Al's domain decision 2026-05-15:
+      // - apex            → OTA / consumer-facing (post-WordPress-cutover)
+      // - my.             → client portal
+      // - tailfire.       → admin
+      if (/^https:\/\/(?:[\w-]+\.)?phoenixvoyages\.ca$/.test(origin)) {
         return callback(null, true)
       }
       // Allow tailfire.ca subdomains (api-dev, etc.)

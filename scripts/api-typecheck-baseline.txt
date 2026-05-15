@@ -1,0 +1,30 @@
+# B12 baseline — normalized API typecheck diagnostic keys.
+# Format: <file>::<TS code>::<first-line message with quoted identifiers collapsed>
+# Updated 2026-05-15 by api-typecheck-baseline.sh update.
+# CI script: scripts/api-typecheck-baseline.sh check
+
+src/auth/guards/mfa.guard.ts::TS6133::'...' is declared but its value is never read.
+src/contacts/contact-groups.service.ts::TS2322::Type '...' is not assignable to type '...'.
+src/contacts/contact-lifecycle.service.ts::TS2322::Type '...' is not assignable to type '...'.
+src/contacts/contact-merge.service.ts::TS6133::'...' is declared but its value is never read.
+src/contacts/contact-merge.service.ts::TS6138::Property '...' is declared but its value is never read.
+src/contacts/contacts.service.ts::TS2769::No overload matches this call.
+src/contacts/contacts.service.ts::TS6133::'...' is declared but its value is never read.
+src/email-accounts/email-accounts.controller.ts::TS6133::'...' is declared but its value is never read.
+src/email-accounts/email-sync-scheduler.service.ts::TS18048::'...' is possibly '...'.
+src/email-accounts/email-sync-scheduler.service.ts::TS2339::Property '...' does not exist on type '...'.
+src/email-accounts/email-sync-scheduler.service.ts::TS2532::Object is possibly '...'.
+src/email-accounts/imap-sync.service.ts::TS2769::No overload matches this call.
+src/email-accounts/imap-sync.service.ts::TS6133::'...' is declared but its value is never read.
+src/email-accounts/imap-write.service.ts::TS2339::Property '...' does not exist on type '...'.
+src/reporting/queries/sales.queries.ts::TS2532::Object is possibly '...'.
+src/softvoyage/dto/vacation-live-search.dto.ts::TS2564::Property '...' has no initializer and is not definitely assigned in the constructor.
+src/softvoyage/softvoyage-search.processor.ts::TS2352::Conversion of type '...' to type '...' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to '...' first.
+src/softvoyage/softvoyage-search.processor.ts::TS2493::Tuple type '...' of length '...' has no element at index '...'.
+src/softvoyage/softvoyage-search.processor.ts::TS2584::Cannot find name '...'. Do you need to change your target library? Try changing the '...' compiler option to include '...'.
+src/softvoyage/softvoyage-search.processor.ts::TS2769::No overload matches this call.
+src/softvoyage/softvoyage.controller.ts::TS2584::Cannot find name '...'. Do you need to change your target library? Try changing the '...' compiler option to include '...'.
+src/softvoyage/softvoyage.controller.ts::TS6133::'...' is declared but its value is never read.
+src/softvoyage/softvoyage.service.ts::TS2352::Conversion of type '...' to type '...' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to '...' first.
+src/softvoyage/softvoyage.service.ts::TS2493::Tuple type '...' of length '...' has no element at index '...'.
+src/softvoyage/softvoyage.service.ts::TS2769::No overload matches this call.

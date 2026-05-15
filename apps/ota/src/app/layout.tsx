@@ -6,10 +6,12 @@ import { Nav } from "@/components/layout/nav";
 import { Footer } from "@/components/layout/footer";
 import { ChatWidgetLoader } from "@/components/chat/chat-widget-loader";
 import { TripBasketProvider } from "@/components/trip-builder/trip-basket-provider";
+import { CookieBanner } from "@/components/cookie-consent/cookie-banner";
 import { generateOrganizationJsonLd, generateSearchActionJsonLd } from "@/lib/structured-data";
 import "./globals.css";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://ota.phoenixvoyages.ca";
+// B5 (Al's domain decision 2026-05-15): apex post-WordPress-cutover.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://phoenixvoyages.ca";
 const OG_IMAGE = "https://cdn.tailfire.ca/photos/og/phoenix-voyages/cover_image_fb_og.jpg";
 
 export const metadata: Metadata = {
@@ -69,6 +71,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <main>{children}</main>
           <Footer />
           <ChatWidgetLoader />
+          <CookieBanner />
         </TripBasketProvider>
       </body>
     </html>

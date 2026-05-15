@@ -669,7 +669,7 @@ export class ImapSyncService {
       auth: { user: config.user, pass: config.pass },
       logger: false,
       connectionTimeout: 15_000,  // 15s to establish TCP connection
-      greetTimeout: 15_000,       // 15s to receive server greeting
+      greetingTimeout: 15_000,    // 15s to receive server greeting (B12: was greetTimeout, ImapFlow ignores unknown keys silently)
       socketTimeout: 30_000,      // 30s inactivity timeout on socket
     })
     // Prevent unhandled 'error' event from crashing the process

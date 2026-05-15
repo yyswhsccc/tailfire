@@ -10,10 +10,11 @@
 import { Module } from '@nestjs/common'
 import { ConsumerAuthController } from './consumer-auth.controller'
 import { ConsumerAuthService } from './consumer-auth.service'
+import { TurnstileService } from './turnstile.service'
 
 @Module({
   controllers: [ConsumerAuthController],
-  providers: [ConsumerAuthService],
+  providers: [ConsumerAuthService, TurnstileService],
   exports: [ConsumerAuthService],
 })
 export class ConsumerAuthModule {}
