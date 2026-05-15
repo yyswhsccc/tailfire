@@ -38,7 +38,6 @@ const {
   commissionChecks,
   commissionCheckItems,
   commissionItemSettlements,
-  userProfiles,
 } = schema
 
 const TEST_AGENCY_ID = '00000000-0000-0000-0000-000000000001'
@@ -246,7 +245,7 @@ describe('CommissionService.createHistoricalPaidCheck (P1.C)', () => {
 
   describe('idempotency via (source, sourceRef)', () => {
     it('rejects a duplicate (source, sourceRef) with 409 + existingCheckId', async () => {
-      const first = await commissionService.createHistoricalPaidCheck(
+      await commissionService.createHistoricalPaidCheck(
         TEST_AGENCY_ID,
         {
           checkNumber: 'TES-PAID-99999',
