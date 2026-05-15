@@ -120,6 +120,33 @@ function detectCurrency(supplierName: string | undefined | null): 'CAD' | 'USD' 
   return supplierCurrencyOverrides[supplierName] ?? 'CAD'
 }
 
+// ─── Cancellation policy boilerplate (P2.A — TES cutover backfill) ───────────
+// Per-type fallback policy strings used when the TES booking does not carry an
+// explicit cancellation policy and the matched supplier has no
+// default_cancellation_policy. See docs/runbooks/tes-cutover-backfill-plan.md
+// #25 / P1.D — Phoenix Voyages legal counsel should approve these strings vs
+// Reg 26/05 §38 disclosure requirements before treating them as TICO-safe.
+const CANCELLATION_BOILERPLATE: Record<string, string> = {
+  flight: 'Per airline fare rules. See booking confirmation for details.',
+  lodging: 'Per hotel cancellation policy in booking confirmation.',
+  custom_cruise: 'Per cruise line standard cancellation schedule.',
+  tour: 'Per tour operator terms. See booking confirmation.',
+  transportation: 'Non-refundable within 48 hours of service.',
+  insurance: 'Per policy terms and conditions.',
+  package: 'Per tour operator terms; subject to bundle restrictions.',
+  options: 'See booking confirmation.',
+  dining: 'Per restaurant cancellation policy. See booking confirmation.',
+}
+
+function resolveCancellationPolicy(
+  activityType: string | undefined | null,
+  supplierDefault?: string | null
+): string {
+  if (supplierDefault && supplierDefault.trim()) return supplierDefault
+  if (!activityType) return CANCELLATION_BOILERPLATE.tour!
+  return CANCELLATION_BOILERPLATE[activityType] ?? CANCELLATION_BOILERPLATE.tour!
+}
+
 let authToken = ''
 let tokenObtainedAt = 0
 const TOKEN_REFRESH_INTERVAL_MS = 45 * 60 * 1000 // Refresh every 45 min (before 60 min expiry)
@@ -880,6 +907,7 @@ async function importTrips(ledger: Ledger): Promise<void> {
       const carriers: Array<{
         wrapper: Record<string, unknown>
         activityId?: string
+        activityType?: string
         supplierId?: number
         confirmationNumber?: string
         startDate?: string
@@ -1000,6 +1028,7 @@ async function importTrips(ledger: Ledger): Promise<void> {
             carriers.push({
               wrapper: carrier as any,
               activityId: result.id,
+              activityType,
               supplierId: tc.SupplierID,
               confirmationNumber: carrier.ConfirmationNumber || undefined,
               startDate: carrier.StartDateTimeLocal?.split('T')[0],
@@ -1055,12 +1084,24 @@ async function importTrips(ledger: Ledger): Promise<void> {
               continue
             }
 
+            // P2.B: pass packageDetails and cancellationPolicy at create time so
+            // package_details row is populated (G6) and activity_pricing.cancellation_policy
+            // is set (G1). Supplier UUID is resolved post-import in Step 10 — we pass
+            // supplierName here for human-readable display; supplierId is wired up later
+            // via activity_suppliers.
+            const pkgCancellationPolicy = resolveCancellationPolicy('package')
             const pkgResult = await apiPost<{ id: string }>('/activities', {
               activityType: 'package',
               componentType: 'package',
               itineraryDayId: packageDayId,
               name: `${supplierName} Package`,
               activityIds: pkgCarriers.map(c => c.activityId!),
+              cancellationPolicy: pkgCancellationPolicy,
+              packageDetails: {
+                supplierName,
+                paymentStatus: 'unpaid',
+                cancellationPolicy: pkgCancellationPolicy,
+              },
             })
             for (const c of pkgCarriers) {
               packageActivityIds.set(c.activityId!, pkgResult.id)
@@ -1193,6 +1234,15 @@ async function importTrips(ledger: Ledger): Promise<void> {
         const grossPriceCents = priceCents
         if (matchedActivityId && priceCents) {
           claimedActivities.add(matchedActivityId)
+          // Resolve cancellation policy: supplier default if present (4/380 suppliers
+          // have one), otherwise per-type boilerplate. Determine activity type from
+          // the carrier match (or 'tour' for generic insurance fallback).
+          const matchedCarrier = carriers.find(c => c.activityId === matchedActivityId)
+          const activityType = matchedCarrier?.activityType ?? (isInsurance ? 'insurance' : 'tour')
+          // Supplier-default lookup happens later via activity_suppliers join +
+          // suppliers.default_cancellation_policy. Only 4/380 TES suppliers have a
+          // default populated at present; per-type boilerplate covers the rest.
+          const cancellationPolicy = resolveCancellationPolicy(activityType)
           try {
             await apiPatch(`/activities/${matchedActivityId}`, {
               totalPriceCents: grossPriceCents,
@@ -1201,6 +1251,8 @@ async function importTrips(ledger: Ledger): Promise<void> {
               confirmationNumber: bookingNum || undefined,
               commissionTotalCents: commissionCents || undefined,
               bookingDate: booking.BookingDate?.split('T')[0] || undefined,
+              supplier: booking.TourOperator?.TourOperatorName || undefined,
+              cancellationPolicy,
             })
             await delay(DELAY_MS)
           } catch (err) {
@@ -2568,8 +2620,84 @@ async function importCommissionChecks(ledger: Ledger): Promise<void> {
 // TES `booking.Commission.Paid` represents amounts already settled from supplier
 // to the agency and then paid out to the agent. These don't appear in the
 // commission-checks.json export (those are supplier→agency "received" checks).
-// We import them as separate check rows with checkType='paid', status='accepted'
-// to preserve the pre-cutover settlement history for IC payouts reconciliation.
+//
+// P2.C (TES cutover backfill): use the new
+// POST /commission/checks/historical-paid endpoint which creates the paid check
+// AND the commission_item_settlements rows in one transaction. Without paired
+// settlements, getCommissionDue() surfaces 100% of historical TES check_items
+// as still-owed to agents at cutover. See P1.C in
+// docs/runbooks/tes-cutover-backfill-plan.md.
+//
+// Settlement amounts PRESERVE TES Commission.Paid (allocated proportionally
+// across the booking's commission_check_items by received_cents). The native
+// formula at commission.service.ts:741 is intentionally NOT used — re-deriving
+// with current splitValue/tax settings would rewrite historical state.
+
+// Fetch (id, received_cents) of all commission_check_items reconciled against a
+// given TF activity. Uses Supabase REST since the importer doesn't have direct
+// Drizzle access from this script. Returns empty array on any failure.
+async function fetchCheckItemsForActivity(
+  tfActivityId: string
+): Promise<Array<{ id: string; received_cents: number }>> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return []
+
+  // Step 1: get the activity_pricing.id for this activity_id
+  const pricingResp = await fetch(
+    `${SUPABASE_URL}/rest/v1/activity_pricing?activity_id=eq.${tfActivityId}&select=id`,
+    {
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    }
+  )
+  if (!pricingResp.ok) return []
+  const pricing = (await pricingResp.json()) as Array<{ id: string }>
+  if (pricing.length === 0 || !pricing[0]) return []
+
+  // Step 2: get commission_check_items reconciled to that pricing row
+  const itemsResp = await fetch(
+    `${SUPABASE_URL}/rest/v1/commission_check_items?activity_pricing_id=eq.${pricing[0].id}&select=id,received_cents`,
+    {
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    }
+  )
+  if (!itemsResp.ok) return []
+  return (await itemsResp.json()) as Array<{ id: string; received_cents: number }>
+}
+
+// Proportionally allocate `totalCents` across items keyed by their received_cents
+// weight. Last item absorbs any rounding remainder so SUM(settlements) === totalCents.
+function allocatePaidAcrossItems(
+  totalCents: number,
+  items: Array<{ id: string; received_cents: number }>
+): Array<{ checkItemId: string; settledAmountCents: number }> {
+  if (items.length === 0) return []
+  const totalReceived = items.reduce((s, i) => s + (i.received_cents || 0), 0)
+
+  // If no received_cents on any item (degenerate), divide equally.
+  if (totalReceived === 0) {
+    const each = Math.floor(totalCents / items.length)
+    const remainder = totalCents - each * items.length
+    return items.map((item, idx) => ({
+      checkItemId: item.id,
+      settledAmountCents: idx === 0 ? each + remainder : each,
+    }))
+  }
+
+  let allocated = 0
+  return items.map((item, idx) => {
+    const isLast = idx === items.length - 1
+    const amount = isLast
+      ? totalCents - allocated
+      : Math.round((totalCents * (item.received_cents || 0)) / totalReceived)
+    allocated += amount
+    return { checkItemId: item.id, settledAmountCents: amount }
+  })
+}
 
 async function importPaidCommissionChecks(ledger: Ledger): Promise<void> {
   if (ledger.completedSteps.includes('paidCommissionChecks') && RESUME) {
@@ -2577,12 +2705,13 @@ async function importPaidCommissionChecks(ledger: Ledger): Promise<void> {
     return
   }
 
-  console.log('\n── Step 14b: Importing Paid Commission Checks ──')
+  console.log('\n── Step 14b: Importing Paid Commission Checks (+ settlements) ──')
   const bookings = loadJson<TSBooking[]>('bookings.json')
 
   let created = 0
   let skipped = 0
   let errors = 0
+  let orphans = 0 // Paid > 0 but no commission_check_items found — can't build settlement payload
 
   for (let i = 0; i < bookings.length; i++) {
     const booking = bookings[i]
@@ -2593,7 +2722,10 @@ async function importPaidCommissionChecks(ledger: Ledger): Promise<void> {
 
     const sourceId = `paid-${booking.BookingID}`
     const existing = findMapping(ledger, 'paidCheck', sourceId)
-    if (existing && existing.status !== 'error') { skipped++; continue }
+    if (existing && existing.status !== 'error') {
+      skipped++
+      continue
+    }
     if (existing && existing.status === 'error') {
       const idx = ledger.mappings.indexOf(existing)
       if (idx >= 0) ledger.mappings.splice(idx, 1)
@@ -2601,8 +2733,29 @@ async function importPaidCommissionChecks(ledger: Ledger): Promise<void> {
 
     const agentUserId = resolveAgentUserId(booking.TripDescription, ledger)
     if (!agentUserId) {
-      console.warn(`  WARN: No agent for booking ${booking.BookingID} and ADMIN_FALLBACK_USER_ID not set; skipping paid check`)
+      console.warn(`  WARN: No agent for booking ${booking.BookingID}; skipping paid check`)
       skipped++
+      continue
+    }
+
+    // Resolve the TF activity for this booking from ledger (set in Step 8).
+    const bookingMapping = findMapping(ledger, 'booking', booking.BookingID)
+    const tfActivityId = bookingMapping?.tailfireId
+    if (!tfActivityId) {
+      console.warn(
+        `  WARN: No TF activity mapped for booking ${booking.BookingID}; skipping paid check (orphan)`
+      )
+      orphans++
+      continue
+    }
+
+    // Fetch commission_check_items reconciled to this activity (from Step 11).
+    const items = await fetchCheckItemsForActivity(tfActivityId)
+    if (items.length === 0) {
+      console.warn(
+        `  WARN: No commission_check_items for activity ${tfActivityId} (booking ${booking.BookingID}); skipping paid check (orphan)`
+      )
+      orphans++
       continue
     }
 
@@ -2612,31 +2765,63 @@ async function importPaidCommissionChecks(ledger: Ledger): Promise<void> {
     const initialsKey = parseAgentInitials(booking.TripDescription) || ''
     const agentFullName = agentMapping[initialsKey]?.fullName ?? 'Historical TES Agent'
 
+    const settlements = allocatePaidAcrossItems(paidCents, items)
+
     try {
-      const result = await apiPost<{ id: string }>('/commission/checks', {
-        checkNumber: `TES-PAID-${booking.BookingID}`,
-        checkType: 'paid',
-        checkDate: (booking.StartDate || booking.BookingDate || '').split('T')[0] || new Date().toISOString().split('T')[0],
-        checkAmountCents: paidCents,
-        currency,
-        recipientUserId: agentUserId,
-        recipientName: agentFullName,
-        source: 'travelesolutions',
-        sourceRef: String(booking.BookingID),
-        notes: `Historical paid commission for booking #${booking.BookingID} (${supplierName}). Imported as accepted — TES is source of truth for pre-cutover settlements.`,
+      const result = await apiPost<{ id: string; settlementCount: number; duplicateCount: number }>(
+        '/commission/checks/historical-paid',
+        {
+          checkNumber: `TES-PAID-${booking.BookingID}`,
+          checkDate:
+            (booking.StartDate || booking.BookingDate || '').split('T')[0] ||
+            new Date().toISOString().split('T')[0],
+          currency,
+          recipientUserId: agentUserId,
+          recipientName: agentFullName,
+          source: 'travelesolutions',
+          sourceRef: String(booking.BookingID),
+          notes: `Historical paid commission for booking #${booking.BookingID} (${supplierName}). Imported as accepted — TES is source of truth for pre-cutover settlements.`,
+          settlements,
+        }
+      )
+
+      addMapping(ledger, {
+        sourceType: 'paidCheck',
+        sourceId,
+        tailfireId: result.id,
+        status: 'created',
+        data: {
+          settlementCount: result.settlementCount,
+          duplicateCount: result.duplicateCount,
+          paidCents,
+        },
       })
-
-      // Transition to accepted: pending → submitted → accepted
-      await apiPatch(`/commission/checks/${result.id}`, { status: 'submitted' })
-      await delay(DELAY_MS)
-      await apiPost(`/commission/checks/${result.id}/accept`, {})
-      await delay(DELAY_MS)
-
-      addMapping(ledger, { sourceType: 'paidCheck', sourceId, tailfireId: result.id, status: 'created' })
       created++
     } catch (err) {
-      addMapping(ledger, { sourceType: 'paidCheck', sourceId, tailfireId: '', status: 'error', error: (err as Error).message })
-      errors++
+      const message = (err as Error).message
+
+      // 409 = (source, sourceRef) already exists — extract existing id from the
+      // body and treat as success (idempotent re-run after partial failure).
+      const conflictMatch = message.match(/existingCheckId["']?\s*:\s*["']([0-9a-f-]+)["']/i)
+      if (conflictMatch && conflictMatch[1]) {
+        addMapping(ledger, {
+          sourceType: 'paidCheck',
+          sourceId,
+          tailfireId: conflictMatch[1],
+          status: 'created',
+          data: { conflictResumed: true },
+        })
+        created++
+      } else {
+        addMapping(ledger, {
+          sourceType: 'paidCheck',
+          sourceId,
+          tailfireId: '',
+          status: 'error',
+          error: message,
+        })
+        errors++
+      }
     }
 
     if ((i + 1) % 50 === 0) {
@@ -2647,7 +2832,9 @@ async function importPaidCommissionChecks(ledger: Ledger): Promise<void> {
 
   ledger.completedSteps.push('paidCommissionChecks')
   saveLedger(ledger)
-  console.log(`  Paid Commission Checks: ${created} created, ${skipped} skipped, ${errors} errors`)
+  console.log(
+    `  Paid Commission Checks: ${created} created, ${skipped} skipped, ${orphans} orphans (no check items), ${errors} errors`
+  )
 }
 
 // ─── Step 14c: Commission Adjustments ────────────────────────────────────────
