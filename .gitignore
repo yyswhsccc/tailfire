@@ -15,3 +15,6 @@ data/migration/
 dump.rdb
 .playwright-mcp/
 .superpowers/
+
+# Migration data symlink (developer-local; data lives in parent tailfire-project/data/)
+/data
