@@ -275,21 +275,20 @@ Surprise finding: IC payouts is already on `main`. Despite "deferred" classifica
 ---
 
 ### B12. API typecheck governance
-**Owner:** Claude · **Effort:** Half day · **Blocks:** Phase 1 (or accept as risk) · **Status:** `[ ]` · **Issue:** _file_
+**Owner:** Claude · **Effort:** ~2 hrs actual (Codex-approved Option B) · **Blocks:** Phase 1 · **Status:** `[~]` · **Issue:** _filed in B12 PR_ · **Codex consult:** SMALL FIXES → Option B (accept-as-risk), 2026-05-15
 
-`pnpm --filter @tailfire/api typecheck` fails. Build passes only because Nest uses SWC (`nest-cli.json` `"typeCheck": false`). PR validation has it informational.
+Codex consult (2026-05-15) took the launch-window math seriously and recommended **Option B (accept-as-risk)** with these specifics:
 
-**Why it's a launch blocker:**
-- Latent type errors won't be caught by CI
-- Re-enabling `typeCheck: true` breaks Railway Docker builds until errors are fixed
-- Currently masked by deploy keeping the stale container if build fails
+1. **Fix today (real bug):** `apps/api/src/email-accounts/imap-sync.service.ts:672` — `greetTimeout` was a typo; ImapFlow expects `greetingTimeout` and silently ignored the unknown key.
+2. **Regression check shape:** track the SET of normalized diagnostic keys (file + TS code + first-line message with quoted identifiers collapsed), NOT the count. Count-only is too weak — one new auth/payment error could replace one unused-import and slip through.
+3. **Defer the full clean** to a 2-week post-launch target.
 
 **Acceptance:**
-- [ ] Triage every API TS error: fix, suppress with reason, or accept-as-risk
-- [ ] API typecheck CI step graduated to **blocking**
-- [ ] Document known-good baseline for regression detection
-
-**Alternative path:** Accept-as-risk for launch, target fix within 2 weeks post-launch. Document the accepted error count in `docs/KNOWN_ISSUES.md`.
+- [x] Real bug fixed: `greetTimeout` → `greetingTimeout` in `imap-sync.service.ts`
+- [x] Baseline of 26 normalized diagnostic keys committed at `scripts/api-typecheck-baseline.txt`
+- [x] CI script `scripts/api-typecheck-baseline.sh` runs in `pr-validation.yml` as the 5th blocking job (`api-typecheck-baseline`); fails on any NEW key, allows disappearing keys
+- [x] Accepted-baseline pattern documented in `docs/KNOWN_ISSUES.md` (PR #389)
+- [ ] **Post-launch (2 weeks):** triage and fix all 26 baseline keys; re-baseline to empty; switch `nest-cli.json` to `"typeCheck": true`
 
 ---
 
