@@ -138,6 +138,42 @@ export interface AddCheckItemDto {
   receivedCents?: number
 }
 
+// ============================================================================
+// HISTORICAL PAID CHECK (TES cutover backfill — P1.C)
+// ============================================================================
+//
+// Used by the TES importer / backfill scripts to create paid commission_checks
+// AND commission_item_settlements in a single transaction. Preserves historical
+// settlement state at cutover so getCommissionDue() does not surface already-
+// paid TES commissions as still-owed.
+//
+// See docs/runbooks/tes-cutover-backfill-plan.md#p1c-historical-paid-settlement-endpoint
+
+export interface HistoricalPaidSettlementDto {
+  checkItemId: string // commission_check_items.id (from imported received check)
+  settledAmountCents: number // exact amount preserved from TES Commission.Paid allocation
+}
+
+export interface CreateHistoricalPaidCheckDto {
+  checkNumber: string
+  checkDate: string // ISO date YYYY-MM-DD
+  currency: string // 3-char ISO
+  recipientUserId: string // user_profiles.id of the agent who received the historical payment
+  recipientName?: string
+  source: string // e.g. 'travelesolutions'
+  sourceRef?: string // (source, sourceRef) used for idempotency lookup
+  notes?: string
+  settlements: HistoricalPaidSettlementDto[]
+}
+
+export interface HistoricalPaidCheckResponseDto extends CommissionCheckResponseDto {
+  // Count of newly-inserted commission_item_settlements rows.
+  // (settlements.length - settlementCount) = rows skipped by ON CONFLICT
+  // because that (checkItemId, recipientUserId) pair was already settled.
+  settlementCount: number
+  duplicateCount: number
+}
+
 export interface CommissionCheckItemResponseDto {
   id: string
   checkId: string

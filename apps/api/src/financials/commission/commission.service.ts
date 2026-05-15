@@ -14,6 +14,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from '@nestjs/common'
 import { eq, and, desc, sql, between, inArray, count } from 'drizzle-orm'
@@ -41,6 +42,8 @@ import type {
   CreateDepositDto,
   FinalizeDepositDto,
   DepositDetailResponseDto,
+  CreateHistoricalPaidCheckDto,
+  HistoricalPaidCheckResponseDto,
 } from './commission.types'
 
 @Injectable()
@@ -336,6 +339,160 @@ export class CommissionService {
       .returning()
 
     return this.formatCheck(updated)
+  }
+
+  // ============================================================================
+  // HISTORICAL PAID CHECK (TES cutover backfill — P1.C)
+  // ============================================================================
+  //
+  // Atomically creates a paid commission_checks row (status='accepted') AND
+  // the corresponding commission_item_settlements rows, preserving historical
+  // settlement state at TES → TF cutover so getCommissionDue() does not
+  // surface already-paid TES commissions as still-owed to agents.
+  //
+  // Codex-validated design (2026-05-15):
+  // - settled_amount_cents preserves TES Commission.Paid (NOT re-derived via
+  //   current split/tax formula — that would rewrite history)
+  // - idempotent via (source, sourceRef) match → 409 with existing check id
+  // - settlements use ON CONFLICT (check_item_id, recipient_user_id) DO NOTHING
+  //   so re-running the backfill is safe
+  //
+  // See docs/runbooks/tes-cutover-backfill-plan.md#p1c-historical-paid-settlement-endpoint
+
+  async createHistoricalPaidCheck(
+    agencyId: string,
+    dto: CreateHistoricalPaidCheckDto,
+    userId?: string
+  ): Promise<HistoricalPaidCheckResponseDto> {
+    if (!dto.settlements || dto.settlements.length === 0) {
+      throw new BadRequestException('settlements must contain at least one row')
+    }
+
+    // Reject duplicate checkItemIds in input — same (checkItem, recipient) pair
+    // would be a caller bug (can only resolve to one settlement under the unique
+    // constraint anyway).
+    const seenItems = new Set<string>()
+    for (const s of dto.settlements) {
+      if (seenItems.has(s.checkItemId)) {
+        throw new BadRequestException(
+          `Duplicate checkItemId in settlements: ${s.checkItemId}`
+        )
+      }
+      seenItems.add(s.checkItemId)
+      if (s.settledAmountCents < 0) {
+        throw new BadRequestException(
+          `settledAmountCents must be ≥ 0 (checkItemId=${s.checkItemId})`
+        )
+      }
+    }
+
+    // Idempotency: if a paid check with the same (source, sourceRef) already
+    // exists for this agency, reject with the existing id so callers can use
+    // it instead of creating a duplicate.
+    if (dto.sourceRef) {
+      const [existing] = await this.db.client
+        .select({ id: this.db.schema.commissionChecks.id })
+        .from(this.db.schema.commissionChecks)
+        .where(
+          and(
+            eq(this.db.schema.commissionChecks.agencyId, agencyId),
+            eq(this.db.schema.commissionChecks.checkType, 'paid'),
+            eq(this.db.schema.commissionChecks.source, dto.source),
+            eq(this.db.schema.commissionChecks.sourceRef, dto.sourceRef)
+          )
+        )
+        .limit(1)
+      if (existing) {
+        throw new ConflictException({
+          message: 'Historical paid check already exists for this (source, sourceRef)',
+          existingCheckId: existing.id,
+        })
+      }
+    }
+
+    // Validate all check_items belong to the same agency (cross-agency leak guard).
+    const checkItemIds = dto.settlements.map((s) => s.checkItemId)
+    const reachableItems = await this.db.client
+      .select({ id: this.db.schema.commissionCheckItems.id })
+      .from(this.db.schema.commissionCheckItems)
+      .innerJoin(
+        this.db.schema.commissionChecks,
+        eq(this.db.schema.commissionCheckItems.checkId, this.db.schema.commissionChecks.id)
+      )
+      .where(
+        and(
+          inArray(this.db.schema.commissionCheckItems.id, checkItemIds),
+          eq(this.db.schema.commissionChecks.agencyId, agencyId)
+        )
+      )
+
+    if (reachableItems.length !== checkItemIds.length) {
+      const found = new Set(reachableItems.map((r) => r.id))
+      const missing = checkItemIds.filter((id) => !found.has(id))
+      throw new NotFoundException(
+        `commission_check_items not found in this agency: ${missing.join(', ')}`
+      )
+    }
+
+    const totalCents = dto.settlements.reduce((sum, s) => sum + s.settledAmountCents, 0)
+
+    // Atomic insert: paid check + N settlements.
+    const result = await this.db.client.transaction(async (tx) => {
+      const [check] = await tx
+        .insert(this.db.schema.commissionChecks)
+        .values({
+          agencyId,
+          checkNumber: dto.checkNumber,
+          checkType: 'paid',
+          checkDate: dto.checkDate,
+          checkAmountCents: totalCents,
+          currency: dto.currency,
+          recipientUserId: dto.recipientUserId,
+          recipientName: dto.recipientName,
+          status: 'accepted', // Historical → already settled
+          source: dto.source,
+          sourceRef: dto.sourceRef,
+          notes: dto.notes,
+          createdBy: userId,
+          updatedBy: userId,
+        })
+        .returning()
+
+      if (!check) {
+        throw new BadRequestException('Failed to create historical paid check')
+      }
+
+      const settlementRows = dto.settlements.map((s) => ({
+        checkItemId: s.checkItemId,
+        recipientUserId: dto.recipientUserId,
+        paidCheckId: check.id,
+        settledAmountCents: s.settledAmountCents,
+        createdBy: userId,
+      }))
+
+      const inserted = await tx
+        .insert(this.db.schema.commissionItemSettlements)
+        .values(settlementRows)
+        .onConflictDoNothing({
+          target: [
+            this.db.schema.commissionItemSettlements.checkItemId,
+            this.db.schema.commissionItemSettlements.recipientUserId,
+          ],
+        })
+        .returning({ id: this.db.schema.commissionItemSettlements.id })
+
+      return {
+        check,
+        settlementCount: inserted.length,
+        duplicateCount: dto.settlements.length - inserted.length,
+      }
+    })
+
+    return {
+      ...this.formatCheck(result.check),
+      settlementCount: result.settlementCount,
+      duplicateCount: result.duplicateCount,
+    }
   }
 
   // ============================================================================

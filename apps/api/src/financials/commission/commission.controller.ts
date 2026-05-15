@@ -38,6 +38,8 @@ import type {
   DepositDetailResponseDto,
   PendingReceivablesFilterDto,
   PendingReceivablesResponseDto,
+  CreateHistoricalPaidCheckDto,
+  HistoricalPaidCheckResponseDto,
 } from './commission.types'
 
 @ApiTags('Commission')
@@ -120,6 +122,32 @@ export class CommissionController {
     @Param('id') id: string
   ): Promise<CommissionCheckResponseDto> {
     return this.commissionService.recallCheck(auth.agencyId, id, auth.userId)
+  }
+
+  /**
+   * Create a historical paid commission check WITH settlements in one transaction.
+   *
+   * Used by the TES → TF cutover importer / backfill scripts to preserve
+   * historical settlement state. Without paired settlement rows, getCommissionDue()
+   * would surface already-paid TES commissions as still-owed to agents — see
+   * docs/runbooks/tes-cutover-backfill-plan.md (P1.C / #33).
+   *
+   * Body shape:
+   * {
+   *   checkNumber, checkDate, currency, recipientUserId, recipientName?,
+   *   source, sourceRef?, notes?,
+   *   settlements: [{ checkItemId, settledAmountCents }]
+   * }
+   *
+   * Returns 409 if a (source, sourceRef) match already exists.
+   */
+  @Post('commission/checks/historical-paid')
+  @AdminOnly()
+  async createHistoricalPaidCheck(
+    @GetAuthContext() auth: AuthContext,
+    @Body() dto: CreateHistoricalPaidCheckDto
+  ): Promise<HistoricalPaidCheckResponseDto> {
+    return this.commissionService.createHistoricalPaidCheck(auth.agencyId, dto, auth.userId)
   }
 
   // ============================================================================
