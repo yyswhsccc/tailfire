@@ -22,6 +22,7 @@ import { EmailTemplatesService } from '../email/email-templates.service'
 import { DocumentTemplatesService } from '../document-templates/document-templates.service'
 import { HandlebarsRendererService } from '../document-templates/handlebars-renderer.service'
 import { PuppeteerPdfService } from '../document-render/puppeteer-pdf.service'
+import { validateTICOCompliance as validateTICOCompliancePure } from './tico-compliance'
 import type {
   TICOTripOrder,
   BusinessConfiguration,
@@ -443,6 +444,10 @@ export class TripOrderService {
   /**
    * Validate TICO compliance requirements (Ontario Regulation 26/05, Section 38)
    * Returns array of compliance violations — empty means compliant.
+   *
+   * Implementation lives in `./tico-compliance.ts` as a pure function so it
+   * can be unit-tested without instantiating the full service tree.
+   * See docs/COMPLIANCE_TICO.md for the canonical §38 mapping.
    */
   validateTICOCompliance(tripOrder: {
     orderData: unknown
@@ -450,63 +455,7 @@ export class TripOrderService {
     bookingDetails: unknown
     businessConfig: unknown
   }): string[] {
-    const violations: string[] = []
-    const orderData = tripOrder.orderData as TICOTripOrder | null
-    const businessConfig = tripOrder.businessConfig as BusinessConfiguration | null
-    const paymentSummary = tripOrder.paymentSummary as TripOrderPaymentSummary | null
-    const bookingDetails = tripOrder.bookingDetails as TripOrderBookingDetail[] | null
-
-    // §38(1) — Customer name and address
-    const customer = orderData?.order_header?.customer_info
-    if (!customer?.name || customer.name === 'Customer') {
-      violations.push('Customer name is required (Reg. 26/05 §38(1))')
-    }
-
-    // §38(2) — Date of booking
-    if (!orderData?.order_header?.order_date) {
-      violations.push('Order date is required (Reg. 26/05 §38(2))')
-    }
-
-    // §38(3) — Payment amount and balance owing
-    if (paymentSummary == null) {
-      violations.push('Payment summary is required (Reg. 26/05 §38(3))')
-    }
-
-    // §38(5) — Total price of travel services
-    if (!orderData?.cost_breakdown?.final_total && orderData?.cost_breakdown?.final_total !== 0) {
-      violations.push('Total price is required (Reg. 26/05 §38(5))')
-    }
-
-    // §38(6) — Agency info is built into the template from agency_settings,
-    // so we only check that businessConfig was populated at all
-    if (!businessConfig) {
-      violations.push('Agency configuration is missing — cannot generate compliant invoice')
-    }
-
-    // §38(7) — Service description with destination and departure date
-    if (!orderData?.service_details?.description) {
-      violations.push('Service description is required (Reg. 26/05 §38(7))')
-    }
-    if (!orderData?.service_details?.travel_dates?.departure) {
-      violations.push('Departure date is required (Reg. 26/05 §38(7))')
-    }
-
-    // §38(7) — At least one booking/service must be listed
-    if (!bookingDetails || bookingDetails.length === 0) {
-      violations.push('At least one booking must be included (Reg. 26/05 §38(7))')
-    }
-
-    // §38(12) — Travel counsellor name
-    if (!orderData?.order_header?.agent_info?.name) {
-      violations.push('Travel counsellor name is required (Reg. 26/05 §38(12))')
-    }
-
-    // §38 — Compliance statement must be present
-    if (!orderData?.compliance_statement) {
-      violations.push('TICO compliance statement is required')
-    }
-
-    return violations
+    return validateTICOCompliancePure(tripOrder)
   }
 
   /**
