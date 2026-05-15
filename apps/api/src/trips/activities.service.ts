@@ -530,6 +530,7 @@ export class ActivitiesService {
     packageDetails?: {
       supplierId?: string | null
       supplierName?: string | null
+      paymentStatus?: 'unpaid' | 'deposit_paid' | 'paid' | 'refunded' | 'partially_refunded'
       cancellationPolicy?: string | null
       cancellationDeadline?: string | null
       termsAndConditions?: string | null
@@ -2663,6 +2664,7 @@ export class ActivitiesService {
     details?: {
       supplierId?: string | null
       supplierName?: string | null
+      paymentStatus?: 'unpaid' | 'deposit_paid' | 'paid' | 'refunded' | 'partially_refunded'
       cancellationPolicy?: string | null
       cancellationDeadline?: string | null
       termsAndConditions?: string | null
@@ -2699,6 +2701,7 @@ export class ActivitiesService {
         activityId,
         supplierId: details?.supplierId || null,
         supplierName: details?.supplierName || null,
+        paymentStatus: details?.paymentStatus || 'unpaid',
         cancellationPolicy: details?.cancellationPolicy || null,
         cancellationDeadline: details?.cancellationDeadline || null,
         termsAndConditions: details?.termsAndConditions || null,
