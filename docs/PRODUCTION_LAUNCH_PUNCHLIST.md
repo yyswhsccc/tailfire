@@ -234,7 +234,7 @@ Surprise finding: IC payouts is already on `main`. Despite "deferred" classifica
 ---
 
 ### B10. Production smoke test thinness
-**Owner:** Claude · **Effort:** 2-3 hrs · **Blocks:** Phase 6 confidence · **Status:** `[ ]` · **Issue:** _file_
+**Owner:** Claude · **Effort:** Half day to 1 day (per v3 changelog — Codex bumped from 2-3 hrs after scope review) · **Blocks:** Phase 6 confidence · **Status:** `[ ]` · **Issue:** _file_
 
 `.github/workflows/deploy-prod.yml:201` only checks API health. Missing:
 - OTA homepage / search
