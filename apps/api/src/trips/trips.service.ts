@@ -28,8 +28,6 @@ import type {
   TripStatus,
   TripBookingStatusResponseDto,
   ActivityBookingStatusDto,
-  ExpectedPaymentStatus,
-  CommissionStatus,
   CancelTripDto,
 } from '@tailfire/shared-types'
 import {
@@ -1793,8 +1791,10 @@ export class TripsService {
 
       const { status, contribution } = summarizeActivityPaymentStatus({
         activityId: activity.id,
+        // Drizzle row has nullable totalPriceCents — coerce to number for the
+        // helper. Null currency-only rows treat 0 cost as the baseline.
         pricing: pricing
-          ? { totalPriceCents: pricing.totalPriceCents, commissionTotalCents: pricing.commissionTotalCents }
+          ? { totalPriceCents: pricing.totalPriceCents ?? 0, commissionTotalCents: pricing.commissionTotalCents }
           : null,
         items: items.map(item => ({
           expectedAmountCents: item.expectedAmountCents,
