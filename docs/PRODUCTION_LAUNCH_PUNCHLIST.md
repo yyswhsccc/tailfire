@@ -300,21 +300,23 @@ Surprise finding: IC payouts is already on `main`. Despite "deferred" classifica
 ---
 
 ### B13. Pre-launch silent failure audit
-**Owner:** Claude · **Effort:** 2-3 hrs · **Blocks:** soft launch tolerance, not hard launch · **Status:** `[ ]` · **Issue:** _file_
+**Owner:** Claude · **Effort:** ~30 min actual · **Blocks:** soft launch tolerance, not hard launch · **Status:** `[x]` · **Issue:** [#383](https://github.com/Systemsaholic/tailfire/issues/383) · **PR:** [#384](https://github.com/Systemsaholic/tailfire/pull/384) (merged 2026-05-15)
 
-`apps/ota/src/app/api/consumer-activity/route.ts:16` intentionally returns 204 on all failures. Acceptable for analytics. The pattern may exist in other catch-blocks that should be audited.
+`apps/ota/src/app/api/consumer-activity/route.ts:16` intentionally returns 204 on all failures. Acceptable for analytics — the comment now spells this out. The pattern was audited across api/ota/admin/client; only one truly silent `catch {}` was found (softvoyage debug-Redis save).
 
 **Acceptance:**
-- [ ] Grep all `try { ... } catch { ... }` with empty/204 catches
-- [ ] For each: confirm intent is analytics, OR add Sentry breadcrumb / error capture
-- [ ] Document accepted silent failures in `docs/KNOWN_ISSUES.md`
+- [x] Grep all `try { ... } catch { ... }` with empty/204 catches
+- [x] For each: confirm intent is analytics, OR add Sentry breadcrumb / error capture (softvoyage now logs `logger.warn`; OTA route now `console.warn`s for Vercel logs since OTA has no Sentry)
+- [ ] **Follow-up doc-only PR:** Document accepted silent failures in `docs/KNOWN_ISSUES.md` (file exists; B13 section pending)
 
 ---
 
 ### B14. TES import script re-validation against current `main`
-**Owner:** Claude + Al · **Effort:** 2-3 days · **Blocks:** Phase 3-4 (gating real prod data import) · **Status:** `[ ]` · **Issue:** _file_
+**Owner:** Claude + Al · **Effort:** 2-3 days · **Blocks:** Phase 3-4 (gating real prod data import) · **Status:** `[~]` · **Issue:** _filed in B14 PR_
 
-The TES import script (`/Users/alguertin/Development/tailfire-project/scripts/migration/import-to-tailfire.ts`, **117KB, outside git**) was last validated on **2026-04-02**. Six weeks of codebase changes have happened since then — none verified compatible.
+The TES import script was last validated on **2026-04-02**. Six weeks of codebase changes have happened since then — none verified compatible.
+
+**Step 1 (script copied into git, 2026-05-15):** The 117KB importer + 5 sibling scripts now live at `tailfire/scripts/migration/`. Real per-env data files (`agent-initials-mapping.json`, `supplier-currency-overrides.json`) stay local-only via `data/.gitignore` because they contain PII / commercial data. Only `*.example` templates are committed. See `scripts/migration/README.md` for the full layout.
 
 **Specific risks identified from the diff between 2026-04-02 and `origin/main @ 42d03684`:**
 
@@ -329,7 +331,7 @@ The TES import script (`/Users/alguertin/Development/tailfire-project/scripts/mi
 | Booking-detail hydration fix (#355) | LOW | Import only writes, doesn't read. |
 
 **Acceptance:**
-- [ ] Get import script into version control (copy into `tailfire/scripts/migration/` or add as git submodule — see "Risks the import script lives outside git")
+- [x] Get import script into version control (committed to `tailfire/scripts/migration/` 2026-05-15 with PII-safe `data/.gitignore`)
 - [ ] Re-run import against fresh tf-demo (preview) with current `main` codebase
 - [ ] Capture every failure during the dry-run; patch the script for each
 - [ ] Complete W1-W5 (real agent mapping, `trip_collaborators` backfill, `commission_adjustments` decision, paid-checks decision)

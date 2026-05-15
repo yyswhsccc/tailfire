@@ -1,0 +1,10 @@
+# TES migration data — DO NOT commit real mapping files.
+# Real agent-initials-mapping.json contains PII (staff names, emails, user UUIDs).
+# Real supplier-currency-overrides.json may contain commercial data.
+#
+# Each environment (Dev / Preview / Prod) needs its own concrete mapping
+# generated from that environment's user_profiles. The .example templates
+# below are committed; the concrete files are local-only.
+*
+!.gitignore
+!*.example

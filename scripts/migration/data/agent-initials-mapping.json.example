@@ -1,0 +1,19 @@
+{
+  "_comment": "Template for TES agent initials → TF user_profiles.id mapping. Copy to agent-initials-mapping.json and fill in real UUIDs from your TF environment. Different file per env (TF-Demo vs Prod). The key is exactly the uppercase initials found inside parentheses in TES trip names, e.g. 'Smith Family Mexico 2026 (SL)' → key is 'SL'.",
+  "JL": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "SL": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "Sebastian Larente", "email": "sebastian@phoenixvoyages.ca" },
+  "MG": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "AG": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "DB": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "DH": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "RS": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "AC": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "HB": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "PL": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "MP": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "CB": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "MF": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "HD": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "CF": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" },
+  "AR": { "userId": "00000000-0000-0000-0000-000000000000", "fullName": "First Last", "email": "first.last@phoenixvoyages.ca" }
+}
