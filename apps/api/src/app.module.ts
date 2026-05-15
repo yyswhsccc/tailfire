@@ -103,11 +103,24 @@ import { IcPayoutsModule } from './ic-payouts/ic-payouts.module'
     ScheduleModule.forRoot(),
 
     // Rate limiting (30 req/min default for API key users; JWT users skip via custom guards)
+    // 'register-email' is a per-email throttler used by /consumer-auth/register (B2).
     ThrottlerModule.forRoot([
       {
         name: 'default',
         ttl: Number(process.env.THROTTLE_TTL) || 60000,
         limit: Number(process.env.THROTTLE_LIMIT) || 30,
+      },
+      {
+        name: 'register-email',
+        ttl: 60_000,
+        limit: 3,
+        getTracker: (req: Record<string, unknown>) => {
+          const body = (req.body ?? {}) as { email?: unknown }
+          const email = typeof body.email === 'string' ? body.email.toLowerCase().trim() : ''
+          // Fall back to IP when email is missing so anonymous abusers still get tracked.
+          // Wrong email format is rejected by class-validator before this guard runs.
+          return Promise.resolve(email || (req.ip as string) || 'anonymous')
+        },
       },
     ]),
 

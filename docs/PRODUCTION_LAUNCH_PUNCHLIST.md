@@ -53,36 +53,39 @@ Status legend: `[ ]` todo · `[~]` in progress · `[!]` blocked · `[x]` done
 ---
 
 ### B1. Security: Consumer-activity admin endpoints lack agency scoping
-**Owner:** Claude · **Effort:** 1-2 hrs if existing agency-scope helpers fit, half-day otherwise · **Blocks:** Phase 1 · **Status:** `[~]` · **Issue:** [#379](https://github.com/Systemsaholic/tailfire/issues/379)
+**Owner:** Claude · **Effort:** ~2 hrs actual · **Blocks:** Phase 1 · **Status:** `[x]` · **Issue:** [#379](https://github.com/Systemsaholic/tailfire/issues/379) · **PR:** [#380](https://github.com/Systemsaholic/tailfire/pull/380) (merged 2026-05-15)
 
-`apps/api/src/consumer-activity/consumer-activity.controller.ts:23` exposes 3 endpoints with no `@AdminOnly` and no agency-ownership check:
+`apps/api/src/consumer-activity/consumer-activity.controller.ts:23` exposed 3 endpoints with no `@AdminOnly` and no agency-ownership check:
 - `GET /consumer-activity/by-contact/:id`
 - `GET /consumer-activity/signals/:id`
 - `GET /consumer-activity/insights/:id`
 
-`apps/api/src/consumer-activity/consumer-activity.service.ts:50` fetches by raw `contactId` only.
+`apps/api/src/consumer-activity/consumer-activity.service.ts:50` fetched by raw `contactId` only.
 
-**Impact:** Any authenticated agent (any agency) can read any agency's consumer browsing/intent data. **Cross-agency PII leak.**
+**Impact:** Any authenticated agent (any agency) could read any agency's consumer browsing/intent data. **Cross-agency PII leak.**
 
 **Acceptance:**
-- [ ] All three endpoints gated by `@AdminOnly` (or agency-scope guard matching `contacts.controller.ts`)
-- [ ] Service verifies contact agency matches actor's agency before returning data
-- [ ] Spec covers: same-agency 200, cross-agency 403, anonymous 401
+- [x] All three endpoints gated by `@AdminOnly`
+- [x] Service verifies contact agency matches actor's agency before returning data (`assertContactInAgency`)
+- [x] Spec covers: same-agency 200, cross-agency 403, anonymous 401 (global JwtAuthGuard)
+- [x] Codex APPROVE: no auth-bypass paths, defense-in-depth correct
 
 ---
 
 ### B2. Security: Public registration not throttled
-**Owner:** Claude · **Effort:** 2-4 hrs (Turnstile/hCaptcha + per-email throttling, not 30min) · **Blocks:** Phase 1 · **Status:** `[ ]` · **Issue:** _file_
+**Owner:** Claude · **Effort:** 2-4 hrs (Turnstile/hCaptcha + per-email throttling, not 30min) · **Blocks:** Phase 1 · **Status:** `[~]` · **Issue:** [#381](https://github.com/Systemsaholic/tailfire/issues/381)
 
 `apps/api/src/consumer-auth/consumer-auth.controller.ts:28` — `POST /consumer-auth/register` is public + ungated. `apps/api/src/auth/auth.controller.ts:25` notes `ThrottlerGuard` is NOT global.
 
 **Impact:** Account spray, fake accounts, magic-link abuse, email deliverability damage.
 
 **Acceptance:**
-- [ ] `ThrottlerGuard` applied (per-IP + per-email rate limit)
-- [ ] Cloudflare Turnstile or hCaptcha on the registration form
-- [ ] Spec covers: 5 attempts in 1 min → 429
-- [ ] Decide: keep public endpoint or force through OTA service-key proxy (Codex preferred option)
+- [~] `ThrottlerGuard` applied (per-IP `default` + per-email `register-email` named throttler) — code in B2 PR
+- [~] Cloudflare Turnstile token wired in DTO + `TurnstileService` verifies before any DB write — code in B2 PR
+- [~] Spec covers: per-throttler decorator wiring, missing/invalid Turnstile → 400, dev mode bypass when disabled
+- [ ] OTA registration form widget integration (separate follow-up — needs `NEXT_PUBLIC_TURNSTILE_SITE_KEY` from Doppler)
+- [ ] Doppler `prd` keys: `TURNSTILE_SECRET`, `TURNSTILE_REQUIRED=true`
+- [ ] Decision DEFERRED: keep public endpoint or force through OTA service-key proxy (Codex's preferred long-term option). Phase 1 ships throttler+CAPTCHA-token verification on the public endpoint to close the immediate window; proxy migration filed as follow-up.
 
 ---
 

@@ -33,4 +33,12 @@ export class RegisterConsumerDto {
   @IsString()
   advisorSlug?: string
 
+  @ApiPropertyOptional({
+    description:
+      'Cloudflare Turnstile token (cf-turnstile-response). Required when TURNSTILE_REQUIRED=true on the server.',
+    example: '0.eEUFb1lsPsEY...truncated',
+  })
+  @IsOptional()
+  @IsString()
+  turnstileToken?: string
 }
