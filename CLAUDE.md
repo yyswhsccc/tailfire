@@ -116,6 +116,18 @@ async tryAssignAllTripTravelersToActivity(activityId: string, tripId: string): P
 
 The existing `ActivityTravelerAssignmentPolicy` (#359) uses `try*` because trip-traveler fan-out is a UX shortcut — losing one assignment to a transient DB hiccup is recoverable on the next save. Payment schedules (#361) and similar must follow strict mode.
 
+### 9. TripsService Refactor Inventory (Refactor Roadmap — Issue #360)
+
+`apps/api/src/trips/TRIPS_SERVICE_SURFACE.md` is the canonical inventory of `TripsService`'s 56 public methods, their split target services, and their characterization status.
+
+**Doctrine:** every PR that extracts methods out of `TripsService` into a new service class **must cite this inventory in its body**. Acceptable forms:
+
+- `Surface inventory: moving method #N (foo) to X service` (line in PR description)
+- `Surface inventory unchanged (extracting pure helper)`
+- `Updates TRIPS_SERVICE_SURFACE.md (with rationale)`
+
+Reviewers may reject the PR if no citation appears. This is the enforcement mechanism that prevents the inventory from becoming "documentation theater" (Codex audit concern).
+
 ## Development Workflow (A to Z)
 
 ### Complete Flow

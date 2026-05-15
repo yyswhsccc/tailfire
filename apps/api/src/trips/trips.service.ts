@@ -66,6 +66,10 @@ import type {
 import { ItinerariesService } from './itineraries.service'
 import { ItineraryVersionsService } from './itinerary-versions.service'
 import { GroupBillingService } from './group-billing.service'
+import {
+  summarizeActivityPaymentStatus,
+  emptyTripBookingStatusSummary,
+} from './trip-booking-status-helpers'
 
 @Injectable()
 export class TripsService {
@@ -1666,6 +1670,13 @@ export class TripsService {
    *
    * @param tripId - Trip ID
    */
+  /**
+   * **Split target: TripBookingSummaryReader** (Refactor Roadmap #360).
+   * Pure status-derivation logic has been extracted to
+   * `trip-booking-status-helpers.ts` with characterization specs. The
+   * remaining orchestration (Drizzle reads, mapping) is ready to move to a
+   * dedicated reader service. See `TRIPS_SERVICE_SURFACE.md`.
+   */
   async getBookingStatus(tripId: string): Promise<TripBookingStatusResponseDto> {
     // 1. Verify trip exists
     const [trip] = await this.db.client
@@ -1685,19 +1696,7 @@ export class TripsService {
       .where(eq(this.db.schema.itineraries.tripId, tripId))
 
     if (itineraries.length === 0) {
-      return {
-        tripId,
-        activities: {},
-        summary: {
-          totalActivities: 0,
-          activitiesWithPaymentSchedule: 0,
-          totalExpectedCents: 0,
-          totalPaidCents: 0,
-          totalRemainingCents: 0,
-          overdueCount: 0,
-          upcomingDueCount: 0,
-        },
-      }
+      return emptyTripBookingStatusSummary(tripId)
     }
 
     const itineraryIds = itineraries.map(i => i.id)
@@ -1709,19 +1708,7 @@ export class TripsService {
       .where(inArray(this.db.schema.itineraryDays.itineraryId, itineraryIds))
 
     if (days.length === 0) {
-      return {
-        tripId,
-        activities: {},
-        summary: {
-          totalActivities: 0,
-          activitiesWithPaymentSchedule: 0,
-          totalExpectedCents: 0,
-          totalPaidCents: 0,
-          totalRemainingCents: 0,
-          overdueCount: 0,
-          upcomingDueCount: 0,
-        },
-      }
+      return emptyTripBookingStatusSummary(tripId)
     }
 
     const dayIds = days.map(d => d.id)
@@ -1736,19 +1723,7 @@ export class TripsService {
       .where(inArray(this.db.schema.itineraryActivities.itineraryDayId, dayIds))
 
     if (activities.length === 0) {
-      return {
-        tripId,
-        activities: {},
-        summary: {
-          totalActivities: 0,
-          activitiesWithPaymentSchedule: 0,
-          totalExpectedCents: 0,
-          totalPaidCents: 0,
-          totalRemainingCents: 0,
-          overdueCount: 0,
-          upcomingDueCount: 0,
-        },
-      }
+      return emptyTripBookingStatusSummary(tripId)
     }
 
     const activityIds = activities.map(a => a.id)
@@ -1796,7 +1771,11 @@ export class TripsService {
       itemsByConfig.set(item.paymentScheduleConfigId, items)
     }
 
-    // 8. Build the activities map and summary
+    // 8. Build the activities map and summary using the extracted helper
+    // (#360 — moves the per-activity status logic out of this 250-LOC method
+    // into a pure function with its own spec coverage. Future
+    // TripBookingSummaryReader extraction can move the orchestration above
+    // without re-deriving the status precedence rules.)
     const activitiesStatus: Record<string, ActivityBookingStatusDto> = {}
     let totalExpectedCents = 0
     let totalPaidCents = 0
@@ -1812,77 +1791,28 @@ export class TripsService {
       const scheduleConfig = pricing ? scheduleConfigMap.get(pricing.id) : null
       const items = scheduleConfig ? itemsByConfig.get(scheduleConfig.id) || [] : []
 
-      const hasPaymentSchedule = items.length > 0
-
-      if (hasPaymentSchedule) {
-        activitiesWithPaymentSchedule++
-      }
-
-      // Get base cost from activity_pricing (authoritative source)
-      const baseCostCents = pricing?.totalPriceCents ?? 0
-
-      // Calculate totals for this activity
-      let activityExpectedCents = 0
-      let activityPaidCents = 0
-      let nextDueDate: string | null = null
-      let worstStatus: ExpectedPaymentStatus | null = null
-
-      if (hasPaymentSchedule) {
-        // When payment schedule exists, use schedule items for tracking
-        for (const item of items) {
-          activityExpectedCents += item.expectedAmountCents
-          activityPaidCents += item.paidAmountCents || 0
-
-          // Track overdue and upcoming due counts
-          if (item.dueDate) {
-            if (item.status === 'overdue' || (item.dueDate < today && item.status !== 'paid')) {
-              overdueCount++
-              worstStatus = 'overdue'
-            } else if (item.dueDate <= oneWeekFromNow && item.status !== 'paid') {
-              upcomingDueCount++
-            }
-
-            // Find next unpaid due date
-            if (item.status !== 'paid' && (!nextDueDate || item.dueDate < nextDueDate)) {
-              nextDueDate = item.dueDate
-            }
-          }
-
-          // Determine worst status (priority: overdue > partial > pending > paid)
-          if (item.status === 'overdue') {
-            worstStatus = 'overdue'
-          } else if (item.status === 'partial' && worstStatus !== 'overdue') {
-            worstStatus = 'partial'
-          } else if (item.status === 'pending' && worstStatus !== 'overdue' && worstStatus !== 'partial') {
-            worstStatus = 'pending'
-          } else if (!worstStatus) {
-            worstStatus = item.status as ExpectedPaymentStatus
-          }
-        }
-      } else {
-        // No payment schedule - use base cost as expected amount
-        activityExpectedCents = baseCostCents
-        // Set status to 'unpaid' if there's a cost but no payments yet
-        if (baseCostCents > 0) {
-          worstStatus = 'pending' as ExpectedPaymentStatus // Show as pending (unpaid)
-        }
-      }
-
-      totalExpectedCents += activityExpectedCents
-      totalPaidCents += activityPaidCents
-
-      activitiesStatus[activity.id] = {
+      const { status, contribution } = summarizeActivityPaymentStatus({
         activityId: activity.id,
-        paymentStatus: worstStatus,
-        paymentPaidCents: activityPaidCents,
-        paymentTotalCents: activityExpectedCents,
-        paymentRemainingCents: activityExpectedCents - activityPaidCents,
-        commissionStatus: pricing?.commissionTotalCents
-          ? ('pending' as CommissionStatus)
+        pricing: pricing
+          ? { totalPriceCents: pricing.totalPriceCents, commissionTotalCents: pricing.commissionTotalCents }
           : null,
-        commissionTotalCents: pricing?.commissionTotalCents || 0,
-        hasPaymentSchedule,
-        nextDueDate,
+        items: items.map(item => ({
+          expectedAmountCents: item.expectedAmountCents,
+          paidAmountCents: item.paidAmountCents || 0,
+          dueDate: item.dueDate,
+          status: item.status,
+        })),
+        today,
+        oneWeekFromNow,
+      })
+
+      activitiesStatus[activity.id] = status
+      totalExpectedCents += contribution.expectedCents
+      totalPaidCents += contribution.paidCents
+      overdueCount += contribution.overdueCount
+      upcomingDueCount += contribution.upcomingDueCount
+      if (contribution.hasPaymentSchedule) {
+        activitiesWithPaymentSchedule++
       }
     }
 
