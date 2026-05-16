@@ -33,6 +33,7 @@ import { componentMediaKeys } from '@/hooks/use-component-media'
 import { api } from '@/lib/api'
 import { useIsChildOfPackage } from '@/hooks/use-is-child-of-package'
 import { EditTravelersDialog } from './edit-travelers-dialog'
+import { useTripTravelerAvatars } from '@/hooks/use-trip-traveler-avatars'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { buildInitialPricingState, type PricingData, type PricingBreakdownItem } from '@/lib/pricing'
@@ -596,9 +597,10 @@ export function TourForm({
     pricingBreakdown,
   }
 
-  // Get travelers from trip data
-  const travelers = trip?.travelers || []
-  const totalTravelers = trip?.travelers?.length || 0
+  // #438: trip?.travelers is never populated by TripsService.findOne; pull
+  // from the dedicated trip-travelers endpoint instead.
+  const travelers = useTripTravelerAvatars(trip?.id)
+  const totalTravelers = travelers.length
 
   return (
     <div className="max-w-5xl relative">
