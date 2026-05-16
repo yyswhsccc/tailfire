@@ -42,6 +42,7 @@ import { DatabaseService } from '../db/database.service'
 import { ItineraryDaysService } from './itinerary-days.service'
 import { ActivitiesService } from './activities.service'
 import { DayLocationService } from './day-location.service'
+import { ActivityTravelerAssignmentPolicy } from './activity-traveler-assignment.policy'
 import type {
   CreateFlightComponentDto,
   FlightComponentDto,
@@ -93,7 +94,8 @@ export class ComponentOrchestrationService {
     private readonly db: DatabaseService,
     private readonly itineraryDaysService: ItineraryDaysService,
     private readonly activitiesService: ActivitiesService,
-    private readonly dayLocationService: DayLocationService
+    private readonly dayLocationService: DayLocationService,
+    private readonly travelerAssignment: ActivityTravelerAssignmentPolicy,
   ) {}
 
   /**
@@ -363,6 +365,12 @@ export class ComponentOrchestrationService {
     }
 
     await this.markItineraryChangedForActivity(activityId)
+
+    // #430: fan trip travelers onto the new activity. activities.service does
+    // this for activities created via ActivitiesService.create, but the
+    // typed-component create paths (flight, lodging, …) bypass that service
+    // entirely and were dropping the side effect on the floor.
+    await this.travelerAssignment.tryAssignAllTripTravelersToActivityById(activityId)
 
     // Cascade day location recalculation (non-fatal — failures logged to Sentry)
     if (dto.itineraryDayId) {
@@ -705,6 +713,9 @@ export class ComponentOrchestrationService {
 
     await this.markItineraryChangedForActivity(activityId)
 
+    // #430: see createFlight comment.
+    await this.travelerAssignment.tryAssignAllTripTravelersToActivityById(activityId)
+
     // Cascade day location recalculation (non-fatal — failures logged to Sentry)
     if (dto.itineraryDayId) {
       const itineraryId = await this.getItineraryIdFromDayId(dto.itineraryDayId)
@@ -1012,6 +1023,9 @@ export class ComponentOrchestrationService {
         .where(eq(this.db.schema.activityPricing.activityId, activityId))
     }
 
+    // #430: see createFlight comment.
+    await this.travelerAssignment.tryAssignAllTripTravelersToActivityById(activityId)
+
     return this.getTransportation(activityId)
   }
 
@@ -1312,6 +1326,9 @@ export class ComponentOrchestrationService {
         .where(eq(this.db.schema.activityPricing.activityId, activityId))
     }
 
+    // #430: see createFlight comment.
+    await this.travelerAssignment.tryAssignAllTripTravelersToActivityById(activityId)
+
     return this.getDining(activityId)
   }
 
@@ -1551,6 +1568,9 @@ export class ComponentOrchestrationService {
 
     await this.markItineraryChangedForActivity(activityId)
 
+    // #430: see createFlight comment.
+    await this.travelerAssignment.tryAssignAllTripTravelersToActivityById(activityId)
+
     // Cascade day location recalculation (non-fatal — failures logged to Sentry)
     if (dto.itineraryDayId) {
       const itineraryId = await this.getItineraryIdFromDayId(dto.itineraryDayId)
@@ -1755,6 +1775,9 @@ export class ComponentOrchestrationService {
         })
         .where(eq(this.db.schema.activityPricing.activityId, activityId))
     }
+
+    // #430: see createFlight comment.
+    await this.travelerAssignment.tryAssignAllTripTravelersToActivityById(activityId)
 
     return this.getOptions(activityId)
   }
@@ -2052,6 +2075,9 @@ export class ComponentOrchestrationService {
         finalPricing = updatedPricing
       }
     }
+
+    // #430: see createFlight comment.
+    await this.travelerAssignment.tryAssignAllTripTravelersToActivityById(component.id)
 
     // Construct DTO directly from inserted/updated data (no re-fetch)
     return {
@@ -2368,6 +2394,9 @@ export class ComponentOrchestrationService {
       }
     }
 
+    // #430: see createFlight comment.
+    await this.travelerAssignment.tryAssignAllTripTravelersToActivityById(component.id)
+
     // Construct DTO directly from inserted/updated data (no re-fetch)
     return {
       id: component.id,
@@ -2640,6 +2669,9 @@ export class ComponentOrchestrationService {
     if (dto.tourDayDetails) {
       await this.tourDayDetailsService.create(component.id, dto.tourDayDetails)
     }
+
+    // #430: see createFlight comment.
+    await this.travelerAssignment.tryAssignAllTripTravelersToActivityById(component.id)
 
     // Return constructed DTO
     return {

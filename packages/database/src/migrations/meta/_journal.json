@@ -1653,6 +1653,13 @@
       "when": 1779273000000,
       "tag": "20260518110000_reapply_commission_tracking_cents_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 236,
+      "version": "7",
+      "when": 1779451200000,
+      "tag": "20260520120000_backfill_activity_travelers",
+      "breakpoints": true
     }
   ]
 }

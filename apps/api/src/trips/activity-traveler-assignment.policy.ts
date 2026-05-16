@@ -123,6 +123,41 @@ export class ActivityTravelerAssignmentPolicy {
   }
 
   /**
+   * Insert one row per current trip traveler onto the given activity, resolving
+   * the trip from the activity itself rather than requiring the caller to know it.
+   *
+   * Use this from call sites that already have the activity id but would need
+   * an extra join to get the trip (e.g. ComponentOrchestrationService —
+   * #430). Resolves trip via both linkages the schema supports:
+   * itinerary_activities.itinerary_day_id → itinerary_days.itinerary_id →
+   * itineraries.trip_id, or itinerary_activities.trip_id directly (floating
+   * activities).
+   */
+  async tryAssignAllTripTravelersToActivityById(
+    activityId: string,
+  ): Promise<BestEffortResult> {
+    try {
+      await this.db.client.execute(sql`
+        INSERT INTO activity_travelers (activity_id, trip_traveler_id, trip_id)
+        SELECT ia.id, tt.id, tt.trip_id
+        FROM itinerary_activities ia
+        LEFT JOIN itinerary_days id_day ON id_day.id = ia.itinerary_day_id
+        LEFT JOIN itineraries it ON it.id = id_day.itinerary_id
+        JOIN trip_travelers tt
+          ON tt.trip_id = COALESCE(it.trip_id, ia.trip_id)
+        WHERE ia.id = ${activityId}::uuid
+        ON CONFLICT (activity_id, trip_traveler_id) DO NOTHING
+      `)
+      return { ok: true }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to assign trip travelers to activity ${activityId} (by id): ${error}`,
+      )
+      return { ok: false, error }
+    }
+  }
+
+  /**
    * Insert the given traveler onto every existing activity on the trip,
    * across all itineraries plus floating-package activities. Used by
    * TripTravelersService.create when the caller passes addToAllActivities.
