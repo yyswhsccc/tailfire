@@ -19,6 +19,7 @@ import {
 } from '@nestjs/common'
 import { eq, and, desc, sql, between, inArray, count } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
+import { CommissionSettlementReversalService } from './commission-settlement-reversal.service'
 import { VALID_CHECK_TRANSITIONS } from './commission.types'
 import type {
   CreateCommissionCheckDto,
@@ -50,7 +51,10 @@ import type {
 export class CommissionService {
   private readonly logger = new Logger(CommissionService.name)
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly settlementReversalService: CommissionSettlementReversalService,
+  ) {}
 
   // ============================================================================
   // CHECK CRUD
@@ -258,12 +262,22 @@ export class CommissionService {
       dto.status === 'cancelled' && check.checkType === 'paid'
 
     if (isCancellingPaidCheck) {
+      // PR-1: replaces prior `DELETE FROM commission_item_settlements` — the
+      // settlements are reversed via paired negation rows so the original
+      // financial history is preserved forever (audit-proof pillar).
+      const reason = dto.notes?.trim() || `Paid check ${check.checkNumber} cancelled`
+      const actor = userId ?? check.createdBy ?? check.agencyId
+
       const [updated] = await this.db.client.transaction(async (tx) => {
-        // Delete settlement rows to reopen items for future payout
-        await tx.execute(sql`
-          DELETE FROM commission_item_settlements
-          WHERE paid_check_id = ${checkId}
-        `)
+        await this.settlementReversalService.reverseAllByPaidCheck(
+          {
+            paidCheckId: checkId,
+            reason,
+            actorUserId: actor,
+            agencyId,
+          },
+          tx,
+        )
 
         // Revert reconciled adjustments back to pending
         await tx.execute(sql`

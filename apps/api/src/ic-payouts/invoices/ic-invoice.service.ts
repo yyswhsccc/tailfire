@@ -50,6 +50,7 @@ import { StorageService } from '../../trips/storage.service'
 import { RCTI_AGREEMENT_VERSION } from '../authorizations/rcti-template'
 import type { SubmitClaimInput } from './dto/submit-claim.dto'
 import { DisbursementService } from '../disbursements/disbursement.service'
+import { CommissionSettlementReversalService } from '../../financials/commission/commission-settlement-reversal.service'
 
 const {
   icTaxProfiles,
@@ -109,6 +110,7 @@ export class IcInvoiceService {
     private readonly storage: StorageService,
     private readonly disbursementService: DisbursementService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly settlementReversalService: CommissionSettlementReversalService,
   ) {}
 
   // ============================================================================
@@ -274,11 +276,16 @@ export class IcInvoiceService {
       }
 
       if (invoice.reservationCheckId) {
-        // 1. Delete settled commission_item_settlements linked to this reservation
-        await tx.execute(sql`
-          DELETE FROM commission_item_settlements
-          WHERE paid_check_id = ${invoice.reservationCheckId}
-        `)
+        // 1. PR-1: reverse settlements via paired negation rows (was DELETE).
+        await this.settlementReversalService.reverseAllByPaidCheck(
+          {
+            paidCheckId: invoice.reservationCheckId,
+            reason: `IC invoice ${invoice.invoiceNumber} rejected: ${reason}`,
+            actorUserId: rejectorUserId,
+            agencyId: invoice.agencyId,
+          },
+          tx,
+        )
 
         // 2. Flip reconciled adjustments back to pending
         await tx.execute(sql`
@@ -393,11 +400,16 @@ export class IcInvoiceService {
       }
 
       if (updated.reservationCheckId) {
-        // Unwind the reservation, same as reject
-        await tx.execute(sql`
-          DELETE FROM commission_item_settlements
-          WHERE paid_check_id = ${updated.reservationCheckId}
-        `)
+        // PR-1: reverse settlements via paired negation rows (was DELETE).
+        await this.settlementReversalService.reverseAllByPaidCheck(
+          {
+            paidCheckId: updated.reservationCheckId,
+            reason: `IC invoice ${updated.invoiceNumber} cancelled: ${reason}`,
+            actorUserId: cancellerUserId,
+            agencyId: updated.agencyId,
+          },
+          tx,
+        )
 
         await tx.execute(sql`
           UPDATE commission_adjustments

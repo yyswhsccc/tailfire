@@ -11,6 +11,7 @@ import { CommissionService } from './commission.service'
 import { CommissionAdjustmentsService } from './commission-adjustments.service'
 import { CommissionAuditService } from './commission-audit.service'
 import { CommissionReconcileService } from './commission-reconcile.service'
+import { CommissionSettlementReversalService } from './commission-settlement-reversal.service'
 import { CommissionController } from './commission.controller'
 import { CommissionAdjustmentsController } from './commission-adjustments.controller'
 
@@ -22,12 +23,14 @@ import { CommissionAdjustmentsController } from './commission-adjustments.contro
     CommissionAdjustmentsService,
     CommissionAuditService,
     CommissionReconcileService,
+    CommissionSettlementReversalService,
   ],
   exports: [
     CommissionService,
     CommissionAdjustmentsService,
     CommissionAuditService,
     CommissionReconcileService,
+    CommissionSettlementReversalService,
   ],
 })
 export class CommissionModule {}
