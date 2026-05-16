@@ -8,8 +8,18 @@
 -- Fix: filter gross_received to the same departed + reconciled population
 -- that committed_payable_cents was computed against, so the subtraction
 -- works on apples-to-apples buckets.
+--
+-- Hotfix 2026-05-16: use DROP + CREATE instead of CREATE OR REPLACE. The
+-- previous definition created by migration 20260517110000 had column order
+-- ending in (agency_retains_cents, total_gross_received_cents). This new
+-- definition inserts standalone_reconciled_adjustments_cents BEFORE those
+-- two — and Postgres rejects CREATE OR REPLACE VIEW when column position
+-- changes (error 42P16: cannot change name of view column). DROP IF EXISTS
+-- + CREATE sidesteps that constraint. Nothing else depends on the view yet.
 
-CREATE OR REPLACE VIEW v_commission_position AS
+DROP VIEW IF EXISTS v_commission_position;
+
+CREATE VIEW v_commission_position AS
 WITH latest_per_recipient AS (
   SELECT DISTINCT ON (agency_id, currency, recipient_user_id)
     agency_id,
