@@ -297,10 +297,24 @@ function createMockDb(initialState?: {
   const mockExecute = jest.fn(async (sqlObj: unknown) => {
     if (inTransaction) {
       const idx = insideTxExecuteCount++
-      // PR-1: conflict-detection SELECT. Use settlementsOverrides to simulate
-      // a concurrent winner — if override is set, return those rows AS
-      // "conflicting" (the service throws ConflictException).
-      if (sqlContains(sqlObj, 'for update') || sqlContains(sqlObj, 'reverses_settlement_id is null')) {
+      // PR-1 Commit 11: there are now TWO tx.execute() calls in the claim
+      // happy path:
+      //   (1) SELECT id FROM commission_check_items ... FOR UPDATE
+      //       (row-level lock so concurrent submits serialize)
+      //   (2) SELECT check_item_id FROM commission_item_settlements ...
+      //       reverses_settlement_id IS NULL  (pre-flight conflict check)
+      // We route (1) to a no-op and only treat (2) as the conflict signal —
+      // otherwise the same "FOR UPDATE" substring would match both and double-
+      // count.
+      if (
+        sqlContains(sqlObj, 'commission_check_items') &&
+        sqlContains(sqlObj, 'for update')
+      ) {
+        // (1) check_item row lock — no rows needed; service ignores the result.
+        return []
+      }
+      // PR-1: conflict-detection SELECT (the settlements one).
+      if (sqlContains(sqlObj, 'reverses_settlement_id is null')) {
         const callN = settlementsCallCount++
         calls.settlementsInserts++ // surface that the conflict check ran
         // PR-1 semantics translation: in the OLD impl, an empty

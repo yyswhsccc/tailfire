@@ -1583,6 +1583,13 @@
       "when": 1779103200000,
       "tag": "20260516101000_commission_adjustments_activity_optional",
       "breakpoints": true
+    },
+    {
+      "idx": 226,
+      "version": "7",
+      "when": 1779127200000,
+      "tag": "20260516180000_commission_settlements_fix_unique_and_check",
+      "breakpoints": true
     }
   ]
 }

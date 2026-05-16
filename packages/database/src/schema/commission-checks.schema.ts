@@ -153,9 +153,12 @@ export const commissionItemSettlements = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
 
+    // PR-1: settlements never delete (reversal-row pattern); RESTRICT both FKs
+    // so an accidental hard delete of a parent surfaces loudly instead of
+    // silently wiping audit history. Mirrors migration 20260516100400.
     checkItemId: uuid('check_item_id')
       .notNull()
-      .references(() => commissionCheckItems.id, { onDelete: 'cascade' }),
+      .references(() => commissionCheckItems.id, { onDelete: 'restrict' }),
 
     recipientUserId: uuid('recipient_user_id')
       .notNull()
@@ -163,7 +166,7 @@ export const commissionItemSettlements = pgTable(
 
     paidCheckId: uuid('paid_check_id')
       .notNull()
-      .references(() => commissionChecks.id, { onDelete: 'cascade' }),
+      .references(() => commissionChecks.id, { onDelete: 'restrict' }),
 
     settledAmountCents: integer('settled_amount_cents').notNull(),
 
