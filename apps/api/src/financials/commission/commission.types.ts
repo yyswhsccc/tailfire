@@ -237,6 +237,8 @@ export interface CommissionAdjustmentFilterDto {
   checkId?: string
   adjustmentType?: CommissionAdjustmentType
   status?: CommissionAdjustmentStatus
+  /** PR-1: server-side scope filter — non-admins are pinned to their own userId. */
+  agentUserId?: string
   page?: number
   limit?: number
 }
