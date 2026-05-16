@@ -17,7 +17,7 @@
 
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { schema } from '@tailfire/database'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
 import { CommissionAuditService } from './commission-audit.service'
 
@@ -123,61 +123,76 @@ export class CommissionSettlementReversalService {
     const negatedBreakdown = this.negateBreakdown(original.computationBreakdown)
     const now = new Date()
 
-    // PR-1 Commit 12 (Codex round-4 fix): mark the ORIGINAL row as reversed
-    // in the same transaction. Without this, the original keeps
-    // reverses_settlement_id = NULL forever and "active settlement"
-    // predicates that filter on reversed_at IS NULL keep treating it as
-    // active. The partial unique index from migration 20260516210000 also
-    // depends on this update to free the (check_item_id, recipient_user_id)
-    // slot for a future re-claim.
-    await tx
+    // PR-1 Commit 13 (Codex round-5 fix): the concurrency-safe pattern.
+    //
+    // Atomic claim: UPDATE the ORIGINAL row WHERE reversed_at IS NULL
+    // RETURNING. Postgres serializes UPDATEs on the same row, so two
+    // concurrent reverseSingle() calls race here. The winner gets a
+    // returned id; the loser's WHERE doesn't match (reversed_at is no
+    // longer NULL) and gets zero rows back — at which point we look up
+    // the existing reversal row in a fresh statement (the txn is NOT
+    // aborted because no unique violation was triggered).
+    //
+    // This replaces commit 12's try/catch on 23505, which was wrong: a
+    // unique-violation aborts the txn, so the follow-up SELECT inside the
+    // same txn always fails. The new pattern avoids ever needing the
+    // 23505 path.
+    const claimed = await tx
       .update(schema.commissionItemSettlements)
       .set({
         reversedAt: now,
         reversedBy: input.actorUserId,
         reversedReason: input.reason,
       })
-      .where(eq(schema.commissionItemSettlements.id, original.id))
+      .where(
+        and(
+          eq(schema.commissionItemSettlements.id, original.id),
+          isNull(schema.commissionItemSettlements.reversedAt),
+        ),
+      )
+      .returning({ id: schema.commissionItemSettlements.id })
 
-    // Insert the paired negation row. The new partial unique on
-    // reverses_settlement_id (WHERE is_reversal = true) prevents two
-    // concurrent reverseSettlement() calls from both landing here. On
-    // 23505 the caller retries — see commit 12 spec.
-    let inserted: { id: string } | undefined
-    try {
-      const rows = await tx
-        .insert(schema.commissionItemSettlements)
-        .values({
-          checkItemId: original.checkItemId,
-          recipientUserId: original.recipientUserId,
-          paidCheckId: original.paidCheckId,
-          settledAmountCents: -original.settledAmountCents,
-          isReversal: true,
-          reversesSettlementId: original.id,
-          reversedAt: now,
-          reversedBy: input.actorUserId,
-          reversedReason: input.reason,
-          computationBreakdown: negatedBreakdown,
-          createdBy: input.actorUserId,
-        })
-        .returning({ id: schema.commissionItemSettlements.id })
-      inserted = rows[0]
-    } catch (err) {
-      const code = (err as { code?: string })?.code
-      if (code === '23505') {
-        // Concurrent reverseSettlement() got there first; treat idempotently.
-        const existingReversal = await tx
-          .select({ id: schema.commissionItemSettlements.id })
-          .from(schema.commissionItemSettlements)
-          .where(eq(schema.commissionItemSettlements.reversesSettlementId, original.id))
-          .limit(1)
-        if (existingReversal[0]) {
-          this.logger.debug(`settlement ${input.settlementId} reversed concurrently — returning idempotent result`)
-          return { reversalRowId: existingReversal[0].id, alreadyReversed: true }
-        }
+    if (claimed.length === 0) {
+      // Lost the race — another tx already marked this original reversed
+      // and committed. Find their reversal row and return idempotently.
+      const existingReversal = await tx
+        .select({ id: schema.commissionItemSettlements.id })
+        .from(schema.commissionItemSettlements)
+        .where(eq(schema.commissionItemSettlements.reversesSettlementId, original.id))
+        .limit(1)
+      if (existingReversal[0]) {
+        this.logger.debug(`settlement ${input.settlementId} reversed concurrently — returning idempotent result`)
+        return { reversalRowId: existingReversal[0].id, alreadyReversed: true }
       }
-      throw err
+      // This shouldn't happen: the original is marked reversed but no
+      // negation row exists. Surface it loudly — likely an admin patched
+      // the original row directly without going through this service.
+      throw new Error(
+        `Settlement ${input.settlementId} is marked reversed but no negation row exists. Manual investigation required.`,
+      )
     }
+
+    // We own the reversal. Insert the negation row. The unique on
+    // reverses_settlement_id WHERE is_reversal = true cannot fire here
+    // because the only way to reach this branch is winning the UPDATE
+    // race above — but we still wrap in a defensive check so the failure
+    // mode is clear if invariants drift.
+    const [inserted] = await tx
+      .insert(schema.commissionItemSettlements)
+      .values({
+        checkItemId: original.checkItemId,
+        recipientUserId: original.recipientUserId,
+        paidCheckId: original.paidCheckId,
+        settledAmountCents: -original.settledAmountCents,
+        isReversal: true,
+        reversesSettlementId: original.id,
+        reversedAt: now,
+        reversedBy: input.actorUserId,
+        reversedReason: input.reason,
+        computationBreakdown: negatedBreakdown,
+        createdBy: input.actorUserId,
+      })
+      .returning({ id: schema.commissionItemSettlements.id })
 
     if (!inserted) {
       throw new Error(`Failed to insert reversal row for settlement ${input.settlementId}`)
@@ -333,4 +348,3 @@ export class CommissionSettlementReversalService {
     return (db as DatabaseService['db']).transaction(fn)
   }
 }
-
