@@ -951,8 +951,15 @@ export class CommissionService {
       JOIN trips t ON t.id = i.trip_id
       JOIN trip_collaborators tc ON tc.trip_id = t.id AND tc.is_active = true
       JOIN user_profiles up ON up.id = tc.user_id
+      -- PR-1 Commit 13 (Codex round-5 fix): an "active settlement" is one
+      -- that hasn't been reversed. Without the is_reversal/reversed_at
+      -- filter, reversed items would stay hidden from getCommissionDue()
+      -- forever — the cis row still exists, just marked reversed.
       LEFT JOIN commission_item_settlements cis
-        ON cis.check_item_id = cci.id AND cis.recipient_user_id = up.id
+        ON cis.check_item_id = cci.id
+        AND cis.recipient_user_id = up.id
+        AND cis.is_reversal = false
+        AND cis.reversed_at IS NULL
       WHERE cc.agency_id = ${agencyId}
         AND cc.check_type = 'received'
         AND cc.status = 'accepted'
