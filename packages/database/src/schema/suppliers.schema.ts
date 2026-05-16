@@ -4,7 +4,7 @@
  * Normalized supplier data for bookings (hotels, airlines, tour operators, etc.)
  */
 
-import { pgTable, uuid, varchar, timestamp, jsonb, boolean, text, index } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, timestamp, jsonb, boolean, decimal, text, index } from 'drizzle-orm/pg-core'
 
 export type SupplierContactInfo = {
   email?: string
@@ -27,6 +27,11 @@ export const suppliers = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     isPreferred: boolean('is_preferred').notNull().default(false),
     notes: text('notes'),
+
+    // Commission tax defaults (PR-1) — pre-fills embedded_tax_* on commission_check_items
+    defaultCommissionTaxType: varchar('default_commission_tax_type', { length: 50 }),
+    defaultCommissionTaxRatePercent: decimal('default_commission_tax_rate_percent', { precision: 5, scale: 2 }),
+    commissionIncludesTax: boolean('commission_includes_tax').notNull().default(false),
 
     // Default booking text
     defaultTermsAndConditions: text('default_terms_and_conditions'),

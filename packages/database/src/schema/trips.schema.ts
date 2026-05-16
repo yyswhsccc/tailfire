@@ -241,8 +241,12 @@ export const tripCollaborators = pgTable('trip_collaborators', {
   tripId: uuid('trip_id').notNull().references(() => trips.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull(), // FK to users
 
-  // Commission Split
+  // Commission Split (between collaborators on a trip)
   commissionPercentage: decimal('commission_percentage', { precision: 5, scale: 2 }).notNull(), // 30.00 = 30%
+
+  // Per-trip agent split override (PR-1) — NULL = use agent's profile splitValue.
+  // Replaces the old "splitValue from user_profiles.commission_settings" per-trip behavior.
+  agentSplitOverride: decimal('agent_split_override', { precision: 5, scale: 2 }),
 
   // Role
   role: varchar('role', { length: 50 }), // 'lead', 'support', 'specialist'

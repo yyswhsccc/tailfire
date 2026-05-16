@@ -1527,6 +1527,55 @@
       "when": 1779039600000,
       "tag": "20260515200000_backfill_remaining_trip_owners",
       "breakpoints": true
+    },
+    {
+      "idx": 218,
+      "version": "7",
+      "when": 1779098400000,
+      "tag": "20260516100000_commission_check_items_tax_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 219,
+      "version": "7",
+      "when": 1779099000000,
+      "tag": "20260516100100_suppliers_commission_tax_defaults",
+      "breakpoints": true
+    },
+    {
+      "idx": 220,
+      "version": "7",
+      "when": 1779099600000,
+      "tag": "20260516100200_commission_tracking_add_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 221,
+      "version": "7",
+      "when": 1779100200000,
+      "tag": "20260516100300_trip_collaborators_agent_split_override",
+      "breakpoints": true
+    },
+    {
+      "idx": 222,
+      "version": "7",
+      "when": 1779100800000,
+      "tag": "20260516100400_commission_item_settlements_reversal",
+      "breakpoints": true
+    },
+    {
+      "idx": 223,
+      "version": "7",
+      "when": 1779101400000,
+      "tag": "20260516100500_commission_history_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 224,
+      "version": "7",
+      "when": 1779102600000,
+      "tag": "20260516100700_commission_checks_immutability_trigger",
+      "breakpoints": true
     }
   ]
 }

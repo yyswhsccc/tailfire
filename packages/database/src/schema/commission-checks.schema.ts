@@ -19,6 +19,7 @@ import {
   date,
   timestamp,
   boolean,
+  jsonb,
   unique,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
@@ -126,6 +127,11 @@ export const commissionCheckItems = pgTable(
     receivedParentCents: integer('received_parent_cents').default(0),
     receivedCents: integer('received_cents').default(0),
 
+    // Tax-on-commission (PR-1 — supplier embeds GST/HST in received_cents)
+    embeddedTaxCents: integer('embedded_tax_cents').notNull().default(0),
+    embeddedTaxType: varchar('embedded_tax_type', { length: 50 }),
+    embeddedTaxRatePercent: decimal('embedded_tax_rate_percent', { precision: 5, scale: 2 }),
+
     // Audit
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -161,15 +167,19 @@ export const commissionItemSettlements = pgTable(
 
     settledAmountCents: integer('settled_amount_cents').notNull(),
 
+    // Reversal pattern (PR-1) — replaces CASCADE DELETE
+    isReversal: boolean('is_reversal').notNull().default(false),
+    reversesSettlementId: uuid('reverses_settlement_id'),
+    reversedAt: timestamp('reversed_at', { withTimezone: true }),
+    reversedBy: uuid('reversed_by'),
+    reversedReason: text('reversed_reason'),
+
+    // Formula snapshot for forever audit (PR-1)
+    computationBreakdown: jsonb('computation_breakdown'),
+
     createdBy: uuid('created_by'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    uniqueItemRecipient: unique('unique_check_item_recipient').on(
-      table.checkItemId,
-      table.recipientUserId
-    ),
-  })
+  }
 )
 
 // ============================================================================
