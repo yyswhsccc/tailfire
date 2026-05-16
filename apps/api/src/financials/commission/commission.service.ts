@@ -648,7 +648,7 @@ export class CommissionService {
         s.commission_includes_tax AS includes_tax
       FROM activity_pricing ap
       LEFT JOIN itinerary_activities ia ON ia.id = ap.activity_id
-      LEFT JOIN activity_suppliers asup ON asup.activity_id = ia.id AND asup.is_primary = true
+      LEFT JOIN activity_suppliers asup ON asup.activity_id = ia.id AND asup.primary_supplier = true
       LEFT JOIN suppliers s ON s.id = asup.supplier_id
       WHERE ap.id = ${activityPricingId}::uuid
       LIMIT 1
