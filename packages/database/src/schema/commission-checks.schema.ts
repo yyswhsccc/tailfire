@@ -19,6 +19,7 @@ import {
   date,
   timestamp,
   boolean,
+  jsonb,
   unique,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
@@ -126,6 +127,11 @@ export const commissionCheckItems = pgTable(
     receivedParentCents: integer('received_parent_cents').default(0),
     receivedCents: integer('received_cents').default(0),
 
+    // Tax-on-commission (PR-1 — supplier embeds GST/HST in received_cents)
+    embeddedTaxCents: integer('embedded_tax_cents').notNull().default(0),
+    embeddedTaxType: varchar('embedded_tax_type', { length: 50 }),
+    embeddedTaxRatePercent: decimal('embedded_tax_rate_percent', { precision: 5, scale: 2 }),
+
     // Audit
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -147,9 +153,12 @@ export const commissionItemSettlements = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
 
+    // PR-1: settlements never delete (reversal-row pattern); RESTRICT both FKs
+    // so an accidental hard delete of a parent surfaces loudly instead of
+    // silently wiping audit history. Mirrors migration 20260516100400.
     checkItemId: uuid('check_item_id')
       .notNull()
-      .references(() => commissionCheckItems.id, { onDelete: 'cascade' }),
+      .references(() => commissionCheckItems.id, { onDelete: 'restrict' }),
 
     recipientUserId: uuid('recipient_user_id')
       .notNull()
@@ -157,19 +166,23 @@ export const commissionItemSettlements = pgTable(
 
     paidCheckId: uuid('paid_check_id')
       .notNull()
-      .references(() => commissionChecks.id, { onDelete: 'cascade' }),
+      .references(() => commissionChecks.id, { onDelete: 'restrict' }),
 
     settledAmountCents: integer('settled_amount_cents').notNull(),
 
+    // Reversal pattern (PR-1) — replaces CASCADE DELETE
+    isReversal: boolean('is_reversal').notNull().default(false),
+    reversesSettlementId: uuid('reverses_settlement_id'),
+    reversedAt: timestamp('reversed_at', { withTimezone: true }),
+    reversedBy: uuid('reversed_by'),
+    reversedReason: text('reversed_reason'),
+
+    // Formula snapshot for forever audit (PR-1)
+    computationBreakdown: jsonb('computation_breakdown'),
+
     createdBy: uuid('created_by'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    uniqueItemRecipient: unique('unique_check_item_recipient').on(
-      table.checkItemId,
-      table.recipientUserId
-    ),
-  })
+  }
 )
 
 // ============================================================================
@@ -202,6 +215,11 @@ export const commissionAdjustments = pgTable('commission_adjustments', {
   // Agent/company association
   agentUserId: uuid('agent_user_id').references(() => userProfiles.id),
   companyName: varchar('company_name', { length: 255 }),
+
+  // PR-1: optional scope to a specific activity_pricing row.
+  activityPricingId: uuid('activity_pricing_id').references(() => activityPricing.id, { onDelete: 'set null' }),
+  // PR-1: explicit opt-in flag (overrides amount-sign inference).
+  isOptional: boolean('is_optional').notNull().default(false),
 
   // Status
   status: commissionAdjustmentStatusEnum('status').notNull().default('pending'),

@@ -53,6 +53,7 @@ export * from './financials.schema'
 
 // Commission system (check-based commission tracking)
 export * from './commission-checks.schema'
+export * from './commission-history.schema'
 
 // Agency tax filing config (CRA payer identity for T4A filings)
 export * from './agency-tax-filing-config.schema'

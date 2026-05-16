@@ -19,6 +19,7 @@ import {
 } from '@nestjs/common'
 import { eq, and, desc, sql, between, inArray, count } from 'drizzle-orm'
 import { DatabaseService } from '../../db/database.service'
+import { CommissionSettlementReversalService } from './commission-settlement-reversal.service'
 import { VALID_CHECK_TRANSITIONS } from './commission.types'
 import type {
   CreateCommissionCheckDto,
@@ -50,7 +51,10 @@ import type {
 export class CommissionService {
   private readonly logger = new Logger(CommissionService.name)
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly settlementReversalService: CommissionSettlementReversalService,
+  ) {}
 
   // ============================================================================
   // CHECK CRUD
@@ -258,12 +262,22 @@ export class CommissionService {
       dto.status === 'cancelled' && check.checkType === 'paid'
 
     if (isCancellingPaidCheck) {
+      // PR-1: replaces prior `DELETE FROM commission_item_settlements` — the
+      // settlements are reversed via paired negation rows so the original
+      // financial history is preserved forever (audit-proof pillar).
+      const reason = dto.notes?.trim() || `Paid check ${check.checkNumber} cancelled`
+      const actor = userId ?? check.createdBy ?? check.agencyId
+
       const [updated] = await this.db.client.transaction(async (tx) => {
-        // Delete settlement rows to reopen items for future payout
-        await tx.execute(sql`
-          DELETE FROM commission_item_settlements
-          WHERE paid_check_id = ${checkId}
-        `)
+        await this.settlementReversalService.reverseAllByPaidCheck(
+          {
+            paidCheckId: checkId,
+            reason,
+            actorUserId: actor,
+            agencyId,
+          },
+          tx,
+        )
 
         // Revert reconciled adjustments back to pending
         await tx.execute(sql`
@@ -321,17 +335,36 @@ export class CommissionService {
     return this.formatCheck(updated)
   }
 
-  async recallCheck(agencyId: string, checkId: string, userId?: string): Promise<CommissionCheckResponseDto> {
+  async recallCheck(
+    agencyId: string,
+    checkId: string,
+    userId?: string,
+    reason?: string,
+  ): Promise<CommissionCheckResponseDto> {
     const check = await this.getCheckRecord(agencyId, checkId)
 
     if (check.status !== 'accepted') {
       throw new BadRequestException('Only accepted checks can be recalled')
     }
 
+    // PR-1: recall is a signed transition that unlocks the immutability
+    // trigger added in migration 20260516100700. Reason is required so the
+    // audit trail can explain why the financial identity was reopened.
+    if (!reason || reason.trim().length === 0) {
+      throw new BadRequestException(
+        'recallCheck requires a reason — it unlocks the accepted-check immutability guard.',
+      )
+    }
+
+    const newNotes = check.notes
+      ? `${check.notes}\n[Recall ${new Date().toISOString()}] ${reason}`
+      : `[Recall ${new Date().toISOString()}] ${reason}`
+
     const [updated] = await this.db.client
       .update(this.db.schema.commissionChecks)
       .set({
         status: 'submitted',
+        notes: newNotes,
         updatedBy: userId,
         updatedAt: new Date(),
       })
@@ -470,16 +503,27 @@ export class CommissionService {
         createdBy: userId,
       }))
 
-      const inserted = await tx
-        .insert(this.db.schema.commissionItemSettlements)
-        .values(settlementRows)
-        .onConflictDoNothing({
-          target: [
-            this.db.schema.commissionItemSettlements.checkItemId,
-            this.db.schema.commissionItemSettlements.recipientUserId,
-          ],
-        })
-        .returning({ id: this.db.schema.commissionItemSettlements.id })
+      // PR-1 Commit 12: the partial unique on commission_item_settlements is
+      // now `(check_item_id, recipient_user_id) WHERE is_reversal = false
+      // AND reversed_at IS NULL` — see migration 20260516210000. Drizzle's
+      // onConflictDoNothing() in this version does not expose the partial
+      // index predicate, so we drop down to raw SQL to target the partial
+      // unique correctly. Same idempotent semantics as before.
+      const inserted: { id: string }[] = []
+      for (const row of settlementRows) {
+        const [maybe] = await tx.execute<{ id: string }>(sql`
+          INSERT INTO commission_item_settlements
+            (check_item_id, recipient_user_id, paid_check_id, settled_amount_cents, created_by)
+          VALUES
+            (${row.checkItemId}::uuid, ${row.recipientUserId}::uuid,
+             ${row.paidCheckId}::uuid, ${row.settledAmountCents}, ${row.createdBy ?? null})
+          ON CONFLICT (check_item_id, recipient_user_id)
+            WHERE is_reversal = false AND reversed_at IS NULL
+            DO NOTHING
+          RETURNING id
+        `)
+        if (maybe?.id) inserted.push({ id: maybe.id })
+      }
 
       return {
         check,
@@ -505,7 +549,20 @@ export class CommissionService {
     dto: AddCheckItemDto
   ): Promise<CommissionCheckItemResponseDto> {
     // Verify check exists and belongs to agency
-    await this.getCheckRecord(agencyId, checkId)
+    const check = await this.getCheckRecord(agencyId, checkId)
+
+    // PR-1 immutability guard: once accepted, items cannot be added.
+    // Recall (accepted → pending) is the only way to unlock.
+    if (check.status === 'accepted') {
+      throw new BadRequestException(
+        `commission_check ${checkId} is accepted and locked. Recall before adding items.`,
+      )
+    }
+    if (check.status === 'cancelled') {
+      throw new BadRequestException(
+        `commission_check ${checkId} is cancelled. Cannot add items to a cancelled check.`,
+      )
+    }
 
     // Verify activity pricing belongs to same agency
     const [pricing] = await this.db.client
@@ -523,6 +580,19 @@ export class CommissionService {
       throw new NotFoundException(`Activity pricing ${dto.activityPricingId} not found`)
     }
 
+    // PR-1: resolve embedded_tax fields. Caller wins; otherwise derive from
+    // supplier defaults via the formula helper (embedded = gross × rate /
+    // (100 + rate) when commission_includes_tax = true).
+    const tax = await this.resolveCheckItemTax(
+      dto.activityPricingId,
+      dto.receivedCents ?? 0,
+      {
+        embeddedTaxCents: dto.embeddedTaxCents,
+        embeddedTaxType: dto.embeddedTaxType,
+        embeddedTaxRatePercent: dto.embeddedTaxRatePercent,
+      },
+    )
+
     const [item] = await this.db.client
       .insert(this.db.schema.commissionCheckItems)
       .values({
@@ -531,10 +601,73 @@ export class CommissionService {
         projectedCents: dto.projectedCents,
         receivedParentCents: dto.receivedParentCents ?? 0,
         receivedCents: dto.receivedCents ?? 0,
+        embeddedTaxCents: tax.embeddedTaxCents,
+        embeddedTaxType: tax.embeddedTaxType,
+        embeddedTaxRatePercent: tax.embeddedTaxRatePercent != null ? String(tax.embeddedTaxRatePercent) : null,
       })
       .returning()
 
     return this.formatCheckItem(item)
+  }
+
+  /**
+   * PR-1: resolves embedded-tax inputs for a new commission_check_item.
+   * Caller-supplied values always win. When omitted, looks up the supplier
+   * via the activity_pricing → itinerary_activities → activity_suppliers
+   * chain (or activity_pricing.supplierName fallback) and applies the
+   * formula. Returns { embeddedTaxCents, embeddedTaxType, embeddedTaxRatePercent }.
+   */
+  private async resolveCheckItemTax(
+    activityPricingId: string,
+    grossCents: number,
+    callerSupplied: {
+      embeddedTaxCents?: number
+      embeddedTaxType?: string | null
+      embeddedTaxRatePercent?: number | null
+    },
+  ): Promise<{
+    embeddedTaxCents: number
+    embeddedTaxType: string | null
+    embeddedTaxRatePercent: number | null
+  }> {
+    // Caller wins entirely — no derivation when they supplied anything.
+    if (callerSupplied.embeddedTaxCents !== undefined) {
+      return {
+        embeddedTaxCents: callerSupplied.embeddedTaxCents,
+        embeddedTaxType: callerSupplied.embeddedTaxType ?? null,
+        embeddedTaxRatePercent: callerSupplied.embeddedTaxRatePercent ?? null,
+      }
+    }
+
+    // Look up supplier defaults via activity_suppliers (most authoritative)
+    // with a fallback to activity_pricing.supplier (denormalized name).
+    const rows: any[] = await this.db.client.execute(sql`
+      SELECT
+        s.default_commission_tax_type AS tax_type,
+        s.default_commission_tax_rate_percent::numeric AS rate_percent,
+        s.commission_includes_tax AS includes_tax
+      FROM activity_pricing ap
+      LEFT JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      LEFT JOIN activity_suppliers asup ON asup.activity_id = ia.id AND asup.is_primary = true
+      LEFT JOIN suppliers s ON s.id = asup.supplier_id
+      WHERE ap.id = ${activityPricingId}::uuid
+      LIMIT 1
+    `)
+    const row = (rows as Array<{ tax_type?: string | null; rate_percent?: string | null; includes_tax?: boolean | null }>)[0]
+    const ratePercent = row?.rate_percent != null ? Number(row.rate_percent) : null
+    const includesTax = !!row?.includes_tax
+
+    if (!includesTax || ratePercent === null || ratePercent === 0) {
+      return { embeddedTaxCents: 0, embeddedTaxType: row?.tax_type ?? null, embeddedTaxRatePercent: ratePercent }
+    }
+
+    // Lazy import to avoid a wider service refactor for one helper.
+    const { computeEmbeddedTaxFromInclusive } = await import('./commission-formula')
+    return {
+      embeddedTaxCents: computeEmbeddedTaxFromInclusive(grossCents, ratePercent),
+      embeddedTaxType: row?.tax_type ?? null,
+      embeddedTaxRatePercent: ratePercent,
+    }
   }
 
   async removeCheckItem(
@@ -542,7 +675,15 @@ export class CommissionService {
     checkId: string,
     itemId: string
   ): Promise<{ success: boolean }> {
-    await this.getCheckRecord(agencyId, checkId)
+    const check = await this.getCheckRecord(agencyId, checkId)
+
+    // PR-1 immutability guard: items on accepted checks must be reversed,
+    // not deleted. Recall the check to unlock removal during correction.
+    if (check.status === 'accepted') {
+      throw new BadRequestException(
+        `commission_check ${checkId} is accepted and locked. Recall before removing items.`,
+      )
+    }
 
     const [deleted] = await this.db.client
       .delete(this.db.schema.commissionCheckItems)
@@ -810,8 +951,15 @@ export class CommissionService {
       JOIN trips t ON t.id = i.trip_id
       JOIN trip_collaborators tc ON tc.trip_id = t.id AND tc.is_active = true
       JOIN user_profiles up ON up.id = tc.user_id
+      -- PR-1 Commit 13 (Codex round-5 fix): an "active settlement" is one
+      -- that hasn't been reversed. Without the is_reversal/reversed_at
+      -- filter, reversed items would stay hidden from getCommissionDue()
+      -- forever — the cis row still exists, just marked reversed.
       LEFT JOIN commission_item_settlements cis
-        ON cis.check_item_id = cci.id AND cis.recipient_user_id = up.id
+        ON cis.check_item_id = cci.id
+        AND cis.recipient_user_id = up.id
+        AND cis.is_reversal = false
+        AND cis.reversed_at IS NULL
       WHERE cc.agency_id = ${agencyId}
         AND cc.check_type = 'received'
         AND cc.status = 'accepted'
@@ -911,15 +1059,21 @@ export class CommissionService {
           JOIN trips t ON t.id = i.trip_id
           JOIN trip_collaborators tc ON tc.trip_id = t.id AND tc.user_id = ${agent.userId} AND tc.is_active = true
           JOIN user_profiles up ON up.id = tc.user_id
+          -- PR-1 Commit 12: only "active" settlements block re-claim. A
+          -- reversed original (reversed_at IS NOT NULL) or a reversal row
+          -- (is_reversal = true) is not active.
           LEFT JOIN commission_item_settlements existing
-            ON existing.check_item_id = cci.id AND existing.recipient_user_id = ${agent.userId}
+            ON existing.check_item_id = cci.id
+            AND existing.recipient_user_id = ${agent.userId}
+            AND existing.is_reversal = false
+            AND existing.reversed_at IS NULL
           WHERE existing.id IS NULL
             AND t.status IN ('travelling', 'travelled')
             AND src_cc.agency_id = ${agencyId}
             AND src_cc.check_type = 'received'
             AND src_cc.status = 'accepted'
             AND src_cc.currency = ${agent.currency}   -- ← only claim items in matching currency
-          ON CONFLICT (check_item_id, recipient_user_id) DO NOTHING
+          ON CONFLICT (check_item_id, recipient_user_id) WHERE is_reversal = false AND reversed_at IS NULL DO NOTHING
           RETURNING settled_amount_cents
         `)
 

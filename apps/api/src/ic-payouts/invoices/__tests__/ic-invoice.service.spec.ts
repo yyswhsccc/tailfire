@@ -27,9 +27,14 @@ import { PlaceOfSupplyService } from '../../place-of-supply/place-of-supply.serv
 import { IcInvoicePdfService } from '../ic-invoice-pdf.service'
 import { StorageService } from '../../../trips/storage.service'
 import { DisbursementService } from '../../disbursements/disbursement.service'
+import { CommissionSettlementReversalService } from '../../../financials/commission/commission-settlement-reversal.service'
 
 const mockEventEmitter = { emit: jest.fn() }
 const mockDisbursementService = { enqueue: jest.fn().mockResolvedValue({}) }
+const mockReversalService = {
+  reverseSettlement: jest.fn().mockResolvedValue({ reversalRowId: 'rev-1', alreadyReversed: false }),
+  reverseAllByPaidCheck: jest.fn().mockResolvedValue({ reversedSettlementIds: [], reversalRowIds: [] }),
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -64,31 +69,53 @@ function makeProfile(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function makeCadItem(id: string, commissionCents = 10_000) {
+// PR-1: with the formula in play, the "commissionCents" the IC sees is no
+// longer the supplier gross — it's grossReceivedCents × (100 - feeRate%) ×
+// agentSplit% × collaborator%. To keep the test fixtures readable, these
+// helpers accept a `grossCents` and synthesize SQL rows in the new shape;
+// callers compare against the formula output, not the raw gross.
+function makeCadItem(id: string, grossCents = 10_000) {
   return {
     id,
     checkId: 'src-check-cad',
     activityPricingId: `ap-${id}`,
     description: `Activity for ${id}`,
-    receivedCents: commissionCents,
+    receivedCents: grossCents,
     currency: 'CAD',
     tripRef: 'TRIP-001',
-    commissionCents,
-    settled_amount_cents: commissionCents,
+    // PR-1 formula-input columns surfaced via SQL
+    gross_received_cents: String(grossCents),
+    embedded_tax_cents: '0',
+    embedded_tax_type: null,
+    embedded_tax_rate_percent: null,
+    default_fee_rate_percent: '5.00',
+    fee_rate_override_percent: null,
+    default_agent_split_percent: '60',
+    agent_split_override_percent: null,
+    collaborator_percent: '100',
+    settled_amount_cents: grossCents,
   }
 }
 
-function makeUsdItem(id: string, commissionCents = 8_000) {
+function makeUsdItem(id: string, grossCents = 8_000) {
   return {
     id,
     checkId: 'src-check-usd',
     activityPricingId: `ap-${id}`,
     description: `Activity for ${id}`,
-    receivedCents: commissionCents,
+    receivedCents: grossCents,
     currency: 'USD',
     tripRef: 'TRIP-002',
-    commissionCents,
-    settled_amount_cents: commissionCents,
+    gross_received_cents: String(grossCents),
+    embedded_tax_cents: '0',
+    embedded_tax_type: null,
+    embedded_tax_rate_percent: null,
+    default_fee_rate_percent: '5.00',
+    fee_rate_override_percent: null,
+    default_agent_split_percent: '60',
+    agent_split_override_percent: null,
+    collaborator_percent: '100',
+    settled_amount_cents: grossCents,
   }
 }
 
@@ -250,44 +277,89 @@ function createMockDb(initialState?: {
 
   // execute() handles several different raw SQL calls.
   // We distinguish them by tracking call order within the transaction.
-  // Order inside tx: [0]=settlements INSERT, [1]=adjustments UPDATE
-  // Outside tx: [0]=eligibleItems query, [1]=adjustments query
+  // PR-1 inside-tx order changed:
+  //   [0] SELECT check_item_id ... FOR UPDATE (conflict detection — empty for happy path)
+  //   [1] UPDATE adjustments → reconciled
+  // Settlements are now inserted via tx.insert() not tx.execute(), so mockExecute
+  // no longer sees them. The mockInsert chain captures them.
   let outsideExecuteCount = 0
   let insideTxExecuteCount = 0
   let inTransaction = false
 
-  const mockExecute = jest.fn(async (_sql: unknown) => {
+  // Inspect Drizzle SQL template to route the call.
+  const sqlContains = (s: unknown, needle: string): boolean => {
+    const obj = s as { queryChunks?: Array<{ value?: unknown }> } | string
+    if (typeof obj === 'string') return obj.includes(needle)
+    if (!obj || !Array.isArray(obj.queryChunks)) return false
+    return obj.queryChunks.some((c) => String(c?.value ?? '').toLowerCase().includes(needle.toLowerCase()))
+  }
+
+  const mockExecute = jest.fn(async (sqlObj: unknown) => {
     if (inTransaction) {
       const idx = insideTxExecuteCount++
-      if (idx === 0) {
-        // settlements INSERT ... ON CONFLICT DO NOTHING RETURNING id
-        calls.settlementsInserts++
-        const callN = settlementsCallCount++
-        if (settlementsOverrides.has(callN)) {
-          return settlementsOverrides.get(callN)!
-        }
-        // Default: return one row per eligible item in the state
-        if (state.settlementsReturning !== null) {
-          return state.settlementsReturning
-        }
-        return state.eligibleItems.map((_, i) => ({ id: `settlement-${i}` }))
+      // PR-1 Commit 11: there are now TWO tx.execute() calls in the claim
+      // happy path:
+      //   (1) SELECT id FROM commission_check_items ... FOR UPDATE
+      //       (row-level lock so concurrent submits serialize)
+      //   (2) SELECT check_item_id FROM commission_item_settlements ...
+      //       reverses_settlement_id IS NULL  (pre-flight conflict check)
+      // We route (1) to a no-op and only treat (2) as the conflict signal —
+      // otherwise the same "FOR UPDATE" substring would match both and double-
+      // count.
+      if (
+        sqlContains(sqlObj, 'commission_check_items') &&
+        sqlContains(sqlObj, 'for update')
+      ) {
+        // (1) check_item row lock — no rows needed; service ignores the result.
+        return []
       }
-      if (idx === 1) {
-        // adjustments UPDATE ... RETURNING
+      // PR-1: conflict-detection SELECT (the settlements one). Commit 12
+      // changed the active-settlement predicate from
+      // `reverses_settlement_id IS NULL` to
+      // `is_reversal = false AND reversed_at IS NULL`. Match either so
+      // historical mocks keep working.
+      if (
+        sqlContains(sqlObj, 'reverses_settlement_id is null') ||
+        (sqlContains(sqlObj, 'is_reversal = false') && sqlContains(sqlObj, 'reversed_at is null'))
+      ) {
+        const callN = settlementsCallCount++
+        calls.settlementsInserts++ // surface that the conflict check ran
+        // PR-1 semantics translation: in the OLD impl, an empty
+        // `settlementsReturning` array signalled "INSERT … ON CONFLICT
+        // returned 0 rows → conflict". In the new impl, conflict = SELECT
+        // FOR UPDATE returned ≥1 rows. So when state.settlementsReturning is
+        // explicitly `[]`, we surface a synthetic conflicting row here to
+        // preserve the test intent.
+        if (Array.isArray(state.settlementsReturning) && state.settlementsReturning.length === 0) {
+          return [{ check_item_id: 'simulated-conflict' }]
+        }
+        if (settlementsOverrides.has(callN)) {
+          const winners = settlementsOverrides.get(callN)!
+          if (winners.length === 0) {
+            return [{ check_item_id: 'simulated-conflict' }]
+          }
+          return winners.map((w) => ({ check_item_id: w.id }))
+        }
+        return []
+      }
+      if (sqlContains(sqlObj, 'update commission_adjustments')) {
+        // adjustments UPDATE
         const rows = state.adjustments
           .filter(a => a.status === 'pending')
           .map(a => ({ amount_cents: a.amountCents, id: a.id }))
-        calls.adjustmentsUpdates.push({ status: 'reconciled' })
+        calls.adjustmentsUpdates.push({
+          status: sqlContains(sqlObj, "'pending'") && sqlContains(sqlObj, 'check_id = null') ? 'pending' : 'reconciled',
+        })
         return rows
       }
-      // Additional execute calls in reject() path:
+      // Default catchall (e.g. reject path's settlements ops which are now
+      // handled via the reversal service mock, but legacy DELETE could still
+      // appear in some test paths). idx ordering is preserved for back-compat.
       if (idx === 2) {
-        // DELETE settlements
         calls.settlementsDelete++
         return []
       }
       if (idx === 3) {
-        // UPDATE adjustments back to pending
         calls.adjustmentsUpdates.push({ status: 'pending' })
         return []
       }
@@ -479,6 +551,7 @@ describe('IcInvoiceService.submitClaim — C3 reservation', () => {
         { provide: StorageService, useValue: mockStorage },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: DisbursementService, useValue: mockDisbursementService },
+        { provide: CommissionSettlementReversalService, useValue: mockReversalService },
       ],
     }).compile()
 
@@ -616,12 +689,15 @@ describe('IcInvoiceService.submitClaim — C3 reservation', () => {
       })),
     }))
 
-    // Override transaction to use the overridden insert + always succeed settlements (1 row)
+    // Override transaction. PR-1: settlements are inserted via tx.insert()
+    // not tx.execute(); the only execute inside the tx is the SELECT FOR
+    // UPDATE conflict check (which should return [] for happy path) and the
+    // adjustments UPDATE. Return [] for both.
     db._mocks.mockTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
       const tx = {
         insert: db._mocks.mockInsert,
         update: db.client.update,
-        execute: jest.fn(async () => [{ id: 'claimed-row' }]), // 1 row = 1 item settled
+        execute: jest.fn(async () => []),
         select: db.client.select,
       }
       return cb(tx)
@@ -809,6 +885,7 @@ describe('IcInvoiceService.getEligibleForUser — eligibility query', () => {
         { provide: StorageService, useValue: createMockStorage() },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: DisbursementService, useValue: mockDisbursementService },
+        { provide: CommissionSettlementReversalService, useValue: mockReversalService },
       ],
     }).compile()
 
@@ -832,22 +909,41 @@ describe('IcInvoiceService.getEligibleForUser — eligibility query', () => {
       adjustments: [cadAdjustment],
     })
 
-    // Override execute to return items in the raw SQL shape that getEligibleForUser expects.
-    // Outside-tx execute call 0: items query. Adjustments use Drizzle .select().
+    // PR-1: SQL now returns all formula inputs; service applies
+    // computeAgentShare and surfaces agentShareCents + breakdown.
+    // i1: $500 gross, no tax, default 5% fee, 60% split, 100% solo
+    //     → base $500 - 5% ($25) = $475 × 60% = $285 = 28500 cents
+    // i2: $300 gross, no tax → 30000 - 1500 = 28500 × 60% = 17100 cents
     db._mocks.mockExecute.mockImplementation(async () => [
       {
         check_item_id: 'i1',
         currency: 'CAD',
         trip_ref: 'Smith',
         description: 'Resort',
-        commission_cents: '50000',
+        gross_received_cents: '50000',
+        embedded_tax_cents: '0',
+        embedded_tax_type: null,
+        embedded_tax_rate_percent: null,
+        default_fee_rate_percent: '5.00',
+        fee_rate_override_percent: null,
+        default_agent_split_percent: '60',
+        agent_split_override_percent: null,
+        collaborator_percent: '100',
       } as any,
       {
         check_item_id: 'i2',
         currency: 'USD',
         trip_ref: 'Jones',
         description: 'Flight',
-        commission_cents: '30000',
+        gross_received_cents: '30000',
+        embedded_tax_cents: '0',
+        embedded_tax_type: null,
+        embedded_tax_rate_percent: null,
+        default_fee_rate_percent: '5.00',
+        fee_rate_override_percent: null,
+        default_agent_split_percent: '60',
+        agent_split_override_percent: null,
+        collaborator_percent: '100',
       } as any,
     ] as any)
 
@@ -875,7 +971,9 @@ describe('IcInvoiceService.getEligibleForUser — eligibility query', () => {
     expect(cad).toBeDefined()
     expect(cad.items).toHaveLength(1)
     expect(cad.items[0]!.checkItemId).toBe('i1')
-    expect(cad.items[0]!.commissionCents).toBe(50000)
+    // PR-1: $500 gross at 5% fee, 60% split, 100% solo → $285
+    expect(cad.items[0]!.agentShareCents).toBe(28500)
+    expect(cad.items[0]!.breakdown.formulaVersion).toBe(1)
     expect(cad.adjustments).toHaveLength(1)
     expect(cad.adjustments[0]!.adjustmentId).toBe('adj-cad-1')
 
@@ -883,7 +981,8 @@ describe('IcInvoiceService.getEligibleForUser — eligibility query', () => {
     expect(usd).toBeDefined()
     expect(usd.items).toHaveLength(1)
     expect(usd.items[0]!.checkItemId).toBe('i2')
-    expect(usd.items[0]!.commissionCents).toBe(30000)
+    // PR-1: $300 gross at 5% fee, 60% split, 100% solo → $171
+    expect(usd.items[0]!.agentShareCents).toBe(17100)
     expect(usd.adjustments).toHaveLength(0)
   })
 
@@ -924,6 +1023,7 @@ describe('IcInvoiceService.approve', () => {
         { provide: StorageService, useValue: createMockStorage() },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: DisbursementService, useValue: mockDisbursementService },
+        { provide: CommissionSettlementReversalService, useValue: mockReversalService },
       ],
     }).compile()
 
@@ -1021,6 +1121,7 @@ describe('IcInvoiceService.submitClaim — auto-approve path (Task 29)', () => {
         { provide: StorageService, useValue: mockStorage },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: DisbursementService, useValue: mockDisbursementService },
+        { provide: CommissionSettlementReversalService, useValue: mockReversalService },
       ],
     }).compile()
 
@@ -1126,6 +1227,7 @@ describe('IcInvoiceService.reject', () => {
         { provide: StorageService, useValue: createMockStorage() },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: DisbursementService, useValue: mockDisbursementService },
+        { provide: CommissionSettlementReversalService, useValue: mockReversalService },
       ],
     }).compile()
 
@@ -1149,17 +1251,14 @@ describe('IcInvoiceService.reject', () => {
 
     const rejectedInvoice = makeInvoiceRow({ status: 'rejected', rejectedReason: 'Wrong line items' })
 
+    // PR-1: DELETE FROM commission_item_settlements is gone — replaced by
+    // settlementReversalService.reverseAllByPaidCheck() which we mock at the
+    // module level. The only tx.execute() the reject() flow now makes inside
+    // the txn is the adjustments UPDATE.
     let txExecuteCount = 0
     const mockTxExecute = jest.fn(async () => {
-      const idx = txExecuteCount++
-      if (idx === 0) {
-        deleteSettlementsCount.n++
-        return []
-      }
-      if (idx === 1) {
-        adjustmentsUpdates.push({ status: 'pending' })
-        return []
-      }
+      txExecuteCount++
+      adjustmentsUpdates.push({ status: 'pending' })
       return []
     })
 
@@ -1206,12 +1305,24 @@ describe('IcInvoiceService.reject', () => {
 
     await buildModule(rejectDb as any)
 
+    mockReversalService.reverseAllByPaidCheck.mockClear()
     const result = await service.reject(INVOICE_ID, 'Wrong line items', 'admin-1')
     expect(result.status).toBe('rejected')
     expect(result.rejectedReason).toBe('Wrong line items')
 
-    // Settlements deleted
-    expect(deleteSettlementsCount.n).toBe(1)
+    // PR-1: settlements are reversed (not deleted) via the reversal service
+    expect(mockReversalService.reverseAllByPaidCheck).toHaveBeenCalledTimes(1)
+    expect(mockReversalService.reverseAllByPaidCheck).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paidCheckId: RESERVATION_CHECK_ID,
+        actorUserId: 'admin-1',
+        agencyId: AGENCY_ID,
+      }),
+      expect.anything(),
+    )
+
+    // unused counter — kept for future test extensions
+    void deleteSettlementsCount
 
     // Adjustments flipped back to pending
     expect(adjustmentsUpdates).toContainEqual(

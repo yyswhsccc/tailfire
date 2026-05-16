@@ -6,8 +6,10 @@
  * workaround used in TraveleSolutions.
  */
 
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Req, HttpCode, HttpStatus } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common'
 import { AdminOnly } from '../../auth/decorators/admin-only.decorator'
+import { GetAuthContext } from '../../auth/decorators/auth-context.decorator'
+import type { AuthContext } from '../../auth/auth.types'
 import { ApiTags } from '@nestjs/swagger'
 import { CommissionAdjustmentsService } from './commission-adjustments.service'
 import type {
@@ -23,33 +25,90 @@ import type {
 export class CommissionAdjustmentsController {
   constructor(private readonly adjustmentsService: CommissionAdjustmentsService) {}
 
+  /**
+   * POST /commission/adjustments
+   * PR-1: admin-only. Creating an adjustment writes to the agent payout
+   * ledger; ICs cannot self-issue adjustments to their own commission.
+   */
   @Post('commission/adjustments')
+  @AdminOnly()
   async createAdjustment(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Body() dto: CreateCommissionAdjustmentDto
   ): Promise<CommissionAdjustmentResponseDto> {
-    const agencyId = req.user?.agencyId
-    const userId = req.user?.userId
-    return this.adjustmentsService.createAdjustment(agencyId, dto, userId)
+    return this.adjustmentsService.createAdjustment(auth.agencyId, dto, auth.userId)
   }
 
+  /**
+   * GET /commission/adjustments
+   * Non-admins see only their own adjustments (server-side enforced via
+   * agentUserId filter; the client cannot widen scope).
+   */
   @Get('commission/adjustments')
   async getAdjustments(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Query() filter: CommissionAdjustmentFilterDto
   ): Promise<PaginatedCommissionAdjustmentsResponseDto> {
-    const agencyId = req.user?.agencyId
-    return this.adjustmentsService.getAdjustments(agencyId, filter)
+    if (auth.role !== 'admin') {
+      filter.agentUserId = auth.userId
+    }
+    return this.adjustmentsService.getAdjustments(auth.agencyId, filter)
   }
 
+  /**
+   * PATCH /commission/adjustments/:id
+   * PR-1: admin-only. Editing tax, amount, or status reaches the financial
+   * ledger.
+   */
   @Patch('commission/adjustments/:id')
+  @AdminOnly()
   async updateAdjustment(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
     @Body() dto: UpdateCommissionAdjustmentDto
   ): Promise<CommissionAdjustmentResponseDto> {
-    const agencyId = req.user?.agencyId
-    return this.adjustmentsService.updateAdjustment(agencyId, id, dto)
+    return this.adjustmentsService.updateAdjustment(auth.agencyId, id, dto)
+  }
+
+  /**
+   * POST /commission/adjustments/:id/reconcile
+   * PR-1: admin-only. Flip a pending adjustment to reconciled explicitly
+   * (mirrors the implicit auto-reconcile that happens during claim
+   * submission). Used when an admin wants to clear an outstanding
+   * adjustment without waiting for the IC to claim it.
+   */
+  @Post('commission/adjustments/:id/reconcile')
+  @AdminOnly()
+  async reconcileAdjustment(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() body: { reason?: string } = {},
+  ): Promise<CommissionAdjustmentResponseDto> {
+    return this.adjustmentsService.setStatus(auth.agencyId, id, 'reconciled', {
+      actorUserId: auth.userId,
+      reason: body.reason ?? null,
+    })
+  }
+
+  /**
+   * POST /commission/adjustments/:id/unreconcile
+   * PR-1: admin-only signed transition — reason REQUIRED. Reopens a
+   * previously-reconciled adjustment.
+   */
+  @Post('commission/adjustments/:id/unreconcile')
+  @AdminOnly()
+  async unreconcileAdjustment(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() body: { reason?: string } = {},
+  ): Promise<CommissionAdjustmentResponseDto> {
+    if (!body.reason || body.reason.trim().length === 0) {
+      throw new BadRequestException('unreconcile requires a reason')
+    }
+    return this.adjustmentsService.setStatus(auth.agencyId, id, 'pending', {
+      actorUserId: auth.userId,
+      reason: body.reason,
+    })
   }
 
   /**
@@ -62,10 +121,9 @@ export class CommissionAdjustmentsController {
   @AdminOnly()
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteAdjustment(
-    @Req() req: any,
+    @GetAuthContext() auth: AuthContext,
     @Param('id') id: string,
   ): Promise<void> {
-    const agencyId = req.user?.agencyId
-    await this.adjustmentsService.deleteAdjustment(agencyId, id)
+    await this.adjustmentsService.deleteAdjustment(auth.agencyId, id)
   }
 }

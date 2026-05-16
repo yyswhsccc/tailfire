@@ -94,6 +94,11 @@ export class CommissionAdjustmentsService {
       conditions.push(eq(this.db.schema.commissionAdjustments.status, filter.status))
     }
 
+    // PR-1: scope filter — controller pins this to auth.userId for non-admins.
+    if (filter.agentUserId) {
+      conditions.push(eq(this.db.schema.commissionAdjustments.agentUserId, filter.agentUserId))
+    }
+
     const whereClause = and(...conditions)
 
     const [adjustments, countResult] = await Promise.all([
@@ -160,6 +165,61 @@ export class CommissionAdjustmentsService {
     const [updated] = await this.db.client
       .update(this.db.schema.commissionAdjustments)
       .set(updateData)
+      .where(eq(this.db.schema.commissionAdjustments.id, adjustmentId))
+      .returning()
+
+    return this.formatAdjustment(updated)
+  }
+
+  /**
+   * Set an adjustment's status explicitly. PR-1 admin tool used by the
+   * /reconcile and /unreconcile endpoints. Idempotent (no-op if already in
+   * target status).
+   */
+  async setStatus(
+    agencyId: string,
+    adjustmentId: string,
+    targetStatus: 'pending' | 'reconciled',
+    opts: { actorUserId: string; reason: string | null },
+  ): Promise<CommissionAdjustmentResponseDto> {
+    const [existing] = await this.db.client
+      .select()
+      .from(this.db.schema.commissionAdjustments)
+      .where(
+        and(
+          eq(this.db.schema.commissionAdjustments.id, adjustmentId),
+          eq(this.db.schema.commissionAdjustments.agencyId, agencyId),
+        ),
+      )
+      .limit(1)
+
+    if (!existing) {
+      throw new NotFoundException(`Adjustment ${adjustmentId} not found`)
+    }
+
+    if (existing.status === targetStatus) {
+      return this.formatAdjustment(existing)
+    }
+
+    // PR-1: unreconcile must not detach from a paid check it's already linked
+    // to (that path requires reversing the parent check itself).
+    if (targetStatus === 'pending' && existing.checkId) {
+      throw new BadRequestException(
+        `Adjustment ${adjustmentId} is attached to commission_check ${existing.checkId}. Reverse the parent check to unreconcile.`,
+      )
+    }
+
+    const [updated] = await this.db.client
+      .update(this.db.schema.commissionAdjustments)
+      .set({
+        status: targetStatus,
+        updatedAt: new Date(),
+        // Append the reason into the description so the audit is inline-readable
+        // even before the audit-trail UI ships in PR-2/J.
+        description: opts.reason
+          ? `${existing.description}\n[${targetStatus} ${new Date().toISOString()} by ${opts.actorUserId}] ${opts.reason}`
+          : existing.description,
+      })
       .where(eq(this.db.schema.commissionAdjustments.id, adjustmentId))
       .returning()
 

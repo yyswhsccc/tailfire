@@ -136,6 +136,19 @@ export interface AddCheckItemDto {
   projectedCents?: number
   receivedParentCents?: number
   receivedCents?: number
+
+  /**
+   * PR-1: tax embedded in receivedCents. When omitted, importers compute it
+   * from supplier defaults via the commission-formula helper:
+   *   embedded_tax = gross × rate / (100 + rate) when supplier.commission_includes_tax = true
+   *   embedded_tax = 0 otherwise.
+   * Caller-supplied values always win over the derived default.
+   */
+  embeddedTaxCents?: number
+  /** PR-1: GST | HST | QST | PST | NONE. Mirrors supplier.default_commission_tax_type. */
+  embeddedTaxType?: string | null
+  /** PR-1: rate as percentage (e.g. 5.00 = GST). */
+  embeddedTaxRatePercent?: number | null
 }
 
 // ============================================================================
@@ -237,6 +250,8 @@ export interface CommissionAdjustmentFilterDto {
   checkId?: string
   adjustmentType?: CommissionAdjustmentType
   status?: CommissionAdjustmentStatus
+  /** PR-1: server-side scope filter — non-admins are pinned to their own userId. */
+  agentUserId?: string
   page?: number
   limit?: number
 }

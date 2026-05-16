@@ -74,6 +74,7 @@ import { StripeInvoiceController } from './stripe-invoice.controller'
     TripOrderService,
     StripeConnectService,
     StripeInvoiceService,
+    CommissionModule, // PR-1: re-export so TripsService can inject CommissionAuditService
   ],
 })
 export class FinancialsModule {}

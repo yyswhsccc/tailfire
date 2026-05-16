@@ -26,6 +26,7 @@ import { AgencyTaxFilingController } from './agency-tax-filing/agency-tax-filing
 import { IcInvoiceController } from './invoices/ic-invoice.controller'
 import { TripsModule } from '../trips/trips.module'
 import { DocumentRenderModule } from '../document-render/document-render.module'
+import { CommissionModule } from '../financials/commission/commission.module'
 import { QUEUES } from '../automation/automation.types'
 
 /**
@@ -73,6 +74,7 @@ import { QUEUES } from '../automation/automation.types'
     DocumentRenderModule,
     HttpModule,
     EmailModule,
+    CommissionModule, // provides CommissionSettlementReversalService (PR-1)
     BullModule.registerQueue(
       {
         name: QUEUES.IC_PAYOUT_DISBURSE,
