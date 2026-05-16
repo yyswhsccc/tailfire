@@ -93,24 +93,35 @@ agency_retains       = commissionable_base - agent_share + tax
 
 Sequence designed to ship incrementally, allow rollback per PR, and isolate risk.
 
-| PR | Branch | Size | Risk | Depends | What it ships |
-|---|---|---|---|---|---|
-| **PR-A** | `feature/commission-cci-tax-cols` | S | Low | — | `commission_check_items.embedded_tax_*` + supplier defaults schema; backfills to zero/none |
-| **PR-B** | `feature/commission-tracking-reconciled` | S | Low | — | `commission_tracking.is_reconciled` + audit columns; backfills existing rows to `true` |
-| **PR-C** | `feature/commission-audit-history-tables` | M | Low | — | History tables for checks, items, settlements, adjustments, tracking, activity_pricing, trip_collaborators |
-| **PR-D** | `feature/commission-settlements-reversal` | M | High | PR-A | Reversal-row schema + `computation_breakdown` JSONB + drop CASCADE FKs + immutability trigger |
-| **PR-E** | `feature/commission-formula-and-services` | L | Medium | PR-A,B,C,D | `computeAgentShare` formula module + audit interceptor + reconcile service + IC v2 math wiring + legacy hardening + adjustments fixes |
-| **PR-F** | `feature/trip-settings-tab` | L | Low | PR-B,C,E | Trip Settings tab (Admin Settings card) + collaborator UI + per-collaborator `agent_split_override` schema + reconcile surfaces (3) |
-| **PR-G** | `feature/deposit-full-crud` | L | Medium | PR-A,E | Full CRUD for deposit/receive tool via shared workbench + tax fields per line + URL filter persistence |
-| **PR-H** | `feature/ic-v2-transparency-ui` | M | Low | PR-E | ClaimBuilder breakdown view + positive adjustment opt-in + agent portal inline claim page |
-| **PR-I** | `feature/commission-drift-check` | M | Low | PR-A,B,D | `v_commission_position` view + drift snapshot table + nightly job + admin trigger endpoint |
-| **PR-J** | `feature/commission-reports-and-audit-trail` | L | Low | PR-C,I | Audit trail viewer + position dashboard + 6 audit reports |
-| **PR-K** | `feature/drop-commission-tracking-rollups` | M | Medium | PR-E | Final cleanup — drops the rollup columns after all readers migrated |
-| **Event** | Flag flip `IC_PAYOUTS_V2_ENABLED=true` on tf-demo | — | Medium | All above | Coordinated event |
-| **Event** | Phase 4 disposable prod-clone end-to-end run | — | High | All above | B14 acceptance gate |
-| **Event** | Production cutover | — | High | Phase 4 clean | The big day |
+**Shipping status (2026-05-16):** the 11 original PRs collapsed during execution into PR-0 → PR-4 + PR-J squash-merges to main, all live on production. Original A-K nodes mapped to actual shipped PRs in the rightmost column.
 
-**Estimated calendar**: ~3-4 weeks of focused engineering (16-18 dev days) at 1 PR per 1-2 days with review cycles.
+| PR | Branch | Size | Risk | Depends | What it ships | Shipped as |
+|---|---|---|---|---|---|---|
+| **PR-A** | `feature/commission-cci-tax-cols` | S | Low | — | `commission_check_items.embedded_tax_*` + supplier defaults schema; backfills to zero/none | ✅ PR-1 #417 |
+| **PR-B** | `feature/commission-tracking-reconciled` | S | Low | — | `commission_tracking.is_reconciled` + audit columns; backfills existing rows to `true` | ✅ PR-1 #417 |
+| **PR-C** | `feature/commission-audit-history-tables` | M | Low | — | History tables for checks, items, settlements, adjustments, tracking, activity_pricing, trip_collaborators | ✅ PR-1 #417 |
+| **PR-D** | `feature/commission-settlements-reversal` | M | High | PR-A | Reversal-row schema + `computation_breakdown` JSONB + drop CASCADE FKs + immutability trigger | ✅ PR-1 #417 |
+| **PR-E** | `feature/commission-formula-and-services` | L | Medium | PR-A,B,C,D | `computeAgentShare` formula module + audit interceptor + reconcile service + IC v2 math wiring + legacy hardening + adjustments fixes | ✅ PR-1 #417 |
+| **PR-F** | `feature/trip-settings-tab` | L | Low | PR-B,C,E | Trip Settings tab (Admin Settings card) + collaborator UI + per-collaborator `agent_split_override` schema + reconcile surfaces (3) | ✅ PR-2 #418 |
+| **PR-G** | `feature/deposit-full-crud` | L | Medium | PR-A,E | Full CRUD for deposit/receive tool via shared workbench + tax fields per line + URL filter persistence | ✅ PR-2 #418 |
+| **PR-H** | `feature/ic-v2-transparency-ui` | M | Low | PR-E | ClaimBuilder breakdown view + positive adjustment opt-in + agent portal inline claim page | ✅ PR-2 #418 |
+| **PR-I** | `feature/commission-drift-check` | M | Low | PR-A,B,D | `v_commission_position` view + drift snapshot table + nightly job + admin trigger endpoint | ✅ PR-3 #419 (+ #420 hotfix) |
+| **PR-J** | `feature/commission-reports-and-audit-trail` | L | Low | PR-C,I | 10 audit-report endpoints (R1-R10): GST/HST, T4A, A/R aging, agent payments, supplier received, discrepancy, audit trail, reversals, overrides, drift snapshot | ✅ R1/R3/R6 via PR-3 #419; R2/R4/R5/R7/R8/R9 via **PR-J #427 (2e459720)**; R10 implicit in drift scheduler. Codex round-2 APPROVE. UI dashboards deferred. |
+| **PR-K** | `feature/drop-commission-tracking-rollups` | M | Medium | PR-E | Final cleanup — drops the rollup columns after all readers migrated | ⏸ DEFERRED per Codex until prod runs stable under V2 and remaining readers (`financial.queries.ts:108`, `commission.service.ts:884`, importer DTOs) are migrated off rollups. |
+| **Event** | Flag flip `IC_PAYOUTS_V2_ENABLED=true` on tf-demo | — | Medium | All above | Coordinated event | ✅ 2026-05-16 17:21Z |
+| **Event** | Phase 4 disposable prod-clone end-to-end run | — | High | All above | B14 acceptance gate | ✅ Equivalent: tf-demo end-to-end claim lifecycle (slarente → $332.99 invoice approved → drift clean) |
+| **Event** | Production cutover | — | High | Phase 4 clean | The big day | ✅ 2026-05-16 17:45Z: Doppler prd flags flipped, Railway api-prod + Vercel admin redeployed. Prod DB still empty (pre-launch); real TES import is a separate workstream when Phoenix Voyages is ready. |
+
+**Extras shipped during execution (not in original plan):**
+- **PR-0 (#416)** — IC v2 money-path gate (`IC_PAYOUTS_V2_ENABLED`); the missing flag wrapper that decouples merge-to-main from production cutover. Wraps every new endpoint with 410 Gone when disabled.
+- **PR-4 (#423)** — TES importer fixes: step reorder so received checks aren't accepted before items added (PR-1 immutability trigger), new Step 15b (bulk-reconcile imported tracking — closes the `source='travelesolutions'` reconciliation gap), new Step 15c (deferred check acceptance), hardened verifier.
+- **#420** — PR-3 view hotfix (DROP+CREATE instead of CREATE OR REPLACE — PG rejects column reorder).
+- **#421/#422** — Schema drift recovery (3 prod migrations + 1 dev migration; tables had columns missing post-manual-DB-edit).
+- **#424** — tf-demo execution runbook (`docs/runbooks/pr4-tf-demo-execution.md`).
+- **#426** — Notification email link fix (ADMIN_URL absolute prefix; Gmail was rendering `/commission/...` as `http://commission/...`).
+- **#427** — PR-J 6 remaining report endpoints (R2/R4/R5/R7/R8/R9).
+
+**Actual calendar**: 1 work session (2026-05-16) to fully ship code + flag flip; full session spanned ~7h including all Codex validation rounds. Lots of work was already on `main` from prior weeks.
 
 ---
 

@@ -355,7 +355,7 @@ V1 path resumes immediately. Any IC v2 in-flight claims should be drained per Se
 
 ## Out of scope for this runbook
 
-- PR-J (audit trail UI dashboards + 3 more report endpoints) — optional pre-cutover, deferred per Codex
+- ~~PR-J (audit trail UI dashboards + 3 more report endpoints) — optional pre-cutover, deferred per Codex~~ ✅ **PR-J #427 shipped 2026-05-16**. All 10 report endpoints (R1-R10) live on prod. UI dashboards still deferred.
 - PR-K (drop commission_tracking rollup columns) — NOT safe before flag flip, deferred to post-cutover
 - Production cutover — separate runbook at `docs/runbooks/ic-payouts-cutover.md`
 
