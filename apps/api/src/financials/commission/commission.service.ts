@@ -503,9 +503,9 @@ export class CommissionService {
         createdBy: userId,
       }))
 
-      // PR-1 Commit 11: the legacy full UNIQUE(check_item_id, recipient_user_id)
-      // was dropped in migration 20260516180000 and replaced with a partial
-      // unique idx WHERE reverses_settlement_id IS NULL. Drizzle's
+      // PR-1 Commit 12: the partial unique on commission_item_settlements is
+      // now `(check_item_id, recipient_user_id) WHERE is_reversal = false
+      // AND reversed_at IS NULL` — see migration 20260516210000. Drizzle's
       // onConflictDoNothing() in this version does not expose the partial
       // index predicate, so we drop down to raw SQL to target the partial
       // unique correctly. Same idempotent semantics as before.
@@ -518,7 +518,7 @@ export class CommissionService {
             (${row.checkItemId}::uuid, ${row.recipientUserId}::uuid,
              ${row.paidCheckId}::uuid, ${row.settledAmountCents}, ${row.createdBy ?? null})
           ON CONFLICT (check_item_id, recipient_user_id)
-            WHERE reverses_settlement_id IS NULL
+            WHERE is_reversal = false AND reversed_at IS NULL
             DO NOTHING
           RETURNING id
         `)
@@ -1052,15 +1052,21 @@ export class CommissionService {
           JOIN trips t ON t.id = i.trip_id
           JOIN trip_collaborators tc ON tc.trip_id = t.id AND tc.user_id = ${agent.userId} AND tc.is_active = true
           JOIN user_profiles up ON up.id = tc.user_id
+          -- PR-1 Commit 12: only "active" settlements block re-claim. A
+          -- reversed original (reversed_at IS NOT NULL) or a reversal row
+          -- (is_reversal = true) is not active.
           LEFT JOIN commission_item_settlements existing
-            ON existing.check_item_id = cci.id AND existing.recipient_user_id = ${agent.userId}
+            ON existing.check_item_id = cci.id
+            AND existing.recipient_user_id = ${agent.userId}
+            AND existing.is_reversal = false
+            AND existing.reversed_at IS NULL
           WHERE existing.id IS NULL
             AND t.status IN ('travelling', 'travelled')
             AND src_cc.agency_id = ${agencyId}
             AND src_cc.check_type = 'received'
             AND src_cc.status = 'accepted'
             AND src_cc.currency = ${agent.currency}   -- ← only claim items in matching currency
-          ON CONFLICT (check_item_id, recipient_user_id) WHERE reverses_settlement_id IS NULL DO NOTHING
+          ON CONFLICT (check_item_id, recipient_user_id) WHERE is_reversal = false AND reversed_at IS NULL DO NOTHING
           RETURNING settled_amount_cents
         `)
 
