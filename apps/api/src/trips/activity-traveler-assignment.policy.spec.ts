@@ -112,6 +112,35 @@ describe('ActivityTravelerAssignmentPolicy', () => {
     })
   })
 
+  describe('tryAssignAllTripTravelersToActivityById (#430)', () => {
+    it('executes the join INSERT and returns { ok: true }', async () => {
+      const db = buildMockDb()
+      const policy = new ActivityTravelerAssignmentPolicy(db as any)
+
+      const result = await policy.tryAssignAllTripTravelersToActivityById('activity-9')
+
+      expect(result.ok).toBe(true)
+      expect(result.error).toBeUndefined()
+      expect(db.client.execute).toHaveBeenCalledTimes(1)
+    })
+
+    it('returns { ok: false, error } when execute() rejects (logs, does not throw)', async () => {
+      const db = buildMockDb()
+      const boom = new Error('join failed')
+      db.client.execute.mockRejectedValueOnce(boom)
+      const policy = new ActivityTravelerAssignmentPolicy(db as any)
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const result = await policy.tryAssignAllTripTravelersToActivityById('activity-9')
+
+      expect(result.ok).toBe(false)
+      expect(result.error).toBe(boom)
+
+      warnSpy.mockRestore()
+    })
+  })
+
   describe('tryAssignTravelerToAllTripActivities', () => {
     it('executes the fan-out INSERT and returns { ok: true }', async () => {
       const db = buildMockDb()
