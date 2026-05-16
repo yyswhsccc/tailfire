@@ -67,6 +67,7 @@ import type {
   TripExpectedPaymentDto,
   TripPaymentTransactionDto,
   UpdateTripOwnerDto,
+  UpdateCommissionOverridesDto,
   CancelTripDto,
 } from '../../../../packages/shared-types/src/api'
 
@@ -1097,6 +1098,57 @@ export class TripsController {
       throw new ForbiddenException('Only admins can re-assign trip ownership')
     }
     return this.tripsService.updateOwner(id, dto.ownerId, auth.agencyId, auth.userId)
+  }
+
+  /**
+   * PATCH /trips/:id/commission-overrides  (PR-2)
+   *
+   * Admin-only. Writes trips.commission_fee_rate_override + per-collaborator
+   * commission_percentage + agent_split_override atomically with a
+   * trip_settings_history audit row per change.
+   *
+   * Body: {
+   *   feeRateOverridePercent?: number | null,  // omit to leave unchanged; null = clear
+   *   collaboratorOverrides?: [{
+   *     collaboratorId: string,
+   *     commissionPercentage?: string,         // "100.00" etc.
+   *     agentSplitOverridePercent?: number | null,
+   *   }],
+   *   reason?: string,
+   * }
+   *
+   * Powers the Trip Settings tab Admin Settings card in the admin app.
+   */
+  @Patch(':id/commission-overrides')
+  @AdminOnly()
+  async updateCommissionOverrides(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateCommissionOverridesDto,
+  ) {
+    // PR-2 commit 8 (Codex round-1 fix): forward agencyId so the service
+    // refuses cross-tenant writes (returns 404 on another agency's UUID).
+    return this.tripsService.updateCommissionOverrides(auth.agencyId, id, auth.userId, {
+      feeRateOverridePercent: dto.feeRateOverridePercent,
+      collaboratorOverrides: dto.collaboratorOverrides,
+      reason: dto.reason ?? null,
+    })
+  }
+
+  /**
+   * GET /trips/:id/collaborators  (PR-2)
+   *
+   * List collaborators on a trip with their commission settings + display
+   * info. Powers the Trip Settings collaborator table. Admin-only.
+   */
+  @Get(':id/collaborators')
+  @AdminOnly()
+  async listCollaborators(
+    @GetAuthContext() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    // PR-2 commit 8 (Codex round-1 fix): forward agencyId for tenant scope.
+    return this.tripsService.listCommissionCollaborators(auth.agencyId, id)
   }
 
   // ============================================================================

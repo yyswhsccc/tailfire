@@ -5410,6 +5410,94 @@ export class TripsService {
   }
 
   /**
+   * PR-2: list trip_collaborators with display fields. Powers the Trip
+   * Settings tab collaborator table — surfaces commission_percentage,
+   * agent_split_override, and user display name/email for each row.
+   *
+   * Surface inventory: NEW method #58 — added to
+   * apps/api/src/trips/TRIPS_SERVICE_SURFACE.md per CLAUDE.md §9.
+   */
+  async listCommissionCollaborators(
+    agencyId: string,
+    tripId: string,
+  ): Promise<Array<{
+    id: string
+    tripId: string
+    userId: string
+    commissionPercentage: string
+    agentSplitOverride: string | null
+    role: string | null
+    isActive: boolean
+    createdAt: string
+    user: { id: string; firstName: string | null; lastName: string | null; email: string }
+  }>> {
+    // PR-2 commit 8: pre-check the trip belongs to this agency so we return a
+    // proper 404 (not a confusing empty list) when an admin tries another
+    // agency's UUID. The INNER JOIN below would silently filter, masking the
+    // mistake — explicit lookup gives a useful error.
+    const [trip] = await this.db.client
+      .select({ id: this.db.schema.trips.id })
+      .from(this.db.schema.trips)
+      .where(and(
+        eq(this.db.schema.trips.id, tripId),
+        eq(this.db.schema.trips.agencyId, agencyId),
+      ))
+      .limit(1)
+    if (!trip) {
+      throw new NotFoundException(`Trip ${tripId} not found`)
+    }
+    const rows = await this.db.client
+      .select({
+        id: this.db.schema.tripCollaborators.id,
+        tripId: this.db.schema.tripCollaborators.tripId,
+        userId: this.db.schema.tripCollaborators.userId,
+        commissionPercentage: this.db.schema.tripCollaborators.commissionPercentage,
+        agentSplitOverride: this.db.schema.tripCollaborators.agentSplitOverride,
+        role: this.db.schema.tripCollaborators.role,
+        isActive: this.db.schema.tripCollaborators.isActive,
+        createdAt: this.db.schema.tripCollaborators.createdAt,
+        userIdJoin: this.db.schema.userProfiles.id,
+        userFirstName: this.db.schema.userProfiles.firstName,
+        userLastName: this.db.schema.userProfiles.lastName,
+        userEmail: this.db.schema.userProfiles.email,
+      })
+      .from(this.db.schema.tripCollaborators)
+      .leftJoin(
+        this.db.schema.userProfiles,
+        eq(this.db.schema.tripCollaborators.userId, this.db.schema.userProfiles.id),
+      )
+      .innerJoin(
+        this.db.schema.trips,
+        and(
+          eq(this.db.schema.tripCollaborators.tripId, this.db.schema.trips.id),
+          // PR-2 commit 8 (Codex round-1 fix): enforce tenant scope server-side.
+          // Without this an admin in agency A could enumerate collaborators
+          // on a trip in agency B by guessing the trip UUID.
+          eq(this.db.schema.trips.agencyId, agencyId),
+        ),
+      )
+      .where(eq(this.db.schema.tripCollaborators.tripId, tripId))
+      .orderBy(asc(this.db.schema.tripCollaborators.createdAt))
+
+    return rows.map((r) => ({
+      id: r.id,
+      tripId: r.tripId,
+      userId: r.userId,
+      commissionPercentage: r.commissionPercentage,
+      agentSplitOverride: r.agentSplitOverride,
+      role: r.role,
+      isActive: r.isActive,
+      createdAt: r.createdAt.toISOString(),
+      user: {
+        id: r.userIdJoin ?? r.userId,
+        firstName: r.userFirstName ?? null,
+        lastName: r.userLastName ?? null,
+        email: r.userEmail ?? '',
+      },
+    }))
+  }
+
+  /**
    * PR-1: updateCommissionOverrides — admin-only writer for the per-trip
    * commission settings exposed in the new Trip Settings tab (PR-2):
    *   - trips.commission_fee_rate_override (nullable; NULL = use agency default)
@@ -5425,6 +5513,7 @@ export class TripsService {
    * §9, any future extraction must cite the inventory.
    */
   async updateCommissionOverrides(
+    agencyId: string,
     tripId: string,
     actorUserId: string,
     input: {
@@ -5438,12 +5527,83 @@ export class TripsService {
       userAgent?: string | null
     },
   ): Promise<{ tripId: string; updatedCollaborators: number }> {
+    // PR-2 commit 8 (Codex round-1 fix): scope the trip lookup to the
+    // caller's agency. Without this an admin could mutate commission
+    // overrides on any trip whose UUID they know — even in another agency.
     const [trip] = await this.db.client
       .select()
       .from(this.db.schema.trips)
-      .where(eq(this.db.schema.trips.id, tripId))
+      .where(and(
+        eq(this.db.schema.trips.id, tripId),
+        eq(this.db.schema.trips.agencyId, agencyId),
+      ))
       .limit(1)
     if (!trip) throw new NotFoundException(`Trip ${tripId} not found`)
+
+    // PR-2 commit 8: range-check + sum-to-100 invariant on collaborator
+    // shares. The UI tells the admin "must add to 100" but payout math
+    // applies each commission_percentage directly — without this, a bad
+    // write would over- or under-pay every agent on the trip.
+    if (input.collaboratorOverrides && input.collaboratorOverrides.length > 0) {
+      // Load ALL active collaborators on the trip (not just the ones being
+      // changed) so we can validate the post-update totals.
+      const allActive = await this.db.client
+        .select({
+          id: this.db.schema.tripCollaborators.id,
+          commissionPercentage: this.db.schema.tripCollaborators.commissionPercentage,
+        })
+        .from(this.db.schema.tripCollaborators)
+        .where(and(
+          eq(this.db.schema.tripCollaborators.tripId, tripId),
+          eq(this.db.schema.tripCollaborators.isActive, true),
+        ))
+
+      // Build a map of post-update commission_percentage values, starting
+      // from current state and overlaying each requested change.
+      const projected = new Map<string, number>()
+      for (const row of allActive) {
+        projected.set(row.id, Number(row.commissionPercentage))
+      }
+      for (const co of input.collaboratorOverrides) {
+        // Each provided commissionPercentage must be numeric and in [0,100]
+        if (co.commissionPercentage !== undefined && co.commissionPercentage !== null) {
+          const n = Number(co.commissionPercentage)
+          if (!Number.isFinite(n) || n < 0 || n > 100) {
+            throw new BadRequestException(
+              `commissionPercentage for collaborator ${co.collaboratorId} must be a number in [0, 100], got ${co.commissionPercentage}`,
+            )
+          }
+          projected.set(co.collaboratorId, n)
+        }
+        // agent_split_override range check (nullable)
+        if (
+          co.agentSplitOverridePercent !== undefined &&
+          co.agentSplitOverridePercent !== null
+        ) {
+          const n = co.agentSplitOverridePercent
+          if (!Number.isFinite(n) || n < 0 || n > 100) {
+            throw new BadRequestException(
+              `agentSplitOverridePercent for collaborator ${co.collaboratorId} must be in [0, 100], got ${n}`,
+            )
+          }
+        }
+      }
+
+      // Sum-to-100 invariant on the ACTIVE set (only when we have ≥1
+      // active collaborator after the projection — single-collaborator
+      // trips that haven't been split yet sit at 100 by construction).
+      // Allow a 0.01 tolerance for rounding noise on existing decimal data.
+      const onlyActiveIds = new Set(allActive.map((r) => r.id))
+      let projectedTotal = 0
+      for (const [id, val] of projected.entries()) {
+        if (onlyActiveIds.has(id)) projectedTotal += val
+      }
+      if (projected.size > 0 && Math.abs(projectedTotal - 100) > 0.01) {
+        throw new BadRequestException(
+          `Sum of active collaborator commission_percentage must equal 100 after the update (got ${projectedTotal.toFixed(2)}). Adjust the other collaborators in the same request.`,
+        )
+      }
+    }
 
     let updatedCollaborators = 0
     await this.db.client.transaction(async (tx) => {

@@ -380,11 +380,18 @@ export interface TripCollaboratorResponseDto {
   tripId: string
   userId: string
   commissionPercentage: string // Decimal as string
+  /** PR-2: per-trip agent split override. NULL = use the agent's profile default. */
+  agentSplitOverride: string | null // Decimal as string
   role: string | null
   isActive: boolean
   createdAt: string
-  // Populated user data (Phase 2)
-  // user?: UserResponseDto
+  // Populated user data (PR-2 — shown in Trip Settings collaborator list)
+  user?: {
+    id: string
+    firstName: string | null
+    lastName: string | null
+    email: string
+  }
 }
 
 export interface TripTravelerResponseDto {
@@ -746,6 +753,42 @@ export interface TripShareResponseDto {
  */
 export interface UpdateTripOwnerDto {
   ownerId: string | null // null = only valid for inbound trips
+}
+
+/**
+ * PR-2: per-collaborator commission override (one row of the array below).
+ * `commissionPercentage` is the between-collaborator split (numeric string,
+ * e.g. "100.00") — mandatory non-null. `agentSplitOverridePercent` is the
+ * per-trip override of the agent's profile splitValue (default 60); set to
+ * `null` to clear the override.
+ */
+export interface UpdateCollaboratorCommissionDto {
+  collaboratorId: string
+  commissionPercentage?: string
+  agentSplitOverridePercent?: number | null
+}
+
+/**
+ * PR-2: write trip-level commission settings (Admin only).
+ *
+ * Powers the Trip Settings tab Admin Settings card. Wraps
+ * TripsService.updateCommissionOverrides — atomic UPDATE of trips +
+ * trip_collaborators rows with an audit row per change in
+ * trip_settings_history.
+ *
+ * Field semantics:
+ *   - `feeRateOverridePercent`: omit to leave unchanged; pass a number to
+ *     override the agency default; pass `null` to clear an existing override
+ *     (revert to agency default).
+ *   - `collaboratorOverrides`: empty/omitted array = leave all collaborators
+ *     unchanged. Only the collaboratorIds present in the array are touched.
+ *   - `reason`: free-text reason recorded on every audit row produced by
+ *     this call. Strongly recommended for the Settings tab confirm dialog.
+ */
+export interface UpdateCommissionOverridesDto {
+  feeRateOverridePercent?: number | null
+  collaboratorOverrides?: UpdateCollaboratorCommissionDto[]
+  reason?: string | null
 }
 
 /**

@@ -103,6 +103,7 @@ This addresses Codex's concern that this doc could become "documentation theater
 | 55 | `cancelScheduledTransitions` | 5003 | `void` | |
 | 56 | `rescheduleStatusTransitions` | 5022 | unspecified | |
 | 57 | `updateCommissionOverrides` | 5413 | `{ tripId, updatedCollaborators }` | **PR-1 Commission Foundation**: writes `trips.commission_fee_rate_override` + `trip_collaborators.{commission_percentage, agent_split_override}` atomically with `trip_settings_history` audit rows. Admin-only via the new Trip Settings tab (ships PR-2). Split target: `TripCommissionService` or `TripMutationService`. |
+| 58 | `listCommissionCollaborators` | 5413 | `Array<{ id, …, agentSplitOverride, user }>` | **PR-2 Commission UI**: lists `trip_collaborators` with joined `user_profiles` display fields. Read-only counterpart to #57. Powers the Settings tab collaborator table. Same split target as #57. |
 
 ---
 

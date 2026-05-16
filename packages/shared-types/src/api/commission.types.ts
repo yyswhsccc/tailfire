@@ -173,7 +173,20 @@ export interface CreateDepositDto {
 export interface AddDepositItemDto {
   activityPricingId: string
   receivedCents: number
+  /**
+   * Legacy field kept for backwards compatibility with the deposit UI. Maps
+   * to commission_tracking.tax_amount_cents (slated for removal once
+   * rollup columns drop). Prefer the PR-1 embedded_tax_* fields below.
+   */
   taxCents?: number
+  /**
+   * PR-1 tax-on-commission fields. When omitted, the server derives them
+   * from the supplier's commission_includes_tax + default_commission_*
+   * settings via computeEmbeddedTaxFromInclusive. Caller wins.
+   */
+  embeddedTaxCents?: number
+  embeddedTaxType?: string | null
+  embeddedTaxRatePercent?: number | null
 }
 
 export interface FinalizeDepositDto {

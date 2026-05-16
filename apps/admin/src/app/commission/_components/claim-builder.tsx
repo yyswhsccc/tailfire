@@ -15,8 +15,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { DollarSign } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { DollarSign, ChevronDown, ChevronRight, Info } from 'lucide-react'
 import Link from 'next/link'
+import type { EligibleItemDto } from '@/hooks/use-ic-claims'
 
 // Preview only — server (PlaceOfSupplyService) is authoritative at submission time
 const AGENCY_TAX_RATE_BP = 1300 // ON HST 13%
@@ -43,6 +45,13 @@ interface Props {
 export function ClaimBuilder({ trigger, onBehalfOfUserId, onBehalfOfName }: Props) {
   const [open, setOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // PR-2: positive adjustments are opt-in. Tracks which adjustmentIds the
+  // IC has elected to take on this claim. Negative adjustments are
+  // auto-included server-side regardless of this set.
+  const [optedAdjustmentIds, setOptedAdjustmentIds] = useState<Set<string>>(new Set())
+  // PR-2: per-item breakdown disclosure. Collapsed by default to keep
+  // the list scannable; expanded shows the gross→tax→base→fee→split→share.
+  const [expandedBreakdownIds, setExpandedBreakdownIds] = useState<Set<string>>(new Set())
 
   const isAdminMode = !!onBehalfOfUserId
 
@@ -58,25 +67,43 @@ export function ClaimBuilder({ trigger, onBehalfOfUserId, onBehalfOfName }: Prop
     if (!eligible) return []
     return eligible.itemsByCurrency.map((group) => {
       const selectedItems = group.items.filter((i) => selectedIds.has(i.checkItemId))
-      const itemsTotal = selectedItems.reduce((s, i) => s + i.commissionCents, 0)
-      const adjustmentsTotal = group.adjustments.reduce((s, a) => s + a.amountCents, 0)
+      // PR-2: agentShareCents (formula output) drives the running total.
+      const itemsTotal = selectedItems.reduce((s, i) => s + i.agentShareCents, 0)
+      // PR-2: positive adjustments only count when opted in; negatives
+      // always do (mirrors server-side filter in
+      // fetchPendingAdjustmentsByCurrency).
+      const includedAdjustments = group.adjustments.filter((a) =>
+        a.isOptIn ? optedAdjustmentIds.has(a.adjustmentId) : true,
+      )
+      const adjustmentsTotal = includedAdjustments.reduce((s, a) => s + a.amountCents, 0)
       const base = itemsTotal + adjustmentsTotal
       const tax = taxApplies ? Math.round((base * AGENCY_TAX_RATE_BP) / 10_000) : 0
       const total = base + tax
+      // PR-2 agency-retains preview: SUM(agencyRetainsCents) across selected
+      // items, derived directly from each item's breakdown snapshot. Lets
+      // the admin (and IC) see what's left over after the agent share +
+      // fee + tax pass-through.
+      const agencyRetains = selectedItems.reduce(
+        (s, i) => s + (i.breakdown?.agencyRetainsCents ?? 0),
+        0,
+      )
       return {
         currency: group.currency,
         selectedItemCount: selectedItems.length,
         availableItemCount: group.items.length,
         adjustmentCount: group.adjustments.length,
+        optInCount: group.adjustments.filter((a) => a.isOptIn).length,
+        autoIncludeCount: group.adjustments.filter((a) => !a.isOptIn).length,
         itemsTotal,
         adjustmentsTotal,
         base,
         tax,
         total,
+        agencyRetains,
         hasSelection: selectedItems.length > 0,
       }
     })
-  }, [eligible, selectedIds, taxApplies])
+  }, [eligible, selectedIds, optedAdjustmentIds, taxApplies])
 
   const totalSelectedAcrossCurrencies = previews.reduce((s, p) => s + p.selectedItemCount, 0)
   const invoicesToBeCreated = previews.filter((p) => p.hasSelection).length
@@ -100,10 +127,31 @@ export function ClaimBuilder({ trigger, onBehalfOfUserId, onBehalfOfName }: Prop
     })
   }
 
+  const toggleAdjustmentOptIn = (id: string) => {
+    setOptedAdjustmentIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleBreakdown = (id: string) => {
+    setExpandedBreakdownIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   const handleSubmit = async () => {
     if (totalSelectedAcrossCurrencies === 0) return
     try {
-      const result = await submit.mutateAsync(Array.from(selectedIds))
+      const result = await submit.mutateAsync({
+        selectedCheckItemIds: Array.from(selectedIds),
+        optedInAdjustmentIds: Array.from(optedAdjustmentIds),
+      })
       toast({
         title: isAdminMode ? 'Claim generated' : 'Claim submitted',
         description: isAdminMode
@@ -112,6 +160,8 @@ export function ClaimBuilder({ trigger, onBehalfOfUserId, onBehalfOfName }: Prop
       })
       setOpen(false)
       setSelectedIds(new Set())
+      setOptedAdjustmentIds(new Set())
+      setExpandedBreakdownIds(new Set())
     } catch (e: unknown) {
       const msg = e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : 'An unexpected error occurred.'
       toast({ title: 'Submit failed', description: msg, variant: 'destructive' })
@@ -121,7 +171,11 @@ export function ClaimBuilder({ trigger, onBehalfOfUserId, onBehalfOfName }: Prop
   const handleOpenChange = (next: boolean) => {
     setOpen(next)
     // Reset selection when closing so re-open is always fresh
-    if (!next) setSelectedIds(new Set())
+    if (!next) {
+      setSelectedIds(new Set())
+      setOptedAdjustmentIds(new Set())
+      setExpandedBreakdownIds(new Set())
+    }
   }
 
   return (
@@ -213,56 +267,114 @@ export function ClaimBuilder({ trigger, onBehalfOfUserId, onBehalfOfName }: Prop
                   </Button>
                 </header>
 
-                {/* Line items */}
+                {/* Line items — PR-2: each row exposes a chevron to expand
+                    the formula breakdown (gross → tax → base → fee →
+                    distributable → split → agent share) sourced from the
+                    breakdown JSONB returned by /ic-payouts/me/eligible. */}
                 <ul className="space-y-0" role="list" aria-label={`${group.currency} commission items`}>
                   {group.items.map((item) => {
                     const checked = selectedIds.has(item.checkItemId)
+                    const expanded = expandedBreakdownIds.has(item.checkItemId)
                     const labelId = `label-${item.checkItemId}`
                     return (
-                      <li key={item.checkItemId} className="flex items-start gap-3 py-2.5 border-b last:border-b-0">
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={() => toggle(item.checkItemId)}
-                          id={`item-${item.checkItemId}`}
-                          aria-labelledby={labelId}
-                          className="mt-0.5"
-                        />
-                        <label
-                          id={labelId}
-                          htmlFor={`item-${item.checkItemId}`}
-                          className="flex-1 flex justify-between cursor-pointer min-w-0"
-                        >
-                          <div className="min-w-0 pr-4">
-                            <div className="text-sm font-medium truncate">{item.tripRef ?? '(No trip ref)'}</div>
-                            {item.description && (
-                              <div className="text-xs text-muted-foreground truncate">{item.description}</div>
+                      <li key={item.checkItemId} className="border-b last:border-b-0">
+                        <div className="flex items-start gap-3 py-2.5">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={() => toggle(item.checkItemId)}
+                            id={`item-${item.checkItemId}`}
+                            aria-labelledby={labelId}
+                            className="mt-0.5"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleBreakdown(item.checkItemId)}
+                            className="text-muted-foreground hover:text-foreground mt-0.5"
+                            aria-label={expanded ? 'Hide breakdown' : 'Show breakdown'}
+                            aria-expanded={expanded}
+                          >
+                            {expanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
                             )}
-                          </div>
-                          <span className="font-mono text-sm tabular-nums shrink-0">
-                            {formatCents(item.commissionCents, group.currency)}
-                          </span>
-                        </label>
+                          </button>
+                          <label
+                            id={labelId}
+                            htmlFor={`item-${item.checkItemId}`}
+                            className="flex-1 flex justify-between cursor-pointer min-w-0"
+                          >
+                            <div className="min-w-0 pr-4">
+                              <div className="text-sm font-medium truncate">{item.tripRef ?? '(No trip ref)'}</div>
+                              {item.description && (
+                                <div className="text-xs text-muted-foreground truncate">{item.description}</div>
+                              )}
+                            </div>
+                            <span className="font-mono text-sm tabular-nums shrink-0">
+                              {formatCents(item.agentShareCents, group.currency)}
+                            </span>
+                          </label>
+                        </div>
+                        {expanded && <BreakdownRows item={item} currency={group.currency} />}
                       </li>
                     )
                   })}
                 </ul>
 
-                {/* Pending adjustments (auto-included) */}
+                {/* PR-2: Pending adjustments — opt-in (positive) vs auto-include (negative).
+                    The IC checks positives they want this claim; clawbacks are always-on with a tooltip. */}
                 {group.adjustments.length > 0 && (
                   <div className="bg-muted/40 rounded-md p-3 space-y-1">
                     <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Pending adjustments (auto-included)
+                      Pending adjustments
                     </div>
-                    {group.adjustments.map((a) => (
-                      <div key={a.adjustmentId} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">{a.description}</span>
-                        <span
-                          className={`font-mono tabular-nums ${a.amountCents < 0 ? 'text-red-600' : 'text-green-700'}`}
-                        >
-                          {formatCents(a.amountCents, group.currency)}
-                        </span>
-                      </div>
-                    ))}
+                    {group.adjustments.map((a) => {
+                      if (a.isOptIn) {
+                        const opted = optedAdjustmentIds.has(a.adjustmentId)
+                        return (
+                          <label
+                            key={a.adjustmentId}
+                            htmlFor={`adj-${a.adjustmentId}`}
+                            className="flex items-center gap-2 text-sm cursor-pointer"
+                          >
+                            <Checkbox
+                              id={`adj-${a.adjustmentId}`}
+                              checked={opted}
+                              onCheckedChange={() => toggleAdjustmentOptIn(a.adjustmentId)}
+                            />
+                            <span className="flex-1 text-muted-foreground">{a.description}</span>
+                            <Badge variant="outline" className="text-[10px]">opt-in</Badge>
+                            <span className="font-mono tabular-nums text-green-700">
+                              +{formatCents(a.amountCents, group.currency)}
+                            </span>
+                          </label>
+                        )
+                      }
+                      // Negative — auto-included
+                      return (
+                        <div key={a.adjustmentId} className="flex items-center gap-2 text-sm">
+                          <Checkbox checked disabled aria-label="Auto-included" />
+                          <span className="flex-1 text-muted-foreground">{a.description}</span>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="text-[10px] cursor-help">
+                                  <Info className="h-3 w-3 mr-0.5" />
+                                  clawback
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Negative adjustments (e.g. supplier reversals) are automatically applied
+                                to every claim in this currency. You cannot opt out.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <span className="font-mono tabular-nums text-red-600">
+                            {formatCents(a.amountCents, group.currency)}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 
@@ -275,7 +387,7 @@ export function ClaimBuilder({ trigger, onBehalfOfUserId, onBehalfOfName }: Prop
                     </div>
                     {preview.adjustmentCount > 0 && (
                       <div className="flex justify-between text-muted-foreground">
-                        <span>Adjustments:</span>
+                        <span>Adjustments included:</span>
                         <span className={`font-mono tabular-nums ${preview.adjustmentsTotal < 0 ? 'text-red-600' : ''}`}>
                           {formatCents(preview.adjustmentsTotal, group.currency)}
                         </span>
@@ -296,6 +408,16 @@ export function ClaimBuilder({ trigger, onBehalfOfUserId, onBehalfOfName }: Prop
                     <div className="flex justify-between font-semibold pt-1 border-t">
                       <span>Invoice total (preview):</span>
                       <span className="font-mono tabular-nums">{formatCents(preview.total, group.currency)}</span>
+                    </div>
+                    {/* PR-2 agency retains: the cents that stay with the agency
+                        after this claim — tech fee + tax pass-through + the
+                        agency's share of distributable. Surfaced for full
+                        transparency on both admin and agent surfaces. */}
+                    <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t border-dashed mt-1">
+                      <span>Agency retains (informational):</span>
+                      <span className="font-mono tabular-nums">
+                        {formatCents(preview.agencyRetains, group.currency)}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -321,5 +443,97 @@ export function ClaimBuilder({ trigger, onBehalfOfUserId, onBehalfOfName }: Prop
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * PR-2 ClaimBuilder transparency: shows the full formula derivation for a
+ * single eligible item. Sourced from the breakdown JSONB
+ * (CommissionBreakdownDto) returned alongside agentShareCents by
+ * /ic-payouts/me/eligible after PR-1 commit 7.
+ *
+ * Rows mirror commission-formula.ts exactly:
+ *   gross → embedded tax → base → fee → distributable → split → share
+ * with the override flags surfaced inline when active so a curious agent
+ * can see WHY their tech fee or split is different than usual.
+ */
+function BreakdownRows({ item, currency }: { item: EligibleItemDto; currency: string }) {
+  const b = item.breakdown
+  if (!b) {
+    return (
+      <div className="ml-7 mb-2 text-xs text-muted-foreground italic">
+        Breakdown unavailable (legacy item)
+      </div>
+    )
+  }
+  return (
+    <dl className="ml-7 mb-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-xs">
+      <dt className="text-muted-foreground">Gross received from supplier</dt>
+      <dd className="font-mono tabular-nums">{formatCents(b.grossReceivedCents, currency)}</dd>
+
+      {b.embeddedTaxCents !== 0 && (
+        <>
+          <dt className="text-muted-foreground">
+            − Embedded tax
+            {b.embeddedTaxType && (
+              <span className="text-[10px] ml-1">
+                ({b.embeddedTaxType}{' '}
+                {b.embeddedTaxRatePercent != null ? `${b.embeddedTaxRatePercent}%` : ''})
+              </span>
+            )}
+          </dt>
+          <dd className="font-mono tabular-nums text-muted-foreground">
+            −{formatCents(b.embeddedTaxCents, currency)}
+          </dd>
+        </>
+      )}
+
+      <dt className="font-medium pt-1 border-t border-dashed">Commissionable base</dt>
+      <dd className="font-mono tabular-nums pt-1 border-t border-dashed">
+        {formatCents(b.commissionableBaseCents, currency)}
+      </dd>
+
+      <dt className="text-muted-foreground">
+        − Tech fee ({b.feeRatePercent}%)
+        {b.feeRateOverridden && (
+          <Badge variant="outline" className="text-[9px] ml-1 px-1 py-0">trip override</Badge>
+        )}
+      </dt>
+      <dd className="font-mono tabular-nums text-muted-foreground">
+        −{formatCents(b.platformFeeCents, currency)}
+      </dd>
+
+      <dt className="font-medium">Distributable</dt>
+      <dd className="font-mono tabular-nums">{formatCents(b.distributableCents, currency)}</dd>
+
+      <dt className="text-muted-foreground">
+        × Agent split ({b.agentSplitPercent}%)
+        {b.agentSplitOverridden && (
+          <Badge variant="outline" className="text-[9px] ml-1 px-1 py-0">trip override</Badge>
+        )}
+      </dt>
+      <dd className="font-mono tabular-nums text-muted-foreground">
+        {formatCents(b.agentPoolCents, currency)}
+      </dd>
+
+      {b.collaboratorPercent !== 100 && (
+        <>
+          <dt className="text-muted-foreground">× Your share ({b.collaboratorPercent}%)</dt>
+          <dd className="font-mono tabular-nums text-muted-foreground">
+            {formatCents(b.agentShareCents, currency)}
+          </dd>
+        </>
+      )}
+
+      <dt className="font-semibold pt-1 border-t">Your share</dt>
+      <dd className="font-mono tabular-nums font-semibold pt-1 border-t">
+        {formatCents(b.agentShareCents, currency)}
+      </dd>
+
+      <dt className="text-[10px] text-muted-foreground italic pt-0.5">Agency retains for this item</dt>
+      <dd className="font-mono tabular-nums text-[10px] text-muted-foreground italic pt-0.5">
+        {formatCents(b.agencyRetainsCents, currency)}
+      </dd>
+    </dl>
   )
 }

@@ -31,6 +31,7 @@ import {
   User,
   Link as LinkIcon,
   RotateCcw,
+  Settings,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { DetailLayout } from '@/components/layout'
@@ -40,6 +41,7 @@ import { useTrip, useDeleteTrip, useUncancelTrip, usePublishTripSnapshot, useUnp
 import { useUser } from '@/hooks/use-user'
 import { MoveToGroupDialog } from '@/components/trips/MoveToGroupDialog'
 import { TripOverview } from './_components/trip-overview'
+import { TripSettingsTab } from './_components/trip-settings-tab'
 import { TripTasks } from './_components/trip-tasks'
 import { TripItinerary } from './_components/trip-itinerary'
 import { TripAutomations } from './_components/trip-automations'
@@ -88,7 +90,7 @@ import { formatDate } from '@/lib/date-utils'
 import { useLoading } from '@/context/loading-context'
 import type { TripTravelerResponseDto } from '@tailfire/shared-types/api'
 
-type ActiveTab = 'overview' | 'itinerary' | 'tasks' | 'bookings' | 'payments' | 'insurance' | 'service-fees' | 'documents' | 'emails' | 'forms' | 'notes' | 'automations' | 'activity' | 'travelers' | 'media'
+type ActiveTab = 'overview' | 'itinerary' | 'tasks' | 'bookings' | 'payments' | 'insurance' | 'service-fees' | 'settings' | 'documents' | 'emails' | 'forms' | 'notes' | 'automations' | 'activity' | 'travelers' | 'media'
 
 const getSidebarNav = (activeTab: ActiveTab, setActiveTab: (tab: ActiveTab) => void, travelerIssueCount: number = 0) => [
   {
@@ -147,6 +149,17 @@ const getSidebarNav = (activeTab: ActiveTab, setActiveTab: (tab: ActiveTab) => v
         icon: DollarSign,
         isActive: activeTab === 'service-fees',
         onClick: () => setActiveTab('service-fees'),
+      },
+      {
+        // PR-2: admin-only Trip Settings (commission overrides). The tab
+        // renders an admin-gated empty state for non-admins, so it's safe
+        // to list unconditionally in the nav — the surface decides what
+        // to show.
+        name: 'Settings',
+        href: '#settings',
+        icon: Settings,
+        isActive: activeTab === 'settings',
+        onClick: () => setActiveTab('settings'),
       },
     ],
   },
@@ -497,6 +510,8 @@ export default function TripDetailPage() {
             </div>
           </Card>
         )
+      case 'settings':
+        return <TripSettingsTab tripId={trip.id} />
       case 'bookings':
         return <TripPackages trip={trip} />
       case 'insurance':

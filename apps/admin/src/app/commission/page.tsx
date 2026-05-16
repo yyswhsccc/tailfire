@@ -13,6 +13,7 @@ import { CommissionStats } from './_components/commission-stats'
 import { AgentPayableTable } from './_components/agent-payable-table'
 import { CommissionChecksTable } from './_components/commission-checks-table'
 import { AgentClaimsTab } from './_components/agent-claims-tab'
+import { ReconcilePendingTable } from './_components/reconcile-pending-table'
 import { ClaimBuilder } from './_components/claim-builder'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -62,6 +63,7 @@ export default function CommissionPage() {
           <TabsTrigger value="received">Received Checks</TabsTrigger>
           <TabsTrigger value="claims">{isAdmin ? 'Agent Claims' : 'My Claims'}</TabsTrigger>
           {isAdmin && <TabsTrigger value="disbursements">Disbursements</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>}
           {isAdmin && <TabsTrigger value="unreconciled">Unreconciled</TabsTrigger>}
         </TabsList>
 
@@ -139,6 +141,23 @@ export default function CommissionPage() {
                 <Button asChild>
                   <Link href="/commission/disbursements">Open Disbursements Queue</Link>
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="reconciliation">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending reconciliation</CardTitle>
+                <CardDescription>
+                  Activities on departed/travelling trips waiting for an admin
+                  reconciliation decision. Reconciled items become eligible for
+                  agent payout via IC Payouts V2.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ReconcilePendingTable />
               </CardContent>
             </Card>
           </TabsContent>

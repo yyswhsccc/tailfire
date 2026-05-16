@@ -401,6 +401,20 @@ export class CommissionController {
     })
   }
 
+  /**
+   * GET /commission/tracking/pending-reconciliation  (PR-2)
+   *
+   * Admin-only list of activities that need a reconciliation decision:
+   * trip has departed (status IN travelling, travelled) AND
+   * commission_tracking.is_reconciled = false. Powers the admin
+   * Reconciliation surface with per-row + bulk actions.
+   */
+  @Get('commission/tracking/pending-reconciliation')
+  @AdminOnly()
+  async getPendingReconciliation(@GetAuthContext() auth: AuthContext) {
+    return this.reconcileService.listPendingReconciliation(auth.agencyId)
+  }
+
   // ============================================================================
   // DASHBOARD
   // ============================================================================

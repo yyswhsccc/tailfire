@@ -34,6 +34,16 @@ export interface SupplierDto {
   supplierType: string | null
   contactInfo: SupplierContactInfo | null
   defaultCommissionRate: string | null
+  /**
+   * PR-1 tax-on-commission defaults. When `commissionIncludesTax` is true,
+   * the deposit finalize flow derives embedded_tax_cents per check item via
+   *   embedded_tax = gross × rate / (100 + rate)
+   * (computeEmbeddedTaxFromInclusive in commission-formula.ts). When false,
+   * received_cents on the check item is treated as tax-exclusive.
+   */
+  defaultCommissionTaxType: string | null
+  defaultCommissionTaxRatePercent: string | null
+  commissionIncludesTax: boolean
   isActive: boolean
   isPreferred: boolean
   notes: string | null
@@ -68,6 +78,10 @@ export interface CreateSupplierDto {
   supplierType?: string
   contactInfo?: SupplierContactInfo
   defaultCommissionRate?: string
+  // PR-2 commit 7: commission-tax defaults (PR-1 schema fields).
+  defaultCommissionTaxType?: string | null
+  defaultCommissionTaxRatePercent?: string | null
+  commissionIncludesTax?: boolean
   isActive?: boolean
   isPreferred?: boolean
   notes?: string
@@ -84,6 +98,10 @@ export interface UpdateSupplierDto {
   supplierType?: string
   contactInfo?: SupplierContactInfo
   defaultCommissionRate?: string
+  // PR-2 commit 7: commission-tax defaults (PR-1 schema fields).
+  defaultCommissionTaxType?: string | null
+  defaultCommissionTaxRatePercent?: string | null
+  commissionIncludesTax?: boolean
   isActive?: boolean
   isPreferred?: boolean
   notes?: string

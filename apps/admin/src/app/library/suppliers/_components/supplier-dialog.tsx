@@ -34,6 +34,10 @@ interface SupplierFormData {
   website: string
   address: string
   defaultCommissionRate: string
+  // PR-2 commit 7: commission-tax defaults
+  defaultCommissionTaxType: string
+  defaultCommissionTaxRatePercent: string
+  commissionIncludesTax: boolean
   isActive: boolean
   isPreferred: boolean
   notes: string
@@ -70,6 +74,9 @@ export function SupplierDialog({ supplier, open, onOpenChange }: SupplierDialogP
       website: '',
       address: '',
       defaultCommissionRate: '',
+      defaultCommissionTaxType: '',
+      defaultCommissionTaxRatePercent: '',
+      commissionIncludesTax: false,
       isActive: true,
       isPreferred: false,
       notes: '',
@@ -95,6 +102,9 @@ export function SupplierDialog({ supplier, open, onOpenChange }: SupplierDialogP
           website: supplier.contactInfo?.website || '',
           address: supplier.contactInfo?.address || '',
           defaultCommissionRate: supplier.defaultCommissionRate || '',
+          defaultCommissionTaxType: supplier.defaultCommissionTaxType || '',
+          defaultCommissionTaxRatePercent: supplier.defaultCommissionTaxRatePercent || '',
+          commissionIncludesTax: supplier.commissionIncludesTax,
           isActive: supplier.isActive,
           isPreferred: supplier.isPreferred,
           notes: supplier.notes || '',
@@ -111,6 +121,9 @@ export function SupplierDialog({ supplier, open, onOpenChange }: SupplierDialogP
           website: '',
           address: '',
           defaultCommissionRate: '',
+          defaultCommissionTaxType: '',
+          defaultCommissionTaxRatePercent: '',
+          commissionIncludesTax: false,
           isActive: true,
           isPreferred: false,
           notes: '',
@@ -134,6 +147,11 @@ export function SupplierDialog({ supplier, open, onOpenChange }: SupplierDialogP
       supplierType: data.supplierType || undefined,
       contactInfo: Object.keys(contactInfo).length > 0 ? contactInfo : undefined,
       defaultCommissionRate: data.defaultCommissionRate || undefined,
+      // PR-2 commit 7: commission-tax defaults. Blank string → null (clear);
+      // otherwise pass through.
+      defaultCommissionTaxType: data.defaultCommissionTaxType || null,
+      defaultCommissionTaxRatePercent: data.defaultCommissionTaxRatePercent || null,
+      commissionIncludesTax: data.commissionIncludesTax,
       isActive: data.isActive,
       isPreferred: data.isPreferred,
       notes: data.notes || undefined,
@@ -312,6 +330,64 @@ export function SupplierDialog({ supplier, open, onOpenChange }: SupplierDialogP
 
             {/* Defaults Tab */}
             <TabsContent value="defaults" className="space-y-4 pt-4">
+              {/* PR-2 commit 7: commission-tax defaults
+                  Used by finalizeDeposit to auto-derive embedded_tax_*
+                  on each commission_check_item. When commissionIncludesTax
+                  is true and a rate is set, computeEmbeddedTaxFromInclusive
+                  splits the supplier's gross into base + embedded tax. */}
+              <div className="rounded-md border border-ash-200 p-4 space-y-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-ash-900">Commission tax defaults</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    When this supplier embeds tax in their commission payments (e.g. ACV
+                    pays $105 = $100 commissionable + $5 GST), enable the toggle and set
+                    the rate. Deposit finalize will split it automatically.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="defaultCommissionTaxType">Tax type</Label>
+                    <Select
+                      value={watch('defaultCommissionTaxType')}
+                      onValueChange={(v) => setValue('defaultCommissionTaxType', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="None / no tax" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="GST">GST</SelectItem>
+                        <SelectItem value="HST">HST</SelectItem>
+                        <SelectItem value="QST">QST</SelectItem>
+                        <SelectItem value="PST">PST</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="defaultCommissionTaxRatePercent">Rate (%)</Label>
+                    <Input
+                      id="defaultCommissionTaxRatePercent"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      {...register('defaultCommissionTaxRatePercent')}
+                      placeholder="e.g., 5.00 for GST"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <Switch
+                    id="commissionIncludesTax"
+                    checked={watch('commissionIncludesTax')}
+                    onCheckedChange={(checked) => setValue('commissionIncludesTax', checked)}
+                  />
+                  <Label htmlFor="commissionIncludesTax" className="text-sm">
+                    Supplier&apos;s payment already includes the tax above
+                  </Label>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="defaultTermsAndConditions">Default Terms & Conditions</Label>
                 <Textarea

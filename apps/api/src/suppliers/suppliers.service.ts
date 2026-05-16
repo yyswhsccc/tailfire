@@ -173,6 +173,10 @@ export class SuppliersService {
         supplierType: dto.supplierType?.trim() || null,
         contactInfo: dto.contactInfo || null,
         defaultCommissionRate: dto.defaultCommissionRate || null,
+        // PR-2 commit 7: commission-tax defaults (PR-1 columns)
+        defaultCommissionTaxType: dto.defaultCommissionTaxType ?? null,
+        defaultCommissionTaxRatePercent: dto.defaultCommissionTaxRatePercent ?? null,
+        commissionIncludesTax: dto.commissionIncludesTax ?? false,
         isActive: dto.isActive ?? true,
         isPreferred: dto.isPreferred ?? false,
         notes: dto.notes || null,
@@ -221,6 +225,16 @@ export class SuppliersService {
         ...(dto.defaultCommissionRate !== undefined && {
           defaultCommissionRate: dto.defaultCommissionRate || null,
         }),
+        // PR-2 commit 7: commission-tax defaults
+        ...(dto.defaultCommissionTaxType !== undefined && {
+          defaultCommissionTaxType: dto.defaultCommissionTaxType ?? null,
+        }),
+        ...(dto.defaultCommissionTaxRatePercent !== undefined && {
+          defaultCommissionTaxRatePercent: dto.defaultCommissionTaxRatePercent ?? null,
+        }),
+        ...(dto.commissionIncludesTax !== undefined && {
+          commissionIncludesTax: dto.commissionIncludesTax,
+        }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.isPreferred !== undefined && { isPreferred: dto.isPreferred }),
         ...(dto.notes !== undefined && { notes: dto.notes || null }),
@@ -262,6 +276,10 @@ export class SuppliersService {
       supplierType: supplier.supplierType,
       contactInfo: supplier.contactInfo as SupplierDto['contactInfo'],
       defaultCommissionRate: supplier.defaultCommissionRate,
+      // PR-2 commit 7: surface commission-tax defaults on every supplier read.
+      defaultCommissionTaxType: supplier.defaultCommissionTaxType,
+      defaultCommissionTaxRatePercent: supplier.defaultCommissionTaxRatePercent,
+      commissionIncludesTax: supplier.commissionIncludesTax,
       isActive: supplier.isActive,
       isPreferred: supplier.isPreferred,
       notes: supplier.notes,

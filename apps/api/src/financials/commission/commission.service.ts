@@ -1564,7 +1564,24 @@ export class CommissionService {
           )
         }
 
-        // Insert commission_check_item
+        // PR-2 commit 6: derive embedded_tax_* from the supplier defaults
+        // (added to suppliers in PR-1 commit 1). Falls back to (0, NULL, NULL)
+        // when the supplier has no defaults configured — matches the
+        // existing tf-demo backfill behavior. Caller-supplied embedded_tax_*
+        // fields on the DTO take precedence when present.
+        const resolvedTax = await this.resolveCheckItemTax(
+          item.activityPricingId,
+          item.receivedCents,
+          {
+            embeddedTaxCents: item.embeddedTaxCents,
+            embeddedTaxType: item.embeddedTaxType,
+            embeddedTaxRatePercent: item.embeddedTaxRatePercent,
+          },
+        )
+
+        // Insert commission_check_item with the derived tax fields so
+        // downstream IC v2 eligibility (which reads embedded_tax_* in
+        // commission-formula) sees a complete record.
         await tx
           .insert(this.db.schema.commissionCheckItems)
           .values({
@@ -1572,6 +1589,12 @@ export class CommissionService {
             activityPricingId: item.activityPricingId,
             receivedCents: item.receivedCents,
             receivedParentCents: 0,
+            embeddedTaxCents: resolvedTax.embeddedTaxCents,
+            embeddedTaxType: resolvedTax.embeddedTaxType,
+            embeddedTaxRatePercent:
+              resolvedTax.embeddedTaxRatePercent != null
+                ? String(resolvedTax.embeddedTaxRatePercent)
+                : null,
           })
 
         // Upsert commission_tracking: SELECT + INSERT/UPDATE

@@ -410,6 +410,11 @@ export interface AddDepositItemDto {
   activityPricingId: string
   receivedCents: number
   taxCents?: number
+  // PR-2 commit 6: PR-1 tax-on-commission fields. Optional — server derives
+  // from supplier defaults when omitted via resolveCheckItemTax().
+  embeddedTaxCents?: number
+  embeddedTaxType?: string | null
+  embeddedTaxRatePercent?: number | null
 }
 
 export interface FinalizeDepositDto {

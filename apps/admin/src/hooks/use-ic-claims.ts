@@ -3,17 +3,53 @@ import { api } from '@/lib/api'
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
+/**
+ * PR-1: matches the shape returned by GET /ic-payouts/me/eligible after
+ * the formula wiring landed (commit 7). The server applies
+ * computeAgentShare() and surfaces both the cents AND the breakdown
+ * snapshot — so the ClaimBuilder can render full transparency without
+ * re-doing the math.
+ */
+export interface CommissionBreakdownDto {
+  grossReceivedCents: number
+  embeddedTaxCents: number
+  embeddedTaxType: string | null
+  embeddedTaxRatePercent: number | null
+  commissionableBaseCents: number
+  feeRatePercent: number
+  feeRateOverridden: boolean
+  platformFeeCents: number
+  distributableCents: number
+  agentSplitPercent: number
+  agentSplitOverridden: boolean
+  agentPoolCents: number
+  collaboratorPercent: number
+  agentShareCents: number
+  agencyRetainsCents: number
+  formulaVersion: 1
+  computedAt: string
+}
+
 export interface EligibleItemDto {
   checkItemId: string
   tripRef: string | null
   description: string | null
-  commissionCents: number
+  /** PR-1: agent's share (not the gross supplier amount). */
+  agentShareCents: number
+  /** PR-1: per-line transparency — drives the ClaimBuilder breakdown rows. */
+  breakdown: CommissionBreakdownDto
 }
 
 export interface EligibleAdjustmentDto {
   adjustmentId: string
   description: string
   amountCents: number
+  /**
+   * PR-1: positive adjustments are opt-in (IC checks a box to take them
+   * this claim); negative adjustments (clawbacks) are always auto-included.
+   * Drives the checkbox vs auto-include rendering in the ClaimBuilder.
+   */
+  isOptIn: boolean
 }
 
 export interface EligibleByCurrencyDto {
@@ -62,15 +98,26 @@ export const useEligibleForClaim = (onBehalfOfUserId?: string) =>
  * The resulting invoice belongs to the IC; the admin's id is recorded on
  * the audit event via the controller.
  */
+/**
+ * PR-1 submit shape: selectedCheckItemIds + optedInAdjustmentIds (positive
+ * adjustments the IC chooses to take on this claim — empty array means
+ * "no positive adjustments this round; keep them pending"). Negative
+ * adjustments are auto-included server-side regardless.
+ */
+export interface SubmitClaimInput {
+  selectedCheckItemIds: string[]
+  optedInAdjustmentIds?: string[]
+}
+
 export const useSubmitClaim = (onBehalfOfUserId?: string) => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (selectedCheckItemIds: string[]) =>
+    mutationFn: (input: SubmitClaimInput) =>
       api.post<{ invoices: Array<{ id: string }> }>(
         onBehalfOfUserId
           ? `/ic-payouts/admin/users/${onBehalfOfUserId}/claims`
           : '/ic-payouts/me/claims',
-        { selectedCheckItemIds },
+        input,
       ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: icClaimsKeys.eligible })

@@ -74,8 +74,15 @@ export class ImapWriteService {
     try {
       const lock = await client.getMailboxLock(fromFolder)
       try {
+        // imapflow types messageMove as `false | CopyResponseObject` — narrow before access.
+        // CopyResponseObject.destination is typed `string` in older d.ts but at
+        // runtime it returns the rich object form when called with `uid: true`.
+        // Cast to access `uidMap` from the real response shape.
         const result = await client.messageMove({ uid }, toFolder, { uid: true })
-        const uidMap = result?.destination?.uidMap
+        const uidMap =
+          result === false
+            ? undefined
+            : (result?.destination as unknown as { uidMap?: Record<string, number> })?.uidMap
         const newUid = uidMap ? Number(Object.values(uidMap)[0]) || null : null
         this.logger.debug(
           `Moved UID ${uid} from ${fromFolder} to ${toFolder} → newUid=${newUid} (account ${accountId})`,
@@ -124,9 +131,11 @@ export class ImapWriteService {
       throw new NotFoundException(`Email account ${accountId} not found`)
     }
 
+    // decryptObject returns unknown; we know the shape from how
+    // credentials are encrypted by the IMAP onboarding flow.
     const { username, password } = this.encryptionService.decryptObject(
       account.credentials as any,
-    )
+    ) as { username: string; password: string }
 
     await assertPublicHost(account.imapHost)
 
