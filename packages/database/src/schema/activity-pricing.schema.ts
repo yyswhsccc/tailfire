@@ -112,7 +112,11 @@ export const commissionTracking = pgTable('commission_tracking', {
   commissionStatus: commissionStatusEnum('commission_status').notNull().default('pending'),
   notes: text('notes'),
 
-  // Enhanced commission fields (cents-based, tax-aware)
+  // Rollup columns — slated for removal once readers are refactored to compute
+  // from source (commission_check_items + commission_item_settlements +
+  // commission_adjustments). See PR-1 plan in
+  // docs/runbooks/commission-rebuild-plan.md: the DROP migration ships in a
+  // later commit of this PR after all writers/readers are migrated.
   grossCommissionCents: integer('gross_commission_cents'),
   taxAmountCents: integer('tax_amount_cents').default(0),
   taxType: varchar('tax_type', { length: 50 }),
@@ -125,7 +129,8 @@ export const commissionTracking = pgTable('commission_tracking', {
   source: varchar('source', { length: 100 }).default('manual'),
   sourceBookingRef: varchar('source_booking_ref', { length: 255 }),
 
-  // Reconciliation audit
+  // Reconciliation gate (PR-1) — admin judgment, gates IC v2 eligibility
+  isReconciled: boolean('is_reconciled').notNull().default(false),
   reconciliationDate: timestamp('reconciliation_date', { withTimezone: true }),
   reconciledBy: uuid('reconciled_by'),
 
