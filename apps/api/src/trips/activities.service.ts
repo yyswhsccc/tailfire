@@ -2282,18 +2282,39 @@ export class ActivitiesService {
     // Get activity IDs for batch pricing query
     const activityIds = activities.map(a => a.activity.id)
 
-    // Fetch pricing for all activities in a single query
+    // Fetch pricing for all activities in a single query.
+    // PR-fix #425: include `supplier` (legacy text field used by TES importer
+    // before activity_suppliers was populated). Used as a fallback below.
     const pricingData = await this.db.client
       .select({
         activityId: this.db.schema.activityPricing.activityId,
+        activityPricingId: this.db.schema.activityPricing.id,
         totalPriceCents: this.db.schema.activityPricing.totalPriceCents,
         currency: this.db.schema.activityPricing.currency,
+        supplierLegacy: this.db.schema.activityPricing.supplier,
       })
       .from(this.db.schema.activityPricing)
       .where(inArray(this.db.schema.activityPricing.activityId, activityIds))
 
     const pricingMap = new Map(
       pricingData.map(p => [p.activityId, p])
+    )
+
+    // PR-fix #425: fetch commission totals from commission_tracking so the
+    // bookings table can show a real value instead of always "–".
+    const activityPricingIds = pricingData.map((p) => p.activityPricingId)
+    const commissionData = activityPricingIds.length > 0
+      ? await this.db.client
+          .select({
+            activityPricingId: this.db.schema.commissionTracking.activityPricingId,
+            commissionAmount: this.db.schema.commissionTracking.commissionAmount,
+            commissionStatus: this.db.schema.commissionTracking.commissionStatus,
+          })
+          .from(this.db.schema.commissionTracking)
+          .where(inArray(this.db.schema.commissionTracking.activityPricingId, activityPricingIds))
+      : []
+    const commissionByActivityPricingId = new Map(
+      commissionData.map((c) => [c.activityPricingId, c])
     )
 
     // Fetch payment data (computed from expected_payment_items)
@@ -2359,9 +2380,15 @@ export class ActivitiesService {
       const baseResponse = this.formatActivityResponse(r.activity)
       const pricing = pricingMap.get(r.activity.id)
       const payment = paymentDataMap.get(r.activity.id)
-      // Use activity_suppliers first, fall back to cruise_line_name for cruises
+      // PR-fix #425: 3-tier supplier resolution.
+      // 1. activity_suppliers join (canonical, populated by admin UI on Save)
+      // 2. cruise_line_name (custom_cruise_details, set on cruise creation)
+      // 3. activity_pricing.supplier (legacy text field from TES importer)
+      // The 3rd tier was missing — without it, every TES-imported activity
+      // showed an empty Supplier column on tf-demo.
       const supplierName = supplierMap.get(r.activity.id)
         ?? cruiseLineMap.get(r.activity.id)
+        ?? pricing?.supplierLegacy
         ?? null
 
       // Compute payment status from transaction data
@@ -2384,6 +2411,15 @@ export class ActivitiesService {
           : String(r.dayDate).split('T')[0]!
       }
 
+      // PR-fix #425: surface commission total so the Bookings table can render
+      // a real value instead of always "–". commission_tracking.commission_amount
+      // is stored in dollars (numeric); convert to cents for the DTO contract.
+      const tracking = pricing ? commissionByActivityPricingId.get(pricing.activityPricingId) : undefined
+      const commissionAmount = tracking?.commissionAmount != null ? Number(tracking.commissionAmount) : null
+      const commissionTotalCents = commissionAmount != null && Number.isFinite(commissionAmount)
+        ? Math.round(commissionAmount * 100)
+        : null
+
       return {
         ...baseResponse,
         supplierName,
@@ -2392,6 +2428,8 @@ export class ActivitiesService {
         paymentStatus,
         paidCents: payment?.paidCents ?? null,
         currency: pricing?.currency ?? 'CAD',
+        commissionTotalCents,
+        commissionStatus: tracking?.commissionStatus ?? null,
         pricing: pricing ? {
           totalPriceCents: pricing.totalPriceCents ?? 0,
           currency: pricing.currency ?? 'CAD',

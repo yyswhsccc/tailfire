@@ -1221,7 +1221,10 @@ export class TripsController {
         paymentStatus: a.paymentStatus ?? null,
         paidCents: a.paidCents ?? null,
         currency: a.currency ?? null,
-        commissionTotalCents: a.pricing?.commissionTotalCents ?? null,
+        // PR-fix #425: service returns commissionTotalCents at top level (sourced
+        // from commission_tracking via activity_pricing.id). The old `a.pricing?.commissionTotalCents`
+        // lookup was always null because the pricing object never carried it.
+        commissionTotalCents: a.commissionTotalCents ?? null,
       })),
       total: activities.length,
     }
