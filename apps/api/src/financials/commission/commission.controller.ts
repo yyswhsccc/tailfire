@@ -12,10 +12,11 @@
  * RBAC: admin sees all, agent sees only their own data.
  */
 
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, ForbiddenException, GoneException } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, ForbiddenException, GoneException, BadRequestException } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { ConfigService } from '@nestjs/config'
 import { CommissionService } from './commission.service'
+import { CommissionReconcileService } from './commission-reconcile.service'
 import { AdminOnly } from '../../auth/decorators/admin-only.decorator'
 import { GetAuthContext } from '../../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../../auth/auth.types'
@@ -47,6 +48,7 @@ import type {
 export class CommissionController {
   constructor(
     private readonly commissionService: CommissionService,
+    private readonly reconcileService: CommissionReconcileService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -288,6 +290,111 @@ export class CommissionController {
     @Param('id') id: string
   ): Promise<DepositDetailResponseDto> {
     return this.commissionService.getDepositDetail(auth.agencyId, id)
+  }
+
+  // ============================================================================
+  // RECONCILIATION (PR-1) — admin-only judgment that gates IC v2 eligibility
+  // ============================================================================
+
+  /**
+   * POST /commission/tracking/:trackingId/reconcile
+   * Mark a single activity's commission as reconciled (matches supplier deposit).
+   * Body: { reason?: string }
+   */
+  @Post('commission/tracking/:trackingId/reconcile')
+  @AdminOnly()
+  async reconcileTracking(
+    @GetAuthContext() auth: AuthContext,
+    @Param('trackingId') trackingId: string,
+    @Body() body: { reason?: string } = {},
+  ) {
+    return this.reconcileService.reconcile({
+      trackingId,
+      actorUserId: auth.userId,
+      reason: body.reason ?? null,
+    })
+  }
+
+  /**
+   * POST /commission/tracking/:trackingId/unreconcile
+   * Signed transition — reason REQUIRED. Typical use: supplier short, chasing.
+   */
+  @Post('commission/tracking/:trackingId/unreconcile')
+  @AdminOnly()
+  async unreconcileTracking(
+    @GetAuthContext() auth: AuthContext,
+    @Param('trackingId') trackingId: string,
+    @Body() body: { reason?: string } = {},
+  ) {
+    if (!body.reason || body.reason.trim().length === 0) {
+      throw new BadRequestException('unreconcile requires a reason')
+    }
+    return this.reconcileService.unreconcile({
+      trackingId,
+      actorUserId: auth.userId,
+      reason: body.reason,
+    })
+  }
+
+  /**
+   * POST /commission/activity-pricing/:activityPricingId/reconcile
+   * Alternate path for callers that have the activity_pricing_id (most UI surfaces).
+   */
+  @Post('commission/activity-pricing/:activityPricingId/reconcile')
+  @AdminOnly()
+  async reconcileByActivityPricing(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityPricingId') activityPricingId: string,
+    @Body() body: { reason?: string } = {},
+  ) {
+    return this.reconcileService.reconcile({
+      activityPricingId,
+      actorUserId: auth.userId,
+      reason: body.reason ?? null,
+    })
+  }
+
+  /**
+   * POST /commission/activity-pricing/:activityPricingId/unreconcile
+   */
+  @Post('commission/activity-pricing/:activityPricingId/unreconcile')
+  @AdminOnly()
+  async unreconcileByActivityPricing(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityPricingId') activityPricingId: string,
+    @Body() body: { reason?: string } = {},
+  ) {
+    if (!body.reason || body.reason.trim().length === 0) {
+      throw new BadRequestException('unreconcile requires a reason')
+    }
+    return this.reconcileService.unreconcile({
+      activityPricingId,
+      actorUserId: auth.userId,
+      reason: body.reason,
+    })
+  }
+
+  /**
+   * POST /commission/tracking/bulk-reconcile
+   * For the Trip Bookings "Reconcile All Selected" multi-select action.
+   * Accepts either trackingIds or activityPricingIds. Idempotent.
+   * Body: { trackingIds?: string[], activityPricingIds?: string[], reason?: string }
+   */
+  @Post('commission/tracking/bulk-reconcile')
+  @AdminOnly()
+  async bulkReconcileTracking(
+    @GetAuthContext() auth: AuthContext,
+    @Body() body: { trackingIds?: string[]; activityPricingIds?: string[]; reason?: string } = {},
+  ) {
+    if (!body.trackingIds?.length && !body.activityPricingIds?.length) {
+      throw new BadRequestException('bulk-reconcile requires trackingIds or activityPricingIds')
+    }
+    return this.reconcileService.bulkReconcile({
+      trackingIds: body.trackingIds,
+      activityPricingIds: body.activityPricingIds,
+      actorUserId: auth.userId,
+      reason: body.reason ?? null,
+    })
   }
 
   // ============================================================================
