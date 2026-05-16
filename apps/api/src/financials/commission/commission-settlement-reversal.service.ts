@@ -123,22 +123,61 @@ export class CommissionSettlementReversalService {
     const negatedBreakdown = this.negateBreakdown(original.computationBreakdown)
     const now = new Date()
 
-    const [inserted] = await tx
-      .insert(schema.commissionItemSettlements)
-      .values({
-        checkItemId: original.checkItemId,
-        recipientUserId: original.recipientUserId,
-        paidCheckId: original.paidCheckId,
-        settledAmountCents: -original.settledAmountCents,
-        isReversal: true,
-        reversesSettlementId: original.id,
+    // PR-1 Commit 12 (Codex round-4 fix): mark the ORIGINAL row as reversed
+    // in the same transaction. Without this, the original keeps
+    // reverses_settlement_id = NULL forever and "active settlement"
+    // predicates that filter on reversed_at IS NULL keep treating it as
+    // active. The partial unique index from migration 20260516210000 also
+    // depends on this update to free the (check_item_id, recipient_user_id)
+    // slot for a future re-claim.
+    await tx
+      .update(schema.commissionItemSettlements)
+      .set({
         reversedAt: now,
         reversedBy: input.actorUserId,
         reversedReason: input.reason,
-        computationBreakdown: negatedBreakdown,
-        createdBy: input.actorUserId,
       })
-      .returning({ id: schema.commissionItemSettlements.id })
+      .where(eq(schema.commissionItemSettlements.id, original.id))
+
+    // Insert the paired negation row. The new partial unique on
+    // reverses_settlement_id (WHERE is_reversal = true) prevents two
+    // concurrent reverseSettlement() calls from both landing here. On
+    // 23505 the caller retries — see commit 12 spec.
+    let inserted: { id: string } | undefined
+    try {
+      const rows = await tx
+        .insert(schema.commissionItemSettlements)
+        .values({
+          checkItemId: original.checkItemId,
+          recipientUserId: original.recipientUserId,
+          paidCheckId: original.paidCheckId,
+          settledAmountCents: -original.settledAmountCents,
+          isReversal: true,
+          reversesSettlementId: original.id,
+          reversedAt: now,
+          reversedBy: input.actorUserId,
+          reversedReason: input.reason,
+          computationBreakdown: negatedBreakdown,
+          createdBy: input.actorUserId,
+        })
+        .returning({ id: schema.commissionItemSettlements.id })
+      inserted = rows[0]
+    } catch (err) {
+      const code = (err as { code?: string })?.code
+      if (code === '23505') {
+        // Concurrent reverseSettlement() got there first; treat idempotently.
+        const existingReversal = await tx
+          .select({ id: schema.commissionItemSettlements.id })
+          .from(schema.commissionItemSettlements)
+          .where(eq(schema.commissionItemSettlements.reversesSettlementId, original.id))
+          .limit(1)
+        if (existingReversal[0]) {
+          this.logger.debug(`settlement ${input.settlementId} reversed concurrently — returning idempotent result`)
+          return { reversalRowId: existingReversal[0].id, alreadyReversed: true }
+        }
+      }
+      throw err
+    }
 
     if (!inserted) {
       throw new Error(`Failed to insert reversal row for settlement ${input.settlementId}`)
@@ -154,12 +193,14 @@ export class CommissionSettlementReversalService {
         beforeData: {
           settledAmountCents: original.settledAmountCents,
           isReversal: false,
+          reversedAt: null,
         },
         afterData: {
           reversalRowId: inserted.id,
           reversesSettlementId: original.id,
           settledAmountCents: -original.settledAmountCents,
           isReversal: true,
+          reversedAt: now.toISOString(),
           reversedBy: input.actorUserId,
         },
         changedBy: input.actorUserId,
@@ -191,6 +232,7 @@ export class CommissionSettlementReversalService {
         paidCheckId: schema.commissionItemSettlements.paidCheckId,
         settledAmountCents: schema.commissionItemSettlements.settledAmountCents,
         isReversal: schema.commissionItemSettlements.isReversal,
+        reversedAt: schema.commissionItemSettlements.reversedAt,
         computationBreakdown: schema.commissionItemSettlements.computationBreakdown,
       })
       .from(schema.commissionItemSettlements)
@@ -198,6 +240,9 @@ export class CommissionSettlementReversalService {
       .limit(1)
     if (!row) return null
     if (row.isReversal) return null // reversal rows are not themselves reversible
+    // PR-1 Commit 12: an original row already marked reversed (by a prior
+    // reverseSingle call in another tx) is not "active" anymore.
+    if (row.reversedAt !== null) return null
     return {
       id: row.id,
       checkItemId: row.checkItemId,
@@ -221,9 +266,11 @@ export class CommissionSettlementReversalService {
       computationBreakdown: unknown
     }>
   > {
-    // "Active" = original row (not a reversal) AND not yet reversed.
-    // We approximate by selecting all non-reversal rows; the reverseSingle
-    // path handles already-reversed idempotently.
+    // PR-1 Commit 12: "Active" = original row (is_reversal=false) AND not
+    // yet reversed (reversed_at IS NULL). Previously we returned every
+    // non-reversal row, which would have re-reversed an already-reversed
+    // original (the unique on reverses_settlement_id now blocks the double
+    // insert, but we also want to short-circuit the audit churn).
     const rows = await tx
       .select({
         id: schema.commissionItemSettlements.id,
@@ -232,12 +279,13 @@ export class CommissionSettlementReversalService {
         paidCheckId: schema.commissionItemSettlements.paidCheckId,
         settledAmountCents: schema.commissionItemSettlements.settledAmountCents,
         isReversal: schema.commissionItemSettlements.isReversal,
+        reversedAt: schema.commissionItemSettlements.reversedAt,
         computationBreakdown: schema.commissionItemSettlements.computationBreakdown,
       })
       .from(schema.commissionItemSettlements)
       .where(eq(schema.commissionItemSettlements.paidCheckId, paidCheckId))
     return rows
-      .filter((r) => !r.isReversal)
+      .filter((r) => !r.isReversal && r.reversedAt === null)
       .map((r) => ({
         id: r.id,
         checkItemId: r.checkItemId,

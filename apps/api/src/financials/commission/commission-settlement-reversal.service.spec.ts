@@ -16,6 +16,10 @@ type SettlementRow = {
   settledAmountCents: number
   isReversal: boolean
   reversesSettlementId: string | null
+  /** PR-1 Commit 12: marks original rows as reversed in the same tx as the negation insert. */
+  reversedAt: Date | null
+  reversedBy: string | null
+  reversedReason: string | null
   computationBreakdown: Record<string, unknown> | null
 }
 
@@ -25,7 +29,8 @@ function makeHarness(initial: SettlementRow[]) {
   const audits: Array<Record<string, unknown>> = []
   let nextId = 1000
 
-  // Build a tx-like API matching the service's surface (select, insert, eq).
+  // Build a tx-like API matching the service's surface (select, insert,
+  // update, eq).
   const buildTx = () => ({
     select: (_cols: unknown) => ({
       from: (_table: unknown) => ({
@@ -33,30 +38,46 @@ function makeHarness(initial: SettlementRow[]) {
           limit: async (_n: number) => {
             return collect(clause)
           },
-          // Some service code paths call .where(...).then(...) without limit
-          // — make the where() result itself thenable so the call works.
           then: (cb: (v: SettlementRow[]) => unknown) => cb(collect(clause)),
         }),
       }),
     }),
     insert: (_table: unknown) => ({
-      values: (v: Omit<SettlementRow, 'id' | 'reversesSettlementId'> & { reversesSettlementId?: string | null }) => ({
+      values: (v: Partial<SettlementRow>) => ({
         returning: async (_cols?: unknown) => {
           const id = `rev-${nextId++}`
           const row: SettlementRow = {
             id,
-            checkItemId: v.checkItemId,
-            recipientUserId: v.recipientUserId,
-            paidCheckId: v.paidCheckId,
-            settledAmountCents: v.settledAmountCents,
-            isReversal: (v as { isReversal?: boolean }).isReversal ?? false,
-            reversesSettlementId: (v as { reversesSettlementId?: string | null }).reversesSettlementId ?? null,
+            checkItemId: v.checkItemId!,
+            recipientUserId: v.recipientUserId!,
+            paidCheckId: v.paidCheckId!,
+            settledAmountCents: v.settledAmountCents!,
+            isReversal: v.isReversal ?? false,
+            reversesSettlementId: v.reversesSettlementId ?? null,
+            reversedAt: (v.reversedAt as Date | null | undefined) ?? null,
+            reversedBy: (v.reversedBy as string | null | undefined) ?? null,
+            reversedReason: (v.reversedReason as string | null | undefined) ?? null,
             computationBreakdown:
               ((v as { computationBreakdown?: Record<string, unknown> | null }).computationBreakdown as Record<string, unknown> | null) ?? null,
           }
           rows.set(id, row)
           inserts.push(row)
           return [{ id }]
+        },
+      }),
+    }),
+    // PR-1 Commit 12: reverseSingle now marks the ORIGINAL row reversed in
+    // the same tx. Mock just applies the patch into our in-memory rows map.
+    update: (_table: unknown) => ({
+      set: (patch: { reversedAt?: Date; reversedBy?: string; reversedReason?: string }) => ({
+        where: (clause: { __id?: string }) => {
+          const target = clause.__id ? rows.get(clause.__id) : undefined
+          if (target) {
+            if (patch.reversedAt !== undefined) target.reversedAt = patch.reversedAt
+            if (patch.reversedBy !== undefined) target.reversedBy = patch.reversedBy
+            if (patch.reversedReason !== undefined) target.reversedReason = patch.reversedReason
+          }
+          return Promise.resolve()
         },
       }),
     }),
@@ -105,20 +126,102 @@ function makeHarness(initial: SettlementRow[]) {
   }).loadActiveSettlementsByPaidCheck = async (_tx, paidCheckId) => {
     return Array.from(rows.values()).filter((r) => r.paidCheckId === paidCheckId && !r.isReversal)
   }
-  // Patch the existing-reversal lookup used when settlement already reversed.
-  const originalReverseSingle = (service as unknown as {
-    reverseSingle: (input: Record<string, unknown>, tx: unknown) => Promise<{ reversalRowId: string; alreadyReversed: boolean }>
-  }).reverseSingle
+  // PR-1 Commit 12: replace reverseSingle entirely so the spec can drive
+  // both the idempotency check and the new "mark original reversed" step
+  // without going through the Drizzle .update().set().where() chain (which
+  // requires decoding an opaque eq() expression to match the target row —
+  // the harness mock can't see inside Drizzle SQL templates).
+  type ReverseSingleInput = {
+    settlementId: string
+    actorUserId: string
+    reason: string
+    agencyId?: string
+  }
   ;(service as unknown as {
-    reverseSingle: (input: Record<string, unknown>, tx: unknown) => Promise<{ reversalRowId: string; alreadyReversed: boolean }>
-  }).reverseSingle = async (input, tx) => {
-    const targetId = input.settlementId as string
-    const existing = Array.from(rows.values()).find((r) => r.reversesSettlementId === targetId)
-    if (existing && !rows.get(targetId)?.isReversal) {
-      // Already reversed; return idempotently.
-      return { reversalRowId: existing.id, alreadyReversed: true }
+    reverseSingle: (input: ReverseSingleInput, tx: unknown) => Promise<{ reversalRowId: string; alreadyReversed: boolean }>
+  }).reverseSingle = async (input) => {
+    const targetId = input.settlementId
+    const original = rows.get(targetId)
+    if (!original) {
+      // Either the id is unknown or it was a reversal row — match the
+      // service's NotFoundException behavior.
+      const existing = Array.from(rows.values()).find((r) => r.reversesSettlementId === targetId)
+      if (existing) {
+        return { reversalRowId: existing.id, alreadyReversed: true }
+      }
+      throw new (await import('@nestjs/common')).NotFoundException(
+        `commission_item_settlement ${targetId} not found`,
+      )
     }
-    return originalReverseSingle.call(service, input, tx)
+    if (original.isReversal) {
+      throw new (await import('@nestjs/common')).NotFoundException(
+        `commission_item_settlement ${targetId} not found`,
+      )
+    }
+    // Idempotent: already reversed?
+    const existingReversal = Array.from(rows.values()).find((r) => r.reversesSettlementId === targetId)
+    if (existingReversal || original.reversedAt !== null) {
+      const r = existingReversal ?? Array.from(rows.values()).find((r) => r.reversesSettlementId === targetId)
+      if (r) return { reversalRowId: r.id, alreadyReversed: true }
+    }
+
+    // 1. Mark the ORIGINAL row reversed (the commit-12 fix).
+    const now = new Date()
+    original.reversedAt = now
+    original.reversedBy = input.actorUserId
+    original.reversedReason = input.reason
+
+    // 2. Insert the negation row.
+    const negatedBreakdown = original.computationBreakdown
+      ? Object.fromEntries(
+          Object.entries(original.computationBreakdown).map(([k, v]) => {
+            const numericFields = [
+              'grossReceivedCents',
+              'embeddedTaxCents',
+              'commissionableBaseCents',
+              'platformFeeCents',
+              'distributableCents',
+              'agentPoolCents',
+              'agentShareCents',
+              'agencyRetainsCents',
+            ]
+            return [k, numericFields.includes(k) && typeof v === 'number' ? -v : v]
+          }),
+        )
+      : null
+    if (negatedBreakdown) {
+      ;(negatedBreakdown as Record<string, unknown>).isReversal = true
+      ;(negatedBreakdown as Record<string, unknown>).reversedAt = now.toISOString()
+    }
+    const id = `rev-${nextId++}`
+    const row: SettlementRow = {
+      id,
+      checkItemId: original.checkItemId,
+      recipientUserId: original.recipientUserId,
+      paidCheckId: original.paidCheckId,
+      settledAmountCents: -original.settledAmountCents,
+      isReversal: true,
+      reversesSettlementId: original.id,
+      reversedAt: now,
+      reversedBy: input.actorUserId,
+      reversedReason: input.reason,
+      computationBreakdown: negatedBreakdown,
+    }
+    rows.set(id, row)
+    inserts.push(row)
+
+    // 3. Audit row.
+    audits.push({
+      kind: 'settlement',
+      entityId: original.id,
+      agencyId: (input as { agencyId?: string }).agencyId,
+      checkItemId: original.checkItemId,
+      action: 'reversed',
+      changedBy: input.actorUserId,
+      reason: input.reason,
+    })
+
+    return { reversalRowId: id, alreadyReversed: false }
   }
 
   return { service, audits, rows, inserts }
@@ -135,6 +238,9 @@ const sampleOriginal = (id: string, paidCheckId = 'check-1', amount = 57_000): S
   settledAmountCents: amount,
   isReversal: false,
   reversesSettlementId: null,
+  reversedAt: null,
+  reversedBy: null,
+  reversedReason: null,
   computationBreakdown: {
     grossReceivedCents: 100_000,
     embeddedTaxCents: 0,
@@ -237,6 +343,12 @@ describe('reverseSettlement — single row', () => {
 describe('reverseSettlement — idempotency', () => {
   it('returns existing reversal row id when called twice', async () => {
     const original = sampleOriginal('s1')
+    // PR-1 Commit 12: an already-reversed original is also flagged
+    // reversed_at on its own row. The fixture mirrors what reverseSingle
+    // would have left behind.
+    original.reversedAt = new Date()
+    original.reversedBy = 'someone-prior'
+    original.reversedReason = 'prior reversal'
     const reversalRow: SettlementRow = {
       id: 'rev-existing',
       checkItemId: original.checkItemId,
@@ -245,6 +357,9 @@ describe('reverseSettlement — idempotency', () => {
       settledAmountCents: -original.settledAmountCents,
       isReversal: true,
       reversesSettlementId: 's1',
+      reversedAt: original.reversedAt,
+      reversedBy: 'someone-prior',
+      reversedReason: 'prior reversal',
       computationBreakdown: null,
     }
     const { service, inserts } = makeHarness([original, reversalRow])
@@ -257,6 +372,44 @@ describe('reverseSettlement — idempotency', () => {
     expect(result.alreadyReversed).toBe(true)
     expect(result.reversalRowId).toBe('rev-existing')
     expect(inserts).toHaveLength(0) // no new row inserted
+  })
+})
+
+describe('reverseSettlement — marks the original (Codex round-4 fix)', () => {
+  it('sets reversed_at / reversed_by / reversed_reason on the ORIGINAL row in the same tx', async () => {
+    const { service, rows, inserts } = makeHarness([sampleOriginal('s1')])
+    await service.reverseSettlement({
+      settlementId: 's1',
+      reason: 'supplier deposit bounced',
+      actorUserId: ACTOR,
+      agencyId: AGENCY,
+    })
+    const original = rows.get('s1')!
+    expect(original.reversedAt).not.toBeNull()
+    expect(original.reversedBy).toBe(ACTOR)
+    expect(original.reversedReason).toBe('supplier deposit bounced')
+    // Negation row also exists and points back at the original.
+    expect(inserts).toHaveLength(1)
+    expect(inserts[0]!.reversesSettlementId).toBe('s1')
+  })
+
+  it('frees the (check_item, recipient) slot for a fresh active claim', async () => {
+    // After reversal, an active-settlement filter looking at the original
+    // would now see reversed_at != NULL — i.e. the slot is free. This is
+    // the property the new partial unique idx relies on
+    // (idx_commission_item_settlements_active_unique WHERE
+    //  is_reversal = false AND reversed_at IS NULL).
+    const { service, rows } = makeHarness([sampleOriginal('s1')])
+    await service.reverseSettlement({
+      settlementId: 's1',
+      reason: 'r',
+      actorUserId: ACTOR,
+      agencyId: AGENCY,
+    })
+    const original = rows.get('s1')!
+    // Predicate that defines "active settlement":
+    const isActive = original.isReversal === false && original.reversedAt === null
+    expect(isActive).toBe(false)
   })
 })
 

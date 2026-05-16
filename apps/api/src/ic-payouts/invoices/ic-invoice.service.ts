@@ -563,7 +563,8 @@ export class IcInvoiceService {
       LEFT JOIN commission_item_settlements existing
         ON existing.check_item_id = cci.id
         AND existing.recipient_user_id = ${userId}::uuid
-        AND existing.reverses_settlement_id IS NULL
+        AND existing.is_reversal = false
+        AND existing.reversed_at IS NULL
       WHERE src_cc.agency_id = ${agencyId}::uuid
         AND src_cc.check_type = 'received'
         AND src_cc.status = 'accepted'
@@ -801,7 +802,8 @@ export class IcInvoiceService {
           FROM commission_item_settlements
           WHERE check_item_id = ANY(${sql.raw(`ARRAY[${itemIds.map(id => `'${id}'`).join(',')}]::uuid[]`)}::uuid[])
             AND recipient_user_id = ${args.userId}::uuid
-            AND reverses_settlement_id IS NULL
+            AND is_reversal = false
+            AND reversed_at IS NULL
         `)
         if (conflicting && conflicting.length > 0) {
           throw new ConflictException(
@@ -1113,7 +1115,8 @@ export class IcInvoiceService {
       LEFT JOIN commission_item_settlements existing
         ON existing.check_item_id = cci.id
         AND existing.recipient_user_id = ${userId}::uuid
-        AND existing.reverses_settlement_id IS NULL
+        AND existing.is_reversal = false
+        AND existing.reversed_at IS NULL
       WHERE src_cc.agency_id = ${agencyId}::uuid
         AND src_cc.check_type = 'received'
         AND src_cc.status = 'accepted'

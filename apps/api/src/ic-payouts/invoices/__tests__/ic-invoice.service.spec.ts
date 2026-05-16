@@ -313,8 +313,15 @@ function createMockDb(initialState?: {
         // (1) check_item row lock — no rows needed; service ignores the result.
         return []
       }
-      // PR-1: conflict-detection SELECT (the settlements one).
-      if (sqlContains(sqlObj, 'reverses_settlement_id is null')) {
+      // PR-1: conflict-detection SELECT (the settlements one). Commit 12
+      // changed the active-settlement predicate from
+      // `reverses_settlement_id IS NULL` to
+      // `is_reversal = false AND reversed_at IS NULL`. Match either so
+      // historical mocks keep working.
+      if (
+        sqlContains(sqlObj, 'reverses_settlement_id is null') ||
+        (sqlContains(sqlObj, 'is_reversal = false') && sqlContains(sqlObj, 'reversed_at is null'))
+      ) {
         const callN = settlementsCallCount++
         calls.settlementsInserts++ // surface that the conflict check ran
         // PR-1 semantics translation: in the OLD impl, an empty
