@@ -52,7 +52,16 @@ export function useCreateTour(itineraryId: string, dayId: string) {
 
   return useMutation({
     mutationFn: async (data: TourFormData) => {
-      const payload = toTourApiPayload(data)
+      // #441: the form's save handler passes `pricingBreakdownJson` and
+      // `bookingDate` as extras on top of TourFormData (they're not in the
+      // RHF schema, they live in adjacent useState). `toTourApiPayload`
+      // returns a fresh object literal that doesn't include them, so the
+      // mutator was silently dropping the breakdown rows on every create.
+      // Re-apply the extras post-mapper so they reach the API.
+      const payload = {
+        ...toTourApiPayload(data),
+        pricingBreakdownJson: (data as any).pricingBreakdownJson ?? null,
+      }
       return api.post<ActivityResponseDto>(`/days/${dayId}/activities`, payload)
     },
     onSuccess: () => {
@@ -84,7 +93,11 @@ export function useUpdateTour(itineraryId: string, dayId: string) {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: TourFormData }) => {
-      const payload = toTourApiPayload(data)
+      // #441: see useCreateTour comment.
+      const payload = {
+        ...toTourApiPayload(data),
+        pricingBreakdownJson: (data as any).pricingBreakdownJson ?? null,
+      }
       return api.patch<ActivityResponseDto>(`/days/${dayId}/activities/${id}`, payload)
     },
     onSuccess: (updatedTour) => {
