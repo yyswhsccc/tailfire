@@ -1625,6 +1625,27 @@
       "when": 1779186600000,
       "tag": "20260517130000_v_commission_position_fix_gross",
       "breakpoints": true
+    },
+    {
+      "idx": 232,
+      "version": "7",
+      "when": 1779271200000,
+      "tag": "20260518100000_reapply_traveler_snapshot_tracking",
+      "breakpoints": true
+    },
+    {
+      "idx": 233,
+      "version": "7",
+      "when": 1779271800000,
+      "tag": "20260518100100_reapply_agency_id_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 234,
+      "version": "7",
+      "when": 1779272400000,
+      "tag": "20260518100200_reapply_geolocation_to_days_and_itineraries",
+      "breakpoints": true
     }
   ]
 }
