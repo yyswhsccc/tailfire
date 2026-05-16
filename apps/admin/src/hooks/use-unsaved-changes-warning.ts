@@ -1,22 +1,18 @@
 'use client'
 
 /**
- * useUnsavedChangesWarning — warns the user before they navigate away with
- * dirty form state. Two layers, both opt-in via this single hook call:
+ * useUnsavedChangesWarning — registers the current form's dirty state with
+ * the DirtyGuardProvider so <GuardedLink> and useGuardedRouter can prompt
+ * before navigating away.
  *
- *   1. Browser beforeunload (refresh, tab close, hard URL change, external
- *      link) — native dialog. Browser controls the message (modern browsers
- *      ignore custom strings and show stock copy).
- *
- *   2. In-app navigation — registers with the DirtyGuardProvider so
- *      <GuardedLink> and useGuardedRouter prompt before navigating. This is
- *      the #313 follow-up to #306; #306 deliberately scoped out in-app nav
- *      after Codex flagged the original history-monkeypatch approach as
- *      unsafe coupling to App Router internals.
- *
- * The in-app guard only catches navigation that goes through GuardedLink /
- * useGuardedRouter. Bare <Link>s and raw useRouter() calls navigate silently
- * — Codex's recommendation: that's the deliberate trade-off for safety.
+ * The hook used to also install a `window.beforeunload` listener for hard
+ * navigations (refresh, tab close, external URL). That layer was removed:
+ * `beforeunload` is the only browser-controlled dialog that cannot be
+ * skinned with the rest of the admin's UI, and post-#439 e2e showed it
+ * firing spuriously after a successful save when the form's `isDirty`
+ * hadn't yet flipped back to false. The user policy is: no browser-default
+ * dialogs anywhere. Hard navigations now silently lose unsaved changes —
+ * the in-app guard still catches in-app navigation, which is the common path.
  *
  * Forms call this once with their RHF isDirty value:
  *
@@ -24,28 +20,8 @@
  *   useUnsavedChangesWarning(isDirty)
  */
 
-import { useEffect } from 'react'
 import { useRegisterDirtyGuard } from '@/lib/dirty-guard'
 
 export function useUnsavedChangesWarning(enabled: boolean): void {
-  // In-app guard: register a getter so the LATEST `enabled` is consulted
-  // at click time, not at registration time.
   useRegisterDirtyGuard(() => enabled)
-
-  // Browser-level guard
-  useEffect(() => {
-    if (!enabled) return
-
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      // Modern browsers ignore custom messages here and show stock copy.
-      e.returnValue = ''
-      return ''
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-
-    return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload)
-    }
-  }, [enabled])
 }

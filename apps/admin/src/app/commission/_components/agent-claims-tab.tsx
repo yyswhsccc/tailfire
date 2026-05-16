@@ -35,6 +35,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useMyInvoices } from '@/hooks/use-ic-claims'
 import { CommissionChecksTable } from './commission-checks-table'
 import type { CommissionCheckResponseDto } from '@tailfire/shared-types/api'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 
 const V2_ENABLED = process.env.NEXT_PUBLIC_IC_PAYOUTS_V2_ENABLED === 'true'
 
@@ -102,6 +114,22 @@ function AdminClaimsCard() {
   const { toast } = useToast()
   const [busyId, setBusyId] = useState<string | null>(null)
 
+  // Reason prompt — replaces window.prompt with a shadcn AlertDialog so the
+  // admin's look-and-feel is consistent and the OS-native chrome dialog
+  // never appears (user policy: no browser-default dialogs anywhere).
+  const [reasonPrompt, setReasonPrompt] = useState<{
+    open: boolean
+    id: string | null
+    action: 'reject' | 'cancel' | null
+    title: string
+    description: string
+    confirmLabel: string
+    value: string
+  }>({ open: false, id: null, action: null, title: '', description: '', confirmLabel: 'Confirm', value: '' })
+
+  const closeReasonPrompt = () =>
+    setReasonPrompt((s) => ({ ...s, open: false, id: null, action: null, value: '' }))
+
   const onApprove = async (id: string) => {
     setBusyId(id)
     try {
@@ -114,31 +142,55 @@ function AdminClaimsCard() {
     }
   }
 
-  const onReject = async (id: string) => {
-    const reason = window.prompt('Reason for rejecting this claim?')
-    if (!reason) return
-    setBusyId(id)
-    try {
-      await reject.mutateAsync({ id, reason })
-      toast({ title: 'Claim rejected' })
-    } catch (e: any) {
-      toast({ title: 'Reject failed', description: e?.message, variant: 'destructive' })
-    } finally {
-      setBusyId(null)
-    }
+  const onReject = (id: string) => {
+    setReasonPrompt({
+      open: true,
+      id,
+      action: 'reject',
+      title: 'Reject claim',
+      description: 'Reason for rejecting this claim?',
+      confirmLabel: 'Reject claim',
+      value: '',
+    })
   }
 
-  const onCancel = async (id: string) => {
-    const reason = window.prompt(
-      'Why are you cancelling this claim?\n\n(Duplicate, stuck state, admin error, IC asked to redo…)',
-    )
-    if (!reason) return
+  const onCancel = (id: string) => {
+    setReasonPrompt({
+      open: true,
+      id,
+      action: 'cancel',
+      title: 'Cancel claim',
+      description:
+        'Why are you cancelling this claim? (Duplicate, stuck state, admin error, IC asked to redo…)',
+      confirmLabel: 'Cancel claim',
+      value: '',
+    })
+  }
+
+  const submitReasonPrompt = async () => {
+    const reason = reasonPrompt.value.trim()
+    const id = reasonPrompt.id
+    const action = reasonPrompt.action
+    if (!reason || !id || !action) {
+      closeReasonPrompt()
+      return
+    }
+    closeReasonPrompt()
     setBusyId(id)
     try {
-      await cancel.mutateAsync({ id, reason })
-      toast({ title: 'Claim cancelled' })
+      if (action === 'reject') {
+        await reject.mutateAsync({ id, reason })
+        toast({ title: 'Claim rejected' })
+      } else {
+        await cancel.mutateAsync({ id, reason })
+        toast({ title: 'Claim cancelled' })
+      }
     } catch (e: any) {
-      toast({ title: 'Cancel failed', description: e?.message, variant: 'destructive' })
+      toast({
+        title: action === 'reject' ? 'Reject failed' : 'Cancel failed',
+        description: e?.message,
+        variant: 'destructive',
+      })
     } finally {
       setBusyId(null)
     }
@@ -183,6 +235,44 @@ function AdminClaimsCard() {
           />
         )}
       </CardContent>
+
+      <AlertDialog
+        open={reasonPrompt.open}
+        onOpenChange={(open) => {
+          if (!open) closeReasonPrompt()
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{reasonPrompt.title}</AlertDialogTitle>
+            <AlertDialogDescription>{reasonPrompt.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-2 py-2">
+            <Label htmlFor="claim-reason">Reason</Label>
+            <Textarea
+              id="claim-reason"
+              value={reasonPrompt.value}
+              onChange={(e) => setReasonPrompt((s) => ({ ...s, value: e.target.value }))}
+              placeholder="Type a brief reason…"
+              rows={4}
+              autoFocus
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={closeReasonPrompt}>Back</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                // Stop Radix from auto-closing; let submitReasonPrompt handle close.
+                e.preventDefault()
+                void submitReasonPrompt()
+              }}
+              disabled={!reasonPrompt.value.trim()}
+            >
+              {reasonPrompt.confirmLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

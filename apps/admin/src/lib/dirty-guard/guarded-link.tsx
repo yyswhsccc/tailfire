@@ -11,6 +11,7 @@
  */
 
 import Link, { type LinkProps } from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { AnchorHTMLAttributes, MouseEvent, ReactNode } from 'react'
 import { useDirtyGuard } from './dirty-guard-provider'
 
@@ -22,7 +23,8 @@ type GuardedLinkProps = LinkProps &
   }
 
 export function GuardedLink({ onClick, confirmMessage, children, ...rest }: GuardedLinkProps) {
-  const { confirmIfDirty } = useDirtyGuard()
+  const { isDirtyNow, confirmIfDirty } = useDirtyGuard()
+  const router = useRouter()
 
   const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
     // Let modified clicks (cmd/ctrl/shift) through unmolested — they open a
@@ -31,11 +33,29 @@ export function GuardedLink({ onClick, confirmMessage, children, ...rest }: Guar
       onClick?.(e)
       return
     }
-    if (!confirmIfDirty(confirmMessage)) {
-      e.preventDefault()
+
+    // Clean form: let next/link handle navigation natively. No await means
+    // no preventDefault, so the browser's prefetched payload is used.
+    if (!isDirtyNow()) {
+      onClick?.(e)
       return
     }
-    onClick?.(e)
+
+    // Dirty form: block native nav, ask via shadcn AlertDialog, then
+    // programmatically navigate if the user confirms. We can't `await`
+    // inside the click handler and then call the original native click,
+    // so route through router.push instead.
+    e.preventDefault()
+    const targetHref = typeof rest.href === 'string' ? rest.href : (rest.href as { toString: () => string })?.toString?.()
+    if (!targetHref) {
+      onClick?.(e)
+      return
+    }
+    void confirmIfDirty(confirmMessage).then((ok) => {
+      if (!ok) return
+      onClick?.(e)
+      router.push(targetHref)
+    })
   }
 
   return (

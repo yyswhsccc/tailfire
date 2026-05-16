@@ -290,8 +290,16 @@ export function useActivityFormLifecycle<
           setActivityPricingId(response.activityPricingId)
         }
 
-        // Reset RHF dirty state without losing the current values
-        form.reset(values, { keepValues: true, keepDirty: false })
+        // Mark the form clean by syncing defaultValues to the just-saved
+        // values. `reset(values)` updates BOTH current values and defaultValues,
+        // so `formState.isDirty` flips to false synchronously — required so
+        // the `beforeunload` listener (registered via useUnsavedChangesWarning)
+        // is removed BEFORE FormSuccessOverlay's onComplete fires a navigation.
+        // Previously we passed `{ keepValues: true, keepDirty: false }`, which
+        // left defaultValues stale and let beforeunload fire mid-success — see
+        // post-#439 e2e where Save triggered a "Leave site?" prompt despite
+        // a successful save.
+        form.reset(values)
 
         setShowSuccess(true)
         onSaveSuccess?.(response)

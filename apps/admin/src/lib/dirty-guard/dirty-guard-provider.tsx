@@ -19,9 +19,24 @@
  * In practice only one activity form is mounted at a time, so this is fine.
  * If multiple forms ever co-mount, we'd want a stack or composite OR; for now
  * the single-current model matches the actual usage.
+ *
+ * Prompt UI: the provider renders a shadcn AlertDialog rather than calling
+ * `window.confirm`, so the prompt matches the rest of the admin's look and
+ * feel and isn't a stock OS modal. Callers `await confirmIfDirty()` and act
+ * on the returned boolean.
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 type DirtyChecker = () => boolean
 
@@ -31,11 +46,17 @@ interface DirtyGuardContextValue {
   /** Unregister a previously-registered checker. */
   unregister: (checker: DirtyChecker) => void
   /**
-   * Check whether any registered form is currently dirty, and if so, prompt
-   * the user to confirm. Returns true if it's safe to proceed (not dirty, or
-   * user confirmed). False if user cancelled.
+   * Synchronous check used by navigation primitives to decide whether they
+   * need to preventDefault and prompt at all. No UI side-effect.
    */
-  confirmIfDirty: (message?: string) => boolean
+  isDirtyNow: () => boolean
+  /**
+   * Check whether any registered form is currently dirty, and if so, show
+   * the native shadcn AlertDialog. Resolves true if it's safe to proceed
+   * (not dirty, or user clicked "Leave"). Resolves false if the user
+   * cancelled or dismissed.
+   */
+  confirmIfDirty: (message?: string) => Promise<boolean>
 }
 
 const DirtyGuardContext = createContext<DirtyGuardContextValue | null>(null)
@@ -46,6 +67,14 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
   // Most-recently-registered checker wins. Stored in a ref so we don't
   // re-render the entire tree on every register/unregister.
   const checkerRef = useRef<DirtyChecker | null>(null)
+  // Pending decision resolver — set when the dialog opens, consumed when
+  // the user clicks Leave/Stay or dismisses.
+  const resolverRef = useRef<((ok: boolean) => void) | null>(null)
+
+  const [dialog, setDialog] = useState<{ open: boolean; message: string }>({
+    open: false,
+    message: DEFAULT_MESSAGE,
+  })
 
   const register = useCallback((checker: DirtyChecker) => {
     checkerRef.current = checker
@@ -57,20 +86,40 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const confirmIfDirty = useCallback((message: string = DEFAULT_MESSAGE): boolean => {
+  const isDirtyNow = useCallback((): boolean => {
     const checker = checkerRef.current
-    if (!checker) return true
-    let isDirty = false
+    if (!checker) return false
     try {
-      isDirty = checker()
+      return checker()
     } catch {
       // If the checker throws, treat as not dirty — better to let nav
       // happen than to block the user behind a buggy checker.
-      return true
+      return false
     }
-    if (!isDirty) return true
-    // eslint-disable-next-line no-alert
-    return window.confirm(message)
+  }, [])
+
+  const confirmIfDirty = useCallback(
+    (message: string = DEFAULT_MESSAGE): Promise<boolean> => {
+      if (!isDirtyNow()) return Promise.resolve(true)
+      // If a previous decision is somehow still pending, resolve it as
+      // cancelled before starting a new one — prevents leaks.
+      if (resolverRef.current) {
+        resolverRef.current(false)
+        resolverRef.current = null
+      }
+      return new Promise<boolean>((resolve) => {
+        resolverRef.current = resolve
+        setDialog({ open: true, message })
+      })
+    },
+    [isDirtyNow],
+  )
+
+  const resolve = useCallback((ok: boolean) => {
+    const r = resolverRef.current
+    resolverRef.current = null
+    setDialog((d) => ({ ...d, open: false }))
+    r?.(ok)
   }, [])
 
   // Memoize the context value so consumers that depend on `ctx` in their
@@ -79,11 +128,33 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
   // form page would die with React error #185 (infinite update loop) —
   // exactly what #334 was reporting.
   const value = useMemo<DirtyGuardContextValue>(
-    () => ({ register, unregister, confirmIfDirty }),
-    [register, unregister, confirmIfDirty],
+    () => ({ register, unregister, isDirtyNow, confirmIfDirty }),
+    [register, unregister, isDirtyNow, confirmIfDirty],
   )
 
-  return <DirtyGuardContext.Provider value={value}>{children}</DirtyGuardContext.Provider>
+  return (
+    <DirtyGuardContext.Provider value={value}>
+      {children}
+      <AlertDialog
+        open={dialog.open}
+        onOpenChange={(next) => {
+          // Closing via overlay click or Esc resolves as cancel.
+          if (!next) resolve(false)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>{dialog.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => resolve(false)}>Stay on page</AlertDialogCancel>
+            <AlertDialogAction onClick={() => resolve(true)}>Leave</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </DirtyGuardContext.Provider>
+  )
 }
 
 /**
@@ -120,6 +191,7 @@ export function useDirtyGuard(): DirtyGuardContextValue {
   return {
     register: () => undefined,
     unregister: () => undefined,
-    confirmIfDirty: () => true,
+    isDirtyNow: () => false,
+    confirmIfDirty: () => Promise.resolve(true),
   }
 }
