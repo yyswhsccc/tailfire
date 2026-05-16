@@ -2627,22 +2627,27 @@ async function importCommissionChecks(ledger: Ledger): Promise<void> {
       const tfCheckId = result.id
       await delay(DELAY_MS)
 
-      // Transition status
+      // PR-4 (Codex round-1): DEFER acceptance until AFTER Step 15
+      // (commissionCheckItems). PR-1's addCheckItem() rejects accepted
+      // checks (commission.service.ts:554), so we must keep checks in
+      // pending/submitted state through item creation, then promote them
+      // via Step 15c (acceptReceivedChecks).
       const statusName = check.CheckStatus?.Name
-      if (statusName === 'Accepted') {
-        // pending → submitted → accepted
-        await apiPatch(`/commission/checks/${tfCheckId}`, { status: 'submitted' })
-        await delay(DELAY_MS)
-        await apiPost(`/commission/checks/${tfCheckId}/accept`, {})
-        await delay(DELAY_MS)
-      } else if (statusName === 'Submitted') {
-        // pending → submitted
+      if (statusName === 'Submitted' || statusName === 'Accepted') {
+        // Move to submitted now; acceptance (if any) happens in Step 15c.
         await apiPatch(`/commission/checks/${tfCheckId}`, { status: 'submitted' })
         await delay(DELAY_MS)
       }
       // "Pending" — leave as-is (default)
 
-      addMapping(ledger, { sourceType: 'commissionCheck', sourceId: checkId, tailfireId: tfCheckId, status: 'created' })
+      addMapping(ledger, {
+        sourceType: 'commissionCheck',
+        sourceId: checkId,
+        tailfireId: tfCheckId,
+        status: 'created',
+        // Stash original TES status so Step 15c can decide what to accept.
+        data: { tesOriginalStatus: statusName ?? 'Pending' },
+      })
       created++
     } catch (err) {
       addMapping(ledger, { sourceType: 'commissionCheck', sourceId: checkId, tailfireId: '', status: 'error', error: (err as Error).message })
@@ -3134,6 +3139,178 @@ async function reconcileCommissionCheckItems(ledger: Ledger): Promise<void> {
   saveLedger(ledger)
 }
 
+// ─── Step 15b: Reconcile Imported Commission Tracking ────────────────────────
+//
+// PR-4 (Codex round-1): IC v2 eligibility requires
+// commission_tracking.is_reconciled = true (ic-invoice.service.ts:557). PR-1's
+// migration backfilled existing source='tes_import' rows, but the importer
+// writes source='travelesolutions' — so a fresh import produces ZERO eligible
+// items unless we explicitly reconcile each one. This step bulk-reconciles
+// every activityPricingId we just created a check item for.
+//
+// Endpoint: POST /commission/tracking/bulk-reconcile
+// Idempotent: marking an already-reconciled row is a no-op.
+
+async function reconcileImportedTracking(ledger: Ledger): Promise<void> {
+  if (ledger.completedSteps.includes('reconcileImportedTracking') && RESUME) {
+    console.log('  Reconcile Imported Tracking: skipped (completed)')
+    return
+  }
+
+  console.log('\n── Step 15b: Reconciling Imported Commission Tracking ──')
+
+  // PR-4 (Codex round-2 fix #2): only reconcile items whose parent check
+  // was originally Accepted in TES. Pending/Submitted checks represent
+  // open receivables, not facts — reconciling them would prematurely
+  // gate them into IC eligibility and lie about TES truth.
+  //
+  // Build a set of tfCheckIds that should propagate to reconciliation.
+  const acceptedTfCheckIds = new Set<string>()
+  for (const m of ledger.mappings) {
+    if (m.sourceType !== 'commissionCheck') continue
+    if (m.status !== 'created') continue
+    if (!m.tailfireId) continue
+    const original = (m.data as { tesOriginalStatus?: string } | undefined)?.tesOriginalStatus
+    if (original === 'Accepted') acceptedTfCheckIds.add(m.tailfireId)
+  }
+
+  // Collect distinct activityPricingIds for check items linked to those
+  // accepted parent checks. Step 15 stamps both checkId and activityPricingId
+  // into the commissionCheckItem mapping's data block.
+  const activityPricingIds = new Set<string>()
+  for (const m of ledger.mappings) {
+    if (m.sourceType !== 'commissionCheckItem') continue
+    if (m.status !== 'created') continue
+    const d = m.data as { activityPricingId?: string; checkId?: string } | undefined
+    if (!d?.activityPricingId || !d.checkId) continue
+    if (!acceptedTfCheckIds.has(d.checkId)) continue
+    activityPricingIds.add(d.activityPricingId)
+  }
+
+  if (activityPricingIds.size === 0) {
+    console.log('  No activity_pricing_ids to reconcile (no check items created).')
+    ledger.completedSteps.push('reconcileImportedTracking')
+    saveLedger(ledger)
+    return
+  }
+
+  console.log(`  Reconciling ${activityPricingIds.size} activity_pricing_id(s) via bulk endpoint...`)
+
+  // Chunk to keep payloads reasonable. The endpoint accepts arrays.
+  const CHUNK_SIZE = 200
+  const ids = Array.from(activityPricingIds)
+  let reconciled = 0
+  let errors = 0
+
+  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+    const chunk = ids.slice(i, i + CHUNK_SIZE)
+    try {
+      const result = await apiPost<{ reconciledCount?: number; alreadyReconciledCount?: number }>(
+        '/commission/tracking/bulk-reconcile',
+        {
+          activityPricingIds: chunk,
+          reason: 'TES import — pre-cutover historical settlements are facts',
+        }
+      )
+      reconciled += result.reconciledCount ?? chunk.length
+      console.log(`  Chunk ${i / CHUNK_SIZE + 1}: reconciled=${result.reconciledCount ?? '?'} alreadyReconciled=${result.alreadyReconciledCount ?? '?'}`)
+      await delay(DELAY_MS)
+    } catch (err) {
+      errors++
+      console.error(`  ERROR bulk-reconcile chunk ${i / CHUNK_SIZE + 1}: ${(err as Error).message}`)
+    }
+  }
+
+  console.log(`  Reconcile Imported Tracking: ${reconciled} reconciled, ${errors} chunk errors`)
+
+  // PR-4 (Codex round-2 fix #5): gate step — must not mark complete on
+  // partial failure. IC eligibility will silently drop unreconciled items
+  // and the runbook expects 0 unreconciled after this step.
+  if (errors > 0) {
+    throw new Error(`reconcileImportedTracking: ${errors} chunk(s) failed — re-run with --step reconcileImportedTracking --resume after investigating`)
+  }
+  ledger.completedSteps.push('reconcileImportedTracking')
+  saveLedger(ledger)
+}
+
+// ─── Step 15c: Accept Deferred Received Checks ────────────────────────────────
+//
+// PR-4 (Codex round-1): Step 14 used to accept checks inline, but PR-1's
+// addCheckItem() now rejects accepted checks. We deferred acceptance to here,
+// after Step 15 (items) and Step 15b (reconcile). Now safe to accept any
+// check whose TES original status was 'Accepted'.
+
+async function acceptReceivedChecks(ledger: Ledger): Promise<void> {
+  if (ledger.completedSteps.includes('acceptReceivedChecks') && RESUME) {
+    console.log('  Accept Received Checks: skipped (completed)')
+    return
+  }
+
+  console.log('\n── Step 15c: Accepting Received Commission Checks ──')
+
+  const toAccept = ledger.mappings.filter((m) => {
+    if (m.sourceType !== 'commissionCheck') return false
+    if (m.status !== 'created') return false
+    if (!m.tailfireId) return false
+    const original = (m.data as { tesOriginalStatus?: string } | undefined)?.tesOriginalStatus
+    return original === 'Accepted'
+  })
+
+  if (toAccept.length === 0) {
+    console.log('  No checks to accept (no TES checks were originally Accepted).')
+    ledger.completedSteps.push('acceptReceivedChecks')
+    saveLedger(ledger)
+    return
+  }
+
+  console.log(`  Accepting ${toAccept.length} previously-deferred check(s)...`)
+
+  let accepted = 0
+  let alreadyAccepted = 0
+  let errors = 0
+
+  for (const m of toAccept) {
+    // PR-4 (Codex round-2 fix #4): GET-first idempotency. Substring matching
+    // on error messages was too broad (HTTP body strings include "status",
+    // "statusCode", etc.) and would silently mask real failures.
+    try {
+      const existing = await apiGet<{ status?: string }>(`/commission/checks/${m.tailfireId}`)
+      if (existing?.status === 'accepted') {
+        alreadyAccepted++
+        continue
+      }
+    } catch (preErr) {
+      // GET failure is not fatal — fall through to POST and let it surface.
+      console.warn(`  WARN pre-check GET failed for ${m.tailfireId}: ${(preErr as Error).message}`)
+    }
+
+    try {
+      await apiPost(`/commission/checks/${m.tailfireId}/accept`, {})
+      accepted++
+      await delay(DELAY_MS)
+    } catch (err) {
+      const msg = (err as Error).message
+      errors++
+      console.error(`  ERROR accepting check ${m.tailfireId} (TES id ${m.sourceId}): ${msg}`)
+    }
+
+    if ((accepted + alreadyAccepted + errors) % 25 === 0) {
+      console.log(`  Accept progress: ${accepted + alreadyAccepted}/${toAccept.length}`)
+      saveLedger(ledger)
+    }
+  }
+
+  console.log(`  Accept Received Checks: ${accepted} accepted, ${alreadyAccepted} already-accepted, ${errors} errors`)
+
+  // PR-4 (Codex round-2 fix #5): do NOT mark this gate step complete on
+  // partial failure. --resume must retry until clean.
+  if (errors > 0) {
+    throw new Error(`acceptReceivedChecks: ${errors} check(s) failed to accept — re-run with --step acceptReceivedChecks --resume after investigating`)
+  }
+  ledger.completedSteps.push('acceptReceivedChecks')
+  saveLedger(ledger)
+}
+
 // ─── Post-Import: Draft Status Fixup ──────────────────────────────────────────
 
 async function runLifecycleBackfill(ledger: Ledger): Promise<void> {
@@ -3226,6 +3403,19 @@ async function main() {
   const ledger = loadLedger()
   const startTime = Date.now()
 
+  // PR-4 (Codex round-1): commission steps must respect PR-1 invariants:
+  //   - addCheckItem() rejects accepted checks → Step 14 cannot accept inline
+  //   - IC eligibility requires commission_tracking.is_reconciled = true
+  //   - Step 14b (paid checks) depends on commission_check_items existing
+  //
+  // Order:
+  //   14. commissionChecks         — create + maybe submit, NEVER accept
+  //   15. commissionCheckItems     — add items (requires checks NOT accepted)
+  //   15b. reconcileImportedTracking — bulk-reconcile every imported activityPricingId
+  //   15c. acceptReceivedChecks    — accept the checks originally Accepted in TES
+  //   14b. paidCommissionChecks    — historical paid checks + settlements
+  //                                  (needs check items + recipientUserId mapped)
+  //   14c. commissionAdjustments
   const steps: Record<string, () => Promise<void>> = {
     suppliers: () => importSuppliers(ledger),
     contacts: () => importContacts(ledger),
@@ -3236,9 +3426,11 @@ async function main() {
     paymentSchedules: () => importPaymentSchedules(ledger),
     paymentTransactions: () => importPaymentTransactions(ledger),
     commissionChecks: () => importCommissionChecks(ledger),
+    commissionCheckItems: () => reconcileCommissionCheckItems(ledger),
+    reconcileImportedTracking: () => reconcileImportedTracking(ledger),
+    acceptReceivedChecks: () => acceptReceivedChecks(ledger),
     paidCommissionChecks: () => importPaidCommissionChecks(ledger),
     commissionAdjustments: () => importCommissionAdjustments(ledger),
-    commissionCheckItems: () => reconcileCommissionCheckItems(ledger),
     draftFixup: () => runLifecycleBackfill(ledger),
   }
 
