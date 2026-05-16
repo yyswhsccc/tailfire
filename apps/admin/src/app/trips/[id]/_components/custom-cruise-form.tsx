@@ -30,6 +30,7 @@ import { useBookings } from '@/hooks/use-bookings'
 import { useQueryClient } from '@tanstack/react-query'
 import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import { EditTravelersDialog } from './edit-travelers-dialog'
+import { useTripTravelerAvatars } from '@/hooks/use-trip-traveler-avatars'
 import { CruisePassengersSection } from './cruise-passengers-section'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
@@ -721,9 +722,10 @@ export function CustomCruiseForm({
     }
   }
 
-  // Get travelers from trip data
-  const travelers = trip?.travelers || []
-  const totalTravelers = trip?.travelers?.length || 0
+  // #438: trip?.travelers is never populated by TripsService.findOne; pull
+  // from the dedicated trip-travelers endpoint instead.
+  const travelers = useTripTravelerAvatars(trip?.id)
+  const totalTravelers = travelers.length
 
   // Use changeCounter to refresh values after changes; no render-time subscription
   const currentValues = useMemo(() => {

@@ -33,6 +33,7 @@ import { useIsChildOfPackage } from '@/hooks/use-is-child-of-package'
 import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import { itineraryDayKeys } from '@/hooks/use-itinerary-days'
 import { EditTravelersDialog } from './edit-travelers-dialog'
+import { useTripTravelerAvatars } from '@/hooks/use-trip-traveler-avatars'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { buildInitialPricingState, type PricingData, type PricingBreakdownItem, type ValidationErrors } from '@/lib/pricing'
@@ -797,9 +798,10 @@ export function LodgingForm({
     }
   )
 
-  // Get travelers from trip data
-  const travelers = trip?.travelers || []
-  const totalTravelers = trip?.travelers?.length || 0
+  // #438: trip?.travelers is never populated by TripsService.findOne; pull
+  // from the dedicated trip-travelers endpoint instead.
+  const travelers = useTripTravelerAvatars(trip?.id)
+  const totalTravelers = travelers.length
 
   // Helper to show field errors
   const FieldError = ({ path }: { path: string }) => {

@@ -44,6 +44,7 @@ import type { NormalizedFlightStatus, NormalizedFlightOffer } from '@tailfire/sh
 import { FlightOffersSearchPanel } from '@/components/flight-offers-search-panel'
 import { normalizedTimeToFormFields } from '@/lib/flight-time-utils'
 import { EditTravelersDialog } from './edit-travelers-dialog'
+import { useTripTravelerAvatars } from '@/hooks/use-trip-traveler-avatars'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { ComponentMediaTab } from '@/components/shared'
 import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
@@ -910,9 +911,11 @@ export function FlightForm({
     setSupplierCommissionRate(defaults.commissionRate)
   }, [])
 
-  // Get travelers from trip data
-  const travelers: Array<{ id: string; name: string; initials: string }> = trip?.travelers || []
-  const totalTravelers = trip?.travelers?.length || 0
+  // #438: trip?.travelers is never populated by TripsService.findOne; pull
+  // from the dedicated trip-travelers endpoint that EditTravelersDialog
+  // already uses, then derive the avatar shape locally.
+  const travelers = useTripTravelerAvatars(trip?.id)
+  const totalTravelers = travelers.length
 
   return (
     <div className="relative max-w-5xl">
