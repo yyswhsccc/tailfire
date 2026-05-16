@@ -182,13 +182,20 @@ export class ContactsService {
     }
 
     if (filters.search) {
+      // #429: per-column ilike misses "First Last" queries because no single
+      // column holds the concatenation. Add ilike branches over the three
+      // first-name → last-name combos as well, NULL-safe via coalesce.
+      const term = `%${filters.search}%`
       const searchCondition = or(
-        ilike(this.db.schema.contacts.firstName, `%${filters.search}%`),
-        ilike(this.db.schema.contacts.lastName, `%${filters.search}%`),
-        ilike(this.db.schema.contacts.preferredName, `%${filters.search}%`),
-        ilike(this.db.schema.contacts.legalFirstName, `%${filters.search}%`),
-        ilike(this.db.schema.contacts.email, `%${filters.search}%`),
-        ilike(this.db.schema.contacts.phone, `%${filters.search}%`),
+        ilike(this.db.schema.contacts.firstName, term),
+        ilike(this.db.schema.contacts.lastName, term),
+        ilike(this.db.schema.contacts.preferredName, term),
+        ilike(this.db.schema.contacts.legalFirstName, term),
+        ilike(this.db.schema.contacts.email, term),
+        ilike(this.db.schema.contacts.phone, term),
+        sql`(coalesce(${this.db.schema.contacts.firstName}, '') || ' ' || coalesce(${this.db.schema.contacts.lastName}, '')) ILIKE ${term}`,
+        sql`(coalesce(${this.db.schema.contacts.preferredName}, '') || ' ' || coalesce(${this.db.schema.contacts.lastName}, '')) ILIKE ${term}`,
+        sql`(coalesce(${this.db.schema.contacts.legalFirstName}, '') || ' ' || coalesce(${this.db.schema.contacts.lastName}, '')) ILIKE ${term}`,
       )
       if (searchCondition) {
         conditions.push(searchCondition)
