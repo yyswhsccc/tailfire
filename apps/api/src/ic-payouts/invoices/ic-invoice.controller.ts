@@ -25,7 +25,9 @@ import {
   Param,
   Query,
   UsePipes,
+  GoneException,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { ApiTags } from '@nestjs/swagger'
 import { AdminOnly } from '../../auth/decorators/admin-only.decorator'
 import { GetAuthContext } from '../../auth/decorators/auth-context.decorator'
@@ -49,7 +51,29 @@ export class IcInvoiceController {
   constructor(
     private readonly service: IcInvoiceService,
     private readonly storage: StorageService,
+    private readonly configService: ConfigService,
   ) {}
+
+  /**
+   * Symmetric gate to the legacy CommissionController's isIcPayoutsV2Enabled()
+   * check. When `IC_PAYOUTS_V2_ENABLED=false` (the default while V2 math is
+   * being rebuilt), the money-path V2 endpoints return 410 Gone. Browse/admin
+   * endpoints that don't compute money (list invoices, approve/reject/cancel)
+   * remain open so any in-flight invoices can be cleaned up.
+   *
+   * Without this gate, IC v2's claim path silently issues invoices with the
+   * gross supplier `received_cents` as the line amount — no fee, split, or
+   * tax applied. See PR-0 in docs/runbooks/commission-rebuild-plan.md.
+   */
+  private assertV2MoneyPathReady(endpoint: string): void {
+    const enabled = this.configService.get<string>('IC_PAYOUTS_V2_ENABLED') === 'true'
+    if (!enabled) {
+      throw new GoneException(
+        `IC Payouts V2 money-path endpoint (${endpoint}) is disabled while the commission ` +
+          'formula and reconciliation gate are being rebuilt. See docs/runbooks/commission-rebuild-plan.md.'
+      )
+    }
+  }
 
   // ==========================================================================
   // IC routes
@@ -64,6 +88,7 @@ export class IcInvoiceController {
    */
   @Get('me/eligible')
   async getEligible(@GetAuthContext() auth: AuthContext) {
+    this.assertV2MoneyPathReady('GET /ic-payouts/me/eligible')
     return this.service.getEligibleForUser(auth.agencyId, auth.userId)
   }
 
@@ -81,6 +106,7 @@ export class IcInvoiceController {
     @GetAuthContext() auth: AuthContext,
     @Body() body: SubmitClaimZodDto,
   ) {
+    this.assertV2MoneyPathReady('POST /ic-payouts/me/claims')
     return this.service.submitClaim({
       agencyId: auth.agencyId,
       userId: auth.userId,
@@ -228,6 +254,7 @@ export class IcInvoiceController {
     @GetAuthContext() auth: AuthContext,
     @Param('userId') userId: string,
   ) {
+    this.assertV2MoneyPathReady('GET /ic-payouts/admin/users/:userId/eligible')
     return this.service.getEligibleForUser(auth.agencyId, userId)
   }
 
@@ -245,6 +272,7 @@ export class IcInvoiceController {
     @Param('userId') userId: string,
     @Body() body: SubmitClaimZodDto,
   ) {
+    this.assertV2MoneyPathReady('POST /ic-payouts/admin/users/:userId/claims')
     return this.service.submitClaim({
       agencyId: auth.agencyId,
       userId,
