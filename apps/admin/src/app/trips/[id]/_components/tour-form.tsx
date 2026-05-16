@@ -347,6 +347,12 @@ export function TourForm({
       setIsBooked(tourData.bookingStatus === 'booked')
       setBookingDate(tourData.bookingDate ?? null)
 
+      // #441: re-sync per-person breakdown from server. The useState
+      // initializer only ran with the initial (often-undefined) activity
+      // prop, so without this the form re-loaded showing $0 in the
+      // breakdown panel and the saved rows were invisible to the user.
+      setPricingBreakdown(((tourData as any).pricingBreakdownJson ?? null) as PricingBreakdownItem[] | null)
+
       // Build initial pricing state from server data
       const initialPricing = buildInitialPricingState(tourData as any)
 
