@@ -33,6 +33,7 @@ import { Queue } from 'bullmq'
 import { eq, and, inArray, sql } from 'drizzle-orm'
 import { EventEmitter2 } from '@nestjs/event-emitter'
 import { DatabaseService } from '../../db/database.service'
+import { CommissionSettlementReversalService } from '../../financials/commission/commission-settlement-reversal.service'
 import { schema } from '@tailfire/database'
 import { QUEUES } from '../../automation/automation.types'
 import { FxRateService } from '../fx/fx-rate.service'
@@ -60,6 +61,7 @@ export class DisbursementService {
     @InjectQueue(QUEUES.IC_PAYOUT_DISBURSE) private readonly queue: Queue,
     private readonly fxRate: FxRateService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly settlementReversalService: CommissionSettlementReversalService,
   ) {}
 
   // ============================================================================
@@ -508,11 +510,16 @@ export class DisbursementService {
 
       // 4. Reverse the invoice reservation (same pattern as IcInvoiceService.reject)
       if (invoice.reservationCheckId) {
-        // 4a. Delete settled commission_item_settlements linked to this reservation
-        await tx.execute(sql`
-          DELETE FROM commission_item_settlements
-          WHERE paid_check_id = ${invoice.reservationCheckId}
-        `)
+        // 4a. PR-1: reverse settlements via paired negation rows (was DELETE).
+        await this.settlementReversalService.reverseAllByPaidCheck(
+          {
+            paidCheckId: invoice.reservationCheckId,
+            reason: `Disbursement ${disbursementId} failed: ${reason}`,
+            actorUserId: failedByUserId,
+            agencyId: invoice.agencyId,
+          },
+          tx,
+        )
 
         // 4b. Flip reconciled adjustments back to pending
         await tx.execute(sql`
