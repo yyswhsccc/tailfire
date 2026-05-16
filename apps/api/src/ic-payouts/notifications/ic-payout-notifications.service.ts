@@ -495,12 +495,24 @@ export class IcPayoutNotificationsService {
     return `${currency} ${(cents / 100).toFixed(2)}`
   }
 
+  /**
+   * Email recipients open links from a mail client, not the admin app, so
+   * relative URLs resolve against the mail-client origin (and Gmail will even
+   * coerce a bare leading slash into `http://commission/...` — confirmed in
+   * the wild). All notification links MUST be absolute. ADMIN_URL is in
+   * Doppler for every environment (dev/stg/prd); fall back to '' so the link
+   * fails fast in misconfigured environments instead of mailing a broken URL.
+   */
+  private absoluteAdminUrl(path: string): string {
+    const base = (process.env.ADMIN_URL ?? '').replace(/\/+$/, '')
+    return `${base}${path}`
+  }
+
   private adminInvoiceUrl(invoiceId: string): string {
-    // Relative path — will become an absolute URL once ADMIN_URL is in env config
-    return `/commission/disbursements?invoiceId=${invoiceId}`
+    return this.absoluteAdminUrl(`/commission/disbursements?invoiceId=${invoiceId}`)
   }
 
   private adminDisbursementUrl(disbursementId: string): string {
-    return `/commission/disbursements/${disbursementId}`
+    return this.absoluteAdminUrl(`/commission/disbursements/${disbursementId}`)
   }
 }

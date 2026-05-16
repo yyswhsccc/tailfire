@@ -231,6 +231,39 @@ describe('IcPayoutNotificationsService', () => {
     expect(call.agencyId).toBe(AGENCY_ID)
   })
 
+  // ── N2b: admin review link is absolute (ADMIN_URL prefixed) ───────────────
+  // Regression test for the prod bug where Gmail rendered '/commission/...'
+  // as 'http://commission/...' because ADMIN_URL was never prefixed.
+  it('N2b: onInvoiceSubmitted — admin review link is absolute via ADMIN_URL', async () => {
+    const prevAdminUrl = process.env.ADMIN_URL
+    process.env.ADMIN_URL = 'https://tailfire.phoenixvoyages.ca'
+    try {
+      const db = createPreciseDb({
+        whereResults: [[{ email: ADMIN_EMAIL }]],
+      })
+      const email = createMockEmail()
+      const svc = await buildService(db, email)
+
+      await svc.onInvoiceSubmitted(
+        makeSubmittedEvent({ autoApproved: false, invoiceId: 'inv-test-123' }),
+      )
+
+      const call = email.sendEmail.mock.calls[0][0]
+      const expectedAbs =
+        'https://tailfire.phoenixvoyages.ca/commission/disbursements?invoiceId=inv-test-123'
+      expect(call.html).toContain(`href="${expectedAbs}"`)
+      expect(call.text).toContain(expectedAbs)
+      // Must NOT contain the legacy bare-relative path
+      expect(call.html).not.toContain('href="/commission/disbursements?invoiceId=')
+    } finally {
+      if (prevAdminUrl === undefined) {
+        delete process.env.ADMIN_URL
+      } else {
+        process.env.ADMIN_URL = prevAdminUrl
+      }
+    }
+  })
+
   // ── N3: no admin recipients → warn + no-op ────────────────────────────────
   it('N3: onInvoiceSubmitted — warns and no-ops if no admin recipients', async () => {
     const db = createPreciseDb({ whereResults: [[]] })
