@@ -9,6 +9,12 @@
  *
  * Forms that want to skip the guard (e.g. their own Cancel button — Cancel
  * IS the discard affordance) should keep using the bare useRouter().
+ *
+ * The guard now resolves asynchronously because the confirmation UI is a
+ * shadcn AlertDialog rather than a blocking `window.confirm`. Callers that
+ * relied on the previous synchronous boolean return continue to work — we
+ * just fire-and-forget the navigation once the user confirms. The router's
+ * own return type stays void either way.
  */
 
 import { useRouter as useRawRouter } from 'next/navigation'
@@ -19,31 +25,51 @@ type RawRouter = ReturnType<typeof useRawRouter>
 
 export function useGuardedRouter(): RawRouter {
   const router = useRawRouter()
-  const { confirmIfDirty } = useDirtyGuard()
+  const { isDirtyNow, confirmIfDirty } = useDirtyGuard()
 
   return useMemo<RawRouter>(
     () => ({
       ...router,
       push: (...args: Parameters<RawRouter['push']>) => {
-        if (!confirmIfDirty()) return
-        router.push(...args)
+        if (!isDirtyNow()) {
+          router.push(...args)
+          return
+        }
+        void confirmIfDirty().then((ok) => {
+          if (ok) router.push(...args)
+        })
       },
       replace: (...args: Parameters<RawRouter['replace']>) => {
-        if (!confirmIfDirty()) return
-        router.replace(...args)
+        if (!isDirtyNow()) {
+          router.replace(...args)
+          return
+        }
+        void confirmIfDirty().then((ok) => {
+          if (ok) router.replace(...args)
+        })
       },
       back: () => {
-        if (!confirmIfDirty()) return
-        router.back()
+        if (!isDirtyNow()) {
+          router.back()
+          return
+        }
+        void confirmIfDirty().then((ok) => {
+          if (ok) router.back()
+        })
       },
       forward: () => {
-        if (!confirmIfDirty()) return
-        router.forward()
+        if (!isDirtyNow()) {
+          router.forward()
+          return
+        }
+        void confirmIfDirty().then((ok) => {
+          if (ok) router.forward()
+        })
       },
       // prefetch and refresh don't navigate visibly; leave them un-guarded.
       prefetch: router.prefetch,
       refresh: router.refresh,
     }),
-    [router, confirmIfDirty],
+    [router, isDirtyNow, confirmIfDirty],
   )
 }
