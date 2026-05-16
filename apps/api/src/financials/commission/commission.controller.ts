@@ -511,6 +511,143 @@ export class CommissionController {
   }
 
   // ============================================================================
+  // PR-J — additional audit reports (R2, R4, R5, R7, R8, R9)
+  // ============================================================================
+
+  /**
+   * R2: GET /commission/reports/t4a?taxYear=2025[&userId=]
+   * Per-IC reportable income (CRA T4A): sums cad_equivalent_base_cents from
+   * sent disbursements completed in the calendar year.
+   * Bounded cardinality (one row per IC), no pagination.
+   */
+  @Get('commission/reports/t4a')
+  @AdminOnly()
+  async getT4aSlipData(
+    @GetAuthContext() auth: AuthContext,
+    @Query('taxYear') taxYear: string,
+    @Query('userId') userId?: string,
+  ) {
+    const year = parseInt(taxYear, 10)
+    if (!Number.isFinite(year)) {
+      throw new BadRequestException('taxYear is required (e.g. 2025)')
+    }
+    return this.reportsService.getT4aSlipData({
+      agencyId: auth.agencyId,
+      taxYear: year,
+      userId,
+    })
+  }
+
+  /**
+   * R4: GET /commission/reports/agent-payments?userId=&page=&limit=
+   * Every settlement row (incl. reversals) for a given IC, newest first.
+   */
+  @Get('commission/reports/agent-payments')
+  @AdminOnly()
+  async getAgentPaymentHistory(
+    @GetAuthContext() auth: AuthContext,
+    @Query('userId') userId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.reportsService.getAgentPaymentHistory({
+      agencyId: auth.agencyId,
+      userId,
+      page: page ? Math.max(1, parseInt(page, 10)) : 1,
+      limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10))) : 50,
+    })
+  }
+
+  /**
+   * R5: GET /commission/reports/supplier-received?supplierId=&fromDate=&toDate=&page=&limit=
+   * Received commission checks from a given supplier within an optional window.
+   */
+  @Get('commission/reports/supplier-received')
+  @AdminOnly()
+  async getSupplierReceivedHistory(
+    @GetAuthContext() auth: AuthContext,
+    @Query('supplierId') supplierId: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.reportsService.getSupplierReceivedHistory({
+      agencyId: auth.agencyId,
+      supplierId,
+      fromDate,
+      toDate,
+      page: page ? Math.max(1, parseInt(page, 10)) : 1,
+      limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10))) : 50,
+    })
+  }
+
+  /**
+   * R7: GET /commission/reports/audit-trail?entityType=&entityId=
+   * Single-record history viewer. entityType ∈ {check, item, settlement,
+   * adjustment, tracking, activity_pricing, trip_settings}. Caps at 500
+   * history rows (single-record audit, deep histories are very rare).
+   */
+  @Get('commission/reports/audit-trail')
+  @AdminOnly()
+  async getAuditTrail(
+    @GetAuthContext() auth: AuthContext,
+    @Query('entityType') entityType: string,
+    @Query('entityId') entityId: string,
+  ) {
+    const validTypes = ['check', 'item', 'settlement', 'adjustment', 'tracking', 'activity_pricing', 'trip_settings'] as const
+    type EntityType = (typeof validTypes)[number]
+    if (!validTypes.includes(entityType as EntityType)) {
+      throw new BadRequestException(`entityType must be one of: ${validTypes.join(', ')}`)
+    }
+    return this.reportsService.getAuditTrail({
+      agencyId: auth.agencyId,
+      entityType: entityType as EntityType,
+      entityId,
+    })
+  }
+
+  /**
+   * R8: GET /commission/reports/reversals?fromDate=&toDate=&page=&limit=
+   * Every reversal action within a window, paired with the original.
+   */
+  @Get('commission/reports/reversals')
+  @AdminOnly()
+  async getReversalReport(
+    @GetAuthContext() auth: AuthContext,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.reportsService.getReversalReport({
+      agencyId: auth.agencyId,
+      fromDate,
+      toDate,
+      page: page ? Math.max(1, parseInt(page, 10)) : 1,
+      limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10))) : 50,
+    })
+  }
+
+  /**
+   * R9: GET /commission/reports/overrides?page=&limit=
+   * Trips with any commission override active + per-collaborator overlays.
+   */
+  @Get('commission/reports/overrides')
+  @AdminOnly()
+  async getOverrideUsageReport(
+    @GetAuthContext() auth: AuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.reportsService.getOverrideUsageReport({
+      agencyId: auth.agencyId,
+      page: page ? Math.max(1, parseInt(page, 10)) : 1,
+      limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10))) : 50,
+    })
+  }
+
+  // ============================================================================
   // DASHBOARD
   // ============================================================================
 
