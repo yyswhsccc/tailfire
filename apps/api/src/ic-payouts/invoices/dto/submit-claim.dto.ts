@@ -16,6 +16,14 @@ export class SubmitClaimDto {
   @IsUUID('4', { each: true })
   @ArrayMinSize(1)
   selectedCheckItemIds!: string[]
+
+  /**
+   * PR-1: IDs of POSITIVE pending adjustments the IC is electing to take on
+   * this claim. Positive adjustments are opt-in; if omitted, they stay
+   * pending for a future claim. Negative adjustments (clawbacks) are always
+   * auto-included regardless of this field.
+   */
+  optedInAdjustmentIds?: string[]
 }
 
 export interface SubmitClaimInput {
@@ -29,12 +37,18 @@ export interface SubmitClaimInput {
    */
   submittedByAdminUserId?: string
   selectedCheckItemIds: string[]
+  /** PR-1: see SubmitClaimDto.optedInAdjustmentIds */
+  optedInAdjustmentIds?: string[]
 }
 
 // ── Zod schemas (used by IcInvoiceController with zodValidation pipe) ─────────
 
 export const submitClaimSchema = z.object({
-  selectedCheckItemIds: z.array(z.string().uuid()).min(1),
+  // PR-1: allow empty selectedCheckItemIds when the claim is adjustment-only
+  // (e.g. backing out a clawback on its own). Either selection list or
+  // optedInAdjustmentIds must be non-empty — service enforces.
+  selectedCheckItemIds: z.array(z.string().uuid()).default([]),
+  optedInAdjustmentIds: z.array(z.string().uuid()).optional(),
 })
 export type SubmitClaimZodDto = z.infer<typeof submitClaimSchema>
 

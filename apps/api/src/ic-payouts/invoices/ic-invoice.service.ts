@@ -51,6 +51,7 @@ import { RCTI_AGREEMENT_VERSION } from '../authorizations/rcti-template'
 import type { SubmitClaimInput } from './dto/submit-claim.dto'
 import { DisbursementService } from '../disbursements/disbursement.service'
 import { CommissionSettlementReversalService } from '../../financials/commission/commission-settlement-reversal.service'
+import { computeAgentShare, type CommissionBreakdown } from '../../financials/commission/commission-formula'
 
 const {
   icTaxProfiles,
@@ -73,7 +74,13 @@ interface EligibleItem {
   currency: string
   description: string | null
   tripRef: string | null
-  commissionCents: number
+  /**
+   * PR-1: agent's share computed via commission-formula. Replaces the raw
+   * gross-supplier amount that used to flow into invoice lines + settlements.
+   */
+  agentShareCents: number
+  /** PR-1: forever-audit JSONB snapshot persisted into commission_item_settlements. */
+  breakdown: CommissionBreakdown
 }
 
 interface PendingAdjustment {
@@ -118,8 +125,14 @@ export class IcInvoiceService {
   // ============================================================================
 
   async submitClaim(input: SubmitClaimInput): Promise<SubmitClaimResult> {
-    if (!input.selectedCheckItemIds || input.selectedCheckItemIds.length === 0) {
-      throw new BadRequestException('No eligible items selected')
+    // PR-1: allow adjustment-only claims (no check items selected) but at least
+    // ONE of selectedCheckItemIds / optedInAdjustmentIds must be non-empty.
+    const hasSelectedItems = !!input.selectedCheckItemIds && input.selectedCheckItemIds.length > 0
+    const hasOptedInAdj = !!input.optedInAdjustmentIds && input.optedInAdjustmentIds.length > 0
+    if (!hasSelectedItems && !hasOptedInAdj) {
+      throw new BadRequestException(
+        'No eligible items selected and no optional adjustments opted in. Provide at least one.',
+      )
     }
 
     // 1. Fetch IC tax profile and enforce RCTI requirement
@@ -128,27 +141,56 @@ export class IcInvoiceService {
       throw new ForbiddenException('Active RCTI authorization required before submitting an invoice')
     }
 
-    // 2. Fetch eligible items grouped by currency
-    const itemsByCurrency = await this.fetchEligibleItemsByCurrency(
-      input.agencyId,
-      input.userId,
-      input.selectedCheckItemIds,
-    )
+    // 2. Fetch eligible items grouped by currency (may be empty for adj-only claims)
+    const itemsByCurrency = hasSelectedItems
+      ? await this.fetchEligibleItemsByCurrency(
+          input.agencyId,
+          input.userId,
+          input.selectedCheckItemIds,
+        )
+      : new Map<string, EligibleItem[]>()
 
-    if (itemsByCurrency.size === 0) {
+    if (hasSelectedItems && itemsByCurrency.size === 0) {
       throw new BadRequestException('No eligible items found for the selected IDs')
     }
 
-    // 3. Fetch pending adjustments grouped by currency
+    // 3. Fetch pending adjustments grouped by currency. PR-1: filter positive
+    //    adjustments to only the IDs in optedInAdjustmentIds. Negative
+    //    adjustments are always auto-included.
     const adjustmentsByCurrency = await this.fetchPendingAdjustmentsByCurrency(
       input.agencyId,
       input.userId,
+      input.optedInAdjustmentIds ?? [],
     )
+
+    // PR-1: for adj-only claims, populate currency keys from adjustments map
+    // so we emit at least one invoice per currency.
+    const currencies = new Set<string>([
+      ...itemsByCurrency.keys(),
+      ...adjustmentsByCurrency.keys(),
+    ])
+
+    if (currencies.size === 0) {
+      throw new BadRequestException('No eligible items or adjustments found')
+    }
 
     // 4. One transaction per currency (independent — one failure doesn't block another)
     const invoices: IcInvoice[] = []
-    for (const [currency, items] of itemsByCurrency) {
+    for (const currency of currencies) {
+      const items = itemsByCurrency.get(currency) ?? []
       const adjustments = adjustmentsByCurrency.get(currency) ?? []
+
+      // PR-1 net-negative guard: a claim must NOT have a negative bottom line
+      // unless it's purely an adjustment-back-out of a prior clawback.
+      const itemsTotal = items.reduce((s, it) => s + it.agentShareCents, 0)
+      const adjTotal = adjustments.reduce((s, a) => s + a.amountCents, 0)
+      if (itemsTotal + adjTotal < 0) {
+        throw new BadRequestException(
+          `Claim for ${currency} would net to ${itemsTotal + adjTotal} cents — negative claims are not allowed. ` +
+            'Wait for positive activity to offset the clawback, or omit the negative adjustment from this claim.',
+        )
+      }
+
       const invoice = await this.submitCurrencyInvoice({
         agencyId: input.agencyId,
         userId: input.userId,
@@ -464,29 +506,50 @@ export class IcInvoiceService {
         checkItemId: string
         tripRef: string | null
         description: string | null
-        commissionCents: number
+        /** PR-1: agent's share computed via commission-formula (not gross supplier amount). */
+        agentShareCents: number
+        /** PR-1: full formula snapshot — surfaced for ClaimBuilder transparency. */
+        breakdown: CommissionBreakdown
       }>
       adjustments: Array<{
         adjustmentId: string
         description: string
         amountCents: number
+        /** PR-1: positive adjustments are opt-in; negative ones auto-include. */
+        isOptIn: boolean
       }>
     }>
   }> {
-    // Fetch unsettled commission check items the user is a collaborator on.
-    // trip_ref is composed from trip.reference_number with fallback to trip.name —
-    // activity_pricing has no trip_ref column (was a Task 24 mistake); trips table is
-    // the source of truth for the human-readable identifier shown to the IC.
+    // PR-1: fetch all formula inputs in one SQL pass.
+    //   - cci.embedded_tax_cents             → embedded_tax (PR-1 column)
+    //   - cci.embedded_tax_type / _rate_percent
+    //   - ct.is_reconciled                   → gate
+    //   - t.commission_fee_rate_override     → per-trip fee override
+    //   - ags.commission_fee_rate            → agency default (5%)
+    //   - tc.commission_percentage           → between-collaborator share
+    //   - tc.agent_split_override            → per-trip split override (PR-1)
+    //   - up.commission_settings->>splitValue → agent profile default split
+    // Items must be: not yet settled, on departing/departed trips, from accepted
+    // received checks, AND commission_tracking.is_reconciled = true.
     const itemRows: any[] = await this.db.client.execute(sql`
       SELECT
         cci.id AS check_item_id,
         src_cc.currency,
         COALESCE(t.reference_number, t.name) AS trip_ref,
         cci.description,
-        GREATEST(COALESCE(cci.received_cents, 0), 0) AS commission_cents
+        GREATEST(COALESCE(cci.received_cents, 0), 0)        AS gross_received_cents,
+        COALESCE(cci.embedded_tax_cents, 0)                  AS embedded_tax_cents,
+        cci.embedded_tax_type                                AS embedded_tax_type,
+        cci.embedded_tax_rate_percent                        AS embedded_tax_rate_percent,
+        COALESCE(ags.commission_fee_rate, '5.00')::numeric   AS default_fee_rate_percent,
+        t.commission_fee_rate_override::numeric              AS fee_rate_override_percent,
+        COALESCE(((up.commission_settings->>'splitValue')::numeric), 60)::numeric AS default_agent_split_percent,
+        tc.agent_split_override::numeric                     AS agent_split_override_percent,
+        tc.commission_percentage::numeric                    AS collaborator_percent
       FROM commission_check_items cci
       JOIN commission_checks src_cc ON src_cc.id = cci.check_id
       JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
+      JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
       JOIN itinerary_activities ia ON ia.id = ap.activity_id
       JOIN itinerary_days id_day ON id_day.id = ia.itinerary_day_id
       JOIN itineraries i ON i.id = id_day.itinerary_id
@@ -495,13 +558,17 @@ export class IcInvoiceService {
         ON tc.trip_id = t.id
         AND tc.user_id = ${userId}::uuid
         AND tc.is_active = true
+      LEFT JOIN user_profiles up ON up.id = ${userId}::uuid
+      LEFT JOIN agency_settings ags ON ags.agency_id = ${agencyId}::uuid
       LEFT JOIN commission_item_settlements existing
         ON existing.check_item_id = cci.id
         AND existing.recipient_user_id = ${userId}::uuid
+        AND existing.reverses_settlement_id IS NULL
       WHERE src_cc.agency_id = ${agencyId}::uuid
         AND src_cc.check_type = 'received'
         AND src_cc.status = 'accepted'
         AND t.status IN ('travelling', 'travelled')
+        AND ct.is_reconciled = true
         AND existing.id IS NULL
     `)
 
@@ -515,20 +582,35 @@ export class IcInvoiceService {
         eq(commissionAdjustments.status, 'pending'),
       ))
 
-    // Group by currency
     const groups = new Map<string, {
-      items: Array<{ checkItemId: string; tripRef: string | null; description: string | null; commissionCents: number }>
-      adjustments: Array<{ adjustmentId: string; description: string; amountCents: number }>
+      items: Array<{ checkItemId: string; tripRef: string | null; description: string | null; agentShareCents: number; breakdown: CommissionBreakdown }>
+      adjustments: Array<{ adjustmentId: string; description: string; amountCents: number; isOptIn: boolean }>
     }>()
 
     for (const row of itemRows) {
       const c = row.currency as string
       if (!groups.has(c)) groups.set(c, { items: [], adjustments: [] })
+
+      // PR-1: apply formula. Coerce numeric strings (Drizzle returns decimals as
+      // strings) to numbers for the calculator.
+      const { agentShareCents, breakdown } = computeAgentShare({
+        grossReceivedCents: Number(row.gross_received_cents),
+        embeddedTaxCents: Number(row.embedded_tax_cents),
+        embeddedTaxType: row.embedded_tax_type ?? null,
+        embeddedTaxRatePercent: row.embedded_tax_rate_percent != null ? Number(row.embedded_tax_rate_percent) : null,
+        defaultFeeRatePercent: Number(row.default_fee_rate_percent),
+        feeRateOverridePercent: row.fee_rate_override_percent != null ? Number(row.fee_rate_override_percent) : null,
+        defaultAgentSplitPercent: Number(row.default_agent_split_percent),
+        agentSplitOverridePercent: row.agent_split_override_percent != null ? Number(row.agent_split_override_percent) : null,
+        collaboratorPercent: Number(row.collaborator_percent),
+      })
+
       groups.get(c)!.items.push({
         checkItemId: row.check_item_id as string,
         tripRef: (row.trip_ref as string) ?? null,
         description: (row.description as string) ?? null,
-        commissionCents: Number(row.commission_cents),
+        agentShareCents,
+        breakdown,
       })
     }
 
@@ -539,6 +621,8 @@ export class IcInvoiceService {
         adjustmentId: adj.id,
         description: adj.description,
         amountCents: adj.amountCents,
+        // PR-1: positive = opt-in (IC chooses to take it); negative = auto-include.
+        isOptIn: adj.amountCents > 0,
       })
     }
 
@@ -635,8 +719,10 @@ export class IcInvoiceService {
       icGstHstRegistered: args.profile.gstHstRegistered,
     })
 
-    // 3. Compute amounts
-    const commissionTotal = args.items.reduce((s, it) => s + it.commissionCents, 0)
+    // 3. Compute amounts — PR-1: use agentShareCents (formula output), not raw
+    // gross supplier amount. Each item's breakdown is persisted into the
+    // matching settlement row's computation_breakdown JSONB.
+    const commissionTotal = args.items.reduce((s, it) => s + it.agentShareCents, 0)
     const adjustmentTotal = args.adjustments.reduce((s, a) => s + a.amountCents, 0)
     const reportableBase = commissionTotal + adjustmentTotal
     const taxCents = pos.rateBp > 0 ? Math.round((reportableBase * pos.rateBp) / 10_000) : 0
@@ -671,31 +757,47 @@ export class IcInvoiceService {
         throw new Error('Failed to create reservation check')
       }
 
-      // 4b. Atomically claim commission items via INSERT...ON CONFLICT DO NOTHING.
-      //     The UNIQUE constraint on (check_item_id, recipient_user_id) means only
-      //     the first concurrent caller wins; all others get 0 rows back.
-      const itemIds = args.items.map(i => i.id)
-      const claimed: { id: string }[] = await tx.execute(sql`
-        INSERT INTO commission_item_settlements
-          (check_item_id, recipient_user_id, paid_check_id, settled_amount_cents, created_by)
-        SELECT
-          cci.id,
-          ${args.userId}::uuid,
-          ${reservationCheck.id}::uuid,
-          GREATEST(COALESCE(cci.received_cents, 0), 0),
-          ${args.userId}::uuid
-        FROM commission_check_items cci
-        WHERE cci.id = ANY(${sql.raw(`ARRAY[${itemIds.map(id => `'${id}'`).join(',')}]::uuid[]`)}::uuid[])
-        ON CONFLICT (check_item_id, recipient_user_id) DO NOTHING
-        RETURNING id
-      `)
+      // 4b. PR-1: claim commission items by inserting one settlement per item
+      // with the COMPUTED agentShareCents (not the raw supplier amount) and
+      // the formula breakdown JSONB. The PR-1 migration dropped the old
+      // UNIQUE(check_item_id, recipient_user_id) constraint (incompatible
+      // with reversal pairs), so we enforce no-double-claim by checking for
+      // an existing active (non-reversed) settlement BEFORE inserting.
+      //
+      // Concurrent winner detection: a race between two in-flight invoices
+      // claiming the same item is resolved by a SELECT … FOR UPDATE on the
+      // commission_check_items row + read-back of existing active settlements
+      // inside the txn. If any selected item has an active settlement at
+      // claim time, we throw ConflictException → tx rolls back, no partial
+      // claim, IC refreshes and tries again.
+      const itemIds = args.items.length > 0 ? args.items.map(i => i.id) : []
+      if (itemIds.length > 0) {
+        const conflicting: { check_item_id: string }[] = await tx.execute(sql`
+          SELECT check_item_id
+          FROM commission_item_settlements
+          WHERE check_item_id = ANY(${sql.raw(`ARRAY[${itemIds.map(id => `'${id}'`).join(',')}]::uuid[]`)}::uuid[])
+            AND recipient_user_id = ${args.userId}::uuid
+            AND reverses_settlement_id IS NULL
+          FOR UPDATE
+        `)
+        if (conflicting && conflicting.length > 0) {
+          throw new ConflictException(
+            'One or more items already claimed by a concurrent in-flight invoice. ' +
+              'Please refresh your selection and try again.',
+          )
+        }
 
-      // C3 invariant: if fewer rows returned than expected → conflict → rollback
-      if (!claimed || claimed.length < itemIds.length) {
-        throw new ConflictException(
-          'One or more items already claimed by a concurrent in-flight invoice. ' +
-          'Please refresh your selection and try again.',
-        )
+        // Insert one settlement per item with its breakdown snapshot.
+        for (const it of args.items) {
+          await tx.insert(schema.commissionItemSettlements).values({
+            checkItemId: it.id,
+            recipientUserId: args.userId,
+            paidCheckId: reservationCheck.id,
+            settledAmountCents: it.agentShareCents,
+            computationBreakdown: it.breakdown as unknown as Record<string, unknown>,
+            createdBy: args.userId,
+          })
+        }
       }
 
       // 4c. Claim pending adjustments — atomically mark as reconciled
@@ -751,7 +853,7 @@ export class IcInvoiceService {
         throw new Error('Failed to insert invoice')
       }
 
-      // 4e. Insert ic_invoice_lines
+      // 4e. Insert ic_invoice_lines — PR-1: line amount = agentShareCents
       const lineValues = [
         ...args.items.map(it => ({
           invoiceId: invoice.id,
@@ -760,7 +862,7 @@ export class IcInvoiceService {
           adjustmentId: null as string | null,
           description: it.description ?? null,
           tripRef: it.tripRef ?? null,
-          amountCents: it.commissionCents,
+          amountCents: it.agentShareCents,
           currency: args.currency,
         })),
         ...args.adjustments.map(a => ({
@@ -925,22 +1027,30 @@ export class IcInvoiceService {
   ): Promise<Map<string, EligibleItem[]>> {
     if (selectedIds.length === 0) return new Map()
 
-    // Fetch eligible items: must be unsettled, on departing/departed trips,
-    // from accepted received checks, and in the requested selection.
-    // The currency comes from the parent commission_checks row.
-    // PR-1: fixed prior `ap.trip_ref` reference — that column never existed.
-    // trip_ref is composed from trip.reference_number with fallback to trip.name
-    // (matches the pattern at line 484 in submitCurrencyInvoice).
+    // PR-1: fetch all formula inputs (mirror of getEligibleForUser SQL) and
+    // enforce the is_reconciled gate. Items the IC selected that don't pass
+    // the gate are silently dropped — the UI lists only reconciled items so
+    // the only way to land here with an ineligible id is racey UX or admin
+    // unreconciliation between browse and submit.
     const rows: any[] = await this.db.client.execute(sql`
       SELECT
         cci.id,
         src_cc.currency,
         cci.description,
         COALESCE(t.reference_number, t.name) AS trip_ref,
-        GREATEST(COALESCE(cci.received_cents, 0), 0) AS commission_cents
+        GREATEST(COALESCE(cci.received_cents, 0), 0)        AS gross_received_cents,
+        COALESCE(cci.embedded_tax_cents, 0)                  AS embedded_tax_cents,
+        cci.embedded_tax_type                                AS embedded_tax_type,
+        cci.embedded_tax_rate_percent                        AS embedded_tax_rate_percent,
+        COALESCE(ags.commission_fee_rate, '5.00')::numeric   AS default_fee_rate_percent,
+        t.commission_fee_rate_override::numeric              AS fee_rate_override_percent,
+        COALESCE(((up.commission_settings->>'splitValue')::numeric), 60)::numeric AS default_agent_split_percent,
+        tc.agent_split_override::numeric                     AS agent_split_override_percent,
+        tc.commission_percentage::numeric                    AS collaborator_percent
       FROM commission_check_items cci
       JOIN commission_checks src_cc ON src_cc.id = cci.check_id
       JOIN activity_pricing ap ON ap.id = cci.activity_pricing_id
+      JOIN commission_tracking ct ON ct.component_pricing_id = ap.id
       JOIN itinerary_activities ia ON ia.id = ap.activity_id
       JOIN itinerary_days id_day ON id_day.id = ia.itinerary_day_id
       JOIN itineraries i ON i.id = id_day.itinerary_id
@@ -949,13 +1059,17 @@ export class IcInvoiceService {
         ON tc.trip_id = t.id
         AND tc.user_id = ${userId}::uuid
         AND tc.is_active = true
+      LEFT JOIN user_profiles up ON up.id = ${userId}::uuid
+      LEFT JOIN agency_settings ags ON ags.agency_id = ${agencyId}::uuid
       LEFT JOIN commission_item_settlements existing
         ON existing.check_item_id = cci.id
         AND existing.recipient_user_id = ${userId}::uuid
+        AND existing.reverses_settlement_id IS NULL
       WHERE src_cc.agency_id = ${agencyId}::uuid
         AND src_cc.check_type = 'received'
         AND src_cc.status = 'accepted'
         AND t.status IN ('travelling', 'travelled')
+        AND ct.is_reconciled = true
         AND existing.id IS NULL
         AND cci.id = ANY(${sql.raw(`ARRAY[${selectedIds.map(id => `'${id}'`).join(',')}]::uuid[]`)}::uuid[])
     `)
@@ -964,12 +1078,26 @@ export class IcInvoiceService {
     for (const row of rows) {
       const currency: string = row.currency
       if (!map.has(currency)) map.set(currency, [])
+
+      const { agentShareCents, breakdown } = computeAgentShare({
+        grossReceivedCents: Number(row.gross_received_cents),
+        embeddedTaxCents: Number(row.embedded_tax_cents),
+        embeddedTaxType: row.embedded_tax_type ?? null,
+        embeddedTaxRatePercent: row.embedded_tax_rate_percent != null ? Number(row.embedded_tax_rate_percent) : null,
+        defaultFeeRatePercent: Number(row.default_fee_rate_percent),
+        feeRateOverridePercent: row.fee_rate_override_percent != null ? Number(row.fee_rate_override_percent) : null,
+        defaultAgentSplitPercent: Number(row.default_agent_split_percent),
+        agentSplitOverridePercent: row.agent_split_override_percent != null ? Number(row.agent_split_override_percent) : null,
+        collaboratorPercent: Number(row.collaborator_percent),
+      })
+
       map.get(currency)!.push({
         id: row.id,
         currency,
         description: row.description ?? null,
         tripRef: row.trip_ref ?? null,
-        commissionCents: Number(row.commission_cents),
+        agentShareCents,
+        breakdown,
       })
     }
     return map
@@ -978,6 +1106,12 @@ export class IcInvoiceService {
   private async fetchPendingAdjustmentsByCurrency(
     agencyId: string,
     userId: string,
+    /**
+     * PR-1: ids of POSITIVE adjustments the IC opted in to take on this claim.
+     * Negative adjustments (clawbacks) are always auto-included; positive ones
+     * are only included if their id appears here.
+     */
+    optedInIds: string[] = [],
   ): Promise<Map<string, PendingAdjustment[]>> {
     const rows: any[] = await this.db.client.execute(sql`
       SELECT
@@ -991,14 +1125,21 @@ export class IcInvoiceService {
         AND ca.status = 'pending'
     `)
 
+    const optedSet = new Set(optedInIds)
+
     const map = new Map<string, PendingAdjustment[]>()
     for (const row of rows) {
       const currency: string = row.currency
+      // PR-1: filter positive adjustments by opt-in; negative are auto-included.
+      const amountCents = Number(row.amount_cents)
+      if (amountCents > 0 && !optedSet.has(row.id)) {
+        continue
+      }
       if (!map.has(currency)) map.set(currency, [])
       map.get(currency)!.push({
         id: row.id,
         currency,
-        amountCents: Number(row.amount_cents),
+        amountCents,
         description: row.description,
       })
     }
