@@ -38,9 +38,19 @@ function makeController(flagValue: string | undefined): CommissionController {
     unreconcile: jest.fn(),
     bulkReconcile: jest.fn(),
   }
+  const driftService = {
+    runSnapshot: jest.fn().mockResolvedValue([]),
+  }
+  const reportsService = {
+    getGstHstCollected: jest.fn().mockResolvedValue([]),
+    getArAging: jest.fn().mockResolvedValue({ rows: [], page: 1, limit: 50, totalRows: 0 }),
+    getDiscrepancy: jest.fn().mockResolvedValue({ rows: [], page: 1, limit: 50, totalRows: 0 }),
+  }
   return new CommissionController(
     commissionService as any,
     reconcileService as any,
+    driftService as any,
+    reportsService as any,
     configService as any,
   )
 }

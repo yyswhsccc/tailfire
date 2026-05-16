@@ -17,6 +17,8 @@ import { ApiTags } from '@nestjs/swagger'
 import { ConfigService } from '@nestjs/config'
 import { CommissionService } from './commission.service'
 import { CommissionReconcileService } from './commission-reconcile.service'
+import { CommissionDriftService } from './commission-drift.service'
+import { CommissionReportsService } from './commission-reports.service'
 import { AdminOnly } from '../../auth/decorators/admin-only.decorator'
 import { GetAuthContext } from '../../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../../auth/auth.types'
@@ -49,6 +51,8 @@ export class CommissionController {
   constructor(
     private readonly commissionService: CommissionService,
     private readonly reconcileService: CommissionReconcileService,
+    private readonly driftService: CommissionDriftService,
+    private readonly reportsService: CommissionReportsService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -413,6 +417,97 @@ export class CommissionController {
   @AdminOnly()
   async getPendingReconciliation(@GetAuthContext() auth: AuthContext) {
     return this.reconcileService.listPendingReconciliation(auth.agencyId)
+  }
+
+  // ============================================================================
+  // DRIFT CHECK (PR-3) — admin manual trigger
+  // ============================================================================
+
+  /**
+   * POST /commission/admin/drift-check/run  (PR-3)
+   *
+   * Runs CommissionDriftService.runSnapshot() synchronously for the
+   * caller's agency and returns the inserted snapshot rows so the admin
+   * can immediately see the current bucket state. Per-tenant scoped —
+   * never snapshots another agency, regardless of how the scheduler
+   * runs in the background (which iterates all agencies).
+   *
+   * Drift formula (locked): committed_payable - in_flight
+   *                         - adjustments_reconciled - settled_active
+   * Non-zero true_drift fires a Sentry alert with per-currency fingerprint.
+   */
+  @Post('commission/admin/drift-check/run')
+  @AdminOnly()
+  async runDriftCheck(@GetAuthContext() auth: AuthContext) {
+    return {
+      snapshots: await this.driftService.runSnapshot(auth.agencyId),
+    }
+  }
+
+  // ============================================================================
+  // REPORTS (PR-3) — operator-queryable, no UI yet
+  // ============================================================================
+
+  /**
+   * R1: GET /commission/reports/gst-hst-collected?fromDate=&toDate=
+   * Bounded cardinality (tax_type × rate combinations) so no pagination.
+   * Every row includes currency.
+   */
+  @Get('commission/reports/gst-hst-collected')
+  @AdminOnly()
+  async getGstHstCollected(
+    @GetAuthContext() auth: AuthContext,
+    @Query('fromDate') fromDate: string,
+    @Query('toDate') toDate: string,
+  ) {
+    return this.reportsService.getGstHstCollected({
+      agencyId: auth.agencyId,
+      fromDate,
+      toDate,
+    })
+  }
+
+  /**
+   * R3: GET /commission/reports/ar-aging?currency=&page=&limit=
+   * Paginated (default 50). Currency filter optional. Age buckets by
+   * trip.end_date: 0-30 / 31-60 / 61-90 / 90+.
+   */
+  @Get('commission/reports/ar-aging')
+  @AdminOnly()
+  async getArAging(
+    @GetAuthContext() auth: AuthContext,
+    @Query('currency') currency?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.reportsService.getArAging({
+      agencyId: auth.agencyId,
+      currency,
+      page: page ? Math.max(1, parseInt(page, 10)) : 1,
+      limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10))) : 50,
+    })
+  }
+
+  /**
+   * R6: GET /commission/reports/discrepancy?currency=&page=&limit=
+   * Paginated (default 50). Variance is signed:
+   *   negative = supplier short
+   *   positive = over-pay
+   */
+  @Get('commission/reports/discrepancy')
+  @AdminOnly()
+  async getDiscrepancy(
+    @GetAuthContext() auth: AuthContext,
+    @Query('currency') currency?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.reportsService.getDiscrepancy({
+      agencyId: auth.agencyId,
+      currency,
+      page: page ? Math.max(1, parseInt(page, 10)) : 1,
+      limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10))) : 50,
+    })
   }
 
   // ============================================================================

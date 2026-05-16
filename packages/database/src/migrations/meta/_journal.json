@@ -1597,6 +1597,34 @@
       "when": 1779138000000,
       "tag": "20260516210000_commission_settlements_active_predicate_fix",
       "breakpoints": true
+    },
+    {
+      "idx": 228,
+      "version": "7",
+      "when": 1779184800000,
+      "tag": "20260517100000_commission_drift_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 229,
+      "version": "7",
+      "when": 1779185400000,
+      "tag": "20260517110000_v_commission_position",
+      "breakpoints": true
+    },
+    {
+      "idx": 230,
+      "version": "7",
+      "when": 1779186000000,
+      "tag": "20260517120000_drift_snapshots_standalone_adjustments",
+      "breakpoints": true
+    },
+    {
+      "idx": 231,
+      "version": "7",
+      "when": 1779186600000,
+      "tag": "20260517130000_v_commission_position_fix_gross",
+      "breakpoints": true
     }
   ]
 }
