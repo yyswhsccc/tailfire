@@ -95,9 +95,13 @@ export class IcInvoiceController {
   /**
    * POST /ic-payouts/me/claims
    * Submit a commission claim. Creates one IcInvoice per currency covering
-   * the selected check items + all pending adjustments in the same currency.
+   * the selected check items + opted-in positive adjustments + all
+   * negative (clawback) adjustments in the same currency.
    *
-   * Body: { selectedCheckItemIds: string[] }
+   * PR-1: `optedInAdjustmentIds` is now wired through. Without this field
+   * the IC's positive pending adjustments stay pending for a future claim.
+   *
+   * Body: { selectedCheckItemIds: string[], optedInAdjustmentIds?: string[] }
    * Returns: { invoices: IcInvoice[] }
    */
   @Post('me/claims')
@@ -111,6 +115,7 @@ export class IcInvoiceController {
       agencyId: auth.agencyId,
       userId: auth.userId,
       selectedCheckItemIds: body.selectedCheckItemIds,
+      optedInAdjustmentIds: body.optedInAdjustmentIds,
     })
   }
 
@@ -262,7 +267,7 @@ export class IcInvoiceController {
    * POST /ic-payouts/admin/users/:userId/claims
    * Submit a claim on behalf of an IC. Identical semantics to
    * /ic-payouts/me/claims except the target user is the URL param and the
-   * audit event records the admin actor.
+   * audit event records the admin actor. PR-1: forwards optedInAdjustmentIds.
    */
   @Post('admin/users/:userId/claims')
   @AdminOnly()
@@ -278,6 +283,7 @@ export class IcInvoiceController {
       userId,
       submittedByAdminUserId: auth.userId,
       selectedCheckItemIds: body.selectedCheckItemIds,
+      optedInAdjustmentIds: body.optedInAdjustmentIds,
     })
   }
 

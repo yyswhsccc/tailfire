@@ -757,28 +757,51 @@ export class IcInvoiceService {
         throw new Error('Failed to create reservation check')
       }
 
-      // 4b. PR-1: claim commission items by inserting one settlement per item
-      // with the COMPUTED agentShareCents (not the raw supplier amount) and
-      // the formula breakdown JSONB. The PR-1 migration dropped the old
-      // UNIQUE(check_item_id, recipient_user_id) constraint (incompatible
-      // with reversal pairs), so we enforce no-double-claim by checking for
-      // an existing active (non-reversed) settlement BEFORE inserting.
+      // 4b. PR-1 (Codex round-3 fix): claim commission items by inserting one
+      // settlement per item with the COMPUTED agentShareCents and the formula
+      // breakdown JSONB.
       //
-      // Concurrent winner detection: a race between two in-flight invoices
-      // claiming the same item is resolved by a SELECT … FOR UPDATE on the
-      // commission_check_items row + read-back of existing active settlements
-      // inside the txn. If any selected item has an active settlement at
-      // claim time, we throw ConflictException → tx rolls back, no partial
-      // claim, IC refreshes and tries again.
+      // Concurrency: the OLD `SELECT … FOR UPDATE` on commission_item_settlements
+      // had a fatal flaw — on the happy path no settlement exists, so there
+      // is no row to lock and two concurrent submits can both pass the check
+      // and both insert. We fix this two ways:
+      //
+      //   (a) Take a row-level lock on the commission_check_items themselves
+      //       (which always exist) so two concurrent submitClaim()s for the
+      //       same item serialize on the same lock.
+      //   (b) Rely on the partial unique index
+      //       `idx_commission_item_settlements_active_unique` (added by
+      //       migration 20260516180000) as the DB-level safety net — if the
+      //       app-level lock somehow doesn't serialize, the second insert
+      //       hits a 23505 (unique_violation) which we translate to
+      //       ConflictException.
+      //
+      // The partial unique allows reversal rows (reverses_settlement_id IS NOT
+      // NULL) to coexist with the original positive row, which is what
+      // enables the reversal pattern.
       const itemIds = args.items.length > 0 ? args.items.map(i => i.id) : []
       if (itemIds.length > 0) {
+        // (a) Lock the check_item rows for the duration of this txn so a
+        //     concurrent submitClaim for the same items blocks until we
+        //     commit. Rows always exist (caller selected them from the
+        //     eligible list, which JOINs commission_check_items).
+        await tx.execute(sql`
+          SELECT id
+          FROM commission_check_items
+          WHERE id = ANY(${sql.raw(`ARRAY[${itemIds.map(id => `'${id}'`).join(',')}]::uuid[]`)}::uuid[])
+          FOR UPDATE
+        `)
+
+        // Pre-flight: surface a friendly ConflictException if an active
+        // (non-reversed) settlement already exists for any selected item.
+        // This catches the "browse list went stale between page load and
+        // submit" case before we even attempt the insert.
         const conflicting: { check_item_id: string }[] = await tx.execute(sql`
           SELECT check_item_id
           FROM commission_item_settlements
           WHERE check_item_id = ANY(${sql.raw(`ARRAY[${itemIds.map(id => `'${id}'`).join(',')}]::uuid[]`)}::uuid[])
             AND recipient_user_id = ${args.userId}::uuid
             AND reverses_settlement_id IS NULL
-          FOR UPDATE
         `)
         if (conflicting && conflicting.length > 0) {
           throw new ConflictException(
@@ -787,30 +810,56 @@ export class IcInvoiceService {
           )
         }
 
-        // Insert one settlement per item with its breakdown snapshot.
-        for (const it of args.items) {
-          await tx.insert(schema.commissionItemSettlements).values({
-            checkItemId: it.id,
-            recipientUserId: args.userId,
-            paidCheckId: reservationCheck.id,
-            settledAmountCents: it.agentShareCents,
-            computationBreakdown: it.breakdown as unknown as Record<string, unknown>,
-            createdBy: args.userId,
-          })
+        // Insert one settlement per item with its breakdown snapshot. If a
+        // concurrent winner sneaks in between our pre-flight and this insert
+        // (rare — we hold the check_item locks), the partial unique idx
+        // throws 23505 which we catch and rethrow as ConflictException.
+        try {
+          for (const it of args.items) {
+            await tx.insert(schema.commissionItemSettlements).values({
+              checkItemId: it.id,
+              recipientUserId: args.userId,
+              paidCheckId: reservationCheck.id,
+              settledAmountCents: it.agentShareCents,
+              computationBreakdown: it.breakdown as unknown as Record<string, unknown>,
+              createdBy: args.userId,
+            })
+          }
+        } catch (err) {
+          // postgres-js surfaces the SQLSTATE on .code
+          const code = (err as { code?: string })?.code
+          if (code === '23505') {
+            throw new ConflictException(
+              'A concurrent claim won the race for one or more items. ' +
+                'Please refresh your selection and try again.',
+            )
+          }
+          throw err
         }
       }
 
-      // 4c. Claim pending adjustments — atomically mark as reconciled
-      await tx.execute(sql`
-        UPDATE commission_adjustments
-        SET status = 'reconciled',
-            check_id = ${reservationCheck.id}::uuid,
-            updated_at = now()
-        WHERE agent_user_id = ${args.userId}::uuid
-          AND agency_id = ${args.agencyId}::uuid
-          AND status = 'pending'
-          AND currency = ${args.currency}
-      `)
+      // 4c. PR-1 (Codex round-3 fix): claim ONLY the adjustments that made
+      // it into args.adjustments. Previously this UPDATE reconciled ALL
+      // pending adjustments for the user+currency, which over-claimed any
+      // positive adjustment the IC did NOT opt in to.
+      //
+      // args.adjustments is already filtered by fetchPendingAdjustmentsByCurrency
+      // to: positives in optedInAdjustmentIds + all negatives. So updating
+      // exactly these ids matches what was added to the invoice lines.
+      const adjustmentIdsToClaim = args.adjustments.map((a) => a.id)
+      if (adjustmentIdsToClaim.length > 0) {
+        await tx.execute(sql`
+          UPDATE commission_adjustments
+          SET status = 'reconciled',
+              check_id = ${reservationCheck.id}::uuid,
+              updated_at = now()
+          WHERE id = ANY(${sql.raw(`ARRAY[${adjustmentIdsToClaim.map((id) => `'${id}'`).join(',')}]::uuid[]`)}::uuid[])
+            AND agent_user_id = ${args.userId}::uuid
+            AND agency_id = ${args.agencyId}::uuid
+            AND status = 'pending'
+            AND currency = ${args.currency}
+        `)
+      }
 
       // 4d. Insert ic_invoices — CRA snapshot: identity fields frozen at creation
       const [invoice] = await tx

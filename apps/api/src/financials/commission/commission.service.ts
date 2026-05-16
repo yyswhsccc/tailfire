@@ -503,16 +503,27 @@ export class CommissionService {
         createdBy: userId,
       }))
 
-      const inserted = await tx
-        .insert(this.db.schema.commissionItemSettlements)
-        .values(settlementRows)
-        .onConflictDoNothing({
-          target: [
-            this.db.schema.commissionItemSettlements.checkItemId,
-            this.db.schema.commissionItemSettlements.recipientUserId,
-          ],
-        })
-        .returning({ id: this.db.schema.commissionItemSettlements.id })
+      // PR-1 Commit 11: the legacy full UNIQUE(check_item_id, recipient_user_id)
+      // was dropped in migration 20260516180000 and replaced with a partial
+      // unique idx WHERE reverses_settlement_id IS NULL. Drizzle's
+      // onConflictDoNothing() in this version does not expose the partial
+      // index predicate, so we drop down to raw SQL to target the partial
+      // unique correctly. Same idempotent semantics as before.
+      const inserted: { id: string }[] = []
+      for (const row of settlementRows) {
+        const [maybe] = await tx.execute<{ id: string }>(sql`
+          INSERT INTO commission_item_settlements
+            (check_item_id, recipient_user_id, paid_check_id, settled_amount_cents, created_by)
+          VALUES
+            (${row.checkItemId}::uuid, ${row.recipientUserId}::uuid,
+             ${row.paidCheckId}::uuid, ${row.settledAmountCents}, ${row.createdBy ?? null})
+          ON CONFLICT (check_item_id, recipient_user_id)
+            WHERE reverses_settlement_id IS NULL
+            DO NOTHING
+          RETURNING id
+        `)
+        if (maybe?.id) inserted.push({ id: maybe.id })
+      }
 
       return {
         check,
@@ -1049,7 +1060,7 @@ export class CommissionService {
             AND src_cc.check_type = 'received'
             AND src_cc.status = 'accepted'
             AND src_cc.currency = ${agent.currency}   -- ← only claim items in matching currency
-          ON CONFLICT (check_item_id, recipient_user_id) DO NOTHING
+          ON CONFLICT (check_item_id, recipient_user_id) WHERE reverses_settlement_id IS NULL DO NOTHING
           RETURNING settled_amount_cents
         `)
 
