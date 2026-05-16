@@ -30,6 +30,7 @@ import { IcPayoutNotificationsService } from '../notifications/ic-payout-notific
 import { DatabaseService } from '../../db/database.service'
 import { FxRateService } from '../fx/fx-rate.service'
 import { QUEUES } from '../../automation/automation.types'
+import { CommissionSettlementReversalService } from '../../financials/commission/commission-settlement-reversal.service'
 
 // Mock EmailService via module factory to avoid compiling email-accounts / imap deps
 // (same pattern as notifications.service.spec.ts)
@@ -270,6 +271,13 @@ async function buildDisbursementService(db: ReturnType<typeof createDisbursement
       { provide: getQueueToken(QUEUES.IC_PAYOUT_DISBURSE), useValue: mockQueue },
       { provide: FxRateService, useValue: mockFxRate },
       { provide: EventEmitter2, useValue: mockEmitter },
+      {
+        provide: CommissionSettlementReversalService,
+        useValue: {
+          reverseAllByPaidCheck: jest.fn().mockResolvedValue({ reversedSettlementIds: [], reversalRowIds: [] }),
+          reverseSettlement: jest.fn().mockResolvedValue({ reversalRowId: 'rev-1', alreadyReversed: false }),
+        },
+      },
     ],
   }).compile()
 
@@ -330,14 +338,10 @@ describe('IC Payout failure path — cross-service integration (Task 40)', () =>
     expect(failedAttempt.manualSentBy).toBe(ADMIN_ID)
     expect(failedAttempt.disbursementId).toBe(DISBURSE_ID)
 
-    // 3. DELETE settlements SQL executed (commission_item_settlements)
-    const deleteSettlementsExec = db._calls.executes.find((e: any) => {
-      const chunks = e?.queryChunks ?? []
-      return chunks.some((c: any) => String(c?.value ?? '').includes('commission_item_settlements'))
-        || String(e).includes('commission_item_settlements')
-    })
-    expect(deleteSettlementsExec).toBeDefined()
-
+    // 3. PR-1: settlements reversed via CommissionSettlementReversalService
+    //    (was inline DELETE FROM commission_item_settlements). The mock
+    //    provider above records the call; we don't see SQL in tx.execute()
+    //    for settlements anymore.
     // 4. UPDATE adjustments SQL executed (commission_adjustments back to 'pending')
     const updateAdjustmentsExec = db._calls.executes.find((e: any) => {
       const chunks = e?.queryChunks ?? []
@@ -394,13 +398,15 @@ describe('IC Payout failure path — cross-service integration (Task 40)', () =>
     expect(failedAttempt).toBeDefined()
     expect(failedAttempt.reason).toBe('Admin cancelled before send')
 
-    // Reversal SQL still fires even from 'queued'
-    const execContainingSettlements = db._calls.executes.find((e: any) => {
+    // PR-1: reversal still fires from 'queued', but now through the
+    // CommissionSettlementReversalService (mocked); not visible in
+    // db._calls.executes. The adjustments UPDATE remains a real SQL.
+    const adjustmentsExec = db._calls.executes.find((e: any) => {
       const chunks = e?.queryChunks ?? []
-      return chunks.some((c: any) => String(c?.value ?? '').includes('commission_item_settlements'))
-        || String(e).includes('commission_item_settlements')
+      return chunks.some((c: any) => String(c?.value ?? '').includes('commission_adjustments'))
+        || String(e).includes('commission_adjustments')
     })
-    expect(execContainingSettlements).toBeDefined()
+    expect(adjustmentsExec).toBeDefined()
 
     // Event emitted
     expect(emitter.emit).toHaveBeenCalledWith(

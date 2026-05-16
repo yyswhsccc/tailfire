@@ -121,9 +121,13 @@ export class CommissionController {
   @AdminOnly()
   async recallCheck(
     @GetAuthContext() auth: AuthContext,
-    @Param('id') id: string
+    @Param('id') id: string,
+    @Body() body: { reason?: string } = {}
   ): Promise<CommissionCheckResponseDto> {
-    return this.commissionService.recallCheck(auth.agencyId, id, auth.userId)
+    if (!body.reason || body.reason.trim().length === 0) {
+      throw new BadRequestException('recall requires a reason')
+    }
+    return this.commissionService.recallCheck(auth.agencyId, id, auth.userId, body.reason)
   }
 
   /**

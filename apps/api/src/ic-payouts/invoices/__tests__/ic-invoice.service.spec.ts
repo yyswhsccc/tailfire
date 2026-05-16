@@ -27,9 +27,14 @@ import { PlaceOfSupplyService } from '../../place-of-supply/place-of-supply.serv
 import { IcInvoicePdfService } from '../ic-invoice-pdf.service'
 import { StorageService } from '../../../trips/storage.service'
 import { DisbursementService } from '../../disbursements/disbursement.service'
+import { CommissionSettlementReversalService } from '../../../financials/commission/commission-settlement-reversal.service'
 
 const mockEventEmitter = { emit: jest.fn() }
 const mockDisbursementService = { enqueue: jest.fn().mockResolvedValue({}) }
+const mockReversalService = {
+  reverseSettlement: jest.fn().mockResolvedValue({ reversalRowId: 'rev-1', alreadyReversed: false }),
+  reverseAllByPaidCheck: jest.fn().mockResolvedValue({ reversedSettlementIds: [], reversalRowIds: [] }),
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -479,6 +484,7 @@ describe('IcInvoiceService.submitClaim — C3 reservation', () => {
         { provide: StorageService, useValue: mockStorage },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: DisbursementService, useValue: mockDisbursementService },
+        { provide: CommissionSettlementReversalService, useValue: mockReversalService },
       ],
     }).compile()
 
@@ -809,6 +815,7 @@ describe('IcInvoiceService.getEligibleForUser — eligibility query', () => {
         { provide: StorageService, useValue: createMockStorage() },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: DisbursementService, useValue: mockDisbursementService },
+        { provide: CommissionSettlementReversalService, useValue: mockReversalService },
       ],
     }).compile()
 
@@ -924,6 +931,7 @@ describe('IcInvoiceService.approve', () => {
         { provide: StorageService, useValue: createMockStorage() },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: DisbursementService, useValue: mockDisbursementService },
+        { provide: CommissionSettlementReversalService, useValue: mockReversalService },
       ],
     }).compile()
 
@@ -1021,6 +1029,7 @@ describe('IcInvoiceService.submitClaim — auto-approve path (Task 29)', () => {
         { provide: StorageService, useValue: mockStorage },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: DisbursementService, useValue: mockDisbursementService },
+        { provide: CommissionSettlementReversalService, useValue: mockReversalService },
       ],
     }).compile()
 
@@ -1126,6 +1135,7 @@ describe('IcInvoiceService.reject', () => {
         { provide: StorageService, useValue: createMockStorage() },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: DisbursementService, useValue: mockDisbursementService },
+        { provide: CommissionSettlementReversalService, useValue: mockReversalService },
       ],
     }).compile()
 
@@ -1149,17 +1159,14 @@ describe('IcInvoiceService.reject', () => {
 
     const rejectedInvoice = makeInvoiceRow({ status: 'rejected', rejectedReason: 'Wrong line items' })
 
+    // PR-1: DELETE FROM commission_item_settlements is gone — replaced by
+    // settlementReversalService.reverseAllByPaidCheck() which we mock at the
+    // module level. The only tx.execute() the reject() flow now makes inside
+    // the txn is the adjustments UPDATE.
     let txExecuteCount = 0
     const mockTxExecute = jest.fn(async () => {
-      const idx = txExecuteCount++
-      if (idx === 0) {
-        deleteSettlementsCount.n++
-        return []
-      }
-      if (idx === 1) {
-        adjustmentsUpdates.push({ status: 'pending' })
-        return []
-      }
+      txExecuteCount++
+      adjustmentsUpdates.push({ status: 'pending' })
       return []
     })
 
@@ -1206,12 +1213,24 @@ describe('IcInvoiceService.reject', () => {
 
     await buildModule(rejectDb as any)
 
+    mockReversalService.reverseAllByPaidCheck.mockClear()
     const result = await service.reject(INVOICE_ID, 'Wrong line items', 'admin-1')
     expect(result.status).toBe('rejected')
     expect(result.rejectedReason).toBe('Wrong line items')
 
-    // Settlements deleted
-    expect(deleteSettlementsCount.n).toBe(1)
+    // PR-1: settlements are reversed (not deleted) via the reversal service
+    expect(mockReversalService.reverseAllByPaidCheck).toHaveBeenCalledTimes(1)
+    expect(mockReversalService.reverseAllByPaidCheck).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paidCheckId: RESERVATION_CHECK_ID,
+        actorUserId: 'admin-1',
+        agencyId: AGENCY_ID,
+      }),
+      expect.anything(),
+    )
+
+    // unused counter — kept for future test extensions
+    void deleteSettlementsCount
 
     // Adjustments flipped back to pending
     expect(adjustmentsUpdates).toContainEqual(

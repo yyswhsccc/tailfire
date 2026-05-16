@@ -33,8 +33,14 @@ function makeController(flagValue: string | undefined): CommissionController {
   const commissionService = {
     payAgents: jest.fn().mockResolvedValue([]),
   }
+  const reconcileService = {
+    reconcile: jest.fn(),
+    unreconcile: jest.fn(),
+    bulkReconcile: jest.fn(),
+  }
   return new CommissionController(
     commissionService as any,
+    reconcileService as any,
     configService as any,
   )
 }

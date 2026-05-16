@@ -25,6 +25,7 @@ import { DatabaseService } from '../../../db/database.service'
 import { FxRateService } from '../../fx/fx-rate.service'
 import { getQueueToken } from '@nestjs/bullmq'
 import { QUEUES } from '../../../automation/automation.types'
+import { CommissionSettlementReversalService } from '../../../financials/commission/commission-settlement-reversal.service'
 
 const mockEventEmitter = { emit: jest.fn() }
 
@@ -404,6 +405,15 @@ async function buildModule(
       { provide: getQueueToken(QUEUES.IC_PAYOUT_DISBURSE), useValue: queue },
       { provide: FxRateService, useValue: fxRate },
       { provide: EventEmitter2, useValue: mockEventEmitter },
+      // PR-1: DisbursementService now reverses settlements via this service
+      // (replaces inline DELETE) when handling failed disbursements.
+      {
+        provide: CommissionSettlementReversalService,
+        useValue: {
+          reverseAllByPaidCheck: jest.fn().mockResolvedValue({ reversedSettlementIds: [], reversalRowIds: [] }),
+          reverseSettlement: jest.fn().mockResolvedValue({ reversalRowId: 'rev-1', alreadyReversed: false }),
+        },
+      },
     ],
   }).compile()
 
@@ -685,12 +695,15 @@ describe('DisbursementService.fail', () => {
     const invoiceCancelUpdate = db._calls.updates.find((u: any) => u.status === 'cancelled')
     expect(invoiceCancelUpdate).toBeDefined()
 
-    // Reversal SQL fired: DELETE settlements + UPDATE adjustments
-    const deleteSettlements = db._calls.executes.find(
-      (e: any) => e?.queryChunks?.some((c: any) => String(c?.value ?? '').includes('commission_item_settlements'))
-        || String(e).includes('commission_item_settlements'),
+    // PR-1: DELETE FROM commission_item_settlements removed — settlements are
+    // now reversed via CommissionSettlementReversalService.reverseAllByPaidCheck.
+    // The mock provider records the call; only the adjustments UPDATE fires
+    // through tx.execute() in this transaction.
+    const adjustmentsExecute = db._calls.executes.find(
+      (e: any) => e?.queryChunks?.some((c: any) => String(c?.value ?? '').includes('commission_adjustments'))
+        || String(e).includes('commission_adjustments'),
     )
-    expect(deleteSettlements).toBeDefined()
+    expect(adjustmentsExecute).toBeDefined()
 
     // commissionChecks cancelled
     const checkCancelUpdate = db._calls.updates.find((u: any) => u.status === 'cancelled')
