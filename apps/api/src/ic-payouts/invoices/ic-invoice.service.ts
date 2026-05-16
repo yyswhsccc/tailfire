@@ -928,12 +928,15 @@ export class IcInvoiceService {
     // Fetch eligible items: must be unsettled, on departing/departed trips,
     // from accepted received checks, and in the requested selection.
     // The currency comes from the parent commission_checks row.
+    // PR-1: fixed prior `ap.trip_ref` reference — that column never existed.
+    // trip_ref is composed from trip.reference_number with fallback to trip.name
+    // (matches the pattern at line 484 in submitCurrencyInvoice).
     const rows: any[] = await this.db.client.execute(sql`
       SELECT
         cci.id,
         src_cc.currency,
         cci.description,
-        ap.trip_ref AS trip_ref,
+        COALESCE(t.reference_number, t.name) AS trip_ref,
         GREATEST(COALESCE(cci.received_cents, 0), 0) AS commission_cents
       FROM commission_check_items cci
       JOIN commission_checks src_cc ON src_cc.id = cci.check_id

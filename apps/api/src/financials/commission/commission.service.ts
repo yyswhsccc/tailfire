@@ -335,17 +335,36 @@ export class CommissionService {
     return this.formatCheck(updated)
   }
 
-  async recallCheck(agencyId: string, checkId: string, userId?: string): Promise<CommissionCheckResponseDto> {
+  async recallCheck(
+    agencyId: string,
+    checkId: string,
+    userId?: string,
+    reason?: string,
+  ): Promise<CommissionCheckResponseDto> {
     const check = await this.getCheckRecord(agencyId, checkId)
 
     if (check.status !== 'accepted') {
       throw new BadRequestException('Only accepted checks can be recalled')
     }
 
+    // PR-1: recall is a signed transition that unlocks the immutability
+    // trigger added in migration 20260516100700. Reason is required so the
+    // audit trail can explain why the financial identity was reopened.
+    if (!reason || reason.trim().length === 0) {
+      throw new BadRequestException(
+        'recallCheck requires a reason — it unlocks the accepted-check immutability guard.',
+      )
+    }
+
+    const newNotes = check.notes
+      ? `${check.notes}\n[Recall ${new Date().toISOString()}] ${reason}`
+      : `[Recall ${new Date().toISOString()}] ${reason}`
+
     const [updated] = await this.db.client
       .update(this.db.schema.commissionChecks)
       .set({
         status: 'submitted',
+        notes: newNotes,
         updatedBy: userId,
         updatedAt: new Date(),
       })
@@ -519,7 +538,20 @@ export class CommissionService {
     dto: AddCheckItemDto
   ): Promise<CommissionCheckItemResponseDto> {
     // Verify check exists and belongs to agency
-    await this.getCheckRecord(agencyId, checkId)
+    const check = await this.getCheckRecord(agencyId, checkId)
+
+    // PR-1 immutability guard: once accepted, items cannot be added.
+    // Recall (accepted → pending) is the only way to unlock.
+    if (check.status === 'accepted') {
+      throw new BadRequestException(
+        `commission_check ${checkId} is accepted and locked. Recall before adding items.`,
+      )
+    }
+    if (check.status === 'cancelled') {
+      throw new BadRequestException(
+        `commission_check ${checkId} is cancelled. Cannot add items to a cancelled check.`,
+      )
+    }
 
     // Verify activity pricing belongs to same agency
     const [pricing] = await this.db.client
@@ -556,7 +588,15 @@ export class CommissionService {
     checkId: string,
     itemId: string
   ): Promise<{ success: boolean }> {
-    await this.getCheckRecord(agencyId, checkId)
+    const check = await this.getCheckRecord(agencyId, checkId)
+
+    // PR-1 immutability guard: items on accepted checks must be reversed,
+    // not deleted. Recall the check to unlock removal during correction.
+    if (check.status === 'accepted') {
+      throw new BadRequestException(
+        `commission_check ${checkId} is accepted and locked. Recall before removing items.`,
+      )
+    }
 
     const [deleted] = await this.db.client
       .delete(this.db.schema.commissionCheckItems)
