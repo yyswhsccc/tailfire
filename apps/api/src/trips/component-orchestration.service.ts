@@ -310,6 +310,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -497,6 +502,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -647,6 +657,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -783,6 +798,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -946,6 +966,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -1095,6 +1120,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -1236,6 +1266,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -1366,6 +1401,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -1596,6 +1636,8 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: forward bookingDate (see flight updateXxx for context)
+      bookingDate: dto.bookingDate,
       photos: dto.photos,
     })
 
@@ -1668,6 +1710,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -1791,6 +1838,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -1951,6 +2003,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -2120,6 +2177,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -2257,6 +2319,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -2425,6 +2492,11 @@ export class ComponentOrchestrationService {
       referralUrl: dto.referralUrl,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: bookingDate was being silently dropped by every component
+      // update path (flight/lodging/transportation/dining/portInfo/options/
+      // customCruise/package/tour) — Zod schema accepts it, base activity
+      // service handles it, but the orchestration relay forgot to forward it.
+      bookingDate: dto.bookingDate,
       pricingType: dto.pricingType,
       currency: dto.currency,
       photos: dto.photos,
@@ -2683,6 +2755,8 @@ export class ComponentOrchestrationService {
       notes: dto.notes,
       proposalStatus: dto.proposalStatus,
       bookingStatus: dto.bookingStatus,
+      // Fix #428: forward bookingDate (see flight updateXxx for context)
+      bookingDate: dto.bookingDate,
     })
 
     // Update tour day details if provided

@@ -670,6 +670,9 @@ export type BaseCreateComponentDto = {
   referralUrl?: string | null
   proposalStatus?: ActivityProposalStatus
   bookingStatus?: ActivityBookingStatus
+  // Fix #428: bookingDate accepted by Zod base*ComponentSchema and persisted
+  // on itinerary_activities. ISO date string (YYYY-MM-DD).
+  bookingDate?: string | null
 
   // Pricing
   pricingType?: PricingType | null
@@ -845,6 +848,9 @@ export type BaseUpdateComponentDto = {
   referralUrl?: string | null
   proposalStatus?: ActivityProposalStatus
   bookingStatus?: ActivityBookingStatus
+  // Fix #428: bookingDate accepted by Zod base*ComponentSchema and persisted
+  // on itinerary_activities. ISO date string (YYYY-MM-DD).
+  bookingDate?: string | null
 
   // Pricing
   pricingType?: PricingType | null

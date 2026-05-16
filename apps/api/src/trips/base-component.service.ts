@@ -45,6 +45,10 @@ export interface BaseComponentData {
   status?: string
   proposalStatus?: string
   bookingStatus?: string
+  // Fix #428: bookingDate accepted by Zod baseCreateComponentSchema +
+  // baseUpdateComponentSchema and persisted on itinerary_activities, but
+  // the base-component service was silently dropping it on the way through.
+  bookingDate?: string | null
   pricingType?: string | null
   currency?: string
   photos?: any[] | null
@@ -66,6 +70,8 @@ export interface UpdateBaseComponentData {
   status?: string
   proposalStatus?: string
   bookingStatus?: string
+  // Fix #428: see BaseComponentData above
+  bookingDate?: string | null
   pricingType?: string | null
   currency?: string
   photos?: any[] | null
@@ -166,6 +172,8 @@ export class BaseComponentService {
         referralUrl: data.referralUrl || null,
         proposalStatus: (data.proposalStatus as any) || 'draft',
         bookingStatus: (data.bookingStatus as any) || 'unbooked',
+        // Fix #428: persist initial bookingDate when supplied at create
+        bookingDate: data.bookingDate ? new Date(data.bookingDate) : null,
         pricingType: data.pricingType as any,
         currency,
         photos: data.photos || null,
@@ -266,6 +274,11 @@ export class BaseComponentService {
         ...(data.referralUrl !== undefined && { referralUrl: data.referralUrl || null }),
         ...(data.proposalStatus && { proposalStatus: data.proposalStatus as any }),
         ...(data.bookingStatus && { bookingStatus: data.bookingStatus as any }),
+        // Fix #428: write through bookingDate. `undefined` = leave alone;
+        // explicit `null` clears it (e.g. when un-booking an activity).
+        ...(data.bookingDate !== undefined && {
+          bookingDate: data.bookingDate ? new Date(data.bookingDate) : null,
+        }),
         ...(data.pricingType !== undefined && { pricingType: data.pricingType as any }),
         ...(data.currency && { currency: data.currency }),
         ...(data.photos !== undefined && { photos: data.photos }),
