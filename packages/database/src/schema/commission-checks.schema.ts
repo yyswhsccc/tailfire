@@ -213,6 +213,11 @@ export const commissionAdjustments = pgTable('commission_adjustments', {
   agentUserId: uuid('agent_user_id').references(() => userProfiles.id),
   companyName: varchar('company_name', { length: 255 }),
 
+  // PR-1: optional scope to a specific activity_pricing row.
+  activityPricingId: uuid('activity_pricing_id').references(() => activityPricing.id, { onDelete: 'set null' }),
+  // PR-1: explicit opt-in flag (overrides amount-sign inference).
+  isOptional: boolean('is_optional').notNull().default(false),
+
   // Status
   status: commissionAdjustmentStatusEnum('status').notNull().default('pending'),
 

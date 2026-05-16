@@ -569,6 +569,19 @@ export class CommissionService {
       throw new NotFoundException(`Activity pricing ${dto.activityPricingId} not found`)
     }
 
+    // PR-1: resolve embedded_tax fields. Caller wins; otherwise derive from
+    // supplier defaults via the formula helper (embedded = gross × rate /
+    // (100 + rate) when commission_includes_tax = true).
+    const tax = await this.resolveCheckItemTax(
+      dto.activityPricingId,
+      dto.receivedCents ?? 0,
+      {
+        embeddedTaxCents: dto.embeddedTaxCents,
+        embeddedTaxType: dto.embeddedTaxType,
+        embeddedTaxRatePercent: dto.embeddedTaxRatePercent,
+      },
+    )
+
     const [item] = await this.db.client
       .insert(this.db.schema.commissionCheckItems)
       .values({
@@ -577,10 +590,73 @@ export class CommissionService {
         projectedCents: dto.projectedCents,
         receivedParentCents: dto.receivedParentCents ?? 0,
         receivedCents: dto.receivedCents ?? 0,
+        embeddedTaxCents: tax.embeddedTaxCents,
+        embeddedTaxType: tax.embeddedTaxType,
+        embeddedTaxRatePercent: tax.embeddedTaxRatePercent != null ? String(tax.embeddedTaxRatePercent) : null,
       })
       .returning()
 
     return this.formatCheckItem(item)
+  }
+
+  /**
+   * PR-1: resolves embedded-tax inputs for a new commission_check_item.
+   * Caller-supplied values always win. When omitted, looks up the supplier
+   * via the activity_pricing → itinerary_activities → activity_suppliers
+   * chain (or activity_pricing.supplierName fallback) and applies the
+   * formula. Returns { embeddedTaxCents, embeddedTaxType, embeddedTaxRatePercent }.
+   */
+  private async resolveCheckItemTax(
+    activityPricingId: string,
+    grossCents: number,
+    callerSupplied: {
+      embeddedTaxCents?: number
+      embeddedTaxType?: string | null
+      embeddedTaxRatePercent?: number | null
+    },
+  ): Promise<{
+    embeddedTaxCents: number
+    embeddedTaxType: string | null
+    embeddedTaxRatePercent: number | null
+  }> {
+    // Caller wins entirely — no derivation when they supplied anything.
+    if (callerSupplied.embeddedTaxCents !== undefined) {
+      return {
+        embeddedTaxCents: callerSupplied.embeddedTaxCents,
+        embeddedTaxType: callerSupplied.embeddedTaxType ?? null,
+        embeddedTaxRatePercent: callerSupplied.embeddedTaxRatePercent ?? null,
+      }
+    }
+
+    // Look up supplier defaults via activity_suppliers (most authoritative)
+    // with a fallback to activity_pricing.supplier (denormalized name).
+    const rows: any[] = await this.db.client.execute(sql`
+      SELECT
+        s.default_commission_tax_type AS tax_type,
+        s.default_commission_tax_rate_percent::numeric AS rate_percent,
+        s.commission_includes_tax AS includes_tax
+      FROM activity_pricing ap
+      LEFT JOIN itinerary_activities ia ON ia.id = ap.activity_id
+      LEFT JOIN activity_suppliers asup ON asup.activity_id = ia.id AND asup.is_primary = true
+      LEFT JOIN suppliers s ON s.id = asup.supplier_id
+      WHERE ap.id = ${activityPricingId}::uuid
+      LIMIT 1
+    `)
+    const row = (rows as Array<{ tax_type?: string | null; rate_percent?: string | null; includes_tax?: boolean | null }>)[0]
+    const ratePercent = row?.rate_percent != null ? Number(row.rate_percent) : null
+    const includesTax = !!row?.includes_tax
+
+    if (!includesTax || ratePercent === null || ratePercent === 0) {
+      return { embeddedTaxCents: 0, embeddedTaxType: row?.tax_type ?? null, embeddedTaxRatePercent: ratePercent }
+    }
+
+    // Lazy import to avoid a wider service refactor for one helper.
+    const { computeEmbeddedTaxFromInclusive } = await import('./commission-formula')
+    return {
+      embeddedTaxCents: computeEmbeddedTaxFromInclusive(grossCents, ratePercent),
+      embeddedTaxType: row?.tax_type ?? null,
+      embeddedTaxRatePercent: ratePercent,
+    }
   }
 
   async removeCheckItem(

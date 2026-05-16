@@ -64,6 +64,7 @@ import type {
 import { ItinerariesService } from './itineraries.service'
 import { ItineraryVersionsService } from './itinerary-versions.service'
 import { GroupBillingService } from './group-billing.service'
+import { CommissionAuditService } from '../financials/commission/commission-audit.service'
 import {
   summarizeActivityPaymentStatus,
   emptyTripBookingStatusSummary,
@@ -89,6 +90,7 @@ export class TripsService {
     @Inject(forwardRef(() => ItineraryVersionsService))
     private readonly itineraryVersionsService: ItineraryVersionsService,
     private readonly groupBillingService: GroupBillingService,
+    private readonly commissionAuditService: CommissionAuditService,
   ) {}
 
   /**
@@ -5405,6 +5407,143 @@ export class TripsService {
     }
 
     return locations
+  }
+
+  /**
+   * PR-1: updateCommissionOverrides — admin-only writer for the per-trip
+   * commission settings exposed in the new Trip Settings tab (PR-2):
+   *   - trips.commission_fee_rate_override (nullable; NULL = use agency default)
+   *   - trip_collaborators[].agent_split_override (nullable per collaborator)
+   *   - trip_collaborators[].commission_percentage (between-collaborator split)
+   *
+   * Every change writes a trip_settings_history row via CommissionAuditService
+   * so the audit trail is queryable forever. The whole update runs in a single
+   * transaction — partial application is not allowed.
+   *
+   * Surface inventory: this is a NEW method on TripsService, added in
+   * apps/api/src/trips/TRIPS_SERVICE_SURFACE.md (entry #57). Per CLAUDE.md
+   * §9, any future extraction must cite the inventory.
+   */
+  async updateCommissionOverrides(
+    tripId: string,
+    actorUserId: string,
+    input: {
+      feeRateOverridePercent?: number | null
+      collaboratorOverrides?: Array<{
+        collaboratorId: string
+        commissionPercentage?: string | null
+        agentSplitOverridePercent?: number | null
+      }>
+      reason?: string | null
+      userAgent?: string | null
+    },
+  ): Promise<{ tripId: string; updatedCollaborators: number }> {
+    const [trip] = await this.db.client
+      .select()
+      .from(this.db.schema.trips)
+      .where(eq(this.db.schema.trips.id, tripId))
+      .limit(1)
+    if (!trip) throw new NotFoundException(`Trip ${tripId} not found`)
+
+    let updatedCollaborators = 0
+    await this.db.client.transaction(async (tx) => {
+      // Fee-rate override on the trip itself
+      if (input.feeRateOverridePercent !== undefined) {
+        const beforeFee = trip.commissionFeeRateOverride
+        const afterFee =
+          input.feeRateOverridePercent === null
+            ? null
+            : String(input.feeRateOverridePercent)
+        if (beforeFee !== afterFee) {
+          await tx
+            .update(this.db.schema.trips)
+            .set({ commissionFeeRateOverride: afterFee, updatedAt: new Date() })
+            .where(eq(this.db.schema.trips.id, tripId))
+          await this.commissionAuditService.writeTripSettingsHistory(
+            {
+              tripId,
+              scope: 'trip',
+              scopeId: tripId,
+              action: 'updated',
+              beforeData: { commissionFeeRateOverride: beforeFee },
+              afterData: { commissionFeeRateOverride: afterFee },
+              changedBy: actorUserId,
+              userAgent: input.userAgent ?? null,
+              reason: input.reason ?? null,
+            },
+            tx,
+          )
+        }
+      }
+
+      // Per-collaborator overrides
+      for (const co of input.collaboratorOverrides ?? []) {
+        const [existing] = await tx
+          .select()
+          .from(this.db.schema.tripCollaborators)
+          .where(
+            and(
+              eq(this.db.schema.tripCollaborators.id, co.collaboratorId),
+              eq(this.db.schema.tripCollaborators.tripId, tripId),
+            ),
+          )
+          .limit(1)
+        if (!existing) {
+          throw new NotFoundException(
+            `trip_collaborator ${co.collaboratorId} not found on trip ${tripId}`,
+          )
+        }
+
+        const beforeData = {
+          commissionPercentage: existing.commissionPercentage,
+          agentSplitOverride: existing.agentSplitOverride,
+        }
+        const afterData: Record<string, unknown> = { ...beforeData }
+        const updates: Record<string, unknown> = {}
+
+        if (co.commissionPercentage !== undefined && co.commissionPercentage !== existing.commissionPercentage) {
+          if (co.commissionPercentage === null) {
+            throw new BadRequestException(
+              `commissionPercentage cannot be NULL on trip_collaborator ${co.collaboratorId} — set a value (e.g. "100.00").`,
+            )
+          }
+          updates.commissionPercentage = co.commissionPercentage
+          afterData.commissionPercentage = co.commissionPercentage
+        }
+        if (co.agentSplitOverridePercent !== undefined) {
+          const next = co.agentSplitOverridePercent === null ? null : String(co.agentSplitOverridePercent)
+          if (next !== existing.agentSplitOverride) {
+            updates.agentSplitOverride = next
+            afterData.agentSplitOverride = next
+          }
+        }
+
+        if (Object.keys(updates).length === 0) continue
+
+        await tx
+          .update(this.db.schema.tripCollaborators)
+          .set(updates)
+          .where(eq(this.db.schema.tripCollaborators.id, co.collaboratorId))
+
+        await this.commissionAuditService.writeTripSettingsHistory(
+          {
+            tripId,
+            scope: 'collaborator',
+            scopeId: co.collaboratorId,
+            action: 'updated',
+            beforeData,
+            afterData,
+            changedBy: actorUserId,
+            userAgent: input.userAgent ?? null,
+            reason: input.reason ?? null,
+          },
+          tx,
+        )
+        updatedCollaborators++
+      }
+    })
+
+    return { tripId, updatedCollaborators }
   }
 }
 
