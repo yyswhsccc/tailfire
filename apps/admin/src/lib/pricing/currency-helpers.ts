@@ -65,18 +65,31 @@ function getCurrencySymbol(currency: string): string {
  * Utility to avoid duplication in edit mode loaders
  */
 export function buildInitialPricingState(component: any) {
+  // #441 / #443: the activity DTO nests pricing fields under `pricing.*`
+  // (totalPriceCents, taxesAndFeesCents, commissionTotalCents, currency,
+  // pricingType, pricingBreakdownJson, supplier, etc.). Reading them at
+  // the top level returned undefined → 0 → form hydration showed $0 even
+  // when DB had a price, and the payment-schedule preview submitted
+  // $0/$0 deposit rows that the API rightly rejected with "Expected
+  // payment items must sum to total. Expected: X, Got: 0".
+  //
+  // Prefer the nested `pricing` block; fall back to top-level so legacy
+  // callers with flat DTOs (e.g. trip-order builders) still work.
+  const p = component?.pricing ?? component
   return {
-    totalPriceCents: component.totalPriceCents || 0,
-    taxesAndFeesCents: component.taxesAndFeesCents || 0,
-    currency: component.currency || 'CAD',
-    commissionTotalCents: component.commissionTotalCents || 0,
-    commissionSplitPercentage: component.commissionSplitPercentage ? parseFloat(component.commissionSplitPercentage) : 0,
-    commissionExpectedDate: component.commissionExpectedDate || null,
-    termsAndConditions: component.termsAndConditions || '',
-    cancellationPolicy: component.cancellationPolicy || '',
-    confirmationNumber: component.confirmationNumber || '',
-    referralUrl: component.referralUrl || '',
-    supplier: component.supplier || '',
-    pricingBreakdown: component.pricingBreakdownJson ?? null,
+    totalPriceCents: p?.totalPriceCents ?? component?.totalPriceCents ?? 0,
+    taxesAndFeesCents: p?.taxesAndFeesCents ?? component?.taxesAndFeesCents ?? 0,
+    currency: p?.currency ?? component?.currency ?? 'CAD',
+    commissionTotalCents: p?.commissionTotalCents ?? component?.commissionTotalCents ?? 0,
+    commissionSplitPercentage: (p?.commissionSplitPercentage ?? component?.commissionSplitPercentage)
+      ? parseFloat(p?.commissionSplitPercentage ?? component?.commissionSplitPercentage)
+      : 0,
+    commissionExpectedDate: p?.commissionExpectedDate ?? component?.commissionExpectedDate ?? null,
+    termsAndConditions: p?.termsAndConditions ?? component?.termsAndConditions ?? '',
+    cancellationPolicy: p?.cancellationPolicy ?? component?.cancellationPolicy ?? '',
+    confirmationNumber: component?.confirmationNumber ?? '',
+    referralUrl: component?.referralUrl ?? '',
+    supplier: p?.supplier ?? component?.supplier ?? '',
+    pricingBreakdown: component?.pricingBreakdownJson ?? p?.pricingBreakdownJson ?? null,
   }
 }
