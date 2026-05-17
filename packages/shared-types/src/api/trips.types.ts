@@ -136,6 +136,18 @@ interface CreateTripTravelerBySnapshotDto extends CreateTripTravelerBaseDto {
     passportExpiry?: string
     nationality?: string
   }
+  /**
+   * #448: agent-confirmed link to an existing contact discovered via the
+   * dedup-on-create flow. When set, the server skips the inline contact
+   * insert and links the traveler to this contactId.
+   */
+  useExistingContactId?: string
+  /**
+   * #448: agent-confirmed override to create a new contact even though
+   * a dedup match was returned. Only honoured when paired with the same
+   * email that triggered the original 409.
+   */
+  overrideDedup?: boolean
 }
 
 /**

@@ -58,6 +58,51 @@ export class ContactsService {
    * Create a new contact
    */
   async create(dto: CreateContactDto, agencyId: string, userId?: string): Promise<ContactResponseDto> {
+    // #448: dedup on create. The contacts table has no unique constraint
+    // beyond portal_user_id, and both TES import and inline UI create
+    // paths blindly insert duplicates — production already has
+    // contacts where the same email exists 16-35 times.
+    //
+    // Phase 1: when the dto provides a non-empty email, check for an
+    // existing contact in the same agency with that email (case-insensitive).
+    // If found, throw 409 Conflict with the existing contact ID so the UI
+    // can prompt "use existing X?" rather than silently making another dup.
+    //
+    // Phase 2 (fuzzy name match) and Phase 3 (partial unique index) live
+    // in follow-up PRs — see issue #448.
+    if (dto.email && dto.email.trim() !== '') {
+      const normalizedEmail = dto.email.trim().toLowerCase()
+      const [existing] = await this.db.client
+        .select({
+          id: this.db.schema.contacts.id,
+          firstName: this.db.schema.contacts.firstName,
+          lastName: this.db.schema.contacts.lastName,
+          email: this.db.schema.contacts.email,
+        })
+        .from(this.db.schema.contacts)
+        .where(
+          and(
+            eq(this.db.schema.contacts.agencyId, agencyId),
+            sql`lower(${this.db.schema.contacts.email}) = ${normalizedEmail}`,
+            eq(this.db.schema.contacts.isActive, true),
+          ),
+        )
+        .limit(1)
+
+      if (existing) {
+        throw new ConflictException({
+          message: `A contact with email "${dto.email}" already exists`,
+          code: 'CONTACT_EMAIL_EXISTS',
+          existingContact: {
+            id: existing.id,
+            firstName: existing.firstName,
+            lastName: existing.lastName,
+            email: existing.email,
+          },
+        })
+      }
+    }
+
     const [contact] = await this.db.client
       .insert(this.db.schema.contacts)
       .values({

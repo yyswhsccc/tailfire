@@ -4,9 +4,9 @@
  * Business logic for managing travelers on trips.
  */
 
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, Logger } from '@nestjs/common'
 import { EventEmitter2 } from '@nestjs/event-emitter'
-import { eq, and, asc, desc, inArray } from 'drizzle-orm'
+import { eq, and, asc, desc, inArray, sql } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { TravellerSplitsService } from '../financials/traveller-splits.service'
 import { TripNotificationsService } from '../financials/trip-notifications.service'
@@ -112,11 +112,85 @@ export class TripTravelersService {
       throw new BadRequestException('Either contactId or contactSnapshot must be provided')
     }
 
-    // Auto-create a CRM Contact when traveler is created inline (snapshot only, no contactId)
-    // Set owner to trip owner so the contact belongs to the agent working on the trip
+    // Auto-create a CRM Contact when traveler is created inline (snapshot only, no contactId).
+    // Set owner to trip owner so the contact belongs to the agent working on the trip.
+    //
+    // #448 phase 1: dedup before insert, BUT never silent. Per the contact-
+    // merge spec (docs/superpowers/specs/2026-04-03-contact-merge-design.md)
+    // agents must explicitly confirm any link to an existing contact —
+    // the platform never auto-merges or auto-links.
+    //
+    // Flow:
+    //   1. Snapshot has email → look for an active contact in the same
+    //      agency with the same email (case-insensitive).
+    //   2. If found AND the requesting user can access that contact
+    //      (via ContactAccessService.canAccessSensitiveData) → throw
+    //      409 with the existing contact info. UI prompts the agent
+    //      to either use the existing record (passing useExistingContactId)
+    //      or override (overrideDedup=true) to create a new contact
+    //      anyway.
+    //   3. If a match exists but the requesting user cannot access it
+    //      → create a new contact silently. Revealing another agent's
+    //      private contact would leak data; the dup is the lesser evil.
+    //
+    // The caller can short-circuit by passing one of:
+    //   - dto.contactId: skip the inline path entirely (existing behavior)
+    //   - dto.useExistingContactId: confirmed link to existing
+    //   - dto.overrideDedup === true: confirmed create-new despite match
     let autoCreatedContactId: string | undefined
-    if (hasContactSnapshot && !hasContactId) {
+
+    if (hasContactSnapshot && !hasContactId && dto.useExistingContactId) {
+      // Agent confirmed in the UI that they want to use this existing contact.
+      autoCreatedContactId = dto.useExistingContactId
+    } else if (hasContactSnapshot && !hasContactId) {
       const snapshot = dto.contactSnapshot as Record<string, any>
+      const snapshotEmail = typeof snapshot.email === 'string' ? snapshot.email.trim() : ''
+      const overrideDedup = dto.overrideDedup === true
+
+      if (snapshotEmail && !overrideDedup) {
+        const normalized = snapshotEmail.toLowerCase()
+        const [existing] = await this.db.client
+          .select({
+            id: this.db.schema.contacts.id,
+            firstName: this.db.schema.contacts.firstName,
+            lastName: this.db.schema.contacts.lastName,
+            email: this.db.schema.contacts.email,
+          })
+          .from(this.db.schema.contacts)
+          .where(
+            and(
+              eq(this.db.schema.contacts.agencyId, trip.agencyId),
+              sql`lower(${this.db.schema.contacts.email}) = ${normalized}`,
+              eq(this.db.schema.contacts.isActive, true),
+            ),
+          )
+          .limit(1)
+        if (existing) {
+          // Only reveal the match if the user can access this contact.
+          // Otherwise create a new contact (acceptable dup vs. data leak).
+          // If no auth context is available (legacy callers / system tasks),
+          // skip the prompt and create new — the prompt only makes sense
+          // when there is an actual agent to respond to it.
+          const canReveal = auth
+            ? (await this.contactAccessService.canAccessSensitiveData(existing.id, auth)).canAccessBasic
+            : false
+          if (canReveal) {
+            throw new ConflictException({
+              message: `A contact with email "${snapshotEmail}" already exists. Use existing or create new?`,
+              code: 'TRAVELER_CONTACT_EMAIL_EXISTS',
+              existingContact: {
+                id: existing.id,
+                firstName: existing.firstName,
+                lastName: existing.lastName,
+                email: existing.email,
+              },
+              // Hint for the UI handler:
+              hint: 'Resubmit with useExistingContactId=<id> to link, or overrideDedup=true to create a new contact anyway.',
+            })
+          }
+        }
+      }
+
       const [newContact] = await this.db.client
         .insert(this.db.schema.contacts)
         .values({
