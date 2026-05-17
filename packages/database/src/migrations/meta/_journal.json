@@ -1660,6 +1660,13 @@
       "when": 1779451200000,
       "tag": "20260520120000_backfill_activity_travelers",
       "breakpoints": true
+    },
+    {
+      "idx": 237,
+      "version": "7",
+      "when": 1779537600000,
+      "tag": "20260521120000_trip_status_allow_planning_to_active",
+      "breakpoints": true
     }
   ]
 }
