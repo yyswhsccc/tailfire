@@ -118,6 +118,15 @@ export const itineraryActivities = pgTable('itinerary_activities', {
   isVisibleInCalendar: boolean('is_visible_in_calendar').default(true).notNull(),
   bookingDate: timestamp('booking_date', { withTimezone: true }),
 
+  // Cancellation metadata (#452) — booking_status='cancelled' requires all of
+  // these to be set (enforced by chk_cancellation_requires_metadata).
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  cancelledBy: uuid('cancelled_by'),
+  cancellationReason: text('cancellation_reason'),
+  cancellationRefundDecision: varchar('cancellation_refund_decision', { length: 40 }),
+  cancellationRefundAmountCents: integer('cancellation_refund_amount_cents'),
+  cancellationNotes: text('cancellation_notes'),
+
   // Optional external "Book this activity" URL surfaced as a CTA on the
   // shared-trip / proposal preview (#302). Affiliate / referral links are
   // routinely long, so text rather than varchar(N).

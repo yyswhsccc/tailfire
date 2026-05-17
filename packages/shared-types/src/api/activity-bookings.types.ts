@@ -37,6 +37,33 @@ export type ActivityBookingsFilterDto = {
   bookingStatus?: ActivityBookingStatus // Defaults to 'booked'
 }
 
+// Cancellation (#452): cancelling a booked activity must record reason +
+// refund decision. The DB constraint requires all three to be set whenever
+// booking_status='cancelled', so the API will reject incomplete payloads.
+export type CancellationRefundDecision =
+  | 'full_refund_pending'
+  | 'partial_refund_pending'
+  | 'no_refund'
+  | 'supplier_retains'
+
+export type CancelActivityBookingDto = {
+  cancellationReason: string
+  refundDecision: CancellationRefundDecision
+  refundAmountCents?: number | null // Required for partial_refund_pending; informational for full/no
+  cancellationNotes?: string | null
+}
+
+// 409 returned by /unmark when the booking has payments or a confirmation #
+// — caller must route the user to the cancel-with-policy dialog instead.
+export type UnmarkBlockedResponse = {
+  code: 'BOOKING_HAS_PAYMENTS_USE_CANCEL'
+  activityId: string
+  paymentTotalCents: number
+  paymentCount: number
+  hasConfirmationNumber: boolean
+  hint: string
+}
+
 // Response DTOs
 
 export type ActivityBookingResponseDto = {

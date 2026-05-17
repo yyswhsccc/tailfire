@@ -34,7 +34,7 @@ import { ActivitiesService } from './activities.service'
 import { TripAccessService } from './trip-access.service'
 import { GetAuthContext } from '../auth/decorators/auth-context.decorator'
 import type { AuthContext } from '../auth/auth.types'
-import { MarkActivityBookedDto, ActivityBookingsFilterDto } from './dto'
+import { MarkActivityBookedDto, ActivityBookingsFilterDto, CancelActivityBookingDto } from './dto'
 import type {
   ActivityBookingResponseDto,
   ActivityBookingsListResponseDto,
@@ -102,22 +102,51 @@ export class ActivityBookingsController {
    * Business rules:
    * - Activities with packageId cannot be unmarked individually (400 error)
    * - Sets bookingStatus to 'unbooked' and bookingDate to null
+   * - 409 BOOKING_HAS_PAYMENTS_USE_CANCEL if any payment or confirmation # exists.
+   *   The caller must route the user to the cancel-with-policy dialog instead.
    *
    * Access check: User must have write access to the trip.
    */
   @Post(':activityId/unmark')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Remove booking status from an activity' })
+  @ApiOperation({ summary: 'Remove booking status from an activity (only when no payments)' })
   @ApiParam({ name: 'activityId', description: 'Activity UUID' })
   @ApiResponse({ status: 200, description: 'Booking status removed' })
   @ApiResponse({ status: 400, description: 'Activity is part of a package' })
   @ApiResponse({ status: 404, description: 'Activity not found' })
+  @ApiResponse({ status: 409, description: 'Booking has payments / confirmation number — use /cancel instead' })
   async unmarkAsBooked(
     @GetAuthContext() auth: AuthContext,
     @Param('activityId', ParseUUIDPipe) activityId: string
   ): Promise<ActivityBookingResponseDto> {
     await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
     return this.activityBookingsService.unmarkAsBooked(activityId, auth.userId)
+  }
+
+  /**
+   * Cancel a booked activity (#452)
+   * POST /bookings/activities/:activityId/cancel
+   *
+   * Required when the booking has payments or a confirmation number.
+   * Records reason + refund decision + actor; payment_transactions are not
+   * touched (refunds tracked separately so the ledger stays intact).
+   *
+   * Access check: User must have write access to the trip.
+   */
+  @Post(':activityId/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancel a booked activity with reason + refund decision' })
+  @ApiParam({ name: 'activityId', description: 'Activity UUID' })
+  @ApiResponse({ status: 200, description: 'Activity cancelled' })
+  @ApiResponse({ status: 400, description: 'Activity is not booked, or refund payload incomplete' })
+  @ApiResponse({ status: 404, description: 'Activity not found' })
+  async cancelBooking(
+    @GetAuthContext() auth: AuthContext,
+    @Param('activityId', ParseUUIDPipe) activityId: string,
+    @Body() dto: CancelActivityBookingDto
+  ): Promise<ActivityBookingResponseDto> {
+    await this.activitiesService.verifyTripAccessFromActivityId(activityId, auth, true)
+    return this.activityBookingsService.cancelBooking(activityId, dto, auth.userId)
   }
 
   /**

@@ -30,6 +30,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useToast } from '@/hooks/use-toast'
@@ -39,6 +40,8 @@ import {
   useValidateBooking,
 } from '@/hooks/use-activity-bookings'
 import type { BookingValidationError } from '@/hooks/use-activity-bookings'
+import { ApiError } from '@/lib/api'
+import { CancelBookingDialog } from './cancel-booking-dialog'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -54,6 +57,16 @@ export interface BookingHeaderButtonProps {
   parentPackageId?: string | null
   parentPackageName?: string | null
   tripId: string
+  /**
+   * Optional context that powers the #452 cancel dialog and the
+   * unmark-vs-cancel routing decision in the booked-state dropdown.
+   * When omitted, the dialog still works — paymentTotalCents simply
+   * isn't shown and the unmark item assumes no payments (server still
+   * 409s if any exist, so this is safe — the UI just can't pre-warn).
+   */
+  paymentTotalCents?: number
+  confirmationNumber?: string | null
+  cancellationPolicy?: string | null
   /** Switch to a specific tab in the parent form */
   onNavigateToTab?: (tab: string) => void
   /** Called after successful booking */
@@ -134,6 +147,9 @@ export function BookingHeaderButton({
   parentPackageId,
   parentPackageName,
   tripId,
+  paymentTotalCents = 0,
+  confirmationNumber,
+  cancellationPolicy,
   onNavigateToTab,
   onBooked,
   onUnbooked,
@@ -150,6 +166,16 @@ export function BookingHeaderButton({
   const [bookingDateInput, setBookingDateInput] = useState(
     () => new Date().toISOString().split('T')[0]
   )
+
+  // #452 — dialog state for Cancel Booking flow
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+
+  // If we have local hints, decide unmark-vs-cancel without an API roundtrip.
+  // The server still authoritatively enforces this — anything we missed gets
+  // a 409 BOOKING_HAS_PAYMENTS_USE_CANCEL which we then translate to opening
+  // the cancel dialog. Belt + braces.
+  const hasCommitments =
+    paymentTotalCents > 0 || (confirmationNumber != null && confirmationNumber.trim() !== '')
 
   // ------- Handlers -------
 
@@ -243,22 +269,39 @@ export function BookingHeaderButton({
   async function handleUnbook() {
     if (!activityId) return
 
+    // #452: if we can see commitments locally, skip the network call and
+    // jump straight into the cancel dialog — better UX and avoids a wasted
+    // mutation roundtrip.
+    if (hasCommitments) {
+      setCancelDialogOpen(true)
+      return
+    }
+
     try {
       await unmarkBooked.mutateAsync(activityId)
-
       toast({
         title: 'Booking removed',
         description: `"${activityName}" is no longer marked as booked.`,
       })
-
       onUnbooked?.()
     } catch (err) {
+      // Server told us this booking has commitments after all — route into
+      // the cancel-with-policy flow rather than surface a confusing error.
+      if (err instanceof ApiError && err.code === 'BOOKING_HAS_PAYMENTS_USE_CANCEL') {
+        setCancelDialogOpen(true)
+        return
+      }
       toast({
         title: 'Failed to remove booking',
         description: (err as Error).message,
         variant: 'destructive',
       })
     }
+  }
+
+  function handleCancelClick() {
+    if (!activityId) return
+    setCancelDialogOpen(true)
   }
 
   // ------- State 1: Not saved yet -------
@@ -309,26 +352,57 @@ export function BookingHeaderButton({
 
   if (isBooked) {
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            className="gap-2 border-green-500 text-green-700 hover:bg-green-50"
-          >
-            <Check className="h-4 w-4" />
-            Booked{bookingDate ? ` \u2014 ${format(new Date(bookingDate), 'MMM d, yyyy')}` : ''}
-            <ChevronDown className="h-3 w-3" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuItem
-            onClick={handleUnbook}
-            className="text-red-600"
-          >
-            Remove Booking
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="gap-2 border-green-500 text-green-700 hover:bg-green-50"
+            >
+              <Check className="h-4 w-4" />
+              Booked{bookingDate ? ` \u2014 ${format(new Date(bookingDate), 'MMM d, yyyy')}` : ''}
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuItem
+              onClick={handleCancelClick}
+              className="text-red-600"
+            >
+              Cancel Booking\u2026
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={handleUnbook}
+              disabled={hasCommitments}
+              className="text-gray-700"
+              title={
+                hasCommitments
+                  ? 'This booking has payments or a confirmation number \u2014 use Cancel instead.'
+                  : undefined
+              }
+            >
+              Mark Unbooked
+              {hasCommitments && (
+                <span className="ml-2 text-[10px] text-gray-400">(use Cancel)</span>
+              )}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {activityId && (
+          <CancelBookingDialog
+            open={cancelDialogOpen}
+            onOpenChange={setCancelDialogOpen}
+            activityId={activityId}
+            activityName={activityName}
+            cancellationPolicy={cancellationPolicy}
+            paymentTotalCents={paymentTotalCents}
+            confirmationNumber={confirmationNumber}
+            onCancelled={() => onUnbooked?.()}
+          />
+        )}
+      </>
     )
   }
 

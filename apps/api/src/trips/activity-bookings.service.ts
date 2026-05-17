@@ -9,7 +9,7 @@
  * - Booking = A status applied to an activity (bookingStatus field + bookingDate)
  */
 
-import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Inject, forwardRef } from '@nestjs/common'
 import { sql, and, eq } from 'drizzle-orm'
 import { DatabaseService } from '../db/database.service'
 import { ActivitiesService } from './activities.service'
@@ -23,6 +23,7 @@ import type {
   ActivityBookingResponseDto,
   ActivityBookingsListResponseDto,
   BookingValidationResult,
+  CancelActivityBookingDto,
 } from '@tailfire/shared-types'
 
 @Injectable()
@@ -147,7 +148,14 @@ export class ActivityBookingsService {
   }
 
   /**
-   * Remove booking status from an activity
+   * Remove booking status from an activity (path B in #452).
+   *
+   * Only safe when the booking has no payments AND no confirmation number —
+   * an agent is reverting a click they made by mistake before any real money
+   * or supplier-side commitment was recorded. When either condition fails,
+   * the caller is routed to {@link cancelBooking} via a 409 with the
+   * `BOOKING_HAS_PAYMENTS_USE_CANCEL` code; payments and audit trail belong
+   * on the cancellation flow, not a silent unbook.
    */
   async unmarkAsBooked(
     activityId: string,
@@ -163,6 +171,23 @@ export class ActivityBookingsService {
     // Package guard: block if activity is a child of a package
     if (activity.parentActivityId && activity.parentActivityType === 'package') {
       throw new BadRequestException('Activity is linked to a package. Use package booking instead.')
+    }
+
+    // #452 guard: payments or a confirmation number mean this isn't a misclick —
+    // route the agent to the cancel-with-policy flow instead of silently unbooking.
+    const { paymentTotalCents, paymentCount, hasConfirmationNumber } =
+      await this.getBookingCommitmentSummary(activityId)
+    if (paymentTotalCents > 0 || paymentCount > 0 || hasConfirmationNumber) {
+      throw new ConflictException({
+        code: 'BOOKING_HAS_PAYMENTS_USE_CANCEL',
+        activityId,
+        paymentTotalCents,
+        paymentCount,
+        hasConfirmationNumber,
+        hint:
+          'This booking has payments or a confirmation number attached. ' +
+          'Use the Cancel Booking flow to record a reason + refund decision and preserve the audit trail.',
+      })
     }
 
     // Route through ActivitiesService.update() to preserve audit events
@@ -189,6 +214,124 @@ export class ActivityBookingsService {
       paymentScheduleMissing,
       bookable: true,
       blockedReason: null,
+    }
+  }
+
+  /**
+   * Cancel a booked activity (path A in #452).
+   *
+   * Required when the booking has payments or a confirmation number. Records
+   * reason + refund decision + actor, sets booking_status='cancelled', and
+   * leaves payment_transactions in place — refund work tracks separately so
+   * the financial ledger stays intact. The DB-level
+   * chk_cancellation_requires_metadata enforces the same invariant the DTO
+   * does so importers and scripts can't sneak around it.
+   */
+  async cancelBooking(
+    activityId: string,
+    dto: CancelActivityBookingDto,
+    actorId?: string | null
+  ): Promise<ActivityBookingResponseDto> {
+    const activity = await this.fetchActivityWithTripId(activityId)
+    if (!activity) {
+      throw new NotFoundException('Activity not found')
+    }
+
+    if (activity.parentActivityId && activity.parentActivityType === 'package') {
+      throw new BadRequestException('Activity is linked to a package. Use package booking instead.')
+    }
+
+    // Cancellation only applies to currently-booked activities — guard the
+    // common operator mistake of trying to cancel an already-cancelled or
+    // never-booked row.
+    if (activity.bookingStatus !== 'booked') {
+      throw new BadRequestException(
+        `Cannot cancel activity in '${activity.bookingStatus}' state — only booked activities can be cancelled.`
+      )
+    }
+
+    // Partial-refund decisions need an explicit amount; the DB allows NULL
+    // here so we have to validate at the boundary. Full/no/supplier_retains
+    // are categorical and don't carry a numeric amount.
+    if (dto.refundDecision === 'partial_refund_pending') {
+      if (dto.refundAmountCents == null || dto.refundAmountCents <= 0) {
+        throw new BadRequestException(
+          'refundAmountCents > 0 is required when refundDecision is partial_refund_pending.'
+        )
+      }
+    }
+
+    // Persist the cancellation atomically. We bypass ActivitiesService.update()
+    // here because it doesn't know about the cancellation columns; routing the
+    // status change through it would still leave reason/refund/actor unset
+    // and trip the DB CHECK constraint. We emit our own audit row below.
+    await this.db.client.execute(sql`
+      UPDATE itinerary_activities SET
+        booking_status = 'cancelled',
+        cancelled_at = NOW(),
+        cancelled_by = ${actorId ?? null}::uuid,
+        cancellation_reason = ${dto.cancellationReason},
+        cancellation_refund_decision = ${dto.refundDecision},
+        cancellation_refund_amount_cents = ${dto.refundAmountCents ?? null},
+        cancellation_notes = ${dto.cancellationNotes ?? null},
+        updated_at = NOW()
+      WHERE id = ${activityId}
+    `)
+
+    // Re-evaluate trip lifecycle — cancelling the last booked activity demotes
+    // the trip from active back to planning, same as unmark.
+    await this.tripLifecycleService.onBookingCancelled(activityId)
+
+    const paymentScheduleMissing = await this.getPaymentScheduleMissing(activityId)
+
+    return {
+      id: activityId,
+      name: activity.name,
+      activityType: activity.activityType,
+      bookingStatus: 'cancelled' as const,
+      bookingDate: activity.bookingDate
+        ? new Date(activity.bookingDate).toISOString().split('T')[0]!
+        : null,
+      parentActivityId: activity.parentActivityId,
+      paymentScheduleMissing,
+      bookable: true,
+      blockedReason: null,
+    }
+  }
+
+  /**
+   * Summarise booking commitments for #452 guarding. Returns total paid,
+   * count of transactions, and whether a confirmation number exists.
+   */
+  private async getBookingCommitmentSummary(activityId: string): Promise<{
+    paymentTotalCents: number
+    paymentCount: number
+    hasConfirmationNumber: boolean
+  }> {
+    type Row = {
+      payment_total_cents: string | number | null
+      payment_count: string | number | null
+      has_confirmation_number: boolean | null
+    }
+    const result = await this.db.client.execute(sql`
+      SELECT
+        COALESCE(SUM(pt.amount_cents), 0)::bigint AS payment_total_cents,
+        COUNT(pt.id)::int AS payment_count,
+        BOOL_OR(ia.confirmation_number IS NOT NULL AND ia.confirmation_number <> '')
+          AS has_confirmation_number
+      FROM itinerary_activities ia
+      LEFT JOIN activity_pricing ap ON ap.activity_id = ia.id
+      LEFT JOIN payment_schedule_config psc ON psc.component_pricing_id = ap.id
+      LEFT JOIN expected_payment_items epi ON epi.payment_schedule_config_id = psc.id
+      LEFT JOIN payment_transactions pt ON pt.expected_payment_item_id = epi.id
+      WHERE ia.id = ${activityId}
+      GROUP BY ia.id
+    `) as unknown as Row[]
+    const row = result?.[0]
+    return {
+      paymentTotalCents: Number(row?.payment_total_cents ?? 0),
+      paymentCount: Number(row?.payment_count ?? 0),
+      hasConfirmationNumber: Boolean(row?.has_confirmation_number),
     }
   }
 

@@ -18,6 +18,7 @@ import type {
   ActivityBookingsFilterDto,
   ActivityBookingResponseDto,
   ActivityBookingsListResponseDto,
+  CancelActivityBookingDto,
 } from '@tailfire/shared-types'
 
 export interface BookingValidationError {
@@ -118,6 +119,39 @@ export function useUnmarkActivityBooked() {
       queryClient.invalidateQueries({ queryKey: ['activities'] })
       queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
       queryClient.invalidateQueries({ queryKey: activityBookingKeys.all })
+    },
+  })
+}
+
+/**
+ * Cancel a booked activity (#452).
+ *
+ * Required when the booking has payments or a confirmation number — the
+ * unmark endpoint will 409 with BOOKING_HAS_PAYMENTS_USE_CANCEL in that
+ * case and the dropdown shunts the agent here.
+ */
+export function useCancelActivityBooking() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      activityId,
+      data,
+    }: {
+      activityId: string
+      data: CancelActivityBookingDto
+    }) => {
+      return api.post<ActivityBookingResponseDto>(
+        `/bookings/activities/${activityId}/cancel`,
+        data
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['activities'] })
+      queryClient.invalidateQueries({ queryKey: ['itinerary-days'] })
+      queryClient.invalidateQueries({ queryKey: activityBookingKeys.all })
+      // Trip lifecycle may have changed; refresh trip queries too.
+      queryClient.invalidateQueries({ queryKey: ['trips'] })
     },
   })
 }
