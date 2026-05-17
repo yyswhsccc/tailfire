@@ -861,7 +861,13 @@ export class ActivitiesService {
       dto.commissionSplitPercentage !== undefined ||
       dto.supplier !== undefined ||
       dto.cancellationPolicy !== undefined ||
-      dto.termsAndConditions !== undefined
+      dto.termsAndConditions !== undefined ||
+      // #441 follow-up: tour-form sends per-person rows in pricingBreakdownJson;
+      // the generic activity PATCH route was dropping them on the floor because
+      // this gate (and the SQL below) didn't know about the field. The
+      // tour-specific create + the orchestration-service typed-component routes
+      // already persist it, but the editor save lands on this generic update.
+      (dto as any).pricingBreakdownJson !== undefined
 
     if (hasPricingUpdates) {
       // Child pricing guard: block pricing updates on children linked to packages
@@ -876,6 +882,12 @@ export class ActivitiesService {
 
       // Update activity_pricing table
       try {
+        // #441: pricing_breakdown_json needs a separate JSONB-cast because
+        // a JS array passed through `sql` template renders as a stringified
+        // value, not as JSONB. Cast explicitly to avoid a 42804 column-type
+        // mismatch.
+        const breakdownJson = (dto as any).pricingBreakdownJson
+        const breakdownProvided = breakdownJson !== undefined
         await this.db.client.execute(sql`
           UPDATE activity_pricing
           SET
@@ -887,6 +899,10 @@ export class ActivitiesService {
             supplier = COALESCE(${dto.supplier ?? null}, supplier),
             cancellation_policy = COALESCE(${dto.cancellationPolicy ?? null}, cancellation_policy),
             terms_and_conditions = COALESCE(${dto.termsAndConditions ?? null}, terms_and_conditions),
+            pricing_breakdown_json = CASE
+              WHEN ${breakdownProvided}::boolean THEN ${breakdownJson ? JSON.stringify(breakdownJson) : null}::jsonb
+              ELSE pricing_breakdown_json
+            END,
             updated_at = NOW()
           WHERE activity_id = ${id}
         `)
