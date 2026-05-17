@@ -160,8 +160,13 @@ export function BookingHeaderButton({
       const result = await validateBooking.mutateAsync(activityId)
 
       if (result.valid) {
-        // Reset confirmation state each time we open it
-        setBookingDateInput(bookingDate || new Date().toISOString().split('T')[0])
+        // Reset confirmation state each time we open it. Strip any time
+        // suffix off the stored bookingDate — the API contract is strictly
+        // YYYY-MM-DD and full ISO strings (e.g. when the activity already
+        // had a bookingDate set via a date-aware setter) 400-out the mark
+        // endpoint with "bookingDate must be YYYY-MM-DD format".
+        const initialDate = (bookingDate?.split('T')[0]) || new Date().toISOString().split('T')[0]
+        setBookingDateInput(initialDate)
         setShowConfirmation(true)
       } else {
         // Navigate to the first error's tab
@@ -198,10 +203,15 @@ export function BookingHeaderButton({
     if (!activityId) return
 
     try {
+      // Belt-and-braces: ensure we never send a full ISO string. The
+      // initializer in handleValidate already slices the time portion,
+      // but defensive trim here protects against future paths that hand
+      // an ISO string straight to the input.
+      const dateOnly = (bookingDateInput ?? '').split('T')[0] || new Date().toISOString().split('T')[0]!
       const response = await markBooked.mutateAsync({
         activityId,
         data: {
-          bookingDate: bookingDateInput,
+          bookingDate: dateOnly,
         },
       })
 
