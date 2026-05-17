@@ -108,7 +108,11 @@ async function handleErrorResponse(response: Response): Promise<never> {
       ? (body.errors as Array<{ message: string; code: string }>)
       : undefined
 
-  throw new ApiError(response.status, message, fieldErrors, metadata, code, errors, structuredErrors)
+  // #448 phase 1B: pass through the full body so callers can read code-
+  // specific extras (e.g. existingContact on TRAVELER_CONTACT_EMAIL_EXISTS).
+  // We already extract the well-known keys above; this preserves the rest
+  // for handlers that need to act on richer detail.
+  throw new ApiError(response.status, message, fieldErrors, metadata, code, errors, structuredErrors, body)
 }
 
 /**
@@ -126,6 +130,8 @@ export class ApiError extends Error {
   public code?: string
   public errors?: string[]
   public structuredErrors?: Array<{ message: string; code: string }>
+  /** Full server error body so handlers can read code-specific extras. */
+  public details?: Record<string, unknown>
 
   constructor(
     public status: number,
@@ -135,6 +141,7 @@ export class ApiError extends Error {
     code?: string,
     errors?: string[],
     structuredErrors?: Array<{ message: string; code: string }>,
+    details?: Record<string, unknown>,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -142,6 +149,7 @@ export class ApiError extends Error {
     this.metadata = metadata
     this.code = code
     this.errors = errors
+    this.details = details
     this.structuredErrors = structuredErrors
   }
 }

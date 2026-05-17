@@ -23,6 +23,25 @@ import {
 } from '@/components/ui/select'
 import { useCreateTripTraveler } from '@/hooks/use-trip-travelers'
 import { useToast } from '@/hooks/use-toast'
+import { useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { ApiError } from '@/lib/api'
+
+interface ExistingContactSuggestion {
+  id: string
+  firstName: string | null
+  lastName: string | null
+  email: string | null
+}
 
 const inlineContactSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
@@ -51,6 +70,16 @@ export function InlineContactForm({
   const createTraveler = useCreateTripTraveler(tripId)
   const { toast } = useToast()
 
+  // #448 phase 1B: dedup prompt state. The server returns 409 with code
+  // TRAVELER_CONTACT_EMAIL_EXISTS when the email maps to an accessible
+  // existing contact; we open this dialog so the agent can choose to
+  // link to the existing record or proceed with a brand-new contact.
+  const [dedupPrompt, setDedupPrompt] = useState<{
+    open: boolean
+    existing: ExistingContactSuggestion | null
+    pendingValues: InlineContactFormValues | null
+  }>({ open: false, existing: null, pendingValues: null })
+
   const form = useForm<InlineContactFormValues>({
     resolver: zodResolver(inlineContactSchema),
     defaultValues: {
@@ -63,34 +92,70 @@ export function InlineContactForm({
     },
   })
 
+  const submitTraveler = async (
+    data: InlineContactFormValues,
+    extra?: { useExistingContactId?: string; overrideDedup?: boolean },
+  ) => {
+    await createTraveler.mutateAsync({
+      contactSnapshot: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email || undefined,
+        phone: data.phone || undefined,
+      },
+      role: data.role,
+      travelerType: data.travelerType,
+      addToAllActivities,
+      ...(extra ?? {}),
+    } as any)
+    toast({
+      title: 'Traveler added',
+      description: `${data.firstName} ${data.lastName} has been added to the trip`,
+    })
+    form.reset()
+    onSuccess()
+  }
+
   const onSubmit = async (data: InlineContactFormValues) => {
     try {
-      // Create traveler with contact snapshot
-      await createTraveler.mutateAsync({
-        contactSnapshot: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email || undefined,
-          phone: data.phone || undefined,
-        },
-        role: data.role,
-        travelerType: data.travelerType,
-        addToAllActivities,
-      })
+      await submitTraveler(data)
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'TRAVELER_CONTACT_EMAIL_EXISTS') {
+        const existing = error.details?.existingContact as ExistingContactSuggestion | undefined
+        if (existing) {
+          setDedupPrompt({ open: true, existing, pendingValues: data })
+          return
+        }
+      }
+      const message = error instanceof Error ? error.message : 'Failed to add traveler'
+      toast({ title: 'Error', description: message, variant: 'destructive' })
+    }
+  }
 
-      toast({
-        title: 'Traveler added',
-        description: `${data.firstName} ${data.lastName} has been added to the trip`,
-      })
+  const closeDedupPrompt = () =>
+    setDedupPrompt({ open: false, existing: null, pendingValues: null })
 
-      form.reset()
-      onSuccess()
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to add traveler',
-        variant: 'destructive',
-      })
+  const handleUseExisting = async () => {
+    const { existing, pendingValues } = dedupPrompt
+    closeDedupPrompt()
+    if (!existing || !pendingValues) return
+    try {
+      await submitTraveler(pendingValues, { useExistingContactId: existing.id })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to link existing contact'
+      toast({ title: 'Error', description: message, variant: 'destructive' })
+    }
+  }
+
+  const handleCreateAnyway = async () => {
+    const { pendingValues } = dedupPrompt
+    closeDedupPrompt()
+    if (!pendingValues) return
+    try {
+      await submitTraveler(pendingValues, { overrideDedup: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add traveler'
+      toast({ title: 'Error', description: message, variant: 'destructive' })
     }
   }
 
@@ -237,6 +302,39 @@ export function InlineContactForm({
           </div>
         </form>
       </Form>
+
+      <AlertDialog
+        open={dedupPrompt.open}
+        onOpenChange={(open) => { if (!open) closeDedupPrompt() }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Existing contact found</AlertDialogTitle>
+            <AlertDialogDescription>
+              A contact with email <strong>{dedupPrompt.existing?.email}</strong> already exists
+              in your agency:{' '}
+              <strong>
+                {dedupPrompt.existing?.firstName} {dedupPrompt.existing?.lastName}
+              </strong>
+              .
+              <br /><br />
+              Use the existing contact to keep your CRM clean, or create a new one if this is
+              a different person who happens to share an email.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+            <AlertDialogCancel onClick={closeDedupPrompt}>Cancel</AlertDialogCancel>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleCreateAnyway} disabled={createTraveler.isPending}>
+                Create new anyway
+              </Button>
+              <AlertDialogAction onClick={(e) => { e.preventDefault(); void handleUseExisting() }}>
+                Use existing contact
+              </AlertDialogAction>
+            </div>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
