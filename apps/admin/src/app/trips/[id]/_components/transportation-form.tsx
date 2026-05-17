@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { api } from '@/lib/api'
 import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
+import { BookingChecklist } from '@/components/activities/booking-checklist'
 import { useActivityNameGenerator } from '@/hooks/use-activity-name-generator'
 import { FormSuccessOverlay } from '@/components/ui/form-success-overlay'
 import { useActivityNavigation } from '@/hooks/use-activity-navigation'
@@ -1616,6 +1617,14 @@ export function TransportationForm({
 
         {/* Booking & Pricing Tab */}
         <TabsContent value="pricing" className="mt-6 space-y-6">
+          {/* #441 follow-up: live booking checklist. */}
+          <BookingChecklist
+            activityId={activityId}
+            activityType="transportation"
+            isBooked={activityIsBooked}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
+          />
+
           {/* Pricing Section */}
           <div data-field="travelers">
           <PricingSection

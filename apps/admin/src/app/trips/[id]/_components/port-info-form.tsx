@@ -28,6 +28,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { useTripTravelerAvatars } from '@/hooks/use-trip-traveler-avatars'
+import { BookingChecklist } from '@/components/activities/booking-checklist'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
 import { DocumentUploader } from '@/components/document-uploader'
@@ -729,9 +730,16 @@ export function PortInfoForm({
           )}
         </TabsContent>
 
-        <TabsContent value="booking" className="mt-6">
-          <div className="text-center py-12 text-gray-500">
-            <p>Use the booking button in the header to manage booking status.</p>
+        <TabsContent value="booking" className="mt-6 space-y-4">
+          {/* #441 follow-up: live booking checklist. */}
+          <BookingChecklist
+            activityId={activityId}
+            activityType="port_info"
+            isBooked={activityIsBooked}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
+          />
+          <div className="text-center py-8 text-gray-500">
+            <p>Use the booking button in the header to mark this port-info activity as booked.</p>
           </div>
         </TabsContent>
 

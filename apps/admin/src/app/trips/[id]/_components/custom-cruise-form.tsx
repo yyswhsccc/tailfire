@@ -31,6 +31,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { BookingHeaderButton } from '@/components/activities/booking-header-button'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { useTripTravelerAvatars } from '@/hooks/use-trip-traveler-avatars'
+import { BookingChecklist } from '@/components/activities/booking-checklist'
 import { CruisePassengersSection } from './cruise-passengers-section'
 import { DatePickerEnhanced } from '@/components/ui/date-picker-enhanced'
 import { TimePicker } from '@/components/ui/time-picker'
@@ -1694,6 +1695,14 @@ export function CustomCruiseForm({
 
         {/* Booking & Pricing Tab */}
         <TabsContent value="pricing" className="mt-6 space-y-6">
+          {/* #441 follow-up: live booking checklist. */}
+          <BookingChecklist
+            activityId={activityId}
+            activityType="custom_cruise"
+            isBooked={activityIsBooked}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
+          />
+
           {/* Cruise-specific booking info */}
           <Card>
             <CardHeader>

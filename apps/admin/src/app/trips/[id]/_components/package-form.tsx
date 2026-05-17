@@ -17,6 +17,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useUnsavedChangesWarning } from '@/hooks/use-unsaved-changes-warning'
+import { BookingChecklist } from '@/components/activities/booking-checklist'
 import { Package, FileText, DollarSign, Check, AlertCircle, Link as LinkIcon, Unlink } from 'lucide-react'
 import type { PackageResponseDto, PackageLinkedActivityDto } from '@tailfire/shared-types/api'
 import { Button } from '@/components/ui/button'
@@ -680,6 +681,14 @@ export function PackageForm({
 
         {/* Booking & Pricing Tab */}
         <TabsContent value="booking" className="mt-6 space-y-6">
+          {/* #441 follow-up: live booking checklist. */}
+          <BookingChecklist
+            activityId={currentPackageId}
+            activityType="package"
+            isBooked={isBooked}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
+          />
+
           {/* Pricing Section */}
           <PricingSection
             pricingData={pricingData}

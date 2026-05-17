@@ -132,3 +132,25 @@ export function useValidateBooking() {
     },
   })
 }
+
+/**
+ * Same endpoint, but as a useQuery so it auto-refetches whenever the
+ * activity surface (`activities`, `bookings`, `itinerary-days`) is
+ * invalidated by another mutation. Powers the BookingChecklist widget
+ * which has to react live to field edits without the user pressing
+ * "Mark as Booked" first.
+ */
+export function useBookingValidationQuery(activityId: string | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['activity-bookings', 'validate', activityId],
+    queryFn: async () => {
+      return api.get<BookingValidationResult>(`/bookings/activities/${activityId}/validate`)
+    },
+    enabled: !!activityId && enabled,
+    // Re-run on focus so the checklist reflects edits made in other tabs.
+    refetchOnWindowFocus: true,
+    // Keep the previous result while refetching so the checklist doesn't
+    // flash empty.
+    placeholderData: (prev) => prev,
+  })
+}

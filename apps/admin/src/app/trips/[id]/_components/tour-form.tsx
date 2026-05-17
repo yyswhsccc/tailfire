@@ -34,6 +34,7 @@ import { api } from '@/lib/api'
 import { useIsChildOfPackage } from '@/hooks/use-is-child-of-package'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { useTripTravelerAvatars } from '@/hooks/use-trip-traveler-avatars'
+import { BookingChecklist } from '@/components/activities/booking-checklist'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { buildInitialPricingState, type PricingData, type PricingBreakdownItem } from '@/lib/pricing'
@@ -1243,6 +1244,16 @@ export function TourForm({
         </TabsContent>
 
         <TabsContent value="booking" className="mt-6 space-y-6">
+          {/* #441 follow-up: live checklist of all booking prerequisites,
+              click-to-fix routing per item. Hides itself once the activity
+              is booked (the header badge takes over from there). */}
+          <BookingChecklist
+            activityId={activityId}
+            activityType="tour"
+            isBooked={isBooked}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
+          />
+
           {/* Pricing Section */}
           <PricingSection
             pricingData={pricingData}

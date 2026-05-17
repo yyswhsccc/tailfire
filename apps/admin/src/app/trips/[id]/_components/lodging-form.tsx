@@ -34,6 +34,7 @@ import { BookingHeaderButton } from '@/components/activities/booking-header-butt
 import { itineraryDayKeys } from '@/hooks/use-itinerary-days'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { useTripTravelerAvatars } from '@/hooks/use-trip-traveler-avatars'
+import { BookingChecklist } from '@/components/activities/booking-checklist'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { PricingSection, CommissionSection, BookingDetailsSection, type SupplierDefaults } from '@/components/pricing'
 import { buildInitialPricingState, type PricingData, type PricingBreakdownItem, type ValidationErrors } from '@/lib/pricing'
@@ -1334,6 +1335,14 @@ export function LodgingForm({
         </TabsContent>
 
         <TabsContent value="booking" className="mt-6 space-y-6">
+          {/* #441 follow-up: live booking checklist. */}
+          <BookingChecklist
+            activityId={activityId}
+            activityType="lodging"
+            isBooked={activityIsBooked}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
+          />
+
           {/* Pricing Section */}
           <PricingSection
             pricingData={pricingData}

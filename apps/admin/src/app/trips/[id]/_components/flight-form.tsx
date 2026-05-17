@@ -45,6 +45,7 @@ import { FlightOffersSearchPanel } from '@/components/flight-offers-search-panel
 import { normalizedTimeToFormFields } from '@/lib/flight-time-utils'
 import { EditTravelersDialog } from './edit-travelers-dialog'
 import { useTripTravelerAvatars } from '@/hooks/use-trip-traveler-avatars'
+import { BookingChecklist } from '@/components/activities/booking-checklist'
 import { PaymentScheduleSection } from './payment-schedule-section'
 import { ComponentMediaTab } from '@/components/shared'
 import { ActivityCommentsPanel } from '@/components/activities/activity-comments-panel'
@@ -1849,6 +1850,15 @@ export function FlightForm({
         </TabsContent>
 
         <TabsContent value="booking" className="mt-6 space-y-6">
+          {/* #441 follow-up: live booking checklist (12-check coverage,
+              click-to-fix routing). */}
+          <BookingChecklist
+            activityId={activityId}
+            activityType="flight"
+            isBooked={activityIsBooked}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
+          />
+
           {/* Pricing Section */}
           <PricingSection
             pricingData={pricingData}
