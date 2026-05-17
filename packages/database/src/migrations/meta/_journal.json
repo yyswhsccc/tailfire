@@ -1667,6 +1667,13 @@
       "when": 1779537600000,
       "tag": "20260521120000_trip_status_allow_planning_to_active",
       "breakpoints": true
+    },
+    {
+      "idx": 238,
+      "version": "7",
+      "when": 1779624000000,
+      "tag": "20260522100000_activity_cancellation_columns",
+      "breakpoints": true
     }
   ]
 }

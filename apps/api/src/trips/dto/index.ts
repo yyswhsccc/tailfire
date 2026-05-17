@@ -38,7 +38,7 @@ export {
 } from './bulk-trip-operations.dto'
 
 // Activity Bookings DTOs
-export { MarkActivityBookedDto, ActivityBookingsFilterDto } from './activity-bookings.dto'
+export { MarkActivityBookedDto, ActivityBookingsFilterDto, CancelActivityBookingDto } from './activity-bookings.dto'
 
 // Trip Share DTOs
 export { CreateTripShareDto, UpdateTripShareDto } from './create-trip-share.dto'
