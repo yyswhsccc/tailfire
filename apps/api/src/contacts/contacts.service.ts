@@ -182,23 +182,48 @@ export class ContactsService {
     }
 
     if (filters.search) {
-      // #429: per-column ilike misses "First Last" queries because no single
-      // column holds the concatenation. Add ilike branches over the three
-      // first-name → last-name combos as well, NULL-safe via coalesce.
-      const term = `%${filters.search}%`
-      const searchCondition = or(
-        ilike(this.db.schema.contacts.firstName, term),
-        ilike(this.db.schema.contacts.lastName, term),
-        ilike(this.db.schema.contacts.preferredName, term),
-        ilike(this.db.schema.contacts.legalFirstName, term),
-        ilike(this.db.schema.contacts.email, term),
-        ilike(this.db.schema.contacts.phone, term),
-        sql`(coalesce(${this.db.schema.contacts.firstName}, '') || ' ' || coalesce(${this.db.schema.contacts.lastName}, '')) ILIKE ${term}`,
-        sql`(coalesce(${this.db.schema.contacts.preferredName}, '') || ' ' || coalesce(${this.db.schema.contacts.lastName}, '')) ILIKE ${term}`,
-        sql`(coalesce(${this.db.schema.contacts.legalFirstName}, '') || ' ' || coalesce(${this.db.schema.contacts.lastName}, '')) ILIKE ${term}`,
-      )
-      if (searchCondition) {
-        conditions.push(searchCondition)
+      // #429 follow-up: the post-#429 SQL handled `First Last` via a concat
+      // ILIKE, but contacts with internal whitespace (first_name = 'Mary
+      // Ellen', last_name = 'Agnel') still failed when the user typed
+      // `Mary Agnel` — the literal substring `Mary Agnel` is not present
+      // in `Mary Ellen Agnel`.
+      //
+      // Tokenize the search query on whitespace. For single-token queries
+      // (`Mike`, `michael@`, a phone number) keep the existing per-column
+      // OR — this is the common case and the email/phone branches matter.
+      // For multi-token queries, AND each token against the union of name
+      // fields so `Mary Agnel` → token `Mary` matches first_name AND token
+      // `Agnel` matches last_name → row passes. Whitespace differences
+      // (single vs. double space, leading/trailing) no longer block the
+      // match because we never form a substring containing whitespace.
+      const tokens = filters.search.trim().split(/\s+/).filter(Boolean)
+
+      if (tokens.length === 1) {
+        const term = `%${tokens[0]}%`
+        const condition = or(
+          ilike(this.db.schema.contacts.firstName, term),
+          ilike(this.db.schema.contacts.lastName, term),
+          ilike(this.db.schema.contacts.preferredName, term),
+          ilike(this.db.schema.contacts.legalFirstName, term),
+          ilike(this.db.schema.contacts.email, term),
+          ilike(this.db.schema.contacts.phone, term),
+        )
+        if (condition) conditions.push(condition)
+      } else if (tokens.length > 1) {
+        // Multi-token: every token must match SOME name field.
+        const perToken = tokens.map((token) => {
+          const term = `%${token}%`
+          return or(
+            ilike(this.db.schema.contacts.firstName, term),
+            ilike(this.db.schema.contacts.lastName, term),
+            ilike(this.db.schema.contacts.preferredName, term),
+            ilike(this.db.schema.contacts.legalFirstName, term),
+          )
+        }).filter(Boolean) as ReturnType<typeof or>[]
+        if (perToken.length > 0) {
+          const combined = and(...perToken)
+          if (combined) conditions.push(combined)
+        }
       }
     }
 
